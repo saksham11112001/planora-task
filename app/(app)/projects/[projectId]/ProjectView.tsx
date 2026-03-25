@@ -146,25 +146,63 @@ export function ProjectView({ project, tasks, members, clients, defaultClientId,
     }
   }
 
-  async function toggleDone(taskId: string, status: string, e: React.MouseEvent) {
+  async function toggleDone(task: Task, e: React.MouseEvent) {
     e.stopPropagation()
-    setCompleting(p => new Set(p).add(taskId))
-    const newStatus = status === 'completed' ? 'todo' : 'completed'
-    await fetch(`/api/tasks/${taskId}`, {
+
+    // Reopen a completed task
+    if (task.status === 'completed') {
+      setCompleting(p => new Set(p).add(task.id))
+      await fetch(`/api/tasks/${task.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'todo', completed_at: null }),
+      })
+      setCompleting(p => { const s = new Set(p); s.delete(task.id); return s })
+      startT(() => router.refresh()); return
+    }
+
+    // Already pending approval — inform and do nothing
+    if (task.status === 'in_review' || task.approval_status === 'pending') {
+      toast.info('This task is pending approval — waiting for the approver.')
+      return
+    }
+
+    // Needs approval → submit for review instead of completing
+    if (task.approval_required) {
+      setCompleting(p => new Set(p).add(task.id))
+      const res = await fetch(`/api/tasks/${task.id}/approve`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decision: 'submit' }),
+      })
+      setCompleting(p => { const s = new Set(p); s.delete(task.id); return s })
+      if (res.ok) toast.success('Submitted for approval ✓')
+      else { const d = await res.json(); toast.error(d.error ?? 'Could not submit') }
+      startT(() => router.refresh()); return
+    }
+
+    // Normal task — complete directly
+    setCompleting(p => new Set(p).add(task.id))
+    await fetch(`/api/tasks/${task.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: newStatus, completed_at: newStatus === 'completed' ? new Date().toISOString() : null }),
+      body: JSON.stringify({ status: 'completed', completed_at: new Date().toISOString() }),
     })
-    setCompleting(p => { const s = new Set(p); s.delete(taskId); return s })
-    if (newStatus === 'completed') toast.success('Done! 🎉')
+    setCompleting(p => { const s = new Set(p); s.delete(task.id); return s })
+    toast.success('Done! 🎉')
     startT(() => router.refresh())
   }
 
   async function bulkComplete() {
-    await Promise.all([...checked].map(id => fetch(`/api/tasks/${id}`, {
+    const ids = [...checked]
+    const allTasks = tasks.filter(t => ids.includes(t.id))
+    const canComplete   = allTasks.filter(t => !t.approval_required)
+    const needsApproval = allTasks.filter(t => t.approval_required)
+    await Promise.all(canComplete.map(t => fetch(`/api/tasks/${t.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: 'completed', completed_at: new Date().toISOString() }),
     })))
-    setChecked(new Set()); toast.success(`${checked.size} tasks completed`); startT(() => router.refresh())
+    setChecked(new Set())
+    if (canComplete.length) toast.success(`${canComplete.length} tasks completed 🎉`)
+    if (needsApproval.length) toast.info(`${needsApproval.length} task(s) need approval — skipped`)
+    startT(() => router.refresh())
   }
 
   function TaskRow({ task }: { task: Task }) {
@@ -176,18 +214,29 @@ export function ProjectView({ project, tasks, members, clients, defaultClientId,
     const subsDone = subs.filter(s => s.status === 'completed').length
     const [newSubInput, setNewSubInput] = useState('')
 
+    const isPending = task.status === 'in_review' || task.approval_status === 'pending'
+
     return (
       <>
-      <div className={cn('task-row group', selectedTask?.id === task.id && 'selected', checked.has(task.id) && 'bg-teal-50/60')}>
+      <div className={cn('task-row group', selectedTask?.id === task.id && 'selected', checked.has(task.id) && 'bg-teal-50/60')}
+        style={{ background: isPending ? '#faf5ff' : undefined }}>
         <input type="checkbox" checked={checked.has(task.id)}
           onChange={() => setChecked(p => { const s = new Set(p); s.has(task.id) ? s.delete(task.id) : s.add(task.id); return s })}
           onClick={e => e.stopPropagation()} className="h-3.5 w-3.5 rounded border-gray-300 accent-teal-600 flex-shrink-0 cursor-pointer"/>
-        {/* Check circle - only assignee or manager+ can complete */}
+        {/* Check circle */}
         {(canManage || task.assignee_id === currentUserId) ? (
-          <button onClick={e => toggleDone(task.id, task.status, e)}
-            className={cn('task-check flex-shrink-0', isComp && 'done', completing.has(task.id) && 'popping')}>
-            {isComp && <svg viewBox="0 0 16 16" fill="none" className="h-2.5 w-2.5"><path d="M13 4L6.5 11 3 7.5" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-          </button>
+          isPending ? (
+            <div title="Pending approval"
+              className="task-check flex-shrink-0"
+              style={{ background: '#f5f3ff', borderColor: '#7c3aed', cursor: 'default' }}>
+              <Clock className="h-2 w-2" style={{ color: '#7c3aed' }}/>
+            </div>
+          ) : (
+            <button onClick={e => toggleDone(task, e)}
+              className={cn('task-check flex-shrink-0', isComp && 'done', completing.has(task.id) && 'popping')}>
+              {isComp && <svg viewBox="0 0 16 16" fill="none" className="h-2.5 w-2.5"><path d="M13 4L6.5 11 3 7.5" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+            </button>
+          )
         ) : (
           <div className={cn('task-check flex-shrink-0', isComp && 'done')} style={{ cursor: 'default', opacity: 0.5 }}>
             {isComp && <svg viewBox="0 0 16 16" fill="none" className="h-2.5 w-2.5"><path d="M13 4L6.5 11 3 7.5" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
@@ -517,16 +566,34 @@ export function ProjectView({ project, tasks, members, clients, defaultClientId,
                     {colTasks.map(task => {
                       const assignee = task.assignee as unknown as { id: string; name: string } | null
                       const pri      = PRIORITY_CONFIG[task.priority]
+                      const boardPending = task.status === 'in_review' || task.approval_status === 'pending'
                       return (
                         <div key={task.id} onClick={() => setSelectedTask(task)}
-                          className={cn('bg-white rounded-xl p-3 cursor-pointer hover:shadow-md transition-all border', selectedTask?.id === task.id ? 'border-teal-400 shadow-md' : 'border-gray-100 shadow-sm')}>
+                          className={cn('bg-white rounded-xl p-3 cursor-pointer hover:shadow-md transition-all border',
+                            selectedTask?.id === task.id ? 'border-teal-400 shadow-md' : boardPending ? 'border-violet-200' : 'border-gray-100 shadow-sm')}>
                           <div className="flex items-start gap-2 mb-2">
-                            <button onClick={e => toggleDone(task.id, task.status, e)}
-                              className={cn('task-check mt-0.5 flex-shrink-0', task.status === 'completed' && 'done')}>
-                              {task.status === 'completed' && <svg viewBox="0 0 16 16" fill="none" className="h-2.5 w-2.5"><path d="M13 4L6.5 11 3 7.5" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-                            </button>
-                            <p className={cn('text-sm font-medium leading-snug flex-1', task.status === 'completed' ? 'line-through text-gray-400' : 'text-gray-900')}>{task.title}</p>
+                            {boardPending ? (
+                              <div className="task-check mt-0.5 flex-shrink-0"
+                                style={{ background: '#f5f3ff', borderColor: '#7c3aed', cursor: 'default' }}
+                                title="Pending approval">
+                                <Clock className="h-2 w-2" style={{ color: '#7c3aed' }}/>
+                              </div>
+                            ) : (
+                              <button onClick={e => toggleDone(task, e)}
+                                className={cn('task-check mt-0.5 flex-shrink-0', task.status === 'completed' && 'done')}>
+                                {task.status === 'completed' && <svg viewBox="0 0 16 16" fill="none" className="h-2.5 w-2.5"><path d="M13 4L6.5 11 3 7.5" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                              </button>
+                            )}
+                            <p className={cn('text-sm font-medium leading-snug flex-1',
+                              task.status === 'completed' ? 'line-through text-gray-400'
+                              : boardPending ? 'text-violet-700' : 'text-gray-900')}>{task.title}</p>
                           </div>
+                          {boardPending && (
+                            <div style={{ marginBottom: 6 }}>
+                              <span style={{ fontSize: 10, background: '#ede9fe', color: '#7c3aed',
+                                padding: '2px 6px', borderRadius: 4, fontWeight: 500 }}>⏳ Pending approval</span>
+                            </div>
+                          )}
                           <div className="flex items-center justify-between mt-2">
                             <div className="flex items-center gap-1.5">
                               <PriorityBadge priority={task.priority}/>
