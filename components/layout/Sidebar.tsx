@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from 'react'
 import {
   Home, CheckSquare, ListTodo, Users2, FolderOpen,
   RefreshCw, Users, BarChart2, Settings, Plus,
-  ChevronDown, ChevronRight, Clock, Zap, X, Upload,
+  ChevronDown, ChevronRight, Clock, Zap, X, Upload, Calendar,
 } from 'lucide-react'
 import { cn }            from '@/lib/utils/cn'
 import { useAppStore }   from '@/store/appStore'
@@ -77,10 +77,8 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
         <GL>Personal</GL>
         <SI href="/dashboard"  active={isActive('/dashboard', true)} icon={<Home       className="h-4 w-4"/>} label="Home"/>
         <SI href="/tasks"      active={isActive('/tasks',    true)}  icon={<CheckSquare className="h-4 w-4"/>} label="My tasks"/>
-        <SI href="/inbox"      active={isActive('/inbox')}           icon={<ListTodo   className="h-4 w-4"/>} label="One-time tasks"/>
         <Div/>
         <GL>Work</GL>
-        <SI href="/clients"    active={isActive('/clients')}         icon={<Users2     className="h-4 w-4"/>} label="Clients"/>
 
         {/* Projects section */}
         <div style={{ display: 'flex', alignItems: 'center', padding: '5px 10px 2px' }}>
@@ -159,6 +157,9 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
       })()}
 
       <div style={{ padding: '8px', borderTop: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
+        <SI href="/clients"  active={isActive('/clients')}  icon={<Users2   className="h-4 w-4"/>} label="Clients"/>
+        <SI href="/inbox"    active={isActive('/inbox')}    icon={<ListTodo className="h-4 w-4"/>} label="One-time tasks"/>
+        <div style={{ height:1, background:'rgba(255,255,255,0.07)', margin:'6px 4px' }}/>
         <SI href="/settings" active={isActive('/settings')} icon={<Settings className="h-4 w-4"/>} label="Settings"/>
         <Link href="/profile"
           style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 8,

@@ -16,6 +16,8 @@ interface EmployeeStat {
 }
 
 interface Props {
+  currentUserId?: string
+  userRole?:      string
   dailyData:       { date: string; created: number; completed: number }[]
   memberData:      { name: string; completed: number; inProgress: number }[]
   priorityData:    { name: string; value: number; color: string }[]
@@ -215,8 +217,16 @@ function MetricRow({ label, value, color, bar, barColor }: {
   )
 }
 
-export function ReportsCharts({ dailyData, memberData, priorityData, projectData, timeByProject, employeeStats }: Props) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'employees'>('overview')
+export function ReportsCharts({ dailyData, memberData, priorityData, projectData, timeByProject, employeeStats, currentUserId, userRole }: Props) {
+  const [activeTab,    setActiveTab]    = useState<'overview' | 'employees'>('overview')
+  const [timeline,     setTimeline]     = useState<'30' | '60' | '90' | '365'>('90')
+  const [empFilter,    setEmpFilter]    = useState('')
+  const canViewAll = !userRole || ['owner','admin','manager'].includes(userRole)
+
+  // Role-based employee list: members/viewers see only themselves
+  const visibleStats = canViewAll
+    ? (empFilter ? employeeStats.filter(e => e.uid === empFilter || e.name.toLowerCase().includes(empFilter.toLowerCase())) : employeeStats)
+    : employeeStats.filter(e => e.uid === currentUserId)
 
   return (
     <div>
@@ -334,13 +344,41 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
       {/* ── EMPLOYEE PERFORMANCE TAB ──────────────────────────── */}
       {activeTab === 'employees' && (
         <div>
+          {/* Timeline + filter toolbar */}
+          <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:16, flexWrap:'wrap' }}>
+            <div style={{ display:'flex', gap:4, background:'var(--surface-subtle)', padding:4, borderRadius:8, border:'1px solid var(--border)' }}>
+              {(['30','60','90','365'] as const).map(t => (
+                <button key={t} onClick={() => setTimeline(t)}
+                  style={{ padding:'5px 12px', borderRadius:6, border:'none', cursor:'pointer',
+                    fontSize:12, fontWeight:500, fontFamily:'inherit',
+                    background: timeline===t ? 'var(--brand)' : 'transparent',
+                    color: timeline===t ? '#fff' : 'var(--text-muted)',
+                    transition:'all 0.15s' }}>
+                  {t === '365' ? '1 year' : `${t} days`}
+                </button>
+              ))}
+            </div>
+            {canViewAll && employeeStats.length > 1 && (
+              <select value={empFilter} onChange={e => setEmpFilter(e.target.value)}
+                style={{ padding:'6px 12px', borderRadius:8, border:'1px solid var(--border)',
+                  background:'var(--surface)', fontSize:12, color:'var(--text-primary)', cursor:'pointer' }}>
+                <option value="">All employees</option>
+                {employeeStats.map(e => <option key={e.uid} value={e.uid}>{e.name}</option>)}
+              </select>
+            )}
+            {!canViewAll && (
+              <span style={{ fontSize:12, color:'var(--text-muted)', fontStyle:'italic' }}>
+                Showing your performance only
+              </span>
+            )}
+          </div>
           {/* Header summary */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
             {[
-              { label: 'Team members', value: employeeStats.length, color: '#0d9488', bg: '#f0fdfa' },
-              { label: 'Avg completion rate', value: employeeStats.length ? `${Math.round(employeeStats.reduce((s, e) => s + e.completionRate, 0) / employeeStats.length)}%` : '—', color: '#16a34a', bg: '#f0fdf4' },
-              { label: 'Total overdue', value: employeeStats.reduce((s, e) => s + e.overdue, 0), color: '#dc2626', bg: '#fef2f2' },
-              { label: 'Total hours logged', value: `${Math.round(employeeStats.reduce((s, e) => s + e.hoursLogged, 0))}h`, color: '#7c3aed', bg: '#f5f3ff' },
+              { label: canViewAll ? 'Team members' : 'Your stats', value: visibleStats.length, color: '#0d9488', bg: '#f0fdfa' },
+              { label: 'Avg completion rate', value: visibleStats.length ? `${Math.round(visibleStats.reduce((s, e) => s + e.completionRate, 0) / visibleStats.length)}%` : '—', color: '#16a34a', bg: '#f0fdf4' },
+              { label: 'Total overdue', value: visibleStats.reduce((s, e) => s + e.overdue, 0), color: '#dc2626', bg: '#fef2f2' },
+              { label: 'Total hours logged', value: `${Math.round(visibleStats.reduce((s, e) => s + e.hoursLogged, 0))}h`, color: '#7c3aed', bg: '#f5f3ff' },
             ].map(k => (
               <div key={k.label} style={{ background: k.bg, borderRadius: 10, padding: '14px 16px', border: `1px solid ${k.color}22` }}>
                 <p style={{ fontSize: 12, color: k.color, fontWeight: 500, marginBottom: 4 }}>{k.label}</p>

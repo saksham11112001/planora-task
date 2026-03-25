@@ -1,61 +1,82 @@
 'use client'
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, X, RefreshCw } from 'lucide-react'
+import { Plus, X, RefreshCw, User, Flag, Briefcase, Paperclip } from 'lucide-react'
 import { toast } from '@/store/appStore'
 
+// ── Granular frequency options ─────────────────────────────────
 const FREQUENCIES = [
-  { v: 'daily',     l: 'Daily' },
-  { v: 'weekly',    l: 'Weekly' },
-  { v: 'bi_weekly', l: 'Every 2 weeks' },
-  { v: 'monthly',   l: 'Monthly' },
-  { v: 'quarterly', l: 'Quarterly' },
-  { v: 'annual',    l: 'Annual' },
+  { group: 'Daily',    v: 'daily',              l: 'Every day' },
+  { group: 'Weekly',   v: 'weekly_mon',         l: 'Every Monday' },
+  { group: 'Weekly',   v: 'weekly_tue',         l: 'Every Tuesday' },
+  { group: 'Weekly',   v: 'weekly_wed',         l: 'Every Wednesday' },
+  { group: 'Weekly',   v: 'weekly_thu',         l: 'Every Thursday' },
+  { group: 'Weekly',   v: 'weekly_fri',         l: 'Every Friday' },
+  { group: 'Weekly',   v: 'bi_weekly',          l: 'Every 2 weeks' },
+  { group: 'Monthly',  v: 'monthly_1',          l: '1st of every month' },
+  { group: 'Monthly',  v: 'monthly_15',         l: '15th of every month' },
+  { group: 'Monthly',  v: 'monthly_last',       l: 'Last day of month' },
+  { group: 'Monthly',  v: 'monthly',            l: 'Monthly (same date)' },
+  { group: 'Other',    v: 'quarterly',          l: 'Quarterly' },
+  { group: 'Other',    v: 'annual',             l: 'Annually' },
 ]
 
-const PRIORITY_COLORS: Record<string, string> = {
-  none: '#94a3b8', low: '#16a34a', medium: '#ca8a04', high: '#ea580c', urgent: '#dc2626',
-}
+const FREQ_LABEL: Record<string, string> = Object.fromEntries(FREQUENCIES.map(f => [f.v, f.l]))
+
+const PRIORITY_OPTIONS = [
+  { value: 'none',   label: 'No priority', color: '#94a3b8' },
+  { value: 'low',    label: 'Low',         color: '#16a34a' },
+  { value: 'medium', label: 'Medium',      color: '#ca8a04' },
+  { value: 'high',   label: 'High',        color: '#ea580c' },
+  { value: 'urgent', label: 'Urgent',      color: '#dc2626' },
+]
 
 interface Props {
   members:        { id: string; name: string }[]
-  projects:       { id: string; name: string; color: string }[]
   clients?:       { id: string; name: string; color: string }[]
   currentUserId?: string
-  // Edit mode
   editTask?: {
     id: string; title: string; frequency: string; priority: string
-    assignee_id: string | null; project_id: string | null; client_id?: string | null
+    assignee_id: string | null; client_id?: string | null
   }
-  onCreated?:  () => void
-  onEdited?:   () => void
+  onCreated?:    () => void
+  onEdited?:     () => void
   onCancelEdit?: () => void
 }
 
-export function InlineRecurringTask({ members, projects, clients = [], currentUserId, editTask, onCreated, onEdited, onCancelEdit }: Props) {
+export function InlineRecurringTask({ members, clients = [], currentUserId, editTask, onCreated, onEdited, onCancelEdit }: Props) {
   const router   = useRouter()
   const inputRef = useRef<HTMLInputElement>(null)
   const rowRef   = useRef<HTMLDivElement>(null)
+  const fileRef  = useRef<HTMLInputElement>(null)
 
   const isEdit = !!editTask
-
   const [open,      setOpen]      = useState(isEdit)
   const [saving,    setSaving]    = useState(false)
   const [title,     setTitle]     = useState(editTask?.title ?? '')
-  const [frequency, setFrequency] = useState(editTask?.frequency ?? 'weekly')
+  const [frequency, setFrequency] = useState(editTask?.frequency ?? 'weekly_mon')
   const [priority,  setPriority]  = useState(editTask?.priority ?? 'medium')
   const [assignee,  setAssignee]  = useState(editTask?.assignee_id ?? currentUserId ?? '')
-  const [projectId, setProjectId] = useState(editTask?.project_id ?? '')
   const [clientId,  setClientId]  = useState(editTask?.client_id ?? '')
+  const [files,     setFiles]     = useState<File[]>([])
 
   useEffect(() => {
     if (open && !isEdit) setTimeout(() => inputRef.current?.focus(), 50)
   }, [open, isEdit])
 
+  const handleClickOutside = useCallback((e: MouseEvent) => {
+    if (rowRef.current && !rowRef.current.contains(e.target as Node) && !title.trim()) close()
+  }, [title])
+
+  useEffect(() => {
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [handleClickOutside])
+
   function close() {
     if (isEdit) { onCancelEdit?.(); return }
-    setOpen(false); setTitle(''); setFrequency('weekly'); setPriority('medium')
-    setProjectId(''); setClientId(''); setAssignee(currentUserId ?? '')
+    setOpen(false); setTitle(''); setFrequency('weekly_mon'); setPriority('medium')
+    setClientId(''); setAssignee(currentUserId ?? ''); setFiles([])
   }
 
   async function save() {
@@ -63,14 +84,11 @@ export function InlineRecurringTask({ members, projects, clients = [], currentUs
     setSaving(true)
     try {
       const body = {
-        title:       title.trim(),
-        frequency,   priority,
-        assignee_id: assignee   || null,
-        project_id:  projectId  || null,
-        client_id:   clientId   || null,
+        title: title.trim(), frequency, priority,
+        assignee_id: assignee  || null,
+        client_id:   clientId  || null,
         start_date:  new Date().toISOString().split('T')[0],
       }
-
       let res: Response
       if (isEdit) {
         res = await fetch(`/api/recurring/${editTask!.id}`, {
@@ -83,127 +101,163 @@ export function InlineRecurringTask({ members, projects, clients = [], currentUs
           body: JSON.stringify(body),
         })
       }
+      const d = await res.json()
+      if (!res.ok) { toast.error(d.error ?? 'Failed'); return }
 
-      if (!res.ok) { const d = await res.json(); toast.error(d.error ?? 'Failed'); return }
-      toast.success(isEdit ? 'Updated!' : 'Recurring task created!')
-      if (isEdit) { onEdited?.() } else { close(); onCreated?.() }
-      router.refresh()
+      // Upload attachments if any
+      if (files.length > 0 && d.data?.id) {
+        const fd = new FormData()
+        files.forEach(f => fd.append('files', f))
+        await fetch(`/api/tasks/${d.data.id}/attachments`, { method: 'POST', body: fd })
+      }
+
+      toast.success(isEdit ? 'Updated ✓' : 'Recurring task created ✓')
+      if (isEdit) { onEdited?.(); return }
+      close()
+      onCreated ? onCreated() : router.refresh()
     } finally { setSaving(false) }
   }
 
-  function onKeyDown(e: React.KeyboardEvent) {
-    if (e.key === 'Enter') { e.preventDefault(); save() }
-    if (e.key === 'Escape') close()
-  }
+  const priConf = PRIORITY_OPTIONS.find(p => p.value === priority) ?? PRIORITY_OPTIONS[2]
 
   if (!open) {
     return (
-      <button onClick={() => setOpen(true)} style={{
-        display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-        padding: '10px 16px', border: 'none', background: 'transparent',
-        cursor: 'pointer', color: 'var(--text-muted)', transition: 'all 0.1s',
+      <div onClick={() => setOpen(true)} style={{
+        display:'flex', alignItems:'center', gap:8, padding:'10px 20px',
+        cursor:'pointer', borderTop:'1px dashed var(--border)', color:'var(--text-muted)',
+        transition:'all 0.15s', userSelect:'none',
       }}
-      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--brand)'; (e.currentTarget as HTMLElement).style.background = 'var(--brand-light)' }}
-      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'; (e.currentTarget as HTMLElement).style.background = 'transparent' }}>
-        <Plus style={{ width: 14, height: 14, flexShrink: 0 }}/>
-        <span style={{ fontSize: 13 }}>Add recurring task</span>
-      </button>
+      onMouseEnter={e=>{(e.currentTarget as any).style.color='var(--brand)';(e.currentTarget as any).style.background='var(--brand-light)'}}
+      onMouseLeave={e=>{(e.currentTarget as any).style.color='var(--text-muted)';(e.currentTarget as any).style.background='transparent'}}>
+        <Plus style={{ width:14, height:14, flexShrink:0 }}/>
+        <span style={{ fontSize:13 }}>Add recurring task</span>
+      </div>
     )
   }
 
   return (
     <div ref={rowRef} style={{
-      borderTop: isEdit ? 'none' : '2px solid var(--brand)',
-      background: 'var(--brand-light)', padding: '12px 16px',
+      margin:'6px 12px 10px', borderRadius:10,
+      border:'1.5px solid var(--brand-border)',
+      background:'var(--surface)',
+      boxShadow:'0 2px 12px rgba(13,148,136,0.08)',
+      overflow:'hidden',
     }}>
       {/* Title row */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <RefreshCw style={{ width: 14, height: 14, color: 'var(--brand)', flexShrink: 0 }}/>
-        <input
-          ref={inputRef}
-          value={title}
-          onChange={e => setTitle(e.target.value)}
-          onKeyDown={onKeyDown}
-          placeholder={isEdit ? 'Task name…' : 'Recurring task name…'}
-          style={{
-            flex: 1, fontSize: 13, fontWeight: 500, border: 'none', outline: 'none',
-            background: 'transparent', color: 'var(--text-primary)',
-          }}
-        />
-        <button onClick={close} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}>
-          <X style={{ width: 13, height: 13 }}/>
+      <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px 8px' }}>
+        <RefreshCw style={{ width:13, height:13, color:'var(--brand)', flexShrink:0 }}/>
+        <input ref={inputRef} value={title} onChange={e => setTitle(e.target.value)}
+          onKeyDown={e => { if (e.key==='Enter') save(); if (e.key==='Escape') close() }}
+          placeholder="Recurring task name…"
+          style={{ flex:1, fontSize:14, fontWeight:500, border:'none', outline:'none',
+            background:'transparent', color:'var(--text-primary)' }}/>
+        <button onClick={close} style={{ background:'none', border:'none', cursor:'pointer',
+          color:'var(--text-muted)', display:'flex', padding:2, borderRadius:4 }}>
+          <X style={{ width:13, height:13 }}/>
         </button>
       </div>
 
-      {/* Options */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+      <div style={{ height:1, background:'var(--border-light)', margin:'0 14px' }}/>
 
-        {/* Frequency */}
-        <select value={frequency} onChange={e => setFrequency(e.target.value)} style={{
-          fontSize: 12, padding: '4px 8px', borderRadius: 6,
-          border: '1px solid var(--brand)', background: 'var(--brand-light)',
-          color: 'var(--brand)', fontWeight: 600, cursor: 'pointer',
-        }}>
-          {FREQUENCIES.map(f => <option key={f.v} value={f.v}>{f.l}</option>)}
-        </select>
+      {/* Options pills */}
+      <div style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 14px 10px', flexWrap:'wrap' }}>
+
+        {/* Frequency — grouped select */}
+        <label style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px',
+          borderRadius:20, border:'1.5px solid var(--brand-border)',
+          background:'var(--brand-light)', cursor:'pointer' }}>
+          <RefreshCw style={{ width:10, height:10, color:'var(--brand)', flexShrink:0 }}/>
+          <select value={frequency} onChange={e => setFrequency(e.target.value)}
+            style={{ fontSize:12, border:'none', outline:'none',
+              background:'transparent', color:'var(--brand)',
+              cursor:'pointer', appearance:'none', fontWeight:500 }}>
+            {(['Daily','Weekly','Monthly','Other'] as const).map(group => (
+              <optgroup key={group} label={group}>
+                {FREQUENCIES.filter(f => f.group === group).map(f => (
+                  <option key={f.v} value={f.v}>{f.l}</option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </label>
 
         {/* Assignee */}
-        <select value={assignee} onChange={e => setAssignee(e.target.value)} style={{
-          fontSize: 12, padding: '4px 8px', borderRadius: 6,
-          border: '1px solid var(--border)', background: 'var(--surface)',
-          color: 'var(--text-secondary)', cursor: 'pointer',
-        }}>
-          <option value="">Unassigned</option>
-          {members.map(m => <option key={m.id} value={m.id}>{m.name}{m.id === currentUserId ? ' (me)' : ''}</option>)}
-        </select>
+        <label style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px',
+          borderRadius:20, border:'1px solid var(--border)',
+          background:'var(--surface-subtle)', cursor:'pointer' }}>
+          <User style={{ width:11, height:11, color:'var(--text-muted)', flexShrink:0 }}/>
+          <select value={assignee} onChange={e => setAssignee(e.target.value)}
+            style={{ fontSize:12, border:'none', outline:'none',
+              background:'transparent', color:'var(--text-secondary)',
+              cursor:'pointer', appearance:'none' }}>
+            <option value="">Unassigned</option>
+            {members.map(m => <option key={m.id} value={m.id}>{m.name}{m.id===currentUserId?' (me)':''}</option>)}
+          </select>
+        </label>
 
         {/* Priority */}
-        <select value={priority} onChange={e => setPriority(e.target.value)} style={{
-          fontSize: 12, padding: '4px 8px', borderRadius: 6,
-          border: `1px solid ${PRIORITY_COLORS[priority]}44`,
-          background: PRIORITY_COLORS[priority] + '18',
-          color: PRIORITY_COLORS[priority], cursor: 'pointer',
-        }}>
-          {[['none','No priority'],['low','Low'],['medium','Medium'],['high','High'],['urgent','Urgent']].map(([v,l]) => (
-            <option key={v} value={v}>{l}</option>
-          ))}
-        </select>
-
-        {/* Project */}
-        {projects.length > 0 && (
-          <select value={projectId} onChange={e => setProjectId(e.target.value)} style={{
-            fontSize: 12, padding: '4px 8px', borderRadius: 6,
-            border: '1px solid var(--border)', background: 'var(--surface)',
-            color: 'var(--text-secondary)', cursor: 'pointer',
-          }}>
-            <option value="">No project</option>
-            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+        <label style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px',
+          borderRadius:20, border:`1px solid ${priConf.color}44`,
+          background:`${priConf.color}18`, cursor:'pointer' }}>
+          <Flag style={{ width:11, height:11, color:priConf.color, flexShrink:0 }}/>
+          <select value={priority} onChange={e => setPriority(e.target.value)}
+            style={{ fontSize:12, border:'none', outline:'none',
+              background:'transparent', color:priConf.color,
+              cursor:'pointer', appearance:'none', fontWeight:500 }}>
+            {PRIORITY_OPTIONS.map(({ value, label }) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
           </select>
-        )}
+        </label>
 
         {/* Client */}
         {clients.length > 0 && (
-          <select value={clientId} onChange={e => setClientId(e.target.value)} style={{
-            fontSize: 12, padding: '4px 8px', borderRadius: 6,
-            border: '1px solid var(--border)', background: 'var(--surface)',
-            color: 'var(--text-secondary)', cursor: 'pointer',
-          }}>
-            <option value="">No client</option>
-            {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+          <label style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px',
+            borderRadius:20,
+            border: clientId ? `1px solid ${clients.find(c=>c.id===clientId)?.color ?? '#0d9488'}55` : '1px solid var(--border)',
+            background: clientId ? `${clients.find(c=>c.id===clientId)?.color ?? '#0d9488'}14` : 'var(--surface-subtle)',
+            cursor:'pointer' }}>
+            {clientId
+              ? <span style={{ width:8, height:8, borderRadius:2, flexShrink:0,
+                  background:clients.find(c=>c.id===clientId)?.color??'#0d9488', display:'inline-block' }}/>
+              : <Briefcase style={{ width:11, height:11, color:'var(--text-muted)', flexShrink:0 }}/>
+            }
+            <select value={clientId} onChange={e => setClientId(e.target.value)}
+              style={{ fontSize:12, border:'none', outline:'none',
+                background:'transparent',
+                color: clientId ? (clients.find(c=>c.id===clientId)?.color??'#0d9488') : 'var(--text-secondary)',
+                cursor:'pointer', appearance:'none', fontWeight: clientId?600:400 }}>
+              <option value="">Client…</option>
+              {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </label>
         )}
 
+        {/* Attachment */}
+        <button onClick={() => fileRef.current?.click()}
+          style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px',
+            borderRadius:20, border:'1px solid var(--border)', background:'var(--surface-subtle)',
+            cursor:'pointer', fontSize:12, color:'var(--text-secondary)',
+            fontFamily:'inherit' }}>
+          <Paperclip style={{ width:11, height:11 }}/>
+          {files.length > 0 ? `${files.length} file${files.length>1?'s':''}` : 'Attach'}
+        </button>
+        <input ref={fileRef} type="file" multiple style={{ display:'none' }}
+          onChange={e => setFiles(Array.from(e.target.files ?? []))}/>
+
         {/* Save */}
-        <button onClick={save} disabled={saving || !title.trim()} style={{
-          marginLeft: 'auto', padding: '4px 16px', borderRadius: 6, border: 'none',
-          background: title.trim() ? 'var(--brand)' : 'var(--border)',
-          color: title.trim() ? '#fff' : 'var(--text-muted)',
-          fontSize: 12, fontWeight: 600, cursor: title.trim() ? 'pointer' : 'default',
-          flexShrink: 0, transition: 'all 0.15s',
-        }}>
-          {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Add'}
+        <button onClick={save} disabled={saving || !title.trim()}
+          style={{ marginLeft:'auto', padding:'5px 16px', borderRadius:20, border:'none',
+            background: title.trim() ? 'var(--brand)' : 'var(--border)',
+            color: title.trim() ? '#fff' : 'var(--text-muted)',
+            fontSize:12, fontWeight:600, cursor: title.trim() ? 'pointer' : 'default',
+            transition:'all 0.15s', flexShrink:0, opacity: saving ? 0.7 : 1,
+            fontFamily:'inherit' }}>
+          {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Add task'}
         </button>
       </div>
     </div>
   )
 }
+
+export { FREQ_LABEL }

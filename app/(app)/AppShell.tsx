@@ -54,7 +54,35 @@ export function AppShell({ user, org, role, workspaceId, children }: Props) {
       {/* Main content */}
       <div className="app-main">
         <Header onMenuClick={() => setMobileOpen(o => !o)}/>
-        <main className="app-content">
+        {/* Trial expired / payment failed banner */}
+        {(() => {
+          const isLocked = org.status === 'expired' || org.status === 'payment_failed' ||
+            (org.status === 'trialing' && org.trial_ends_at && new Date(org.trial_ends_at) < new Date())
+          if (!isLocked) return null
+          return (
+            <div style={{ padding:'10px 20px', background:'#7c3aed',
+              display:'flex', alignItems:'center', justifyContent:'space-between',
+              fontSize:13, color:'#fff', flexShrink:0, zIndex:20, gap:12 }}>
+              <span style={{ fontWeight:500 }}>
+                {org.status === 'payment_failed' ? '⚠️ Payment failed — ' : '🔒 Trial ended — '}
+                Your workspace is in read-only mode. Tasks are visible but cannot be edited.
+              </span>
+              <a href="/settings/billing" style={{ color:'#fff', fontWeight:700,
+                textDecoration:'none', border:'1px solid rgba(255,255,255,0.5)',
+                padding:'4px 12px', borderRadius:6, flexShrink:0 }}>
+                Upgrade now
+              </a>
+            </div>
+          )
+        })()}
+        <main className="app-content" style={{
+          pointerEvents: (org.status === 'expired' || org.status === 'payment_failed' ||
+            (org.status === 'trialing' && org.trial_ends_at && new Date(org.trial_ends_at) < new Date()))
+            ? 'none' : undefined,
+          opacity: (org.status === 'expired' || org.status === 'payment_failed' ||
+            (org.status === 'trialing' && org.trial_ends_at && new Date(org.trial_ends_at) < new Date()))
+            ? 0.6 : undefined,
+        }}>
           <Suspense fallback={<PageFallback/>}>
             {children}
           </Suspense>

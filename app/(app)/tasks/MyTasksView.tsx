@@ -1,7 +1,7 @@
 'use client'
 import { useState, useTransition, useCallback } from 'react'
 import { useRouter }    from 'next/navigation'
-import { RefreshCw, CheckCheck, Clock } from 'lucide-react'
+import { RefreshCw, CheckCheck, Clock, FolderOpen, Filter, X } from 'lucide-react'
 import { cn }           from '@/lib/utils/cn'
 import { PriorityBadge, Avatar } from '@/components/ui/Badge'
 import { TaskDetailPanel }       from '@/components/tasks/TaskDetailPanel'
@@ -47,6 +47,17 @@ export function MyTasksView({ tasks: initialTasks, members, clients, currentUser
   const [selTask,    setSelTask]    = useState<Task | null>(null)
   const [checked,    setChecked]    = useState<Set<string>>(new Set())
   const [completing, setCompleting] = useState<Set<string>>(new Set())
+  const [filterPriority, setFilterPriority] = useState('')
+  const [filterStatus,   setFilterStatus]   = useState('')
+  const [filterOpen,     setFilterOpen]     = useState(false)
+
+  // Apply filters
+  const filteredTasks = tasks.filter(t => {
+    if (filterPriority && t.priority !== filterPriority) return false
+    if (filterStatus   && t.status   !== filterStatus)   return false
+    return true
+  })
+  const activeFilters = [filterPriority, filterStatus].filter(Boolean).length
 
   function refresh() { startT(() => router.refresh()) }
 
@@ -195,7 +206,7 @@ export function MyTasksView({ tasks: initialTasks, members, clients, currentUser
 
         <div style={{ flex:1, overflowY:'auto' }}>
           {LIST_SECS.map(sec => {
-            const secTasks = tasks.filter(t => sec.filter(t, today))
+            const secTasks = filteredTasks.filter(t => sec.filter(t, today))
             if (secTasks.length === 0) return null
             return (
               <div key={sec.key}>
@@ -222,16 +233,28 @@ export function MyTasksView({ tasks: initialTasks, members, clients, currentUser
                         onChange={() => setChecked(p => { const s=new Set(p); s.has(task.id)?s.delete(task.id):s.add(task.id); return s })}
                         onClick={e => e.stopPropagation()} style={{ accentColor:'var(--brand)', width:13, height:13 }}/>
                       <CircleBtn task={task}/>
-                      <div style={{ fontSize:13,
-                        color: task.status==='completed'?'#94a3b8':isPending?'#7c3aed':ov?'#dc2626':'var(--text-primary)',
-                        textDecoration: task.status==='completed'?'line-through':'none',
-                        overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis', paddingRight:8 }}>
-                        {task.title}
-                        {isPending && <span style={{ marginLeft:6, fontSize:11, background:'#ede9fe',
-                          color:'#7c3aed', padding:'1px 5px', borderRadius:3, fontWeight:500 }}>
-                          Pending approval
-                        </span>}
-                        {task.is_recurring && <RefreshCw style={{display:'inline',marginLeft:5,width:10,height:10,color:'var(--brand)',verticalAlign:'middle'}}/>}
+                      <div style={{ minWidth:0, overflow:'hidden' }}>
+                        <div style={{ fontSize:13,
+                          color: task.status==='completed'?'#94a3b8':isPending?'#7c3aed':ov?'#dc2626':'var(--text-primary)',
+                          textDecoration: task.status==='completed'?'line-through':'none',
+                          overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis',
+                          display:'flex', alignItems:'center', gap:6 }}>
+                          <span style={{ overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis', flex:1 }}>{task.title}</span>
+                          {isPending && <span style={{ flexShrink:0, fontSize:11, background:'#ede9fe',
+                            color:'#7c3aed', padding:'1px 5px', borderRadius:3, fontWeight:500 }}>
+                            Pending
+                          </span>}
+                          {task.is_recurring && <RefreshCw style={{ flexShrink:0, width:10, height:10, color:'var(--brand)' }} title="Recurring task"/>}
+                          {task.project_id && !task.is_recurring && <FolderOpen style={{ flexShrink:0, width:10, height:10, color:'#7c3aed' }} title="Project task"/>}
+                        </div>
+                        {(task as any).project && (
+                          <div style={{ fontSize:11, color:'var(--text-muted)', marginTop:1,
+                            display:'flex', alignItems:'center', gap:3, overflow:'hidden', whiteSpace:'nowrap' }}>
+                            <span style={{ width:5, height:5, borderRadius:1,
+                              background:(task as any).project?.color??'#7c3aed', display:'inline-block', flexShrink:0 }}/>
+                            <span style={{ overflow:'hidden', textOverflow:'ellipsis' }}>{(task as any).project?.name}</span>
+                          </div>
+                        )}
                       </div>
                       <div style={{ display:'flex', alignItems:'center', gap:6 }}>
                         {assignee && <><Avatar name={assignee.name} size="xs"/>
@@ -254,7 +277,7 @@ export function MyTasksView({ tasks: initialTasks, members, clients, currentUser
 
           {/* Completed */}
           {(() => {
-            const done = tasks.filter(t => t.status === 'completed')
+            const done = filteredTasks.filter(t => t.status === 'completed')
             if (!done.length) return null
             return (
               <div>

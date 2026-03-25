@@ -205,6 +205,8 @@ export default async function ReportsPage() {
           projectData={projectData}
           timeByProject={timeByProject}
           employeeStats={employeeStats}
+          currentUserId={user.id}
+          userRole={mb.role}
         />
       </div>
     </div>
