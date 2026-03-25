@@ -1,7 +1,8 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { X, ThumbsUp, ThumbsDown, Flag, Calendar, User, Briefcase, Send, Clock, Sparkles } from 'lucide-react'
+import { X, ThumbsUp, ThumbsDown, Flag, User, Briefcase, Send, Clock, Sparkles } from 'lucide-react'
+import { DatePicker } from '@/components/ui/DatePicker'
 import { cn }             from '@/lib/utils/cn'
 import { PRIORITY_CONFIG, STATUS_CONFIG } from '@/types'
 import type { Task }      from '@/types'
@@ -383,11 +384,10 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                 </FieldRow>
 
                 <FieldRow label="Due date">
-                  <Calendar className="h-3.5 w-3.5 text-gray-400" />
-                  <input type="date" value={dueDate}
-                    onChange={e => { setDueDate(e.target.value); patch({ due_date: e.target.value || null }) }}
-                    className="text-sm bg-transparent outline-none cursor-pointer flex-1"
-                    style={{ color: overdue ? '#dc2626' : dueDate ? '#0f172a' : '#94a3b8' }}
+                  <DatePicker
+                    value={dueDate}
+                    overdue={overdue}
+                    onChange={v => { setDueDate(v); patch({ due_date: v || null }) }}
                   />
                   {overdue && <span className="text-xs text-red-500 font-medium flex-shrink-0">Overdue</span>}
                 </FieldRow>
