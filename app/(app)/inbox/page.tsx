@@ -18,7 +18,7 @@ export default async function InboxPage() {
   // Fetch tasks NOT in any project — no clients() join
   const { data: tasks, error } = await supabase.from('tasks')
     .select('id, title, status, priority, due_date, approval_status, client_id, assignee_id, is_recurring, estimated_hours, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url)')
-    .eq('org_id', mb.org_id).is('project_id', null).neq('is_archived', true)
+    .eq('org_id', mb.org_id).is('project_id', null).is('parent_task_id', null).neq('is_archived', true)
     .order('created_at', { ascending: false })
 
   if (error) console.error('[inbox]', error.message)

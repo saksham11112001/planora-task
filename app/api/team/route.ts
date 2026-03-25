@@ -21,29 +21,9 @@ export async function POST(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-  const { data: mb } = await supabase
-    .from('org_members')
-    .select('org_id, role, organisations(plan_tier)')
-    .eq('user_id', user.id).eq('is_active', true).single()
+  const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).single()
   if (!mb || !['owner','admin'].includes(mb.role))
     return NextResponse.json({ error: 'Only owners/admins can invite' }, { status: 403 })
-
-  // ── Plan limit check ────────────────────────────────────────────────────
-  const { PLAN_LIMITS } = await import('@/lib/utils/plans')
-  const planTier   = (mb.organisations as any)?.plan_tier ?? 'free'
-  const maxMembers = PLAN_LIMITS[planTier as keyof typeof PLAN_LIMITS]?.members ?? 5
-  if (maxMembers !== -1) {
-    const { count } = await supabase
-      .from('org_members')
-      .select('id', { count: 'exact', head: true })
-      .eq('org_id', mb.org_id)
-      .eq('is_active', true)
-    if ((count ?? 0) >= maxMembers)
-      return NextResponse.json({
-        error: `Member limit reached (${maxMembers} on your ${planTier} plan). Upgrade to add more.`,
-      }, { status: 403 })
-  }
-  // ────────────────────────────────────────────────────────────────────────
 
   const { email, role = 'member' } = await request.json()
   if (!email?.trim()) return NextResponse.json({ error: 'Email required' }, { status: 400 })
@@ -85,11 +65,16 @@ export async function PATCH(request: NextRequest) {
   if (!mb || !['owner','admin'].includes(mb.role))
     return NextResponse.json({ error: 'Only owners/admins can change roles' }, { status: 403 })
 
-  const { member_id, role } = await request.json()
+  const { member_id, user_id, role } = await request.json()
   if (!['admin','manager','member','viewer'].includes(role))
     return NextResponse.json({ error: 'Invalid role' }, { status: 400 })
 
-  const { error } = await supabase.from('org_members').update({ role }).eq('id', member_id).eq('org_id', mb.org_id)
+  // Accept either member_id (org_members.id) or user_id
+  let query = supabase.from('org_members').update({ role }).eq('org_id', mb.org_id)
+  if (member_id) query = query.eq('id', member_id)
+  else if (user_id) query = query.eq('user_id', user_id)
+  else return NextResponse.json({ error: 'member_id or user_id required' }, { status: 400 })
+  const { error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ success: true })
 }

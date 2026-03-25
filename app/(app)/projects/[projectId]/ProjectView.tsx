@@ -136,10 +136,17 @@ export function ProjectView({ project, tasks, members, clients, defaultClientId,
         <input type="checkbox" checked={checked.has(task.id)}
           onChange={() => setChecked(p => { const s = new Set(p); s.has(task.id) ? s.delete(task.id) : s.add(task.id); return s })}
           onClick={e => e.stopPropagation()} className="h-3.5 w-3.5 rounded border-gray-300 accent-teal-600 flex-shrink-0 cursor-pointer"/>
-        <button onClick={e => toggleDone(task.id, task.status, e)}
-          className={cn('task-check flex-shrink-0', isComp && 'done', completing.has(task.id) && 'popping')}>
-          {isComp && <svg viewBox="0 0 16 16" fill="none" className="h-2.5 w-2.5"><path d="M13 4L6.5 11 3 7.5" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-        </button>
+        {/* Check circle - only assignee or manager+ can complete */}
+        {(canManage || task.assignee_id === currentUserId) ? (
+          <button onClick={e => toggleDone(task.id, task.status, e)}
+            className={cn('task-check flex-shrink-0', isComp && 'done', completing.has(task.id) && 'popping')}>
+            {isComp && <svg viewBox="0 0 16 16" fill="none" className="h-2.5 w-2.5"><path d="M13 4L6.5 11 3 7.5" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+          </button>
+        ) : (
+          <div className={cn('task-check flex-shrink-0', isComp && 'done')} style={{ cursor: 'default', opacity: 0.5 }}>
+            {isComp && <svg viewBox="0 0 16 16" fill="none" className="h-2.5 w-2.5"><path d="M13 4L6.5 11 3 7.5" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+          </div>
+        )}
         <div className="flex-1 min-w-0" onClick={() => setSelectedTask(task)}>
           <span className={cn('text-sm', isComp ? 'line-through text-gray-400' : ov ? 'text-red-700' : 'text-gray-900')}>{task.title}</span>
         </div>

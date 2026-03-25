@@ -386,8 +386,13 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                   <Calendar className="h-3.5 w-3.5 text-gray-400" />
                   <input type="date" value={dueDate}
                     onChange={e => { setDueDate(e.target.value); patch({ due_date: e.target.value || null }) }}
-                    className="text-sm bg-transparent outline-none cursor-pointer flex-1"
-                    style={{ color: overdue ? '#dc2626' : dueDate ? '#0f172a' : '#94a3b8' }}
+                    className="text-sm outline-none cursor-pointer flex-1 rounded-md px-2 py-1"
+                    style={{
+                      color: overdue ? '#dc2626' : dueDate ? 'var(--text-primary)' : 'var(--text-muted)',
+                      background: 'var(--surface-subtle)',
+                      border: '1px solid var(--border)',
+                      colorScheme: 'light dark',
+                    }}
                   />
                   {overdue && <span className="text-xs text-red-500 font-medium flex-shrink-0">Overdue</span>}
                 </FieldRow>
@@ -425,44 +430,103 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
 
             {/* ── Subtasks ── */}
             {tab === 'subtasks' && (
-              <div className="px-5 py-4">
-                {/* Add subtask input */}
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="h-4 w-4 rounded-full border-2 border-teal-400 flex-shrink-0"/>
+              <div style={{ padding: '8px 0' }}>
+                {/* Subtask list + inline add below each */}
+                {subtasks.length === 0 && (
+                  <div style={{ padding: '20px 20px 4px', textAlign: 'center' }}>
+                    <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>No subtasks yet</p>
+                  </div>
+                )}
+                <div>
+                  {subtasks.map(sub => (
+                    <div key={sub.id}
+                      style={{ display: 'flex', alignItems: 'center', gap: 10,
+                        padding: '8px 20px', borderBottom: '1px solid var(--border-light)',
+                        background: 'var(--surface)' }}
+                      className="group">
+                      <button onClick={() => toggleSubtask(sub)}
+                        style={{
+                          width: 16, height: 16, borderRadius: '50%', flexShrink: 0,
+                          border: `2px solid ${sub.status === 'completed' ? 'var(--brand)' : 'var(--border)'}`,
+                          background: sub.status === 'completed' ? 'var(--brand)' : 'transparent',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          cursor: 'pointer', padding: 0, transition: 'all 0.15s',
+                        }}>
+                        {sub.status === 'completed' && (
+                          <svg viewBox="0 0 10 10" fill="none" style={{ width: 8, height: 8 }}>
+                            <path d="M1.5 5L4 7.5L8.5 2.5" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
+                          </svg>
+                        )}
+                      </button>
+                      <span style={{
+                        flex: 1, fontSize: 13, lineHeight: 1.4,
+                        color: sub.status === 'completed' ? 'var(--text-muted)' : 'var(--text-primary)',
+                        textDecoration: sub.status === 'completed' ? 'line-through' : 'none',
+                      }}>
+                        {sub.title}
+                      </span>
+                      {sub.due_date && (
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>
+                          {sub.due_date}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Inline add subtask - always visible at bottom */}
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '10px 20px', borderTop: subtasks.length > 0 ? '1px dashed var(--border)' : 'none',
+                  marginTop: subtasks.length === 0 ? 0 : 4,
+                }}>
+                  <div style={{
+                    width: 16, height: 16, borderRadius: '50%', flexShrink: 0,
+                    border: '2px dashed var(--brand)', opacity: 0.5,
+                  }}/>
                   <input
                     value={newSubtitle}
                     onChange={e => setNewSubtitle(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') addSubtask() }}
-                    placeholder="Add a subtask…"
-                    className="flex-1 text-sm outline-none border-b border-gray-200 focus:border-teal-400 pb-1 transition-colors bg-transparent"
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && newSubtitle.trim()) addSubtask()
+                      if (e.key === 'Escape') setNewSubtitle('')
+                    }}
+                    placeholder="Add subtask… (Enter to save)"
+                    style={{
+                      flex: 1, fontSize: 13, border: 'none', outline: 'none',
+                      background: 'transparent', color: 'var(--text-primary)',
+                    }}
                   />
-                  <button onClick={addSubtask} disabled={addingSub || !newSubtitle.trim()}
-                    className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-40 transition-colors flex-shrink-0">
-                    {addingSub ? '…' : 'Add'}
-                  </button>
+                  {addingSub && (
+                    <span style={{ fontSize: 11, color: 'var(--brand)' }}>Saving…</span>
+                  )}
+                  {newSubtitle.trim() && !addingSub && (
+                    <button onClick={addSubtask}
+                      style={{
+                        fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 6,
+                        background: 'var(--brand)', color: '#fff', border: 'none', cursor: 'pointer',
+                        flexShrink: 0,
+                      }}>
+                      Add
+                    </button>
+                  )}
                 </div>
-                {/* Subtask list */}
-                {subtasks.length === 0
-                  ? <p className="text-xs text-gray-400 text-center py-6">No subtasks yet — add one above</p>
-                  : <div className="space-y-1">
-                    {subtasks.map(sub => (
-                      <div key={sub.id} className="flex items-center gap-3 py-2 px-2 rounded-lg hover:bg-gray-50 group">
-                        <button onClick={() => toggleSubtask(sub)}
-                          className={cn('h-4 w-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors',
-                            sub.status === 'completed' ? 'bg-teal-500 border-teal-500' : 'border-gray-300 hover:border-teal-400')}>
-                          {sub.status === 'completed' && <svg viewBox="0 0 10 10" fill="none" className="h-2.5 w-2.5"><path d="M1.5 5L4 7.5L8.5 2.5" stroke="white" strokeWidth="1.8" strokeLinecap="round"/></svg>}
-                        </button>
-                        <span className={cn('flex-1 text-sm', sub.status === 'completed' ? 'line-through text-gray-400' : 'text-gray-800')}>
-                          {sub.title}
-                        </span>
-                        {sub.due_date && <span className="text-xs text-gray-400">{sub.due_date}</span>}
-                      </div>
-                    ))}
+
+                {/* Progress */}
+                {subtasks.length > 0 && (
+                  <div style={{ padding: '8px 20px 4px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ flex: 1, height: 4, background: 'var(--border-light)', borderRadius: 99, overflow: 'hidden' }}>
+                      <div style={{
+                        height: '100%', background: 'var(--brand)', borderRadius: 99,
+                        width: `${subtasks.length > 0 ? Math.round(subtasks.filter(s => s.status === 'completed').length / subtasks.length * 100) : 0}%`,
+                        transition: 'width 0.3s ease',
+                      }}/>
+                    </div>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>
+                      {subtasks.filter(s => s.status === 'completed').length}/{subtasks.length}
+                    </span>
                   </div>
-                }
-                <p className="text-xs text-gray-400 mt-3 text-center">
-                  {subtasks.filter(s => s.status === 'completed').length}/{subtasks.length} completed
-                </p>
+                )}
               </div>
             )}
 

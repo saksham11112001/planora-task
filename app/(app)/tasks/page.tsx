@@ -18,7 +18,7 @@ export default async function MyTasksPage() {
   // Fetch tasks assigned to me — NO clients() join to avoid FK issues
   const { data: tasks } = await supabase.from('tasks')
     .select('id, title, description, status, priority, due_date, assignee_id, client_id, project_id, approval_status, approval_required, estimated_hours, is_recurring, assignee:users!tasks_assignee_id_fkey(id, name), projects(id, name, color)')
-    .eq('org_id', mb.org_id).eq('assignee_id', user.id).neq('status', 'completed').neq('is_archived', true)
+    .eq('org_id', mb.org_id).eq('assignee_id', user.id).neq('status', 'completed').neq('is_archived', true).is('parent_task_id', null)
     .order('due_date', { ascending: true, nullsFirst: false })
 
   // Fetch clients separately
