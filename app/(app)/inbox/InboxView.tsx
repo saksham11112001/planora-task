@@ -221,7 +221,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
             <div key={section.key}>
               {/* Section header */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 6,
-                padding: '10px 16px 4px', fontSize: 11, fontWeight: 700,
+                padding: '13px 18px 5px', fontSize: 11, fontWeight: 700,
                 textTransform: 'uppercase', letterSpacing: '0.06em', color: section.color }}>
                 ▾ {section.label}
                 <span style={{ opacity: 0.45, fontWeight: 400, textTransform: 'none', fontSize: 11 }}>
@@ -250,7 +250,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                       gridTemplateColumns: '36px 22px 1fr 70px 110px 80px 32px',
                       alignItems: 'center',
                       padding: '0 16px',
-                      minHeight: 42,
+                      minHeight: 50,
                       borderBottom: '1px solid #f8fafc',
                       cursor: 'pointer',
                       background: isSelected ? '#f0fdfa' : isChecked ? '#f7fffe' : section.bg,
@@ -287,7 +287,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                     {/* Title + meta */}
                     <div style={{ minWidth: 0, paddingRight: 8 }}>
                       <p style={{
-                        fontSize: 13, fontWeight: 500, overflow: 'hidden',
+                        fontSize: 13.5, fontWeight: 500, overflow: 'hidden',
                         whiteSpace: 'nowrap', textOverflow: 'ellipsis',
                         color: isComp ? '#94a3b8' : ov ? '#b91c1c' : '#0f172a',
                         textDecoration: isComp ? 'line-through' : 'none',

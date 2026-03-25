@@ -397,7 +397,7 @@ export function ProjectView({ project, tasks, members, clients, defaultClientId,
   return (
     <div className="flex flex-col flex-1 min-h-0">
       {/* Progress bar */}
-      <div className="px-6 py-2" style={{ background: 'var(--surface)' }}>
+      <div className="px-6 py-3" style={{ background: 'var(--surface)' }}>
         <div className="flex items-center gap-3">
           <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
             <div className="h-full rounded-full transition-all duration-700"
@@ -518,7 +518,7 @@ export function ProjectView({ project, tasks, members, clients, defaultClientId,
               </>
             )}
           </div>
-          <div className="flex items-center gap-2 px-4 py-1.5 border-b text-xs font-semibold text-gray-400 uppercase tracking-wide sticky top-0 z-10"
+          <div className="flex items-center gap-2 px-5 py-3 border-b text-xs font-semibold text-gray-400 uppercase tracking-wide sticky top-0 z-10"
             style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
             <div className="w-8 flex-shrink-0"/>
             <div className="flex-1">Task name</div>

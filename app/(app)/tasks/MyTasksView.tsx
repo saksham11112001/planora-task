@@ -155,7 +155,7 @@ export function MyTasksView({ tasks: initialTasks, members, clients, currentUser
       background:'var(--surface)', flexShrink:0 }}>
       {(['List','Board'] as const).map(t => (
         <button key={t} onClick={() => setTab(t)}
-          style={{ padding:'9px 14px', fontSize:13, fontWeight:500, border:'none',
+          style={{ padding:'10px 15px', fontSize:14, fontWeight:500, border:'none',
             background:'transparent', cursor:'pointer', marginBottom:-1,
             borderBottom:`2px solid ${tab===t?'var(--brand)':'transparent'}`,
             color: tab===t?'var(--brand)':'var(--text-muted)' }}>
@@ -174,8 +174,8 @@ export function MyTasksView({ tasks: initialTasks, members, clients, currentUser
             background:'var(--brand-light)', borderBottom:`1px solid var(--brand-border)`, flexShrink:0 }}>
             <span style={{ fontSize:13, fontWeight:500, color:'var(--brand-dark)' }}>{checked.size} selected</span>
             <button onClick={bulkComplete}
-              style={{ background:'var(--brand)', color:'#fff', border:'none', padding:'4px 12px',
-                borderRadius:6, fontSize:12, fontWeight:500, cursor:'pointer', display:'flex', alignItems:'center', gap:5 }}>
+              style={{ background:'var(--brand)', color:'#fff', border:'none', padding:'6px 14px',
+                borderRadius:7, fontSize:13, fontWeight:500, cursor:'pointer', display:'flex', alignItems:'center', gap:6 }}>
               <CheckCheck style={{width:13,height:13}}/> Mark complete
             </button>
             <button onClick={() => setChecked(new Set())}
@@ -184,9 +184,9 @@ export function MyTasksView({ tasks: initialTasks, members, clients, currentUser
             </button>
           </div>
         )}
-        <div style={{ display:'grid', gridTemplateColumns:'28px 20px 1fr 150px 95px 105px',
-          alignItems:'center', padding:'5px 16px', borderBottom:`1px solid var(--border)`,
-          background:'var(--surface)', flexShrink:0, fontSize:10, fontWeight:700,
+        <div style={{ display:'grid', gridTemplateColumns:'28px 22px 1fr 160px 100px 110px',
+          alignItems:'center', padding:'8px 18px', borderBottom:`1px solid var(--border)`,
+          background:'var(--surface-subtle)', flexShrink:0, fontSize:11, fontWeight:700,
           color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.06em' }}>
           <div/><div/><div>Task name</div><div>Assignee</div>
           <div style={{textAlign:'center'}}>Due date</div>
@@ -199,7 +199,7 @@ export function MyTasksView({ tasks: initialTasks, members, clients, currentUser
             if (secTasks.length === 0) return null
             return (
               <div key={sec.key}>
-                <div style={{ display:'flex', alignItems:'center', gap:6, padding:'9px 14px 3px',
+                <div style={{ display:'flex', alignItems:'center', gap:6, padding:'13px 18px 5px',
                   fontSize:11, fontWeight:700, textTransform:'uppercase',
                   letterSpacing:'0.06em', color:sec.color }}>
                   ▾ {sec.label}
@@ -211,8 +211,8 @@ export function MyTasksView({ tasks: initialTasks, members, clients, currentUser
                   const isPending = task.approval_status === 'pending' || task.status === 'in_review'
                   return (
                     <div key={task.id}
-                      style={{ display:'grid', gridTemplateColumns:'28px 20px 1fr 150px 95px 105px',
-                        alignItems:'center', padding:'0 16px', height:40,
+                      style={{ display:'grid', gridTemplateColumns:'28px 22px 1fr 160px 100px 110px',
+                        alignItems:'center', padding:'0 18px', minHeight:48,
                         borderBottom:`1px solid var(--border-light)`,
                         background: checked.has(task.id) ? 'var(--brand-light)'
                           : isPending ? '#faf5ff' : ov ? '#fff9f9' : 'var(--surface)',
@@ -227,7 +227,7 @@ export function MyTasksView({ tasks: initialTasks, members, clients, currentUser
                         textDecoration: task.status==='completed'?'line-through':'none',
                         overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis', paddingRight:8 }}>
                         {task.title}
-                        {isPending && <span style={{ marginLeft:6, fontSize:10, background:'#ede9fe',
+                        {isPending && <span style={{ marginLeft:6, fontSize:11, background:'#ede9fe',
                           color:'#7c3aed', padding:'1px 5px', borderRadius:3, fontWeight:500 }}>
                           Pending approval
                         </span>}
@@ -235,9 +235,9 @@ export function MyTasksView({ tasks: initialTasks, members, clients, currentUser
                       </div>
                       <div style={{ display:'flex', alignItems:'center', gap:6 }}>
                         {assignee && <><Avatar name={assignee.name} size="xs"/>
-                          <span style={{ fontSize:11, color:'var(--text-muted)', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{assignee.name}</span></>}
+                          <span style={{ fontSize:12, color:'var(--text-muted)', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{assignee.name}</span></>}
                       </div>
-                      <div style={{ textAlign:'center', fontSize:12,
+                      <div style={{ textAlign:'center', fontSize:13,
                         color: task.due_date===today?'var(--brand)':ov?'#dc2626':'var(--text-muted)',
                         fontWeight: (task.due_date===today||ov)?600:400 }}>
                         {task.due_date ? fmtDate(task.due_date) : '—'}
@@ -258,7 +258,7 @@ export function MyTasksView({ tasks: initialTasks, members, clients, currentUser
             if (!done.length) return null
             return (
               <div>
-                <div style={{ display:'flex', alignItems:'center', gap:6, padding:'9px 14px 3px',
+                <div style={{ display:'flex', alignItems:'center', gap:6, padding:'13px 18px 5px',
                   fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'#16a34a' }}>
                   ▾ Completed <span style={{ opacity:0.4, fontWeight:400, textTransform:'none', fontSize:11 }}>({done.length})</span>
                 </div>
@@ -266,8 +266,8 @@ export function MyTasksView({ tasks: initialTasks, members, clients, currentUser
                   const assignee = task.assignee as {id:string;name:string}|null
                   return (
                     <div key={task.id}
-                      style={{ display:'grid', gridTemplateColumns:'28px 20px 1fr 150px 95px 105px',
-                        alignItems:'center', padding:'0 16px', height:40,
+                      style={{ display:'grid', gridTemplateColumns:'28px 22px 1fr 160px 100px 110px',
+                        alignItems:'center', padding:'0 18px', minHeight:48,
                         borderBottom:`1px solid var(--border-light)`,
                         background:'var(--surface)', cursor:'pointer', opacity:0.7 }}
                       onClick={() => setSelTask(selTask?.id === task.id ? null : task)}>
@@ -281,9 +281,9 @@ export function MyTasksView({ tasks: initialTasks, members, clients, currentUser
                       </div>
                       <div style={{ display:'flex', alignItems:'center', gap:6 }}>
                         {assignee && <><Avatar name={assignee.name} size="xs"/>
-                          <span style={{ fontSize:11, color:'var(--text-muted)', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{assignee.name}</span></>}
+                          <span style={{ fontSize:12, color:'var(--text-muted)', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{assignee.name}</span></>}
                       </div>
-                      <div style={{ textAlign:'center', fontSize:12, color:'var(--text-muted)' }}>
+                      <div style={{ textAlign:'center', fontSize:13, color:'var(--text-muted)' }}>
                         {task.due_date ? fmtDate(task.due_date) : '—'}
                       </div>
                       <div style={{ display:'flex', justifyContent:'center' }}>
@@ -355,18 +355,18 @@ export function MyTasksView({ tasks: initialTasks, members, clients, currentUser
                               {isDone && <svg viewBox="0 0 10 10" fill="none" style={{width:8,height:8}}><path d="M1.5 5L4 7.5L8.5 2.5" stroke="white" strokeWidth="1.5" strokeLinecap="round"/></svg>}
                             </div>
                         }
-                        <span style={{ fontSize:12.5, fontWeight:500, lineHeight:1.35,
+                        <span style={{ fontSize:13, fontWeight:500, lineHeight:1.4,
                           color: isDone?'var(--text-muted)':isPending?'#7c3aed':'var(--text-primary)',
                           textDecoration: isDone?'line-through':'none' }}>{task.title}</span>
                       </div>
                       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
                         <span style={{ display:'inline-flex', alignItems:'center', gap:4,
-                          padding:'2px 6px', borderRadius:4, fontSize:10, fontWeight:600,
+                          padding:'3px 8px', borderRadius:5, fontSize:11, fontWeight:600,
                           background: pri?.bg ?? '#f8fafc', color: pri?.color ?? '#94a3b8' }}>
                           {pri?.icon} {task.priority.charAt(0).toUpperCase()+task.priority.slice(1)}
                         </span>
                         <div style={{ display:'flex', alignItems:'center', gap:5 }}>
-                          {task.due_date && <span style={{ fontSize:10, color:isOverdue(task.due_date,task.status)?'#dc2626':'var(--text-muted)' }}>{fmtDate(task.due_date)}</span>}
+                          {task.due_date && <span style={{ fontSize:11, color:isOverdue(task.due_date,task.status)?'#dc2626':'var(--text-muted)' }}>{fmtDate(task.due_date)}</span>}
                           {task.is_recurring && <RefreshCw style={{width:9,height:9,color:'var(--brand)'}}/>}
                           {assignee && <Avatar name={assignee.name} size="xs"/>}
                         </div>
