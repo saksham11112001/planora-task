@@ -1,10 +1,9 @@
 'use client'
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useRouter }   from 'next/navigation'
-import { Plus, X, Flag, User, Briefcase, ShieldCheck, ChevronDown } from 'lucide-react'
+import { Plus, X, Flag, Calendar, User, Briefcase, ShieldCheck } from 'lucide-react'
 import { cn }          from '@/lib/utils/cn'
 import { toast }       from '@/store/appStore'
-import { DatePicker }  from '@/components/ui/DatePicker'
 
 interface Member { id: string; name: string; role?: string }
 interface Props {
@@ -15,7 +14,7 @@ interface Props {
 }
 
 const PRIORITIES = [
-  { v: 'none',   l: 'No priority', color: '#94a3b8' },
+  { v: 'none',   l: 'No priority', color:'var(--text-muted)' },
   { v: 'low',    l: 'Low',         color: '#16a34a' },
   { v: 'medium', l: 'Medium',      color: '#ca8a04' },
   { v: 'high',   l: 'High',        color: '#ea580c' },
@@ -26,16 +25,17 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated }
   const router   = useRouter()
   const rowRef   = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const dateRef  = useRef<HTMLInputElement>(null)
 
-  const [open,       setOpen]       = useState(false)
-  const [saving,     setSaving]     = useState(false)
-  const [title,      setTitle]      = useState('')
-  const [assignee,   setAssignee]   = useState(currentUserId ?? '')
-  const [approverId, setApproverId] = useState('')
-  const [priority,   setPriority]   = useState('medium')
-  const [dueDate,    setDueDate]    = useState('')
-  const [clientId,   setClientId]   = useState('')
-  const [drop,       setDrop]       = useState<string | null>(null)
+  const [open,             setOpen]             = useState(false)
+  const [saving,           setSaving]           = useState(false)
+  const [title,            setTitle]            = useState('')
+  const [assignee,         setAssignee]         = useState(currentUserId ?? '')
+  const [approverId,       setApproverId]       = useState('')
+  const [priority,         setPriority]         = useState('medium')
+  const [dueDate,          setDueDate]          = useState('')
+  const [clientId,         setClientId]         = useState('')
+  const [drop,             setDrop]             = useState<string | null>(null)
 
   const approvers = members.filter(m => m.role && ['owner','admin','manager'].includes(m.role))
 
@@ -107,43 +107,36 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated }
   }
 
   return (
-    <div ref={rowRef} style={{ borderTop: '2px solid #0d9488', background: '#f0fdfa22' }}>
-      {/* ── Title row ── */}
-      <div className="flex items-center gap-2.5 px-4 py-3">
+    <div ref={rowRef} className="border-t-2 border-teal-400 bg-teal-50/30">
+      {/* Title row */}
+      <div className="flex items-center gap-2 px-4 py-2.5">
         <div className="h-4 w-4 rounded-full border-2 border-teal-400 flex-shrink-0"/>
-        <input
-          ref={inputRef} value={title} onChange={e => setTitle(e.target.value)}
-          onKeyDown={onKeyDown} placeholder="Task name"
-          className="flex-1 text-sm bg-transparent outline-none text-gray-900 placeholder-gray-400 min-w-0 font-medium"
-        />
-        <button onClick={reset} className="h-6 w-6 flex items-center justify-center text-gray-300 hover:text-gray-500 rounded hover:bg-gray-100 transition-colors flex-shrink-0">
+        <input ref={inputRef} value={title} onChange={e => setTitle(e.target.value)}
+          onKeyDown={onKeyDown} placeholder="Task title..."
+          className="flex-1 text-sm bg-transparent outline-none text-gray-900 placeholder-gray-400 min-w-0 font-medium"/>
+        <button onClick={reset} className="h-5 w-5 flex items-center justify-center text-gray-400 hover:text-gray-600 flex-shrink-0">
           <X className="h-3.5 w-3.5"/>
         </button>
       </div>
 
-      {/* ── Properties row ── */}
+      {/* Chips row */}
       <div className="flex items-center gap-2 px-4 pb-3 flex-wrap">
 
         {/* Priority */}
         <div className="relative">
           <button type="button" onClick={() => setDrop(drop === 'pri' ? null : 'pri')}
             className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border bg-white hover:bg-gray-50 transition-colors"
-            style={{ borderColor: '#e2e8f0', color: priConf.color }}>
+            style={{ borderColor:'var(--border)', color: priConf.color }}>
             <Flag className="h-3 w-3" style={{ color: priConf.color }}/>
             {priConf.l}
-            <ChevronDown className="h-2.5 w-2.5 opacity-50"/>
           </button>
           {drop === 'pri' && (
-            <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl py-1.5 min-w-[155px]" style={{ zIndex: 9999 }}>
+            <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl py-1 min-w-[150px]" style={{ zIndex: 9999 }}>
               {PRIORITIES.map(p => (
                 <button type="button" key={p.v} onClick={() => { setPriority(p.v); setDrop(null) }}
-                  className={cn(
-                    'w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-gray-50 transition-colors',
-                    p.v === priority && 'bg-gray-50'
-                  )}>
-                  <span style={{ color: p.color, fontSize:13 }}>●</span>
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-gray-50 transition-colors">
+                  <span style={{ color: p.color, fontSize: 16, lineHeight: 1 }}>●</span>
                   <span style={{ color: p.color, fontWeight: 500 }}>{p.l}</span>
-                  {p.v === priority && <span className="ml-auto text-gray-300">✓</span>}
                 </button>
               ))}
             </div>
@@ -154,40 +147,80 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated }
         <div className="relative">
           <button type="button" onClick={() => setDrop(drop === 'asgn' ? null : 'asgn')}
             className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-gray-200 bg-white hover:bg-gray-50 transition-colors text-gray-600">
-            {assigneeName
-              ? <><div className="h-4 w-4 rounded-full bg-teal-500 flex items-center justify-center text-white font-bold flex-shrink-0" style={{fontSize:8}}>{assigneeName[0].toUpperCase()}</div>{assigneeName}</>
-              : <><User className="h-3 w-3 text-gray-400"/>Assignee</>
-            }
-            <ChevronDown className="h-2.5 w-2.5 opacity-40"/>
+            <User className="h-3 w-3 text-gray-400"/>
+            {assigneeName ?? 'Assign to'}
           </button>
           {drop === 'asgn' && (
-            <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl py-1.5 min-w-[200px] max-h-52 overflow-y-auto" style={{ zIndex: 9999 }}>
-              <div className="px-3 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Assign to</div>
+            <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl py-1 min-w-[200px] max-h-52 overflow-y-auto" style={{ zIndex: 9999 }}>
               <button type="button" onClick={() => { setAssignee(''); setDrop(null) }}
-                className={cn('w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-gray-400', !assignee && 'bg-gray-50')}>
-                Unassigned
-              </button>
+                className="w-full text-left px-3 py-2 text-xs text-gray-400 hover:bg-gray-50">Unassigned</button>
               {members.map(m => (
                 <button type="button" key={m.id} onClick={() => { setAssignee(m.id); setDrop(null) }}
-                  className={cn('w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-gray-50 transition-colors', m.id === assignee && 'bg-teal-50')}>
+                  className={cn('w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-gray-50 transition-colors', m.id === assignee && 'bg-teal-50 text-teal-700')}>
                   <div className="h-5 w-5 rounded-full bg-teal-500 flex items-center justify-center text-white font-bold flex-shrink-0" style={{ fontSize: 9 }}>
                     {m.name[0]?.toUpperCase()}
                   </div>
-                  <span className="flex-1 text-left text-gray-700">{m.name}</span>
-                  {m.id === currentUserId && <span className="text-[10px] text-gray-400">You</span>}
-                  {m.id === assignee && <span className="text-teal-600 text-[10px]">✓</span>}
+                  <span className="flex-1 text-left">{m.name}</span>
+                  {m.role && <span className="text-gray-400 capitalize text-[10px]">{m.role}</span>}
                 </button>
               ))}
             </div>
           )}
         </div>
 
-        {/* Due date */}
-        <div className="inline-flex items-center px-2.5 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition-colors text-xs font-medium text-gray-600">
-          <DatePicker value={dueDate} onChange={setDueDate} placeholder="Due date" />
+        {/* Approver */}
+        <div className="relative">
+          <button type="button" onClick={() => setDrop(drop === 'apr' ? null : 'apr')}
+            className={cn('inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border bg-white hover:bg-gray-50 transition-colors',
+              approverId ? 'border-violet-300 text-violet-700' : 'border-gray-200 text-gray-600')}>
+            <ShieldCheck className={cn('h-3 w-3', approverId ? 'text-violet-500' : 'text-gray-400')}/>
+            {approverId ? `Approver: ${approverName}` : 'Set approver'}
+          </button>
+          {drop === 'apr' && (
+            <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl py-1 min-w-[210px]" style={{ zIndex: 9999 }}>
+              <div className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">
+                Managers &amp; Admins only
+              </div>
+              <button type="button" onClick={() => { setApproverId(''); setDrop(null) }}
+                className="w-full text-left px-3 py-2 text-xs text-gray-400 hover:bg-gray-50">No approval needed</button>
+              {approvers.length === 0
+                ? <p className="px-3 py-2 text-xs text-gray-400 italic">No managers in org yet</p>
+                : approvers.map(m => (
+                  <button type="button" key={m.id} onClick={() => { setApproverId(m.id); setDrop(null) }}
+                    className={cn('w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-gray-50 transition-colors', m.id === approverId && 'bg-violet-50 text-violet-700')}>
+                    <div className="h-5 w-5 rounded-full bg-violet-500 flex items-center justify-center text-white font-bold flex-shrink-0" style={{ fontSize: 9 }}>
+                      {m.name[0]?.toUpperCase()}
+                    </div>
+                    <span className="flex-1 text-left">{m.name}</span>
+                    <span className="text-gray-400 capitalize text-[10px]">{m.role}</span>
+                  </button>
+                ))
+              }
+            </div>
+          )}
         </div>
 
-        {/* Client — only if org has clients */}
+        {/* Due date */}
+        <div className="relative inline-flex items-center rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition-colors overflow-hidden">
+          <button type="button"
+            onClick={() => dateRef.current?.showPicker?.() ?? dateRef.current?.click()}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-gray-600 cursor-pointer">
+            <Calendar className="h-3 w-3 text-gray-400"/>
+            {dueDate
+              ? new Date(dueDate + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+              : 'Due date'}
+          </button>
+          <input
+            ref={dateRef}
+            type="date"
+            value={dueDate}
+            onChange={e => setDueDate(e.target.value)}
+            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+            style={{ colorScheme: 'light' }}
+          />
+        </div>
+
+        {/* Client */}
         {clients.length > 0 && (
           <div className="relative">
             <button type="button" onClick={() => setDrop(drop === 'cli' ? null : 'cli')}
@@ -196,21 +229,16 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated }
               {clientObj
                 ? <><div className="h-2 w-2 rounded-sm" style={{ background: clientObj.color }}/>{clientObj.name}</>
                 : 'Client'}
-              <ChevronDown className="h-2.5 w-2.5 opacity-40"/>
             </button>
             {drop === 'cli' && (
-              <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl py-1.5 min-w-[170px] max-h-52 overflow-y-auto" style={{ zIndex: 9999 }}>
-                <div className="px-3 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Client</div>
+              <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl py-1 min-w-[170px] max-h-52 overflow-y-auto" style={{ zIndex: 9999 }}>
                 <button type="button" onClick={() => { setClientId(''); setDrop(null) }}
-                  className={cn('w-full text-left px-3 py-2 text-xs text-gray-400 hover:bg-gray-50', !clientId && 'bg-gray-50')}>
-                  No client
-                </button>
+                  className="w-full text-left px-3 py-2 text-xs text-gray-400 hover:bg-gray-50">No client</button>
                 {clients.map(c => (
                   <button type="button" key={c.id} onClick={() => { setClientId(c.id); setDrop(null) }}
                     className={cn('w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-gray-50 transition-colors', c.id === clientId && 'bg-teal-50')}>
                     <div className="h-2.5 w-2.5 rounded-sm flex-shrink-0" style={{ background: c.color }}/>
-                    <span className="text-gray-700">{c.name}</span>
-                    {c.id === clientId && <span className="ml-auto text-teal-600 text-[10px]">✓</span>}
+                    {c.name}
                   </button>
                 ))}
               </div>
@@ -218,49 +246,11 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated }
           </div>
         )}
 
-        {/* Approver — collapsed behind a toggle for cleanliness */}
-        {approvers.length > 0 && (
-          <div className="relative">
-            <button type="button" onClick={() => setDrop(drop === 'apr' ? null : 'apr')}
-              className={cn(
-                'inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border bg-white hover:bg-gray-50 transition-colors',
-                approverId ? 'border-violet-300 text-violet-700' : 'border-gray-200 text-gray-500'
-              )}>
-              <ShieldCheck className={cn('h-3 w-3', approverId ? 'text-violet-500' : 'text-gray-400')}/>
-              {approverId ? approverName : 'Approval'}
-              <ChevronDown className="h-2.5 w-2.5 opacity-40"/>
-            </button>
-            {drop === 'apr' && (
-              <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl py-1.5 min-w-[210px]" style={{ zIndex: 9999 }}>
-                <div className="px-3 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Set approver</div>
-                <button type="button" onClick={() => { setApproverId(''); setDrop(null) }}
-                  className={cn('w-full text-left px-3 py-2 text-xs text-gray-400 hover:bg-gray-50', !approverId && 'bg-gray-50')}>
-                  No approval needed
-                </button>
-                {approvers.map(m => (
-                  <button type="button" key={m.id} onClick={() => { setApproverId(m.id); setDrop(null) }}
-                    className={cn('w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-gray-50 transition-colors', m.id === approverId && 'bg-violet-50')}>
-                    <div className="h-5 w-5 rounded-full bg-violet-500 flex items-center justify-center text-white font-bold flex-shrink-0" style={{ fontSize: 9 }}>
-                      {m.name[0]?.toUpperCase()}
-                    </div>
-                    <span className="flex-1 text-left text-gray-700">{m.name}</span>
-                    <span className="text-gray-400 capitalize text-[10px]">{m.role}</span>
-                    {m.id === approverId && <span className="text-violet-600 text-[10px]">✓</span>}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Actions */}
-        <div className="ml-auto flex items-center gap-2">
-          <kbd className="hidden sm:inline-flex items-center text-[10px] text-gray-300 px-1.5 py-0.5 rounded border border-gray-200">⏎ to add</kbd>
-          <button type="button" onClick={save} disabled={saving || !title.trim()}
-            className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm">
-            {saving ? 'Saving…' : 'Add task'}
-          </button>
-        </div>
+        {/* Save */}
+        <button type="button" onClick={save} disabled={saving || !title.trim()}
+          className="ml-auto inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-40 transition-colors">
+          {saving ? 'Saving…' : 'Add task'}
+        </button>
       </div>
     </div>
   )
