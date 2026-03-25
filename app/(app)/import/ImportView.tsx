@@ -5,13 +5,16 @@ import {
   Upload, FileSpreadsheet, Download, CheckCircle2,
   AlertCircle, Users, FolderOpen, CheckSquare, X,
   ChevronDown, ChevronRight, Loader2, ArrowRight,
+  Building2, RefreshCw,
 } from 'lucide-react'
 import { toast } from '@/store/appStore'
 
 interface ImportResults {
-  members:  { created: number; skipped: number; errors: string[] }
-  projects: { created: number; skipped: number; errors: string[] }
-  tasks:    { created: number; skipped: number; errors: string[] }
+  members:   { created: number; skipped: number; errors: string[] }
+  clients:   { created: number; skipped: number; errors: string[] }
+  projects:  { created: number; skipped: number; errors: string[] }
+  tasks:     { created: number; skipped: number; errors: string[] }
+  recurring: { created: number; skipped: number; errors: string[] }
 }
 
 type UploadState = 'idle' | 'dragging' | 'uploading' | 'done' | 'error'
@@ -90,7 +93,7 @@ export function ImportView() {
             Bulk Import
           </h1>
           <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 6 }}>
-            Download the template, fill in your team members, projects and tasks, then upload it here.
+            Download the template, fill in your data across 5 sheets, then upload it here — members, clients, projects, tasks and recurring tasks.
           </p>
         </div>
 
@@ -240,35 +243,53 @@ export function ImportView() {
             </div>
 
             {/* Summary cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 12 }}>
               <SummaryCard
-                icon={<Users style={{ width: 18, height: 18 }} />}
-                label="Team Members"
+                icon={<Users style={{ width: 16, height: 16 }} />}
+                label="Members"
                 created={results.members.created}
                 skipped={results.members.skipped}
                 color="var(--brand)"
                 bg="var(--brand-light)"
               />
               <SummaryCard
-                icon={<FolderOpen style={{ width: 18, height: 18 }} />}
+                icon={<Building2 style={{ width: 16, height: 16 }} />}
+                label="Clients"
+                created={results.clients.created}
+                skipped={results.clients.skipped}
+                color="#0891b2"
+                bg="#ecfeff"
+              />
+              <SummaryCard
+                icon={<FolderOpen style={{ width: 16, height: 16 }} />}
                 label="Projects"
                 created={results.projects.created}
                 skipped={results.projects.skipped}
                 color="#16a34a"
                 bg="#f0fdf4"
               />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginBottom: 20 }}>
               <SummaryCard
-                icon={<CheckSquare style={{ width: 18, height: 18 }} />}
+                icon={<CheckSquare style={{ width: 16, height: 16 }} />}
                 label="Tasks"
                 created={results.tasks.created}
                 skipped={results.tasks.skipped}
                 color="#7c3aed"
                 bg="#f5f3ff"
               />
+              <SummaryCard
+                icon={<RefreshCw style={{ width: 16, height: 16 }} />}
+                label="Recurring Tasks"
+                created={results.recurring.created}
+                skipped={results.recurring.skipped}
+                color="#ea580c"
+                bg="#fff7ed"
+              />
             </div>
 
             {/* Error details (expandable) */}
-            {(['members', 'projects', 'tasks'] as const).map(key => {
+            {(['members', 'clients', 'projects', 'tasks', 'recurring'] as const).map(key => {
               const section = results[key]
               if (!section.errors.length) return null
               const isOpen = expanded[key]
@@ -344,11 +365,15 @@ export function ImportView() {
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <InfoRow icon={<Users style={{ width: 16, height: 16, color: 'var(--brand)' }} />}
-                label="Team Members" desc="Existing Planora users are added to your org instantly. New email addresses receive an invite email." />
+                label="Team Members" desc="Existing Planora users are added instantly. New emails get an invite." />
+              <InfoRow icon={<Building2 style={{ width: 16, height: 16, color: '#0891b2' }} />}
+                label="Clients" desc="Created with name, email, phone, company, website, industry and color." />
               <InfoRow icon={<FolderOpen style={{ width: 16, height: 16, color: '#16a34a' }} />}
-                label="Projects" desc="Created with name, color, status, due date, owner, and optional budget." />
+                label="Projects" desc="Linked to clients by name. Supports color, status, due date, owner and budget." />
               <InfoRow icon={<CheckSquare style={{ width: 16, height: 16, color: '#7c3aed' }} />}
-                label="Tasks" desc="Linked to projects and assignees by name/email. Tasks without a project are added as one-time tasks." />
+                label="Tasks" desc="Linked to projects and clients by name. Tasks without a project become one-time tasks." />
+              <InfoRow icon={<RefreshCw style={{ width: 16, height: 16, color: '#ea580c' }} />}
+                label="Recurring Tasks" desc="Set frequency (daily/weekly/monthly etc.), assignee and project. Auto-schedules from start date." />
             </div>
           </div>
         )}

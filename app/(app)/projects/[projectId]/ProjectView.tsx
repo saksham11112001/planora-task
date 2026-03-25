@@ -112,7 +112,7 @@ export function ProjectView({ project, tasks, members, clients, defaultClientId,
     const isOpen = expandedSubs[taskId]
     if (isOpen) { setExpandedSubs(p => ({ ...p, [taskId]: false })); return }
     setExpandedSubs(p => ({ ...p, [taskId]: true }))
-    if (subtaskData[taskId]) return // already loaded
+    if (subtaskData[taskId]) return
     setLoadingSubs(p => ({ ...p, [taskId]: true }))
     const r = await fetch(`/api/tasks?parent_id=${taskId}&limit=50`)
     const d = await r.json()
@@ -122,14 +122,31 @@ export function ProjectView({ project, tasks, members, clients, defaultClientId,
 
   async function toggleSubDone(subId: string, status: string, parentId: string) {
     const newStatus = status === 'completed' ? 'todo' : 'completed'
+    // Optimistic update on subtask
+    setSubtaskData(p => ({
+      ...p,
+      [parentId]: (p[parentId] ?? []).map(s =>
+        s.id === subId ? { ...s, status: newStatus } : s
+      ),
+    }))
     await fetch(`/api/tasks/${subId}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: newStatus, completed_at: newStatus === 'completed' ? new Date().toISOString() : null }),
     })
-    // Refresh subtask data
+    // Re-fetch fresh subtask list
     const r = await fetch(`/api/tasks?parent_id=${parentId}&limit=50`)
     const d = await r.json()
-    setSubtaskData(p => ({ ...p, [parentId]: d.data ?? [] }))
+    const freshSubs: any[] = d.data ?? []
+    setSubtaskData(p => ({ ...p, [parentId]: freshSubs }))
+
+    // Auto-complete parent only when ALL subtasks are done
+    if (freshSubs.length > 0 && freshSubs.every(s => s.status === 'completed')) {
+      await fetch(`/api/tasks/${parentId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'completed', completed_at: new Date().toISOString() }),
+      })
+      toast.success('All subtasks done — task completed! 🎉')
+    }
     startT(() => router.refresh())
   }
 
@@ -160,13 +177,33 @@ export function ProjectView({ project, tasks, members, clients, defaultClientId,
       startT(() => router.refresh()); return
     }
 
-    // Already pending approval — inform and do nothing
+    // Already pending approval
     if (task.status === 'in_review' || task.approval_status === 'pending') {
       toast.info('This task is pending approval — waiting for the approver.')
       return
     }
 
-    // Needs approval → submit for review instead of completing
+    // Check subtasks — must all be completed first
+    // Load them if not already loaded
+    let subs = subtaskData[task.id]
+    if (!subs) {
+      setLoadingSubs(p => ({ ...p, [task.id]: true }))
+      const r = await fetch(`/api/tasks?parent_id=${task.id}&limit=50`)
+      const d = await r.json()
+      subs = d.data ?? []
+      setSubtaskData(p => ({ ...p, [task.id]: subs }))
+      setLoadingSubs(p => ({ ...p, [task.id]: false }))
+    }
+
+    if (subs.length > 0 && !subs.every((s: any) => s.status === 'completed')) {
+      // Expand subtasks so user can see what's left
+      setExpandedSubs(p => ({ ...p, [task.id]: true }))
+      const remaining = subs.filter((s: any) => s.status !== 'completed').length
+      toast.error(`Complete all subtasks first — ${remaining} remaining`)
+      return
+    }
+
+    // Needs approval → submit for review
     if (task.approval_required) {
       setCompleting(p => new Set(p).add(task.id))
       const res = await fetch(`/api/tasks/${task.id}/approve`, {
@@ -179,7 +216,7 @@ export function ProjectView({ project, tasks, members, clients, defaultClientId,
       startT(() => router.refresh()); return
     }
 
-    // Normal task — complete directly
+    // Normal complete
     setCompleting(p => new Set(p).add(task.id))
     await fetch(`/api/tasks/${task.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
@@ -210,8 +247,9 @@ export function ProjectView({ project, tasks, members, clients, defaultClientId,
     const isComp   = task.status === 'completed'
     const assignee = task.assignee as unknown as { id: string; name: string } | null
     const statConf = STATUS_CONFIG[task.status]
-    const subs    = subtaskData[task.id] ?? []
-    const subsDone = subs.filter(s => s.status === 'completed').length
+    const subs     = subtaskData[task.id] ?? []
+    const subsDone = subs.filter((s: any) => s.status === 'completed').length
+    const hasUndone = subs.length > 0 && subsDone < subs.length
     const [newSubInput, setNewSubInput] = useState('')
 
     const isPending = task.status === 'in_review' || task.approval_status === 'pending'
@@ -245,21 +283,23 @@ export function ProjectView({ project, tasks, members, clients, defaultClientId,
         <div className="flex-1 min-w-0 flex items-center gap-2" onClick={() => setSelectedTask(task)}>
           <span className={cn('text-sm', isComp ? 'line-through text-gray-400' : ov ? 'text-red-700' : 'text-gray-900')}>{task.title}</span>
         </div>
-        {/* Subtask expand toggle */}
+        {/* Subtask expand toggle — shows count + warns if incomplete */}
         <button
           onClick={e => { e.stopPropagation(); toggleSubExpand(task.id) }}
           style={{
-            display: 'flex', alignItems: 'center', gap: 3, padding: '2px 6px',
-            borderRadius: 4, border: 'none', background: expandedSubs[task.id] ? 'var(--brand-light)' : 'transparent',
-            color: expandedSubs[task.id] ? 'var(--brand)' : 'var(--text-muted)',
+            display: 'flex', alignItems: 'center', gap: 4, padding: '2px 8px',
+            borderRadius: 6,
+            border: `1px solid ${hasUndone ? '#fbbf24' : expandedSubs[task.id] ? 'var(--brand-border)' : 'var(--border)'}`,
+            background: hasUndone ? '#fffbeb' : expandedSubs[task.id] ? 'var(--brand-light)' : 'transparent',
+            color: hasUndone ? '#92400e' : expandedSubs[task.id] ? 'var(--brand)' : 'var(--text-muted)',
             fontSize: 10, fontWeight: 600, cursor: 'pointer', flexShrink: 0,
             transition: 'all 0.1s',
           }}
-          title="Show/hide subtasks">
+          title={subs.length ? `${subsDone}/${subs.length} subtasks done` : 'Add subtasks'}>
           <svg viewBox="0 0 12 12" fill="none" style={{ width: 9, height: 9 }}>
             <path d="M2 3h8M4 6h6M6 9h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
           </svg>
-          {subtaskData[task.id]?.length ? subtaskData[task.id].length : ''}
+          {subs.length > 0 ? `${subsDone}/${subs.length}` : '+'}
         </button>
         <div className="w-36 hidden md:flex items-center gap-2 pl-2" onClick={() => setSelectedTask(task)}>
           {assignee ? <><Avatar name={assignee.name} size="xs"/><span className="text-xs text-gray-500 truncate">{assignee.name}</span></> : <div className="h-5 w-5 rounded-full border border-dashed border-gray-300 opacity-0 group-hover:opacity-100"/>}
@@ -282,13 +322,29 @@ export function ProjectView({ project, tasks, members, clients, defaultClientId,
       {/* Inline subtasks */}
       {expandedSubs[task.id] && (
         <div style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface-subtle)' }}>
+          {/* Progress bar */}
+          {subs.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 16px 3px 48px' }}>
+              <div style={{ flex: 1, height: 3, background: 'var(--border)', borderRadius: 99, overflow: 'hidden' }}>
+                <div style={{
+                  height: '100%', borderRadius: 99,
+                  background: subsDone === subs.length ? '#16a34a' : 'var(--brand)',
+                  width: `${subs.length ? Math.round(subsDone / subs.length * 100) : 0}%`,
+                  transition: 'width 0.3s ease',
+                }}/>
+              </div>
+              <span style={{ fontSize: 10, color: subsDone === subs.length ? '#16a34a' : 'var(--text-muted)', flexShrink: 0, fontWeight: 600 }}>
+                {subsDone}/{subs.length} done
+              </span>
+            </div>
+          )}
           {loadingSubs[task.id] && (
             <div style={{ padding: '8px 48px', fontSize: 12, color: 'var(--text-muted)' }}>Loading…</div>
           )}
-          {subs.map(sub => (
+          {subs.map((sub: any) => (
             <div key={sub.id} style={{
               display: 'flex', alignItems: 'center', gap: 8,
-              padding: '6px 16px 6px 48px',
+              padding: '5px 16px 5px 48px',
               borderBottom: '1px solid var(--border-light)',
             }}>
               <button onClick={() => toggleSubDone(sub.id, sub.status, task.id)}
@@ -306,18 +362,14 @@ export function ProjectView({ project, tasks, members, clients, defaultClientId,
                 )}
               </button>
               <span style={{
-                flex: 1, fontSize: 12, color: sub.status === 'completed' ? 'var(--text-muted)' : 'var(--text-primary)',
+                flex: 1, fontSize: 12,
+                color: sub.status === 'completed' ? 'var(--text-muted)' : 'var(--text-primary)',
                 textDecoration: sub.status === 'completed' ? 'line-through' : 'none',
               }}>{sub.title}</span>
-              {subsDone > 0 && subs.length > 0 && (
-                <span style={{ fontSize: 10, color: 'var(--text-muted)', flexShrink: 0 }}>
-                  {subsDone}/{subs.length}
-                </span>
-              )}
             </div>
           ))}
           {/* Inline add subtask */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 16px 6px 48px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 16px 6px 48px' }}>
             <div style={{ width: 14, height: 14, borderRadius: '50%', flexShrink: 0, border: '1.5px dashed var(--brand)', opacity: 0.5 }}/>
             <input
               value={newSubInput}
@@ -329,7 +381,7 @@ export function ProjectView({ project, tasks, members, clients, defaultClientId,
                 }
                 if (e.key === 'Escape') setNewSubInput('')
               }}
-              placeholder="Add subtask… (Enter)"
+              placeholder="Add subtask… (press Enter)"
               style={{
                 flex: 1, fontSize: 12, border: 'none', outline: 'none',
                 background: 'transparent', color: 'var(--text-primary)',
