@@ -19,17 +19,12 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
+    // suppressHydrationWarning still needed for ThemeProvider useEffect
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Anti-flash: apply theme before paint */}
+        {/* Always light mode — strip any stored dark class immediately */}
         <script dangerouslySetInnerHTML={{ __html: `
-          (function() {
-            try {
-              var t = localStorage.getItem('planora-theme') || 'system';
-              var dark = t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-              if (dark) document.documentElement.classList.add('dark');
-            } catch(e) {}
-          })();
+          try { document.documentElement.classList.remove('dark'); } catch(e) {}
         `}}/>
       </head>
       <body style={{ fontSize: '15px' }}>

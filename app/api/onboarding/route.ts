@@ -11,21 +11,23 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
     const body = await request.json()
-    const { org_name, industry, team_size } = body
+    const { org_name, industry, team_size, phone } = body
     if (!org_name?.trim()) return NextResponse.json({ error: 'Organisation name required' }, { status: 400 })
 
-    // Use admin client to bypass RLS for org creation
     const admin = createSupabaseClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
       { auth: { autoRefreshToken: false, persistSession: false }, global: { headers: { apikey: process.env.SUPABASE_SERVICE_ROLE_KEY!, Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY!}` } } }
     )
 
-    // Ensure user profile exists
+    // Upsert user profile — include phone if provided
     await admin.from('users').upsert({
-      id: user.id, email: user.email ?? '',
-      name: user.user_metadata?.full_name ?? user.email?.split('@')[0] ?? 'User',
-      avatar_url: user.user_metadata?.avatar_url ?? null,
+      id:           user.id,
+      email:        user.email ?? '',
+      name:         user.user_metadata?.full_name ?? user.email?.split('@')[0] ?? 'User',
+      avatar_url:   user.user_metadata?.avatar_url ?? null,
+      phone_number: phone?.trim() || null,
+      whatsapp_opted_in: !!(phone?.trim()),
     }, { onConflict: 'id' })
 
     // Generate unique slug
@@ -34,7 +36,8 @@ export async function POST(request: NextRequest) {
 
     // Create org
     const { data: org, error: orgErr } = await admin.from('organisations').insert({
-      name: org_name.trim(), slug, plan_tier: 'free', status: 'active', industry: industry || null, team_size: team_size || null,
+      name: org_name.trim(), slug, plan_tier: 'free', status: 'active',
+      industry: industry || null, team_size: team_size || null,
     }).select('id').single()
     if (orgErr) return NextResponse.json({ error: orgErr.message }, { status: 500 })
 
