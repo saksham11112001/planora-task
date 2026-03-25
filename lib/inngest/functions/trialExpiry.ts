@@ -1,34 +1,54 @@
-import { inngest }         from '../client'
+import { inngest }           from '../client'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 /**
- * Runs daily at 9 AM IST — downgrades organisations whose trial has expired.
- * Fired by the same daily cron as reminders.
+ * Runs every day at 6:00 AM IST (0:30 AM UTC).
+ * Finds orgs whose trial has expired and are still in 'trialing' status,
+ * then downgrades them to free/active so feature gates kick in.
+ *
+ * Does NOT delete any data — users just lose access to paid features.
  */
 export const trialExpiry = inngest.createFunction(
-  { id: 'trial-expiry', name: 'Trial Expiry — daily check' },
-  { cron: 'TZ=Asia/Kolkata 0 9 * * *' },
-  async () => {
+  {
+    id:   'trial-expiry',
+    name: 'Daily: expire ended trials',
+    concurrency: { limit: 1 },
+  },
+  { cron: '30 0 * * *' }, // 6:00 AM IST
+
+  async ({ step }) => {
     const admin = createAdminClient()
     const now   = new Date().toISOString()
 
-    // Find orgs that are trialing but trial has expired
-    const { data: expired } = await admin
-      .from('organisations')
-      .select('id, name')
-      .eq('status', 'trialing')
-      .lt('trial_ends_at', now)
+    // Find all orgs whose trial has expired and are still marked 'trialing'
+    const expiredOrgs = await step.run('fetch-expired-trials', async () => {
+      const { data } = await admin.from('organisations')
+        .select('id, name')
+        .eq('status', 'trialing')
+        .lte('trial_ends_at', now)
+        .limit(500)
+      return data ?? []
+    })
 
-    if (!expired?.length) return { expired: 0 }
+    let downgraded = 0
 
-    // Downgrade them to free
-    const ids = expired.map(o => o.id)
-    await admin
-      .from('organisations')
-      .update({ status: 'active', plan_tier: 'free' })
-      .in('id', ids)
+    for (const org of expiredOrgs) {
+      await step.run(`downgrade-org-${org.id}`, async () => {
+        await admin.from('organisations')
+          .update({ status: 'active', plan_tier: 'free' })
+          .eq('id', org.id)
 
-    console.log(`[trial-expiry] Expired ${ids.length} trial orgs:`, ids)
-    return { expired: ids.length }
+        // Log the event for visibility
+        await admin.from('billing_events').insert({
+          org_id:     org.id,
+          event_type: 'trial.expired',
+          status:     'expired',
+        })
+
+        downgraded++
+      })
+    }
+
+    return { checked: expiredOrgs.length, downgraded }
   }
 )

@@ -4,7 +4,6 @@ import { onTaskAssigned }      from '@/lib/inngest/functions/onTaskAssigned'
 import { onApprovalRequested, onApprovalCompleted } from '@/lib/inngest/functions/onApproval'
 import { dailyReminders }      from '@/lib/inngest/functions/dailyReminders'
 import { recurringSpawn }      from '@/lib/inngest/functions/recurringSpawn'
-import { trialExpiry }        from '@/lib/inngest/functions/trialExpiry'
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
@@ -14,7 +13,6 @@ export const { GET, POST, PUT } = serve({
     onApprovalCompleted,
     dailyReminders,
     recurringSpawn,
-    trialExpiry,
   ],
   // Signing key required in production; optional in local dev
   signingKey: process.env.INNGEST_SIGNING_KEY,
