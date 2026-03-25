@@ -47,3 +47,23 @@ export async function POST(request: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ data }, { status: 201 })
 }
+
+export async function PATCH(request: NextRequest) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+  const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).single()
+  if (!mb || !['owner','admin','manager'].includes(mb.role)) return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
+
+  const url = new URL(request.url)
+  const id  = url.pathname.split('/').pop()
+  if (!id) return NextResponse.json({ error: 'ID required' }, { status: 400 })
+
+  const { title, frequency, priority, assignee_id, project_id, client_id } = await request.json()
+  const { data, error } = await supabase.from('tasks')
+    .update({ title, frequency, priority, assignee_id: assignee_id || null, project_id: project_id || null, client_id: client_id || null })
+    .eq('id', id).eq('org_id', mb.org_id).select('*').single()
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ data })
+}

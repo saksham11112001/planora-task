@@ -1,7 +1,7 @@
 'use client'
 import { useState, useTransition } from 'react'
 import { useRouter }          from 'next/navigation'
-import { RefreshCw, X }       from 'lucide-react'
+import { RefreshCw, X, Pencil, Check } from 'lucide-react'
 import { InlineRecurringTask } from '@/components/tasks/InlineRecurringTask'
 import { fmtDate }             from '@/lib/utils/format'
 import { toast }               from '@/store/appStore'
@@ -15,125 +15,222 @@ const FREQ_LABELS: Record<string, string> = {
 interface Task {
   id: string; title: string; status: string; priority: string
   frequency: string | null; next_occurrence_date: string | null
-  assignee_id: string | null
+  assignee_id: string | null; client_id: string | null
   assignee: { id: string; name: string } | null
   project:  { id: string; name: string; color: string } | null
+  client:   { id: string; name: string; color: string } | null
 }
 
 interface Props {
   tasks:         Task[]
   members:       { id: string; name: string }[]
   projects:      { id: string; name: string; color: string }[]
+  clients:       { id: string; name: string; color: string }[]
   currentUserId: string
   canManage:     boolean
 }
 
-export function RecurringView({ tasks, members, projects, currentUserId, canManage }: Props) {
+export function RecurringView({ tasks, members, projects, clients, currentUserId, canManage }: Props) {
   const router = useRouter()
-  const [isPending, startT] = useTransition()
+  const [, startT] = useTransition()
+  const [editingId, setEditingId] = useState<string|null>(null)
+  const [editForm, setEditForm] = useState<Partial<Task & { frequency: string }>>({})
+
+  function startEdit(task: Task) {
+    setEditingId(task.id)
+    setEditForm({
+      title:     task.title,
+      frequency: task.frequency ?? 'weekly',
+      priority:  task.priority,
+      assignee_id: task.assignee_id ?? '',
+      client_id:   task.client_id ?? '',
+    })
+  }
+
+  async function saveEdit(id: string) {
+    const res = await fetch(`/api/tasks/${id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title:       editForm.title?.trim(),
+        priority:    editForm.priority,
+        assignee_id: editForm.assignee_id || null,
+        client_id:   editForm.client_id   || null,
+      }),
+    })
+    // frequency lives on the recurring record
+    await fetch(`/api/recurring/${id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ frequency: editForm.frequency }),
+    }).catch(() => {})
+    if (res.ok) { toast.success('Updated'); setEditingId(null); startT(() => router.refresh()) }
+    else        { const d = await res.json(); toast.error(d.error ?? 'Failed') }
+  }
 
   async function handleDelete(id: string) {
     if (!confirm('Delete this recurring task? All future instances will stop being created.')) return
     const res = await fetch(`/api/tasks/${id}`, { method: 'DELETE' })
-    if (res.ok) { toast.success('Recurring task deleted'); startT(() => router.refresh()) }
+    if (res.ok) { toast.success('Deleted'); startT(() => router.refresh()) }
     else        { const d = await res.json(); toast.error(d.error ?? 'Failed') }
   }
 
   return (
     <div className="page-container">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Recurring tasks</h1>
-          <p className="text-sm text-gray-500 mt-1">{tasks.length} active · new instances spawn automatically each day</p>
-        </div>
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>Recurring tasks</h1>
+        <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>{tasks.length} active · instances spawn automatically each morning at 7 AM IST</p>
       </div>
 
-      {/* Empty state */}
-      {tasks.length === 0 && (
-        <div className="card overflow-hidden mb-6">
-          <div className="text-center py-12">
-            <RefreshCw className="h-10 w-10 text-gray-200 mx-auto mb-3" />
-            <h3 className="font-semibold text-gray-900 mb-1">No recurring tasks yet</h3>
-            <p className="text-sm text-gray-400 mb-1">Use the row below to set up your first recurring task</p>
-            <p className="text-xs text-gray-300">Tasks are automatically created on schedule</p>
-          </div>
-          {canManage && (
-            <InlineRecurringTask members={members} projects={projects} currentUserId={currentUserId}
-              onCreated={() => startT(() => router.refresh())} />
-          )}
+      <div className="card-elevated overflow-hidden mb-4">
+        {/* Header */}
+        <div style={{
+          display: 'grid', gridTemplateColumns: '1fr 7rem 5rem 6rem 5rem 4.5rem',
+          padding: '10px 16px', borderBottom: '1px solid var(--border)',
+          background: 'var(--surface-subtle)',
+          fontSize: 11, fontWeight: 700, color: 'var(--text-muted)',
+          textTransform: 'uppercase', letterSpacing: '0.05em',
+        }}>
+          <div>Task</div>
+          <div style={{textAlign:'center'}}>Frequency</div>
+          <div style={{textAlign:'center'}}>Next due</div>
+          <div style={{textAlign:'center'}}>Assignee</div>
+          <div style={{textAlign:'center'}}>Client</div>
+          <div/>
         </div>
-      )}
 
-      {/* Task list */}
-      {tasks.length > 0 && (
-        <div className="card-elevated overflow-hidden mb-4">
-          {/* Column headers */}
-          <div className="grid px-4 py-2.5 border-b text-xs font-semibold text-gray-400 uppercase tracking-wide"
-            style={{ gridTemplateColumns: '1fr 7rem 6rem 6rem 2.5rem', background: 'var(--surface-subtle)', borderColor: 'var(--border)' }}>
-            <div>Task</div>
-            <div className="text-center">Frequency</div>
-            <div className="text-center">Next due</div>
-            <div className="text-center">Assignee</div>
-            <div />
+        {tasks.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '40px 24px' }}>
+            <RefreshCw style={{ width: 36, height: 36, color: 'var(--border)', margin: '0 auto 12px' }}/>
+            <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>No recurring tasks yet</p>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>Use the row below to set up your first recurring task</p>
           </div>
+        )}
 
-          {tasks.map(task => (
-            <div key={task.id}
-              className="grid items-center px-4 py-3.5 border-b last:border-0 hover:bg-gray-50 transition-colors"
-              style={{ gridTemplateColumns: '1fr 7rem 6rem 6rem 2.5rem', borderColor: 'var(--border)' }}>
-
-              <div className="flex items-center gap-2.5 min-w-0">
-                <RefreshCw className="h-3.5 w-3.5 text-teal-500 flex-shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">{task.title}</p>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    {task.project && (
-                      <><div className="h-2 w-2 rounded-sm" style={{ background: task.project.color }} />
-                      <span className="text-xs text-gray-400 truncate">{task.project.name}</span></>
-                    )}
-                    <PriorityBadge priority={task.priority as any} />
-                  </div>
-                </div>
-              </div>
-
-              <div className="text-center">
-                <span className="text-xs px-2 py-1 rounded-full font-medium bg-teal-50 text-teal-700">
-                  {FREQ_LABELS[task.frequency ?? ''] ?? task.frequency}
-                </span>
-              </div>
-
-              <div className="text-center text-xs text-gray-500">
-                {task.next_occurrence_date ? fmtDate(task.next_occurrence_date) : '—'}
-              </div>
-
-              <div className="flex justify-center">
-                {task.assignee
-                  ? <Avatar name={task.assignee.name} size="xs" />
-                  : <div className="h-5 w-5 rounded-full border border-dashed border-gray-300" title="Unassigned" />
-                }
-              </div>
-
-              <div className="flex justify-center">
-                {canManage && (
-                  <button onClick={() => handleDelete(task.id)}
-                    className="h-6 w-6 flex items-center justify-center rounded text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors">
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                )}
+        {tasks.map(task => editingId === task.id ? (
+          /* ── Edit row ── */
+          <div key={task.id} style={{
+            padding: '12px 16px', borderBottom: '1px solid var(--border)',
+            background: 'var(--brand-light)', display: 'flex', flexDirection: 'column', gap: 10,
+          }}>
+            <input
+              value={editForm.title ?? ''}
+              onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))}
+              style={{ fontSize: 14, fontWeight: 500, border: '1px solid var(--border)',
+                borderRadius: 7, padding: '6px 10px', background: 'var(--surface)',
+                color: 'var(--text-primary)', outline: 'none', width: '100%' }}
+            />
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              <select value={editForm.frequency} onChange={e => setEditForm(f => ({ ...f, frequency: e.target.value }))}
+                style={{ fontSize: 12, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)',
+                  background: 'var(--surface)', color: 'var(--text-secondary)' }}>
+                {Object.entries(FREQ_LABELS).map(([v,l]) => <option key={v} value={v}>{l}</option>)}
+              </select>
+              <select value={editForm.assignee_id ?? ''} onChange={e => setEditForm(f => ({ ...f, assignee_id: e.target.value }))}
+                style={{ fontSize: 12, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)',
+                  background: 'var(--surface)', color: 'var(--text-secondary)' }}>
+                <option value="">Unassigned</option>
+                {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </select>
+              <select value={editForm.client_id ?? ''} onChange={e => setEditForm(f => ({ ...f, client_id: e.target.value }))}
+                style={{ fontSize: 12, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)',
+                  background: 'var(--surface)', color: 'var(--text-secondary)' }}>
+                <option value="">No client</option>
+                {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+                <button onClick={() => saveEdit(task.id)} style={{
+                  padding: '5px 14px', borderRadius: 6, border: 'none',
+                  background: 'var(--brand)', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                }}>Save</button>
+                <button onClick={() => setEditingId(null)} style={{
+                  padding: '5px 10px', borderRadius: 6, border: '1px solid var(--border)',
+                  background: 'var(--surface)', color: 'var(--text-secondary)', fontSize: 12, cursor: 'pointer',
+                }}>Cancel</button>
               </div>
             </div>
-          ))}
+          </div>
+        ) : (
+          /* ── Normal row ── */
+          <div key={task.id} className="group" style={{
+            display: 'grid', gridTemplateColumns: '1fr 7rem 5rem 6rem 5rem 4.5rem',
+            alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid var(--border)',
+            transition: 'background 0.1s',
+          }}
+          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--surface-subtle)'}
+          onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}>
 
-          {/* ── Inline creator at bottom of list ── */}
-          {canManage && (
-            <InlineRecurringTask members={members} projects={projects} currentUserId={currentUserId}
-              onCreated={() => startT(() => router.refresh())} />
-          )}
-        </div>
-      )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+              <RefreshCw style={{ width: 13, height: 13, color: 'var(--brand)', flexShrink: 0 }}/>
+              <div style={{ minWidth: 0 }}>
+                <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {task.title}
+                </p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                  {task.project && (
+                    <><div style={{ width: 7, height: 7, borderRadius: 2, background: task.project.color, flexShrink: 0 }}/>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.project.name}</span></>
+                  )}
+                  <PriorityBadge priority={task.priority as any}/>
+                </div>
+              </div>
+            </div>
 
-      <p className="text-xs text-center text-gray-400 mt-4">
-        ⏰ New task instances are automatically created each morning at 7:00 AM
+            <div style={{ textAlign: 'center' }}>
+              <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 99, fontWeight: 600,
+                background: 'var(--brand-light)', color: 'var(--brand)' }}>
+                {FREQ_LABELS[task.frequency ?? ''] ?? task.frequency}
+              </span>
+            </div>
+
+            <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-muted)' }}>
+              {task.next_occurrence_date ? fmtDate(task.next_occurrence_date) : '—'}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+              {task.assignee
+                ? <Avatar name={task.assignee.name} size="xs"/>
+                : <div style={{ width: 20, height: 20, borderRadius: '50%', border: '1.5px dashed var(--border)' }}/>}
+            </div>
+
+            <div style={{ textAlign: 'center' }}>
+              {task.client
+                ? <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
+                    <div style={{ width: 7, height: 7, borderRadius: 2, background: task.client.color, flexShrink: 0 }}/>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 60 }}>{task.client.name}</span>
+                  </div>
+                : <span style={{ fontSize: 11, color: 'var(--border)' }}>—</span>}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 2 }}>
+              {canManage && (
+                <>
+                  <button onClick={() => startEdit(task)}
+                    style={{ width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      borderRadius: 6, border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)' }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--brand)'; (e.currentTarget as HTMLElement).style.background = 'var(--brand-light)' }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'; (e.currentTarget as HTMLElement).style.background = 'transparent' }}>
+                    <Pencil style={{ width: 12, height: 12 }}/>
+                  </button>
+                  <button onClick={() => handleDelete(task.id)}
+                    style={{ width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      borderRadius: 6, border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)' }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#dc2626'; (e.currentTarget as HTMLElement).style.background = '#fff1f2' }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'; (e.currentTarget as HTMLElement).style.background = 'transparent' }}>
+                    <X style={{ width: 12, height: 12 }}/>
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        ))}
+
+        {canManage && (
+          <InlineRecurringTask members={members} projects={projects} clients={clients}
+            currentUserId={currentUserId} onCreated={() => startT(() => router.refresh())}/>
+        )}
+      </div>
+
+      <p style={{ fontSize: 11, textAlign: 'center', color: 'var(--text-muted)', marginTop: 8 }}>
+        ⏰ New instances are created each morning at 7:00 AM IST
       </p>
     </div>
   )

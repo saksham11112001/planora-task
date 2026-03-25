@@ -36,6 +36,9 @@ export function ProjectView({ project, tasks, members, clients, defaultClientId,
   const [completing,   setCompleting]   = useState<Set<string>>(new Set())
   const [collapsed,    setCollapsed]    = useState<Record<string, boolean>>({})
   const [isPending,    startT]          = useTransition()
+  const [expandedSubs, setExpandedSubs] = useState<Record<string, boolean>>({})
+  const [subtaskData,  setSubtaskData]  = useState<Record<string, any[]>>({})
+  const [loadingSubs,  setLoadingSubs]  = useState<Record<string, boolean>>({})
   const today = todayStr()
   const toolbarRef = useRef<HTMLDivElement>(null)
 
@@ -105,6 +108,44 @@ export function ProjectView({ project, tasks, members, clients, defaultClientId,
     ...customSections.map(s => ({ ...s, creator: true, tasks: [] as Task[] })),
   ]
 
+  async function toggleSubExpand(taskId: string) {
+    const isOpen = expandedSubs[taskId]
+    if (isOpen) { setExpandedSubs(p => ({ ...p, [taskId]: false })); return }
+    setExpandedSubs(p => ({ ...p, [taskId]: true }))
+    if (subtaskData[taskId]) return // already loaded
+    setLoadingSubs(p => ({ ...p, [taskId]: true }))
+    const r = await fetch(`/api/tasks?parent_id=${taskId}&limit=50`)
+    const d = await r.json()
+    setSubtaskData(p => ({ ...p, [taskId]: d.data ?? [] }))
+    setLoadingSubs(p => ({ ...p, [taskId]: false }))
+  }
+
+  async function toggleSubDone(subId: string, status: string, parentId: string) {
+    const newStatus = status === 'completed' ? 'todo' : 'completed'
+    await fetch(`/api/tasks/${subId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: newStatus, completed_at: newStatus === 'completed' ? new Date().toISOString() : null }),
+    })
+    // Refresh subtask data
+    const r = await fetch(`/api/tasks?parent_id=${parentId}&limit=50`)
+    const d = await r.json()
+    setSubtaskData(p => ({ ...p, [parentId]: d.data ?? [] }))
+    startT(() => router.refresh())
+  }
+
+  async function addSubtaskInline(parentId: string, title: string) {
+    if (!title.trim()) return
+    const res = await fetch('/api/tasks', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: title.trim(), parent_task_id: parentId, status: 'todo', priority: 'medium' }),
+    })
+    if (res.ok) {
+      const r = await fetch(`/api/tasks?parent_id=${parentId}&limit=50`)
+      const d = await r.json()
+      setSubtaskData(p => ({ ...p, [parentId]: d.data ?? [] }))
+    }
+  }
+
   async function toggleDone(taskId: string, status: string, e: React.MouseEvent) {
     e.stopPropagation()
     setCompleting(p => new Set(p).add(taskId))
@@ -131,7 +172,12 @@ export function ProjectView({ project, tasks, members, clients, defaultClientId,
     const isComp   = task.status === 'completed'
     const assignee = task.assignee as unknown as { id: string; name: string } | null
     const statConf = STATUS_CONFIG[task.status]
+    const subs    = subtaskData[task.id] ?? []
+    const subsDone = subs.filter(s => s.status === 'completed').length
+    const [newSubInput, setNewSubInput] = useState('')
+
     return (
+      <>
       <div className={cn('task-row group', selectedTask?.id === task.id && 'selected', checked.has(task.id) && 'bg-teal-50/60')}>
         <input type="checkbox" checked={checked.has(task.id)}
           onChange={() => setChecked(p => { const s = new Set(p); s.has(task.id) ? s.delete(task.id) : s.add(task.id); return s })}
@@ -147,9 +193,25 @@ export function ProjectView({ project, tasks, members, clients, defaultClientId,
             {isComp && <svg viewBox="0 0 16 16" fill="none" className="h-2.5 w-2.5"><path d="M13 4L6.5 11 3 7.5" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
           </div>
         )}
-        <div className="flex-1 min-w-0" onClick={() => setSelectedTask(task)}>
+        <div className="flex-1 min-w-0 flex items-center gap-2" onClick={() => setSelectedTask(task)}>
           <span className={cn('text-sm', isComp ? 'line-through text-gray-400' : ov ? 'text-red-700' : 'text-gray-900')}>{task.title}</span>
         </div>
+        {/* Subtask expand toggle */}
+        <button
+          onClick={e => { e.stopPropagation(); toggleSubExpand(task.id) }}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 3, padding: '2px 6px',
+            borderRadius: 4, border: 'none', background: expandedSubs[task.id] ? 'var(--brand-light)' : 'transparent',
+            color: expandedSubs[task.id] ? 'var(--brand)' : 'var(--text-muted)',
+            fontSize: 10, fontWeight: 600, cursor: 'pointer', flexShrink: 0,
+            transition: 'all 0.1s',
+          }}
+          title="Show/hide subtasks">
+          <svg viewBox="0 0 12 12" fill="none" style={{ width: 9, height: 9 }}>
+            <path d="M2 3h8M4 6h6M6 9h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+          {subtaskData[task.id]?.length ? subtaskData[task.id].length : ''}
+        </button>
         <div className="w-36 hidden md:flex items-center gap-2 pl-2" onClick={() => setSelectedTask(task)}>
           {assignee ? <><Avatar name={assignee.name} size="xs"/><span className="text-xs text-gray-500 truncate">{assignee.name}</span></> : <div className="h-5 w-5 rounded-full border border-dashed border-gray-300 opacity-0 group-hover:opacity-100"/>}
         </div>
@@ -167,6 +229,67 @@ export function ProjectView({ project, tasks, members, clients, defaultClientId,
           )}
         </div>
       </div>
+
+      {/* Inline subtasks */}
+      {expandedSubs[task.id] && (
+        <div style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface-subtle)' }}>
+          {loadingSubs[task.id] && (
+            <div style={{ padding: '8px 48px', fontSize: 12, color: 'var(--text-muted)' }}>Loading…</div>
+          )}
+          {subs.map(sub => (
+            <div key={sub.id} style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '6px 16px 6px 48px',
+              borderBottom: '1px solid var(--border-light)',
+            }}>
+              <button onClick={() => toggleSubDone(sub.id, sub.status, task.id)}
+                style={{
+                  width: 14, height: 14, borderRadius: '50%', flexShrink: 0, border: 'none',
+                  background: sub.status === 'completed' ? 'var(--brand)' : 'transparent',
+                  outline: `2px solid ${sub.status === 'completed' ? 'var(--brand)' : 'var(--border)'}`,
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  transition: 'all 0.15s',
+                }}>
+                {sub.status === 'completed' && (
+                  <svg viewBox="0 0 10 10" fill="none" style={{ width: 8, height: 8 }}>
+                    <path d="M1.5 5L4 7.5L8.5 2.5" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
+                  </svg>
+                )}
+              </button>
+              <span style={{
+                flex: 1, fontSize: 12, color: sub.status === 'completed' ? 'var(--text-muted)' : 'var(--text-primary)',
+                textDecoration: sub.status === 'completed' ? 'line-through' : 'none',
+              }}>{sub.title}</span>
+              {subsDone > 0 && subs.length > 0 && (
+                <span style={{ fontSize: 10, color: 'var(--text-muted)', flexShrink: 0 }}>
+                  {subsDone}/{subs.length}
+                </span>
+              )}
+            </div>
+          ))}
+          {/* Inline add subtask */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 16px 6px 48px' }}>
+            <div style={{ width: 14, height: 14, borderRadius: '50%', flexShrink: 0, border: '1.5px dashed var(--brand)', opacity: 0.5 }}/>
+            <input
+              value={newSubInput}
+              onChange={e => setNewSubInput(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && newSubInput.trim()) {
+                  addSubtaskInline(task.id, newSubInput)
+                  setNewSubInput('')
+                }
+                if (e.key === 'Escape') setNewSubInput('')
+              }}
+              placeholder="Add subtask… (Enter)"
+              style={{
+                flex: 1, fontSize: 12, border: 'none', outline: 'none',
+                background: 'transparent', color: 'var(--text-primary)',
+              }}
+            />
+          </div>
+        </div>
+      )}
+      </>
     )
   }
 

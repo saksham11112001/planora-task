@@ -1,4 +1,5 @@
 'use client'
+import React from 'react'
 import { useState, useTransition } from 'react'
 import { useRouter }          from 'next/navigation'
 import { CheckCheck }         from 'lucide-react'
@@ -26,6 +27,62 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
   const [checked,      setChecked]      = useState<Set<string>>(new Set())
   const [completing,   setCompleting]   = useState<Set<string>>(new Set())
   const [, startT]                      = useTransition()
+  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set())
+  const [subtaskMap,    setSubtaskMap]    = useState<Record<string, {id:string;title:string;status:string}[]>>({})
+  const [loadingSubtasks, setLoadingSubtasks] = useState<Set<string>>(new Set())
+
+  async function toggleExpand(taskId: string) {
+    setExpandedTasks(prev => {
+      const next = new Set(prev)
+      if (next.has(taskId)) { next.delete(taskId); return next }
+      next.add(taskId); return next
+    })
+    if (!subtaskMap[taskId]) {
+      setLoadingSubtasks(p => new Set(p).add(taskId))
+      try {
+        const r = await fetch(`/api/tasks?parent_id=${taskId}&limit=50`)
+        const d = await r.json()
+        setSubtaskMap(p => ({ ...p, [taskId]: d.data ?? [] }))
+      } finally {
+        setLoadingSubtasks(p => { const s = new Set(p); s.delete(taskId); return s })
+      }
+    }
+  }
+
+  async function toggleSubRow(parentId: string, subId: string, status: string) {
+    const newStatus = status === 'completed' ? 'todo' : 'completed'
+    setSubtaskMap(p => ({
+      ...p,
+      [parentId]: (p[parentId] ?? []).map(s => s.id === subId ? { ...s, status: newStatus } : s)
+    }))
+    await fetch(`/api/tasks/${subId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: newStatus, completed_at: newStatus === 'completed' ? new Date().toISOString() : null }),
+    })
+    // Check if all subtasks done → auto-complete parent
+    const updatedSubs = (subtaskMap[parentId] ?? []).map(s => s.id === subId ? { ...s, status: newStatus } : s)
+    if (newStatus === 'completed' && updatedSubs.length > 0 && updatedSubs.every(s => s.status === 'completed')) {
+      await fetch(`/api/tasks/${parentId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'completed', completed_at: new Date().toISOString() }),
+      })
+      setLocalTasks(prev => prev.map(t => t.id === parentId ? { ...t, status: 'completed' } : t))
+      toast.success('All subtasks done — task completed! 🎉')
+    }
+    startT(() => router.refresh())
+  }
+
+  async function addSubtaskInline(parentId: string, title: string) {
+    if (!title.trim()) return
+    const r = await fetch('/api/tasks', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: title.trim(), parent_task_id: parentId, status: 'todo' }),
+    })
+    const d = await r.json()
+    if (r.ok && d.data) {
+      setSubtaskMap(p => ({ ...p, [parentId]: [...(p[parentId] ?? []), d.data] }))
+    }
+  }
   const today = todayStr()
 
   async function toggleDone(taskId: string, status: string, e: React.MouseEvent) {
@@ -122,8 +179,8 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
               {section.tasks.map(task => {
                 const ov      = isOverdue(task.due_date, task.status)
                 const isComp  = task.status === 'completed'
-                const assignee = task.assignee as { id: string; name: string } | null
-                const client   = (task as any).client as { id: string; name: string; color: string } | null
+                const assignee = task.assignee as unknown as { id: string; name: string } | null
+                const client   = (task as any).client as unknown as { id: string; name: string; color: string } | null
                 const pri      = PRIORITY_CONFIG[task.priority]
                 const isChecked = checked.has(task.id)
                 const isCompleting = completing.has(task.id)
@@ -259,6 +316,26 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
           onUpdated={() => { startT(() => router.refresh()) }}
         />
       )}
+    </div>
+  )
+}
+
+function SubtaskAdder({ onAdd }: { onAdd: (title: string) => void }) {
+  const [val, setVal] = React.useState('')
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0' }}>
+      <div style={{ width: 14, height: 14, borderRadius: '50%', border: '1.5px dashed var(--brand)', opacity: 0.5, flexShrink: 0 }}/>
+      <input
+        value={val}
+        onChange={e => setVal(e.target.value)}
+        onKeyDown={e => {
+          if (e.key === 'Enter' && val.trim()) { onAdd(val); setVal('') }
+          if (e.key === 'Escape') setVal('')
+        }}
+        placeholder="Add subtask…"
+        style={{ flex: 1, fontSize: 12, border: 'none', outline: 'none',
+          background: 'transparent', color: 'var(--text-primary)' }}
+      />
     </div>
   )
 }

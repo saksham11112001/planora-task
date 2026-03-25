@@ -23,6 +23,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const { data, error } = await supabase.from('tasks').update(updates).eq('id', id).select('*').single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Auto-complete parent task when all subtasks are completed
+  if (updates.status === 'completed' && data?.parent_task_id) {
+    const { data: siblings } = await supabase
+      .from('tasks').select('id, status')
+      .eq('parent_task_id', data.parent_task_id)
+    if (siblings && siblings.length > 0 && siblings.every(s => s.status === 'completed')) {
+      await supabase.from('tasks')
+        .update({ status: 'completed', completed_at: new Date().toISOString() })
+        .eq('id', data.parent_task_id)
+    }
+  }
+
   return NextResponse.json({ data })
 }
 

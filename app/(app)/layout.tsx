@@ -12,11 +12,30 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     getUserProfile(user.id),
   ])
 
-  if (!membership) redirect('/onboarding')
+  // If no active membership, check for pending invite (is_active = false)
+  if (!membership) {
+    const { createClient: createAdminClient } = await import('@/lib/supabase/admin')
+    const admin = createAdminClient()
+    const { data: pending } = await admin
+      .from('org_members')
+      .select('id, org_id, role, organisations(id, name, slug, plan_tier, logo_color)')
+      .eq('user_id', user.id)
+      .eq('is_active', false)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (pending) {
+      // Auto-activate the invited membership
+      await admin.from('org_members').update({ is_active: true }).eq('id', pending.id)
+      // Refresh to pick up new session
+      redirect('/dashboard')
+    }
+    redirect('/onboarding')
+  }
 
   const org = membership.organisations as unknown as {
     id: string; name: string; slug: string; plan_tier: string; logo_color: string
-    status: string | null; trial_ends_at: string | null
   } | null
   if (!org) redirect('/onboarding')
 
@@ -29,13 +48,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         avatar_url: profile?.avatar_url ?? null,
       }}
       org={{
-        id:            org.id,
-        name:          org.name,
-        slug:          org.slug,
-        plan_tier:     org.plan_tier as any,
-        logo_color:    org.logo_color ?? '#0d9488',
-        status:        org.status ?? null,
-        trial_ends_at: org.trial_ends_at ?? null,
+        id:         org.id,
+        name:       org.name,
+        slug:       org.slug,
+        plan_tier:  org.plan_tier as any,
+        logo_color: org.logo_color ?? '#0d9488',
       }}
       role={membership.role}
       workspaceId={null}
