@@ -194,8 +194,17 @@ function Div() { return <div style={{ borderTop: '1px solid rgba(255,255,255,0.0
 function SI({ href, active, icon, label }: { href: string; active: boolean; icon: React.ReactNode; label: string }) {
   return (
     <Link href={href} prefetch={true}
-      className={cn('flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors',
-        active ? 'bg-white/15 text-white font-medium' : 'text-white/60 hover:bg-white/10 hover:text-white')}>
+      style={{
+        display: 'flex', alignItems: 'center', gap: 9,
+        padding: '7px 10px', borderRadius: 7, fontSize: 13,
+        textDecoration: 'none', transition: 'all 0.12s', margin: '1px 4px',
+        background: active ? 'rgba(255,255,255,0.14)' : 'transparent',
+        color: active ? '#fff' : 'rgba(255,255,255,0.6)',
+        fontWeight: active ? 500 : 400,
+        borderLeft: active ? '2px solid rgba(255,255,255,0.5)' : '2px solid transparent',
+      }}
+      onMouseEnter={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)'; (e.currentTarget as HTMLElement).style.color = '#fff' } }}
+      onMouseLeave={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.6)' } }}>
       {icon}{label}
     </Link>
   )

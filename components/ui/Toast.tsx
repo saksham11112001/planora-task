@@ -1,30 +1,45 @@
 'use client'
 import { useToastStore } from '@/store/appStore'
-import { CheckCircle, XCircle, Info, X } from 'lucide-react'
-import { cn } from '@/lib/utils/cn'
+import { CheckCircle, XCircle, Info, AlertTriangle, X } from 'lucide-react'
 
 export function ToastContainer() {
   const { toasts, remove } = useToastStore()
   if (!toasts.length) return null
+
+  const cfg = {
+    success: { bg: '#f0fdf4', border: '#bbf7d0', color: '#15803d', icon: CheckCircle },
+    error:   { bg: '#fef2f2', border: '#fecaca', color: '#b91c1c', icon: XCircle     },
+    info:    { bg: '#eff6ff', border: '#bfdbfe', color: '#1d4ed8', icon: Info         },
+    warning: { bg: '#fffbeb', border: '#fde68a', color: '#92400e', icon: AlertTriangle},
+  }
+
   return (
-    <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
-      {toasts.map(t => (
-        <div key={t.id}
-          className={cn(
-            'flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg border text-sm font-medium min-w-64 max-w-sm',
-            t.type === 'success' && 'bg-green-50 border-green-200 text-green-800',
-            t.type === 'error'   && 'bg-red-50   border-red-200   text-red-800',
-            t.type === 'info'    && 'bg-blue-50  border-blue-200  text-blue-800',
-          )}>
-          {t.type === 'success' && <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0"/>}
-          {t.type === 'error'   && <XCircle     className="h-4 w-4 text-red-600 flex-shrink-0"/>}
-          {t.type === 'info'    && <Info        className="h-4 w-4 text-blue-600 flex-shrink-0"/>}
-          <span className="flex-1">{t.message}</span>
-          <button onClick={() => remove(t.id)} className="opacity-50 hover:opacity-100 transition-opacity">
-            <X className="h-3.5 w-3.5"/>
-          </button>
-        </div>
-      ))}
+    <div style={{ position:'fixed', bottom:20, right:20, zIndex:9999,
+      display:'flex', flexDirection:'column', gap:8, pointerEvents:'none' }}>
+      {toasts.map(t => {
+        const { bg, border, color, icon: Icon } = cfg[t.type as keyof typeof cfg] ?? cfg.info
+        return (
+          <div key={t.id}
+            style={{
+              display:'flex', alignItems:'center', gap:10,
+              padding:'11px 14px', borderRadius:10,
+              background:bg, border:`1px solid ${border}`,
+              boxShadow:'0 4px 20px rgba(0,0,0,0.1)',
+              minWidth:240, maxWidth:360,
+              pointerEvents:'all',
+              animation:'toastIn 0.22s cubic-bezier(0.34,1.56,0.64,1) both',
+            }}>
+            <Icon style={{ width:16, height:16, color, flexShrink:0 }}/>
+            <span style={{ flex:1, fontSize:13, fontWeight:500, color, lineHeight:1.4 }}>{t.message}</span>
+            <button onClick={() => remove(t.id)}
+              style={{ background:'none', border:'none', cursor:'pointer', color, opacity:0.6, padding:2,
+                display:'flex', alignItems:'center', flexShrink:0 }}>
+              <X style={{ width:13, height:13 }}/>
+            </button>
+          </div>
+        )
+      })}
+      <style>{\`@keyframes toastIn{from{opacity:0;transform:translateX(16px) scale(0.95)}to{opacity:1;transform:translateX(0) scale(1)}}\`}</style>
     </div>
   )
 }

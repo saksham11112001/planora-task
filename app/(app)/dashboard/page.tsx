@@ -68,8 +68,8 @@ export default async function DashboardPage() {
   return (
     <div className="page-container">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">{greeting}, {name}!</h1>
-        <p className="text-sm text-gray-500 mt-1">Here&apos;s your work for today</p>
+        <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>{greeting}, {name}!</h1>
+        <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>Here&apos;s your work for today</p>
       </div>
 
       {/* KPI cards */}
@@ -80,16 +80,25 @@ export default async function DashboardPage() {
           { n: pendingCount ?? 0, label: 'Awaiting approval', href: '/tasks'               },
         ].map(({ n, label, href, urgent, brand }) => (
           <Link key={label} href={href}
-            className="card-elevated p-4 block hover:shadow-md transition-shadow"
-            style={n > 0 && urgent ? { background: '#fef2f2', borderColor: '#fecaca' }
-              : n > 0 && brand  ? { background: 'var(--brand-light)', borderColor: 'var(--brand-border)' } : {}}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              {urgent ? <AlertCircle className="h-4 w-4" style={{ color: n > 0 ? '#dc2626' : '#cbd5e1' }}/> :
-               brand  ? <Clock       className="h-4 w-4" style={{ color: n > 0 ? 'var(--brand)' : '#cbd5e1' }}/> :
-                         <CheckSquare className="h-4 w-4" style={{ color:'var(--text-muted)' }}/>}
-              <span className="text-xs font-medium" style={{ color: n > 0 && urgent ? '#dc2626' : n > 0 && brand ? 'var(--brand)' : '#94a3b8' }}>{label}</span>
+            style={{
+              display: 'block', textDecoration: 'none',
+              background: n > 0 && urgent ? '#fef2f2' : n > 0 && brand ? 'var(--brand-light)' : 'var(--surface)',
+              border: `1px solid ${n > 0 && urgent ? '#fecaca' : n > 0 && brand ? 'var(--brand-border)' : 'var(--border)'}`,
+              borderRadius: 12, padding: '16px 18px',
+              transition: 'all 0.15s', cursor: 'pointer',
+            }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.08)' }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'none'; (e.currentTarget as HTMLElement).style.boxShadow = 'none' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: n > 0 && urgent ? '#fecaca' : n > 0 && brand ? 'var(--brand-border)' : 'var(--border-light)' }}>
+                {urgent ? <AlertCircle style={{ width: 15, height: 15, color: n > 0 ? '#dc2626' : '#94a3b8' }}/> :
+                 brand  ? <Clock       style={{ width: 15, height: 15, color: n > 0 ? 'var(--brand)' : '#94a3b8' }}/> :
+                           <CheckSquare style={{ width: 15, height: 15, color: 'var(--text-muted)' }}/>}
+              </div>
+              <span style={{ fontSize: 12, fontWeight: 500, color: n > 0 && urgent ? '#dc2626' : n > 0 && brand ? 'var(--brand)' : 'var(--text-muted)' }}>{label}</span>
             </div>
-            <p className="text-3xl font-bold" style={{ color: n > 0 && urgent ? '#dc2626' : n > 0 && brand ? 'var(--brand)' : '#cbd5e1' }}>{n}</p>
+            <p style={{ fontSize: 32, fontWeight: 800, lineHeight: 1, color: n > 0 && urgent ? '#dc2626' : n > 0 && brand ? 'var(--brand)' : '#cbd5e1' }}>{n}</p>
           </Link>
         ))}
       </div>
@@ -98,7 +107,7 @@ export default async function DashboardPage() {
         {/* My tasks */}
         <div>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold text-gray-900">My tasks</h2>
+<h2 style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>My tasks</h2>
             <Link href="/tasks" className="text-xs flex items-center gap-1 text-teal-600 hover:text-teal-700">View all <ArrowRight className="h-3 w-3"/></Link>
           </div>
           <div className="card-elevated overflow-hidden">

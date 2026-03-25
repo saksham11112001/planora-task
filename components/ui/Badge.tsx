@@ -6,8 +6,14 @@ export function PriorityBadge({ priority }: { priority: TaskPriority }) {
   const c = PRIORITY_CONFIG[priority]
   if (!c || priority === 'none') return null
   return (
-    <span className="priority-chip" style={{ background: c.bg, color: c.color }}>
-      <span className="h-1.5 w-1.5 rounded-full flex-shrink-0" style={{ background: c.dot }}/>
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 4,
+      padding: '2px 8px', borderRadius: 99,
+      fontSize: '0.7rem', fontWeight: 600, whiteSpace: 'nowrap',
+      background: c.bg, color: c.color,
+      border: `1px solid ${c.dot}33`,
+    }}>
+      <span style={{ width: 5, height: 5, borderRadius: '50%', background: c.dot, flexShrink: 0 }}/>
       {c.label}
     </span>
   )
@@ -61,7 +67,7 @@ export function RoleBadge({ role }: { role: string }) {
   )
 }
 
-export function Avatar({ name, size = 'sm', color }: { name: string; size?: 'xs'|'sm'|'md'|'lg'; color?: string }) {
+export function Avatar({ name, size = 'sm', color, title }: { name: string; size?: 'xs'|'sm'|'md'; color?: string; title?: string }: { name: string; size?: 'xs'|'sm'|'md'|'lg'; color?: string }) {
   const sz = { xs: 'h-5 w-5 text-xs', sm: 'h-7 w-7 text-xs', md: 'h-8 w-8 text-sm', lg: 'h-10 w-10 text-sm' }
   const bg = color ?? '#0d9488'
   const initials = name.split(' ').slice(0,2).map(p => p[0]?.toUpperCase() ?? '').join('')

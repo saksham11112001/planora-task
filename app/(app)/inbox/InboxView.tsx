@@ -2,7 +2,7 @@
 import React from 'react'
 import { useState, useTransition } from 'react'
 import { useRouter }          from 'next/navigation'
-import { CheckCheck, Clock, ListTree, Plus } from 'lucide-react'
+import { CheckCheck, Clock } from 'lucide-react'
 import { InlineOneTimeTask }  from '@/components/tasks/InlineOneTimeTask'
 import { TaskDetailPanel }    from '@/components/tasks/TaskDetailPanel'
 import { cn }                 from '@/lib/utils/cn'
@@ -353,8 +353,21 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                             fontSize: 10, fontWeight: 600, cursor: 'pointer',
                           }}
                           title={subs.length ? `${subsDone}/${subs.length} subtasks` : 'Add subtasks'}>
-                          <ListTree style={{ width: 10, height: 10 }}/>
-                          {subs.length > 0 ? `${subsDone}/${subs.length}` : '+'}
+                          {subs.length > 0 ? (
+                            <>
+                              <svg viewBox="0 0 10 10" fill="none" style={{ width: 8, height: 8, flexShrink: 0 }}>
+                                <path d="M1 2.5h8M2.5 5h5.5M4 7.5h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                              </svg>
+                              <span style={{ fontVariantNumeric: 'tabular-nums' }}>{subsDone}/{subs.length}</span>
+                            </>
+                          ) : (
+                            <>
+                              <svg viewBox="0 0 10 10" fill="none" style={{ width: 8, height: 8, flexShrink: 0 }}>
+                                <path d="M1 2.5h8M2.5 5h5.5M4 7.5h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                              </svg>
+                              <span>Add</span>
+                            </>
+                          )}
                         </button>
                       )
                     })()}
