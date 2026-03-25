@@ -16,6 +16,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const org = membership.organisations as unknown as {
     id: string; name: string; slug: string; plan_tier: string; logo_color: string
+    status: string | null; trial_ends_at: string | null
   } | null
   if (!org) redirect('/onboarding')
 
@@ -28,11 +29,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         avatar_url: profile?.avatar_url ?? null,
       }}
       org={{
-        id:         org.id,
-        name:       org.name,
-        slug:       org.slug,
-        plan_tier:  org.plan_tier as any,
-        logo_color: org.logo_color ?? '#0d9488',
+        id:            org.id,
+        name:          org.name,
+        slug:          org.slug,
+        plan_tier:     org.plan_tier as any,
+        logo_color:    org.logo_color ?? '#0d9488',
+        status:        org.status ?? null,
+        trial_ends_at: org.trial_ends_at ?? null,
       }}
       role={membership.role}
       workspaceId={null}

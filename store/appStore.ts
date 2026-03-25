@@ -1,7 +1,10 @@
 import { create } from 'zustand'
 
 interface User    { id: string; name: string; email: string; avatar_url: string | null }
-interface Org     { id: string; name: string; slug: string; plan_tier: string; logo_color: string }
+interface Org     {
+  id: string; name: string; slug: string; plan_tier: string; logo_color: string
+  status: string | null; trial_ends_at: string | null
+}
 interface Session { user: User; org: Org; role: string; workspaceId: string | null }
 
 interface AppState {

@@ -22,9 +22,30 @@ export async function POST(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-  const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).single()
+  const { data: mb } = await supabase
+    .from('org_members')
+    .select('org_id, role, organisations(plan_tier)')
+    .eq('user_id', user.id).eq('is_active', true).single()
   if (!mb || !['owner','admin','manager'].includes(mb.role))
     return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
+
+  // ── Plan limit check ────────────────────────────────────────────────────
+  const { PLAN_LIMITS } = await import('@/lib/utils/plans')
+  const planTier  = (mb.organisations as any)?.plan_tier ?? 'free'
+  const maxProjects = PLAN_LIMITS[planTier as keyof typeof PLAN_LIMITS]?.projects ?? 3
+  if (maxProjects !== -1) {
+    const { count } = await supabase
+      .from('projects')
+      .select('id', { count: 'exact', head: true })
+      .eq('org_id', mb.org_id)
+      .neq('is_archived', true)
+    if ((count ?? 0) >= maxProjects)
+      return NextResponse.json({
+        error: `Project limit reached (${maxProjects} on your ${planTier} plan). Upgrade to add more.`,
+      }, { status: 403 })
+  }
+  // ────────────────────────────────────────────────────────────────────────
+
   const body = await request.json()
   if (!body.name?.trim()) return NextResponse.json({ error: 'Name required' }, { status: 400 })
   const { data, error } = await supabase.from('projects').insert({

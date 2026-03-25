@@ -11,7 +11,7 @@ import { useAppStore }    from '@/store/appStore'
 
 interface Props {
   user:        { id: string; name: string; email: string; avatar_url: string | null }
-  org:         { id: string; name: string; slug: string; plan_tier: any; logo_color: string }
+  org:         { id: string; name: string; slug: string; plan_tier: any; logo_color: string; status: string | null; trial_ends_at: string | null }
   role:        string
   workspaceId: string | null
   children:    React.ReactNode
@@ -61,23 +61,13 @@ export function AppShell({ user, org, role, workspaceId, children }: Props) {
         </main>
       </div>
 
-      <Suspense fallback={null}><RouteLoader/></Suspense>
-      <AppLoader/>
-      <SearchModal/>
       <ToastContainer/>
+      <SearchModal/>
+      <RouteLoader/>
     </div>
   )
 }
 
 function PageFallback() {
-  return (
-    <div style={{ flex: 1, padding: 24 }}>
-      {[...Array(3)].map((_, i) => (
-        <div key={i} style={{ height: 80, borderRadius: 10, background:'var(--surface)',
-          border:'1px solid var(--border)', marginBottom: 12,
-          animation: 'pulse 1.5s ease-in-out infinite', opacity: 1 - i * 0.2 }}/>
-      ))}
-      <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}`}</style>
-    </div>
-  )
+  return <AppLoader/>
 }
