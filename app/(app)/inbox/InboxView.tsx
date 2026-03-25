@@ -2,7 +2,7 @@
 import React from 'react'
 import { useState, useTransition } from 'react'
 import { useRouter }          from 'next/navigation'
-import { CheckCheck }         from 'lucide-react'
+import { CheckCheck, Clock } from 'lucide-react'
 import { InlineOneTimeTask }  from '@/components/tasks/InlineOneTimeTask'
 import { TaskDetailPanel }    from '@/components/tasks/TaskDetailPanel'
 import { cn }                 from '@/lib/utils/cn'
@@ -85,30 +85,69 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
   }
   const today = todayStr()
 
-  async function toggleDone(taskId: string, status: string, e: React.MouseEvent) {
+  async function toggleDone(task: Task, e: React.MouseEvent) {
     e.stopPropagation()
-    const newStatus = status === 'completed' ? 'todo' : 'completed'
-    // Optimistic update
-    setLocalTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t))
-    setSelectedTask(prev => prev?.id === taskId ? { ...prev, status: newStatus } : prev)
-    setCompleting(p => new Set(p).add(taskId))
-    const res = await fetch(`/api/tasks/${taskId}`, {
+
+    // Reopen a completed task
+    if (task.status === 'completed') {
+      setLocalTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: 'todo', completed_at: null } : t))
+      setSelectedTask(prev => prev?.id === task.id ? { ...prev, status: 'todo' } : prev)
+      await fetch(`/api/tasks/${task.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'todo', completed_at: null }),
+      })
+      startT(() => router.refresh()); return
+    }
+
+    // Already in review — inform user
+    if (task.status === 'in_review' || task.approval_status === 'pending') {
+      toast.info('This task is pending approval — waiting for your approver.')
+      return
+    }
+
+    // Needs approval → submit for review
+    if (task.approval_required) {
+      setCompleting(p => new Set(p).add(task.id))
+      setLocalTasks(prev => prev.map(t => t.id === task.id
+        ? { ...t, status: 'in_review', approval_status: 'pending' } : t))
+      setSelectedTask(prev => prev?.id === task.id
+        ? { ...prev, status: 'in_review', approval_status: 'pending' } : prev)
+      const res = await fetch(`/api/tasks/${task.id}/approve`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decision: 'submit' }),
+      })
+      setCompleting(p => { const s = new Set(p); s.delete(task.id); return s })
+      if (res.ok) toast.success('Submitted for approval ✓')
+      else toast.error('Could not submit — please try again')
+      startT(() => router.refresh()); return
+    }
+
+    // Normal completion
+    setLocalTasks(prev => prev.map(t => t.id === task.id
+      ? { ...t, status: 'completed', completed_at: new Date().toISOString() } : t))
+    setSelectedTask(prev => prev?.id === task.id ? { ...prev, status: 'completed' } : prev)
+    setCompleting(p => new Set(p).add(task.id))
+    const res = await fetch(`/api/tasks/${task.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: newStatus, completed_at: newStatus === 'completed' ? new Date().toISOString() : null }),
+      body: JSON.stringify({ status: 'completed', completed_at: new Date().toISOString() }),
     })
-    setCompleting(p => { const s = new Set(p); s.delete(taskId); return s })
+    setCompleting(p => { const s = new Set(p); s.delete(task.id); return s })
     if (!res.ok) { toast.error('Failed to update task'); return }
-    if (newStatus === 'completed') toast.success('Task completed! ✓')
+    toast.success('Task completed! ✓')
     startT(() => router.refresh())
   }
 
   async function bulkComplete() {
-    await Promise.all([...checked].map(id => fetch(`/api/tasks/${id}`, {
+    const ids = [...checked]
+    const canComplete = localTasks.filter(t => ids.includes(t.id) && !t.approval_required)
+    const needsApproval = localTasks.filter(t => ids.includes(t.id) && t.approval_required)
+    await Promise.all(canComplete.map(t => fetch(`/api/tasks/${t.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: 'completed', completed_at: new Date().toISOString() }),
     })))
     setChecked(new Set())
-    toast.success(`${checked.size} tasks completed`)
+    if (canComplete.length) toast.success(`${canComplete.length} tasks completed`)
+    if (needsApproval.length) toast.info(`${needsApproval.length} task(s) need approval — skipped`)
     startT(() => router.refresh())
   }
 
@@ -185,6 +224,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                 const isChecked = checked.has(task.id)
                 const isCompleting = completing.has(task.id)
                 const isSelected   = selectedTask?.id === task.id
+                const isPending    = task.status === 'in_review' || task.approval_status === 'pending'
 
                 return (
                   <div key={task.id}
@@ -207,13 +247,17 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
 
                     {/* Circle check button */}
                     <button
-                      onClick={e => toggleDone(task.id, task.status, e)}
+                      onClick={e => {
+                        e.stopPropagation()
+                        toggleDone(task, e)
+                      }}
+                      title={task.approval_required && task.status !== 'completed' ? (task.status === 'in_review' ? 'Pending approval' : 'Submit for approval') : (isComp ? 'Mark incomplete' : 'Mark complete')}
                       style={{
                         width: 17, height: 17, borderRadius: '50%', flexShrink: 0,
-                        background: isComp ? '#0d9488' : 'transparent',
-                        border: `1.5px solid ${isComp ? '#0d9488' : ov ? '#fca5a5' : '#cbd5e1'}`,
+                        background: isComp ? '#0d9488' : isPending ? '#f5f3ff' : 'transparent',
+                        border: `1.5px solid ${isComp ? '#0d9488' : isPending ? '#7c3aed' : ov ? '#fca5a5' : '#cbd5e1'}`,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        cursor: 'pointer', transition: 'all 0.15s',
+                        cursor: isPending ? 'default' : 'pointer', transition: 'all 0.15s',
                         opacity: isCompleting ? 0.5 : 1,
                       }}>
                       {isComp && (
@@ -221,6 +265,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                           <path d="M13 4L6.5 11 3 7.5" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
                       )}
+                      {isPending && !isComp && <Clock style={{ width: 8, height: 8, color: '#7c3aed' }}/>}
                     </button>
 
                     {/* Title + meta */}
