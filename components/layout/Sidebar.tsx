@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from 'react'
 import {
   Home, CheckSquare, ListTodo, Users2, FolderOpen,
   RefreshCw, Users, BarChart2, Settings, Plus,
-  ChevronDown, ChevronRight, Clock, Zap, X,
+  ChevronDown, ChevronRight, Clock, Zap, X, Upload,
 } from 'lucide-react'
 import { cn }            from '@/lib/utils/cn'
 import { useAppStore }   from '@/store/appStore'
@@ -63,7 +63,6 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
           {session?.org.name ?? 'Planora'}
         </span>
         <PlanBadge plan={plan}/>
-        {/* Close button — mobile only */}
         {onClose && (
           <button onClick={onClose}
             style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)',
@@ -120,13 +119,14 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
 
         <Div/>
         <GL>Organisation</GL>
-        <SI href="/team"      active={isActive('/team')}      icon={<Users    className="h-4 w-4"/>} label="Team"/>
-        <SI href="/time"      active={isActive('/time')}      icon={<Clock    className="h-4 w-4"/>} label="Time tracking"/>
+        <SI href="/team"      active={isActive('/team')}      icon={<Users     className="h-4 w-4"/>} label="Team"/>
+        <SI href="/time"      active={isActive('/time')}      icon={<Clock     className="h-4 w-4"/>} label="Time tracking"/>
         <SI href="/recurring" active={isActive('/recurring')} icon={<RefreshCw className="h-4 w-4"/>} label="Recurring tasks"/>
         <SI href="/reports"   active={isActive('/reports')}   icon={<BarChart2 className="h-4 w-4"/>} label="Reports"/>
+        <SI href="/import"    active={isActive('/import')}    icon={<Upload    className="h-4 w-4"/>} label="Import data"/>
       </nav>
 
-      {/* Trial banner — shows days remaining with urgency colouring */}
+      {/* Trial banner */}
       {(() => {
         const trialEnd   = session?.org.trial_ends_at
         const isTrialing = session?.org.status === 'trialing' && trialEnd
@@ -160,8 +160,6 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
 
       <div style={{ padding: '8px', borderTop: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
         <SI href="/settings" active={isActive('/settings')} icon={<Settings className="h-4 w-4"/>} label="Settings"/>
-
-        {/* User profile row */}
         <Link href="/profile"
           style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 8,
             textDecoration: 'none', marginTop: 2 }}

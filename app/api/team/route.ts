@@ -69,11 +69,18 @@ export async function PATCH(request: NextRequest) {
   if (!['admin','manager','member','viewer'].includes(role))
     return NextResponse.json({ error: 'Invalid role' }, { status: 400 })
 
-  // Accept either member_id (org_members.id) or user_id
-  let query = supabase.from('org_members').update({ role }).eq('org_id', mb.org_id)
+  // Validate that whichever ID we got is a non-empty UUID-shaped string
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  const idToCheck = member_id || user_id
+  if (!idToCheck || !UUID_RE.test(idToCheck))
+    return NextResponse.json({ error: 'Valid member_id or user_id is required' }, { status: 400 })
+
+  // Use admin client so RLS doesn't interfere with cross-user updates
+  const admin = createAdminClient()
+  let query = admin.from('org_members').update({ role }).eq('org_id', mb.org_id)
   if (member_id) query = query.eq('id', member_id)
-  else if (user_id) query = query.eq('user_id', user_id)
-  else return NextResponse.json({ error: 'member_id or user_id required' }, { status: 400 })
+  else           query = query.eq('user_id', user_id)
+
   const { error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ success: true })

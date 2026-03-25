@@ -245,7 +245,8 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
         {task && (
           <>
             {/* ── Panel header ── */}
-            <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 sticky top-0 bg-white z-10">
+            <div className="flex items-center gap-2 px-4 py-3 border-b sticky top-0 z-10"
+              style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
               <button
                 onClick={handleComplete}
                 className={cn('task-check flex-shrink-0', isCompleted && 'done', completing && 'popping')}
@@ -257,17 +258,21 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                   </svg>
                 )}
               </button>
-              <span className={cn('text-xs font-medium flex-1', isCompleted ? 'text-green-600' : 'text-gray-400')}>
+              <span className="text-xs font-medium flex-1" style={{ color: isCompleted ? '#16a34a' : 'var(--text-muted)' }}>
                 {isCompleted ? '✓ Completed' : 'Mark complete'}
               </span>
-              <button onClick={onClose} className="h-7 w-7 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 transition-colors">
+              <button onClick={onClose}
+                className="h-7 w-7 flex items-center justify-center rounded-lg transition-colors"
+                style={{ color: 'var(--text-muted)' }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'var(--border-light)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                 <X className="h-3.5 w-3.5" />
               </button>
             </div>
 
             {/* ── Approval banners ── */}
             {isPending && isDesignatedApprover && (
-              <div className="px-4 py-3 flex items-center gap-3 border-b border-amber-200" style={{ background: '#fffbeb' }}>
+              <div className="px-4 py-3 flex items-center gap-3 border-b" style={{ background: 'var(--warning-surface, #fffbeb)', borderColor: 'var(--warning-border, #fde68a)' }}>
                 <p className="text-xs font-semibold text-amber-800 flex-1">Pending your approval</p>
                 <button onClick={() => callApproveAPI('approve')} disabled={approving}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50">
@@ -331,8 +336,9 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                 rows={1}
                 className={cn(
                   'w-full text-lg font-bold resize-none outline-none bg-transparent leading-snug',
-                  isCompleted ? 'line-through text-gray-400' : 'text-gray-900'
+                  isCompleted ? 'line-through' : ''
                 )}
+                style={{ color: isCompleted ? 'var(--text-muted)' : 'var(--text-primary)' }}
               />
               <textarea
                 value={description}
@@ -340,7 +346,8 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                 onBlur={() => description !== (task.description ?? '') && patch({ description: description || null })}
                 placeholder="Add a description..."
                 rows={3}
-                className="w-full mt-2 text-sm text-gray-500 resize-none outline-none bg-transparent leading-relaxed placeholder-gray-300"
+                className="w-full mt-2 text-sm resize-none outline-none bg-transparent leading-relaxed"
+                style={{ color: 'var(--text-secondary)', caretColor: 'var(--brand)' }}
               />
             </div>
 
@@ -358,7 +365,8 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
               <div className="px-5 py-3">
                 <FieldRow label="Status">
                   <select value={status} onChange={e => { setStatus(e.target.value); patch({ status: e.target.value }) }}
-                    className="text-sm bg-transparent outline-none cursor-pointer text-gray-700 flex-1">
+                    className="text-sm bg-transparent outline-none cursor-pointer flex-1"
+                    style={{ color: 'var(--text-primary)' }}>
                     {Object.entries(STATUS_CONFIG).map(([v, c]) => <option key={v} value={v}>{c.label}</option>)}
                   </select>
                 </FieldRow>
@@ -366,7 +374,8 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                 <FieldRow label="Priority">
                   <Flag className="h-3.5 w-3.5" style={{ color: priConf.color }} />
                   <select value={priority} onChange={e => { setPriority(e.target.value); patch({ priority: e.target.value }) }}
-                    className="text-sm bg-transparent outline-none cursor-pointer text-gray-700 flex-1">
+                    className="text-sm bg-transparent outline-none cursor-pointer flex-1"
+                    style={{ color: 'var(--text-primary)' }}>
                     {Object.entries(PRIORITY_CONFIG).map(([v, c]) => <option key={v} value={v}>{c.label}</option>)}
                   </select>
                 </FieldRow>
@@ -374,7 +383,8 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                 <FieldRow label="Assignee">
                   {assigneeId && <Avatar name={assignee?.name ?? '?'} size="xs" />}
                   <select value={assigneeId} onChange={e => { setAssigneeId(e.target.value); patch({ assignee_id: e.target.value || null }) }}
-                    className="text-sm bg-transparent outline-none cursor-pointer text-gray-700 flex-1">
+                    className="text-sm bg-transparent outline-none cursor-pointer flex-1"
+                    style={{ color: 'var(--text-primary)' }}>
                     <option value="">Unassigned</option>
                     {members.map(m => (
                       <option key={m.id} value={m.id}>{m.name}{m.id === currentUserId ? ' (me)' : ''}</option>
@@ -383,7 +393,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                 </FieldRow>
 
                 <FieldRow label="Due date">
-                  <Calendar className="h-3.5 w-3.5 text-gray-400" />
+                  <Calendar className="h-3.5 w-3.5" style={{ color: 'var(--text-muted)' }} />
                   <input type="date" value={dueDate}
                     onChange={e => { setDueDate(e.target.value); patch({ due_date: e.target.value || null }) }}
                     className="text-sm outline-none cursor-pointer flex-1 rounded-md px-2 py-1"
@@ -401,7 +411,8 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                   <FieldRow label="Client">
                     {clientId && <div className="h-3 w-3 rounded-sm flex-shrink-0" style={{ background: client?.color }} />}
                     <select value={clientId} onChange={e => { setClientId(e.target.value); patch({ client_id: e.target.value || null }) }}
-                      className="text-sm bg-transparent outline-none cursor-pointer text-gray-700 flex-1">
+                      className="text-sm bg-transparent outline-none cursor-pointer flex-1"
+                      style={{ color: 'var(--text-primary)' }}>
                       <option value="">No client</option>
                       {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
@@ -409,20 +420,21 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                 )}
 
                 <FieldRow label="Est. hours">
-                  <Clock className="h-3.5 w-3.5 text-gray-400" />
+                  <Clock className="h-3.5 w-3.5" style={{ color: 'var(--text-muted)' }} />
                   <input type="number" step="0.5" min="0" value={estHours}
                     onChange={e => setEstHours(e.target.value)}
                     onBlur={() => patch({ estimated_hours: estHours ? parseFloat(estHours) : null })}
                     placeholder="0"
-                    className="text-sm bg-transparent outline-none text-gray-700 w-16"
+                    className="text-sm bg-transparent outline-none w-16"
+                    style={{ color: 'var(--text-primary)' }}
                   />
-                  {estHours && <span className="text-xs text-gray-400">hrs</span>}
+                  {estHours && <span className="text-xs" style={{ color: 'var(--text-muted)' }}>hrs</span>}
                 </FieldRow>
 
                 {task.project && (
                   <FieldRow label="Project">
                     <div className="h-2.5 w-2.5 rounded-sm flex-shrink-0" style={{ background: (task.project as any).color }} />
-                    <span className="text-sm text-gray-700">{(task.project as any).name}</span>
+                    <span className="text-sm" style={{ color: 'var(--text-primary)' }}>{(task.project as any).name}</span>
                   </FieldRow>
                 )}
               </div>
@@ -533,24 +545,34 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
             {/* ── Attachments ── */}
             {tab === 'attachments' && (
               <div className="px-5 py-4">
-                {/* Upload button */}
                 <div
                   onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center cursor-pointer hover:border-teal-300 hover:bg-teal-50/30 transition-colors mb-4">
+                  className="rounded-xl p-6 text-center cursor-pointer transition-colors mb-4"
+                  style={{
+                    border: '2px dashed var(--border)',
+                    background: 'var(--surface-subtle)',
+                  }}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLElement).style.borderColor = 'var(--brand)'
+                    ;(e.currentTarget as HTMLElement).style.background = 'var(--brand-light)'
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'
+                    ;(e.currentTarget as HTMLElement).style.background = 'var(--surface-subtle)'
+                  }}>
                   {uploading
-                    ? <p className="text-sm text-teal-600 font-medium">Uploading…</p>
+                    ? <p className="text-sm font-medium" style={{ color: 'var(--brand)' }}>Uploading…</p>
                     : <>
                       <div className="text-3xl mb-2">📎</div>
-                      <p className="text-sm font-medium text-gray-700">Click to upload a file</p>
-                      <p className="text-xs text-gray-400 mt-1">PDF, Word, Excel, images · Max 20 MB</p>
+                      <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Click to upload a file</p>
+                      <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>PDF, Word, Excel, images · Max 20 MB</p>
                     </>
                   }
                   <input ref={fileInputRef} type="file" className="hidden" onChange={uploadFile}
                     accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.gif,.webp,.txt,.csv"/>
                 </div>
-                {/* Attachment list */}
                 {attachments.length === 0
-                  ? <p className="text-xs text-gray-400 text-center py-4">No files attached yet</p>
+                  ? <p className="text-xs text-center py-4" style={{ color: 'var(--text-muted)' }}>No files attached yet</p>
                   : <div className="space-y-2">
                     {attachments.map(att => {
                       const isImg = att.mime_type?.startsWith('image/')
@@ -561,18 +583,22 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                         ? (att.file_size/1024/1024).toFixed(1) + ' MB'
                         : (att.file_size/1024).toFixed(0) + ' KB') : ''
                       return (
-                        <div key={att.id} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 border border-gray-100 group hover:border-gray-200 transition-colors">
+                        <div key={att.id}
+                          className="flex items-center gap-3 p-3 rounded-xl group transition-colors"
+                          style={{ background: 'var(--surface-subtle)', border: '1px solid var(--border-light)' }}>
                           <span className="text-2xl flex-shrink-0">{icon}</span>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-800 truncate">{att.file_name}</p>
-                            <p className="text-xs text-gray-400">{kb}{att.uploader?.name ? ` · ${att.uploader.name}` : ''}</p>
+                            <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{att.file_name}</p>
+                            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{kb}{att.uploader?.name ? ` · ${att.uploader.name}` : ''}</p>
                           </div>
                           <button onClick={() => getSignedUrl(att.storage_path, att.file_name)}
-                            className="text-xs text-teal-600 hover:text-teal-700 font-medium px-2 py-1 rounded hover:bg-teal-50 transition-colors flex-shrink-0">
+                            className="text-xs font-medium px-2 py-1 rounded transition-colors flex-shrink-0"
+                            style={{ color: 'var(--brand)' }}>
                             Download
                           </button>
                           <button onClick={() => deleteAttachment(att.id, att.storage_path)}
-                            className="text-xs text-red-400 hover:text-red-600 px-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                            className="text-xs px-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                            style={{ color: '#f87171' }}>
                             ✕
                           </button>
                         </div>
@@ -596,7 +622,12 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                       placeholder="Write a comment... (Cmd+Enter to send, @ to mention)"
                       rows={2}
                       members={members}
-                      className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 transition-all"
+                      className="w-full text-sm rounded-lg px-3 py-2 outline-none transition-all"
+                      style={{
+                        border: '1px solid var(--border)',
+                        background: 'var(--surface-subtle)',
+                        color: 'var(--text-primary)',
+                      } as React.CSSProperties}
                     />
                     {comment.trim() && (
                       <button onClick={sendComment} disabled={sending}
@@ -607,7 +638,6 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                     )}
                   </div>
                 </div>
-                {/* Render existing comments */}
                 {task.comments && (task.comments as any[]).length > 0 ? (
                   <div className="space-y-3 mb-4">
                     {(task.comments as any[]).sort((a,b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()).map((cm: any) => (
@@ -615,10 +645,11 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                         <Avatar name={cm.author?.name ?? '?'} size="sm" />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-baseline gap-2 mb-1">
-                            <span className="text-xs font-semibold text-gray-900">{cm.author?.name ?? 'Unknown'}</span>
-                            <span className="text-xs text-gray-400">{new Date(cm.created_at).toLocaleDateString('en-IN', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })}</span>
+                            <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{cm.author?.name ?? 'Unknown'}</span>
+                            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{new Date(cm.created_at).toLocaleDateString('en-IN', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })}</span>
                           </div>
-                          <div className="text-sm text-gray-700 bg-gray-50 rounded-lg px-3 py-2 leading-relaxed whitespace-pre-wrap border border-gray-100">
+                          <div className="text-sm rounded-lg px-3 py-2 leading-relaxed whitespace-pre-wrap"
+                            style={{ color: 'var(--text-primary)', background: 'var(--surface-subtle)', border: '1px solid var(--border-light)' }}>
                             <CommentText text={cm.content} members={members}/>
                           </div>
                         </div>
@@ -626,7 +657,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-gray-400 text-center py-6 mb-4">No comments yet — be the first to add one</p>
+                  <p className="text-xs text-center py-6 mb-4" style={{ color: 'var(--text-muted)' }}>No comments yet — be the first to add one</p>
                 )}
               </div>
             )}
@@ -634,9 +665,9 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
             {/* ── Time ── */}
             {tab === 'time' && (
               <div className="px-5 py-6 text-center">
-                <p className="text-sm text-gray-400">
+                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
                   Log time on the{' '}
-                  <a href="/time" className="text-teal-600 underline">Time tracking</a>{' '}
+                  <a href="/time" style={{ color: 'var(--brand)' }} className="underline">Time tracking</a>{' '}
                   page and link it to this task.
                 </p>
               </div>
@@ -650,8 +681,9 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
 
 function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-center gap-3 py-2.5 border-b border-gray-50 last:border-0">
-      <div className="w-24 text-xs text-gray-400 flex-shrink-0">{label}</div>
+    <div className="flex items-center gap-3 py-2.5 last:border-0"
+      style={{ borderBottom: '1px solid var(--border-light)' }}>
+      <div className="w-24 text-xs flex-shrink-0" style={{ color: 'var(--text-muted)' }}>{label}</div>
       <div className="flex items-center gap-2 flex-1 min-w-0">{children}</div>
     </div>
   )
