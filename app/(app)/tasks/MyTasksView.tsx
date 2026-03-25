@@ -5,6 +5,7 @@ import { RefreshCw, CheckCheck, Clock, FolderOpen, Filter, X } from 'lucide-reac
 import { cn }           from '@/lib/utils/cn'
 import { PriorityBadge, Avatar } from '@/components/ui/Badge'
 import { TaskDetailPanel }       from '@/components/tasks/TaskDetailPanel'
+import { CompletionAttachModal }  from '@/components/tasks/CompletionAttachModal'
 import { fmtDate, isOverdue, todayStr } from '@/lib/utils/format'
 import { PRIORITY_CONFIG } from '@/types'
 import type { Task } from '@/types'
@@ -47,6 +48,7 @@ export function MyTasksView({ tasks: initialTasks, members, clients, currentUser
   const [selTask,    setSelTask]    = useState<Task | null>(null)
   const [checked,    setChecked]    = useState<Set<string>>(new Set())
   const [completing, setCompleting] = useState<Set<string>>(new Set())
+  const [completingTask, setCompletingTask] = useState<Task | null>(null)
   const [filterPriority, setFilterPriority] = useState('')
   const [filterStatus,   setFilterStatus]   = useState('')
   const [filterOpen,     setFilterOpen]     = useState(false)
@@ -405,6 +407,7 @@ export function MyTasksView({ tasks: initialTasks, members, clients, currentUser
       <TaskDetailPanel task={selTask} members={members} clients={clients}
         currentUserId={currentUserId} userRole={userRole}
         onClose={() => setSelTask(null)} onUpdated={refresh}/>
+    </>
     </>
   )
 }

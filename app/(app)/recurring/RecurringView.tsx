@@ -224,7 +224,7 @@ export function RecurringView({ tasks, members, projects, clients, currentUserId
         ))}
 
         {canManage && (
-          <InlineRecurringTask members={members} projects={projects} clients={clients}
+          <InlineRecurringTask members={members} clients={clients}
             currentUserId={currentUserId} onCreated={() => startT(() => router.refresh())}/>
         )}
       </div>

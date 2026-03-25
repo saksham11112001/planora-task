@@ -121,6 +121,7 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
         <SI href="/time"      active={isActive('/time')}      icon={<Clock     className="h-4 w-4"/>} label="Time tracking"/>
         <SI href="/recurring" active={isActive('/recurring')} icon={<RefreshCw className="h-4 w-4"/>} label="Recurring tasks"/>
         <SI href="/reports"   active={isActive('/reports')}   icon={<BarChart2 className="h-4 w-4"/>} label="Reports"/>
+        <SI href="/calendar"  active={isActive('/calendar')}  icon={<Calendar  className="h-4 w-4"/>} label="Calendar"/>
         <SI href="/import"    active={isActive('/import')}    icon={<Upload    className="h-4 w-4"/>} label="Import data"/>
       </nav>
 

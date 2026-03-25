@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter }          from 'next/navigation'
 import { CheckCheck, Clock } from 'lucide-react'
 import { InlineOneTimeTask }  from '@/components/tasks/InlineOneTimeTask'
+import { CompletionAttachModal } from '@/components/tasks/CompletionAttachModal'
 import { TaskDetailPanel }    from '@/components/tasks/TaskDetailPanel'
 import { cn }                 from '@/lib/utils/cn'
 import { toast }              from '@/store/appStore'
@@ -31,6 +32,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
   const [subtaskMap,    setSubtaskMap]    = useState<Record<string, {id:string;title:string;status:string}[]>>({})
   const [loadingSubtasks, setLoadingSubtasks] = useState<Set<string>>(new Set())
   const [newSubInputs, setNewSubInputs]   = useState<Record<string, string>>({})
+  const [completingTask, setCompletingTask] = useState<Task | null>(null)
 
   async function toggleExpand(taskId: string) {
     setExpandedTasks(prev => {
@@ -483,6 +485,31 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
           )}
         </div>
       </div>
+
+      {/* Completion attach modal */}
+      {completingTask && (
+        <CompletionAttachModal
+          taskId={completingTask.id}
+          taskTitle={completingTask.title}
+          onConfirm={async () => {
+            const task = completingTask
+            setCompletingTask(null)
+            setCompleting(p => new Set(p).add(task.id))
+            setLocalTasks(prev => prev.map(t => t.id === task.id
+              ? { ...t, status: 'completed', completed_at: new Date().toISOString() } : t))
+            setSelectedTask(prev => prev?.id === task.id
+              ? { ...prev, status: 'completed', completed_at: new Date().toISOString() } : prev)
+            await fetch(`/api/tasks/${task.id}`, {
+              method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ status: 'completed', completed_at: new Date().toISOString() }),
+            })
+            setCompleting(p => { const s = new Set(p); s.delete(task.id); return s })
+            toast.success('Task completed! ✓')
+            startT(() => router.refresh())
+          }}
+          onCancel={() => setCompletingTask(null)}
+        />
+      )}
 
       {/* Task detail panel */}
       {selectedTask && (
