@@ -405,6 +405,7 @@ export async function POST(request: NextRequest) {
       const iAssignee = findCol(headers, 'assigneeemail', 'assignee')
       const iPriority = findCol(headers, 'priority')
       const iProject  = findCol(headers, 'projectname', 'project')
+      const iClient   = findCol(headers, 'clientname', 'client')
       const iStart    = findCol(headers, 'startdate', 'start')
       const iDesc     = findCol(headers, 'description', 'desc')
       const VALID_FREQS = ['daily','weekly','bi_weekly','monthly','quarterly','annual']
@@ -421,6 +422,7 @@ export async function POST(request: NextRequest) {
           results.recurring.errors.push(`"${title}": invalid priority "${priority}"`); results.recurring.skipped++; continue
         }
         const projectId  = await resolveProject(cell(row, iProject))
+        const clientId   = await resolveClient(cell(row, iClient))
         const assigneeId = cell(row, iAssignee) ? await resolveEmail(cell(row, iAssignee)) : null
         const startDate  = cell(row, iStart) || new Date().toISOString().split('T')[0]
         const { error: rErr } = await admin.from('tasks').insert({
@@ -430,6 +432,7 @@ export async function POST(request: NextRequest) {
           is_recurring: true, frequency: freq,
           next_occurrence_date: nextOccurrence(freq, startDate),
           assignee_id: assigneeId, project_id: projectId,
+          client_id: clientId,
           created_by: user.id, approval_required: false,
         })
         if (rErr) { results.recurring.errors.push(`"${title}": ${rErr.message}`); results.recurring.skipped++ }
