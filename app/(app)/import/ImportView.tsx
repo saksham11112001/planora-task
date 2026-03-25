@@ -5,7 +5,7 @@ import {
   Upload, FileSpreadsheet, Download, CheckCircle2,
   AlertCircle, Users, FolderOpen, CheckSquare, X,
   ChevronDown, ChevronRight, Loader2, ArrowRight,
-  Building2, RefreshCw,
+  Building2, RefreshCw, ListTodo,
 } from 'lucide-react'
 import { toast } from '@/store/appStore'
 
@@ -14,6 +14,7 @@ interface ImportResults {
   clients:   { created: number; skipped: number; errors: string[] }
   projects:  { created: number; skipped: number; errors: string[] }
   tasks:     { created: number; skipped: number; errors: string[] }
+  onetasks:  { created: number; skipped: number; errors: string[] }
   recurring: { created: number; skipped: number; errors: string[] }
 }
 
@@ -93,7 +94,7 @@ export function ImportView() {
             Bulk Import
           </h1>
           <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 6 }}>
-            Download the template, fill in your data across 5 sheets, then upload it here — members, clients, projects, tasks and recurring tasks.
+            Download the template, fill in your data across 6 sheets, then upload it here — members, clients, projects, tasks, one-time tasks and recurring tasks.
           </p>
         </div>
 
@@ -279,6 +280,14 @@ export function ImportView() {
                 bg="#f5f3ff"
               />
               <SummaryCard
+                icon={<ListTodo style={{ width: 16, height: 16 }} />}
+                label="One-Time Tasks"
+                created={results.onetasks.created}
+                skipped={results.onetasks.skipped}
+                color="#0891b2"
+                bg="#ecfeff"
+              />
+              <SummaryCard
                 icon={<RefreshCw style={{ width: 16, height: 16 }} />}
                 label="Recurring Tasks"
                 created={results.recurring.created}
@@ -289,7 +298,7 @@ export function ImportView() {
             </div>
 
             {/* Error details (expandable) */}
-            {(['members', 'clients', 'projects', 'tasks', 'recurring'] as const).map(key => {
+            {(['members', 'clients', 'projects', 'tasks', 'onetasks', 'recurring'] as const).map(key => {
               const section = results[key]
               if (!section.errors.length) return null
               const isOpen = expanded[key]
@@ -371,7 +380,9 @@ export function ImportView() {
               <InfoRow icon={<FolderOpen style={{ width: 16, height: 16, color: '#16a34a' }} />}
                 label="Projects" desc="Linked to clients by name. Supports color, status, due date, owner and budget." />
               <InfoRow icon={<CheckSquare style={{ width: 16, height: 16, color: '#7c3aed' }} />}
-                label="Tasks" desc="Linked to projects and clients by name. Tasks without a project become one-time tasks." />
+                label="Tasks (Project)" desc="Linked to a project by name. Assignee resolved by email." />
+              <InfoRow icon={<ListTodo style={{ width: 16, height: 16, color: '#0891b2' }} />}
+                label="One-Time Tasks" desc="Inbox tasks with no project. Supports client, assignee, priority and due date." />
               <InfoRow icon={<RefreshCw style={{ width: 16, height: 16, color: '#ea580c' }} />}
                 label="Recurring Tasks" desc="Set frequency (daily/weekly/monthly etc.), assignee and project. Auto-schedules from start date." />
             </div>

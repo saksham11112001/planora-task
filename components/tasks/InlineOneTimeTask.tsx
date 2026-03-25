@@ -1,7 +1,7 @@
 'use client'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, X, User, Flag, Calendar, Shield } from 'lucide-react'
+import { Plus, X, User, Flag, Calendar, Shield, Briefcase } from 'lucide-react'
 import { toast } from '@/store/appStore'
 
 interface Member { id: string; name: string; role?: string }
@@ -247,17 +247,23 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated }
           <label style={{
             display: 'flex', alignItems: 'center', gap: 5,
             padding: '4px 10px', borderRadius: 20,
-            border: '1px solid var(--border)',
-            background: 'var(--surface-subtle)',
+            border: clientId ? `1px solid ${clients.find(c=>c.id===clientId)?.color ?? 'var(--border)'}44` : '1px solid var(--border)',
+            background: clientId ? `${clients.find(c=>c.id===clientId)?.color ?? '#0d9488'}12` : 'var(--surface-subtle)',
             cursor: 'pointer',
           }}>
+            {clientId
+              ? <span style={{ width: 8, height: 8, borderRadius: 2, flexShrink: 0, background: clients.find(c=>c.id===clientId)?.color ?? '#0d9488', display: 'inline-block' }}/>
+              : <Briefcase style={{ width: 11, height: 11, color: 'var(--text-muted)', flexShrink: 0 }} />
+            }
             <select
               value={clientId}
               onChange={e => setClientId(e.target.value)}
               style={{
                 fontSize: 12, border: 'none', outline: 'none',
-                background: 'transparent', color: 'var(--text-secondary)',
+                background: 'transparent',
+                color: clientId ? (clients.find(c=>c.id===clientId)?.color ?? 'var(--text-secondary)') : 'var(--text-secondary)',
                 cursor: 'pointer', appearance: 'none',
+                fontWeight: clientId ? 500 : 400,
               }}
             >
               <option value="">No client</option>
