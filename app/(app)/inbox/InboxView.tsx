@@ -2,7 +2,7 @@
 import React from 'react'
 import { useState, useTransition } from 'react'
 import { useRouter }          from 'next/navigation'
-import { CheckCheck, Clock } from 'lucide-react'
+import { CheckCheck, Clock, ListTree, Plus } from 'lucide-react'
 import { InlineOneTimeTask }  from '@/components/tasks/InlineOneTimeTask'
 import { TaskDetailPanel }    from '@/components/tasks/TaskDetailPanel'
 import { cn }                 from '@/lib/utils/cn'
@@ -30,6 +30,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set())
   const [subtaskMap,    setSubtaskMap]    = useState<Record<string, {id:string;title:string;status:string}[]>>({})
   const [loadingSubtasks, setLoadingSubtasks] = useState<Set<string>>(new Set())
+  const [newSubInputs, setNewSubInputs]   = useState<Record<string, string>>({})
 
   async function toggleExpand(taskId: string) {
     setExpandedTasks(prev => {
@@ -51,6 +52,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
 
   async function toggleSubRow(parentId: string, subId: string, status: string) {
     const newStatus = status === 'completed' ? 'todo' : 'completed'
+    // Optimistic update
     setSubtaskMap(p => ({
       ...p,
       [parentId]: (p[parentId] ?? []).map(s => s.id === subId ? { ...s, status: newStatus } : s)
@@ -59,9 +61,13 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: newStatus, completed_at: newStatus === 'completed' ? new Date().toISOString() : null }),
     })
-    // Check if all subtasks done → auto-complete parent
-    const updatedSubs = (subtaskMap[parentId] ?? []).map(s => s.id === subId ? { ...s, status: newStatus } : s)
-    if (newStatus === 'completed' && updatedSubs.length > 0 && updatedSubs.every(s => s.status === 'completed')) {
+    // Re-fetch fresh list
+    const r = await fetch(`/api/tasks?parent_id=${parentId}&limit=50`)
+    const d = await r.json()
+    const freshSubs = d.data ?? []
+    setSubtaskMap(p => ({ ...p, [parentId]: freshSubs }))
+    // Auto-complete parent when ALL subtasks done
+    if (freshSubs.length > 0 && freshSubs.every((s: any) => s.status === 'completed')) {
       await fetch(`/api/tasks/${parentId}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'completed', completed_at: new Date().toISOString() }),
@@ -102,6 +108,15 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
     // Already in review — inform user
     if (task.status === 'in_review' || task.approval_status === 'pending') {
       toast.info('This task is pending approval — waiting for your approver.')
+      return
+    }
+
+    // Block if subtasks are incomplete
+    const subs = subtaskMap[task.id]
+    if (subs && subs.length > 0 && !subs.every((s: any) => s.status === 'completed')) {
+      setExpandedTasks(prev => { const next = new Set(prev); next.add(task.id); return next })
+      const remaining = subs.filter((s: any) => s.status !== 'completed').length
+      toast.error(`Complete all subtasks first — ${remaining} remaining`)
       return
     }
 
@@ -193,10 +208,10 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
         )}
 
         {/* Column headers */}
-        <div style={{ display: 'grid', gridTemplateColumns: '36px 22px 1fr 110px 80px 32px',
+        <div style={{ display: 'grid', gridTemplateColumns: '36px 22px 1fr 70px 110px 80px 32px',
           padding: '6px 16px', background:'var(--surface-subtle)', borderBottom:'1px solid var(--border)',
           fontSize: 10, fontWeight: 700, color:'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', flexShrink: 0 }}>
-          <div/><div/><div>Task</div><div style={{ textAlign: 'center' }}>Due date</div>
+          <div/><div/><div>Task</div><div style={{ textAlign: 'center', fontSize: 9 }}>Subtasks</div><div style={{ textAlign: 'center' }}>Due date</div>
           <div style={{ textAlign: 'center' }}>Priority</div><div/>
         </div>
 
@@ -227,11 +242,12 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                 const isPending    = task.status === 'in_review' || task.approval_status === 'pending'
 
                 return (
-                  <div key={task.id}
+                  <div key={task.id}>
+                  <div
                     onClick={() => setSelectedTask(task)}
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: '36px 22px 1fr 110px 80px 32px',
+                      gridTemplateColumns: '36px 22px 1fr 70px 110px 80px 32px',
                       alignItems: 'center',
                       padding: '0 16px',
                       minHeight: 42,
@@ -320,6 +336,29 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                       </span>
                     </div>
 
+                    {/* Subtask toggle button */}
+                    {(() => {
+                      const subs = subtaskMap[task.id] ?? []
+                      const subsDone = subs.filter((s: any) => s.status === 'completed').length
+                      const hasUndone = subs.length > 0 && subsDone < subs.length
+                      const isExpanded = expandedTasks.has(task.id)
+                      return (
+                        <button
+                          onClick={e => { e.stopPropagation(); toggleExpand(task.id) }}
+                          style={{
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3,
+                            padding: '2px 6px', borderRadius: 6, border: 'none',
+                            background: hasUndone ? '#fffbeb' : isExpanded ? 'var(--brand-light)' : 'transparent',
+                            color: hasUndone ? '#92400e' : isExpanded ? 'var(--brand)' : 'var(--text-muted)',
+                            fontSize: 10, fontWeight: 600, cursor: 'pointer',
+                          }}
+                          title={subs.length ? `${subsDone}/${subs.length} subtasks` : 'Add subtasks'}>
+                          <ListTree style={{ width: 10, height: 10 }}/>
+                          {subs.length > 0 ? `${subsDone}/${subs.length}` : '+'}
+                        </button>
+                      )
+                    })()}
+
                     {/* Assignee avatar (right edge) */}
                     {assignee ? (
                       <div style={{ width: 22, height: 22, borderRadius: '50%', background: '#0d9488',
@@ -329,6 +368,86 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                         {assignee.name[0]?.toUpperCase()}
                       </div>
                     ) : <div/>}
+                  </div>
+
+                  {/* Inline subtasks panel */}
+                  {expandedTasks.has(task.id) && (
+                    <div style={{ background: '#f8fafc', borderBottom: '1px solid var(--border)' }}>
+                      {/* Progress bar */}
+                      {(subtaskMap[task.id] ?? []).length > 0 && (() => {
+                        const subs = subtaskMap[task.id] ?? []
+                        const done = subs.filter((s: any) => s.status === 'completed').length
+                        return (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 16px 3px 58px' }}>
+                            <div style={{ flex: 1, height: 3, background: 'var(--border)', borderRadius: 99, overflow: 'hidden' }}>
+                              <div style={{ height: '100%', borderRadius: 99,
+                                background: done === subs.length ? '#16a34a' : 'var(--brand)',
+                                width: `${subs.length ? Math.round(done / subs.length * 100) : 0}%`,
+                                transition: 'width 0.3s',
+                              }}/>
+                            </div>
+                            <span style={{ fontSize: 10, fontWeight: 600, flexShrink: 0,
+                              color: done === subs.length ? '#16a34a' : 'var(--text-muted)' }}>
+                              {done}/{subs.length} done
+                            </span>
+                          </div>
+                        )
+                      })()}
+                      {loadingSubtasks.has(task.id) && (
+                        <div style={{ padding: '6px 58px', fontSize: 11, color: 'var(--text-muted)' }}>Loading…</div>
+                      )}
+                      {(subtaskMap[task.id] ?? []).map((sub: any) => (
+                        <div key={sub.id} style={{
+                          display: 'flex', alignItems: 'center', gap: 8,
+                          padding: '5px 16px 5px 58px',
+                          borderBottom: '1px solid var(--border-light)',
+                        }}>
+                          <button
+                            onClick={() => toggleSubRow(task.id, sub.id, sub.status)}
+                            style={{
+                              width: 14, height: 14, borderRadius: '50%', flexShrink: 0, border: 'none',
+                              background: sub.status === 'completed' ? 'var(--brand)' : 'transparent',
+                              outline: `2px solid ${sub.status === 'completed' ? 'var(--brand)' : 'var(--border)'}`,
+                              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              transition: 'all 0.15s',
+                            }}>
+                            {sub.status === 'completed' && (
+                              <svg viewBox="0 0 10 10" fill="none" style={{ width: 8, height: 8 }}>
+                                <path d="M1.5 5L4 7.5L8.5 2.5" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
+                              </svg>
+                            )}
+                          </button>
+                          <span style={{
+                            flex: 1, fontSize: 12,
+                            color: sub.status === 'completed' ? 'var(--text-muted)' : 'var(--text-primary)',
+                            textDecoration: sub.status === 'completed' ? 'line-through' : 'none',
+                          }}>{sub.title}</span>
+                        </div>
+                      ))}
+                      {/* Add subtask input */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 16px 6px 58px' }}>
+                        <div style={{ width: 14, height: 14, borderRadius: '50%', flexShrink: 0,
+                          border: '1.5px dashed var(--brand)', opacity: 0.5 }}/>
+                        <input
+                          value={newSubInputs[task.id] ?? ''}
+                          onChange={e => setNewSubInputs(p => ({ ...p, [task.id]: e.target.value }))}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter' && (newSubInputs[task.id] ?? '').trim()) {
+                              addSubtaskInline(task.id, newSubInputs[task.id])
+                              setNewSubInputs(p => ({ ...p, [task.id]: '' }))
+                            }
+                            if (e.key === 'Escape') setNewSubInputs(p => ({ ...p, [task.id]: '' }))
+                          }}
+                          placeholder="Add subtask… (press Enter)"
+                          style={{
+                            flex: 1, fontSize: 12, border: 'none', outline: 'none',
+                            background: 'transparent', color: 'var(--text-primary)',
+                          }}
+                          onClick={e => e.stopPropagation()}
+                        />
+                      </div>
+                    </div>
+                  )}
                   </div>
                 )
               })}

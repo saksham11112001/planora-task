@@ -242,35 +242,39 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated }
           />
         </label>
 
-        {/* Client */}
-        {clients.length > 0 && (
-          <label style={{
-            display: 'flex', alignItems: 'center', gap: 5,
-            padding: '4px 10px', borderRadius: 20,
-            border: clientId ? `1px solid ${clients.find(c=>c.id===clientId)?.color ?? 'var(--border)'}44` : '1px solid var(--border)',
-            background: clientId ? `${clients.find(c=>c.id===clientId)?.color ?? '#0d9488'}12` : 'var(--surface-subtle)',
-            cursor: 'pointer',
-          }}>
-            {clientId
-              ? <span style={{ width: 8, height: 8, borderRadius: 2, flexShrink: 0, background: clients.find(c=>c.id===clientId)?.color ?? '#0d9488', display: 'inline-block' }}/>
-              : <Briefcase style={{ width: 11, height: 11, color: 'var(--text-muted)', flexShrink: 0 }} />
-            }
+        {/* Client — always shown, even when no clients exist */}
+        <label style={{
+          display: 'flex', alignItems: 'center', gap: 5,
+          padding: '4px 10px', borderRadius: 20,
+          border: clientId ? `1px solid ${clients.find(c=>c.id===clientId)?.color ?? '#0d9488'}55` : '1px solid var(--border)',
+          background: clientId ? `${clients.find(c=>c.id===clientId)?.color ?? '#0d9488'}14` : 'var(--surface-subtle)',
+          cursor: clients.length > 0 ? 'pointer' : 'default',
+          opacity: clients.length === 0 ? 0.45 : 1,
+        }}>
+          {clientId
+            ? <span style={{ width: 8, height: 8, borderRadius: 2, flexShrink: 0,
+                background: clients.find(c=>c.id===clientId)?.color ?? '#0d9488', display: 'inline-block' }}/>
+            : <Briefcase style={{ width: 11, height: 11, color: 'var(--text-muted)', flexShrink: 0 }} />
+          }
+          {clients.length === 0 ? (
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>No clients</span>
+          ) : (
             <select
               value={clientId}
               onChange={e => setClientId(e.target.value)}
               style={{
                 fontSize: 12, border: 'none', outline: 'none',
                 background: 'transparent',
-                color: clientId ? (clients.find(c=>c.id===clientId)?.color ?? 'var(--text-secondary)') : 'var(--text-secondary)',
+                color: clientId ? (clients.find(c=>c.id===clientId)?.color ?? '#0d9488') : 'var(--text-secondary)',
                 cursor: 'pointer', appearance: 'none',
-                fontWeight: clientId ? 500 : 400,
+                fontWeight: clientId ? 600 : 400,
               }}
             >
-              <option value="">No client</option>
+              <option value="">Client…</option>
               {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
-          </label>
-        )}
+          )}
+        </label>
 
         {/* Approver */}
         {approvers.length > 0 && (
