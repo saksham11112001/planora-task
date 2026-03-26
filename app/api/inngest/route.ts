@@ -16,6 +16,4 @@ export const { GET, POST, PUT } = serve({
     recurringSpawn,
     trialExpiry,
   ],
-  // Signing key required in production; optional in local dev
-  signingKey: process.env.INNGEST_SIGNING_KEY,
 })

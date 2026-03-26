@@ -1,8 +1,10 @@
-import { Inngest } from 'inngest'
+import { Inngest, EventSchemas } from 'inngest'
 
 export const inngest = new Inngest({
-  id: 'planora',
-  name: 'Planora',
+  id:          'planora',
+  name:        'Planora',
+  eventKey:    process.env.INNGEST_EVENT_KEY,
+  signingKey:  process.env.INNGEST_SIGNING_KEY,
 })
 
 export type PlanoraEvents = {
