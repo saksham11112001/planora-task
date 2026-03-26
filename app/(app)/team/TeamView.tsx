@@ -1,12 +1,12 @@
 'use client'
-import { useState }   from 'react'
-import { useRouter }  from 'next/navigation'
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { UserPlus, Mail, Crown, Shield, User, ChevronDown, Check } from 'lucide-react'
-import { cn }         from '@/lib/utils/cn'
-import { toast }      from '@/store/appStore'
-import { fmtDate }    from '@/lib/utils/format'
+import { cn } from '@/lib/utils/cn'
+import { toast } from '@/store/appStore'
+import { fmtDate } from '@/lib/utils/format'
 
-const ROLES = ['admin','manager','member','viewer'] as const
+const ROLES = ['admin', 'manager', 'member', 'viewer'] as const
 const ROLE_ICONS: Record<string, any> = { owner: Crown, admin: Shield, manager: UserPlus, member: User, viewer: User }
 const ROLE_COLORS: Record<string, string> = {
   owner: '#ca8a04', admin: '#7c3aed', manager: '#0d9488', member: '#64748b', viewer: '#94a3b8'
@@ -35,11 +35,11 @@ export function TeamView({
 }) {
   const router = useRouter()
   const [showInvite, setShowInvite] = useState(false)
-  const [invEmail,   setInvEmail]   = useState('')
-  const [invRole,    setInvRole]    = useState<'manager' | 'member' | 'viewer'>('member')
-  const [inviting,   setInviting]   = useState(false)
-  const [roleEditing,setRoleEditing]= useState<string | null>(null)
-  const [saving,     setSaving]     = useState<string | null>(null)
+  const [invEmail, setInvEmail] = useState('')
+  const [invRole, setInvRole] = useState<'manager' | 'member' | 'viewer'>('member')
+  const [inviting, setInviting] = useState(false)
+  const [roleEditing, setRoleEditing] = useState<string | null>(null)
+  const [saving, setSaving] = useState<string | null>(null)
 
   async function invite(e: React.FormEvent) {
     e.preventDefault()
@@ -170,7 +170,7 @@ export function TeamView({
         )}
 
         {/* Members list */}
-        <div className="card overflow-hidden">
+        <div className="card" style={{ overflow: "visible" }}>
           {members.map((m, i) => {
             const RoleIcon = ROLE_ICONS[m.role] ?? User
             const rate = m.tasks_30d ? Math.round((m.done_30d / m.tasks_30d) * 100) : 0
@@ -235,7 +235,7 @@ export function TeamView({
                 </div>
 
                 {/* Role badge / editable dropdown */}
-                <div className="relative flex-shrink-0">
+                <div style={{ position: "relative", flexShrink: 0 }}>
                   {canManage && !isMe && !isOwner ? (
                     <>
                       <button
@@ -263,15 +263,16 @@ export function TeamView({
                         <>
                           {/* Click-outside backdrop */}
                           <div
-                            className="fixed inset-0" style={{ zIndex: 9998 }}
+                            style={{ position: 'fixed', inset: 0, zIndex: 9998 }}
                             onClick={() => setRoleEditing(null)}
                           />
                           <div
-                            className="absolute right-0 top-full mt-1.5 rounded-xl shadow-xl py-1.5 min-w-[150px]"
                             style={{
+                              position: 'absolute', right: 0, top: '100%', marginTop: 6,
+                              borderRadius: 12, padding: '4px 0', minWidth: 160,
                               background: 'var(--surface)',
                               border: '1px solid var(--border)',
-                              boxShadow: '0 12px 32px rgba(0,0,0,0.18)',
+                              boxShadow: '0 16px 40px rgba(0,0,0,0.18)',
                               zIndex: 9999,
                             }}
                           >
