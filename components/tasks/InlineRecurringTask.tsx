@@ -3,6 +3,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, X, RefreshCw, User, Flag, Briefcase, Paperclip } from 'lucide-react'
 import { toast } from '@/store/appStore'
+import { useTaskFields } from '@/lib/hooks/useTaskFields'
 
 // ── Granular frequency options ─────────────────────────────────
 const FREQUENCIES = [
@@ -51,6 +52,8 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, edit
   const fileRef  = useRef<HTMLInputElement>(null)
 
   const isEdit = !!editTask
+  const { show, required } = useTaskFields()
+  const [errors, setErrors] = useState<Record<string,string>>({})
   const [open,      setOpen]      = useState(isEdit)
   const [saving,    setSaving]    = useState(false)
   const [title,     setTitle]     = useState(editTask?.title ?? '')
@@ -79,7 +82,18 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, edit
     setClientId(''); setAssignee(currentUserId ?? ''); setFiles([])
   }
 
+  function validate(): boolean {
+    const errs: Record<string,string> = {}
+    if (!title.trim()) errs.title = 'Title required'
+    if (required('assignee')   && !assignee)   errs.assignee   = 'Assignee required'
+    if (required('client')     && !clientId)   errs.client     = 'Client required'
+    if (required('attachment') && files.length === 0) errs.attachment = 'Attachment required'
+    setErrors(errs)
+    return Object.keys(errs).length === 0
+  }
+
   async function save() {
+    if (!validate()) return
     if (!title.trim()) { inputRef.current?.focus(); return }
     setSaving(true)
     try {
@@ -211,7 +225,7 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, edit
         </label>
 
         {/* Client */}
-        {clients.length > 0 && (
+        {show('client') && clients.length > 0 && (
           <label style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px',
             borderRadius:20,
             border: clientId ? `1px solid ${clients.find(c=>c.id===clientId)?.color ?? '#0d9488'}55` : '1px solid var(--border)',
@@ -234,7 +248,7 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, edit
         )}
 
         {/* Attachment */}
-        <button onClick={() => fileRef.current?.click()}
+        {show('attachment') && <button onClick={() => fileRef.current?.click()}
           style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px',
             borderRadius:20, border:'1px solid var(--border)', background:'var(--surface-subtle)',
             cursor:'pointer', fontSize:12, color:'var(--text-secondary)',
@@ -242,9 +256,18 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, edit
           <Paperclip style={{ width:11, height:11 }}/>
           {files.length > 0 ? `${files.length} file${files.length>1?'s':''}` : 'Attach'}
         </button>
+        }
         <input ref={fileRef} type="file" multiple style={{ display:'none' }}
           onChange={e => setFiles(Array.from(e.target.files ?? []))}/>
 
+        {/* Errors */}
+        {Object.values(errors).some(Boolean) && (
+          <div style={{ display:'flex', flexWrap:'wrap', gap:4, width:'100%', paddingTop:4 }}>
+            {Object.entries(errors).filter(([,v]) => v).map(([k, v]) => (
+              <span key={k} style={{ fontSize:11, color:'#dc2626', background:'#fef2f2', padding:'2px 8px', borderRadius:99 }}>{v}</span>
+            ))}
+          </div>
+        )}
         {/* Save */}
         <button onClick={save} disabled={saving || !title.trim()}
           style={{ marginLeft:'auto', padding:'5px 16px', borderRadius:20, border:'none',

@@ -1,86 +1,103 @@
 'use client'
 import { Sun, Moon, Monitor, ArrowLeft } from 'lucide-react'
+import Link from 'next/link'
 import { useTheme } from '@/components/theme/ThemeProvider'
-import Link         from 'next/link'
-
-const THEMES = [
-  { value: 'light'  as const, icon: Sun,     label: 'Light',  desc: 'Clean white interface — default' },
-  { value: 'dark'   as const, icon: Moon,    label: 'Dark',   desc: 'Easy on the eyes at night' },
-  { value: 'system' as const, icon: Monitor, label: 'System', desc: 'Follows your OS preference automatically' },
-]
 
 export function AppearanceView() {
   const { theme, setTheme } = useTheme()
 
+  const OPTIONS = [
+    {
+      value: 'light' as const,
+      label: 'Light',
+      desc: 'Clean white interface — easy on the eyes in daylight',
+      icon: Sun,
+      preview: { bg: '#ffffff', sidebar: '#0f172a', card: '#f8fafc', text: '#0f172a', accent: '#0d9488' },
+    },
+    {
+      value: 'dark' as const,
+      label: 'Dark',
+      desc: 'Dark surfaces — reduces eye strain in low light',
+      icon: Moon,
+      preview: { bg: '#161b27', sidebar: '#0a0f1a', card: '#1e2433', text: '#f1f5f9', accent: '#14b8a6' },
+    },
+  ]
+
   return (
-    <div className="page-container">
-      <div style={{ maxWidth: 520, margin: '0 auto' }}>
-        <Link href="/settings" className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-700 transition-colors mb-6">
-          <ArrowLeft className="h-3.5 w-3.5"/> Settings
-        </Link>
-        <h1 className="text-2xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>Appearance</h1>
-        <p className="text-sm mb-8" style={{ color: 'var(--text-muted)' }}>Choose how Planora looks for you. Your preference is saved locally.</p>
+    <div className="page-container" style={{ maxWidth: 560 }}>
+      <Link href="/settings" style={{ display: 'inline-flex', alignItems: 'center', gap: 6,
+        fontSize: 12, color: 'var(--text-muted)', textDecoration: 'none', marginBottom: 20 }}>
+        <ArrowLeft style={{ width: 13, height: 13 }}/> Settings
+      </Link>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {THEMES.map(({ value, icon: Icon, label, desc }) => (
-            <button key={value} onClick={() => setTheme(value)}
+      <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>Appearance</h1>
+      <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 28 }}>
+        Choose how Planora looks. Your preference is saved locally on this device.
+      </p>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+        {OPTIONS.map(opt => {
+          const Icon = opt.icon
+          const isActive = theme === opt.value
+          const p = opt.preview
+          return (
+            <button key={opt.value} onClick={() => setTheme(opt.value)}
               style={{
-                display: 'flex', alignItems: 'center', gap: 16, padding: '16px 20px',
-                borderRadius: 12, border: `2px solid ${theme === value ? 'var(--brand)' : 'var(--border)'}`,
-                background: theme === value ? 'var(--brand-light)' : 'var(--surface)',
-                cursor: 'pointer', transition: 'all 0.15s', textAlign: 'left', width: '100%',
+                padding: 0, border: `2px solid ${isActive ? 'var(--brand)' : 'var(--border)'}`,
+                borderRadius: 14, cursor: 'pointer', background: 'transparent',
+                transition: 'all 0.2s', textAlign: 'left', overflow: 'hidden',
+                boxShadow: isActive ? '0 0 0 3px var(--brand-light)' : 'none',
               }}>
-              <div style={{
-                width: 44, height: 44, borderRadius: 12, flexShrink: 0,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: theme === value ? 'var(--brand)' : 'var(--border-light)',
-                color: theme === value ? '#fff' : 'var(--text-muted)',
-              }}>
-                <Icon style={{ width: 20, height: 20 }}/>
-              </div>
-              <div style={{ flex: 1 }}>
-                <p style={{ fontSize: 15, fontWeight: 600,
-                  color: theme === value ? 'var(--brand)' : 'var(--text-primary)', marginBottom: 2 }}>
-                  {label}
-                </p>
-                <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>{desc}</p>
-              </div>
-              {theme === value && (
-                <div style={{ width: 22, height: 22, borderRadius: '50%', background: 'var(--brand)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <svg viewBox="0 0 14 14" fill="none" style={{ width: 10, height: 10 }}>
-                    <path d="M2 7l3.5 3.5L12 3.5" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
+              {/* Mini UI preview */}
+              <div style={{ background: p.bg, padding: 10, display: 'flex', gap: 6, height: 90 }}>
+                {/* Mini sidebar */}
+                <div style={{ width: 28, background: p.sidebar, borderRadius: 6, flexShrink: 0,
+                  display: 'flex', flexDirection: 'column', gap: 4, padding: '8px 4px' }}>
+                  {[p.accent, 'rgba(255,255,255,0.2)', 'rgba(255,255,255,0.2)'].map((c, i) => (
+                    <div key={i} style={{ height: 4, borderRadius: 2, background: c }}/>
+                  ))}
                 </div>
-              )}
-            </button>
-          ))}
-        </div>
-
-        {/* Live preview card */}
-        <div style={{ marginTop: 32 }}>
-          <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase',
-            letterSpacing: '0.07em', color: 'var(--text-muted)', marginBottom: 12 }}>
-            Preview
-          </p>
-          <div className="card-elevated p-5">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
-              <div style={{ width: 36, height: 36, borderRadius: 9, background: '#0d9488',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: '#fff', fontWeight: 700, fontSize: 14 }}>P</div>
-              <div style={{ flex: 1 }}>
-                <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>Website Redesign</p>
-                <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Acme Corp · Due Apr 10</p>
+                {/* Mini content */}
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  <div style={{ height: 14, borderRadius: 4, background: p.card, border: `1px solid ${p.sidebar}20` }}/>
+                  <div style={{ height: 10, borderRadius: 3, background: p.card, width: '80%', border: `1px solid ${p.sidebar}20` }}/>
+                  <div style={{ height: 10, borderRadius: 3, background: p.accent + '30', width: '60%' }}/>
+                  <div style={{ marginTop: 2, height: 20, borderRadius: 5, background: p.card,
+                    border: `1px solid ${p.accent}40`, display: 'flex', alignItems: 'center',
+                    padding: '0 6px', gap: 4 }}>
+                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: p.accent }}/>
+                    <div style={{ flex: 1, height: 4, borderRadius: 2, background: p.sidebar + '30' }}/>
+                  </div>
+                </div>
               </div>
-              <span style={{ fontSize: 11, fontWeight: 500, padding: '3px 8px', borderRadius: 4,
-                background: 'var(--brand-light)', color: 'var(--brand)' }}>Active</span>
-            </div>
-            <div style={{ height: 6, borderRadius: 99, background: 'var(--border-light)', overflow: 'hidden' }}>
-              <div style={{ height: 6, width: '67%', background: '#0d9488', borderRadius: 99 }}/>
-            </div>
-            <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>12/18 tasks · 67%</p>
-          </div>
-        </div>
+
+              {/* Label row */}
+              <div style={{ padding: '10px 14px', background: 'var(--surface)', borderTop: '1px solid var(--border)',
+                display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ width: 28, height: 28, borderRadius: 7, flexShrink: 0,
+                  background: isActive ? 'var(--brand)' : 'var(--surface-subtle)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon style={{ width: 13, height: 13, color: isActive ? '#fff' : 'var(--text-muted)' }}/>
+                </div>
+                <div>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: isActive ? 'var(--brand)' : 'var(--text-primary)', marginBottom: 1 }}>
+                    {opt.label} {isActive && '✓'}
+                  </p>
+                  <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>{opt.desc}</p>
+                </div>
+              </div>
+            </button>
+          )
+        })}
+      </div>
+
+      <div style={{ marginTop: 20, padding: '12px 14px', borderRadius: 8,
+        background: 'var(--surface-subtle)', border: '1px solid var(--border)',
+        display: 'flex', alignItems: 'center', gap: 8 }}>
+        <Monitor style={{ width: 14, height: 14, color: 'var(--text-muted)', flexShrink: 0 }}/>
+        <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+          You can also toggle theme instantly using the <strong style={{ color: 'var(--text-secondary)' }}>sun/moon button</strong> in the top navigation bar.
+        </p>
       </div>
     </div>
   )

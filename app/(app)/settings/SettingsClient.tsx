@@ -10,7 +10,7 @@ interface Section {
 }
 
 const ICON_MAP: Record<string, any> = {
-  Palette, Building2, Users, LayoutGrid, Tag, CreditCard, Bell
+  Palette, Building2, Users, LayoutGrid, Tag, CreditCard, Bell, Trash2
 }
 
 interface Props {

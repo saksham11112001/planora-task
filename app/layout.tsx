@@ -22,9 +22,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     // suppressHydrationWarning still needed for ThemeProvider useEffect
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Always light mode — strip any stored dark class immediately */}
+        {/* Apply saved theme before paint to avoid flash */}
         <script dangerouslySetInnerHTML={{ __html: `
-          try { document.documentElement.classList.remove('dark'); } catch(e) {}
+          try {
+            const t = localStorage.getItem('planora-theme');
+            if (t === 'dark') document.documentElement.classList.add('dark');
+            else document.documentElement.classList.remove('dark');
+          } catch(e) {}
         `}}/>
       </head>
       <body style={{ fontSize: '15px' }}>

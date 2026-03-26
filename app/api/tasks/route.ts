@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
 
   const sp  = request.nextUrl.searchParams
   let q = supabase.from('tasks')
-    .select('id, title, status, priority, due_date, assignee_id, project_id, client_id, is_recurring, frequency, next_occurrence_date, parent_task_id')
+    .select('id, title, status, priority, due_date, assignee_id, project_id, client_id, is_recurring, frequency, next_occurrence_date, parent_task_id, custom_fields')
     .eq('org_id', mb.org_id).neq('is_archived', true)
   if (sp.get('project_id'))   q = q.eq('project_id', sp.get('project_id')!)
   if (sp.get('assignee_id'))  q = q.eq('assignee_id', sp.get('assignee_id')!)

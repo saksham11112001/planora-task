@@ -1,4 +1,7 @@
 'use client'
+// Custom fields panel
+import { CustomFieldsPanel } from '@/components/tasks/CustomFieldsPanel'
+import type { CustomFieldDef } from '@/components/tasks/CustomFieldsPanel'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { X, ThumbsUp, ThumbsDown, Flag, Calendar, User, Briefcase, Send, Clock, Sparkles } from 'lucide-react'
@@ -46,6 +49,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
   const [comment,     setComment]     = useState('')
   const [sending,     setSending]     = useState(false)
   const [tab,         setTab]         = useState<'details' | 'subtasks' | 'attachments' | 'comments' | 'time'>('details')
+  const [customFieldDefs, setCustomFieldDefs] = useState<CustomFieldDef[]>([])
 
   const [subtasks,      setSubtasks]      = useState<any[]>([])
   const [subtasksLoaded,setSubtasksLoaded]= useState(false)
@@ -63,6 +67,14 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     if (tab === 'attachments' && task) loadAttachments(task.id)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, task?.id])
+
+  /* load org custom field definitions once on mount */
+  useEffect(() => {
+    fetch('/api/settings/custom-fields')
+      .then(r => r.json())
+      .then(d => setCustomFieldDefs(d.data ?? []))
+      .catch(() => {})
+  }, [])
 
   /* sync from task */
   useEffect(() => {
@@ -438,6 +450,17 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                   </FieldRow>
                 )}
               </div>
+              {/* ── Custom fields ── */}
+              {customFieldDefs.length > 0 && task && (
+                <div className="px-5 pb-3">
+                  <CustomFieldsPanel
+                    taskId={task.id}
+                    fieldDefs={customFieldDefs}
+                    existing={(task as any).custom_fields ?? {}}
+                    onSaved={fields => {}}
+                  />
+                </div>
+              )}
             )}
 
             {/* ── Subtasks ── */}

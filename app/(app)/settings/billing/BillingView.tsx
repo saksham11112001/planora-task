@@ -36,13 +36,35 @@ interface Props {
 
 export function BillingView({ orgName, currentPlan, status, subscriptionId, trialEndsAt }: Props) {
   const [loading,  setLoading]  = useState<string | null>(null)
-  const [annual,   setAnnual]   = useState(false)
+  const [annual,    setAnnual]    = useState(false)
+  const [couponCode, setCouponCode] = useState('')
+  const [couponMsg,  setCouponMsg]  = useState<{ok:boolean;text:string}|null>(null)
+  const [applyingCoupon, setApplyingCoupon] = useState(false)
 
   // Trial countdown
   const trialDaysLeft = trialEndsAt
     ? Math.max(0, Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / 86400000))
     : null
   const isTrialing = status === 'trialing' && trialDaysLeft !== null && trialDaysLeft > 0
+
+  async function applyCoupon() {
+    if (!couponCode.trim()) return
+    setApplyingCoupon(true); setCouponMsg(null)
+    try {
+      const res = await fetch('/api/coupon', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: couponCode.trim() }),
+      })
+      const d = await res.json()
+      if (res.ok) {
+        setCouponMsg({ ok:true, text:`✓ ${d.plan.charAt(0).toUpperCase()+d.plan.slice(1)} plan activated for ${d.months} month${d.months>1?'s':''}! Refreshing…` })
+        setCouponCode('')
+        setTimeout(() => window.location.reload(), 2000)
+      } else {
+        setCouponMsg({ ok:false, text:d.error ?? 'Invalid coupon' })
+      }
+    } finally { setApplyingCoupon(false) }
+  }
 
   async function handleUpgrade(plan: string) {
     if (plan === 'free' || plan === currentPlan) return
@@ -286,6 +308,40 @@ export function BillingView({ orgName, currentPlan, status, subscriptionId, tria
         <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 16, textAlign: 'center' }}>
           All payments processed securely via Razorpay · Cancel anytime · No hidden fees
         </p>
+      </div>
+
+      {/* Coupon / promo code */}
+      <div style={{ marginTop:28, padding:'18px 20px', borderRadius:12,
+        background:'var(--surface-subtle)', border:'1px solid var(--border)' }}>
+        <p style={{ fontSize:13,fontWeight:600,color:'var(--text-primary)',marginBottom:4 }}>
+          Have a promo code?
+        </p>
+        <p style={{ fontSize:12,color:'var(--text-muted)',marginBottom:12 }}>
+          Enter a coupon or special access code to unlock a plan for free.
+        </p>
+        <div style={{ display:'flex',gap:8 }}>
+          <input value={couponCode} onChange={e=>setCouponCode(e.target.value.toUpperCase())}
+            onKeyDown={e=>e.key==='Enter'&&applyCoupon()}
+            placeholder="ENTER CODE HERE"
+            style={{ flex:1,padding:'9px 12px',borderRadius:8,border:'1.5px solid var(--border)',
+              outline:'none',fontSize:13,background:'var(--surface)',color:'var(--text-primary)',
+              fontFamily:'inherit',letterSpacing:'0.05em',fontWeight:500 }}
+            onFocus={e=>e.target.style.borderColor='var(--brand)'}
+            onBlur={e=>e.target.style.borderColor='var(--border)'}/>
+          <button onClick={applyCoupon} disabled={applyingCoupon||!couponCode.trim()}
+            style={{ padding:'9px 18px',borderRadius:8,border:'none',
+              background:couponCode.trim()?'var(--brand)':'var(--border)',color:'#fff',
+              fontSize:13,fontWeight:600,cursor:couponCode.trim()?'pointer':'not-allowed',
+              fontFamily:'inherit',opacity:applyingCoupon?0.7:1 }}>
+            {applyingCoupon?'Applying…':'Apply'}
+          </button>
+        </div>
+        {couponMsg && (
+          <p style={{ marginTop:8,fontSize:12,fontWeight:500,
+            color:couponMsg.ok?'#16a34a':'#dc2626' }}>
+            {couponMsg.text}
+          </p>
+        )}
       </div>
     </div>
   )

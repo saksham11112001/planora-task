@@ -192,6 +192,8 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void } = {}) {
         )}
       </div>
 
+      <ThemeToggle/>
+
       {/* Bell */}
       <div className="relative" ref={bellRef}>
         <button onClick={openBell}

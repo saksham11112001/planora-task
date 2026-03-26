@@ -1,8 +1,10 @@
 'use client'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, X, User, Flag, Calendar, Shield, Briefcase } from 'lucide-react'
+import { Plus, X, User, Flag, Calendar, Shield, Briefcase, Paperclip, AlertCircle } from 'lucide-react'
 import { toast } from '@/store/appStore'
+import { useTaskFields } from '@/lib/hooks/useTaskFields'
+import { QuickAddClientModal } from '@/components/clients/QuickAddClientModal'
 
 interface Member { id: string; name: string; role?: string }
 
@@ -25,6 +27,8 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated }
   const router   = useRouter()
   const inputRef = useRef<HTMLInputElement>(null)
   const rowRef   = useRef<HTMLDivElement>(null)
+  const fileRef  = useRef<HTMLInputElement>(null)
+  const { show, required } = useTaskFields()
 
   const [open,       setOpen]       = useState(false)
   const [saving,     setSaving]     = useState(false)
@@ -34,13 +38,18 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated }
   const [dueDate,    setDueDate]    = useState('')
   const [clientId,   setClientId]   = useState('')
   const [approverId, setApproverId] = useState('')
+  const [files,      setFiles]      = useState<File[]>([])
+  const [errors,     setErrors]     = useState<Record<string,string>>({})
+  const [showAddClient, setShowAddClient] = useState(false)
+  const [clientList,    setClientList]    = useState(clients)
 
   const approvers = members.filter(m => m.role && ['owner','admin','manager'].includes(m.role))
-  const priConf = PRIORITY_OPTIONS.find(p => p.value === priority) ?? PRIORITY_OPTIONS[2]
+  const priConf   = PRIORITY_OPTIONS.find(p => p.value === priority) ?? PRIORITY_OPTIONS[2]
 
   function reset() {
     setOpen(false); setTitle(''); setAssignee(currentUserId ?? '')
-    setPriority('medium'); setDueDate(''); setClientId(''); setApproverId('')
+    setPriority('medium'); setDueDate(''); setClientId('')
+    setApproverId(''); setFiles([]); setErrors({})
   }
 
   const handleClickOutside = useCallback((e: MouseEvent) => {
@@ -54,19 +63,28 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated }
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [handleClickOutside])
 
-  function openRow() {
-    setOpen(true)
-    setTimeout(() => inputRef.current?.focus(), 50)
+  function openRow() { setOpen(true); setTimeout(() => inputRef.current?.focus(), 50) }
+
+  function validate(): boolean {
+    const errs: Record<string,string> = {}
+    if (!title.trim()) { errs.title = 'Title is required'; inputRef.current?.focus(); setErrors(errs); return false }
+    if (required('assignee')   && !assignee)   errs.assignee   = 'Assignee is required'
+    if (required('due_date')   && !dueDate)    errs.due_date   = 'Due date is required'
+    if (required('client')     && !clientId)   errs.client     = 'Client is required'
+    if (required('approver')   && !approverId) errs.approver   = 'Approver is required'
+    if (required('attachment') && files.length === 0) errs.attachment = 'Attachment is required'
+    setErrors(errs)
+    return Object.keys(errs).length === 0
   }
 
   async function save() {
-    if (!title.trim()) { inputRef.current?.focus(); return }
+    if (!validate()) return
     setSaving(true)
     try {
       const res = await fetch('/api/tasks', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: title.trim(),
+          title:             title.trim(),
           assignee_id:       assignee     || null,
           priority,
           due_date:          dueDate      || null,
@@ -77,6 +95,14 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated }
       })
       const d = await res.json()
       if (!res.ok) { toast.error(d.error ?? 'Failed'); return }
+
+      // Upload attachments if any
+      if (files.length > 0 && d.data?.id) {
+        const fd = new FormData()
+        files.forEach(f => fd.append('files', f))
+        await fetch(`/api/tasks/${d.data.id}/attachments`, { method: 'POST', body: fd })
+      }
+
       toast.success('Task created')
       reset()
       onCreated ? onCreated() : router.refresh()
@@ -88,238 +114,180 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated }
     if (e.key === 'Escape') reset()
   }
 
-  /* ── Collapsed trigger ── */
   if (!open) {
     return (
-      <div
-        onClick={openRow}
-        style={{
-          display: 'flex', alignItems: 'center', gap: 8,
-          padding: '9px 20px',
-          cursor: 'pointer',
-          borderTop: '1px dashed var(--border)',
-          color: 'var(--text-muted)',
-          transition: 'all 0.15s',
-          userSelect: 'none',
-        }}
-        onMouseEnter={e => {
-          const el = e.currentTarget as HTMLElement
-          el.style.color = 'var(--brand)'
-          el.style.background = 'var(--brand-light)'
-        }}
-        onMouseLeave={e => {
-          const el = e.currentTarget as HTMLElement
-          el.style.color = 'var(--text-muted)'
-          el.style.background = 'transparent'
-        }}
-      >
+      <div onClick={openRow} style={{
+        display: 'flex', alignItems: 'center', gap: 8, padding: '9px 20px',
+        cursor: 'pointer', borderTop: '1px dashed var(--border)', color: 'var(--text-muted)',
+        transition: 'all 0.15s', userSelect: 'none',
+      }}
+      onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = 'var(--brand)'; el.style.background = 'var(--brand-light)' }}
+      onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = 'var(--text-muted)'; el.style.background = 'transparent' }}>
         <Plus style={{ width: 14, height: 14, flexShrink: 0 }} />
         <span style={{ fontSize: 13 }}>Add task</span>
       </div>
     )
   }
 
-  /* ── Expanded form ── */
   return (
-    <div
-      ref={rowRef}
-      style={{
-        margin: '6px 12px 10px',
-        borderRadius: 10,
-        border: '1.5px solid var(--brand-border)',
-        background: 'var(--surface)',
-        boxShadow: '0 2px 12px rgba(13,148,136,0.08)',
-        overflow: 'hidden',
-      }}
-    >
-      {/* Title row */}
+    <>
+    {showAddClient && (
+      <QuickAddClientModal
+        onClose={() => setShowAddClient(false)}
+        onCreated={newClient => {
+          setClientList(p => [...p, newClient])
+          setClientId(newClient.id)
+          setShowAddClient(false)
+        }}
+      />
+    )}
+    <div ref={rowRef} style={{
+      margin: '6px 12px 10px', borderRadius: 10,
+      border: '1.5px solid var(--brand-border)',
+      background: 'var(--surface)',
+      boxShadow: '0 2px 12px rgba(13,148,136,0.08)', overflow: 'hidden',
+    }}>
+      {/* Title */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px 8px' }}>
-        {/* Circle placeholder for task check */}
-        <div style={{
-          width: 15, height: 15, borderRadius: '50%', flexShrink: 0,
-          border: '2px solid var(--brand)', opacity: 0.5,
-        }} />
-        <input
-          ref={inputRef}
-          value={title}
-          onChange={e => setTitle(e.target.value)}
-          onKeyDown={onKeyDown}
+        <div style={{ width: 15, height: 15, borderRadius: '50%', flexShrink: 0, border: '2px solid var(--brand)', opacity: 0.5 }} />
+        <input ref={inputRef} value={title} onChange={e => setTitle(e.target.value)} onKeyDown={onKeyDown}
           placeholder="Task name…"
-          style={{
-            flex: 1, fontSize: 14, fontWeight: 500,
-            border: 'none', outline: 'none',
-            background: 'transparent',
-            color: 'var(--text-primary)',
-          }}
-        />
-        <button
-          onClick={reset}
-          style={{
-            background: 'none', border: 'none', cursor: 'pointer',
-            color: 'var(--text-muted)', display: 'flex', padding: 2, borderRadius: 4,
-          }}
-        >
+          style={{ flex: 1, fontSize: 14, fontWeight: 500, border: 'none', outline: 'none',
+            background: 'transparent', color: 'var(--text-primary)', fontFamily: 'inherit' }}/>
+        <button onClick={reset} style={{ background: 'none', border: 'none', cursor: 'pointer',
+          color: 'var(--text-muted)', display: 'flex', padding: 2, borderRadius: 4 }}>
           <X style={{ width: 13, height: 13 }} />
         </button>
       </div>
 
-      {/* Divider */}
       <div style={{ height: 1, background: 'var(--border-light)', margin: '0 14px' }} />
 
-      {/* Options row */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px 10px', flexWrap: 'wrap' }}>
+      {/* Pills row */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px 4px', flexWrap: 'wrap' }}>
 
         {/* Assignee */}
-        <label style={{
-          display: 'flex', alignItems: 'center', gap: 5,
-          padding: '4px 10px', borderRadius: 20,
-          border: '1px solid var(--border)',
-          background: 'var(--surface-subtle)',
-          cursor: 'pointer', position: 'relative',
-        }}>
-          <User style={{ width: 11, height: 11, color: 'var(--text-muted)', flexShrink: 0 }} />
-          <select
-            value={assignee}
-            onChange={e => setAssignee(e.target.value)}
-            style={{
-              fontSize: 12, border: 'none', outline: 'none',
-              background: 'transparent', color: 'var(--text-secondary)',
-              cursor: 'pointer', appearance: 'none', paddingRight: 2,
-            }}
-          >
-            <option value="">Unassigned</option>
-            {members.map(m => (
-              <option key={m.id} value={m.id}>{m.name}{m.id === currentUserId ? ' (me)' : ''}</option>
-            ))}
-          </select>
-        </label>
+        {show('assignee') && (
+          <label style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 20,
+            border: `1px solid ${errors.assignee ? '#fca5a5' : 'var(--border)'}`,
+            background: errors.assignee ? '#fef2f2' : 'var(--surface-subtle)', cursor: 'pointer' }}>
+            <User style={{ width: 11, height: 11, color: errors.assignee ? '#dc2626' : 'var(--text-muted)', flexShrink: 0 }} />
+            <select value={assignee} onChange={e => { setAssignee(e.target.value); setErrors(p => ({ ...p, assignee: '' })) }}
+              style={{ fontSize: 12, border: 'none', outline: 'none', background: 'transparent',
+                color: 'var(--text-secondary)', cursor: 'pointer', appearance: 'none', fontFamily: 'inherit' }}>
+              <option value="">Unassigned{required('assignee') ? ' *' : ''}</option>
+              {members.map(m => <option key={m.id} value={m.id}>{m.name}{m.id === currentUserId ? ' (me)' : ''}</option>)}
+            </select>
+          </label>
+        )}
 
         {/* Priority */}
-        <label style={{
-          display: 'flex', alignItems: 'center', gap: 5,
-          padding: '4px 10px', borderRadius: 20,
-          border: `1px solid ${priConf.color}44`,
-          background: `${priConf.color}18`,
-          cursor: 'pointer',
-        }}>
-          <Flag style={{ width: 11, height: 11, color: priConf.color, flexShrink: 0 }} />
-          <select
-            value={priority}
-            onChange={e => setPriority(e.target.value)}
-            style={{
-              fontSize: 12, border: 'none', outline: 'none',
-              background: 'transparent', color: priConf.color,
-              cursor: 'pointer', appearance: 'none', fontWeight: 500,
-            }}
-          >
-            {PRIORITY_OPTIONS.map(({ value, label }) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </select>
-        </label>
+        {show('priority') && (
+          <label style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 20,
+            border: `1px solid ${priConf.color}44`, background: `${priConf.color}18`, cursor: 'pointer' }}>
+            <Flag style={{ width: 11, height: 11, color: priConf.color, flexShrink: 0 }} />
+            <select value={priority} onChange={e => setPriority(e.target.value)}
+              style={{ fontSize: 12, border: 'none', outline: 'none', background: 'transparent',
+                color: priConf.color, cursor: 'pointer', appearance: 'none', fontWeight: 500, fontFamily: 'inherit' }}>
+              {PRIORITY_OPTIONS.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
+            </select>
+          </label>
+        )}
 
         {/* Due date */}
-        <label style={{
-          display: 'flex', alignItems: 'center', gap: 5,
-          padding: '4px 10px', borderRadius: 20,
-          border: '1px solid var(--border)',
-          background: 'var(--surface-subtle)',
-          cursor: 'pointer',
-        }}>
-          <Calendar style={{ width: 11, height: 11, color: 'var(--text-muted)', flexShrink: 0 }} />
-          <input
-            type="date"
-            value={dueDate}
-            onChange={e => setDueDate(e.target.value)}
-            style={{
-              fontSize: 12, border: 'none', outline: 'none',
-              background: 'transparent',
-              color: dueDate ? 'var(--text-primary)' : 'var(--text-muted)',
-              cursor: 'pointer', colorScheme: 'light dark',
-              width: dueDate ? 'auto' : 80,
-            }}
-            placeholder="Due date"
-          />
-        </label>
+        {show('due_date') && (
+          <label style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 20,
+            border: `1px solid ${errors.due_date ? '#fca5a5' : 'var(--border)'}`,
+            background: errors.due_date ? '#fef2f2' : 'var(--surface-subtle)', cursor: 'pointer' }}>
+            <Calendar style={{ width: 11, height: 11, color: errors.due_date ? '#dc2626' : 'var(--text-muted)', flexShrink: 0 }} />
+            <input type="date" value={dueDate} onChange={e => { setDueDate(e.target.value); setErrors(p => ({ ...p, due_date: '' })) }}
+              style={{ fontSize: 12, border: 'none', outline: 'none', background: 'transparent',
+                color: dueDate ? 'var(--text-primary)' : 'var(--text-muted)', cursor: 'pointer',
+                colorScheme: 'light dark', width: dueDate ? 'auto' : 80, fontFamily: 'inherit' }}
+              placeholder={required('due_date') ? 'Due date *' : 'Due date'}/>
+          </label>
+        )}
 
-        {/* Client — always shown, even when no clients exist */}
-        <label style={{
-          display: 'flex', alignItems: 'center', gap: 5,
-          padding: '4px 10px', borderRadius: 20,
-          border: clientId ? `1px solid ${clients.find(c=>c.id===clientId)?.color ?? '#0d9488'}55` : '1px solid var(--border)',
-          background: clientId ? `${clients.find(c=>c.id===clientId)?.color ?? '#0d9488'}14` : 'var(--surface-subtle)',
-          cursor: clients.length > 0 ? 'pointer' : 'default',
-          opacity: clients.length === 0 ? 0.45 : 1,
-        }}>
-          {clientId
-            ? <span style={{ width: 8, height: 8, borderRadius: 2, flexShrink: 0,
-                background: clients.find(c=>c.id===clientId)?.color ?? '#0d9488', display: 'inline-block' }}/>
-            : <Briefcase style={{ width: 11, height: 11, color: 'var(--text-muted)', flexShrink: 0 }} />
-          }
-          {clients.length === 0 ? (
-            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>No clients</span>
-          ) : (
-            <select
-              value={clientId}
-              onChange={e => setClientId(e.target.value)}
-              style={{
-                fontSize: 12, border: 'none', outline: 'none',
-                background: 'transparent',
-                color: clientId ? (clients.find(c=>c.id===clientId)?.color ?? '#0d9488') : 'var(--text-secondary)',
-                cursor: 'pointer', appearance: 'none',
-                fontWeight: clientId ? 600 : 400,
-              }}
-            >
-              <option value="">Client…</option>
-              {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          )}
-        </label>
+        {/* Client */}
+        {show('client') && (
+          <label style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 20,
+            border: errors.client ? '1px solid #fca5a5' : clientId
+              ? `1px solid ${clients.find(c => c.id === clientId)?.color ?? '#0d9488'}55`
+              : '1px solid var(--border)',
+            background: errors.client ? '#fef2f2' : clientId
+              ? `${clients.find(c => c.id === clientId)?.color ?? '#0d9488'}14`
+              : 'var(--surface-subtle)', cursor: 'pointer' }}>
+            {clientId
+              ? <span style={{ width: 8, height: 8, borderRadius: 2, flexShrink: 0,
+                  background: clients.find(c => c.id === clientId)?.color ?? '#0d9488', display: 'inline-block' }}/>
+              : <Briefcase style={{ width: 11, height: 11, color: errors.client ? '#dc2626' : 'var(--text-muted)', flexShrink: 0 }} />
+            }
+            {clients.length === 0
+              ? <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>No clients</span>
+              : <select value={clientId} onChange={e => { setClientId(e.target.value); setErrors(p => ({ ...p, client: '' })) }}
+                  style={{ fontSize: 12, border: 'none', outline: 'none', background: 'transparent',
+                    color: clientId ? (clients.find(c => c.id === clientId)?.color ?? '#0d9488') : 'var(--text-secondary)',
+                    cursor: 'pointer', appearance: 'none', fontWeight: clientId ? 600 : 400, fontFamily: 'inherit' }}>
+                  <option value="">Client{required('client') ? ' *' : '…'}</option>
+                  {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+            }
+          </label>
+        )}
 
         {/* Approver */}
-        {approvers.length > 0 && (
-          <label style={{
-            display: 'flex', alignItems: 'center', gap: 5,
-            padding: '4px 10px', borderRadius: 20,
-            border: approverId ? '1px solid #7c3aed44' : '1px solid var(--border)',
-            background: approverId ? '#7c3aed12' : 'var(--surface-subtle)',
-            cursor: 'pointer',
-          }}>
-            <Shield style={{ width: 11, height: 11, color: approverId ? '#7c3aed' : 'var(--text-muted)', flexShrink: 0 }} />
-            <select
-              value={approverId}
-              onChange={e => setApproverId(e.target.value)}
-              style={{
-                fontSize: 12, border: 'none', outline: 'none',
-                background: 'transparent',
-                color: approverId ? '#7c3aed' : 'var(--text-secondary)',
-                cursor: 'pointer', appearance: 'none', fontWeight: approverId ? 500 : 400,
-              }}
-            >
-              <option value="">No approver</option>
+        {show('approver') && approvers.length > 0 && (
+          <label style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 20,
+            border: errors.approver ? '1px solid #fca5a5' : approverId ? '1px solid #7c3aed44' : '1px solid var(--border)',
+            background: errors.approver ? '#fef2f2' : approverId ? '#7c3aed12' : 'var(--surface-subtle)', cursor: 'pointer' }}>
+            <Shield style={{ width: 11, height: 11, color: errors.approver ? '#dc2626' : approverId ? '#7c3aed' : 'var(--text-muted)', flexShrink: 0 }} />
+            <select value={approverId} onChange={e => { setApproverId(e.target.value); setErrors(p => ({ ...p, approver: '' })) }}
+              style={{ fontSize: 12, border: 'none', outline: 'none', background: 'transparent',
+                color: approverId ? '#7c3aed' : 'var(--text-secondary)', cursor: 'pointer',
+                appearance: 'none', fontWeight: approverId ? 500 : 400, fontFamily: 'inherit' }}>
+              <option value="">Approver{required('approver') ? ' *' : ''}</option>
               {approvers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
           </label>
         )}
 
-        {/* Save button — pushed right */}
-        <button
-          onClick={save}
-          disabled={saving || !title.trim()}
-          style={{
-            marginLeft: 'auto',
-            padding: '5px 16px', borderRadius: 20, border: 'none',
+        {/* Attachment */}
+        {show('attachment') && (
+          <button onClick={() => fileRef.current?.click()}
+            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 20,
+              border: errors.attachment ? '1px solid #fca5a5' : files.length > 0 ? '1px solid var(--brand-border)' : '1px solid var(--border)',
+              background: errors.attachment ? '#fef2f2' : files.length > 0 ? 'var(--brand-light)' : 'var(--surface-subtle)',
+              color: errors.attachment ? '#dc2626' : files.length > 0 ? 'var(--brand)' : 'var(--text-secondary)',
+              fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
+            <Paperclip style={{ width: 11, height: 11 }}/>
+            {files.length > 0 ? `${files.length} file${files.length > 1 ? 's' : ''}` : required('attachment') ? 'Attach *' : 'Attach'}
+          </button>
+        )}
+        <input ref={fileRef} type="file" multiple style={{ display: 'none' }}
+          onChange={e => { setFiles(Array.from(e.target.files ?? [])); setErrors(p => ({ ...p, attachment: '' })) }}/>
+
+        {/* Save */}
+        <button onClick={save} disabled={saving || !title.trim()}
+          style={{ marginLeft: 'auto', padding: '5px 16px', borderRadius: 20, border: 'none',
             background: title.trim() ? 'var(--brand)' : 'var(--border)',
             color: title.trim() ? '#fff' : 'var(--text-muted)',
-            fontSize: 12, fontWeight: 600,
-            cursor: title.trim() ? 'pointer' : 'default',
-            transition: 'all 0.15s', flexShrink: 0,
-            opacity: saving ? 0.7 : 1,
-          }}
-        >
+            fontSize: 12, fontWeight: 600, cursor: title.trim() ? 'pointer' : 'default',
+            transition: 'all 0.15s', flexShrink: 0, opacity: saving ? 0.7 : 1, fontFamily: 'inherit' }}>
           {saving ? 'Saving…' : 'Add task'}
         </button>
       </div>
+
+      {/* Validation errors */}
+      {Object.values(errors).some(Boolean) && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '4px 14px 8px' }}>
+          {Object.entries(errors).filter(([,v]) => v).map(([k, v]) => (
+            <span key={k} style={{ display: 'inline-flex', alignItems: 'center', gap: 4,
+              fontSize: 11, color: '#dc2626', background: '#fef2f2',
+              padding: '2px 8px', borderRadius: 99 }}>
+              <AlertCircle style={{ width: 10, height: 10 }}/> {v}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

@@ -55,7 +55,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     'title','description','status','priority','due_date','start_date',
     'completed_at','assignee_id','client_id','approval_status',
     'approval_required','approved_by','approved_at',
-    'estimated_hours','sort_order',
+    'estimated_hours','sort_order','custom_fields',
   ]
   const updates: Record<string, unknown> = {}
   for (const k of ALLOWED) { if (k in body) updates[k] = body[k] }
@@ -91,8 +91,12 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     .eq('user_id', user.id).eq('is_active', true).single()
   if (!mb || !['owner','admin','manager'].includes(mb.role))
     return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
+  // Soft delete — move to trash with deleted_at timestamp
+  // Tasks are permanently purged after 30 days via cron
   const { error } = await supabase
-    .from('tasks').delete().eq('id', id).eq('org_id', mb.org_id)
+    .from('tasks')
+    .update({ is_archived: true, deleted_at: new Date().toISOString() })
+    .eq('id', id).eq('org_id', mb.org_id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ success: true })
 }
