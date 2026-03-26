@@ -101,17 +101,8 @@ export function MyTasksView({ tasks: initialTasks, members, clients, currentUser
       refresh(); return
     }
 
-    // Normal completion
-    setTasks(prev => prev.map(t => t.id === task.id
-      ? { ...t, status: 'completed', completed_at: new Date().toISOString() } : t))
-    setSelTask(prev => prev?.id === task.id ? { ...prev, status: 'completed' } : prev)
-    setCompleting(p => new Set(p).add(task.id))
-    await fetch(`/api/tasks/${task.id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'completed', completed_at: new Date().toISOString() }),
-    })
-    setCompleting(p => { const s=new Set(p); s.delete(task.id); return s })
-    refresh()
+    // Show attachment modal before completing
+    setCompletingTask(task)
   }
 
   async function bulkComplete() {
@@ -333,6 +324,29 @@ export function MyTasksView({ tasks: initialTasks, members, clients, currentUser
   // BOARD VIEW
   return (
     <>
+      {completingTask && (
+        <CompletionAttachModal
+          taskId={completingTask.id}
+          taskTitle={completingTask.title}
+          onConfirm={async () => {
+            const task = completingTask
+            setCompletingTask(null)
+            setCompleting(p => new Set(p).add(task.id))
+            setTasks(prev => prev.map(t => t.id === task.id
+              ? { ...t, status: 'completed', completed_at: new Date().toISOString() } : t))
+            setSelTask(prev => prev?.id === task.id
+              ? { ...prev, status: 'completed', completed_at: new Date().toISOString() } : prev)
+            await fetch(`/api/tasks/${task.id}`, {
+              method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ status: 'completed', completed_at: new Date().toISOString() }),
+            })
+            setCompleting(p => { const s = new Set(p); s.delete(task.id); return s })
+            toast.success('Task done! 🎉')
+            refresh()
+          }}
+          onCancel={() => setCompletingTask(null)}
+        />
+      )}
       <Tabs/>
       <div style={{ flex:1, overflowX:'auto', overflowY:'hidden', padding:'14px 20px',
         background:'var(--surface-subtle)', display:'flex', gap:12, alignItems:'flex-start' }}>
