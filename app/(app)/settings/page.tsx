@@ -12,7 +12,8 @@ const SECTIONS = [
   { href: '/settings/tasks',        label: 'Task fields',      desc: 'Show/hide fields, set mandatory fields', adminOnly: true,  color: '#ca8a04', bg: '#fffbeb', iconName: 'LayoutGrid'},
   { href: '/settings/categories',   label: 'Client categories',desc: 'Manage client category options',         adminOnly: true,  color: '#ea580c', bg: '#fff7ed', iconName: 'Tag'       },
   { href: '/settings/custom-fields', label: 'Custom task fields',  desc: 'Add fields like Case No, Filing Date, Hearing Date', adminOnly: true,  color: '#0891b2', bg: '#ecfeff', iconName: 'LayoutGrid' },
-  { href: '/settings/trash',           label: 'Trash & recovery',    desc: 'Restore deleted tasks (30-day window)',            adminOnly: false, color: '#94a3b8', bg: '#f8fafc', iconName: 'Trash2'    },
+  { href: '/settings/permissions',     label: 'Role permissions',   desc: 'Control what each role can access', adminOnly: true,  color: '#7c3aed', bg: '#f5f3ff', iconName: 'ShieldCheck' },
+  { href: '/settings/trash',              label: 'Trash & recovery',    desc: 'Restore deleted tasks (30-day window)',            adminOnly: false, color: '#94a3b8', bg: '#f8fafc', iconName: 'Trash2'    },
   { href: '/settings/billing',          label: 'Billing & plan',   desc: 'Subscription and upgrade options',       adminOnly: true,  color: '#16a34a', bg: '#f0fdf4', iconName: 'CreditCard'},
   { href: '/settings/notifications', label: 'Notifications',   desc: 'Email and WhatsApp preferences',        adminOnly: false, color: '#db2777', bg: '#fdf2f8', iconName: 'Bell'      },
 ]
