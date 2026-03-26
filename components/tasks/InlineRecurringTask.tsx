@@ -347,8 +347,8 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, edit
         </button>
       </div>
     </div>
-  )
     </>
+  )
 }
 
 export { FREQ_LABEL }
