@@ -6,9 +6,10 @@ import {
   Home, CheckSquare, ListTodo, Users2, FolderOpen,
   RefreshCw, Users, BarChart2, Settings, Plus,
   ChevronDown, ChevronRight, Clock, Zap, X, Upload,
-  Calendar, Shield,
+  Calendar, Shield, LogOut,
 } from 'lucide-react'
 import { cn }            from '@/lib/utils/cn'
+import { createClient }  from '@/lib/supabase/client'
 import { useAppStore }   from '@/store/appStore'
 import { PlanBadge }     from '@/components/ui/Badge'
 
@@ -189,6 +190,7 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
             <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{session?.user.email}</p>
           </div>
         </Link>
+        <LogoutButton/>
       </div>
     </aside>
   )
@@ -219,5 +221,24 @@ function SI({ href, active, icon, label }: { href: string; active: boolean; icon
       onMouseLeave={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.6)' } }}>
       {icon}{label}
     </Link>
+  )
+}
+
+function LogoutButton() {
+  const router = useRouter()
+  async function logout() {
+    const sb = createClient()
+    await sb.auth.signOut()
+    router.push('/login')
+  }
+  return (
+    <button onClick={logout}
+      style={{ display:'flex', alignItems:'center', gap:9, padding:'7px 10px', borderRadius:7,
+        fontSize:13, color:'rgba(255,100,100,0.75)', background:'transparent', border:'none',
+        cursor:'pointer', width:'100%', textAlign:'left', transition:'all 0.12s', margin:'1px 4px' }}
+      onMouseEnter={e=>{(e.currentTarget as HTMLElement).style.background='rgba(239,68,68,0.12)';(e.currentTarget as HTMLElement).style.color='#f87171'}}
+      onMouseLeave={e=>{(e.currentTarget as HTMLElement).style.background='transparent';(e.currentTarget as HTMLElement).style.color='rgba(255,100,100,0.75)'}}>
+      <LogOut style={{ width:15, height:15, flexShrink:0 }}/> Sign out
+    </button>
   )
 }

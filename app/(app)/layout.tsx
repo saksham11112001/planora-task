@@ -18,7 +18,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     const admin = createAdminClient()
     const { data: pending } = await admin
       .from('org_members')
-      .select('id, org_id, role, organisations(id, name, slug, plan_tier, logo_color)')
+      .select('id, org_id, role, organisations(id, name, slug, plan_tier, logo_color, status, trial_ends_at)')
       .eq('user_id', user.id)
       .eq('is_active', false)
       .order('created_at', { ascending: false })
@@ -36,6 +36,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const org = membership.organisations as unknown as {
     id: string; name: string; slug: string; plan_tier: string; logo_color: string
+    status: string | null; trial_ends_at: string | null
   } | null
   if (!org) redirect('/onboarding')
 
@@ -51,8 +52,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         id:         org.id,
         name:       org.name,
         slug:       org.slug,
-        plan_tier:  org.plan_tier as any,
-        logo_color: org.logo_color ?? '#0d9488',
+        plan_tier:   org.plan_tier as any,
+        logo_color:  org.logo_color ?? '#0d9488',
+        status:      (org as any).status ?? null,
+        trial_ends_at: (org as any).trial_ends_at ?? null,
       }}
       role={membership.role}
       workspaceId={null}

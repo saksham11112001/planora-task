@@ -192,6 +192,24 @@ export async function POST(request: NextRequest) {
               results.members.skipped++
             }
           } else {
+            // Invite sent successfully — also resolve their new auth ID and
+            // pre-create the org_members row so they land in the org even
+            // if they sign in directly without clicking the invite link.
+            const newAuthId = await resolveAuthUser(email)
+            if (newAuthId) {
+              await admin.from('users').upsert(
+                { id: newAuthId, email, name: name || email.split('@')[0] },
+                { onConflict: 'id', ignoreDuplicates: true }
+              )
+              await admin.from('org_members').insert({
+                org_id: orgId, user_id: newAuthId, role, is_active: true,
+              }).onConflict ? undefined : undefined // ignore if already exists
+              // upsert to be safe
+              await admin.from('org_members').upsert(
+                { org_id: orgId, user_id: newAuthId, role, is_active: true },
+                { onConflict: 'org_id,user_id', ignoreDuplicates: false }
+              )
+            }
             results.members.created++
           }
         }
