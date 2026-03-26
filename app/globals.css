@@ -810,3 +810,168 @@ html.dark .sticky {
   }
   .sidebar-backdrop { display: none !important; }
 }
+
+/* ── Sidebar ─────────────────────────────────────────────────────*/
+html.dark aside { background: #0a0f1a !important; }
+
+/* ── Header ─────────────────────────────────────────────────────*/
+html.dark header { background: var(--surface) !important; border-color: var(--border) !important; }
+
+/* ── Inline style overrides for dark mode ───────────────────────*/
+/* surface-subtle backgrounds */
+html.dark [style*="background: 'var(--surface-subtle)'"],
+html.dark [style*="background:'var(--surface-subtle)'"],
+html.dark [style*="background: var(--surface-subtle)"] {
+  background: var(--surface-subtle) !important;
+}
+
+/* Priority/status chip backgrounds */
+html.dark [style*="background: '#fff7ed'"],
+html.dark [style*="background:'#fff7ed'"] { background: rgba(234,88,12,0.15) !important; }
+html.dark [style*="background: '#fef2f2'"],
+html.dark [style*="background:'#fef2f2'"] { background: rgba(220,38,38,0.12) !important; }
+html.dark [style*="background: '#f0fdf4'"],
+html.dark [style*="background:'#f0fdf4'"] { background: rgba(22,163,74,0.12) !important; }
+html.dark [style*="background: '#f5f3ff'"],
+html.dark [style*="background:'#f5f3ff'"] { background: rgba(124,58,237,0.12) !important; }
+html.dark [style*="background: '#fffbeb'"],
+html.dark [style*="background:'#fffbeb'"] { background: rgba(202,138,4,0.12) !important; }
+html.dark [style*="background: '#ecfeff'"],
+html.dark [style*="background:'#ecfeff'"] { background: rgba(8,145,178,0.12) !important; }
+html.dark [style*="background: '#fdf2f8'"],
+html.dark [style*="background:'#fdf2f8'"] { background: rgba(219,39,119,0.12) !important; }
+html.dark [style*="background: '#f0fdfa'"],
+html.dark [style*="background:'#f0fdfa'"] { background: var(--brand-light) !important; }
+
+/* Surface subtle for page backgrounds */
+html.dark [style*="background: '#f8fafc'"],
+html.dark [style*="background:'#f8fafc'"],
+html.dark [style*="background: '#f1f5f9'"] { background: var(--surface-subtle) !important; }
+
+/* Pure white surfaces */
+html.dark [style*="background: 'white'"],
+html.dark [style*="background:'white'"],
+html.dark [style*="background: white"] { background: var(--surface) !important; }
+
+/* Text color overrides */
+html.dark [style*="color: 'white'"],
+html.dark [style*="color:'white'"],
+html.dark [style*="color: white"] { color: var(--text-primary) !important; }
+
+/* Border overrides */
+html.dark [style*="border: '1px solid #e2e8f0'"],
+html.dark [style*="borderBottom: '1px solid #f8fafc'"],
+html.dark [style*="borderBottom: '1px solid #f1f5f9'"] {
+  border-color: var(--border-light) !important;
+}
+html.dark [style*="border-bottom: 1px solid #f8fafc"],
+html.dark [style*="border-bottom: 1px solid #e2e8f0"] {
+  border-color: var(--border-light) !important;
+}
+
+/* ── Dashboard hero — keep gradient, just darken ────────────────*/
+html.dark .page-container { color: var(--text-primary); }
+
+/* ── Section headers ─────────────────────────────────────────── */
+html.dark .section-header { color: inherit; }
+html.dark [style*="textTransform: 'uppercase'"][style*="color: '#"] { opacity: 0.9; }
+
+/* ── Status badges inline ────────────────────────────────────── */
+html.dark .status-badge { filter: brightness(0.9); }
+html.dark .priority-chip { filter: brightness(0.9); }
+
+/* ── Tailwind gray text ───────────────────────────────────────*/
+html.dark .text-gray-500      { color: var(--text-muted)       !important; }
+html.dark .text-gray-400      { color: var(--text-muted)       !important; }
+html.dark .text-gray-300      { color: var(--text-muted)       !important; }
+html.dark .text-gray-600      { color: var(--text-secondary)   !important; }
+html.dark .text-gray-800      { color: var(--text-primary)     !important; }
+html.dark .hover\:text-gray-700:hover { color: var(--text-primary) !important; }
+
+/* ── Tailwind border ──────────────────────────────────────────*/
+html.dark .border             { border-color: var(--border)      !important; }
+html.dark .border-b           { border-color: var(--border-light) !important; }
+html.dark .border-gray-50     { border-color: var(--border-light) !important; }
+
+/* ── Tailwind hover backgrounds ─────────────────────────────── */
+html.dark .hover\:bg-gray-50:hover  { background-color: var(--surface-hover) !important; }
+html.dark .hover\:bg-gray-100:hover { background-color: var(--border-light)  !important; }
+
+/* ── Completion modal ────────────────────────────────────────*/
+html.dark [style*="background: 'rgba(0,0,0,0.4)'"] { background: rgba(0,0,0,0.7) !important; }
+
+/* ── Calendar ────────────────────────────────────────────────*/
+html.dark [style*="background: '#fff'"]:not(svg):not(path) { background: var(--surface) !important; }
+
+/* ── Inline forms (recurring, one-time) ────────────────────── */
+html.dark [style*="background: 'var(--surface)'"]:not(html):not(body) { background: var(--surface) !important; }
+html.dark [style*="background: 'var(--surface-subtle)'"]:not(html):not(body) { background: var(--surface-subtle) !important; }
+
+/* ── Scrollbars in dark mode ────────────────────────────────*/
+html.dark ::-webkit-scrollbar-thumb { background: #2d3748; }
+html.dark ::-webkit-scrollbar-thumb:hover { background: #4a5568; }
+
+/* ── Toast in dark mode ─────────────────────────────────────*/
+html.dark [style*="background:'#f0fdf4'"] { background: rgba(22,163,74,0.15) !important; }
+html.dark [style*="background:'#fef2f2'"] { background: rgba(220,38,38,0.15) !important; }
+html.dark [style*="background:'#eff6ff'"] { background: rgba(29,78,216,0.15) !important; }
+html.dark [style*="background:'#fffbeb'"] { background: rgba(202,138,4,0.15) !important; }
+
+/* ── Kanban cards ────────────────────────────────────────────*/
+html.dark .bg-white { background-color: var(--surface) !important; }
+
+/* ── Task rows — mobile responsive ──────────────────────────────*/
+/* On mobile, task grid shows only checkbox + title + priority pill */
+@media (max-width: 640px) {
+  /* Collapse assignee name and date columns on small screens */
+  .mytasks-row {
+    grid-template-columns: 28px 22px 1fr 80px !important;
+  }
+  /* Hide date and assignee columns (cols 4 and 5) */
+  .mytasks-row > *:nth-child(4) { display: none !important; }
+  .mytasks-row > *:nth-child(5) { display: none !important; }
+
+  /* Page container padding reduction */
+  .page-container { padding: 12px !important; }
+
+  /* Inline task forms — wrap gracefully on mobile */
+  .inline-task-pills {
+    gap: 4px !important;
+  }
+
+  /* Header search hide on mobile */
+  .header-search { display: none !important; }
+
+  /* Smaller header height */
+  header { height: 52px !important; }
+
+  /* Task detail panel full screen on mobile */
+  .detail-panel {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    z-index: 60 !important;
+    border-radius: 0 !important;
+  }
+
+  /* Reports charts — stack on mobile */
+  .reports-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Calendar — compact on mobile */
+  .calendar-grid {
+    font-size: 10px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .mytasks-row {
+    grid-template-columns: 28px 22px 1fr 70px !important;
+  }
+  /* Also hide priority on very small screens, keep only title */
+  .mytasks-row > *:nth-child(6) { 
+    display: none !important; 
+  }
+}
