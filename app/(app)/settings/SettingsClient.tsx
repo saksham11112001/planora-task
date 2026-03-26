@@ -85,6 +85,7 @@ export function SettingsClient({ sections, isAdmin, orgName, planTier, role, use
           <DeleteAccountButton userId={userId} orgId={orgId} isOwner={isOwner}/>
         </div>
       </div>
+      )}
     </div>
   )
 }
