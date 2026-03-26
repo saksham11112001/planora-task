@@ -3,7 +3,8 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, X, RefreshCw, User, Flag, Briefcase, Paperclip } from 'lucide-react'
 import { toast } from '@/store/appStore'
-import { useOrgSettings } from '@/lib/hooks/useOrgSettings'
+import { useOrgSettings }       from '@/lib/hooks/useOrgSettings'
+import { QuickAddClientModal }   from '@/components/clients/QuickAddClientModal'
 import { InlineCustomFields } from '@/components/tasks/InlineCustomFields'
 
 // ── Granular frequency options ─────────────────────────────────
@@ -54,10 +55,15 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, edit
 
   const isEdit = !!editTask
   const { customFields, taskFields } = useOrgSettings()
+  // Keep clientList in sync with prop
+  const [_prevClients, setPrevClients] = useState(clients)
+  if (clients !== _prevClients) { setPrevClients(clients); setClientList(clients) }
   const show     = (key: string) => taskFields[key]?.visible !== false
   const required = (key: string) => taskFields[key]?.mandatory === true
   const [errors,       setErrors]       = useState<Record<string,string>>({})
-  const [customValues, setCustomValues] = useState<Record<string,any>>({})
+  const [customValues,    setCustomValues]    = useState<Record<string,any>>({})
+  const [showAddClient,   setShowAddClient]   = useState(false)
+  const [clientList,      setClientList]      = useState(clients)
   const [open,      setOpen]      = useState(isEdit)
   const [saving,    setSaving]    = useState(false)
   const [title,     setTitle]     = useState(editTask?.title ?? '')
@@ -141,6 +147,17 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, edit
 
   if (!open) {
     return (
+      <>
+      {showAddClient && (
+        <QuickAddClientModal
+          onClose={() => setShowAddClient(false)}
+          onCreated={newClient => {
+            setClientList(p => [...p, newClient])
+            setClientId(newClient.id)
+            setShowAddClient(false)
+          }}
+        />
+      )}
       <div onClick={() => setOpen(true)} style={{
         display:'flex', alignItems:'center', gap:8, padding:'10px 20px',
         cursor:'pointer', borderTop:'1px dashed var(--border)', color:'var(--text-muted)',
@@ -151,10 +168,22 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, edit
         <Plus style={{ width:14, height:14, flexShrink:0 }}/>
         <span style={{ fontSize:13 }}>Add recurring task</span>
       </div>
+      </>
     )
   }
 
   return (
+    <>
+    {showAddClient && (
+      <QuickAddClientModal
+        onClose={() => setShowAddClient(false)}
+        onCreated={newClient => {
+          setClientList(p => [...p, newClient])
+          setClientId(newClient.id)
+          setShowAddClient(false)
+        }}
+      />
+    )}
     <div ref={rowRef} style={{
       margin:'6px 12px 10px', borderRadius:10,
       border:'1.5px solid var(--brand-border)',
@@ -230,24 +259,33 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, edit
         </label>
 
         {/* Client */}
-        {show('client') && clients.length > 0 && (
+        {show('client') && (
           <label style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px',
             borderRadius:20,
-            border: clientId ? `1px solid ${clients.find(c=>c.id===clientId)?.color ?? '#0d9488'}55` : '1px solid var(--border)',
-            background: clientId ? `${clients.find(c=>c.id===clientId)?.color ?? '#0d9488'}14` : 'var(--surface-subtle)',
+            border: errors.client ? '1px solid #fca5a5'
+              : clientId ? `1px solid ${clientList.find(c=>c.id===clientId)?.color ?? '#0d9488'}55`
+              : '1px solid var(--border)',
+            background: errors.client ? '#fef2f2'
+              : clientId ? `${clientList.find(c=>c.id===clientId)?.color ?? '#0d9488'}14`
+              : 'var(--surface-subtle)',
             cursor:'pointer' }}>
             {clientId
               ? <span style={{ width:8, height:8, borderRadius:2, flexShrink:0,
-                  background:clients.find(c=>c.id===clientId)?.color??'#0d9488', display:'inline-block' }}/>
-              : <Briefcase style={{ width:11, height:11, color:'var(--text-muted)', flexShrink:0 }}/>
+                  background:clientList.find(c=>c.id===clientId)?.color??'#0d9488', display:'inline-block' }}/>
+              : <Briefcase style={{ width:11, height:11, color: errors.client?'#dc2626':'var(--text-muted)', flexShrink:0 }}/>
             }
-            <select value={clientId} onChange={e => setClientId(e.target.value)}
+            <select value={clientId} onChange={e => {
+                if (e.target.value === '__add__') { setShowAddClient(true) }
+                else { setClientId(e.target.value); setErrors(p => ({...p, client:''})) }
+              }}
               style={{ fontSize:12, border:'none', outline:'none',
                 background:'transparent',
-                color: clientId ? (clients.find(c=>c.id===clientId)?.color??'#0d9488') : 'var(--text-secondary)',
+                color: clientId ? (clientList.find(c=>c.id===clientId)?.color??'#0d9488')
+                  : errors.client ? '#dc2626' : 'var(--text-secondary)',
                 cursor:'pointer', appearance:'none', fontWeight: clientId?600:400 }}>
-              <option value="">Client…</option>
-              {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              <option value="">{required('client') ? 'Client *' : 'Client…'}</option>
+              {clientList.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              <option value="__add__">+ Add new client…</option>
             </select>
           </label>
         )}
@@ -295,6 +333,7 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, edit
       </div>
     </div>
   )
+    </>
 }
 
 export { FREQ_LABEL }
