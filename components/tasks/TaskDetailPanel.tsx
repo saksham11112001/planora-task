@@ -374,6 +374,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
 
             {/* ── Details ── */}
             {tab === 'details' && (
+              <>
               <div className="px-5 py-3">
                 <FieldRow label="Status">
                   <select value={status} onChange={e => { setStatus(e.target.value); patch({ status: e.target.value }) }}
@@ -461,6 +462,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                   />
                 </div>
               )}
+              </>
             )}
 
             {/* ── Subtasks ── */}
