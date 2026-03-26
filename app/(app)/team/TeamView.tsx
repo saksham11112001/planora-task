@@ -263,15 +263,16 @@ export function TeamView({
                         <>
                           {/* Click-outside backdrop */}
                           <div
-                            className="fixed inset-0 z-10"
+                            className="fixed inset-0" style={{ zIndex: 9998 }}
                             onClick={() => setRoleEditing(null)}
                           />
                           <div
-                            className="absolute right-0 top-full mt-1.5 rounded-xl shadow-xl py-1.5 z-20 min-w-[150px]"
+                            className="absolute right-0 top-full mt-1.5 rounded-xl shadow-xl py-1.5 min-w-[150px]"
                             style={{
                               background: 'var(--surface)',
                               border: '1px solid var(--border)',
-                              boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                              boxShadow: '0 12px 32px rgba(0,0,0,0.18)',
+                              zIndex: 9999,
                             }}
                           >
                             <p className="px-3 pb-1.5 pt-0.5 text-xs font-semibold uppercase tracking-wide"

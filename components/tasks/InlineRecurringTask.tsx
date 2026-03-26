@@ -3,7 +3,8 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, X, RefreshCw, User, Flag, Briefcase, Paperclip } from 'lucide-react'
 import { toast } from '@/store/appStore'
-import { useTaskFields } from '@/lib/hooks/useTaskFields'
+import { useOrgSettings } from '@/lib/hooks/useOrgSettings'
+import { InlineCustomFields } from '@/components/tasks/InlineCustomFields'
 
 // ── Granular frequency options ─────────────────────────────────
 const FREQUENCIES = [
@@ -52,8 +53,11 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, edit
   const fileRef  = useRef<HTMLInputElement>(null)
 
   const isEdit = !!editTask
-  const { show, required } = useTaskFields()
-  const [errors, setErrors] = useState<Record<string,string>>({})
+  const { customFields, taskFields } = useOrgSettings()
+  const show     = (key: string) => taskFields[key]?.visible !== false
+  const required = (key: string) => taskFields[key]?.mandatory === true
+  const [errors,       setErrors]       = useState<Record<string,string>>({})
+  const [customValues, setCustomValues] = useState<Record<string,any>>({})
   const [open,      setOpen]      = useState(isEdit)
   const [saving,    setSaving]    = useState(false)
   const [title,     setTitle]     = useState(editTask?.title ?? '')
@@ -101,7 +105,8 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, edit
         title: title.trim(), frequency, priority,
         assignee_id: assignee  || null,
         client_id:   clientId  || null,
-        start_date:  new Date().toISOString().split('T')[0],
+        start_date:   new Date().toISOString().split('T')[0],
+        custom_fields: Object.keys(customValues).length > 0 ? customValues : undefined,
       }
       let res: Response
       if (isEdit) {
@@ -259,6 +264,15 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, edit
         }
         <input ref={fileRef} type="file" multiple style={{ display:'none' }}
           onChange={e => setFiles(Array.from(e.target.files ?? []))}/>
+
+        {/* Custom fields */}
+        {customFields.length > 0 && (
+          <InlineCustomFields
+            defs={customFields}
+            values={customValues}
+            onChange={(k, v) => setCustomValues(p => ({ ...p, [k]: v }))}
+          />
+        )}
 
         {/* Errors */}
         {Object.values(errors).some(Boolean) && (
