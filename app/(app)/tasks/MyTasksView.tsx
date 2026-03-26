@@ -215,7 +215,7 @@ export function MyTasksView({ tasks: initialTasks, members, clients, currentUser
                   const isPending = task.approval_status === 'pending' || task.status === 'in_review'
                   return (
                     <div key={task.id}
-                      style={{ display:'grid', gridTemplateColumns:'28px 22px 1fr 160px 100px 110px',
+                      className="mytasks-row" style={{ display:'grid', gridTemplateColumns:'28px 22px 1fr 160px 100px 110px',
                         alignItems:'center', padding:'0 18px', minHeight:48,
                         borderBottom:`1px solid var(--border-light)`,
                         background: checked.has(task.id) ? 'var(--brand-light)'
@@ -234,7 +234,7 @@ export function MyTasksView({ tasks: initialTasks, members, clients, currentUser
                           display:'flex', alignItems:'center', gap:6 }}>
                           {task.is_recurring && <RefreshCw style={{ flexShrink:0, width:11, height:11, color:'var(--brand)', marginRight:2 }} title="Recurring task"/>}
                           {task.project_id && !task.is_recurring && <FolderOpen style={{ flexShrink:0, width:11, height:11, color:'#7c3aed', marginRight:2 }} title="Project task"/>}
-                          <span style={{ overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis', flex:1 }}>{task.title}</span>
+                          <span className="task-title" style={{ overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis', flex:1 }}>{task.title}</span>
                           {isPending && <span style={{ flexShrink:0, fontSize:11, background:'#ede9fe',
                             color:'#7c3aed', padding:'1px 5px', borderRadius:3, fontWeight:500 }}>
                             Pending
@@ -248,17 +248,25 @@ export function MyTasksView({ tasks: initialTasks, members, clients, currentUser
                             <span style={{ overflow:'hidden', textOverflow:'ellipsis' }}>{(task as any).project?.name}</span>
                           </div>
                         )}
+                        {/* Mobile: show due date + priority inline */}
+                        <div className="show-mobile-meta" style={{ display:'none', alignItems:'center', gap:6, marginTop:2 }}>
+                          {task.due_date && <span style={{ fontSize:10, color:ov?'#dc2626':'var(--text-muted)', fontWeight:ov?600:400 }}>{fmtDate(task.due_date)}</span>}
+                          {task.priority && task.priority!=='none' && <span style={{ fontSize:10, fontWeight:600, color:
+                            task.priority==='urgent'?'#dc2626':task.priority==='high'?'#ea580c':task.priority==='medium'?'#ca8a04':'#16a34a' }}>
+                            {task.priority}
+                          </span>}
+                        </div>
                       </div>
-                      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                      <div className="hide-mobile" style={{ display:'flex', alignItems:'center', gap:6 }}>
                         {assignee && <><Avatar name={assignee.name} size="xs"/>
                           <span style={{ fontSize:12, color:'var(--text-muted)', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{assignee.name}</span></>}
                       </div>
-                      <div style={{ textAlign:'center', fontSize:13,
+                      <div className="hide-mobile" style={{ textAlign:'center', fontSize:13,
                         color: task.due_date===today?'var(--brand)':ov?'#dc2626':'var(--text-muted)',
                         fontWeight: (task.due_date===today||ov)?600:400 }}>
                         {task.due_date ? fmtDate(task.due_date) : '—'}
                       </div>
-                      <div style={{ display:'flex', justifyContent:'center' }}>
+                      <div className="hide-mobile" style={{ display:'flex', justifyContent:'center' }}>
                         <PriorityBadge priority={task.priority}/>
                       </div>
                     </div>
@@ -282,7 +290,7 @@ export function MyTasksView({ tasks: initialTasks, members, clients, currentUser
                   const assignee = task.assignee as {id:string;name:string}|null
                   return (
                     <div key={task.id}
-                      style={{ display:'grid', gridTemplateColumns:'28px 22px 1fr 160px 100px 110px',
+                      className="mytasks-row" style={{ display:'grid', gridTemplateColumns:'28px 22px 1fr 160px 100px 110px',
                         alignItems:'center', padding:'0 18px', minHeight:48,
                         borderBottom:`1px solid var(--border-light)`,
                         background:'var(--surface)', cursor:'pointer', opacity:0.7 }}
@@ -295,14 +303,14 @@ export function MyTasksView({ tasks: initialTasks, members, clients, currentUser
                         overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis', paddingRight:8 }}>
                         {task.title}
                       </div>
-                      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                      <div className="hide-mobile" style={{ display:'flex', alignItems:'center', gap:6 }}>
                         {assignee && <><Avatar name={assignee.name} size="xs"/>
                           <span style={{ fontSize:12, color:'var(--text-muted)', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{assignee.name}</span></>}
                       </div>
                       <div style={{ textAlign:'center', fontSize:13, color:'var(--text-muted)' }}>
                         {task.due_date ? fmtDate(task.due_date) : '—'}
                       </div>
-                      <div style={{ display:'flex', justifyContent:'center' }}>
+                      <div className="hide-mobile" style={{ display:'flex', justifyContent:'center' }}>
                         <PriorityBadge priority={task.priority}/>
                       </div>
                     </div>
@@ -324,6 +332,15 @@ export function MyTasksView({ tasks: initialTasks, members, clients, currentUser
   // BOARD VIEW
   return (
     <>
+      <style>{`
+        @media (max-width: 640px) {
+          .hide-mobile { display: none !important; }
+          .mytasks-row, .mytasks-header {
+            grid-template-columns: 28px 22px 1fr 32px !important;
+          }
+          .show-mobile-meta { display: flex !important; }
+        }
+      `}</style>
       {completingTask && (
         <CompletionAttachModal
           taskId={completingTask.id}

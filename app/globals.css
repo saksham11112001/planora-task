@@ -975,3 +975,44 @@ html.dark .bg-white { background-color: var(--surface) !important; }
     display: none !important; 
   }
 }
+
+/* ── Dark mode task title contrast boost ─────────────────────── */
+html.dark {
+  --text-primary:   #f8fafc;   /* bumped from #f1f5f9 — more visible */
+  --text-secondary: #cbd5e1;   /* bumped from #94a3b8 */
+  --text-muted:     #94a3b8;   /* bumped from #64748b */
+}
+
+/* Task row text in dark mode — override inline style issues */
+html.dark [style*="color: 'var(--text-primary)'"],
+html.dark [style*="color:'var(--text-primary)'"] {
+  color: #f8fafc !important;
+}
+html.dark [style*="color: 'var(--text-secondary)'"],
+html.dark [style*="color:'var(--text-secondary)'"] {
+  color: #cbd5e1 !important;
+}
+html.dark [style*="color: 'var(--text-muted)'"],
+html.dark [style*="color:'var(--text-muted)'"] {
+  color: #94a3b8 !important;
+}
+
+/* Catch-all for task name spans in dark mode */
+html.dark .task-row span,
+html.dark [style*="fontSize:13"][style*="color"],
+html.dark [style*="font-size: 13px"] {
+  color: #f8fafc;
+}
+
+/* Assignee names in task rows */
+html.dark [style*="fontSize:12"][style*="text-muted"] {
+  color: #94a3b8 !important;
+}
+/* ── Task title visibility in dark mode ─────────────────────── */
+html.dark .task-title {
+  color: #f8fafc !important;
+}
+html.dark .task-title.done,
+html.dark .task-title[style*="#94a3b8"] {
+  color: #64748b !important;
+}

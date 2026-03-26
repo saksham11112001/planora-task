@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter }          from 'next/navigation'
 import { CheckCheck, Clock } from 'lucide-react'
 import { InlineOneTimeTask }  from '@/components/tasks/InlineOneTimeTask'
+import { CompletionAttachModal } from '@/components/tasks/CompletionAttachModal'
 import { TaskDetailPanel }    from '@/components/tasks/TaskDetailPanel'
 import { cn }                 from '@/lib/utils/cn'
 import { toast }              from '@/store/appStore'
@@ -31,6 +32,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
   const [subtaskMap,    setSubtaskMap]    = useState<Record<string, {id:string;title:string;status:string}[]>>({})
   const [loadingSubtasks, setLoadingSubtasks] = useState<Set<string>>(new Set())
   const [newSubInputs, setNewSubInputs]   = useState<Record<string, string>>({})
+  const [completingTask, setCompletingTask] = useState<Task | null>(null)
 
   async function toggleExpand(taskId: string) {
     setExpandedTasks(prev => {
@@ -179,6 +181,15 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
   ].filter(s => s.tasks.length > 0 || s.addRow)
 
   return (
+    <>
+    <style>{`
+      @media (max-width: 640px) {
+        .hide-mobile { display: none !important; }
+        .inbox-task-row, .inbox-header-row {
+          grid-template-columns: 36px 22px 1fr 32px !important;
+        }
+      }
+    `}</style>
     <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
       {/* Main list */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -208,11 +219,14 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
         )}
 
         {/* Column headers */}
-        <div style={{ display: 'grid', gridTemplateColumns: '36px 22px 1fr 70px 110px 80px 32px',
-          padding: '6px 16px', background:'var(--surface-subtle)', borderBottom:'1px solid var(--border)',
-          fontSize: 10, fontWeight: 700, color:'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', flexShrink: 0 }}>
-          <div/><div/><div>Task</div><div style={{ textAlign: 'center', fontSize: 9 }}>Subtasks</div><div style={{ textAlign: 'center' }}>Due date</div>
-          <div style={{ textAlign: 'center' }}>Priority</div><div/>
+        <div className="inbox-header-row" style={{ padding: '6px 16px', background:'var(--surface-subtle)', borderBottom:'1px solid var(--border)',
+          fontSize: 10, fontWeight: 700, color:'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', flexShrink: 0,
+          display: 'grid', gridTemplateColumns: '36px 22px 1fr 70px 110px 80px 32px' }}>
+          <div/><div/><div>Task</div>
+          <div className="hide-mobile" style={{ textAlign: 'center', fontSize: 9 }}>Subtasks</div>
+          <div className="hide-mobile" style={{ textAlign: 'center' }}>Due date</div>
+          <div className="hide-mobile" style={{ textAlign: 'center' }}>Priority</div>
+          <div/>
         </div>
 
         {/* Task list */}
@@ -245,6 +259,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                   <div key={task.id}>
                   <div
                     onClick={() => setSelectedTask(task)}
+                    className="inbox-task-row"
                     style={{
                       display: 'grid',
                       gridTemplateColumns: '36px 22px 1fr 70px 110px 80px 32px',
@@ -321,7 +336,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                     </div>
 
                     {/* Due date */}
-                    <div style={{ textAlign: 'center', fontSize: 12,
+                    <div className="hide-mobile" style={{ textAlign: 'center', fontSize: 12,
                       color: ov ? '#dc2626' : task.due_date === today ? '#0d9488' : '#94a3b8',
                       fontWeight: ov || task.due_date === today ? 600 : 400 }}>
                       {task.due_date ? fmtDate(task.due_date) : '—'}
@@ -484,6 +499,31 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
         </div>
       </div>
 
+      {/* Completion attach modal */}
+      {completingTask && (
+        <CompletionAttachModal
+          taskId={completingTask.id}
+          taskTitle={completingTask.title}
+          onConfirm={async () => {
+            const task = completingTask
+            setCompletingTask(null)
+            setCompleting(p => new Set(p).add(task.id))
+            setLocalTasks(prev => prev.map(t => t.id === task.id
+              ? { ...t, status: 'completed', completed_at: new Date().toISOString() } : t))
+            setSelectedTask(prev => prev?.id === task.id
+              ? { ...prev, status: 'completed', completed_at: new Date().toISOString() } : prev)
+            await fetch(`/api/tasks/${task.id}`, {
+              method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ status: 'completed', completed_at: new Date().toISOString() }),
+            })
+            setCompleting(p => { const s = new Set(p); s.delete(task.id); return s })
+            toast.success('Task completed! ✓')
+            startT(() => router.refresh())
+          }}
+          onCancel={() => setCompletingTask(null)}
+        />
+      )}
+
       {/* Task detail panel */}
       {selectedTask && (
         <TaskDetailPanel
@@ -494,6 +534,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
         />
       )}
     </div>
+    </>
   )
 }
 
