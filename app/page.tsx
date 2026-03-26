@@ -175,6 +175,12 @@ export default async function LandingPage() {
               desc: 'Track completion rates per employee. 30/60/90 day timelines. Role-based visibility.',
               demo: 'reports',
             },
+            {
+              icon: '📥', color: '#7c3aed', bg: 'rgba(124,58,237,0.08)', border: 'rgba(124,58,237,0.2)',
+              title: 'Import existing data',
+              desc: 'Already using spreadsheets? Import your clients, projects, tasks, and team data from Excel in one click. No manual re-entry.',
+              demo: 'import',
+            },
           ].map(f => (
             <div key={f.title} style={{ background: f.bg, border: `1px solid ${f.border}`, borderRadius: 16, padding: '24px 20px' }}>
               <div style={{ fontSize: 28, marginBottom: 12 }}>{f.icon}</div>

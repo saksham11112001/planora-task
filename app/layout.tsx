@@ -25,8 +25,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* Apply saved theme before paint to avoid flash */}
         <script dangerouslySetInnerHTML={{ __html: `
           try {
-            const t = localStorage.getItem('planora-theme');
-            if (t === 'dark') document.documentElement.classList.add('dark');
+            const t = localStorage.getItem('planora-theme') || 'system';
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const dark = t === 'dark' || (t === 'system' && prefersDark);
+            if (dark) document.documentElement.classList.add('dark');
             else document.documentElement.classList.remove('dark');
           } catch(e) {}
         `}}/>

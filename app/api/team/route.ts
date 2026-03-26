@@ -22,8 +22,8 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).single()
-  if (!mb || !['owner','admin'].includes(mb.role))
-    return NextResponse.json({ error: 'Only owners/admins can invite' }, { status: 403 })
+  if (!mb || !['owner','admin','manager'].includes(mb.role))
+    return NextResponse.json({ error: 'Only owners/admins/managers can invite' }, { status: 403 })
 
   const { email, role = 'member' } = await request.json()
   if (!email?.trim()) return NextResponse.json({ error: 'Email required' }, { status: 400 })
@@ -58,6 +58,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
+  // Note: managers can only change roles of members/viewers, not admins/owners
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })

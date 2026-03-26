@@ -67,7 +67,8 @@ export function SettingsClient({ sections, isAdmin, orgName, planTier, role, use
         })}
       </div>
 
-      {/* Danger zone */}
+      {/* Danger zone — owner/admin only */}
+      {(role === 'owner' || role === 'admin') && (
       <div style={{ marginTop: 32, padding: '20px', borderRadius: 12, border: '1px solid #fecaca', background: '#fef2f2' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
           <div>

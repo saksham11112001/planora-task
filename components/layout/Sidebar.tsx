@@ -5,7 +5,8 @@ import { useState, useEffect, useRef } from 'react'
 import {
   Home, CheckSquare, ListTodo, Users2, FolderOpen,
   RefreshCw, Users, BarChart2, Settings, Plus,
-  ChevronDown, ChevronRight, Clock, Zap, X, Upload, Calendar,
+  ChevronDown, ChevronRight, Clock, Zap, X, Upload,
+  Calendar, Shield,
 } from 'lucide-react'
 import { cn }            from '@/lib/utils/cn'
 import { useAppStore }   from '@/store/appStore'
@@ -18,11 +19,11 @@ let _cacheTime    = 0
 const CACHE_TTL   = 30_000
 
 export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
-  const pathname  = usePathname()
+  const pathname    = usePathname()
   const { session } = useAppStore()
   const [projectsOpen, setProjectsOpen] = useState(true)
   const [projects, setProjects]         = useState<Project[]>(_projectCache)
-  const fetchRef  = useRef(false)
+  const fetchRef = useRef(false)
 
   useEffect(() => {
     const now = Date.now()
@@ -44,13 +45,16 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
     return pathname === href || pathname.startsWith(href + '/')
   }
 
-  const plan = session?.org.plan_tier ?? 'free'
-  const userName = session?.user.name ?? session?.user.email?.split('@')[0] ?? ''
-  const userInitial = userName[0]?.toUpperCase() ?? 'U'
+  const plan      = session?.org.plan_tier ?? 'free'
+  const role      = session?.role ?? ''
+  const userName  = session?.user.name ?? session?.user.email?.split('@')[0] ?? ''
+  const userInit  = userName[0]?.toUpperCase() ?? 'U'
+  const canManage = ['owner','admin','manager'].includes(role)
 
   return (
     <aside style={{ width: 236, background: '#0f172a', display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Brand */}
+
+      {/* ── Brand ── */}
       <div style={{ padding: '13px 12px', borderBottom: '1px solid rgba(255,255,255,0.08)',
         display: 'flex', alignItems: 'center', gap: 9, flexShrink: 0 }}>
         <div style={{ width: 27, height: 27, borderRadius: 7, background: session?.org.logo_color ?? '#0d9488',
@@ -72,15 +76,18 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
         )}
       </div>
 
-      {/* Nav */}
-      <nav style={{ flex: 1, overflowY: 'auto', padding: '8px 8px', scrollbarWidth: 'none' }}>
-        <GL>Personal</GL>
-        <SI href="/dashboard"  active={isActive('/dashboard', true)} icon={<Home       className="h-4 w-4"/>} label="Home"/>
-        <SI href="/tasks"      active={isActive('/tasks',    true)}  icon={<CheckSquare className="h-4 w-4"/>} label="My tasks"/>
-        <Div/>
-        <GL>Work</GL>
+      {/* ── Scrollable nav ── */}
+      <nav style={{ flex: 1, overflowY: 'auto', padding: '8px', scrollbarWidth: 'none' }}>
 
-        {/* Projects section */}
+        {/* PERSONAL */}
+        <GL>Personal</GL>
+        <SI href="/dashboard" active={isActive('/dashboard', true)} icon={<Home       className="h-4 w-4"/>} label="Home"/>
+        <SI href="/tasks"     active={isActive('/tasks',    true)}  icon={<CheckSquare className="h-4 w-4"/>} label="My tasks"/>
+        <Div/>
+
+        {/* WORK */}
+        <GL>Work</GL>
+        {/* Projects collapsible */}
         <div style={{ display: 'flex', alignItems: 'center', padding: '5px 10px 2px' }}>
           <button onClick={() => setProjectsOpen(p => !p)}
             style={{ display: 'flex', alignItems: 'center', gap: 5, flex: 1, background: 'none',
@@ -91,14 +98,12 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
           </button>
           <Link href="/projects/new" onClick={() => { _cacheTime = 0 }}
             style={{ display: 'flex', alignItems: 'center', justifyContent: 'center',
-              width: 20, height: 20, borderRadius: 4, color: 'rgba(255,255,255,0.3)',
-              textDecoration: 'none' }}
+              width: 20, height: 20, borderRadius: 4, color: 'rgba(255,255,255,0.3)', textDecoration: 'none' }}
             className="hover:bg-white/10 hover:text-white transition-colors"
             title="New project">
             <Plus className="h-3 w-3"/>
           </Link>
         </div>
-
         {projectsOpen && (
           <>
             <SI href="/projects" active={pathname === '/projects'} icon={<FolderOpen className="h-3.5 w-3.5"/>} label="All projects"/>
@@ -114,69 +119,74 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
             ))}
           </>
         )}
-
+        <SI href="/clients"  active={isActive('/clients')}  icon={<Users2   className="h-4 w-4"/>} label="Clients"/>
         <Div/>
+
+        {/* ORGANISATION */}
         <GL>Organisation</GL>
-        <SI href="/team"      active={isActive('/team')}      icon={<Users     className="h-4 w-4"/>} label="Team"/>
-        <SI href="/time"      active={isActive('/time')}      icon={<Clock     className="h-4 w-4"/>} label="Time tracking"/>
+        <SI href="/team"     active={isActive('/team')}     icon={<Users    className="h-4 w-4"/>} label="Team"/>
+        <SI href="/time"     active={isActive('/time')}     icon={<Clock    className="h-4 w-4"/>} label="Time tracking"/>
+        <SI href="/reports"  active={isActive('/reports')}  icon={<BarChart2 className="h-4 w-4"/>} label="Reports"/>
+        <SI href="/calendar" active={isActive('/calendar')} icon={<Calendar className="h-4 w-4"/>} label="Calendar"/>
+        <Div/>
+
+        {/* TASKS */}
+        <GL>Tasks</GL>
+        <SI href="/inbox"    active={isActive('/inbox')}    icon={<ListTodo className="h-4 w-4"/>} label="One-time tasks"/>
         <SI href="/recurring" active={isActive('/recurring')} icon={<RefreshCw className="h-4 w-4"/>} label="Recurring tasks"/>
-        <SI href="/reports"   active={isActive('/reports')}   icon={<BarChart2 className="h-4 w-4"/>} label="Reports"/>
-        <SI href="/calendar"  active={isActive('/calendar')}  icon={<Calendar  className="h-4 w-4"/>} label="Calendar"/>
-        <SI href="/import"    active={isActive('/import')}    icon={<Upload    className="h-4 w-4"/>} label="Import data"/>
+        <Div/>
+
+        {/* TOOLS */}
+        <GL>Tools</GL>
+        <SI href="/import"   active={isActive('/import')}   icon={<Upload   className="h-4 w-4"/>} label="Import data"/>
+        {canManage && (
+          <SI href="/settings/permissions" active={isActive('/settings/permissions')} icon={<Shield className="h-4 w-4"/>} label="Permissions"/>
+        )}
       </nav>
 
-      {/* Trial banner */}
+      {/* ── Trial banner ── */}
       {(() => {
         const trialEnd   = session?.org.trial_ends_at
         const isTrialing = session?.org.status === 'trialing' && trialEnd
         if (!isTrialing) return null
-        const daysLeft = Math.max(0, Math.ceil(
-          (new Date(trialEnd!).getTime() - Date.now()) / 86_400_000
-        ))
+        const daysLeft = Math.max(0, Math.ceil((new Date(trialEnd!).getTime() - Date.now()) / 86_400_000))
         const urgent = daysLeft <= 3
         return (
           <Link href="/settings/billing" style={{
             display: 'block', margin: '0 8px 6px', padding: '10px 12px', borderRadius: 10,
             background: urgent
-              ? 'linear-gradient(135deg, rgba(239,68,68,0.2), rgba(239,68,68,0.1))'
-              : 'linear-gradient(135deg, rgba(13,148,136,0.25), rgba(124,58,237,0.2))',
+              ? 'linear-gradient(135deg,rgba(239,68,68,0.2),rgba(239,68,68,0.1))'
+              : 'linear-gradient(135deg,rgba(13,148,136,0.25),rgba(124,58,237,0.2))',
             border: `1px solid ${urgent ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.1)'}`,
             textDecoration: 'none',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-              <div style={{ width: 6, height: 6, borderRadius: '50%',
-                background: urgent ? '#f87171' : '#14b8a6' }}/>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: urgent ? '#f87171' : '#14b8a6' }}/>
               <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>
-                {daysLeft === 0 ? 'Trial ends today!' : `${daysLeft} day${daysLeft !== 1 ? 's' : ''} left in trial`}
+                {daysLeft === 0 ? 'Trial ends today!' : `${daysLeft} day${daysLeft !== 1 ? 's' : ''} left`}
               </span>
             </div>
-            <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', lineHeight: 1.4 }}>
-              Upgrade to keep all features →
-            </p>
+            <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', lineHeight: 1.4 }}>Upgrade to keep all features →</p>
           </Link>
         )
       })()}
 
+      {/* ── Bottom fixed section ── */}
       <div style={{ padding: '8px', borderTop: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
-        <SI href="/clients"  active={isActive('/clients')}  icon={<Users2   className="h-4 w-4"/>} label="Clients"/>
-        <SI href="/inbox"    active={isActive('/inbox')}    icon={<ListTodo className="h-4 w-4"/>} label="One-time tasks"/>
-        <div style={{ height:1, background:'rgba(255,255,255,0.07)', margin:'6px 4px' }}/>
         <SI href="/settings" active={isActive('/settings')} icon={<Settings className="h-4 w-4"/>} label="Settings"/>
         <Link href="/profile"
           style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 8,
             textDecoration: 'none', marginTop: 2 }}
-          className="hover:bg-white/10 transition-colors group">
+          className="hover:bg-white/10 transition-colors">
           <div style={{ width: 28, height: 28, borderRadius: '50%',
             background: session?.org.logo_color ?? '#0d9488',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             color: '#fff', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
-            {userInitial}
+            {userInit}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ color: '#fff', fontSize: 12, fontWeight: 500, overflow: 'hidden',
-              whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{userName}</p>
-            <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, overflow: 'hidden',
-              whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{session?.user.email}</p>
+            <p style={{ color: '#fff', fontSize: 12, fontWeight: 500, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{userName}</p>
+            <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{session?.user.email}</p>
           </div>
         </Link>
       </div>

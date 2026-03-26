@@ -41,6 +41,6 @@ export default async function TeamPage() {
     inprog_30d:    countMap[(m.users as any)?.id]?.inProgress ?? 0,
   }))
 
-  const canManage = ['owner','admin'].includes(mb.role)
+  const canManage = ['owner','admin','manager'].includes(mb.role)
   return <TeamView members={memberList} canManage={canManage} currentUserId={user.id}/>
 }
