@@ -25,8 +25,7 @@ export default async function LandingPage() {
           {['Features','Pricing','Clients','Blog'].map(l => (
             <a key={l} href={`#${l.toLowerCase()}`} style={{ color: 'rgba(255,255,255,0.55)', fontSize: 14,
               textDecoration: 'none', transition: 'color 0.15s' }}
-              onMouseEnter={e => (e.target as any).style.color = '#fff'}
-              onMouseLeave={e => (e.target as any).style.color = 'rgba(255,255,255,0.55)'}>
+              className="landing-nav-link">
               {l}
             </a>
           ))}
@@ -363,6 +362,7 @@ export default async function LandingPage() {
       <style dangerouslySetInnerHTML={{ __html: `
         @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.4} }
         a:hover{opacity:0.85}
+        .landing-nav-link:hover{color:#fff !important}
       `}}/>
     </div>
   )
