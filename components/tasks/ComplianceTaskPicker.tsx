@@ -46,7 +46,7 @@ export function ComplianceTaskPicker({ onSelect, disabled }: Props) {
   }
 
   return (
-    <div ref={ref} style={{ position: 'relative', flexShrink: 0 }}>
+    <div ref={ref} style={{ position: 'relative', flexShrink: 0, zIndex: 100 }}>
       <button
         onClick={() => !disabled && setOpen(v => !v)}
         disabled={disabled}
@@ -68,7 +68,22 @@ export function ComplianceTaskPicker({ onSelect, disabled }: Props) {
         <>
           <div style={{ position: 'fixed', inset: 0, zIndex: 9998 }} onClick={() => setOpen(false)}/>
           <div style={{
-            position: 'absolute', left: 0, top: 'calc(100% + 6px)',
+            position: 'fixed',
+            top: (() => {
+              const btn = ref.current?.querySelector('button')
+              if (!btn) return 40
+              const rect = btn.getBoundingClientRect()
+              return rect.bottom + 6
+            })(),
+            left: (() => {
+              const btn = ref.current?.querySelector('button')
+              if (!btn) return 0
+              const rect = btn.getBoundingClientRect()
+              // If button is on right side of screen, open to the left
+              return rect.right + 360 > window.innerWidth
+                ? Math.max(8, rect.right - 360)
+                : rect.left
+            })(),
             width: 360, maxHeight: 440, background: 'var(--surface)',
             border: '1px solid var(--border)', borderRadius: 14,
             boxShadow: '0 16px 48px rgba(0,0,0,0.18)', zIndex: 9999,
