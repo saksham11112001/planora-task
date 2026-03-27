@@ -49,6 +49,21 @@ export async function POST(request: NextRequest) {
       data: { invited_to_org: null, invited_role: null }
     })
 
+    // Notify managers that a new member joined
+    try {
+      const { data: userInfo } = await supabase.from('users').select('name, email').eq('id', user.id).maybeSingle()
+      await inngest.send({
+        name: 'team/member-joined',
+        data: {
+          org_id: org.id, new_member_id: user.id,
+          member_name:     (userInfo as any)?.name ?? 'New member',
+          member_email:    (userInfo as any)?.email ?? '',
+          role:            role ?? 'member',
+          invited_by_name: 'Admin',
+          org_name:        org.name ?? '',
+        },
+      })
+    } catch {}
     return NextResponse.json({ success: true, org_name: org.name })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message ?? 'Unexpected error' }, { status: 500 })

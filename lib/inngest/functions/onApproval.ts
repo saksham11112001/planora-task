@@ -1,4 +1,5 @@
 import { inngest }                    from '../client'
+import { acquireEmailSlot }           from '@/lib/email/gate'
 import { createAdminClient }          from '@/lib/supabase/admin'
 import { sendApprovalRequestedEmail, sendApprovalResultEmail } from '@/lib/email/send'
 import { waApprovalNeeded, waApprovalResult }                  from '@/lib/whatsapp/send'
@@ -26,7 +27,8 @@ export const onApprovalRequested = inngest.createFunction(
       sendWA = prefs?.via_whatsapp ?? false
     }
 
-    // Email is always sent by default for approvals
+    // Email is always sent by default for approvals, but max 1 per day
+    if (managerUserId && !(await acquireEmailSlot(managerUserId))) return { skipped: 'daily_limit' }
     await sendApprovalRequestedEmail({
       to:            d.manager_email,
       taskId:        d.task_id,
@@ -66,6 +68,8 @@ export const onApprovalCompleted = inngest.createFunction(
     const sendWhatsApp = prefs?.via_whatsapp ?? false
 
     if (sendEmail) {
+      const canSend = await acquireEmailSlot(d.assignee_id)
+      if (!canSend) return { skipped: 'daily_limit' }
       await sendApprovalResultEmail({
         to:           d.assignee_email,
         taskId:       d.task_id,

@@ -19,6 +19,24 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const { data, error } = await supabase.from('projects').update(updates).eq('id', id).eq('org_id', mb.org_id).select('*').single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  // Fire project status change notification if status changed
+  try {
+    if (body.status && body.status !== existingProject?.status) {
+      const { data: mb2 } = await supabase.from('org_members')
+        .select('users(name), organisations(name)').eq('user_id', user.id).maybeSingle()
+      await inngest.send({
+        name: 'project/status-updated',
+        data: {
+          project_id: id, project_name: data.name,
+          old_status: existingProject?.status ?? '', new_status: body.status,
+          updated_by_id: user.id,
+          updated_by_name: (mb2 as any)?.users?.name ?? 'Someone',
+          org_id: mb.org_id,
+          org_name: (mb2 as any)?.organisations?.name ?? '',
+        },
+      })
+    }
+  } catch {}
   return NextResponse.json({ data })
 }
 
