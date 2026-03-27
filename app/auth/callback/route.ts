@@ -27,6 +27,26 @@ export async function GET(request: NextRequest) {
     const { data: { user }, error } = await supabase.auth.exchangeCodeForSession(code)
 
     if (!error && user) {
+      // Always ensure public.users row exists — Google OAuth creates auth.users
+      // but not public.users. Without this, getUserProfile throws for new users.
+      try {
+        const adminForProfile = createAdminClient()
+        await adminForProfile.from('users').upsert({
+          id:         user.id,
+          email:      user.email ?? '',
+          name: (
+            user.user_metadata?.full_name ??
+            user.user_metadata?.name ??
+            ((user.user_metadata?.given_name && user.user_metadata?.family_name)
+              ? `${user.user_metadata.given_name} ${user.user_metadata.family_name}`
+              : null) ??
+            user.user_metadata?.given_name ??
+            user.email?.split('@')[0] ?? 'User'
+          ),
+          avatar_url: user.user_metadata?.avatar_url ?? null,
+        }, { onConflict: 'id' })
+      } catch (_) {}
+
       const invitedOrgId = user.user_metadata?.invited_to_org as string | undefined
       const invitedRole  = (user.user_metadata?.invited_role as string | undefined) ?? 'member'
 
@@ -42,7 +62,16 @@ export async function GET(request: NextRequest) {
         await admin.from('users').upsert({
           id:         user.id,
           email:      user.email ?? '',
-          name:       user.user_metadata?.full_name ?? user.email?.split('@')[0] ?? 'User',
+          name:       (
+            user.user_metadata?.full_name ??
+            user.user_metadata?.name ??
+            ((user.user_metadata?.given_name && user.user_metadata?.family_name)
+              ? `${user.user_metadata.given_name} ${user.user_metadata.family_name}`
+              : null) ??
+            user.user_metadata?.given_name ??
+            user.email?.split('@')[0]?.replace(/[._]/g, ' ')?.replace(/\w/g, (l: string) => l.toUpperCase()) ??
+            'User'
+          ),
           avatar_url: user.user_metadata?.avatar_url ?? null,
         }, { onConflict: 'id' })
 

@@ -25,16 +25,7 @@ export default async function DashboardPage() {
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
   const from30   = new Date(Date.now() - 30 * 86400000).toISOString()
 
-  const [
-    { count: overdueCount },
-    { count: todayCount },
-    { count: pendingCount },
-    { data: myTasks },
-    { data: activeProjects },
-    { count: completedThisMonth },
-    { count: totalThisMonth },
-    { data: recentClients },
-  ] = await Promise.all([
+  const results = await Promise.allSettled([
     supabase.from('tasks').select('*', { count: 'exact', head: true })
       .eq('org_id', orgId).eq('assignee_id', user.id).in('status', ['todo','in_progress']).lt('due_date', today),
     supabase.from('tasks').select('*', { count: 'exact', head: true })
@@ -56,6 +47,15 @@ export default async function DashboardPage() {
     supabase.from('clients').select('id, name, color').eq('org_id', orgId).eq('status', 'active')
       .order('created_at', { ascending: false }).limit(5),
   ])
+
+  const overdueCount       = results[0].status === 'fulfilled' ? (results[0].value as any).count ?? 0 : 0
+  const todayCount         = results[1].status === 'fulfilled' ? (results[1].value as any).count ?? 0 : 0
+  const pendingCount       = results[2].status === 'fulfilled' ? (results[2].value as any).count ?? 0 : 0
+  const myTasks            = results[3].status === 'fulfilled' ? (results[3].value as any).data ?? [] : []
+  const activeProjects     = results[4].status === 'fulfilled' ? (results[4].value as any).data ?? [] : []
+  const completedThisMonth = results[5].status === 'fulfilled' ? (results[5].value as any).count ?? 0 : 0
+  const totalThisMonth     = results[6].status === 'fulfilled' ? (results[6].value as any).count ?? 0 : 0
+  const recentClients      = results[7].status === 'fulfilled' ? (results[7].value as any).data ?? [] : []
 
   const completionRate = totalThisMonth
     ? Math.round(((completedThisMonth ?? 0) / totalThisMonth) * 100)

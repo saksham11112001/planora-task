@@ -31,6 +31,6 @@ export const getUserProfile = cache(async (userId: string) => {
     .from('users')
     .select('id, name, email, avatar_url')
     .eq('id', userId)
-    .single()
+    .maybeSingle()
   return data
 })
