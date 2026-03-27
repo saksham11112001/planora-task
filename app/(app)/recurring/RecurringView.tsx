@@ -31,6 +31,7 @@ interface Props {
 }
 
 export function RecurringView({ tasks, members, projects, clients, currentUserId, canManage }: Props) {
+  const [clientFilter, setClientFilter] = useState<string>('')
   const router = useRouter()
   const [, startT] = useTransition()
   const [editingId, setEditingId] = useState<string|null>(null)

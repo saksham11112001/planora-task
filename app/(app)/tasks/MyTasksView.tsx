@@ -50,11 +50,13 @@ export function MyTasksView({ tasks: initialTasks, members, clients, currentUser
   const [completing, setCompleting] = useState<Set<string>>(new Set())
   const [completingTask, setCompletingTask] = useState<Task | null>(null)
   const [filterPriority, setFilterPriority] = useState('')
+  const [filterClient,   setFilterClient]   = useState('')
   const [filterStatus,   setFilterStatus]   = useState('')
   const [filterOpen,     setFilterOpen]     = useState(false)
 
   // Apply filters
   const filteredTasks = tasks.filter(t => {
+    if (filterClient && (t as any).client?.id !== filterClient) return false
     if (filterPriority && t.priority !== filterPriority) return false
     if (filterStatus   && t.status   !== filterStatus)   return false
     return true

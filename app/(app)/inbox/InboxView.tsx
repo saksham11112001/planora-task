@@ -22,6 +22,7 @@ interface Props {
 }
 
 export function InboxView({ tasks, members, clients, currentUserId, userRole, canCreate }: Props) {
+  const [clientFilter, setClientFilter] = useState<string>('')
   const router = useRouter()
   const [localTasks,   setLocalTasks]   = useState<Task[]>(tasks)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
@@ -52,8 +53,31 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
     }
   }
 
-  async function toggleSubRow(parentId: string, subId: string, status: string) {
+  async function toggleSubRow(parentId: string, subId: string, status: string, subTitle?: string) {
     const newStatus = status === 'completed' ? 'todo' : 'completed'
+
+    // Document name validation for compliance subtasks
+    // When marking a document subtask as complete, check if an attachment exists with matching name
+    if (newStatus === 'completed' && subTitle) {
+      const attRes = await fetch(`/api/tasks/${subId}/attachments`)
+      const attData = await attRes.json().catch(() => ({ data: [] }))
+      const attachments: { filename: string }[] = attData.data ?? []
+      if (attachments.length === 0) {
+        toast.error(`Upload "${subTitle}" before marking complete`)
+        return
+      }
+      // Check if any attachment filename contains the required document name (case-insensitive)
+      const titleWords = subTitle.toLowerCase().replace(/[^a-z0-9 ]/g, '').split(' ').filter(w => w.length > 2)
+      const hasMatch = attachments.some(a => {
+        const fname = a.filename.toLowerCase()
+        return titleWords.some(w => fname.includes(w))
+      })
+      if (!hasMatch) {
+        toast.error(`File name must match "${subTitle}" — rename your file and re-upload`)
+        return
+      }
+    }
+
     // Optimistic update
     setSubtaskMap(p => ({
       ...p,
@@ -168,10 +192,11 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
     startT(() => router.refresh())
   }
 
-  const overdue  = localTasks.filter(t => t.status !== 'completed' && isOverdue(t.due_date, t.status))
-  const inProg   = localTasks.filter(t => t.status !== 'completed' && !isOverdue(t.due_date, t.status) && t.approval_status !== 'pending')
-  const inReview = localTasks.filter(t => t.approval_status === 'pending')
-  const done     = localTasks.filter(t => t.status === 'completed')
+  const visibleTasks = clientFilter ? localTasks.filter(t => (t as any).client?.id === clientFilter) : localTasks
+  const overdue  = visibleTasks.filter(t => t.status !== 'completed' && isOverdue(t.due_date, t.status))
+  const inProg   = visibleTasks.filter(t => t.status !== 'completed' && !isOverdue(t.due_date, t.status) && t.approval_status !== 'pending')
+  const inReview = visibleTasks.filter(t => t.approval_status === 'pending')
+  const done     = visibleTasks.filter(t => t.status === 'completed')
 
   const sections = [
     { key: 'overdue',  label: 'Overdue',          color: '#dc2626', bg: '#fff9f9', tasks: overdue,   addRow: false },
@@ -197,7 +222,9 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
         <div style={{ padding: '20px 24px 14px', background:'var(--surface)', borderBottom:'1px solid var(--border)', flexShrink: 0 }}>
           <h1 style={{ fontSize: 22, fontWeight: 700, color:'var(--text-primary)', marginBottom: 4 }}>One-time tasks</h1>
           <p style={{ fontSize: 13, color:'var(--text-secondary)' }}>
-            {tasks.length} total · {tasks.filter(t => t.assignee_id === currentUserId).length} assigned to you
+            {visibleTasks.length} task{visibleTasks.length !== 1 ? 's' : ''}
+              {clientFilter && <> · filtered by client</>}
+              {!clientFilter && <> · {tasks.filter(t => t.assignee_id === currentUserId).length} assigned to you</>}
           </p>
         </div>
 
@@ -431,7 +458,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                           borderBottom: '1px solid var(--border-light)',
                         }}>
                           <button
-                            onClick={() => toggleSubRow(task.id, sub.id, sub.status)}
+                            onClick={() => toggleSubRow(task.id, sub.id, sub.status, sub.title)}
                             style={{
                               width: 14, height: 14, borderRadius: '50%', flexShrink: 0, border: 'none',
                               background: sub.status === 'completed' ? 'var(--brand)' : 'transparent',

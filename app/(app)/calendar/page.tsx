@@ -28,6 +28,7 @@ export default async function CalendarPage() {
     .gte('due_date', from.toISOString().split('T')[0])
     .lte('due_date', to.toISOString().split('T')[0])
 
+  const { data: clients } = await supabase.from('clients').select('id, name, color').eq('org_id', mb.org_id).eq('status','active').order('name')
   const { data: tasks } = canViewAll ? await q : await q.eq('assignee_id', user.id)
 
   return <CalendarView tasks={(tasks ?? []) as any} canViewAll={canViewAll} currentUserId={user.id}/>

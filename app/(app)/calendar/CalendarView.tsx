@@ -28,7 +28,7 @@ const MONTH_NAMES = ['January','February','March','April','May','June','July','A
 // Color palette for day cells based on task count / status
 const DAY_HEAT = ['','rgba(13,148,136,0.08)','rgba(13,148,136,0.16)','rgba(13,148,136,0.24)','rgba(13,148,136,0.34)']
 
-export function CalendarView({ tasks, canViewAll, currentUserId }: Props) {
+export function CalendarView({ tasks, clients = [], canViewAll, currentUserId }: Props) {
   const now = new Date()
   const [year,     setYear]     = useState(now.getFullYear())
   const [month,    setMonth]    = useState(now.getMonth())
@@ -85,7 +85,22 @@ export function CalendarView({ tasks, canViewAll, currentUserId }: Props) {
       <div style={{ flex:1, minWidth:0 }}>
 
         {/* Header */}
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:18, flexWrap:'wrap', gap:12 }}>
+        {clients.length > 0 && (
+        <div style={{ padding:'8px 16px 4px', display:'flex', gap:8, alignItems:'center' }}>
+          <span style={{ fontSize:11, color:'var(--text-muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em' }}>Client</span>
+          <select value={clientFilter} onChange={e => setClientFilter(e.target.value)}
+            style={{ padding:'4px 10px', borderRadius:20, fontSize:12, cursor:'pointer', outline:'none',
+              border: clientFilter ? '1px solid var(--brand)' : '1px solid var(--border)',
+              background: clientFilter ? 'rgba(13,148,136,0.08)' : 'var(--surface-subtle)',
+              color: clientFilter ? 'var(--brand)' : 'var(--text-secondary)',
+              fontWeight: clientFilter ? 600 : 400, fontFamily:'inherit', appearance:'none', paddingRight:20 }}>
+            <option value=''>All clients</option>
+            {clients.map(cl => <option key={cl.id} value={cl.id}>{cl.name}</option>)}
+          </select>
+          {clientFilter && <button onClick={() => setClientFilter('')} style={{ fontSize:11, color:'var(--text-muted)', background:'none', border:'none', cursor:'pointer' }}>✕ Clear</button>}
+        </div>
+      )}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:18, flexWrap:'wrap', gap:12 }}>
           <div style={{ display:'flex', alignItems:'center', gap:14 }}>
             <div style={{ display:'flex', alignItems:'center', gap:6 }}>
               <button onClick={prevMonth} style={{ width:32,height:32,borderRadius:8,border:'1px solid var(--border)',

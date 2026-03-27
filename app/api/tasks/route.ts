@@ -76,5 +76,27 @@ export async function POST(request: NextRequest) {
       }
     } catch {}
   }
+  // Create compliance subtasks if provided
+  const subtasks = body.subtasks as { title: string; required: boolean; due_date?: string }[] | undefined
+  if (subtasks && subtasks.length > 0 && task?.id) {
+    try {
+      const subtaskInserts = subtasks.map(s => ({
+        org_id:         mb.org_id,
+        title:          s.title,
+        status:         'todo' as const,
+        priority:       body.priority ?? 'medium',
+        assignee_id:    body.assignee_id || null,
+        client_id:      body.client_id || null,
+        project_id:     body.project_id || null,
+        // Per-subtask due date if set, otherwise inherit parent due date
+        due_date:       s.due_date || body.due_date || null,
+        parent_task_id: task.id,
+        created_by:     user.id,
+        is_recurring:   false,
+      }))
+      await supabase.from('tasks').insert(subtaskInserts)
+    } catch {}
+  }
+
   return NextResponse.json({ data: task }, { status: 201 })
 }
