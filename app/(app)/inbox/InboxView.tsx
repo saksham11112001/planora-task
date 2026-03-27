@@ -2,7 +2,7 @@
 import React from 'react'
 import { useState, useEffect, useTransition } from 'react'
 import { useRouter }          from 'next/navigation'
-import { CheckCheck, Clock } from 'lucide-react'
+import { CheckCheck, Clock, Trash2 } from 'lucide-react'
 import { InlineOneTimeTask }  from '@/components/tasks/InlineOneTimeTask'
 import { CompletionAttachModal } from '@/components/tasks/CompletionAttachModal'
 import { TaskDetailPanel }    from '@/components/tasks/TaskDetailPanel'
