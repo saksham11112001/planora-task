@@ -420,6 +420,7 @@ export function MyTasksView({ tasks: initialTasks, members, clients, currentUser
                         <PriorityBadge priority={task.priority}/>
                       </div>
                     </div>
+                    </React.Fragment>
                   )
                 })}
               </div>
