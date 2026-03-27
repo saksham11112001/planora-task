@@ -1,4 +1,5 @@
 'use client'
+import React from 'react'
 import { useState, useTransition, useCallback } from 'react'
 import { useRouter }    from 'next/navigation'
 import { RefreshCw, CheckCheck, Clock, FolderOpen, Filter, X } from 'lucide-react'
@@ -48,7 +49,9 @@ export function MyTasksView({ tasks: initialTasks, members, clients, currentUser
   const [selTask,    setSelTask]    = useState<Task | null>(null)
   const [checked,    setChecked]    = useState<Set<string>>(new Set())
   const [completing, setCompleting] = useState<Set<string>>(new Set())
-  const [completingTask, setCompletingTask] = useState<Task | null>(null)
+  const [completingTask,  setCompletingTask]  = useState<Task | null>(null)
+  const [subtaskMap,     setSubtaskMap]     = useState<Record<string, any[]>>({})
+  const [expandedTasks,  setExpandedTasks]  = useState<Set<string>>(new Set())
   const [filterPriority, setFilterPriority] = useState('')
   const [filterClient,   setFilterClient]   = useState('')
   const [filterStatus,   setFilterStatus]   = useState('')
@@ -62,6 +65,23 @@ export function MyTasksView({ tasks: initialTasks, members, clients, currentUser
     return true
   })
   const activeFilters = [filterPriority, filterStatus].filter(Boolean).length
+
+  // Auto-load and expand subtasks for all tasks on mount
+  useEffect(() => {
+    if (!tasks || tasks.length === 0) return
+    tasks.forEach(async (task: Task) => {
+      try {
+        const r = await fetch(`/api/tasks?parent_id=${task.id}&limit=50`)
+        const d = await r.json()
+        const subs = d.data ?? []
+        if (subs.length > 0) {
+          setSubtaskMap(p => ({ ...p, [task.id]: subs }))
+          setExpandedTasks(p => { const n = new Set(p); n.add(task.id); return n })
+        }
+      } catch {}
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasks.map((t: Task) => t.id).join(',')])
 
   function refresh() { startT(() => router.refresh()) }
 
@@ -240,7 +260,8 @@ export function MyTasksView({ tasks: initialTasks, members, clients, currentUser
                   const assignee = task.assignee as {id:string;name:string}|null
                   const isPending = task.approval_status === 'pending' || task.status === 'in_review'
                   return (
-                    <div key={task.id}
+                    <React.Fragment key={task.id}>
+                    <div
                       className="mytasks-row" style={{ display:'grid', gridTemplateColumns:'28px 22px 1fr 160px 100px 110px',
                         alignItems:'center', padding:'0 18px', minHeight:48,
                         borderBottom:`1px solid var(--border-light)`,
@@ -296,6 +317,64 @@ export function MyTasksView({ tasks: initialTasks, members, clients, currentUser
                         <PriorityBadge priority={task.priority}/>
                       </div>
                     </div>
+                    {/* Inline subtasks */}
+                    {expandedTasks.has(task.id) && (subtaskMap[task.id] ?? []).length > 0 && (
+                      <div style={{ background:'var(--surface-subtle)', borderBottom:'1px solid var(--border-light)' }}>
+                        {(subtaskMap[task.id] ?? []).map((sub: any) => (
+                          <div key={sub.id} style={{ display:'flex', alignItems:'center', gap:8,
+                            padding:'5px 18px 5px 60px', borderBottom:'1px solid var(--border-light)' }}>
+                            <button onClick={async e => {
+                              e.stopPropagation()
+                              const newStatus = sub.status === 'completed' ? 'todo' : 'completed'
+                              if (newStatus === 'completed') {
+                                const ar = await fetch(`/api/tasks/${sub.id}/attachments`)
+                                const ad = await ar.json().catch(() => ({ data: [] }))
+                                if ((ad.data ?? []).length === 0) {
+                                  toast.error(`📎 Upload "${sub.title}" before marking complete`)
+                                  return
+                                }
+                              }
+                              setSubtaskMap(p => ({ ...p, [task.id]: (p[task.id]??[]).map(s => s.id===sub.id?{...s,status:newStatus}:s) }))
+                              await fetch(`/api/tasks/${sub.id}`, {
+                                method:'PATCH', headers:{'Content-Type':'application/json'},
+                                body: JSON.stringify({ status: newStatus, completed_at: newStatus==='completed'?new Date().toISOString():null })
+                              })
+                            }}
+                              style={{ width:14, height:14, borderRadius:'50%', border:'none', flexShrink:0, cursor:'pointer',
+                                background: sub.status==='completed'?'var(--brand)':'transparent',
+                                outline:`2px solid ${sub.status==='completed'?'var(--brand)':'var(--border)'}`,
+                                display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.15s' }}>
+                              {sub.status==='completed' && (
+                                <svg viewBox="0 0 10 10" fill="none" style={{width:8,height:8}}>
+                                  <path d="M1.5 5L4 7.5L8.5 2.5" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
+                                </svg>
+                              )}
+                            </button>
+                            <span style={{ flex:1, fontSize:12,
+                              color: sub.status==='completed'?'var(--text-muted)':'var(--text-primary)',
+                              textDecoration: sub.status==='completed'?'line-through':'none' }}>{sub.title}</span>
+                            {sub.status !== 'completed' && (
+                              <label style={{ cursor:'pointer', flexShrink:0, display:'flex', alignItems:'center',
+                                gap:4, padding:'2px 8px', borderRadius:99, fontSize:10, fontWeight:600,
+                                background:'rgba(13,148,136,0.1)', color:'var(--brand)',
+                                border:'1px solid rgba(13,148,136,0.3)' }} onClick={e => e.stopPropagation()}>
+                                <input type="file" style={{ display:'none' }}
+                                  onChange={async e => {
+                                    const file = e.target.files?.[0]; if (!file) return
+                                    const fd = new FormData(); fd.append('file', file)
+                                    const res = await fetch(`/api/tasks/${sub.id}/attachments`, { method:'POST', body: fd })
+                                    if (res.ok) toast.success(`✓ Uploaded: ${file.name}`)
+                                    else toast.error('Upload failed')
+                                    e.target.value = ''
+                                  }}/>
+                                ↑ Upload
+                              </label>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    </React.Fragment>
                   )
                 })}
               </div>
@@ -315,7 +394,8 @@ export function MyTasksView({ tasks: initialTasks, members, clients, currentUser
                 {done.map(task => {
                   const assignee = task.assignee as {id:string;name:string}|null
                   return (
-                    <div key={task.id}
+                    <React.Fragment key={task.id}>
+                    <div
                       className="mytasks-row" style={{ display:'grid', gridTemplateColumns:'28px 22px 1fr 160px 100px 110px',
                         alignItems:'center', padding:'0 18px', minHeight:48,
                         borderBottom:`1px solid var(--border-light)`,

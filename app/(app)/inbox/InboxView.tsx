@@ -1,6 +1,6 @@
 'use client'
 import React from 'react'
-import { useState, useTransition } from 'react'
+import { useState, useEffect, useTransition } from 'react'
 import { useRouter }          from 'next/navigation'
 import { CheckCheck, Clock } from 'lucide-react'
 import { InlineOneTimeTask }  from '@/components/tasks/InlineOneTimeTask'
@@ -30,6 +30,25 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
   const [completing,   setCompleting]   = useState<Set<string>>(new Set())
   const [, startT]                      = useTransition()
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set())
+
+  // Auto-load subtasks for all tasks on mount
+  useEffect(() => {
+    if (!tasks || tasks.length === 0) return
+    tasks.forEach(async (task: any) => {
+      if (!subtaskMap[task.id]) {
+        try {
+          const r = await fetch(`/api/tasks?parent_id=${task.id}&limit=50`)
+          const d = await r.json()
+          const subs = d.data ?? []
+          if (subs.length > 0) {
+            setSubtaskMap(p => ({ ...p, [task.id]: subs }))
+            setExpandedTasks(p => { const n = new Set(p); n.add(task.id); return n })
+          }
+        } catch {}
+      }
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasks])
   const [subtaskMap,    setSubtaskMap]    = useState<Record<string, {id:string;title:string;status:string}[]>>({})
   const [loadingSubtasks, setLoadingSubtasks] = useState<Set<string>>(new Set())
   const [newSubInputs, setNewSubInputs]   = useState<Record<string, string>>({})
@@ -56,29 +75,9 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
   async function toggleSubRow(parentId: string, subId: string, status: string, subTitle?: string) {
     const newStatus = status === 'completed' ? 'todo' : 'completed'
 
-    // Attachment is MANDATORY for all compliance subtasks
-    // Block completion if no file has been uploaded to this subtask
-    if (newStatus === 'completed' && subTitle) {
-      const attRes = await fetch(`/api/tasks/${subId}/attachments`)
-      const attData = await attRes.json().catch(() => ({ data: [] }))
-      const attachments: { file_name: string; filename?: string }[] = attData.data ?? []
-
-      if (attachments.length === 0) {
-        toast.error(`📎 Upload "${subTitle}" before marking complete`)
-        return
-      }
-
-      // Warn (not block) if filename doesn't match — user may have renamed
-      const titleWords = subTitle.toLowerCase().replace(/[^a-z0-9 ]/g, '').split(' ').filter(w => w.length > 3)
-      if (titleWords.length > 0) {
-        const hasMatch = attachments.some(a =>
-          titleWords.some(w => (a.file_name ?? a.filename ?? '').toLowerCase().includes(w))
-        )
-        if (!hasMatch) {
-          toast.success(`✓ Marked complete — note: filename doesn't contain "${subTitle}" keywords`)
-        }
-      }
-    }
+    // For compliance subtasks, the API will enforce attachment
+    // The API checks custom_fields._compliance_subtask flag server-side
+    // So we just let the API do the enforcement and show the error if returned
 
     // Optimistic update
     setSubtaskMap(p => ({
@@ -455,7 +454,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                   </div>
 
                   {/* Inline subtasks panel */}
-                  {expandedTasks.has(task.id) && (
+                  {(expandedTasks.has(task.id) || (subtaskMap[task.id] ?? []).length > 0) && (
                     <div style={{ background: '#f8fafc', borderBottom: '1px solid var(--border)' }}>
                       {/* Progress bar */}
                       {(subtaskMap[task.id] ?? []).length > 0 && (() => {

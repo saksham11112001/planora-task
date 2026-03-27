@@ -373,8 +373,11 @@ export function RecurringView({ tasks: initialTasks, members, projects, clients,
         {canManage && (
           <InlineRecurringTask members={members} clients={clients}
             currentUserId={currentUserId} onCreated={(newTask?: any) => {
-              if (newTask) setLocalTasks(p => [...p, newTask])
-              startT(() => router.refresh())
+              if (newTask) {
+                setLocalTasks(p => [...p, newTask])
+                // Don't call router.refresh() immediately - causes page break
+                // User will see new task instantly via localTasks state
+              }
             }}/>
         )}
       </div>
