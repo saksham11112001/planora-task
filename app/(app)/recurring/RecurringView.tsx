@@ -332,7 +332,7 @@ export function RecurringView({ tasks: initialTasks, members, projects, clients,
             <div style={{ background:'var(--surface-subtle)', borderTop:'1px solid var(--border-light)' }}>
               {(subtaskMap[task.id] ?? []).map((sub: any) => (
                 <div key={sub.id} style={{ display:'flex', alignItems:'center', gap:8,
-                  padding:'6px 16px 6px 40px', borderBottom:'1px solid var(--border-light)' }}>
+                  padding:'6px 16px 6px 40px', borderBottom:'1px solid var(--border-light)', background:'var(--surface-subtle)' }}>
                   <button onClick={() => toggleSubDone(task.id, sub.id, sub.status, sub.title)}
                     style={{ width:14, height:14, borderRadius:'50%', border:'none', flexShrink:0, cursor:'pointer',
                       background: sub.status==='completed' ? 'var(--brand)' : 'transparent',

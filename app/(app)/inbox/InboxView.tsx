@@ -76,19 +76,35 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
   async function toggleSubRow(parentId: string, subId: string, status: string, subTitle?: string) {
     const newStatus = status === 'completed' ? 'todo' : 'completed'
 
-    // For compliance subtasks, the API will enforce attachment
-    // The API checks custom_fields._compliance_subtask flag server-side
-    // So we just let the API do the enforcement and show the error if returned
+    // Check attachment BEFORE marking complete (for all subtasks, not just compliance)
+    if (newStatus === 'completed') {
+      const attRes = await fetch(`/api/tasks/${subId}/attachments`)
+      const attData = await attRes.json().catch(() => ({ data: [] }))
+      if ((attData.data ?? []).length === 0) {
+        toast.error(`📎 Upload "${subTitle ?? 'document'}" before marking complete`)
+        return
+      }
+    }
 
-    // Optimistic update
+    // Optimistic update AFTER validation passes
     setSubtaskMap(p => ({
       ...p,
       [parentId]: (p[parentId] ?? []).map(s => s.id === subId ? { ...s, status: newStatus } : s)
     }))
-    await fetch(`/api/tasks/${subId}`, {
+    const patchRes = await fetch(`/api/tasks/${subId}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: newStatus, completed_at: newStatus === 'completed' ? new Date().toISOString() : null }),
     })
+    if (!patchRes.ok) {
+      const err = await patchRes.json().catch(() => ({}))
+      toast.error(err.error ?? 'Could not update subtask')
+      // Roll back
+      setSubtaskMap(p => ({
+        ...p,
+        [parentId]: (p[parentId] ?? []).map(s => s.id === subId ? { ...s, status } : s)
+      }))
+      return
+    }
     // Re-fetch fresh list
     const r = await fetch(`/api/tasks?parent_id=${parentId}&limit=50`)
     const d = await r.json()
@@ -456,7 +472,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
 
                   {/* Inline subtasks panel */}
                   {(expandedTasks.has(task.id) || (subtaskMap[task.id] ?? []).length > 0) && (
-                    <div style={{ background: '#f8fafc', borderBottom: '1px solid var(--border)' }}>
+                    <div style={{ background: 'var(--surface-subtle)', borderBottom: '1px solid var(--border)' }}>
                       {/* Progress bar */}
                       {(subtaskMap[task.id] ?? []).length > 0 && (() => {
                         const subs = subtaskMap[task.id] ?? []

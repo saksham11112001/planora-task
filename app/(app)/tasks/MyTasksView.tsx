@@ -267,7 +267,7 @@ export function MyTasksView({ tasks: initialTasks, members, clients, currentUser
                         alignItems:'center', padding:'0 18px', minHeight:48,
                         borderBottom:`1px solid var(--border-light)`,
                         background: checked.has(task.id) ? 'var(--brand-light)'
-                          : isPending ? '#faf5ff' : ov ? '#fff9f9' : 'var(--surface)',
+                          : isPending ? 'var(--pending-surface, #faf5ff)' : ov ? 'var(--overdue-surface, #fff9f9)' : 'var(--surface)',
                         cursor:'pointer' }}
                       onClick={() => setSelTask(selTask?.id === task.id ? null : task)}>
                       <input type="checkbox" checked={checked.has(task.id)}
