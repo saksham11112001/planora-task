@@ -227,9 +227,31 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
   const canViewAll = !userRole || ['owner','admin','manager'].includes(userRole)
 
   // Role-based employee list: members/viewers see only themselves
-  const visibleStats = canViewAll
-    ? (empFilter ? employeeStats.filter(e => e.uid === empFilter || e.name.toLowerCase().includes(empFilter.toLowerCase())) : employeeStats)
-    : employeeStats.filter(e => e.uid === currentUserId)
+  // Timeline filter: slice weeklyTrend to match selected days
+  const timelineDays = parseInt(timeline)
+  const timelineWeeks = Math.ceil(timelineDays / 7)
+
+  const baseStats = canViewAll ? employeeStats : employeeStats.filter(e => e.uid === currentUserId)
+
+  const visibleStats = (empFilter
+    ? baseStats.filter(e => e.uid === empFilter || e.name.toLowerCase().includes(empFilter.toLowerCase()))
+    : baseStats
+  ).map(e => {
+    const slicedTrend = e.weeklyTrend.slice(-Math.min(timelineWeeks, e.weeklyTrend.length))
+    // Recompute totals from weekly trend for the selected timeline
+    const filteredCompleted  = slicedTrend.reduce((s: number, w: any) => s + w.completed, 0)
+    const filteredAssigned   = slicedTrend.reduce((s: number, w: any) => s + w.assigned, 0)
+    const filteredRate = filteredAssigned > 0
+      ? Math.round((filteredCompleted / filteredAssigned) * 100)
+      : e.completionRate
+    return {
+      ...e,
+      weeklyTrend:    slicedTrend,
+      completed:      timeline === '90' ? e.completed : filteredCompleted,
+      total:          timeline === '90' ? e.total : filteredAssigned,
+      completionRate: timeline === '90' ? e.completionRate : filteredRate,
+    }
+  })
 
   return (
     <div>
@@ -425,7 +447,7 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {employeeStats.map((emp, i) => (
+              {visibleStats.map((emp, i) => (
                 <EmployeeCard key={emp.uid} emp={emp} rank={i + 1} />
               ))}
             </div>
