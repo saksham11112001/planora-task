@@ -30,8 +30,12 @@ interface Props {
   canManage:     boolean
 }
 
-export function RecurringView({ tasks, members, projects, clients, currentUserId, canManage }: Props) {
+export function RecurringView({ tasks: initialTasks, members, projects, clients, currentUserId, canManage }: Props) {
+  const [localTasks,   setLocalTasks]   = useState<Task[]>(initialTasks)
   const [clientFilter, setClientFilter] = useState<string>('')
+  const [subtaskMap,   setSubtaskMap]   = useState<Record<string, any[]>>({})
+  const [expandedSubs, setExpandedSubs] = useState<Set<string>>(new Set())
+  const [newSubInputs, setNewSubInputs] = useState<Record<string,string>>({})
   const router = useRouter()
   const [, startT] = useTransition()
   const [editingId, setEditingId] = useState<string|null>(null)
@@ -74,11 +78,69 @@ export function RecurringView({ tasks, members, projects, clients, currentUserId
     else        { const d = await res.json(); toast.error(d.error ?? 'Failed') }
   }
 
+  async function toggleSubExpand(taskId: string) {
+    setExpandedSubs(prev => {
+      const next = new Set(prev)
+      if (next.has(taskId)) { next.delete(taskId); return next }
+      next.add(taskId); return next
+    })
+    if (!subtaskMap[taskId]) {
+      const r = await fetch(`/api/tasks?parent_id=${taskId}&limit=50`)
+      const d = await r.json()
+      setSubtaskMap(p => ({ ...p, [taskId]: d.data ?? [] }))
+    }
+  }
+
+  async function toggleSubDone(taskId: string, subId: string, status: string, subTitle: string) {
+    const newStatus = status === 'completed' ? 'todo' : 'completed'
+    if (newStatus === 'completed') {
+      const attRes = await fetch(`/api/tasks/${subId}/attachments`)
+      const attData = await attRes.json().catch(() => ({ data: [] }))
+      const attachments: { file_name: string }[] = attData.data ?? []
+      if (attachments.length === 0) {
+        toast.error(`📎 Upload "${subTitle}" before marking complete`)
+        return
+      }
+      // Warn if filename doesn't match
+      const words = subTitle.toLowerCase().replace(/[^a-z0-9 ]/g,'').split(' ').filter(w=>w.length>3)
+      const match = attachments.some(a => words.some(w => (a.file_name||'').toLowerCase().includes(w)))
+      if (!match) toast.success(`✓ Done — note: filename doesn't contain "${subTitle}" keywords`)
+    }
+    setSubtaskMap(p => ({ ...p, [taskId]: (p[taskId]??[]).map(s => s.id===subId ? {...s,status:newStatus} : s) }))
+    await fetch(`/api/tasks/${subId}`, {
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ status: newStatus, completed_at: newStatus==='completed' ? new Date().toISOString() : null })
+    })
+    const r = await fetch(`/api/tasks?parent_id=${taskId}&limit=50`)
+    const d = await r.json()
+    setSubtaskMap(p => ({ ...p, [taskId]: d.data ?? [] }))
+  }
+
+  async function uploadSubAttachment(subId: string, file: File) {
+    const fd = new FormData(); fd.append('file', file)
+    const res = await fetch(`/api/tasks/${subId}/attachments`, { method:'POST', body: fd })
+    if (res.ok) toast.success(`Uploaded: ${file.name}`)
+    else toast.error('Upload failed')
+  }
+
+  async function addSubtask(taskId: string, title: string) {
+    if (!title.trim()) return
+    const { data: mb_data } = await fetch('/api/tasks').then(r=>r.json()).catch(()=>({data:null}))
+    await fetch('/api/tasks', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ title: title.trim(), parent_task_id: taskId, status:'todo', priority:'medium' })
+    })
+    const r = await fetch(`/api/tasks?parent_id=${taskId}&limit=50`)
+    const d = await r.json()
+    setSubtaskMap(p => ({ ...p, [taskId]: d.data ?? [] }))
+    setNewSubInputs(p => ({ ...p, [taskId]: '' }))
+  }
+
   return (
     <div className="page-container">
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>Recurring tasks</h1>
-        <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>{tasks.length} active · instances spawn automatically each morning at 7 AM IST</p>
+        <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>{localTasks.length} active · instances spawn automatically each morning at 7 AM IST</p>
       </div>
 
       <div className="card-elevated overflow-hidden mb-4">
@@ -98,7 +160,7 @@ export function RecurringView({ tasks, members, projects, clients, currentUserId
           <div/>
         </div>
 
-        {tasks.length === 0 && (
+        {localTasks.length === 0 && (
           <div style={{ textAlign: 'center', padding: '40px 24px' }}>
             <RefreshCw style={{ width: 36, height: 36, color: 'var(--border)', margin: '0 auto 12px' }}/>
             <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>No recurring tasks yet</p>
@@ -106,7 +168,7 @@ export function RecurringView({ tasks, members, projects, clients, currentUserId
           </div>
         )}
 
-        {tasks.map(task => editingId === task.id ? (
+        {localTasks.filter(t => !clientFilter || t.client_id === clientFilter).map(task => editingId === task.id ? (
           /* ── Edit row ── */
           <div key={task.id} style={{
             padding: '12px 16px', borderBottom: '1px solid var(--border)',
@@ -222,11 +284,73 @@ export function RecurringView({ tasks, members, projects, clients, currentUserId
               )}
             </div>
           </div>
+
+          {/* Subtasks section */}
+          {expandedSubs.has(task.id) && (
+            <div style={{ background:'var(--surface-subtle)', borderTop:'1px solid var(--border-light)' }}>
+              {(subtaskMap[task.id] ?? []).map((sub: any) => (
+                <div key={sub.id} style={{ display:'flex', alignItems:'center', gap:8,
+                  padding:'6px 16px 6px 40px', borderBottom:'1px solid var(--border-light)' }}>
+                  <button onClick={() => toggleSubDone(task.id, sub.id, sub.status, sub.title)}
+                    style={{ width:14, height:14, borderRadius:'50%', border:'none', flexShrink:0, cursor:'pointer',
+                      background: sub.status==='completed' ? 'var(--brand)' : 'transparent',
+                      outline:`2px solid ${sub.status==='completed' ? 'var(--brand)' : 'var(--border)'}`,
+                      display:'flex', alignItems:'center', justifyContent:'center' }}>
+                    {sub.status==='completed' && (
+                      <svg viewBox="0 0 10 10" fill="none" style={{width:8,height:8}}>
+                        <path d="M1.5 5L4 7.5L8.5 2.5" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
+                      </svg>
+                    )}
+                  </button>
+                  <span style={{ flex:1, fontSize:12,
+                    color: sub.status==='completed' ? 'var(--text-muted)' : 'var(--text-primary)',
+                    textDecoration: sub.status==='completed' ? 'line-through' : 'none' }}>{sub.title}</span>
+                  {sub.status !== 'completed' && (
+                    <label title="Upload document" style={{ cursor:'pointer', flexShrink:0 }}>
+                      <input type="file" style={{ display:'none' }}
+                        onChange={async e => {
+                          const file = e.target.files?.[0]
+                          if (!file) return
+                          await uploadSubAttachment(sub.id, file)
+                          e.target.value = ''
+                        }}/>
+                      <svg viewBox="0 0 16 16" fill="none" style={{ width:13, height:13, color:'var(--text-muted)' }}
+                        stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                        <path d="M8 10V3M5 6l3-3 3 3M3 13h10"/>
+                      </svg>
+                    </label>
+                  )}
+                </div>
+              ))}
+              {/* Inline add subtask */}
+              <div style={{ display:'flex', alignItems:'center', gap:8, padding:'5px 16px 6px 40px' }}>
+                <div style={{ width:14, height:14, borderRadius:'50%', flexShrink:0,
+                  border:'1.5px dashed var(--brand)', opacity:0.5 }}/>
+                <input value={newSubInputs[task.id] ?? ''}
+                  onChange={e => setNewSubInputs(p => ({...p, [task.id]: e.target.value}))}
+                  onKeyDown={e => {
+                    if (e.key==='Enter' && (newSubInputs[task.id]??'').trim()) {
+                      addSubtask(task.id, newSubInputs[task.id])
+                    }
+                    if (e.key==='Escape') setNewSubInputs(p => ({...p, [task.id]:''}))
+                  }}
+                  placeholder="Add subtask… (Enter to save)"
+                  style={{ flex:1, fontSize:12, border:'none', outline:'none',
+                    background:'transparent', color:'var(--text-primary)' }}
+                />
+              </div>
+            </div>
+          )}
+
+        </div>
         ))}
 
         {canManage && (
           <InlineRecurringTask members={members} clients={clients}
-            currentUserId={currentUserId} onCreated={() => startT(() => router.refresh())}/>
+            currentUserId={currentUserId} onCreated={(newTask?: any) => {
+              if (newTask) setLocalTasks(p => [...p, newTask])
+              startT(() => router.refresh())
+            }}/>
         )}
       </div>
 

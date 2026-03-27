@@ -44,7 +44,7 @@ interface Props {
     id: string; title: string; frequency: string; priority: string
     assignee_id: string | null; client_id?: string | null
   }
-  onCreated?:    () => void
+  onCreated?:    (task?: any) => void
   onEdited?:     () => void
   onCancelEdit?: () => void
 }
@@ -145,7 +145,7 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, edit
       toast.success(isEdit ? 'Updated ✓' : 'Recurring task created ✓')
       if (isEdit) { onEdited?.(); return }
       close()
-      onCreated ? onCreated() : router.refresh()
+      onCreated ? onCreated(d.data) : router.refresh()
     } finally { setSaving(false) }
   }
 
