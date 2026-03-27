@@ -60,7 +60,6 @@ export async function POST(request: NextRequest) {
     status:               'todo',
     is_recurring:         true,
     frequency:            dbFrequency,
-    recurrence_rule:      frequency,  // store original granular value in recurrence_rule
     next_occurrence_date: nextDate,
     assignee_id:          assignee_id  || null,
     project_id:           project_id   || null,
@@ -115,7 +114,6 @@ export async function PATCH(request: NextRequest) {
     .update({
       title,
       frequency:       dbFrequency,
-      recurrence_rule: frequency,
       priority,
       assignee_id:     assignee_id || null,
       project_id:      project_id  || null,
