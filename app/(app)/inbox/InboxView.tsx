@@ -477,6 +477,35 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                             color: sub.status === 'completed' ? 'var(--text-muted)' : 'var(--text-primary)',
                             textDecoration: sub.status === 'completed' ? 'line-through' : 'none',
                           }}>{sub.title}</span>
+                          {/* Upload button for compliance subtasks */}
+                          {sub.status !== 'completed' && (
+                            <label title="Upload document" style={{ cursor:'pointer', flexShrink:0 }}>
+                              <input type="file" style={{ display:'none' }}
+                                onChange={async e => {
+                                  const file = e.target.files?.[0]
+                                  if (!file) return
+                                  const fd = new FormData()
+                                  fd.append('file', file)
+                                  const res = await fetch(`/api/tasks/${sub.id}/attachments`, { method:'POST', body: fd })
+                                  if (res.ok) {
+                                    toast.success(`Uploaded: ${file.name}`)
+                                  } else {
+                                    toast.error('Upload failed')
+                                  }
+                                  e.target.value = ''
+                                }}
+                              />
+                              <svg viewBox="0 0 16 16" fill="none" style={{ width:13, height:13, color:'var(--text-muted)' }}
+                                stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                                <path d="M8 10V3M5 6l3-3 3 3M3 13h10"/>
+                              </svg>
+                            </label>
+                          )}
+                          {sub.due_date && (
+                            <span style={{ fontSize:10, color:'var(--text-muted)', flexShrink:0 }}>
+                              {sub.due_date}
+                            </span>
+                          )}
                         </div>
                       ))}
                       {/* Add subtask input */}

@@ -3,7 +3,9 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, X, RefreshCw, User, Flag, Briefcase, Paperclip } from 'lucide-react'
 import { toast } from '@/store/appStore'
-import { useOrgSettings }       from '@/lib/hooks/useOrgSettings'
+import { useOrgSettings }         from '@/lib/hooks/useOrgSettings'
+import { ComplianceTaskPicker }   from '@/components/tasks/ComplianceTaskPicker'
+import type { ComplianceTask }    from '@/lib/data/complianceTasks'
 import { QuickAddClientModal }   from '@/components/clients/QuickAddClientModal'
 import { InlineCustomFields } from '@/components/tasks/InlineCustomFields'
 
@@ -54,7 +56,7 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, edit
   const fileRef  = useRef<HTMLInputElement>(null)
 
   const isEdit = !!editTask
-  const { customFields, taskFields } = useOrgSettings()
+  const { customFields, taskFields, caComplianceMode } = useOrgSettings()
   // Keep clientList in sync with prop
   const [_prevClients, setPrevClients] = useState(clients)
   if (clients !== _prevClients) { setPrevClients(clients); setClientList(clients) }
@@ -64,6 +66,7 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, edit
   const [customValues,    setCustomValues]    = useState<Record<string,any>>({})
   const [showAddClient,   setShowAddClient]   = useState(false)
   const [clientList,      setClientList]      = useState(clients)
+  const [compSubtasks,   setCompSubtasks]   = useState<{title:string;required:boolean;due_date?:string}[]>([])
   const [open,      setOpen]      = useState(isEdit)
   const [saving,    setSaving]    = useState(false)
   const [title,     setTitle]     = useState(editTask?.title ?? '')
@@ -303,6 +306,11 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, edit
         }
         <input ref={fileRef} type="file" multiple style={{ display:'none' }}
           onChange={e => setFiles(Array.from(e.target.files ?? []))}/>
+
+        {/* CA Compliance picker */}
+        {caComplianceMode && (
+          <ComplianceTaskPicker onSelect={handleComplianceSelect}/>
+        )}
 
         {/* Custom fields */}
         {customFields.length > 0 && (

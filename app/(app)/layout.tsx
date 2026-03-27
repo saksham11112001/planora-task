@@ -29,7 +29,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
     // No active membership — check for pending/inactive membership
     if (!membership) {
-      const { createClient: createAdminClient } = await import('@/lib/supabase/admin')
+      const { createAdminClient } = await import('@/lib/supabase/admin')
       const admin = createAdminClient()
 
       const { data: pending } = await admin

@@ -20,7 +20,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     // suppressHydrationWarning still needed for ThemeProvider useEffect
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning style={{ backgroundColor: '#ffffff' }}>
       <head>
         {/* Apply saved theme before paint to avoid flash */}
         <script dangerouslySetInnerHTML={{ __html: `
@@ -28,9 +28,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             const t = localStorage.getItem('planora-theme') || 'system';
             const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
             const dark = t === 'dark' || (t === 'system' && prefersDark);
-            if (dark) document.documentElement.classList.add('dark');
-            else document.documentElement.classList.remove('dark');
-          } catch(e) {}
+            if (dark) {
+              document.documentElement.classList.add('dark');
+              document.documentElement.style.backgroundColor = '#0f172a';
+            } else {
+              document.documentElement.style.backgroundColor = '#ffffff';
+            }
+          } catch(e) {
+            document.documentElement.style.backgroundColor = '#ffffff';
+          }
         `}}/>
       </head>
       <body style={{ fontSize: '15px' }}>

@@ -5,7 +5,7 @@ import { ArrowLeft }          from 'lucide-react'
 import { ProjectView }        from './ProjectView'
 import type { Metadata }      from 'next'
 export const metadata: Metadata = { title: 'Project' }
-export const revalidate = 20
+export const dynamic = 'force-dynamic'
 
 export default async function ProjectPage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params
