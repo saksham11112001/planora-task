@@ -12,6 +12,7 @@ import { cn }            from '@/lib/utils/cn'
 import { createClient }  from '@/lib/supabase/client'
 import { useAppStore }   from '@/store/appStore'
 import { PlanBadge }     from '@/components/ui/Badge'
+import { useOrgSettings } from '@/lib/hooks/useOrgSettings'
 
 interface Project { id: string; name: string; color: string }
 
@@ -51,6 +52,8 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
   const userName  = session?.user.name ?? session?.user.email?.split('@')[0] ?? ''
   const userInit  = userName[0]?.toUpperCase() ?? 'U'
   const canManage = ['owner','admin','manager'].includes(role)
+  const { navFeatures } = useOrgSettings()
+  const nav = navFeatures
 
   return (
     <aside style={{ width: 236, background: '#0f172a', display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -120,27 +123,27 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
             ))}
           </>
         )}
-        <SI href="/clients"  active={isActive('/clients')}  icon={<Users2   className="h-4 w-4"/>} label="Clients"/>
+        {nav.clients && <SI href="/clients"  active={isActive('/clients')}  icon={<Users2   className="h-4 w-4"/>} label="Clients"/>}
         <Div/>
 
         {/* ORGANISATION */}
         <GL>Organisation</GL>
-        <SI href="/team"     active={isActive('/team')}     icon={<Users    className="h-4 w-4"/>} label="Team"/>
-        <SI href="/time"     active={isActive('/time')}     icon={<Clock    className="h-4 w-4"/>} label="Time tracking"/>
-        <SI href="/reports"  active={isActive('/reports')}  icon={<BarChart2 className="h-4 w-4"/>} label="Reports"/>
-        <SI href="/calendar" active={isActive('/calendar')} icon={<Calendar className="h-4 w-4"/>} label="Calendar"/>
+        {nav.team && <SI href="/team"     active={isActive('/team')}     icon={<Users    className="h-4 w-4"/>} label="Team"/>}
+        {nav.time_tracking && <SI href="/time"     active={isActive('/time')}     icon={<Clock    className="h-4 w-4"/>} label="Time tracking"/>}
+        {nav.reports && <SI href="/reports"  active={isActive('/reports')}  icon={<BarChart2 className="h-4 w-4"/>} label="Reports"/>}
+        {nav.calendar && <SI href="/calendar" active={isActive('/calendar')} icon={<Calendar className="h-4 w-4"/>} label="Calendar"/>}
         <Div/>
 
         {/* TASKS */}
         <GL>Tasks</GL>
-        <SI href="/inbox"    active={isActive('/inbox')}    icon={<ListTodo className="h-4 w-4"/>} label="One-time tasks"/>
-        <SI href="/recurring" active={isActive('/recurring')} icon={<RefreshCw className="h-4 w-4"/>} label="Recurring tasks"/>
+        {nav.one_time_tasks && <SI href="/inbox"    active={isActive('/inbox')}    icon={<ListTodo className="h-4 w-4"/>} label="One-time tasks"/>}
+        {nav.recurring_tasks && <SI href="/recurring" active={isActive('/recurring')} icon={<RefreshCw className="h-4 w-4"/>} label="Recurring tasks"/>}
         <Div/>
 
         {/* TOOLS */}
         <GL>Tools</GL>
-        <SI href="/import"   active={isActive('/import')}   icon={<Upload   className="h-4 w-4"/>} label="Import data"/>
-        {canManage && (
+        {nav.import_data && <SI href="/import"   active={isActive('/import')}   icon={<Upload   className="h-4 w-4"/>} label="Import data"/>}
+        {canManage && nav.permissions && (
           <SI href="/settings/permissions" active={isActive('/settings/permissions')} icon={<Shield className="h-4 w-4"/>} label="Permissions"/>
         )}
       </nav>

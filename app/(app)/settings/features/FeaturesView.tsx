@@ -1,39 +1,137 @@
 'use client'
 import { useState } from 'react'
-import { ArrowLeft, FileCheck, BarChart2, Clock } from 'lucide-react'
+import { ArrowLeft, FileCheck, BarChart2, Clock, ListTodo, RefreshCw,
+         FolderOpen, Users2, Calendar, Upload, Users, Shield } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from '@/store/appStore'
 import { clearOrgSettingsCache } from '@/lib/hooks/useOrgSettings'
 
-const FEATURES = [
+// These features control sidebar visibility + functionality
+export const ALL_FEATURES = [
   {
-    key:   'ca_compliance_mode',
-    icon:  FileCheck,
-    color: '#0d9488',
-    title: 'CA Compliance Mode',
-    desc:  "Adds a 'CA Compliance' dropdown to the task bar. Pick from 69 pre-defined CA tasks (GSTR, ITR, TDS, ROC etc.) with document names auto-filled as subtasks. Built from Sachit's compliance template.",
-    badge: 'For CA firms',
+    key:      'ca_compliance_mode',
+    icon:     FileCheck,
+    color:    '#0d9488',
+    title:    'CA Compliance Mode',
+    desc:     "Adds a 'CA Compliance' dropdown to the task bar with 69 pre-defined CA tasks (GSTR, ITR, TDS, ROC etc.) with document names auto-filled as subtasks.",
+    badge:    'For CA firms',
+    section:  'tools',
   },
   {
-    key:   'time_tracking',
-    icon:  Clock,
-    color: '#0891b2',
-    title: 'Time Tracking',
-    desc:  'Enable time logging for tasks and projects. Members can log billable and non-billable hours.',
-    badge: null,
+    key:      'one_time_tasks',
+    icon:     ListTodo,
+    color:    '#0891b2',
+    title:    'One-time tasks',
+    desc:     'Show the One-time tasks page in the sidebar. Disable if your team only uses recurring tasks or projects.',
+    badge:    null,
+    section:  'navigation',
+    default:  true,
   },
   {
-    key:   'advanced_reports',
-    icon:  BarChart2,
-    color: '#7c3aed',
-    title: 'Advanced Reports',
-    desc:  'Enable 30/60/90 day performance reports with per-employee breakdowns.',
-    badge: null,
+    key:      'recurring_tasks',
+    icon:     RefreshCw,
+    color:    '#ea580c',
+    title:    'Recurring tasks',
+    desc:     'Show the Recurring tasks page in the sidebar.',
+    badge:    null,
+    section:  'navigation',
+    default:  true,
+  },
+  {
+    key:      'projects',
+    icon:     FolderOpen,
+    color:    '#7c3aed',
+    title:    'Projects',
+    desc:     'Show the Projects section in the sidebar.',
+    badge:    null,
+    section:  'navigation',
+    default:  true,
+  },
+  {
+    key:      'clients',
+    icon:     Users2,
+    color:    '#0891b2',
+    title:    'Clients',
+    desc:     'Show the Clients section in the sidebar.',
+    badge:    null,
+    section:  'navigation',
+    default:  true,
+  },
+  {
+    key:      'time_tracking',
+    icon:     Clock,
+    color:    '#ca8a04',
+    title:    'Time tracking',
+    desc:     'Show Time tracking in the sidebar. Members can log billable and non-billable hours.',
+    badge:    null,
+    section:  'navigation',
+    default:  true,
+  },
+  {
+    key:      'reports',
+    icon:     BarChart2,
+    color:    '#16a34a',
+    title:    'Reports',
+    desc:     'Show the Reports page in the sidebar with performance charts.',
+    badge:    null,
+    section:  'navigation',
+    default:  true,
+  },
+  {
+    key:      'calendar',
+    icon:     Calendar,
+    color:    '#0d9488',
+    title:    'Calendar',
+    desc:     'Show the Calendar view in the sidebar.',
+    badge:    null,
+    section:  'navigation',
+    default:  true,
+  },
+  {
+    key:      'import_data',
+    icon:     Upload,
+    color:    '#7c3aed',
+    title:    'Import data',
+    desc:     'Show the Import data tool in the sidebar.',
+    badge:    null,
+    section:  'tools',
+    default:  true,
+  },
+  {
+    key:      'team',
+    icon:     Users,
+    color:    '#0891b2',
+    title:    'Team management',
+    desc:     'Show the Team page in the sidebar.',
+    badge:    null,
+    section:  'navigation',
+    default:  true,
+  },
+  {
+    key:      'permissions',
+    icon:     Shield,
+    color:    '#7c3aed',
+    title:    'Role permissions',
+    desc:     'Show the Permissions shortcut in the sidebar for managers.',
+    badge:    null,
+    section:  'tools',
+    default:  false,
   },
 ]
 
+const SECTION_LABELS: Record<string, string> = {
+  navigation: 'Sidebar navigation',
+  tools:      'Tools & features',
+}
+
 export function FeaturesView({ features: initial }: { features: Record<string, boolean> }) {
-  const [features, setFeatures] = useState(initial)
+  // Apply defaults for features not yet in DB
+  const withDefaults: Record<string, boolean> = {}
+  ALL_FEATURES.forEach(f => {
+    withDefaults[f.key] = f.key in initial ? initial[f.key] : (f.default ?? false)
+  })
+
+  const [features, setFeatures] = useState(withDefaults)
   const [saving,   setSaving]   = useState<string | null>(null)
 
   async function toggle(key: string) {
@@ -47,58 +145,70 @@ export function FeaturesView({ features: initial }: { features: Record<string, b
       if (res.ok) {
         setFeatures(p => ({ ...p, [key]: newVal }))
         clearOrgSettingsCache()
-        toast.success(newVal ? 'Feature enabled' : 'Feature disabled')
+        toast.success(newVal ? 'Enabled' : 'Disabled')
       } else { toast.error('Failed to update') }
     } finally { setSaving(null) }
   }
 
+  const sections = ['navigation', 'tools']
+
   return (
-    <div className="page-container" style={{ maxWidth: 640 }}>
+    <div className="page-container" style={{ maxWidth: 680 }}>
       <Link href="/settings" style={{ display:'inline-flex', alignItems:'center', gap:6,
         fontSize:12, color:'var(--text-muted)', textDecoration:'none', marginBottom:20 }}>
         <ArrowLeft style={{ width:13, height:13 }}/> Settings
       </Link>
-      <h1 style={{ fontSize:20, fontWeight:700, color:'var(--text-primary)', marginBottom:4 }}>Features</h1>
+      <h1 style={{ fontSize:20, fontWeight:700, color:'var(--text-primary)', marginBottom:4 }}>Features & navigation</h1>
       <p style={{ fontSize:13, color:'var(--text-muted)', marginBottom:28 }}>
-        Enable or disable features for your organisation. Only admins can change these.
+        Choose what appears in the sidebar and which features are active for your organisation.
       </p>
-      <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-        {FEATURES.map(f => {
-          const Icon    = f.icon
-          const enabled = !!features[f.key]
-          const isSaving = saving === f.key
-          return (
-            <div key={f.key} style={{ padding:'18px 20px', borderRadius:14,
-              border: `1px solid ${enabled ? 'rgba(13,148,136,0.3)' : 'var(--border)'}`,
-              background: enabled ? 'rgba(13,148,136,0.04)' : 'var(--surface)',
-              display:'flex', alignItems:'flex-start', gap:14, transition:'all 0.15s' }}>
-              <div style={{ width:38, height:38, borderRadius:10, flexShrink:0,
-                background: enabled ? f.color : 'var(--surface-subtle)',
-                display:'flex', alignItems:'center', justifyContent:'center', transition:'background 0.15s' }}>
-                <Icon style={{ width:18, height:18, color: enabled ? '#fff' : 'var(--text-muted)' }}/>
-              </div>
-              <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
-                  <span style={{ fontSize:14, fontWeight:600, color:'var(--text-primary)' }}>{f.title}</span>
-                  {f.badge && (
-                    <span style={{ fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:99,
-                      background:'rgba(13,148,136,0.12)', color:'var(--brand)' }}>{f.badge}</span>
-                  )}
+
+      {sections.map(section => (
+        <div key={section} style={{ marginBottom:28 }}>
+          <p style={{ fontSize:11, fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase',
+            letterSpacing:'0.07em', marginBottom:10 }}>{SECTION_LABELS[section]}</p>
+          <div style={{ display:'flex', flexDirection:'column', gap:8, border:'1px solid var(--border)',
+            borderRadius:14, overflow:'hidden' }}>
+            {ALL_FEATURES.filter(f => f.section === section).map((f, idx, arr) => {
+              const Icon    = f.icon
+              const enabled = !!features[f.key]
+              const isSaving = saving === f.key
+              return (
+                <div key={f.key} style={{ padding:'14px 16px', display:'flex', alignItems:'center',
+                  gap:12, background:'var(--surface)',
+                  borderBottom: idx < arr.length-1 ? '1px solid var(--border-light)' : 'none',
+                  opacity: isSaving ? 0.7 : 1, transition:'opacity 0.15s' }}>
+                  <div style={{ width:32, height:32, borderRadius:8, flexShrink:0,
+                    background: enabled ? f.color : 'var(--surface-subtle)',
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                    transition:'background 0.15s' }}>
+                    <Icon style={{ width:15, height:15, color: enabled ? '#fff' : 'var(--text-muted)' }}/>
+                  </div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:2 }}>
+                      <span style={{ fontSize:13, fontWeight:600, color:'var(--text-primary)' }}>{f.title}</span>
+                      {f.badge && (
+                        <span style={{ fontSize:9, fontWeight:700, padding:'2px 7px', borderRadius:99,
+                          background:'rgba(13,148,136,0.12)', color:'var(--brand)' }}>{f.badge}</span>
+                      )}
+                    </div>
+                    <p style={{ fontSize:11, color:'var(--text-muted)', margin:0, lineHeight:1.5 }}>{f.desc}</p>
+                  </div>
+                  <button onClick={() => toggle(f.key)} disabled={isSaving}
+                    style={{ flexShrink:0, width:40, height:22, borderRadius:99, border:'none',
+                      background: enabled ? f.color : 'var(--border)',
+                      cursor: isSaving ? 'not-allowed' : 'pointer',
+                      position:'relative', transition:'background 0.2s' }}>
+                    <span style={{ position:'absolute', top:2, borderRadius:'50%',
+                      width:18, height:18, background:'#fff', transition:'left 0.2s',
+                      left: enabled ? 20 : 2, boxShadow:'0 1px 3px rgba(0,0,0,0.2)' }}/>
+                  </button>
                 </div>
-                <p style={{ fontSize:12, color:'var(--text-muted)', lineHeight:1.6, margin:0 }}>{f.desc}</p>
-              </div>
-              <button onClick={() => toggle(f.key)} disabled={isSaving}
-                style={{ flexShrink:0, width:44, height:24, borderRadius:99, border:'none',
-                  background: enabled ? f.color : 'var(--border)', cursor: isSaving ? 'not-allowed' : 'pointer',
-                  position:'relative', transition:'background 0.2s', opacity: isSaving ? 0.6 : 1 }}>
-                <span style={{ position:'absolute', top:3, borderRadius:'50%',
-                  width:18, height:18, background:'#fff', transition:'left 0.2s',
-                  left: enabled ? 23 : 3 }}/>
-              </button>
-            </div>
-          )
-        })}
-      </div>
+              )
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   )
 }

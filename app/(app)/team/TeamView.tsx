@@ -1,12 +1,12 @@
 'use client'
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState }   from 'react'
+import { useRouter }  from 'next/navigation'
 import { UserPlus, Mail, Crown, Shield, User, ChevronDown, Check } from 'lucide-react'
-import { cn } from '@/lib/utils/cn'
-import { toast } from '@/store/appStore'
-import { fmtDate } from '@/lib/utils/format'
+import { cn }         from '@/lib/utils/cn'
+import { toast }      from '@/store/appStore'
+import { fmtDate }    from '@/lib/utils/format'
 
-const ROLES = ['admin', 'manager', 'member', 'viewer'] as const
+const ROLES = ['admin','manager','member','viewer'] as const
 const ROLE_ICONS: Record<string, any> = { owner: Crown, admin: Shield, manager: UserPlus, member: User, viewer: User }
 const ROLE_COLORS: Record<string, string> = {
   owner: '#ca8a04', admin: '#7c3aed', manager: '#0d9488', member: '#64748b', viewer: '#94a3b8'
@@ -35,11 +35,11 @@ export function TeamView({
 }) {
   const router = useRouter()
   const [showInvite, setShowInvite] = useState(false)
-  const [invEmail, setInvEmail] = useState('')
-  const [invRole, setInvRole] = useState<'manager' | 'member' | 'viewer'>('member')
-  const [inviting, setInviting] = useState(false)
-  const [roleEditing, setRoleEditing] = useState<string | null>(null)
-  const [saving, setSaving] = useState<string | null>(null)
+  const [invEmail,   setInvEmail]   = useState('')
+  const [invRole,    setInvRole]    = useState<'manager' | 'member' | 'viewer'>('member')
+  const [inviting,   setInviting]   = useState(false)
+  const [roleEditing,setRoleEditing]= useState<string | null>(null)
+  const [saving,     setSaving]     = useState<string | null>(null)
 
   async function invite(e: React.FormEvent) {
     e.preventDefault()

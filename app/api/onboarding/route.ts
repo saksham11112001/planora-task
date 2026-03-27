@@ -24,7 +24,16 @@ export async function POST(request: NextRequest) {
     await admin.from('users').upsert({
       id:           user.id,
       email:        user.email ?? '',
-      name:         user.user_metadata?.full_name ?? user.email?.split('@')[0] ?? 'User',
+      name: (
+          user.user_metadata?.full_name ??
+          user.user_metadata?.name ??
+          ((user.user_metadata?.given_name && user.user_metadata?.family_name)
+            ? `${user.user_metadata.given_name} ${user.user_metadata.family_name}`
+            : null) ??
+          user.user_metadata?.given_name ??
+          user.email?.split('@')[0]?.replace(/[._]/g, ' ')?.replace(/\b\w/g, (l: string) => l.toUpperCase()) ??
+          'User'
+        ),
       avatar_url:   user.user_metadata?.avatar_url ?? null,
       phone_number: phone?.trim() || null,
       whatsapp_opted_in: !!(phone?.trim()),

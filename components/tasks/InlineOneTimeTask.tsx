@@ -296,6 +296,11 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated }
         <input ref={fileRef} type="file" multiple style={{ display: 'none' }}
           onChange={e => { setFiles(Array.from(e.target.files ?? [])); setErrors(p => ({ ...p, attachment: '' })) }}/>
 
+        {/* CA Compliance picker — shown as a pill inside the open form */}
+        {caComplianceMode && (
+          <ComplianceTaskPicker onSelect={handleComplianceSelect}/>
+        )}
+
         {/* Custom fields */}
         {customFields.length > 0 && (
           <InlineCustomFields

@@ -69,7 +69,7 @@ export function ProjectView({ project, tasks, members, clients, defaultClientId,
   const [customSections, setCustomSections] = useState<{key:string;label:string;color:string}[]>([])
 
   const total    = tasks.length
-  const done     = tasks.filter(t => t.status === 'completed').length
+  const done     = visibleTasks.filter(t => t.status === 'completed').length
   const progress = total > 0 ? Math.round((done / total) * 100) : 0
 
   // Apply filters

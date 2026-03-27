@@ -9,10 +9,25 @@ export interface TaskFields {
   [key: string]: { visible: boolean; mandatory: boolean }
 }
 
+export interface NavFeatures {
+  one_time_tasks:    boolean
+  recurring_tasks:   boolean
+  projects:          boolean
+  clients:           boolean
+  time_tracking:     boolean
+  reports:           boolean
+  calendar:          boolean
+  import_data:       boolean
+  team:              boolean
+  permissions:       boolean
+  ca_compliance_mode: boolean
+}
+
 interface OrgSettings {
   customFields:       CustomFieldDef[]
   taskFields:         TaskFields
-  caComplianceMode:   boolean   // ← NEW: shows CA Compliance dropdown in task bar
+  caComplianceMode:   boolean
+  navFeatures:        NavFeatures
   loading:            boolean
 }
 
@@ -27,13 +42,28 @@ const DEFAULT_TASK_FIELDS: TaskFields = {
   estimated_hours: { visible: true, mandatory: false },
 }
 
+// All navigation items default to ON
+const DEFAULT_NAV: NavFeatures = {
+  one_time_tasks:    true,
+  recurring_tasks:   true,
+  projects:          true,
+  clients:           true,
+  time_tracking:     true,
+  reports:           true,
+  calendar:          true,
+  import_data:       true,
+  team:              true,
+  permissions:       false,
+  ca_compliance_mode: false,
+}
+
 let _cache: OrgSettings | null = null
 let _cacheTime = 0
 const TTL = 60_000
 
 export function useOrgSettings(): OrgSettings {
   const [state, setState] = useState<OrgSettings>(
-    _cache ?? { customFields: [], taskFields: DEFAULT_TASK_FIELDS, caComplianceMode: false, loading: true }
+    _cache ?? { customFields: [], taskFields: DEFAULT_TASK_FIELDS, caComplianceMode: false, navFeatures: DEFAULT_NAV, loading: true }
   )
 
   useEffect(() => {
@@ -43,10 +73,25 @@ export function useOrgSettings(): OrgSettings {
       fetch('/api/settings/fields').then(r => r.json()).catch(() => ({ data: null })),
       fetch('/api/settings/features').then(r => r.json()).catch(() => ({ data: {} })),
     ]).then(([customRes, fieldsRes, featuresRes]) => {
+      const raw = featuresRes.data ?? {}
+      const nav: NavFeatures = {
+        one_time_tasks:    raw.one_time_tasks    ?? true,
+        recurring_tasks:   raw.recurring_tasks   ?? true,
+        projects:          raw.projects          ?? true,
+        clients:           raw.clients           ?? true,
+        time_tracking:     raw.time_tracking     ?? true,
+        reports:           raw.reports           ?? true,
+        calendar:          raw.calendar          ?? true,
+        import_data:       raw.import_data       ?? true,
+        team:              raw.team              ?? true,
+        permissions:       raw.permissions       ?? false,
+        ca_compliance_mode: raw.ca_compliance_mode ?? false,
+      }
       const s: OrgSettings = {
         customFields:     customRes.data ?? [],
         taskFields:       fieldsRes.data ? { ...DEFAULT_TASK_FIELDS, ...fieldsRes.data } : DEFAULT_TASK_FIELDS,
-        caComplianceMode: featuresRes.data?.ca_compliance_mode ?? false,
+        caComplianceMode: nav.ca_compliance_mode,
+        navFeatures:      nav,
         loading:          false,
       }
       _cache = s; _cacheTime = Date.now()
@@ -57,7 +102,6 @@ export function useOrgSettings(): OrgSettings {
   return state
 }
 
-// Call this to invalidate the cache (e.g. after saving settings)
 export function clearOrgSettingsCache() {
   _cache = null; _cacheTime = 0
 }
