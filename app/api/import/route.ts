@@ -227,7 +227,7 @@ export async function POST(request: NextRequest) {
       const headers = rows[hdrIdx]
       const iName     = findCol(headers, 'clientname', 'name')
       const iEmail    = findCol(headers, 'email')
-      const iPhone    = findCol(headers, 'phone')
+      const iPhone    = findCol(headers, 'phone number', 'phone', 'mobile')
       const iCompany  = findCol(headers, 'company')
       const iWebsite  = findCol(headers, 'website')
       const iIndustry = findCol(headers, 'industry')
@@ -246,7 +246,7 @@ export async function POST(request: NextRequest) {
         const { data: c, error: cErr } = await admin.from('clients').insert({
           org_id: orgId, name: name.trim(),
           email:    cell(row, iEmail)    || null,
-          phone:    cell(row, iPhone)    || null,
+          phone_number: cell(row, iPhone) || null,
           company:  cell(row, iCompany)  || null,
           website:  cell(row, iWebsite)  || null,
           industry: cell(row, iIndustry) || null,

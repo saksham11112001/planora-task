@@ -1016,3 +1016,12 @@ html.dark .task-title.done,
 html.dark .task-title[style*="#94a3b8"] {
   color: #64748b !important;
 }
+/* ── Inline task pill rows — wrap on mobile ───────*/
+.inline-task-pills { flex-wrap: wrap !important; }
+@media (max-width: 640px) {
+  /* Force inline form pills to wrap neatly */
+  [style*="display:'flex'"][style*="flexWrap"],
+  [style*="display: flex"][style*="flex-wrap"] {
+    flex-wrap: wrap;
+  }
+}
