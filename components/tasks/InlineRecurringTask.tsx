@@ -111,11 +111,14 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, edit
     setSaving(true)
     try {
       const body = {
-        title: title.trim(), frequency, priority,
-        assignee_id: assignee  || null,
-        client_id:   clientId  || null,
-        start_date:   new Date().toISOString().split('T')[0],
+        title:         title.trim(),
+        frequency,
+        priority,
+        assignee_id:   assignee  || null,
+        client_id:     clientId  || null,
+        start_date:    new Date().toISOString().split('T')[0],
         custom_fields: Object.keys(customValues).length > 0 ? customValues : undefined,
+        subtasks:      compSubtasks.length > 0 ? compSubtasks : undefined,
       }
       let res: Response
       if (isEdit) {
@@ -347,6 +350,34 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, edit
         <span style={{ fontSize:11, color:'var(--text-muted)', flex:1 }}>
           {title.trim() ? '' : 'Enter a task name to save'}
         </span>
+        {/* Compliance subtasks preview */}
+        {compSubtasks.length > 0 && (
+          <div style={{ width:'100%', marginBottom:6, padding:'8px 12px', borderRadius:8,
+            background:'rgba(13,148,136,0.06)', border:'1px solid rgba(13,148,136,0.25)' }}>
+            <p style={{ fontSize:10, fontWeight:700, color:'var(--brand)', marginBottom:6,
+              textTransform:'uppercase', letterSpacing:'0.06em' }}>📎 Subtasks</p>
+            <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+              {compSubtasks.map((s,i) => (
+                <div key={i} style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  <span style={{ fontSize:11, padding:'2px 8px', borderRadius:99,
+                    background:'rgba(13,148,136,0.12)', color:'var(--brand)',
+                    border:'1px solid rgba(13,148,136,0.3)', flexShrink:0 }}>{s.title} *</span>
+                  <input type="date" value={s.due_date ?? ''}
+                    onChange={e => setCompSubtasks(prev =>
+                      prev.map((sub,idx) => idx===i ? {...sub, due_date: e.target.value||undefined} : sub)
+                    )}
+                    style={{ fontSize:11, border:'1px solid var(--border)', borderRadius:6,
+                      padding:'2px 6px', background:'var(--surface)',
+                      color:'var(--text-secondary)', outline:'none', fontFamily:'inherit' }}
+                  />
+                </div>
+              ))}
+            </div>
+            <p style={{ fontSize:10, color:'var(--text-muted)', marginTop:4 }}>
+              * Upload required to complete · Leave date blank for no specific due date
+            </p>
+          </div>
+        )}
         <button onClick={close} style={{ padding:'5px 12px', borderRadius:20,
           border:'1px solid var(--border)', background:'transparent',
           color:'var(--text-secondary)', fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>
