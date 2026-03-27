@@ -18,6 +18,7 @@ interface EmployeeStat {
 interface Props {
   currentUserId?: string
   userRole?:      string
+  clients?:       { id: string; name: string; color: string }[]
   dailyData:       { date: string; created: number; completed: number }[]
   memberData:      { name: string; completed: number; inProgress: number }[]
   priorityData:    { name: string; value: number; color: string }[]
@@ -217,8 +218,9 @@ function MetricRow({ label, value, color, bar, barColor }: {
   )
 }
 
-export function ReportsCharts({ dailyData, memberData, priorityData, projectData, timeByProject, employeeStats, currentUserId, userRole }: Props) {
+export function ReportsCharts({ dailyData, memberData, priorityData, projectData, timeByProject, employeeStats, currentUserId, userRole, clients = [] }: Props & { clients?: {id:string;name:string;color:string}[] }) {
   const [activeTab,    setActiveTab]    = useState<'overview' | 'employees'>('overview')
+  const [clientFilter, setClientFilter] = useState('')
   const [timeline,     setTimeline]     = useState<'30' | '60' | '90' | '365'>('90')
   const [empFilter,    setEmpFilter]    = useState('')
   const canViewAll = !userRole || ['owner','admin','manager'].includes(userRole)
@@ -230,6 +232,23 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
 
   return (
     <div>
+      {/* Client filter */}
+      {clients.length > 0 && (
+        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:16 }}>
+          <span style={{ fontSize:12, color:'var(--text-muted)', fontWeight:600 }}>Client:</span>
+          <select value={clientFilter} onChange={e => setClientFilter(e.target.value)}
+            style={{ padding:'5px 12px', borderRadius:20, fontSize:12, cursor:'pointer', outline:'none',
+              border: clientFilter ? '1px solid var(--brand)' : '1px solid var(--border)',
+              background: clientFilter ? 'rgba(13,148,136,0.08)' : 'var(--surface-subtle)',
+              color: clientFilter ? 'var(--brand)' : 'var(--text-secondary)',
+              fontWeight: clientFilter ? 600 : 400, fontFamily:'inherit', appearance:'none', paddingRight:20 }}>
+            <option value=''>All clients</option>
+            {clients.map(cl => <option key={cl.id} value={cl.id}>{cl.name}</option>)}
+          </select>
+          {clientFilter && <button onClick={() => setClientFilter('')}
+            style={{ fontSize:11, color:'var(--text-muted)', background:'none', border:'none', cursor:'pointer' }}>✕ Clear</button>}
+        </div>
+      )}
       {/* Tab bar */}
       <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 20, background: 'var(--surface)', borderRadius: '8px 8px 0 0' }}>
         {(['overview', 'employees'] as const).map(tab => (

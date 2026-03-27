@@ -39,6 +39,7 @@ export default async function ReportsPage() {
       .select('id, name, color').eq('org_id', orgId).eq('status', 'active').neq('is_archived', true),
     supabase.from('org_members')
       .select('user_id, role, users(id, name, email)').eq('org_id', orgId).eq('is_active', true),
+    supabase.from('clients').select('id, name, color').eq('org_id', orgId).eq('status','active').order('name'),
   ])
 
   const tasks   = allTasks ?? []
@@ -208,6 +209,7 @@ export default async function ReportsPage() {
           timeByProject={timeByProject}
           employeeStats={employeeStats}
           currentUserId={user.id}
+      clients={clients ?? []}
           userRole={mb.role}
         />
       </div>

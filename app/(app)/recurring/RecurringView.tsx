@@ -224,9 +224,20 @@ export function RecurringView({ tasks: initialTasks, members, projects, clients,
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
               <RefreshCw style={{ width: 13, height: 13, color: 'var(--brand)', flexShrink: 0 }}/>
               <div style={{ minWidth: 0 }}>
-                <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {task.title}
-                </p>
+                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin:0 }}>
+                    {task.title}
+                  </p>
+                  <button onClick={e => { e.stopPropagation(); toggleSubExpand(task.id) }}
+                    style={{ flexShrink:0, fontSize:10, padding:'1px 7px', borderRadius:99, border:'none',
+                      background: expandedSubs.has(task.id) ? 'rgba(13,148,136,0.15)' : 'var(--border-light)',
+                      color: expandedSubs.has(task.id) ? 'var(--brand)' : 'var(--text-muted)',
+                      cursor:'pointer', fontFamily:'inherit', fontWeight:600 }}>
+                    {subtaskMap[task.id]?.length > 0
+                      ? `${subtaskMap[task.id].filter((s:any)=>s.status==='completed').length}/${subtaskMap[task.id].length} subtasks`
+                      : expandedSubs.has(task.id) ? '▲ hide' : '+ subtasks'}
+                  </button>
+                </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
                   {task.project && (
                     <><div style={{ width: 7, height: 7, borderRadius: 2, background: task.project.color, flexShrink: 0 }}/>

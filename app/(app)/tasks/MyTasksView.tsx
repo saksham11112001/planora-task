@@ -190,6 +190,26 @@ export function MyTasksView({ tasks: initialTasks, members, clients, currentUser
             </button>
           </div>
         )}
+        {/* Client filter bar */}
+        {clients && clients.length > 0 && (
+          <div style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 18px',
+            borderBottom:'1px solid var(--border-light)', background:'var(--surface)', flexShrink:0 }}>
+            <span style={{ fontSize:11, color:'var(--text-muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em' }}>Client</span>
+            <select value={filterClient} onChange={e => setFilterClient(e.target.value)}
+              style={{ padding:'4px 10px', borderRadius:20, fontSize:12, cursor:'pointer', outline:'none',
+                border: filterClient ? '1px solid var(--brand)' : '1px solid var(--border)',
+                background: filterClient ? 'rgba(13,148,136,0.08)' : 'var(--surface-subtle)',
+                color: filterClient ? 'var(--brand)' : 'var(--text-secondary)',
+                fontWeight: filterClient ? 600 : 400, fontFamily:'inherit', appearance:'none', paddingRight:20 }}>
+              <option value=''>All clients</option>
+              {(clients ?? []).map(cl => <option key={cl.id} value={cl.id}>{cl.name}</option>)}
+            </select>
+            {filterClient && <button onClick={() => setFilterClient('')}
+              style={{ fontSize:11, color:'var(--text-muted)', background:'none', border:'none', cursor:'pointer' }}>
+              ✕ Clear
+            </button>}
+          </div>
+        )}
         <div style={{ display:'grid', gridTemplateColumns:'28px 22px 1fr 160px 100px 110px',
           alignItems:'center', padding:'8px 18px', borderBottom:`1px solid var(--border)`,
           background:'var(--surface-subtle)', flexShrink:0, fontSize:11, fontWeight:700,

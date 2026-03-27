@@ -31,6 +31,33 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const body = await req.json()
 
   // ── APPROVAL GATE ──────────────────────────────────────────────
+  // Block completing a PARENT task if it has incomplete subtasks
+  if (body.status === 'completed' && !task.parent_task_id) {
+    const { data: subtasks } = await supabase
+      .from('tasks').select('id, status').eq('parent_task_id', id)
+    if (subtasks && subtasks.length > 0) {
+      const incomplete = subtasks.filter(s => s.status !== 'completed')
+      if (incomplete.length > 0) {
+        return NextResponse.json({
+          error: `Complete all subtasks first — ${incomplete.length} remaining`,
+          code: 'SUBTASKS_INCOMPLETE',
+        }, { status: 422 })
+      }
+    }
+  }
+
+  // Block completing a SUBTASK if no attachment uploaded
+  if (body.status === 'completed' && task.parent_task_id) {
+    const { data: attachments } = await supabase
+      .from('task_attachments').select('id').eq('task_id', id).limit(1)
+    if (!attachments || attachments.length === 0) {
+      return NextResponse.json({
+        error: `Upload the required document before marking this subtask complete`,
+        code: 'ATTACHMENT_REQUIRED',
+      }, { status: 422 })
+    }
+  }
+
   // If someone tries to directly set status=completed on an approval-required task
   // that hasn't been approved yet, block it and tell them to use the approve flow.
   if (

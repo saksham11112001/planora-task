@@ -175,7 +175,13 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
       body: JSON.stringify({ status: 'completed', completed_at: new Date().toISOString() }),
     })
     setCompleting(p => { const s = new Set(p); s.delete(task.id); return s })
-    if (!res.ok) { toast.error('Failed to update task'); return }
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}))
+      // Roll back optimistic update
+      setLocalTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: task.status } : t))
+      toast.error(d.error ?? 'Failed to update task')
+      return
+    }
     toast.success('Task completed! ✓')
     startT(() => router.refresh())
   }
@@ -479,9 +485,13 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                             color: sub.status === 'completed' ? 'var(--text-muted)' : 'var(--text-primary)',
                             textDecoration: sub.status === 'completed' ? 'line-through' : 'none',
                           }}>{sub.title}</span>
-                          {/* Upload button for compliance subtasks */}
+                          {/* Upload button - visible pill */}
                           {sub.status !== 'completed' && (
-                            <label title="Upload document" style={{ cursor:'pointer', flexShrink:0 }}>
+                            <label style={{ cursor:'pointer', flexShrink:0, display:'flex', alignItems:'center',
+                              gap:4, padding:'2px 8px', borderRadius:99, fontSize:10, fontWeight:600,
+                              background:'rgba(13,148,136,0.1)', color:'var(--brand)',
+                              border:'1px solid rgba(13,148,136,0.3)' }}
+                              title="Upload required document">
                               <input type="file" style={{ display:'none' }}
                                 onChange={async e => {
                                   const file = e.target.files?.[0]
@@ -489,18 +499,12 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                                   const fd = new FormData()
                                   fd.append('file', file)
                                   const res = await fetch(`/api/tasks/${sub.id}/attachments`, { method:'POST', body: fd })
-                                  if (res.ok) {
-                                    toast.success(`Uploaded: ${file.name}`)
-                                  } else {
-                                    toast.error('Upload failed')
-                                  }
+                                  if (res.ok) toast.success(`✓ Uploaded: ${file.name}`)
+                                  else toast.error('Upload failed')
                                   e.target.value = ''
                                 }}
                               />
-                              <svg viewBox="0 0 16 16" fill="none" style={{ width:13, height:13, color:'var(--text-muted)' }}
-                                stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                                <path d="M8 10V3M5 6l3-3 3 3M3 13h10"/>
-                              </svg>
+                              ↑ Upload
                             </label>
                           )}
                           {sub.due_date && (
