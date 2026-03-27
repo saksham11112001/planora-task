@@ -21,7 +21,7 @@ export default async function MyTasksPage() {
     .from('clients').select('id, name, color').eq('org_id', mb.org_id).eq('status', 'active').order('name')
 
   const { data: tasks } = await supabase.from('tasks')
-    .select('id, title, description, status, priority, due_date, assignee_id, approver_id, client_id, project_id, approval_status, approval_required, estimated_hours, is_recurring, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), approver:users!tasks_approver_id_fkey(id, name), projects(id, name, color)')
+    .select('id, title, description, status, priority, due_date, assignee_id, approver_id, client_id, project_id, approval_status, approval_required, estimated_hours, is_recurring, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), projects(id, name, color)')
     .eq('org_id', mb.org_id).eq('assignee_id', user.id).neq('status', 'completed').neq('is_archived', true).is('parent_task_id', null)
     .order('due_date', { ascending: true, nullsFirst: false })
 
@@ -34,7 +34,7 @@ export default async function MyTasksPage() {
   // For managers with no specific approver set, fetch all org tasks in_review
   const isManager = ['owner','admin','manager'].includes(mb.role)
   const { data: approvalTasks } = await supabase.from('tasks')
-    .select('id, title, description, status, priority, due_date, assignee_id, approver_id, client_id, project_id, approval_status, approval_required, estimated_hours, is_recurring, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), approver:users!tasks_approver_id_fkey(id, name), projects(id, name, color)')
+    .select('id, title, description, status, priority, due_date, assignee_id, approver_id, client_id, project_id, approval_status, approval_required, estimated_hours, is_recurring, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), projects(id, name, color)')
     .eq('org_id', mb.org_id)
     .eq('status', 'in_review')
     .eq('approval_status', 'pending')
@@ -58,8 +58,8 @@ export default async function MyTasksPage() {
     is_recurring: t.is_recurring ?? false, completed_at: null,
     is_archived: false, created_at: '',
     assignee: (t.assignee as any) ?? null,
-    approver: (t.approver as any) ?? null,
-    approver_id: (t as any).approver_id ?? null,
+    approver: null,
+    approver_id: null,
     client: t.client_id ? (clientMap[t.client_id] ?? null) : null,
     project: (t.projects as any) ?? null,
   }))

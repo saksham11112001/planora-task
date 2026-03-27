@@ -41,9 +41,10 @@ const BOARD_COLS = [
 ]
 
 export function MyTasksView({ tasks: initialTasks, pendingApprovalTasks = [], members, clients, currentUserId, userRole }: Props) {
-  const router  = useRouter()
-  const [,startT] = useTransition()
-  const today = todayStr()
+  const router     = useRouter()
+  const [,startT]  = useTransition()
+  const today      = todayStr()
+  const canManage  = ['owner','admin','manager'].includes(userRole ?? '')
 
   const [tasks,      setTasks]      = useState<Task[]>(initialTasks)
   const [tab,        setTab]        = useState<'List'|'Board'>('List')
