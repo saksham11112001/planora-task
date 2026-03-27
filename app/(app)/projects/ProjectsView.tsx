@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
-import { Plus, FolderOpen, Clock } from 'lucide-react'
+import { Plus, FolderOpen, Clock, Trash2 } from 'lucide-react'
 import { ProjectStatusBadge } from '@/components/ui/Badge'
 import { fmtDate } from '@/lib/utils/format'
 
@@ -23,6 +23,17 @@ export function ProjectsView({ projects, counts, clients, canManage }: Props) {
   const active    = visible.filter(p => p.status === 'active')
   const onHold    = visible.filter(p => p.status === 'on_hold')
   const completed = visible.filter(p => p.status === 'completed')
+
+  async function deleteProject(projectId: string, projectName: string) {
+    if (!confirm(`Archive project "${projectName}"? All tasks will be preserved in Trash.`)) return
+    const res = await fetch(`/api/projects/${projectId}`, { method: 'DELETE' })
+    if (res.ok) {
+      window.location.reload()
+    } else {
+      const d = await res.json().catch(() => ({}))
+      alert(d.error ?? 'Could not delete project')
+    }
+  }
 
   return (
     <div className="p-6">
@@ -76,7 +87,22 @@ export function ProjectsView({ projects, counts, clients, canManage }: Props) {
                 const cnt      = counts[p.id] ?? { total: 0, done: 0 }
                 const progress = cnt.total > 0 ? Math.round((cnt.done / cnt.total) * 100) : 0
                 return (
-                  <Link key={p.id} href={`/projects/${p.id}`}
+                  <div key={p.id} className="relative group/card">
+                  {canManage && (
+                    <button
+                      onClick={e => { e.preventDefault(); deleteProject(p.id, p.name) }}
+                      title="Archive project"
+                      className="absolute top-3 right-3 z-10 opacity-0 group-hover/card:opacity-100 transition-opacity"
+                      style={{
+                        width: 28, height: 28, borderRadius: 7, border: 'none',
+                        background: '#fef2f2', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: '#dc2626',
+                      }}>
+                      <Trash2 style={{ width: 13, height: 13 }}/>
+                    </button>
+                  )}
+                  <Link href={`/projects/${p.id}`}
                     className="card-elevated p-5 hover:shadow-md transition-shadow block">
                     <div className="flex items-start justify-between gap-2 mb-3">
                       <div className="flex items-center gap-2.5">
@@ -111,6 +137,7 @@ export function ProjectsView({ projects, counts, clients, canManage }: Props) {
                       </div>
                     )}
                   </Link>
+                  </div>
                 )
               })}
             </div>

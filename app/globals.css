@@ -727,6 +727,9 @@ html.dark [role="listbox"] { background: var(--surface); }
 /* Inline task creators */
 html.dark .border-t.border-dashed { border-color: var(--border); }
 
+/* Show delete button on task row hover */
+.mytasks-row:hover .delete-task-btn { opacity: 1 !important; }
+
 /* Column headers in task list */
 html.dark [style*="background: 'var(--surface)'"],
 html.dark [style*="background:var(--surface)"] {

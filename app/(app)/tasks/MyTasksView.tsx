@@ -2,7 +2,7 @@
 import React from 'react'
 import { useState, useTransition, useCallback, useEffect } from 'react'
 import { useRouter }    from 'next/navigation'
-import { RefreshCw, CheckCheck, Clock, FolderOpen, Filter, X } from 'lucide-react'
+import { RefreshCw, CheckCheck, Clock, FolderOpen, Filter, X, Trash2 } from 'lucide-react'
 import { cn }           from '@/lib/utils/cn'
 import { PriorityBadge, Avatar } from '@/components/ui/Badge'
 import { TaskDetailPanel }       from '@/components/tasks/TaskDetailPanel'
@@ -165,6 +165,18 @@ export function MyTasksView({ tasks: initialTasks, pendingApprovalTasks = [], me
     } else {
       const d = await res.json().catch(() => ({}))
       toast.error(d.error ?? 'Action failed')
+    }
+  }
+
+  async function deleteTask(taskId: string) {
+    if (!confirm('Delete this task? It will move to Trash.')) return
+    setTasks(prev => prev.filter(t => t.id !== taskId))
+    const res = await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' })
+    if (!res.ok) {
+      toast.error('Could not delete task')
+      refresh()
+    } else {
+      toast.success('Moved to Trash')
     }
   }
 
@@ -497,6 +509,32 @@ export function MyTasksView({ tasks: initialTasks, pendingApprovalTasks = [], me
                             )}
                           </div>
                         ))}
+                      </div>
+                    )}
+                    {/* Delete button — managers only, hover to reveal */}
+                    {canManage && (
+                      <div style={{ display:'flex', justifyContent:'flex-end', padding:'0 18px 4px' }}
+                        onClick={e => e.stopPropagation()}>
+                        <button onClick={() => deleteTask(task.id)}
+                          title="Delete task"
+                          style={{
+                            opacity: 0, transition: 'opacity 0.15s',
+                            display: 'flex', alignItems: 'center', gap: 4,
+                            padding: '3px 8px', borderRadius: 6, border: 'none',
+                            background: 'transparent', cursor: 'pointer',
+                            color: 'var(--text-muted)', fontSize: 11, fontFamily: 'inherit',
+                          }}
+                          className="delete-task-btn"
+                          onMouseEnter={e => {
+                            (e.currentTarget as HTMLElement).style.background = '#fef2f2'
+                            ;(e.currentTarget as HTMLElement).style.color = '#dc2626'
+                          }}
+                          onMouseLeave={e => {
+                            (e.currentTarget as HTMLElement).style.background = 'transparent'
+                            ;(e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'
+                          }}>
+                          <Trash2 style={{ width: 11, height: 11 }}/> Delete
+                        </button>
                       </div>
                     )}
                     </React.Fragment>

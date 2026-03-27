@@ -2,7 +2,7 @@
 import Link from 'next/link'
 import { useState, useTransition, useEffect, useRef } from 'react'
 import { useRouter }    from 'next/navigation'
-import { Filter, SortAsc, Plus, CheckCheck, Clock, DollarSign } from 'lucide-react'
+import { Filter, SortAsc, Plus, CheckCheck, Clock, DollarSign, Trash2} from 'lucide-react'
 import { InlineTaskRow }   from '@/components/tasks/InlineTaskRow'
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
 import { PriorityBadge, Avatar }   from '@/components/ui/Badge'
@@ -45,6 +45,17 @@ export function ProjectView({ project, tasks, members, clients, defaultClientId,
   const today = todayStr()
   const toolbarRef = useRef<HTMLDivElement>(null)
 
+  const [filterAssignee, setFilterAssignee] = useState('')
+  const [filterPriority, setFilterPriority] = useState('')
+  const [filterStatus,   setFilterStatus]   = useState('')
+  const [sortBy,         setSortBy]         = useState<'due_date'|'priority'|'title'|'created_at'>('due_date')
+  const [sortDir,        setSortDir]        = useState<'asc'|'desc'>('asc')
+  const [addSectionOpen, setAddSectionOpen] = useState(false)
+  const [newSectionName, setNewSectionName] = useState('')
+  const [customSections, setCustomSections] = useState<{key:string;label:string}[]>([])
+  const [newSubInputs,   setNewSubInputs]   = useState<Record<string,string>>({})
+  const [filterOpen,   setFilterOpen]   = useState(false)
+  const [sortOpen,     setSortOpen]     = useState(false)
   // Close filter/sort dropdowns on outside click
   useEffect(() => {
     function close(e: MouseEvent) {
@@ -58,18 +69,8 @@ export function ProjectView({ project, tasks, members, clients, defaultClientId,
   }, [])
 
   // Filter + Sort state
-  const [filterOpen,   setFilterOpen]   = useState(false)
-  const [sortOpen,     setSortOpen]     = useState(false)
-  const [filterAssignee, setFilterAssignee] = useState('')
-  const [filterPriority, setFilterPriority] = useState('')
-  const [filterStatus,   setFilterStatus]   = useState('')
-  const [sortBy,       setSortBy]       = useState<'due_date'|'priority'|'title'|'created'>('due_date')
-  const [sortDir,      setSortDir]      = useState<'asc'|'desc'>('asc')
 
   // Add Section state
-  const [addSectionOpen, setAddSectionOpen] = useState(false)
-  const [newSectionName, setNewSectionName] = useState('')
-  const [customSections, setCustomSections] = useState<{key:string;label:string;color:string}[]>([])
 
   const total    = tasks.length
   const done     = visibleTasks.filter(t => t.status === 'completed').length
@@ -230,6 +231,17 @@ export function ProjectView({ project, tasks, members, clients, defaultClientId,
     startT(() => router.refresh())
   }
 
+  async function deleteTask(taskId: string) {
+    if (!confirm('Delete this task? It will move to Trash.')) return
+    const res = await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' })
+    if (!res.ok) {
+      toast.error('Could not delete task')
+    } else {
+      toast.success('Moved to Trash')
+      startT(() => router.refresh())
+    }
+  }
+
   async function bulkComplete() {
     const ids = [...checked]
     const allTasks = tasks.filter(t => ids.includes(t.id))
@@ -253,7 +265,6 @@ export function ProjectView({ project, tasks, members, clients, defaultClientId,
     const subs     = subtaskData[task.id] ?? []
     const subsDone = subs.filter((s: any) => s.status === 'completed').length
     const hasUndone = subs.length > 0 && subsDone < subs.length
-    const [newSubInput, setNewSubInput] = useState('')
 
     const isPending = task.status === 'in_review' || task.approval_status === 'pending'
 
@@ -320,6 +331,29 @@ export function ProjectView({ project, tasks, members, clients, defaultClientId,
             </span>
           )}
         </div>
+        {/* Delete button — managers only, hover to reveal */}
+        {canManage && (
+          <button
+            onClick={e => { e.stopPropagation(); deleteTask(task.id) }}
+            className="opacity-0 group-hover:opacity-100 flex-shrink-0"
+            title="Delete task"
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: 26, height: 26, borderRadius: 6, border: 'none',
+              background: 'transparent', cursor: 'pointer',
+              color: 'var(--text-muted)', transition: 'all 0.15s',
+            }}
+            onMouseEnter={e => {
+              (e.currentTarget as HTMLElement).style.background = '#fef2f2'
+              ;(e.currentTarget as HTMLElement).style.color = '#dc2626'
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLElement).style.background = 'transparent'
+              ;(e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'
+            }}>
+            <Trash2 className="h-3 w-3"/>
+          </button>
+        )}
       </div>
 
       {/* Inline subtasks */}
@@ -375,14 +409,14 @@ export function ProjectView({ project, tasks, members, clients, defaultClientId,
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 16px 6px 48px' }}>
             <div style={{ width: 14, height: 14, borderRadius: '50%', flexShrink: 0, border: '1.5px dashed var(--brand)', opacity: 0.5 }}/>
             <input
-              value={newSubInput}
-              onChange={e => setNewSubInput(e.target.value)}
+              value={newSubInputs[task.id] ?? ''}
+              onChange={e => setNewSubInputs(p => ({...p, [task.id]: e.target.value}))}
               onKeyDown={e => {
-                if (e.key === 'Enter' && newSubInput.trim()) {
+                if (e.key === 'Enter' && (newSubInputs[task.id] ?? '').trim()) {
                   addSubtaskInline(task.id, newSubInput)
-                  setNewSubInput('')
+                  setNewSubInputs(p => ({...p, [task.id]: ''}))
                 }
-                if (e.key === 'Escape') setNewSubInput('')
+                if (e.key === 'Escape') setNewSubInputs(p => ({...p, [task.id]: ''}))
               }}
               placeholder="Add subtask… (press Enter)"
               style={{

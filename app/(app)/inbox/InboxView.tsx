@@ -22,6 +22,7 @@ interface Props {
 }
 
 export function InboxView({ tasks, members, clients, currentUserId, userRole, canCreate }: Props) {
+  const canManage = ['owner','admin','manager'].includes(userRole ?? '')
   const [clientFilter, setClientFilter] = useState<string>('')
   const router = useRouter()
   const [localTasks,   setLocalTasks]   = useState<Task[]>(tasks)
@@ -208,6 +209,18 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
     startT(() => router.refresh())
   }
 
+  async function deleteTask(taskId: string) {
+    if (!confirm('Delete this task? It will move to Trash.')) return
+    setLocalTasks(prev => prev.filter(t => t.id !== taskId))
+    const res = await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' })
+    if (!res.ok) {
+      toast.error('Could not delete task')
+      startT(() => router.refresh()) // restore on error
+    } else {
+      toast.success('Moved to Trash')
+    }
+  }
+
   async function bulkComplete() {
     const ids = [...checked]
     const canComplete = localTasks.filter(t => ids.includes(t.id) && !t.approval_required)
@@ -241,7 +254,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
       @media (max-width: 640px) {
         .hide-mobile { display: none !important; }
         .inbox-task-row, .inbox-header-row {
-          grid-template-columns: 36px 22px 1fr 32px !important;
+          grid-template-columns: 36px 22px 1fr 28px 28px !important;
         }
       }
     `}</style>
@@ -293,7 +306,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
         {/* Column headers */}
         <div className="inbox-header-row" style={{ padding: '6px 16px', background:'var(--surface-subtle)', borderBottom:'1px solid var(--border)',
           fontSize: 10, fontWeight: 700, color:'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', flexShrink: 0,
-          display: 'grid', gridTemplateColumns: '36px 22px 1fr 70px 110px 80px 32px' }}>
+          display: 'grid', gridTemplateColumns: '36px 22px 1fr 70px 110px 80px 32px 28px' }}>
           <div/><div/><div>Task</div>
           <div className="hide-mobile" style={{ textAlign: 'center', fontSize: 9 }}>Subtasks</div>
           <div className="hide-mobile" style={{ textAlign: 'center' }}>Due date</div>
@@ -334,7 +347,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                     className="inbox-task-row"
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: '36px 22px 1fr 70px 110px 80px 32px',
+                      gridTemplateColumns: '36px 22px 1fr 70px 110px 80px 32px 28px',
                       alignItems: 'center',
                       padding: '0 16px',
                       minHeight: 50,
@@ -468,6 +481,29 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                         {assignee.name[0]?.toUpperCase()}
                       </div>
                     ) : <div/>}
+                    {/* Delete button — managers only, shows on hover */}
+                    {canManage && (
+                      <button
+                        onClick={e => { e.stopPropagation(); deleteTask(task.id) }}
+                        className="opacity-0 group-hover:opacity-100"
+                        title="Delete task"
+                        style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          width: 24, height: 24, borderRadius: 6, border: 'none',
+                          background: 'transparent', cursor: 'pointer',
+                          color: 'var(--text-muted)', transition: 'all 0.15s', flexShrink: 0,
+                        }}
+                        onMouseEnter={e => {
+                          (e.currentTarget as HTMLElement).style.background = '#fef2f2'
+                          ;(e.currentTarget as HTMLElement).style.color = '#dc2626'
+                        }}
+                        onMouseLeave={e => {
+                          (e.currentTarget as HTMLElement).style.background = 'transparent'
+                          ;(e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'
+                        }}>
+                        <Trash2 style={{ width: 12, height: 12 }}/>
+                      </button>
+                    )}
                   </div>
 
                   {/* Inline subtasks panel */}
