@@ -4,7 +4,7 @@ import { ArrowLeft, FileCheck, BarChart2, Clock, ListTodo, RefreshCw,
          FolderOpen, Users2, Calendar, Upload, Users, Shield } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from '@/store/appStore'
-import { clearOrgSettingsCache } from '@/lib/hooks/useOrgSettings'
+import { refreshOrgSettings } from '@/lib/hooks/useOrgSettings'
 
 // These features control sidebar visibility + functionality
 export const ALL_FEATURES = [
@@ -144,7 +144,7 @@ export function FeaturesView({ features: initial }: { features: Record<string, b
       })
       if (res.ok) {
         setFeatures(p => ({ ...p, [key]: newVal }))
-        clearOrgSettingsCache()
+        await refreshOrgSettings()   // instantly updates sidebar + any other hook instances
         toast.success(newVal ? 'Enabled' : 'Disabled')
       } else { toast.error('Failed to update') }
     } finally { setSaving(null) }
