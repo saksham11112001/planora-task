@@ -1,5 +1,5 @@
 'use client'
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import { useRouter }          from 'next/navigation'
 import { RefreshCw, X, Pencil, Check } from 'lucide-react'
 import { InlineRecurringTask } from '@/components/tasks/InlineRecurringTask'
@@ -77,6 +77,23 @@ export function RecurringView({ tasks: initialTasks, members, projects, clients,
     if (res.ok) { toast.success('Deleted'); startT(() => router.refresh()) }
     else        { const d = await res.json(); toast.error(d.error ?? 'Failed') }
   }
+
+  // Auto-load subtasks for all recurring tasks on mount
+  useEffect(() => {
+    if (!localTasks || localTasks.length === 0) return
+    localTasks.forEach(async (task: Task) => {
+      try {
+        const r = await fetch(`/api/tasks?parent_id=${task.id}&limit=50`)
+        const d = await r.json()
+        const subs = d.data ?? []
+        if (subs.length > 0) {
+          setSubtaskMap(p => ({ ...p, [task.id]: subs }))
+          setExpandedSubs(p => { const n = new Set(p); n.add(task.id); return n })
+        }
+      } catch {}
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localTasks.length])
 
   async function toggleSubExpand(taskId: string) {
     setExpandedSubs(prev => {
@@ -311,7 +328,7 @@ export function RecurringView({ tasks: initialTasks, members, projects, clients,
             </div>
 
           {/* Subtasks section */}
-          {expandedSubs.has(task.id) && (
+          {(expandedSubs.has(task.id) || (subtaskMap[task.id] ?? []).length > 0) && (
             <div style={{ background:'var(--surface-subtle)', borderTop:'1px solid var(--border-light)' }}>
               {(subtaskMap[task.id] ?? []).map((sub: any) => (
                 <div key={sub.id} style={{ display:'flex', alignItems:'center', gap:8,

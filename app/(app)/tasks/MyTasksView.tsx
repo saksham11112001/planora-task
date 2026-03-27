@@ -1,6 +1,6 @@
 'use client'
 import React from 'react'
-import { useState, useTransition, useCallback } from 'react'
+import { useState, useTransition, useCallback, useEffect } from 'react'
 import { useRouter }    from 'next/navigation'
 import { RefreshCw, CheckCheck, Clock, FolderOpen, Filter, X } from 'lucide-react'
 import { cn }           from '@/lib/utils/cn'
@@ -69,19 +69,20 @@ export function MyTasksView({ tasks: initialTasks, members, clients, currentUser
   // Auto-load and expand subtasks for all tasks on mount
   useEffect(() => {
     if (!tasks || tasks.length === 0) return
-    tasks.forEach(async (task: Task) => {
+    const ids = tasks.map((t: Task) => t.id)
+    ids.forEach(async (taskId: string) => {
       try {
-        const r = await fetch(`/api/tasks?parent_id=${task.id}&limit=50`)
+        const r = await fetch(`/api/tasks?parent_id=${taskId}&limit=50`)
         const d = await r.json()
         const subs = d.data ?? []
         if (subs.length > 0) {
-          setSubtaskMap(p => ({ ...p, [task.id]: subs }))
-          setExpandedTasks(p => { const n = new Set(p); n.add(task.id); return n })
+          setSubtaskMap(p => ({ ...p, [taskId]: subs }))
+          setExpandedTasks(p => { const n = new Set(p); n.add(taskId); return n })
         }
       } catch {}
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tasks.map((t: Task) => t.id).join(',')])
+  }, [tasks.length])
 
   function refresh() { startT(() => router.refresh()) }
 

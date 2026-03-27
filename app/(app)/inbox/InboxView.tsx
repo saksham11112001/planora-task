@@ -32,27 +32,28 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set())
 
   // Auto-load subtasks for all tasks on mount
-  useEffect(() => {
-    if (!tasks || tasks.length === 0) return
-    tasks.forEach(async (task: any) => {
-      if (!subtaskMap[task.id]) {
-        try {
-          const r = await fetch(`/api/tasks?parent_id=${task.id}&limit=50`)
-          const d = await r.json()
-          const subs = d.data ?? []
-          if (subs.length > 0) {
-            setSubtaskMap(p => ({ ...p, [task.id]: subs }))
-            setExpandedTasks(p => { const n = new Set(p); n.add(task.id); return n })
-          }
-        } catch {}
-      }
-    })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tasks])
   const [subtaskMap,    setSubtaskMap]    = useState<Record<string, {id:string;title:string;status:string}[]>>({})
   const [loadingSubtasks, setLoadingSubtasks] = useState<Set<string>>(new Set())
   const [newSubInputs, setNewSubInputs]   = useState<Record<string, string>>({})
   const [completingTask, setCompletingTask] = useState<Task | null>(null)
+
+  // Auto-load subtasks for all tasks on mount
+  useEffect(() => {
+    if (!tasks || tasks.length === 0) return
+    tasks.forEach(async (task: any) => {
+      try {
+        const r = await fetch(`/api/tasks?parent_id=${task.id}&limit=50`)
+        const d = await r.json()
+        const subs = d.data ?? []
+        if (subs.length > 0) {
+          setSubtaskMap(p => ({ ...p, [task.id]: subs }))
+          setExpandedTasks(p => { const n = new Set(p); n.add(task.id); return n })
+        }
+      } catch {}
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasks.length])
+
 
   async function toggleExpand(taskId: string) {
     setExpandedTasks(prev => {
