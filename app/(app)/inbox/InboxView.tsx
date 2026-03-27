@@ -56,25 +56,27 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
   async function toggleSubRow(parentId: string, subId: string, status: string, subTitle?: string) {
     const newStatus = status === 'completed' ? 'todo' : 'completed'
 
-    // Document name validation for compliance subtasks
-    // When marking a document subtask as complete, check if an attachment exists with matching name
+    // Attachment is MANDATORY for all compliance subtasks
+    // Block completion if no file has been uploaded to this subtask
     if (newStatus === 'completed' && subTitle) {
       const attRes = await fetch(`/api/tasks/${subId}/attachments`)
       const attData = await attRes.json().catch(() => ({ data: [] }))
-      const attachments: { filename: string }[] = attData.data ?? []
+      const attachments: { file_name: string; filename?: string }[] = attData.data ?? []
+
       if (attachments.length === 0) {
-        toast.error(`Upload "${subTitle}" before marking complete`)
+        toast.error(`📎 Upload "${subTitle}" before marking complete`)
         return
       }
-      // Check if any attachment filename contains the required document name (case-insensitive)
-      const titleWords = subTitle.toLowerCase().replace(/[^a-z0-9 ]/g, '').split(' ').filter(w => w.length > 2)
-      const hasMatch = attachments.some(a => {
-        const fname = a.filename.toLowerCase()
-        return titleWords.some(w => fname.includes(w))
-      })
-      if (!hasMatch) {
-        toast.error(`File name must match "${subTitle}" — rename your file and re-upload`)
-        return
+
+      // Warn (not block) if filename doesn't match — user may have renamed
+      const titleWords = subTitle.toLowerCase().replace(/[^a-z0-9 ]/g, '').split(' ').filter(w => w.length > 3)
+      if (titleWords.length > 0) {
+        const hasMatch = attachments.some(a =>
+          titleWords.some(w => (a.file_name ?? a.filename ?? '').toLowerCase().includes(w))
+        )
+        if (!hasMatch) {
+          toast.success(`✓ Marked complete — note: filename doesn't contain "${subTitle}" keywords`)
+        }
       }
     }
 

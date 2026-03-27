@@ -6,7 +6,6 @@ import type { Metadata } from 'next'
 export const dynamic = 'force-dynamic'
 export const metadata: Metadata = { title: 'Time tracking' }
 
-export const revalidate = 20
 
 export default async function TimePage({
   searchParams,

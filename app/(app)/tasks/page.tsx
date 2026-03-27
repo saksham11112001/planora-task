@@ -6,7 +6,6 @@ import type { Metadata } from 'next'
 export const dynamic = 'force-dynamic'
 export const metadata: Metadata = { title: 'My tasks' }
 
-export const revalidate = 15
 
 export default async function MyTasksPage() {
   const supabase = await createClient()

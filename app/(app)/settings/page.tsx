@@ -5,7 +5,6 @@ import type { Metadata }  from 'next'
 
 export const dynamic = 'force-dynamic'
 export const metadata: Metadata = { title: 'Settings' }
-export const revalidate = 20
 
 const SECTIONS = [
   { href: '/settings/appearance',   label: 'Appearance',       desc: 'Theme and display preferences',          adminOnly: false, color: '#7c3aed', bg: '#f5f3ff', iconName: 'Palette'   },

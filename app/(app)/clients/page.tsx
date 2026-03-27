@@ -7,7 +7,6 @@ import type { Metadata } from 'next'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = { title: 'Clients' }
-export const revalidate = 20
 
 export default async function ClientsPage() {
   const supabase = await createClient()
