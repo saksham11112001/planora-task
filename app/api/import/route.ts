@@ -510,7 +510,7 @@ export async function POST(request: NextRequest) {
         if (isSampleRow(row)) continue
         const typeName = cell(row, iType); if (!typeName) continue
         const compTask = findComplianceTask(typeName)
-        if (!compTask) { caResults.errors.push(\`"\${typeName}": not recognised\`); caResults.skipped++; continue }
+        if (!compTask) { caResults.errors.push(`"${typeName}": not recognised`); caResults.skipped++; continue }
         const clientId   = await resolveClient(cell(row, iClient))
         const assigneeId = cell(row, iAssignee) ? await resolveEmail(cell(row, iAssignee)) : null
         const priority   = cell(row, iPriority) || compTask.priority
@@ -525,7 +525,7 @@ export async function POST(request: NextRequest) {
           next_occurrence_date: frequency && dueDate ? dueDate : null,
           created_by: user.id, approval_required: false,
         }).select('id').single()
-        if (tErr) { caResults.errors.push(\`"\${compTask.title}": \${tErr.message}\`); caResults.skipped++ }
+        if (tErr) { caResults.errors.push(`"${compTask.title}": ${tErr.message}`); caResults.skipped++ }
         else {
           caResults.created++
           if (newTask?.id && compTask.subtasks.length > 0) {
