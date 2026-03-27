@@ -13,7 +13,8 @@ import type { Task } from '@/types'
 import { toast } from '@/store/appStore'
 
 interface Props {
-  tasks:         Task[]
+  tasks:               Task[]
+  pendingApprovalTasks?: Task[]
   members:       { id: string; name: string }[]
   clients:       { id: string; name: string; color: string }[]
   currentUserId?: string
@@ -39,7 +40,7 @@ const BOARD_COLS = [
   { status:'completed',   label:'Done',        color:'#16a34a' },
 ]
 
-export function MyTasksView({ tasks: initialTasks, members, clients, currentUserId, userRole }: Props) {
+export function MyTasksView({ tasks: initialTasks, pendingApprovalTasks = [], members, clients, currentUserId, userRole }: Props) {
   const router  = useRouter()
   const [,startT] = useTransition()
   const today = todayStr()
@@ -152,6 +153,21 @@ export function MyTasksView({ tasks: initialTasks, members, clients, currentUser
     refresh()
   }
 
+  // Approve or reject a task (for managers/approvers)
+  async function handleApproveDecision(taskId: string, decision: 'approve' | 'reject') {
+    const res = await fetch(`/api/tasks/${taskId}/approve`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ decision }),
+    })
+    if (res.ok) {
+      toast.success(decision === 'approve' ? 'Task approved ✓' : 'Task returned to assignee')
+      refresh()
+    } else {
+      const d = await res.json().catch(() => ({}))
+      toast.error(d.error ?? 'Action failed')
+    }
+  }
+
   // Circle button appearance based on state
   function CircleBtn({ task }: { task: Task }) {
     const isPending = task.approval_status === 'pending' || task.status === 'in_review'
@@ -215,6 +231,114 @@ export function MyTasksView({ tasks: initialTasks, members, clients, currentUser
             </button>
           </div>
         )}
+        {/* ── Needs your approval section ─────────────────────────── */}
+        {pendingApprovalTasks.length > 0 && (
+          <div style={{ borderBottom:'2px solid #7c3aed', marginBottom:0 }}>
+            {/* Section header */}
+            <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 18px 8px',
+              background:'var(--pending-surface, #faf5ff)' }}>
+              <span style={{ fontSize:11, fontWeight:700, color:'#7c3aed',
+                textTransform:'uppercase', letterSpacing:'0.06em' }}>
+                🔔 Needs your approval
+              </span>
+              <span style={{ fontSize:11, background:'#7c3aed', color:'#fff',
+                borderRadius:99, padding:'1px 8px', fontWeight:600 }}>
+                {pendingApprovalTasks.length}
+              </span>
+            </div>
+            {/* Approval task rows */}
+            {pendingApprovalTasks.map(task => {
+              const assignee = task.assignee as {id:string;name:string}|null
+              const ov = isOverdue(task.due_date, task.status)
+              return (
+                <React.Fragment key={task.id}>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 140px 100px 110px 200px',
+                  alignItems:'center', padding:'0 18px', minHeight:52,
+                  borderBottom:'1px solid var(--border-light)',
+                  background:'var(--pending-surface, #faf5ff)',
+                  cursor:'pointer' }}
+                  onClick={() => setSelTask(selTask?.id === task.id ? null : task)}>
+                  {/* Title */}
+                  <div style={{ minWidth:0, paddingRight:12 }}>
+                    <div style={{ fontSize:13, fontWeight:600, color:'var(--text-primary)',
+                      overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
+                      {task.title}
+                    </div>
+                    {assignee && (
+                      <div style={{ fontSize:11, color:'var(--text-muted)', marginTop:2,
+                        display:'flex', alignItems:'center', gap:4 }}>
+                        <span>Submitted by {assignee.name}</span>
+                        {task.client_id && (task as any).client && (
+                          <>
+                            <span>·</span>
+                            <span style={{ width:6, height:6, borderRadius:1,
+                              background:(task as any).client?.color ?? '#ccc', display:'inline-block' }}/>
+                            <span>{(task as any).client?.name}</span>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  {/* Assignee */}
+                  <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                    {assignee && <><Avatar name={assignee.name} size="xs"/>
+                      <span style={{ fontSize:12, color:'var(--text-muted)',
+                        overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{assignee.name}</span>
+                    </>}
+                  </div>
+                  {/* Due date */}
+                  <div style={{ textAlign:'center', fontSize:13,
+                    color: ov ? '#dc2626' : 'var(--text-muted)', fontWeight: ov ? 600 : 400 }}>
+                    {task.due_date ? fmtDate(task.due_date) : '—'}
+                  </div>
+                  {/* Priority */}
+                  <div style={{ display:'flex', justifyContent:'center' }}>
+                    <PriorityBadge priority={task.priority}/>
+                  </div>
+                  {/* Approve / Reject buttons */}
+                  <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}
+                    onClick={e => e.stopPropagation()}>
+                    <button onClick={() => handleApproveDecision(task.id, 'approve')}
+                      style={{ padding:'6px 16px', borderRadius:8, border:'none', cursor:'pointer',
+                        background:'#0d9488', color:'#fff', fontSize:12, fontWeight:600,
+                        fontFamily:'inherit', display:'flex', alignItems:'center', gap:4 }}>
+                      ✓ Approve
+                    </button>
+                    <button onClick={() => handleApproveDecision(task.id, 'reject')}
+                      style={{ padding:'6px 16px', borderRadius:8, cursor:'pointer', fontSize:12,
+                        fontWeight:600, fontFamily:'inherit', display:'flex', alignItems:'center', gap:4,
+                        border:'1px solid var(--border)', background:'var(--surface)', color:'var(--text-secondary)' }}>
+                      ✕ Return
+                    </button>
+                  </div>
+                </div>
+                {/* Subtasks if any */}
+                {expandedTasks.has(task.id) && (subtaskMap[task.id] ?? []).length > 0 && (
+                  <div style={{ background:'var(--surface-subtle)', borderBottom:'1px solid var(--border-light)' }}>
+                    {(subtaskMap[task.id] ?? []).map((sub: any) => (
+                      <div key={sub.id} style={{ display:'flex', alignItems:'center', gap:8,
+                        padding:'5px 18px 5px 60px', borderBottom:'1px solid var(--border-light)' }}>
+                        <span style={{ width:10, height:10, borderRadius:'50%', flexShrink:0,
+                          background: sub.status==='completed' ? 'var(--brand)' : 'transparent',
+                          outline: '2px solid ' + (sub.status==='completed' ? 'var(--brand)' : 'var(--border)') }}/>
+                        <span style={{ flex:1, fontSize:12,
+                          color: sub.status==='completed' ? 'var(--text-muted)' : 'var(--text-primary)',
+                          textDecoration: sub.status==='completed' ? 'line-through' : 'none' }}>{sub.title}</span>
+                        <span style={{ fontSize:11, padding:'1px 8px', borderRadius:99,
+                          background: sub.status==='completed' ? 'rgba(13,148,136,0.1)' : '#f1f5f9',
+                          color: sub.status==='completed' ? 'var(--brand)' : 'var(--text-muted)' }}>
+                          {sub.status === 'completed' ? '✓ Done' : 'Pending'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                </React.Fragment>
+              )
+            })}
+          </div>
+        )}
+
         {/* Client filter bar */}
         {clients && clients.length > 0 && (
           <div style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 18px',
