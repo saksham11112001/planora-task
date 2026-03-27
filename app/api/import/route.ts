@@ -2,6 +2,13 @@ import { createClient }      from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse }       from 'next/server'
 import type { NextRequest }   from 'next/server'
+import { COMPLIANCE_TASKS }   from '@/lib/data/complianceTasks'
+
+// Build a lookup map for compliance tasks by title (case-insensitive)
+const COMPLIANCE_MAP = new Map(COMPLIANCE_TASKS.map(t => [t.title.toLowerCase().trim(), t]))
+function findComplianceTask(title: string) {
+  return COMPLIANCE_MAP.get(title.toLowerCase().trim()) ?? null
+}
 
 async function parseXlsx(buffer: ArrayBuffer): Promise<Record<string, string[][]>> {
   const XLSX = await import('xlsx')
@@ -394,19 +401,40 @@ export async function POST(request: NextRequest) {
         }
         const clientId   = await resolveClient(cell(row, iClient))
         const assigneeId = cell(row, iAssignee) ? await resolveEmail(cell(row, iAssignee)) : null
-        const { error: tErr } = await admin.from('tasks').insert({
-          org_id: orgId, title: title.trim(),
+        // Check for compliance_task_type column
+        const iCompliance = findCol(headers, 'compliancetasktype', 'compliance', 'compliancetask')
+        const complianceType = cell(row, iCompliance)
+        const compTask = complianceType ? findComplianceTask(complianceType) : null
+        // If compliance type found, use its title and priority
+        const finalTitle    = compTask ? compTask.title : title.trim()
+        const finalPriority = compTask ? compTask.priority : priority
+
+        const { data: newTask, error: tErr } = await admin.from('tasks').insert({
+          org_id: orgId, title: finalTitle,
           description: cell(row, iDesc) || null,
-          status: 'todo', priority,
-          project_id: null,   // no project → one-time task
+          status: 'todo', priority: finalPriority,
+          project_id: null,
           client_id: clientId,
           assignee_id: assigneeId,
           due_date: cell(row, iDue) || null,
           estimated_hours: cell(row, iHours) ? parseFloat(cell(row, iHours)) : null,
           created_by: user.id, is_recurring: false, approval_required: false,
-        })
-        if (tErr) { results.onetasks.errors.push(`"${title}": ${tErr.message}`); results.onetasks.skipped++ }
-        else results.onetasks.created++
+        }).select('id').single()
+        if (tErr) { results.onetasks.errors.push(`"${finalTitle}": ${tErr.message}`); results.onetasks.skipped++ }
+        else {
+          results.onetasks.created++
+          // Create compliance subtasks if compliance task type matched
+          if (compTask && newTask?.id && compTask.subtasks.length > 0) {
+            const subtaskInserts = compTask.subtasks.map(s => ({
+              org_id: orgId, title: s.title, status: 'todo' as const,
+              priority: compTask.priority, assignee_id: assigneeId || null,
+              client_id: clientId || null, due_date: cell(row, iDue) || null,
+              parent_task_id: newTask.id, created_by: user.id, is_recurring: false,
+              custom_fields: s.required ? { _compliance_subtask: true } : null,
+            }))
+            await admin.from('tasks').insert(subtaskInserts)
+          }
+        }
       }
     }
   }
@@ -460,5 +488,60 @@ export async function POST(request: NextRequest) {
   }
 
   const totalCreated = Object.values(results).reduce((s, r) => s + r.created, 0)
+  // ── 7. CA COMPLIANCE TASKS SHEET ─────────────────────────────
+  const caSheet = Object.keys(sheets).find(k =>
+    norm(k).includes('cacompliance') || (norm(k).includes('compliance') && !norm(k).includes('non'))
+  )
+  if (caSheet) {
+    const caResults = { created: 0, skipped: 0, errors: [] as string[] }
+    const rows = sheets[caSheet]
+    const hdrIdx = rows.findIndex(r =>
+      r.some(cc => norm(cc).includes('compliance') || norm(cc).includes('tasktype'))
+    )
+    if (hdrIdx !== -1) {
+      const headers = rows[hdrIdx]
+      const iType     = findCol(headers, 'compliancetasktype', 'tasktype', 'compliance')
+      const iClient   = findCol(headers, 'clientname', 'client')
+      const iAssignee = findCol(headers, 'assigneeemail', 'assignee')
+      const iDue      = findCol(headers, 'duedate', 'due')
+      const iPriority = findCol(headers, 'priority')
+      const iFreq     = findCol(headers, 'frequency', 'freq')
+      for (const row of rows.slice(hdrIdx + 2)) {
+        if (isSampleRow(row)) continue
+        const typeName = cell(row, iType); if (!typeName) continue
+        const compTask = findComplianceTask(typeName)
+        if (!compTask) { caResults.errors.push(\`"\${typeName}": not recognised\`); caResults.skipped++; continue }
+        const clientId   = await resolveClient(cell(row, iClient))
+        const assigneeId = cell(row, iAssignee) ? await resolveEmail(cell(row, iAssignee)) : null
+        const priority   = cell(row, iPriority) || compTask.priority
+        const dueDate    = cell(row, iDue) || null
+        const freqRaw    = cell(row, iFreq)
+        const freqMap: Record<string,string> = { daily:'daily',weekly:'weekly',monthly:'monthly',quarterly:'quarterly',annual:'annual',yearly:'annual',biweekly:'bi_weekly',fortnightly:'bi_weekly' }
+        const frequency  = freqRaw ? (freqMap[norm(freqRaw)] ?? 'monthly') : null
+        const { data: newTask, error: tErr } = await admin.from('tasks').insert({
+          org_id: orgId, title: compTask.title, status: 'todo', priority,
+          client_id: clientId, assignee_id: assigneeId, due_date: dueDate,
+          is_recurring: !!frequency, frequency: frequency ?? undefined,
+          next_occurrence_date: frequency && dueDate ? dueDate : null,
+          created_by: user.id, approval_required: false,
+        }).select('id').single()
+        if (tErr) { caResults.errors.push(\`"\${compTask.title}": \${tErr.message}\`); caResults.skipped++ }
+        else {
+          caResults.created++
+          if (newTask?.id && compTask.subtasks.length > 0) {
+            await admin.from('tasks').insert(compTask.subtasks.map(s => ({
+              org_id: orgId, title: s.title, status: 'todo' as const, priority,
+              assignee_id: assigneeId || null, client_id: clientId || null, due_date: dueDate,
+              parent_task_id: newTask.id, created_by: user.id, is_recurring: false,
+              custom_fields: s.required ? { _compliance_subtask: true } : null,
+            })))
+          }
+        }
+      }
+    }
+    ;(results as any).compliance = caResults
+    totalCreated += caResults.created
+  }
+
   return NextResponse.json({ success: true, results, totalCreated })
 }
