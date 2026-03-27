@@ -283,7 +283,6 @@ export function RecurringView({ tasks: initialTasks, members, projects, clients,
                 </>
               )}
             </div>
-          </div>
 
           {/* Subtasks section */}
           {expandedSubs.has(task.id) && (
@@ -342,7 +341,7 @@ export function RecurringView({ tasks: initialTasks, members, projects, clients,
             </div>
           )}
 
-        </div>
+          </div>
         ))}
 
         {canManage && (
