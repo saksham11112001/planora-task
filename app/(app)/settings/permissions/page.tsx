@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { createClient } from '@/lib/supabase/server'
 import { redirect }     from 'next/navigation'
 import { PermissionsView } from './PermissionsView'
@@ -12,7 +14,7 @@ export default async function PermissionsPage() {
   const { data: mb } = await supabase
     .from('org_members')
     .select('org_id, role, organisations(plan_tier, status, trial_ends_at)')
-    .eq('user_id', user.id).eq('is_active', true).single()
+    .eq('user_id', user.id).eq('is_active', true).maybeSingle()
   if (!mb || !['owner','admin'].includes(mb.role)) redirect('/settings')
 
   const org = mb.organisations as any

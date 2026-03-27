@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { createClient } from '@/lib/supabase/server'
 import { redirect }     from 'next/navigation'
 import { CustomFieldsSettingsForm } from './CustomFieldsSettingsForm'
@@ -8,7 +10,7 @@ export default async function CustomFieldsPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
-  const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).single()
+  const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).maybeSingle()
   if (!mb || !['owner','admin'].includes(mb.role)) redirect('/settings')
   const { data: settings } = await supabase.from('org_settings').select('custom_task_fields').eq('org_id', mb.org_id).maybeSingle()
   const initial = (settings?.custom_task_fields as any[]) ?? []

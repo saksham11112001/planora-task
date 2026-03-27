@@ -14,7 +14,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
   if (!user) redirect('/login')
 
   const { data: mb } = await supabase.from('org_members')
-    .select('org_id, role').eq('user_id', user.id).eq('is_active', true).single()
+    .select('org_id, role').eq('user_id', user.id).eq('is_active', true).maybeSingle()
   if (!mb) redirect('/onboarding')
 
   // All queries fire in parallel — was sequential before (500ms+ saved)

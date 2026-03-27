@@ -15,7 +15,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const { data: task } = await supabase
     .from('tasks')
-    .select('id, assignee_id, approver_id, org_id, approval_required, approval_status, status')
+    .select('id, assignee_id, approver_id, org_id, approval_required, approval_status, status, parent_task_id')
     .eq('id', id).eq('org_id', mb.org_id).single()
   if (!task) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
@@ -78,11 +78,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     body.approved_at     = new Date().toISOString()
   }
 
-  const ALLOWED = [
+  // Members can only update status/completed_at of tasks assigned to them
+  // Managers can update all fields on any task in their org
+  const ALLOWED = isManager ? [
     'title','description','status','priority','due_date','start_date',
     'completed_at','assignee_id','client_id','approval_status',
     'approval_required','approved_by','approved_at',
     'estimated_hours','sort_order','custom_fields',
+  ] : [
+    // Members: only status + completed_at (to submit/complete their own tasks)
+    'status','completed_at','custom_fields',
   ]
   const updates: Record<string, unknown> = {}
   for (const k of ALLOWED) { if (k in body) updates[k] = body[k] }

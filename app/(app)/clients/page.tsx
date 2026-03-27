@@ -15,7 +15,7 @@ export default async function ClientsPage() {
 
   const { data: mb } = await supabase
     .from('org_members').select('org_id, role')
-    .eq('user_id', user.id).eq('is_active', true).single()
+    .eq('user_id', user.id).eq('is_active', true).maybeSingle()
   if (!mb) redirect('/onboarding')
 
   const { data: clients } = await supabase

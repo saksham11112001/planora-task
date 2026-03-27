@@ -30,7 +30,21 @@ export async function POST(
   // ── Who can do what ────────────────────────────────────────────────────────
   // submit: only the assignee
   if (decision === 'submit') {
-    if (!isAssignee) return NextResponse.json({ error: 'Only the assignee can submit' }, { status: 403 })
+    if (!isAssignee) return NextResponse.json({ error: 'Only the assignee can submit for approval' }, { status: 403 })
+
+    // Block submit if subtasks are incomplete
+    const { data: subtasks } = await supabase
+      .from('tasks').select('id, status, parent_task_id').eq('parent_task_id', id)
+    if (subtasks && subtasks.length > 0) {
+      const incomplete = subtasks.filter((s: any) => s.status !== 'completed')
+      if (incomplete.length > 0) {
+        return NextResponse.json({
+          error: `Complete all subtasks first — ${incomplete.length} remaining`,
+          code: 'SUBTASKS_INCOMPLETE',
+        }, { status: 422 })
+      }
+    }
+
     await supabase.from('tasks').update({ approval_status: 'pending', status: 'in_review' }).eq('id', id)
 
     // Notify designated approver if set, otherwise all managers

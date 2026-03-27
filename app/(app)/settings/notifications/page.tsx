@@ -10,7 +10,7 @@ export default async function NotificationsPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
-  const { data: mb } = await supabase.from('org_members').select('org_id').eq('user_id', user.id).eq('is_active', true).single()
+  const { data: mb } = await supabase.from('org_members').select('org_id').eq('user_id', user.id).eq('is_active', true).maybeSingle()
   if (!mb) redirect('/onboarding')
 
   const { data: prefs } = await supabase.from('notification_preferences')

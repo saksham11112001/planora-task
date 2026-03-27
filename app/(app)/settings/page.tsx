@@ -28,7 +28,7 @@ export default async function SettingsPage() {
   const { data: mb } = await supabase
     .from('org_members')
     .select('role, org_id, organisations(name, plan_tier)')
-    .eq('user_id', user.id).eq('is_active', true).single()
+    .eq('user_id', user.id).eq('is_active', true).maybeSingle()
   if (!mb) redirect('/onboarding')
 
   const isAdmin = ['owner', 'admin'].includes(mb.role)

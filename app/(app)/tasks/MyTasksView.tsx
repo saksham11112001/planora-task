@@ -86,20 +86,24 @@ export function MyTasksView({ tasks: initialTasks, members, clients, currentUser
       return
     }
 
-    // Needs approval → submit for review
+    // Needs approval → check subtasks first, then submit for review
     if (task.approval_required) {
       setCompleting(p => new Set(p).add(task.id))
-      setTasks(prev => prev.map(t => t.id === task.id
-        ? { ...t, status: 'in_review', approval_status: 'pending' } : t))
-      setSelTask(prev => prev?.id === task.id
-        ? { ...prev, status: 'in_review', approval_status: 'pending' } : prev)
       const res = await fetch(`/api/tasks/${task.id}/approve`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ decision: 'submit' }),
       })
       setCompleting(p => { const s=new Set(p); s.delete(task.id); return s })
-      if (res.ok) toast.success('Submitted for approval ✓')
-      else toast.error('Could not submit — please try again')
+      if (res.ok) {
+        setTasks(prev => prev.map(t => t.id === task.id
+          ? { ...t, status: 'in_review', approval_status: 'pending' } : t))
+        setSelTask(prev => prev?.id === task.id
+          ? { ...prev, status: 'in_review', approval_status: 'pending' } : prev)
+        toast.success('Submitted for approval ✓')
+      } else {
+        const d = await res.json().catch(() => ({}))
+        toast.error(d.error ?? 'Could not submit — please try again')
+      }
       refresh(); return
     }
 

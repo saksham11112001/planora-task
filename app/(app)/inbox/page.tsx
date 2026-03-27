@@ -13,7 +13,7 @@ export default async function InboxPage() {
   if (!user) redirect('/login')
 
   const { data: mb } = await supabase.from('org_members')
-    .select('org_id, role').eq('user_id', user.id).eq('is_active', true).single()
+    .select('org_id, role').eq('user_id', user.id).eq('is_active', true).maybeSingle()
   if (!mb) redirect('/onboarding')
 
   // Fetch tasks NOT in any project — no clients() join

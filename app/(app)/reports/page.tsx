@@ -7,7 +7,6 @@ import type { Metadata }  from 'next'
 
 export const dynamic = 'force-dynamic'
 export const metadata: Metadata = { title: 'Reports' }
-export const revalidate = 60
 
 export default async function ReportsPage() {
   const supabase = await createClient()
@@ -15,7 +14,7 @@ export default async function ReportsPage() {
   if (!user) redirect('/login')
 
   const { data: mb } = await supabase
-    .from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).single()
+    .from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).maybeSingle()
   if (!mb) redirect('/onboarding')
 
   const orgId  = mb.org_id

@@ -139,7 +139,22 @@ export function RecurringView({ tasks: initialTasks, members, projects, clients,
   return (
     <div className="page-container">
       <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>Recurring tasks</h1>
+        <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 0 }}>Recurring tasks</h1>
+          {clients.length > 0 && (
+            <select value={clientFilter} onChange={e => setClientFilter(e.target.value)}
+              style={{ padding:'5px 10px', borderRadius:20, fontSize:12, cursor:'pointer', outline:'none',
+                border: clientFilter ? '1px solid var(--brand)' : '1px solid var(--border)',
+                background: clientFilter ? 'rgba(13,148,136,0.08)' : 'var(--surface-subtle)',
+                color: clientFilter ? 'var(--brand)' : 'var(--text-secondary)',
+                fontWeight: clientFilter ? 600 : 400, fontFamily:'inherit', appearance:'none', paddingRight:20 }}>
+              <option value=''>All clients</option>
+              {clients.map(cl => <option key={cl.id} value={cl.id}>{cl.name}</option>)}
+            </select>
+          )}
+          {clientFilter && <button onClick={() => setClientFilter('')}
+            style={{ fontSize:11, color:'var(--text-muted)', background:'none', border:'none', cursor:'pointer' }}>✕ Clear</button>}
+        </div>
         <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>{localTasks.length} active · instances spawn automatically each morning at 7 AM IST</p>
       </div>
 

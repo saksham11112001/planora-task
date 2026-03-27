@@ -151,17 +151,23 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
     // Needs approval → submit for review
     if (task.approval_required) {
       setCompleting(p => new Set(p).add(task.id))
-      setLocalTasks(prev => prev.map(t => t.id === task.id
-        ? { ...t, status: 'in_review', approval_status: 'pending' } : t))
-      setSelectedTask(prev => prev?.id === task.id
-        ? { ...prev, status: 'in_review', approval_status: 'pending' } : prev)
+      // Call API FIRST - it will check subtasks before allowing submission
       const res = await fetch(`/api/tasks/${task.id}/approve`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ decision: 'submit' }),
       })
       setCompleting(p => { const s = new Set(p); s.delete(task.id); return s })
-      if (res.ok) toast.success('Submitted for approval ✓')
-      else toast.error('Could not submit — please try again')
+      if (res.ok) {
+        // Only update UI after API confirms success
+        setLocalTasks(prev => prev.map(t => t.id === task.id
+          ? { ...t, status: 'in_review', approval_status: 'pending' } : t))
+        setSelectedTask(prev => prev?.id === task.id
+          ? { ...prev, status: 'in_review', approval_status: 'pending' } : prev)
+        toast.success('Submitted for approval ✓')
+      } else {
+        const d = await res.json().catch(() => ({}))
+        toast.error(d.error ?? 'Could not submit — please try again')
+      }
       startT(() => router.refresh()); return
     }
 
@@ -228,7 +234,22 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {/* Header */}
         <div style={{ padding: '20px 24px 14px', background:'var(--surface)', borderBottom:'1px solid var(--border)', flexShrink: 0 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 700, color:'var(--text-primary)', marginBottom: 4 }}>One-time tasks</h1>
+          <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+            <h1 style={{ fontSize: 22, fontWeight: 700, color:'var(--text-primary)', marginBottom: 0 }}>One-time tasks</h1>
+            {clients && clients.length > 0 && (
+              <select value={clientFilter} onChange={e => setClientFilter(e.target.value)}
+                style={{ padding:'5px 10px', borderRadius:20, fontSize:12, cursor:'pointer', outline:'none',
+                  border: clientFilter ? '1px solid var(--brand)' : '1px solid var(--border)',
+                  background: clientFilter ? 'rgba(13,148,136,0.08)' : 'var(--surface-subtle)',
+                  color: clientFilter ? 'var(--brand)' : 'var(--text-secondary)',
+                  fontWeight: clientFilter ? 600 : 400, fontFamily:'inherit', appearance:'none', paddingRight:20 }}>
+                <option value=''>All clients</option>
+                {clients.map(cl => <option key={cl.id} value={cl.id}>{cl.name}</option>)}
+              </select>
+            )}
+            {clientFilter && <button onClick={() => setClientFilter('')}
+              style={{ fontSize:11, color:'var(--text-muted)', background:'none', border:'none', cursor:'pointer' }}>✕ Clear</button>}
+          </div>
           <p style={{ fontSize: 13, color:'var(--text-secondary)' }}>
             {visibleTasks.length} task{visibleTasks.length !== 1 ? 's' : ''}
               {clientFilter && <> · filtered by client</>}

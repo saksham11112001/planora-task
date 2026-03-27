@@ -10,7 +10,7 @@ export default async function BillingPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
-  const { data: mb } = await supabase.from('org_members').select('org_id, role, organisations(name, plan_tier, status, subscription_id)').eq('user_id', user.id).eq('is_active', true).single()
+  const { data: mb } = await supabase.from('org_members').select('org_id, role, organisations(name, plan_tier, status, subscription_id)').eq('user_id', user.id).eq('is_active', true).maybeSingle()
   if (!mb || !['owner','admin'].includes(mb.role)) redirect('/settings')
   const org = mb.organisations as any
   return (
