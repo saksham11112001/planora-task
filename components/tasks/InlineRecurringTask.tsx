@@ -146,6 +146,14 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, edit
     } finally { setSaving(false) }
   }
 
+  function handleComplianceSelect(task: import('@/lib/data/complianceTasks').ComplianceTask) {
+    setTitle(task.title)
+    setPriority(task.priority)
+    setCompSubtasks(task.subtasks)
+    setOpen(true)
+    setTimeout(() => inputRef.current?.focus(), 50)
+  }
+
   const priConf = PRIORITY_OPTIONS.find(p => p.value === priority) ?? PRIORITY_OPTIONS[2]
 
   if (!open) {
