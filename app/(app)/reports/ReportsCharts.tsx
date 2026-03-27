@@ -16,6 +16,7 @@ interface EmployeeStat {
 }
 
 interface Props {
+  clients?:       { id: string; name: string; color: string }[]
   currentUserId?: string
   userRole?:      string
   clients?:       { id: string; name: string; color: string }[]
@@ -218,7 +219,7 @@ function MetricRow({ label, value, color, bar, barColor }: {
   )
 }
 
-export function ReportsCharts({ dailyData, memberData, priorityData, projectData, timeByProject, employeeStats, currentUserId, userRole, clients = [] }: Props & { clients?: {id:string;name:string;color:string}[] }) {
+export function ReportsCharts({ dailyData, memberData, priorityData, projectData, timeByProject, employeeStats, currentUserId, userRole, clients = [] }: Props) {
   const [activeTab,    setActiveTab]    = useState<'overview' | 'employees'>('overview')
   const [clientFilter, setClientFilter] = useState('')
   const [timeline,     setTimeline]     = useState<'30' | '60' | '90' | '365'>('90')

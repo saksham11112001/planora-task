@@ -15,7 +15,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const { data: task } = await supabase
     .from('tasks')
-    .select('id, assignee_id, approver_id, org_id, approval_required, approval_status, status, parent_task_id')
+    .select('id, assignee_id, approver_id, org_id, approval_required, approval_status, status, parent_task_id, custom_fields')
     .eq('id', id).eq('org_id', mb.org_id).single()
   if (!task) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
@@ -46,15 +46,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
   }
 
-  // Block completing a SUBTASK if no attachment uploaded
+  // Block completing a COMPLIANCE SUBTASK if no attachment uploaded
+  // Only applies to subtasks flagged with { _compliance_subtask: true } in custom_fields
   if (body.status === 'completed' && task.parent_task_id) {
-    const { data: attachments } = await supabase
-      .from('task_attachments').select('id').eq('task_id', id).limit(1)
-    if (!attachments || attachments.length === 0) {
-      return NextResponse.json({
-        error: `Upload the required document before marking this subtask complete`,
-        code: 'ATTACHMENT_REQUIRED',
-      }, { status: 422 })
+    const isComplianceSubtask = (task as any).custom_fields?._compliance_subtask === true
+    if (isComplianceSubtask) {
+      const { data: attachments } = await supabase
+        .from('task_attachments').select('id').eq('task_id', id).limit(1)
+      if (!attachments || attachments.length === 0) {
+        return NextResponse.json({
+          error: `Upload the required document before marking this compliance subtask complete`,
+          code: 'ATTACHMENT_REQUIRED',
+        }, { status: 422 })
+      }
     }
   }
 

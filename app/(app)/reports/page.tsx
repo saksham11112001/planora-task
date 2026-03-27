@@ -27,6 +27,7 @@ export default async function ReportsPage() {
     { data: timeLogs },
     { data: projects },
     { data: members },
+    { data: clients },
   ] = await Promise.all([
     supabase.from('tasks')
       .select('id, title, status, priority, due_date, assignee_id, created_at, completed_at, project_id')
@@ -208,7 +209,7 @@ export default async function ReportsPage() {
           timeByProject={timeByProject}
           employeeStats={employeeStats}
           currentUserId={user.id}
-      clients={clients ?? []}
+          clients={clients ?? []}
           userRole={mb.role}
         />
       </div>
