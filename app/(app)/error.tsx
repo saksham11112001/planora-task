@@ -1,17 +1,17 @@
 'use client'
 import { useEffect } from 'react'
-import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
 
 export default function AppError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
-  const router = useRouter()
   useEffect(() => { console.error('[App Error]', error) }, [error])
 
-  async function handleLogout() {
-    const sb = createClient()
-    await sb.auth.signOut()
-    router.push('/login')
+  async function signOut() {
+    try {
+      const { createClient } = await import('@/lib/supabase/client')
+      const sb = createClient()
+      await sb.auth.signOut()
+    } finally {
+      window.location.href = '/login'
+    }
   }
 
   return (
@@ -23,30 +23,25 @@ export default function AppError({ error, reset }: { error: Error & { digest?: s
           Something went wrong
         </h1>
         <p style={{ fontSize: 14, color: '#64748b', marginBottom: 8, lineHeight: 1.6 }}>
-          An unexpected error occurred loading your workspace.
+          Your workspace couldn't load. This is usually fixed by signing out and back in.
         </p>
         {error.digest && (
           <p style={{ fontFamily: 'monospace', fontSize: 11, color: '#94a3b8', marginBottom: 24 }}>
             Ref: {error.digest}
           </p>
         )}
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 16 }}>
-          <button onClick={reset}
-            style={{ background: '#0d9488', color: '#fff', border: 'none', padding: '9px 20px',
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+          <button onClick={signOut}
+            style={{ background: '#0d9488', color: '#fff', border: 'none', padding: '10px 24px',
               borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+            Sign out and sign back in
+          </button>
+          <button onClick={reset}
+            style={{ background: '#f1f5f9', color: '#374151', border: '1px solid #e2e8f0',
+              padding: '10px 20px', borderRadius: 8, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }}>
             Try again
           </button>
-          <Link href="/dashboard"
-            style={{ background: '#f1f5f9', color: '#374151', border: '1px solid #e2e8f0', padding: '9px 20px',
-              borderRadius: 8, fontSize: 14, fontWeight: 500, textDecoration: 'none', display: 'inline-block' }}>
-            Go to dashboard
-          </Link>
         </div>
-        <button onClick={handleLogout}
-          style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: 13,
-            cursor: 'pointer', textDecoration: 'underline', fontFamily: 'inherit' }}>
-          Sign out and sign back in
-        </button>
       </div>
     </div>
   )

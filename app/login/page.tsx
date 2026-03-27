@@ -1,6 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 
@@ -18,33 +17,10 @@ function GoogleIcon() {
 }
 
 export default function LoginPage() {
-  const router = useRouter()
-  const [mode,     setMode]     = useState<Mode>('choose')
-  const [email,    setEmail]    = useState('')
-  const [loading,  setLoading]  = useState(false)
-  const [checking, setChecking] = useState(true)
-  const [error,    setError]    = useState('')
-
-  // Auto-redirect if already logged in
-  useEffect(() => {
-    const supabase = createClient()
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        router.replace('/dashboard')
-      } else {
-        setChecking(false)
-      }
-    })
-
-    // Also listen for auth state changes (handles callback redirect)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN' && session?.user) {
-        router.replace('/dashboard')
-      }
-    })
-
-    return () => subscription.unsubscribe()
-  }, [router])
+  const [mode,    setMode]    = useState<Mode>('choose')
+  const [email,   setEmail]   = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error,   setError]   = useState('')
 
   async function handleGoogle() {
     if (loading) return
@@ -59,8 +35,7 @@ export default function LoginPage() {
         },
       })
       if (e) { setError('Google sign-in failed: ' + e.message); setLoading(false) }
-      // Don't setLoading(false) on success — page will redirect
-    } catch (err: any) {
+    } catch {
       setError('Something went wrong. Please try again.')
       setLoading(false)
     }
@@ -80,21 +55,10 @@ export default function LoginPage() {
     setMode('magic_sent')
   }
 
-  // Show minimal loading state while checking session
-  if (checking) {
-    return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'linear-gradient(135deg, #0f172a 0%, #134e4a 60%, #0d9488 100%)' }}>
-        <div style={{ width: 32, height: 32, border: '3px solid rgba(255,255,255,0.2)',
-          borderTopColor: '#0d9488', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }}/>
-        <style dangerouslySetInnerHTML={{ __html: '@keyframes spin{to{transform:rotate(360deg)}}' }}/>
-      </div>
-    )
-  }
-
   return (
     <div style={{
-      minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 16px',
+      minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: '24px 16px',
       background: 'linear-gradient(135deg, #0f172a 0%, #134e4a 60%, #0d9488 100%)',
       fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
     }}>
@@ -103,7 +67,8 @@ export default function LoginPage() {
         {/* Brand */}
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
           <Link href="/" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-            <div style={{ width: 40, height: 40, borderRadius: 11, background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: 18 }}>P</div>
+            <div style={{ width: 40, height: 40, borderRadius: 11, background: 'rgba(255,255,255,0.15)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: 18 }}>P</div>
             <span style={{ color: '#fff', fontWeight: 700, fontSize: 22, letterSpacing: '-0.5px' }}>Planora</span>
           </Link>
           <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14, marginTop: 4 }}>Project management for modern teams</p>
@@ -112,7 +77,7 @@ export default function LoginPage() {
         {/* Card */}
         <div style={{ background: '#fff', borderRadius: 18, padding: '36px 32px', boxShadow: '0 25px 60px rgba(0,0,0,0.3)' }}>
 
-          {/* ── Magic link sent ── */}
+          {/* Magic link sent */}
           {mode === 'magic_sent' && (
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: 48, marginBottom: 16 }}>📬</div>
@@ -121,48 +86,56 @@ export default function LoginPage() {
                 We sent a sign-in link to <strong style={{ color: '#0f172a' }}>{email}</strong>.<br/>
                 Click the link in the email to continue.
               </p>
-              <p style={{ fontSize: 12, color: '#94a3b8' }}>Didn't get it? Check spam or{' '}
-                <button onClick={() => { setMode('magic'); setError('') }} style={{ color: '#0d9488', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, textDecoration: 'underline' }}>try again</button>
+              <p style={{ fontSize: 12, color: '#94a3b8' }}>
+                Didn't get it? Check spam or{' '}
+                <button onClick={() => { setMode('magic'); setError('') }}
+                  style={{ color: '#0d9488', background: 'none', border: 'none', cursor: 'pointer',
+                    fontSize: 12, fontWeight: 600, textDecoration: 'underline' }}>
+                  try again
+                </button>
               </p>
             </div>
           )}
 
-          {/* ── Choose method ── */}
+          {/* Choose method */}
           {mode === 'choose' && (
             <>
               <h1 style={{ fontSize: 20, fontWeight: 700, color: '#0f172a', marginBottom: 4 }}>Welcome to Planora</h1>
               <p style={{ fontSize: 14, color: '#64748b', marginBottom: 24 }}>Sign in or create your free workspace</p>
 
               {error && (
-                <div style={{ marginBottom: 16, padding: '10px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, fontSize: 13, color: '#dc2626' }}>
+                <div style={{ marginBottom: 16, padding: '10px 14px', background: '#fef2f2',
+                  border: '1px solid #fecaca', borderRadius: 8, fontSize: 13, color: '#dc2626' }}>
                   {error}
                 </div>
               )}
 
-              {/* Google */}
               <button onClick={handleGoogle} disabled={loading}
-                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
-                  padding: '13px 16px', border: '1.5px solid #e2e8f0', borderRadius: 10, fontSize: 14, fontWeight: 500,
-                  color: '#374151', background: loading ? '#f8fafc' : '#fff', cursor: loading ? 'not-allowed' : 'pointer',
-                  marginBottom: 12, transition: 'all 0.15s', opacity: loading ? 0.7 : 1 }}>
+                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  gap: 12, padding: '13px 16px', border: '1.5px solid #e2e8f0', borderRadius: 10,
+                  fontSize: 14, fontWeight: 500, color: '#374151',
+                  background: loading ? '#f8fafc' : '#fff',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  marginBottom: 12, transition: 'all 0.15s', opacity: loading ? 0.7 : 1,
+                  fontFamily: 'inherit' }}>
                 {loading
-                  ? <div style={{ width: 18, height: 18, border: '2px solid #e2e8f0', borderTopColor: '#0d9488', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }}/>
+                  ? <div style={{ width: 18, height: 18, border: '2px solid #e2e8f0',
+                      borderTopColor: '#0d9488', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }}/>
                   : <GoogleIcon />}
                 {loading ? 'Connecting...' : 'Continue with Google'}
               </button>
 
-              {/* Divider */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '16px 0' }}>
                 <div style={{ flex: 1, height: 1, background: '#e2e8f0' }}/>
                 <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 500 }}>or</span>
                 <div style={{ flex: 1, height: 1, background: '#e2e8f0' }}/>
               </div>
 
-              {/* Magic link */}
               <button onClick={() => { setMode('magic'); setError('') }}
-                style={{ width: '100%', padding: '13px 16px', border: '1.5px solid #e2e8f0', borderRadius: 10,
-                  fontSize: 14, fontWeight: 500, color: '#374151', background: '#fff', cursor: 'pointer',
-                  transition: 'all 0.15s' }}>
+                style={{ width: '100%', padding: '13px 16px', border: '1.5px solid #e2e8f0',
+                  borderRadius: 10, fontSize: 14, fontWeight: 500, color: '#374151',
+                  background: '#fff', cursor: 'pointer', transition: 'all 0.15s',
+                  fontFamily: 'inherit' }}>
                 ✉ Continue with email link
               </button>
 
@@ -174,11 +147,13 @@ export default function LoginPage() {
             </>
           )}
 
-          {/* ── Magic link form ── */}
+          {/* Magic link form */}
           {mode === 'magic' && (
             <>
               <button onClick={() => { setMode('choose'); setError('') }}
-                style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 13, padding: 0, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 4 }}>
+                style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer',
+                  fontSize: 13, padding: 0, marginBottom: 20, display: 'flex', alignItems: 'center',
+                  gap: 4, fontFamily: 'inherit' }}>
                 ← Back
               </button>
 
@@ -186,7 +161,8 @@ export default function LoginPage() {
               <p style={{ fontSize: 14, color: '#64748b', marginBottom: 24 }}>We'll send you a magic link — no password needed</p>
 
               {error && (
-                <div style={{ marginBottom: 16, padding: '10px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, fontSize: 13, color: '#dc2626' }}>
+                <div style={{ marginBottom: 16, padding: '10px 14px', background: '#fef2f2',
+                  border: '1px solid #fecaca', borderRadius: 8, fontSize: 13, color: '#dc2626' }}>
                   {error}
                 </div>
               )}
@@ -195,16 +171,18 @@ export default function LoginPage() {
                 <input
                   type="email" value={email} onChange={e => setEmail(e.target.value)}
                   placeholder="you@company.com" required autoFocus
-                  style={{ width: '100%', padding: '12px 14px', border: '1.5px solid #e2e8f0', borderRadius: 10,
-                    fontSize: 14, color: '#0f172a', outline: 'none', marginBottom: 12, boxSizing: 'border-box',
-                    transition: 'border-color 0.15s' }}
+                  style={{ width: '100%', padding: '12px 14px', border: '1.5px solid #e2e8f0',
+                    borderRadius: 10, fontSize: 14, color: '#0f172a', outline: 'none',
+                    marginBottom: 12, boxSizing: 'border-box', transition: 'border-color 0.15s' }}
                   onFocus={e => e.target.style.borderColor = '#0d9488'}
                   onBlur={e => e.target.style.borderColor = '#e2e8f0'}
                 />
                 <button type="submit" disabled={loading}
-                  style={{ width: '100%', padding: '13px 16px', background: loading ? '#94a3b8' : '#0d9488',
+                  style={{ width: '100%', padding: '13px 16px',
+                    background: loading ? '#94a3b8' : '#0d9488',
                     color: '#fff', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 600,
-                    cursor: loading ? 'not-allowed' : 'pointer', transition: 'background 0.15s' }}>
+                    cursor: loading ? 'not-allowed' : 'pointer', transition: 'background 0.15s',
+                    fontFamily: 'inherit' }}>
                   {loading ? 'Sending...' : 'Send magic link →'}
                 </button>
               </form>
