@@ -374,9 +374,9 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                     {/* Title + meta */}
                     <div style={{ minWidth: 0, paddingRight: 8 }}>
                       <p style={{
-                        fontSize: 13.5, fontWeight: 500, overflow: 'hidden',
+                        fontSize: 13.5, fontWeight: 600, overflow: 'hidden',
                         whiteSpace: 'nowrap', textOverflow: 'ellipsis',
-                        color: isComp ? '#94a3b8' : ov ? '#b91c1c' : '#0f172a',
+                        color: isComp ? 'var(--text-muted)' : ov ? '#f87171' : 'var(--text-primary)',
                         textDecoration: isComp ? 'line-through' : 'none',
                       }}>{task.title}</p>
                       {(client || assignee || task.approval_status) && (
@@ -409,7 +409,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
 
                     {/* Due date */}
                     <div className="hide-mobile" style={{ textAlign: 'center', fontSize: 12,
-                      color: ov ? '#dc2626' : task.due_date === today ? '#0d9488' : '#94a3b8',
+                      color: ov ? '#f87171' : task.due_date === today ? 'var(--brand)' : 'var(--text-muted)',
                       fontWeight: ov || task.due_date === today ? 600 : 400 }}>
                       {task.due_date ? fmtDate(task.due_date) : '—'}
                     </div>
@@ -435,8 +435,8 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                           style={{
                             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3,
                             padding: '2px 6px', borderRadius: 6, border: 'none',
-                            background: hasUndone ? '#fffbeb' : isExpanded ? 'var(--brand-light)' : 'transparent',
-                            color: hasUndone ? '#92400e' : isExpanded ? 'var(--brand)' : 'var(--text-muted)',
+                            background: hasUndone ? 'var(--warning-surface, #fffbeb)' : isExpanded ? 'var(--brand-light)' : 'transparent',
+                            color: hasUndone ? 'var(--brand-amber, #d97706)' : isExpanded ? 'var(--brand)' : 'var(--text-muted)',
                             fontSize: 10, fontWeight: 600, cursor: 'pointer',
                           }}
                           title={subs.length ? `${subsDone}/${subs.length} subtasks` : 'Add subtasks'}>
@@ -518,7 +518,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                             )}
                           </button>
                           <span style={{
-                            flex: 1, fontSize: 12,
+                            flex: 1, fontSize: 12, fontWeight: sub.status === 'completed' ? 400 : 500,
                             color: sub.status === 'completed' ? 'var(--text-muted)' : 'var(--text-primary)',
                             textDecoration: sub.status === 'completed' ? 'line-through' : 'none',
                           }}>{sub.title}</span>

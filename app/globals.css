@@ -404,6 +404,8 @@ button:focus:not(:focus-visible), a:focus:not(:focus-visible) { outline: none; }
    DARK MODE — all token overrides under html.dark
    ══════════════════════════════════════════════════════════════════ */
 html.dark {
+  --brand-amber:        #fbbf24;
+  --warning-surface:   #2d2010;
   --overdue-surface:    #2d1515;
   --overdue-border:     #7f1d1d;
   --pending-surface:   #1e1535;
