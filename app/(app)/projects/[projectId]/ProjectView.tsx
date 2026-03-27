@@ -31,6 +31,9 @@ const BOARD_COLS = [
 export function ProjectView({ project, tasks, members, clients, defaultClientId, projectOwnerId, canManage, currentUserId, userRole, totalHours, billableHours }: Props) {
   const router = useRouter()
   const [tab,          setTab]          = useState<ViewTab>('list')
+  const [clientFilter, setClientFilter] = useState('')
+
+  const visibleTasks = clientFilter ? tasks.filter(t => (t as any).client?.id === clientFilter || t.client_id === clientFilter) : tasks
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [checked,      setChecked]      = useState<Set<string>>(new Set())
   const [completing,   setCompleting]   = useState<Set<string>>(new Set())
