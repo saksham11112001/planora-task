@@ -4,6 +4,8 @@ import Link              from 'next/link'
 import { Plus, Users2 }  from 'lucide-react'
 import type { Metadata } from 'next'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata: Metadata = { title: 'Clients' }
 export const revalidate = 20
 

@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect }     from 'next/navigation'
 import { SettingsClient } from './SettingsClient'
 import type { Metadata }  from 'next'
+
+export const dynamic = 'force-dynamic'
 export const metadata: Metadata = { title: 'Settings' }
 export const revalidate = 20
 

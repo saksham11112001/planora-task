@@ -4,6 +4,8 @@ import { ReportsCharts }  from './ReportsCharts'
 import { ReportsExport }  from './ReportsExport'
 import { fmtHours }       from '@/lib/utils/format'
 import type { Metadata }  from 'next'
+
+export const dynamic = 'force-dynamic'
 export const metadata: Metadata = { title: 'Reports' }
 export const revalidate = 60
 

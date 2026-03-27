@@ -1,6 +1,8 @@
 import { createClient }  from '@/lib/supabase/server'
 import { redirect }      from 'next/navigation'
 import { TeamView }      from './TeamView'
+
+export const dynamic = 'force-dynamic'
 export const revalidate = 20
 
 export default async function TeamPage() {

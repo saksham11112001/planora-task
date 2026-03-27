@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect }     from 'next/navigation'
 import { CalendarView } from './CalendarView'
 import type { Metadata } from 'next'
+
+export const dynamic = 'force-dynamic'
 export const metadata: Metadata = { title: 'Calendar' }
 export const revalidate = 30
 

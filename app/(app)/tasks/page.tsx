@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect }     from 'next/navigation'
 import { MyTasksView }  from './MyTasksView'
 import type { Metadata } from 'next'
+
+export const dynamic = 'force-dynamic'
 export const metadata: Metadata = { title: 'My tasks' }
 
 export const revalidate = 15
@@ -16,6 +18,9 @@ export default async function MyTasksPage() {
   if (!mb) redirect('/onboarding')
 
   // Fetch tasks assigned to me — NO clients() join to avoid FK issues
+  const { data: clients } = await supabase
+    .from('clients').select('id, name, color').eq('org_id', mb.org_id).eq('status', 'active').order('name')
+
   const { data: tasks } = await supabase.from('tasks')
     .select('id, title, description, status, priority, due_date, assignee_id, client_id, project_id, approval_status, approval_required, estimated_hours, is_recurring, assignee:users!tasks_assignee_id_fkey(id, name), projects(id, name, color)')
     .eq('org_id', mb.org_id).eq('assignee_id', user.id).neq('status', 'completed').neq('is_archived', true).is('parent_task_id', null)

@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect }      from 'next/navigation'
 import { ImportView }    from './ImportView'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata = { title: 'Bulk Import — Planora' }
 
 export default async function ImportPage() {

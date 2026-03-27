@@ -2,6 +2,8 @@ import { createClient }  from '@/lib/supabase/server'
 import { redirect }      from 'next/navigation'
 import { ProfileForm }   from './ProfileForm'
 import type { Metadata } from 'next'
+
+export const dynamic = 'force-dynamic'
 export const metadata: Metadata = { title: 'My profile' }
 
 export const revalidate = 20

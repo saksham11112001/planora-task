@@ -2,6 +2,8 @@ import { createClient }  from '@/lib/supabase/server'
 import { redirect }      from 'next/navigation'
 import { TimeView }      from './TimeView'
 import type { Metadata } from 'next'
+
+export const dynamic = 'force-dynamic'
 export const metadata: Metadata = { title: 'Time tracking' }
 
 export const revalidate = 20

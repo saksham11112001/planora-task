@@ -5,6 +5,8 @@ import { Plus, FolderOpen, CheckSquare, Clock } from 'lucide-react'
 import { ProjectStatusBadge } from '@/components/ui/Badge'
 import { fmtDate }            from '@/lib/utils/format'
 import type { Metadata }      from 'next'
+
+export const dynamic = 'force-dynamic'
 export const metadata: Metadata = { title: 'Projects' }
 export const revalidate = 20
 
