@@ -8,6 +8,7 @@ export const metadata: Metadata = { title: 'One-time tasks' }
 
 
 export default async function InboxPage() {
+  try {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -47,4 +48,8 @@ export default async function InboxPage() {
   }))
 
   return <InboxView tasks={enriched as any} members={memberList} clients={clientList} currentUserId={user.id} userRole={mb.role} canCreate={canCreate}/>
+  } catch (err: any) {
+    console.error('[InboxPage crash]', err?.message ?? err)
+    throw err
+  }
 }

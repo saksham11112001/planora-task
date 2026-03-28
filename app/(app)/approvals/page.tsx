@@ -7,6 +7,7 @@ export const dynamic   = 'force-dynamic'
 export const metadata: Metadata = { title: 'Approvals | Planora' }
 
 export default async function ApprovalsPage() {
+  try {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -95,4 +96,8 @@ export default async function ApprovalsPage() {
       userRole={mb.role}
     />
   )
+  } catch (err: any) {
+    console.error('[ApprovalsPage crash]', err?.message ?? err)
+    throw err
+  }
 }

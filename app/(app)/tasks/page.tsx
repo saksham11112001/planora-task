@@ -8,6 +8,7 @@ export const metadata: Metadata = { title: 'My tasks' }
 
 
 export default async function MyTasksPage() {
+  try {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -33,7 +34,7 @@ export default async function MyTasksPage() {
   // Fetch tasks where this user is the designated approver AND they are in_review
   // For managers with no specific approver set, fetch all org tasks in_review
   const isManager = ['owner','admin','manager'].includes(mb.role)
-  const { data: approvalTasks } = await supabase.from('tasks')
+  const { data: approvalTasks, error: approvalError } = await supabase.from('tasks')
     .select('id, title, description, status, priority, due_date, assignee_id, approver_id, client_id, project_id, approval_status, approval_required, estimated_hours, is_recurring, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), projects(id, name, color)')
     .eq('org_id', mb.org_id)
     .eq('status', 'in_review')
@@ -41,6 +42,7 @@ export default async function MyTasksPage() {
     .neq('is_archived', true)
     .is('parent_task_id', null)
     .order('due_date', { ascending: true, nullsFirst: false })
+  if (approvalError) console.error('[approvalTasks]', approvalError.message)
 
   const { data: members } = await supabase.from('org_members')
     .select('user_id, users(id, name)').eq('org_id', mb.org_id).eq('is_active', true)
@@ -87,4 +89,8 @@ export default async function MyTasksPage() {
     }))
 
   return <MyTasksView tasks={taskList as any} pendingApprovalTasks={approvalList as any} members={memberList} clients={clientList} currentUserId={user.id} userRole={mb.role}/>
+  } catch (err: any) {
+    console.error('[MyTasksPage crash]', err?.message ?? err)
+    throw err  // re-throw so error boundary catches it
+  }
 }

@@ -8,6 +8,7 @@ export const metadata: Metadata = { title: 'Recurring tasks' }
 
 
 export default async function RecurringPage() {
+  try {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -32,4 +33,8 @@ export default async function RecurringPage() {
       tasks={(tasks ?? []).map(t => ({ ...t, assignee: (t.assignee as any) ?? null, project: (t.projects as any) ?? null, client: (t.clients as any) ?? null }))}
       members={memberList} projects={projects ?? []} clients={clients ?? []} currentUserId={user.id} canManage={canManage}/>
   )
+  } catch (err: any) {
+    console.error('[RecurringPage crash]', err?.message ?? err)
+    throw err
+  }
 }

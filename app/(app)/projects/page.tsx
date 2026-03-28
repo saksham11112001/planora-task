@@ -7,6 +7,7 @@ export const dynamic = 'force-dynamic'
 export const metadata: Metadata = { title: 'Projects' }
 
 export default async function ProjectsPage() {
+  try {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -38,4 +39,8 @@ export default async function ProjectsPage() {
       canManage={['owner','admin','manager'].includes(mb.role)}
     />
   )
+  } catch (err: any) {
+    console.error('[ProjectsPage crash]', err?.message ?? err)
+    throw err
+  }
 }

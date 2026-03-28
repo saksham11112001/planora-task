@@ -4,7 +4,7 @@ import { CustomFieldsPanel } from '@/components/tasks/CustomFieldsPanel'
 import type { CustomFieldDef } from '@/components/tasks/CustomFieldsPanel'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { X, ThumbsUp, ThumbsDown, Flag, Calendar, User, Briefcase, Send, Clock, Sparkles } from 'lucide-react'
+import { X, ThumbsUp, ThumbsDown, Flag, Calendar, User, Briefcase, Send, Clock, Sparkles, ShieldCheck } from 'lucide-react'
 import { cn }             from '@/lib/utils/cn'
 import { PRIORITY_CONFIG, STATUS_CONFIG } from '@/types'
 import type { Task }      from '@/types'
@@ -60,6 +60,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
   const [uploading,     setUploading]     = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [aiLoading, setAiLoading] = useState(false)
+  const [isSaving,  setIsSaving]  = useState(false)
   const titleRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
@@ -99,6 +100,14 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     titleRef.current.style.height = titleRef.current.scrollHeight + 'px'
   }, [title])
 
+  /* Clear pending save timers when panel closes */
+  useEffect(() => {
+    if (!task && saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current)
+      saveTimerRef.current = null
+    }
+  }, [task])
+
   /* Escape to close */
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -106,7 +115,6 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     return () => window.removeEventListener('keydown', h)
   }, [onClose])
 
-  const [isSaving, setIsSaving] = useState(false)
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   /* generic PATCH helper — fires and forgets UI state; rolls back on fail */
@@ -131,9 +139,10 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
 
   /* debounced patch — for text fields that change frequently */
   const patchDebounced = useCallback((fields: Record<string, unknown>, delay = 600) => {
+    if (!task) return  // guard: don't save if panel is closing
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
     saveTimerRef.current = setTimeout(() => patch(fields), delay)
-  }, [patch])
+  }, [patch, task])
 
   /* complete toggle */
   async function handleComplete() {
@@ -360,7 +369,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                 ref={titleRef}
                 value={title}
                 onChange={e => { setTitle(e.target.value); patchDebounced({ title: e.target.value }) }}
-                onBlur={() => { if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; if (title !== task.title) patch({ title }) } }}
+                onBlur={() => { if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; if (task && title !== task.title) patch({ title }) } }}
                 rows={1}
                 className={cn(
                   'w-full text-lg font-bold resize-none outline-none bg-transparent leading-snug',
@@ -371,7 +380,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
               <textarea
                 value={description}
                 onChange={e => { setDescription(e.target.value); patchDebounced({ description: e.target.value || null }, 800) }}
-                onBlur={() => { if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; if (description !== (task.description ?? '')) patch({ description: description || null }) } }}
+                onBlur={() => { if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; if (task && description !== (task.description ?? '')) patch({ description: description || null }) } }}
                 placeholder="Add a description..."
                 rows={3}
                 className="w-full mt-2 text-sm resize-none outline-none bg-transparent leading-relaxed"
