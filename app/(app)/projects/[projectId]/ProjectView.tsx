@@ -127,13 +127,17 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
 
   async function toggleSubDone(subId: string, status: string, parentId: string) {
     const newStatus = status === 'completed' ? 'todo' : 'completed'
-    // REQUIRED: check attachment before completing any subtask
+    // Only CA compliance subtasks require attachment — check custom_fields flag
     if (newStatus === 'completed') {
-      const attRes = await fetch(`/api/tasks/${subId}/attachments`)
-      const attData = await attRes.json().catch(() => ({ data: [] }))
-      if ((attData.data ?? []).length === 0) {
-        toast.error('📎 Please upload the required document before completing this subtask')
-        return
+      const sub = (subtaskData[parentId] ?? []).find((s: any) => s.id === subId)
+      const isComplianceSub = sub?.custom_fields?._compliance_subtask === true
+      if (isComplianceSub) {
+        const attRes = await fetch(`/api/tasks/${subId}/attachments`)
+        const attData = await attRes.json().catch(() => ({ data: [] }))
+        if ((attData.data ?? []).length === 0) {
+          toast.error('📎 Upload the required document before completing this CA compliance subtask')
+          return
+        }
       }
     }
     // Optimistic update on subtask

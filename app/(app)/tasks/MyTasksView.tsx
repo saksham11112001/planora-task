@@ -457,11 +457,12 @@ export function MyTasksView({ tasks: initialTasks, pendingApprovalTasks = [], me
                             <button onClick={async e => {
                               e.stopPropagation()
                               const newStatus = sub.status === 'completed' ? 'todo' : 'completed'
-                              if (newStatus === 'completed') {
+                              // Only CA compliance subtasks require attachment
+                              if (newStatus === 'completed' && sub.custom_fields?._compliance_subtask) {
                                 const ar = await fetch(`/api/tasks/${sub.id}/attachments`)
                                 const ad = await ar.json().catch(() => ({ data: [] }))
                                 if ((ad.data ?? []).length === 0) {
-                                  toast.error(`📎 Upload "${sub.title}" before marking complete`)
+                                  toast.error('📎 Upload the required document before completing this CA compliance subtask')
                                   return
                                 }
                               }

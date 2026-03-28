@@ -201,10 +201,27 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
 
   async function toggleSubtask(sub: any) {
     const ns = sub.status === 'completed' ? 'todo' : 'completed'
-    await fetch(`/api/tasks/${sub.id}`, { method: 'PATCH',
+
+    // CA compliance subtasks REQUIRE an attachment before completing
+    if (ns === 'completed' && sub.custom_fields?._compliance_subtask) {
+      const attRes = await fetch(`/api/tasks/${sub.id}/attachments`)
+      const attData = await attRes.json().catch(() => ({ data: [] }))
+      if ((attData.data ?? []).length === 0) {
+        toast.error('📎 Upload the required document before completing this subtask')
+        return
+      }
+    }
+
+    // Optimistic update first
+    setSubtasks(p => p.map(s => s.id === sub.id ? { ...s, status: ns } : s))
+    const res = await fetch(`/api/tasks/${sub.id}`, { method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: ns, completed_at: ns === 'completed' ? new Date().toISOString() : null }) })
-    setSubtasks(p => p.map(s => s.id === sub.id ? { ...s, status: ns } : s))
+    if (!res.ok) {
+      // Revert on failure
+      setSubtasks(p => p.map(s => s.id === sub.id ? { ...s, status: sub.status } : s))
+      toast.error('Could not update subtask')
+    }
   }
 
   async function loadAttachments(taskId: string) {

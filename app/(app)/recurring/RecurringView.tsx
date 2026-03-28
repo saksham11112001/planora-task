@@ -109,13 +109,17 @@ export function RecurringView({ tasks: initialTasks, members, projects, clients,
 
   async function toggleSubDone(taskId: string, subId: string, status: string, subTitle: string) {
     const newStatus = status === 'completed' ? 'todo' : 'completed'
+    // Only CA compliance subtasks require attachment — check custom_fields flag
     if (newStatus === 'completed') {
-      // REQUIRED: any attachment must be uploaded (filename can be anything)
-      const attRes = await fetch(`/api/tasks/${subId}/attachments`)
-      const attData = await attRes.json().catch(() => ({ data: [] }))
-      if ((attData.data ?? []).length === 0) {
-        toast.error('📎 Please upload the required document before completing this subtask')
-        return
+      const sub = (subtaskMap[taskId] ?? []).find((s: any) => s.id === subId)
+      const isComplianceSub = sub?.custom_fields?._compliance_subtask === true
+      if (isComplianceSub) {
+        const attRes = await fetch(`/api/tasks/${subId}/attachments`)
+        const attData = await attRes.json().catch(() => ({ data: [] }))
+        if ((attData.data ?? []).length === 0) {
+          toast.error('📎 Upload the required document before completing this CA compliance subtask')
+          return
+        }
       }
     }
     setSubtaskMap(p => ({ ...p, [taskId]: (p[taskId]??[]).map(s => s.id===subId ? {...s,status:newStatus} : s) }))

@@ -1,6 +1,8 @@
-import { createClient } from '@/lib/supabase/server'
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
+import { createClient }     from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { inngest }            from '@/lib/inngest/client'
+import { NextResponse }       from 'next/server'
+import type { NextRequest }   from 'next/server'
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -112,6 +114,38 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         .update({ status: 'completed', completed_at: new Date().toISOString() })
         .eq('id', data.parent_task_id)
     }
+  }
+
+  // Fire notification if assignee changed to a different person
+  const newAssigneeId = body.assignee_id
+  if (newAssigneeId && newAssigneeId !== user.id &&
+      newAssigneeId !== task.assignee_id) {
+    try {
+      const admin = createAdminClient()
+      const { data: assignee } = await admin.from('users')
+        .select('email, phone_number').eq('id', newAssigneeId).single()
+      const { data: assigner } = await admin.from('users')
+        .select('name').eq('id', user.id).single()
+      const { data: org } = await admin.from('organisations')
+        .select('name').eq('id', mb.org_id).single()
+      if (assignee?.email) {
+        await inngest.send({
+          name: 'task/assigned',
+          data: {
+            task_id: id,
+            task_title: data.title,
+            assignee_id: newAssigneeId,
+            assignee_email: assignee.email,
+            assignee_phone: (assignee as any).phone_number ?? null,
+            assigner_name: (assigner as any)?.name ?? 'Someone',
+            org_id: mb.org_id,
+            org_name: (org as any)?.name ?? '',
+            due_date: data.due_date ?? null,
+            project_name: null,
+          },
+        })
+      }
+    } catch (e) { console.error('[task PATCH notify]', e) }
   }
 
   return NextResponse.json({ data })

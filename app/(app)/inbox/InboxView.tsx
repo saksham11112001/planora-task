@@ -62,13 +62,17 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
   async function toggleSubRow(parentId: string, subId: string, status: string, subTitle?: string) {
     const newStatus = status === 'completed' ? 'todo' : 'completed'
 
-    // Check attachment BEFORE marking complete (compliance subtasks require upload)
+    // Only CA compliance subtasks require attachment — check custom_fields flag
     if (newStatus === 'completed') {
-      const attRes = await fetch(`/api/tasks/${subId}/attachments`)
-      const attData = await attRes.json().catch(() => ({ data: [] }))
-      if ((attData.data ?? []).length === 0) {
-        toast.error('📎 Please upload the required document before completing this subtask')
-        return
+      const sub = (subtaskMap[parentId] ?? []).find((s: any) => s.id === subId)
+      const isComplianceSub = sub?.custom_fields?._compliance_subtask === true
+      if (isComplianceSub) {
+        const attRes = await fetch(`/api/tasks/${subId}/attachments`)
+        const attData = await attRes.json().catch(() => ({ data: [] }))
+        if ((attData.data ?? []).length === 0) {
+          toast.error('📎 Upload the required document before completing this CA compliance subtask')
+          return
+        }
       }
     }
 
