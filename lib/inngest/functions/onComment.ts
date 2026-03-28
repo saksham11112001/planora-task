@@ -18,7 +18,7 @@ export const onTaskCommented = inngest.createFunction(
       .select('via_email').eq('user_id', d.assignee_id).eq('event_type', 'task_commented').maybeSingle()
 
     if (prefs?.via_email === false) return { skipped: 'preference_off' }
-    if (!(await acquireEmailSlot(d.assignee_id))) return { skipped: 'daily_limit' }
+    if (!(await acquireEmailSlot(d.assignee_id, 'task_commented'))) return { skipped: 'daily_limit' }
     await sendTaskCommentedEmail({
       to:            d.assignee_email,
       assigneeName:  d.assignee_name,

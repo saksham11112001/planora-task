@@ -65,7 +65,7 @@ export const dailyReminders = inngest.createFunction(
         const hoursLeft = Math.max(0, Math.round(msLeft / 3600000))
 
         if (sendEmail) {
-          const canSend = await acquireEmailSlot(assignee.id)
+          const canSend = await acquireEmailSlot(assignee.id, 'daily_reminder')
           if (canSend) {
             await sendDueSoonEmail({
               to:           assignee.email,
@@ -133,7 +133,7 @@ export const dailyReminders = inngest.createFunction(
           // Don't escalate to themselves if manager is also the assignee
           if (mgrUser.id === assignee?.id) continue
 
-          if (!(await acquireEmailSlot(mgrUser.id))) continue
+          if (!(await acquireEmailSlot(mgrUser.id, 'escalation_alert'))) continue
           await sendEscalationEmail({
             to:           mgrUser.email,
             managerName:  mgrUser.name,

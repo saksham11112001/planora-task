@@ -25,7 +25,7 @@ export const onTaskAssigned = inngest.createFunction(
     const results: string[] = []
 
     if (sendEmail) {
-      const canSend = await acquireEmailSlot(d.assignee_id)
+      const canSend = await acquireEmailSlot(d.assignee_id, 'task_assigned')
       if (canSend) {
         await sendTaskAssignedEmail({
           to:           d.assignee_email,

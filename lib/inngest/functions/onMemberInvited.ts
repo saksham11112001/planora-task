@@ -29,7 +29,7 @@ export const onMemberInvited = inngest.createFunction(
         .select('via_email').eq('user_id', user.id).eq('event_type', 'member_invited').maybeSingle()
 
       if (prefs?.via_email === false) continue
-      if (!(await acquireEmailSlot(user.id))) continue
+      if (!(await acquireEmailSlot(user.id, 'member_invited'))) continue
       await sendMemberInvitedEmail({
         to:           user.email,
         recipientName: user.name,

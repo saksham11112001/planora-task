@@ -27,7 +27,7 @@ export const onProjectUpdated = inngest.createFunction(
         .select('via_email').eq('user_id', user.id).eq('event_type', 'project_updated').maybeSingle()
 
       if (prefs?.via_email === false) continue
-      if (!(await acquireEmailSlot(user.id))) continue
+      if (!(await acquireEmailSlot(user.id, 'project_updated'))) continue
       await sendProjectUpdatedEmail({
         to:           user.email,
         recipientName: user.name,

@@ -41,7 +41,7 @@ export default async function LandingPage() {
   ]
 
   return (
-    <div style={{ minHeight: '100vh', background: '#fff', fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", overflowX: 'hidden', color: D }}>
+    <div style={{ minHeight: '100vh', background: '#fff', colorScheme: 'light', fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", overflowX: 'hidden', color: D }}>
 
       {/* NAV */}
       <nav style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(10px)', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', padding: '0 5%', height: 64 }}>

@@ -10,7 +10,20 @@ function getSystemTheme(): 'light' | 'dark' {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
 }
 
+const PUBLIC_PATHS = ['/', '/login', '/privacy', '/terms']
+
+function isPublicPage(): boolean {
+  if (typeof window === 'undefined') return false
+  const p = window.location.pathname
+  return PUBLIC_PATHS.some(pub => p === pub || p.startsWith(pub + '/'))
+}
+
 function applyResolved(resolved: 'light' | 'dark') {
+  // Public pages (landing, login, privacy, terms) are always light
+  if (isPublicPage()) {
+    document.documentElement.classList.remove('dark')
+    return
+  }
   if (resolved === 'dark') document.documentElement.classList.add('dark')
   else document.documentElement.classList.remove('dark')
 }
@@ -40,6 +53,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     mq.addEventListener('change', handler)
     return () => mq.removeEventListener('change', handler)
   }, [])
+
+  // Re-apply theme on client-side navigation (catches landing → app transitions)
+  useEffect(() => {
+    const saved = (localStorage.getItem('planora-theme') as Theme) ?? 'system'
+    const r = saved === 'system' ? getSystemTheme() : saved
+    applyResolved(r)
+  })  // runs after every render = catches route changes
 
   function setTheme(t: Theme) {
     localStorage.setItem('planora-theme', t)
