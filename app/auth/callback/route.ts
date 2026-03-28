@@ -117,5 +117,7 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return NextResponse.redirect(new URL('/login?error=auth_failed', request.url))
+  // Auth failed - code missing or session exchange failed
+  // Most common cause: browser cleared cookies between Google login and callback
+  return NextResponse.redirect(new URL('/login?error=auth_failed&hint=try_again', request.url))
 }

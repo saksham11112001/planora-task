@@ -2,7 +2,7 @@
 import React from 'react'
 import { useState, useEffect, useTransition } from 'react'
 import { useRouter }          from 'next/navigation'
-import { CheckCheck, Clock, Trash2 } from 'lucide-react'
+import { CheckCheck, Clock } from 'lucide-react'
 import { InlineOneTimeTask }  from '@/components/tasks/InlineOneTimeTask'
 import { CompletionAttachModal } from '@/components/tasks/CompletionAttachModal'
 import { TaskDetailPanel }    from '@/components/tasks/TaskDetailPanel'
@@ -38,22 +38,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
   const [newSubInputs, setNewSubInputs]   = useState<Record<string, string>>({})
   const [completingTask, setCompletingTask] = useState<Task | null>(null)
 
-  // Auto-load subtasks for all tasks on mount
-  useEffect(() => {
-    if (!tasks || tasks.length === 0) return
-    tasks.forEach(async (task: any) => {
-      try {
-        const r = await fetch(`/api/tasks?parent_id=${task.id}&limit=50`)
-        const d = await r.json()
-        const subs = d.data ?? []
-        if (subs.length > 0) {
-          setSubtaskMap(p => ({ ...p, [task.id]: subs }))
-          setExpandedTasks(p => { const n = new Set(p); n.add(task.id); return n })
-        }
-      } catch {}
-    })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tasks.length])
+  // Subtasks load only when user clicks to expand (not auto-expanded)
 
 
   async function toggleExpand(taskId: string) {
@@ -77,12 +62,12 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
   async function toggleSubRow(parentId: string, subId: string, status: string, subTitle?: string) {
     const newStatus = status === 'completed' ? 'todo' : 'completed'
 
-    // Check attachment BEFORE marking complete (for all subtasks, not just compliance)
+    // Check attachment BEFORE marking complete (compliance subtasks require upload)
     if (newStatus === 'completed') {
       const attRes = await fetch(`/api/tasks/${subId}/attachments`)
       const attData = await attRes.json().catch(() => ({ data: [] }))
       if ((attData.data ?? []).length === 0) {
-        toast.error(`📎 Upload "${subTitle ?? 'document'}" before marking complete`)
+        toast.error('📎 Please upload the required document before completing this subtask')
         return
       }
     }
@@ -507,7 +492,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                   </div>
 
                   {/* Inline subtasks panel */}
-                  {(expandedTasks.has(task.id) || (subtaskMap[task.id] ?? []).length > 0) && (
+                  {expandedTasks.has(task.id) && (
                     <div style={{ background: 'var(--surface-subtle)', borderBottom: '1px solid var(--border)' }}>
                       {/* Progress bar */}
                       {(subtaskMap[task.id] ?? []).length > 0 && (() => {
@@ -619,7 +604,19 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
               {section.addRow && canCreate && (
                 <InlineOneTimeTask
                   members={members} clients={clients} currentUserId={currentUserId}
-                  onCreated={() => startT(() => router.refresh())}
+                  onCreated={(newTask) => {
+                    if (newTask?.id) {
+                      // Optimistically add to local list immediately
+                      const enriched = {
+                        ...newTask,
+                        assignee: members.find(m => m.id === newTask.assignee_id) ?? null,
+                        client: clients.find(c => c.id === newTask.client_id) ?? null,
+                        subtasks: [],
+                      }
+                      setLocalTasks(prev => [enriched as any, ...prev])
+                    }
+                    startT(() => router.refresh())
+                  }}
                 />
               )}
             </div>

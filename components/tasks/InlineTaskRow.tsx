@@ -15,7 +15,7 @@ interface Props {
   clients:          Client[]
   currentUserId?:   string
   defaultStatus?:   string
-  onCreated?:       () => void
+  onCreated?:       (task?: Record<string, unknown>) => void  // passes new task for optimistic add
 }
 
 const PRIORITY_OPTIONS = [
@@ -86,7 +86,8 @@ export function InlineTaskRow({
       const d = await res.json()
       if (!res.ok) { toast.error(d.error ?? 'Failed'); return }
       reset()
-      onCreated ? onCreated() : router.refresh()
+      // Pass the created task back so parent can add it optimistically
+      onCreated ? onCreated(d.data ?? d) : router.refresh()
     } finally { setSaving(false) }
   }
 

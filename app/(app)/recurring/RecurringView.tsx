@@ -53,47 +53,43 @@ export function RecurringView({ tasks: initialTasks, members, projects, clients,
   }
 
   async function saveEdit(id: string) {
-    const res = await fetch(`/api/tasks/${id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title:       editForm.title?.trim(),
-        priority:    editForm.priority,
-        assignee_id: editForm.assignee_id || null,
-        client_id:   editForm.client_id   || null,
+    // Optimistic: update UI immediately
+    const snap = localTasks.map(t => t)
+    setLocalTasks(prev => prev.map(t => t.id === id ? {
+      ...t,
+      title:       editForm.title?.trim() ?? t.title,
+      priority:    editForm.priority as any ?? t.priority,
+      assignee_id: editForm.assignee_id || null,
+      client_id:   editForm.client_id   || null,
+      frequency:   editForm.frequency   ?? (t as any).frequency,
+    } : t))
+    setEditingId(null)
+
+    const [res] = await Promise.all([
+      fetch(`/api/tasks/${id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: editForm.title?.trim(), priority: editForm.priority, assignee_id: editForm.assignee_id || null, client_id: editForm.client_id || null }),
       }),
-    })
-    // frequency lives on the recurring record
-    await fetch(`/api/recurring/${id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ frequency: editForm.frequency }),
-    }).catch(() => {})
-    if (res.ok) { toast.success('Updated'); setEditingId(null); startT(() => router.refresh()) }
-    else        { const d = await res.json(); toast.error(d.error ?? 'Failed') }
+      fetch(`/api/recurring/${id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ frequency: editForm.frequency }),
+      }).catch(() => ({})),
+    ])
+    if (res.ok) { toast.success('Updated'); startT(() => router.refresh()) }
+    else { setLocalTasks(snap); setEditingId(id); const d = await (res as Response).json().catch(() => ({})); toast.error(d.error ?? 'Failed to save') }
   }
 
   async function handleDelete(id: string) {
     if (!confirm('Delete this recurring task? All future instances will stop being created.')) return
+    // Optimistic: remove immediately
+    const snap = localTasks.map(t => t)
+    setLocalTasks(prev => prev.filter(t => t.id !== id))
     const res = await fetch(`/api/tasks/${id}`, { method: 'DELETE' })
     if (res.ok) { toast.success('Deleted'); startT(() => router.refresh()) }
-    else        { const d = await res.json(); toast.error(d.error ?? 'Failed') }
+    else { setLocalTasks(snap); const d = await res.json().catch(() => ({})); toast.error(d.error ?? 'Failed') }
   }
 
-  // Auto-load subtasks for all recurring tasks on mount
-  useEffect(() => {
-    if (!localTasks || localTasks.length === 0) return
-    localTasks.forEach(async (task: Task) => {
-      try {
-        const r = await fetch(`/api/tasks?parent_id=${task.id}&limit=50`)
-        const d = await r.json()
-        const subs = d.data ?? []
-        if (subs.length > 0) {
-          setSubtaskMap(p => ({ ...p, [task.id]: subs }))
-          setExpandedSubs(p => { const n = new Set(p); n.add(task.id); return n })
-        }
-      } catch {}
-    })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [localTasks.length])
+  // Subtasks load lazily on user click only
 
   async function toggleSubExpand(taskId: string) {
     setExpandedSubs(prev => {
@@ -328,7 +324,7 @@ export function RecurringView({ tasks: initialTasks, members, projects, clients,
             </div>
 
           {/* Subtasks section */}
-          {(expandedSubs.has(task.id) || (subtaskMap[task.id] ?? []).length > 0) && (
+          {expandedSubs.has(task.id) && (
             <div style={{ background:'var(--surface-subtle)', borderTop:'1px solid var(--border-light)' }}>
               {(subtaskMap[task.id] ?? []).map((sub: any) => (
                 <div key={sub.id} style={{ display:'flex', alignItems:'center', gap:8,

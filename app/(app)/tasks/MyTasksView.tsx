@@ -68,23 +68,7 @@ export function MyTasksView({ tasks: initialTasks, pendingApprovalTasks = [], me
   })
   const activeFilters = [filterPriority, filterStatus].filter(Boolean).length
 
-  // Auto-load and expand subtasks for all tasks on mount
-  useEffect(() => {
-    if (!tasks || tasks.length === 0) return
-    const ids = tasks.map((t: Task) => t.id)
-    ids.forEach(async (taskId: string) => {
-      try {
-        const r = await fetch(`/api/tasks?parent_id=${taskId}&limit=50`)
-        const d = await r.json()
-        const subs = d.data ?? []
-        if (subs.length > 0) {
-          setSubtaskMap(p => ({ ...p, [taskId]: subs }))
-          setExpandedTasks(p => { const n = new Set(p); n.add(taskId); return n })
-        }
-      } catch {}
-    })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tasks.length])
+  // Subtasks load lazily on user click only
 
   function refresh() { startT(() => router.refresh()) }
 
@@ -94,13 +78,21 @@ export function MyTasksView({ tasks: initialTasks, pendingApprovalTasks = [], me
 
     // If currently completed → reopen as todo
     if (task.status === 'completed') {
+      // Optimistic: instantly mark as todo
+      const snapshot = tasks.map(t => t)
       setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: 'todo', completed_at: null } : t))
       setSelTask(prev => prev?.id === task.id ? { ...prev, status: 'todo' } : prev)
-      await fetch(`/api/tasks/${task.id}`, {
+      const res = await fetch(`/api/tasks/${task.id}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'todo', completed_at: null }),
       })
-      refresh(); return
+      if (!res.ok) {
+        setTasks(snapshot) // revert
+        toast.error('Could not reopen task')
+      } else {
+        refresh()
+      }
+      return
     }
 
     // If in_review already → no action (must be approved by approver)
@@ -139,13 +131,14 @@ export function MyTasksView({ tasks: initialTasks, pendingApprovalTasks = [], me
     // Only complete tasks that don't need approval
     const canComplete = tasks.filter(t => ids.includes(t.id) && !t.approval_required)
     const needsApproval = tasks.filter(t => ids.includes(t.id) && t.approval_required)
+    const bulkSnapshot = tasks.map(t => t) // snapshot for rollback
     setTasks(prev => prev.map(t =>
       canComplete.find(c => c.id === t.id)
         ? { ...t, status: 'completed', completed_at: new Date().toISOString() }
         : t
     ))
     setChecked(new Set())
-    await Promise.all(canComplete.map(t => fetch(`/api/tasks/${t.id}`, {
+    const results = await Promise.all(canComplete.map(t => fetch(`/api/tasks/${t.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: 'completed', completed_at: new Date().toISOString() }),
     })))
@@ -696,6 +689,15 @@ export function MyTasksView({ tasks: initialTasks, pendingApprovalTasks = [], me
                           {task.due_date && <span style={{ fontSize:11, color:isOverdue(task.due_date,task.status)?'#dc2626':'var(--text-muted)' }}>{fmtDate(task.due_date)}</span>}
                           {task.is_recurring && <RefreshCw style={{width:9,height:9,color:'var(--brand)'}}/>}
                           {assignee && <Avatar name={assignee.name} size="xs"/>}
+                          {canManage && (
+                            <button onClick={e => { e.stopPropagation(); deleteTask(task.id) }}
+                              title="Delete" style={{ background:'none', border:'none', cursor:'pointer',
+                                color:'var(--text-muted)', padding:2, display:'flex', alignItems:'center' }}
+                              onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#dc2626'}
+                              onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'}>
+                              <Trash2 style={{width:10,height:10}}/>
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>

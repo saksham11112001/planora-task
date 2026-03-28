@@ -59,6 +59,8 @@ export async function POST(request: NextRequest) {
     priority,
     status:               'todo',
     is_recurring:         true,
+    // Recurring tasks with a client assigned require manager approval before going live
+    approval_required:    !!(client_id),
     frequency:            dbFrequency,
     next_occurrence_date: nextDate,
     assignee_id:          assignee_id  || null,
@@ -84,6 +86,7 @@ export async function POST(request: NextRequest) {
         parent_task_id: task.id,
         created_by:     user.id,
         is_recurring:   false,
+        custom_fields:  s.required ? { _compliance_subtask: true } : null,
       }))
       await supabase.from('tasks').insert(subtaskInserts)
     } catch (e) {

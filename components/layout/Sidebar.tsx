@@ -3,6 +3,7 @@ import Link                       from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect, useRef } from 'react'
 import {
+  CheckSquare,
   Home, CheckSquare, ListTodo, Users2, FolderOpen,
   RefreshCw, Users, BarChart2, Settings, Plus,
   ChevronDown, ChevronRight, Clock, Zap, X, Upload,
@@ -128,6 +129,9 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
 
         {/* ORGANISATION */}
         <GL>Organisation</GL>
+        {canManage && (
+          <SI href="/approvals" active={isActive('/approvals')} icon={<CheckSquare className="h-4 w-4"/>} label="Approvals"/>
+        )}
         {nav.team && <SI href="/team"     active={isActive('/team')}     icon={<Users    className="h-4 w-4"/>} label="Team"/>}
         {nav.time_tracking && <SI href="/time"     active={isActive('/time')}     icon={<Clock    className="h-4 w-4"/>} label="Time tracking"/>}
         {nav.reports && <SI href="/reports"  active={isActive('/reports')}  icon={<BarChart2 className="h-4 w-4"/>} label="Reports"/>}

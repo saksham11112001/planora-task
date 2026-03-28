@@ -28,10 +28,11 @@ const BOARD_COLS = [
   { status: 'completed',   label: 'Done',         color: '#16a34a' },
 ]
 
-export function ProjectView({ project, tasks, members, clients, defaultClientId, projectOwnerId, canManage, currentUserId, userRole, totalHours, billableHours }: Props) {
+export function ProjectView({ project, tasks: initialTasks, members, clients, defaultClientId, projectOwnerId, canManage, currentUserId, userRole, totalHours, billableHours }: Props) {
   const router = useRouter()
   const [tab,          setTab]          = useState<ViewTab>('list')
   const [clientFilter, setClientFilter] = useState('')
+  const [tasks,        setTasks]        = useState<Task[]>(initialTasks)
 
   const visibleTasks = clientFilter ? tasks.filter(t => (t as any).client?.id === clientFilter || t.client_id === clientFilter) : tasks
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
@@ -170,15 +171,18 @@ export function ProjectView({ project, tasks, members, clients, defaultClientId,
   async function toggleDone(task: Task, e: React.MouseEvent) {
     e.stopPropagation()
 
-    // Reopen a completed task
+    // Reopen a completed task — optimistic
     if (task.status === 'completed') {
-      setCompleting(p => new Set(p).add(task.id))
-      await fetch(`/api/tasks/${task.id}`, {
+      const snap = tasks.map(t => t)
+      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: 'todo', completed_at: null } : t))
+      setSelectedTask(prev => prev?.id === task.id ? { ...prev, status: 'todo', completed_at: null } : prev)
+      const res = await fetch(`/api/tasks/${task.id}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'todo', completed_at: null }),
       })
-      setCompleting(p => { const s = new Set(p); s.delete(task.id); return s })
-      startT(() => router.refresh()); return
+      if (!res.ok) { setTasks(snap); toast.error('Could not reopen task') }
+      else startT(() => router.refresh())
+      return
     }
 
     // Already pending approval
@@ -220,21 +224,30 @@ export function ProjectView({ project, tasks, members, clients, defaultClientId,
       startT(() => router.refresh()); return
     }
 
-    // Normal complete
+    // Normal complete — optimistic
+    const completeSnap = tasks.map(t => t)
+    const completedAt = new Date().toISOString()
+    setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: 'completed', completed_at: completedAt } : t))
+    setSelectedTask(prev => prev?.id === task.id ? { ...prev, status: 'completed', completed_at: completedAt } : prev)
     setCompleting(p => new Set(p).add(task.id))
-    await fetch(`/api/tasks/${task.id}`, {
+    const res = await fetch(`/api/tasks/${task.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'completed', completed_at: new Date().toISOString() }),
+      body: JSON.stringify({ status: 'completed', completed_at: completedAt }),
     })
     setCompleting(p => { const s = new Set(p); s.delete(task.id); return s })
+    if (!res.ok) { setTasks(completeSnap); toast.error('Could not complete task') }
     toast.success('Done! 🎉')
     startT(() => router.refresh())
   }
 
   async function deleteTask(taskId: string) {
     if (!confirm('Delete this task? It will move to Trash.')) return
+    const snap = tasks.map(t => t)
+    setTasks(prev => prev.filter(t => t.id !== taskId))
+    setSelectedTask(prev => prev?.id === taskId ? null : prev)
     const res = await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' })
     if (!res.ok) {
+      setTasks(snap)
       toast.error('Could not delete task')
     } else {
       toast.success('Moved to Trash')

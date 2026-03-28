@@ -106,22 +106,34 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     return () => window.removeEventListener('keydown', h)
   }, [onClose])
 
-  /* generic PATCH helper */
-  const patch = useCallback(async (fields: Record<string, unknown>) => {
+  const [isSaving, setIsSaving] = useState(false)
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  /* generic PATCH helper — fires and forgets UI state; rolls back on fail */
+  const patch = useCallback(async (fields: Record<string, unknown>, rollback?: () => void) => {
     if (!task) return
+    setIsSaving(true)
     const res = await fetch(`/api/tasks/${task.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(fields),
     })
+    setIsSaving(false)
     if (!res.ok) {
-      const d = await res.json()
-      toast.error(d.error ?? 'Could not save')
+      const d = await res.json().catch(() => ({}))
+      toast.error(d.error ?? 'Could not save — change reverted')
+      rollback?.()   // restore previous field value
       return
     }
     onUpdated?.()
     router.refresh()
   }, [task, onUpdated, router])
+
+  /* debounced patch — for text fields that change frequently */
+  const patchDebounced = useCallback((fields: Record<string, unknown>, delay = 600) => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    saveTimerRef.current = setTimeout(() => patch(fields), delay)
+  }, [patch])
 
   /* complete toggle */
   async function handleComplete() {
@@ -250,7 +262,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
   return (
     <>
       {isOpen && (
-        <div className="fixed inset-0 z-20 bg-black/10" onClick={onClose} />
+        <div className="fixed inset-0 z-40 bg-black/50" onClick={onClose} style={{ backdropFilter: "blur(2px)" }} />
       )}
 
       <aside className={cn('detail-panel', isOpen && 'open')} onClick={e => e.stopPropagation()}>
@@ -273,12 +285,16 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
               <span className="text-xs font-medium flex-1" style={{ color: isCompleted ? '#16a34a' : 'var(--text-muted)' }}>
                 {isCompleted ? '✓ Completed' : 'Mark complete'}
               </span>
+              {isSaving && (
+                <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>Saving…</span>
+              )}
               <button onClick={onClose}
-                className="h-7 w-7 flex items-center justify-center rounded-lg transition-colors"
-                style={{ color: 'var(--text-muted)' }}
+                className="h-8 w-8 flex items-center justify-center rounded-lg transition-colors"
+                title="Close (Esc)"
+                style={{ color: 'var(--text-muted)', flexShrink: 0 }}
                 onMouseEnter={e => (e.currentTarget.style.background = 'var(--border-light)')}
                 onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                <X className="h-3.5 w-3.5" />
+                <X className="h-4 w-4" />
               </button>
             </div>
 
@@ -343,8 +359,8 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
               <textarea
                 ref={titleRef}
                 value={title}
-                onChange={e => setTitle(e.target.value)}
-                onBlur={() => title !== task.title && patch({ title })}
+                onChange={e => { setTitle(e.target.value); patchDebounced({ title: e.target.value }) }}
+                onBlur={() => { if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; if (title !== task.title) patch({ title }) } }}
                 rows={1}
                 className={cn(
                   'w-full text-lg font-bold resize-none outline-none bg-transparent leading-snug',
@@ -354,8 +370,8 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
               />
               <textarea
                 value={description}
-                onChange={e => setDescription(e.target.value)}
-                onBlur={() => description !== (task.description ?? '') && patch({ description: description || null })}
+                onChange={e => { setDescription(e.target.value); patchDebounced({ description: e.target.value || null }, 800) }}
+                onBlur={() => { if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; if (description !== (task.description ?? '')) patch({ description: description || null }) } }}
                 placeholder="Add a description..."
                 rows={3}
                 className="w-full mt-2 text-sm resize-none outline-none bg-transparent leading-relaxed"
@@ -377,7 +393,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
               <>
               <div className="px-5 py-3">
                 <FieldRow label="Status">
-                  <select value={status} onChange={e => { setStatus(e.target.value); patch({ status: e.target.value }) }}
+                  <select value={status} onChange={e => { const prev = status; setStatus(e.target.value); patch({ status: e.target.value }, () => setStatus(prev)) }}
                     className="text-sm bg-transparent outline-none cursor-pointer flex-1"
                     style={{ color: 'var(--text-primary)' }}>
                     {Object.entries(STATUS_CONFIG).map(([v, c]) => <option key={v} value={v}>{c.label}</option>)}
@@ -386,7 +402,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
 
                 <FieldRow label="Priority">
                   <Flag className="h-3.5 w-3.5" style={{ color: priConf.color }} />
-                  <select value={priority} onChange={e => { setPriority(e.target.value); patch({ priority: e.target.value }) }}
+                  <select value={priority} onChange={e => { const prev = priority; setPriority(e.target.value); patch({ priority: e.target.value }, () => setPriority(prev)) }}
                     className="text-sm bg-transparent outline-none cursor-pointer flex-1"
                     style={{ color: 'var(--text-primary)' }}>
                     {Object.entries(PRIORITY_CONFIG).map(([v, c]) => <option key={v} value={v}>{c.label}</option>)}
@@ -395,7 +411,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
 
                 <FieldRow label="Assignee">
                   {assigneeId && <Avatar name={assignee?.name ?? '?'} size="xs" />}
-                  <select value={assigneeId} onChange={e => { setAssigneeId(e.target.value); patch({ assignee_id: e.target.value || null }) }}
+                  <select value={assigneeId} onChange={e => { const prev = assigneeId; setAssigneeId(e.target.value); patch({ assignee_id: e.target.value || null }, () => setAssigneeId(prev)) }}
                     className="text-sm bg-transparent outline-none cursor-pointer flex-1"
                     style={{ color: 'var(--text-primary)' }}>
                     <option value="">Unassigned</option>
@@ -408,7 +424,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                 <FieldRow label="Due date">
                   <Calendar className="h-3.5 w-3.5" style={{ color: 'var(--text-muted)' }} />
                   <input type="date" value={dueDate}
-                    onChange={e => { setDueDate(e.target.value); patch({ due_date: e.target.value || null }) }}
+                    onChange={e => { const prev = dueDate; setDueDate(e.target.value); patch({ due_date: e.target.value || null }, () => setDueDate(prev)) }}
                     className="text-sm outline-none cursor-pointer flex-1 rounded-md px-2 py-1"
                     style={{
                       color: overdue ? '#dc2626' : dueDate ? 'var(--text-primary)' : 'var(--text-muted)',
