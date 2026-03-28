@@ -18,7 +18,7 @@ export default async function InboxPage() {
 
   // Fetch tasks NOT in any project — no clients() join
   const { data: tasks, error } = await supabase.from('tasks')
-    .select('id, title, status, priority, due_date, approval_status, client_id, assignee_id, is_recurring, estimated_hours, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url)')
+    .select('id, title, status, priority, due_date, approval_status, approval_required, client_id, assignee_id, is_recurring, estimated_hours, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url)')
     .eq('org_id', mb.org_id).is('project_id', null).is('parent_task_id', null).neq('is_archived', true)
     .order('created_at', { ascending: false })
 
@@ -38,7 +38,7 @@ export default async function InboxPage() {
 
   const enriched = (tasks ?? []).map(t => ({
     ...t, description: null, project_id: null, project: null, is_archived: false, created_at: '',
-    approval_required: false, completed_at: null, is_recurring: t.is_recurring ?? false,
+    approval_required: (t as any).approval_required ?? false, completed_at: null, is_recurring: t.is_recurring ?? false,
     estimated_hours: t.estimated_hours ?? null, due_date: t.due_date ?? null,
     assignee_id: t.assignee_id ?? null, client_id: t.client_id ?? null,
     approval_status: t.approval_status ?? null,

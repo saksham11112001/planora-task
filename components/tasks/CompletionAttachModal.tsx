@@ -6,7 +6,7 @@ import { toast } from '@/store/appStore'
 interface Props {
   taskId: string
   taskTitle: string
-  onConfirm: () => void   // called after optional upload, to actually mark complete
+  onConfirm: () => void   // called after required upload, to actually mark complete
   onCancel: () => void
 }
 
@@ -16,17 +16,29 @@ export function CompletionAttachModal({ taskId, taskTitle, onConfirm, onCancel }
   const [uploading, setUploading] = useState(false)
 
   async function handleConfirm() {
-    if (files.length > 0) {
-      setUploading(true)
-      try {
-        const fd = new FormData()
-        files.forEach(f => fd.append('files', f))
-        const res = await fetch(`/api/tasks/${taskId}/attachments`, { method: 'POST', body: fd })
-        if (!res.ok) toast.error('File upload failed — task still marked complete')
-        else toast.success(`${files.length} file${files.length > 1 ? 's' : ''} attached ✓`)
-      } catch { toast.error('Upload failed') }
-      finally { setUploading(false) }
+    // Attachment is REQUIRED — block if no file selected
+    if (files.length === 0) {
+      toast.error('📎 Please attach a document before marking complete')
+      fileRef.current?.click()
+      return
     }
+    setUploading(true)
+    try {
+      const fd = new FormData()
+      files.forEach(f => fd.append('files', f))
+      const res = await fetch(`/api/tasks/${taskId}/attachments`, { method: 'POST', body: fd })
+      if (!res.ok) {
+        toast.error('File upload failed — please try again')
+        setUploading(false)
+        return  // Don't mark complete if upload fails
+      }
+      toast.success(`${files.length} file${files.length > 1 ? 's' : ''} attached ✓`)
+    } catch {
+      toast.error('Upload failed — please try again')
+      setUploading(false)
+      return
+    }
+    setUploading(false)
     onConfirm()
   }
 
@@ -64,7 +76,7 @@ export function CompletionAttachModal({ taskId, taskTitle, onConfirm, onCancel }
         {/* Attachment area */}
         <div style={{ marginBottom: 20 }}>
           <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 10 }}>
-            Attach proof of completion <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(optional)</span>
+            Attach proof of completion <span style={{ fontWeight: 700, color: '#dc2626' }}>*</span>
           </p>
           <div
             onClick={() => fileRef.current?.click()}
@@ -107,7 +119,7 @@ export function CompletionAttachModal({ taskId, taskTitle, onConfirm, onCancel }
               cursor: uploading ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
               opacity: uploading ? 0.7 : 1, transition: 'all 0.15s',
             }}>
-            {uploading ? 'Uploading…' : files.length > 0 ? `Attach & complete` : 'Mark complete'}
+            {uploading ? 'Uploading…' : files.length > 0 ? `Attach & mark complete` : 'Select a file to continue'}
           </button>
           <button onClick={onCancel} style={{
             padding: '10px 16px', borderRadius: 8,

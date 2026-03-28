@@ -107,17 +107,13 @@ export function RecurringView({ tasks: initialTasks, members, projects, clients,
   async function toggleSubDone(taskId: string, subId: string, status: string, subTitle: string) {
     const newStatus = status === 'completed' ? 'todo' : 'completed'
     if (newStatus === 'completed') {
+      // REQUIRED: any attachment must be uploaded (filename can be anything)
       const attRes = await fetch(`/api/tasks/${subId}/attachments`)
       const attData = await attRes.json().catch(() => ({ data: [] }))
-      const attachments: { file_name: string }[] = attData.data ?? []
-      if (attachments.length === 0) {
-        toast.error(`📎 Upload "${subTitle}" before marking complete`)
+      if ((attData.data ?? []).length === 0) {
+        toast.error('📎 Please upload the required document before completing this subtask')
         return
       }
-      // Warn if filename doesn't match
-      const words = subTitle.toLowerCase().replace(/[^a-z0-9 ]/g,'').split(' ').filter(w=>w.length>3)
-      const match = attachments.some(a => words.some(w => (a.file_name||'').toLowerCase().includes(w)))
-      if (!match) toast.success(`✓ Done — note: filename doesn't contain "${subTitle}" keywords`)
     }
     setSubtaskMap(p => ({ ...p, [taskId]: (p[taskId]??[]).map(s => s.id===subId ? {...s,status:newStatus} : s) }))
     await fetch(`/api/tasks/${subId}`, {

@@ -127,6 +127,15 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
 
   async function toggleSubDone(subId: string, status: string, parentId: string) {
     const newStatus = status === 'completed' ? 'todo' : 'completed'
+    // REQUIRED: check attachment before completing any subtask
+    if (newStatus === 'completed') {
+      const attRes = await fetch(`/api/tasks/${subId}/attachments`)
+      const attData = await attRes.json().catch(() => ({ data: [] }))
+      if ((attData.data ?? []).length === 0) {
+        toast.error('📎 Please upload the required document before completing this subtask')
+        return
+      }
+    }
     // Optimistic update on subtask
     setSubtaskData(p => ({
       ...p,
