@@ -4,7 +4,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect, useRef } from 'react'
 import {
   CheckSquare,
-  Home, CheckSquare, ListTodo, Users2, FolderOpen,
+  Home, ListTodo, Users2, FolderOpen,
   RefreshCw, Users, BarChart2, Settings, Plus,
   ChevronDown, ChevronRight, Clock, Zap, X, Upload,
   Calendar, Shield, LogOut,
