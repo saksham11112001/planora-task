@@ -6,6 +6,7 @@ import { InlineRecurringTask } from '@/components/tasks/InlineRecurringTask'
 import { fmtDate }             from '@/lib/utils/format'
 import { toast }               from '@/store/appStore'
 import { PriorityBadge, Avatar } from '@/components/ui/Badge'
+import { TaskDetailPanel }    from '@/components/tasks/TaskDetailPanel'
 
 const FREQ_LABELS: Record<string, string> = {
   daily: 'Daily', weekly: 'Weekly', bi_weekly: 'Every 2 weeks',
@@ -28,16 +29,18 @@ interface Props {
   clients:       { id: string; name: string; color: string }[]
   currentUserId: string
   canManage:     boolean
+  userRole?:     string
 }
 
-export function RecurringView({ tasks: initialTasks, members, projects, clients, currentUserId, canManage }: Props) {
+export function RecurringView({ tasks: initialTasks, members, projects, clients, currentUserId, canManage, userRole }: Props) {
   const [localTasks,   setLocalTasks]   = useState<Task[]>(initialTasks)
   const [clientFilter, setClientFilter] = useState<string>('')
   const [subtaskMap,   setSubtaskMap]   = useState<Record<string, any[]>>({})
   const [expandedSubs, setExpandedSubs] = useState<Set<string>>(new Set())
   const [newSubInputs, setNewSubInputs] = useState<Record<string,string>>({})
   const router = useRouter()
-  const [, startT] = useTransition()
+  const [, startT]         = useTransition()
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [editingId, setEditingId] = useState<string|null>(null)
   const [editForm, setEditForm] = useState<Partial<Task & { frequency: string }>>({})
 
@@ -240,8 +243,9 @@ export function RecurringView({ tasks: initialTasks, members, projects, clients,
           <div key={task.id} className="group" style={{
             display: 'grid', gridTemplateColumns: '1fr 7rem 5rem 6rem 5rem 4.5rem',
             alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid var(--border)',
-            transition: 'background 0.1s',
+            transition: 'background 0.1s', cursor: 'pointer',
           }}
+          onClick={() => setSelectedTask(selectedTask?.id === task.id ? null : task)}
           onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--surface-subtle)'}
           onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}>
 
@@ -301,14 +305,14 @@ export function RecurringView({ tasks: initialTasks, members, projects, clients,
             <div style={{ display: 'flex', justifyContent: 'center', gap: 2 }}>
               {canManage && (
                 <>
-                  <button onClick={() => startEdit(task)}
+                  <button onClick={e => { e.stopPropagation(); startEdit(task) }}
                     style={{ width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center',
                       borderRadius: 6, border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)' }}
                     onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--brand)'; (e.currentTarget as HTMLElement).style.background = 'var(--brand-light)' }}
                     onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'; (e.currentTarget as HTMLElement).style.background = 'transparent' }}>
                     <Pencil style={{ width: 12, height: 12 }}/>
                   </button>
-                  <button onClick={() => handleDelete(task.id)}
+                  <button onClick={e => { e.stopPropagation(); handleDelete(task.id) }}
                     style={{ width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center',
                       borderRadius: 6, border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)' }}
                     onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#dc2626'; (e.currentTarget as HTMLElement).style.background = '#fff1f2' }}
@@ -394,6 +398,16 @@ export function RecurringView({ tasks: initialTasks, members, projects, clients,
       <p style={{ fontSize: 11, textAlign: 'center', color: 'var(--text-muted)', marginTop: 8 }}>
         ⏰ New instances are created each morning at 7:00 AM IST
       </p>
+
+      <TaskDetailPanel
+        task={selectedTask}
+        members={members}
+        clients={clients}
+        currentUserId={currentUserId}
+        userRole={userRole}
+        onClose={() => setSelectedTask(null)}
+        onUpdated={() => { setSelectedTask(null); startT(() => router.refresh()) }}
+      />
     </div>
   )
 }
