@@ -31,6 +31,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid role' }, { status: 400 })
 
   const admin = createAdminClient()
+
+  // Check member limit for this org's plan
+  const { data: orgData } = await admin.from('organisations')
+    .select('plan_tier, status, trial_ends_at').eq('id', mb.org_id).single()
+  const { count: currentMembers } = await admin.from('org_members')
+    .select('id', { count: 'exact', head: true })
+    .eq('org_id', mb.org_id).eq('is_active', true)
+  const plan = effectivePlan(orgData ?? { plan_tier: 'free', status: 'active' })
+  if (isAtMemberLimit(plan, currentMembers ?? 0)) {
+    return NextResponse.json({
+      error: `Your ${plan} plan allows up to ${memberLimit(plan)} members. Upgrade to add more.`
+    }, { status: 403 })
+  }
   // Find existing user by email
   const { data: existingUser } = await admin.from('users').select('id').eq('email', email.toLowerCase().trim()).maybeSingle()
 

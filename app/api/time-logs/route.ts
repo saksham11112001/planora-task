@@ -9,6 +9,15 @@ export async function POST(request: NextRequest) {
   const { data: mb } = await supabase.from('org_members').select('org_id').eq('user_id', user.id).eq('is_active', true).single()
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
 
+  // Time tracking requires Starter+ plan
+  const admin = createAdminClient()
+  const { data: orgData } = await admin.from('organisations')
+    .select('plan_tier, status, trial_ends_at').eq('id', mb.org_id).single()
+  const plan = effectivePlan(orgData ?? { plan_tier: 'free', status: 'active' })
+  if (!canUseFeature(plan, 'time_tracking')) {
+    return NextResponse.json({ error: 'Time tracking requires Starter plan or above. Upgrade at Settings → Billing.' }, { status: 403 })
+  }
+
   const body = await request.json()
   const { hours, description, logged_date, project_id, task_id, is_billable = true } = body
   if (!hours || parseFloat(hours) <= 0) return NextResponse.json({ error: 'Hours must be > 0' }, { status: 400 })

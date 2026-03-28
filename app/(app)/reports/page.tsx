@@ -1,6 +1,8 @@
 import { createClient }   from '@/lib/supabase/server'
+import { effectivePlan, canUseFeature } from '@/lib/utils/planGate'
 import { redirect }       from 'next/navigation'
 import { ReportsCharts }  from './ReportsCharts'
+import { UpgradeWall }    from '@/components/ui/UpgradeWall'
 import { ReportsExport }  from './ReportsExport'
 import { fmtHours }       from '@/lib/utils/format'
 import type { Metadata }  from 'next'
@@ -16,6 +18,19 @@ export default async function ReportsPage() {
   const { data: mb } = await supabase
     .from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).maybeSingle()
   if (!mb) redirect('/onboarding')
+
+  // Reports is a paid feature (Starter+)
+  const { data: orgData } = await supabase.from('organisations')
+    .select('plan_tier, status, trial_ends_at').eq('id', mb.org_id).maybeSingle()
+  const plan = effectivePlan(orgData ?? { plan_tier: 'free', status: 'active' })
+  if (!canUseFeature(plan, 'reports')) {
+    return <UpgradeWall
+      feature="Reports"
+      description="Get detailed insights on task completion, team performance, time logs, overdue work, and billing summaries — all in one place."
+      requiredPlan="Starter"
+      icon="📊"
+    />
+  }
 
   const orgId  = mb.org_id
   const from30 = new Date(Date.now() - 30 * 86400000).toISOString()

@@ -4,10 +4,11 @@
  */
 
 export const PLAN_LIMITS = {
-  free:     { members: 5,   projects: 3,   features: ['tasks','clients','time_tracking','recurring'] },
-  starter:  { members: 15,  projects: 15,  features: ['tasks','clients','time_tracking','recurring','approvals','reports'] },
-  pro:      { members: 50,  projects: 100, features: ['tasks','clients','time_tracking','recurring','approvals','reports','api','exports'] },
-  business: { members: -1,  projects: -1,  features: ['tasks','clients','time_tracking','recurring','approvals','reports','api','exports','sso','audit'] },
+  //                         members  projects   features
+  free:     { members: 5,   projects: 3,   features: ['tasks','clients','recurring'] },
+  starter:  { members: 15,  projects: 15,  features: ['tasks','clients','recurring','time_tracking','approvals','reports'] },
+  pro:      { members: 50,  projects: 100, features: ['tasks','clients','recurring','time_tracking','approvals','reports','api','exports','ca_compliance'] },
+  business: { members: -1,  projects: -1,  features: ['tasks','clients','recurring','time_tracking','approvals','reports','api','exports','ca_compliance','sso','audit'] },
 } as const
 
 export type PlanKey = keyof typeof PLAN_LIMITS

@@ -49,6 +49,7 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
   }
 
   const plan      = session?.org.plan_tier ?? 'free'
+  const isPaid    = plan !== 'free'   // Starter, Pro, Business
   const role      = session?.role ?? ''
   const userName  = session?.user.name ?? session?.user.email?.split('@')[0] ?? ''
   const userInit  = userName[0]?.toUpperCase() ?? 'U'
@@ -133,8 +134,8 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
           <SI href="/approvals" active={isActive('/approvals')} icon={<CheckSquare className="h-4 w-4"/>} label="Approvals"/>
         )}
         {nav.team && <SI href="/team"     active={isActive('/team')}     icon={<Users    className="h-4 w-4"/>} label="Team"/>}
-        {nav.time_tracking && <SI href="/time"     active={isActive('/time')}     icon={<Clock    className="h-4 w-4"/>} label="Time tracking"/>}
-        {nav.reports && <SI href="/reports"  active={isActive('/reports')}  icon={<BarChart2 className="h-4 w-4"/>} label="Reports"/>}
+        {nav.time_tracking && isPaid && <SI href="/time"     active={isActive('/time')}     icon={<Clock    className="h-4 w-4"/>} label="Time tracking"/>}
+        {nav.reports && isPaid && <SI href="/reports"  active={isActive('/reports')}  icon={<BarChart2 className="h-4 w-4"/>} label="Reports"/>}
         {nav.calendar && <SI href="/calendar" active={isActive('/calendar')} icon={<Calendar className="h-4 w-4"/>} label="Calendar"/>}
         <Div/>
 

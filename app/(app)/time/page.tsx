@@ -1,5 +1,5 @@
 import { createClient }  from '@/lib/supabase/server'
-import { redirect }      from 'next/navigation'
+import { effectivePlan, canUseFeature } from '@/lib/utils/planGate'
 import { TimeView }      from './TimeView'
 import type { Metadata } from 'next'
 
@@ -20,6 +20,19 @@ export default async function TimePage({
   const { data: mb } = await supabase.from('org_members')
     .select('org_id, role').eq('user_id', user.id).eq('is_active', true).maybeSingle()
   if (!mb) redirect('/onboarding')
+
+  // Time tracking is a paid feature (Starter+)
+  const { data: orgData } = await supabase.from('organisations')
+    .select('plan_tier, status, trial_ends_at').eq('id', mb.org_id).maybeSingle()
+  const plan = effectivePlan(orgData ?? { plan_tier: 'free', status: 'active' })
+  if (!canUseFeature(plan, 'time_tracking')) {
+    return <UpgradeWall
+      feature="Time Tracking"
+      description="Log billable and non-billable hours against tasks and projects. Track team productivity and generate time reports for client billing."
+      requiredPlan="Starter"
+      icon="⏱️"
+    />
+  }
 
   // Default: current month
   const now       = new Date()

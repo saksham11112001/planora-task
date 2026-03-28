@@ -1,4 +1,6 @@
 import { createClient }    from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { effectivePlan, canUseFeature } from '@/lib/utils/planGate'
 import { NextResponse }    from 'next/server'
 import type { NextRequest } from 'next/server'
 
@@ -8,6 +10,15 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   const { data: mb } = await supabase.from('org_members').select('org_id').eq('user_id', user.id).eq('is_active', true).single()
   if (!mb) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  // Reports requires Starter+ plan
+  const adminC = createAdminClient()
+  const { data: orgData } = await adminC.from('organisations')
+    .select('plan_tier, status, trial_ends_at').eq('id', mb.org_id).single()
+  const plan = effectivePlan(orgData ?? { plan_tier: 'free', status: 'active' })
+  if (!canUseFeature(plan, 'reports')) {
+    return NextResponse.json({ error: 'Reports require Starter plan or above.' }, { status: 403 })
+  }
 
   const type   = req.nextUrl.searchParams.get('type') ?? 'tasks'
   const from30 = new Date(Date.now() - 30 * 86400000).toISOString()
