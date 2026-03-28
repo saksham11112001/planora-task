@@ -47,11 +47,12 @@ export function RecurringView({ tasks: initialTasks, members, projects, clients,
   function startEdit(task: Task) {
     setEditingId(task.id)
     setEditForm({
-      title:     task.title,
-      frequency: task.frequency ?? 'weekly',
-      priority:  task.priority,
-      assignee_id: task.assignee_id ?? '',
-      client_id:   task.client_id ?? '',
+      title:       task.title,
+      frequency:   task.frequency ?? 'weekly',
+      priority:    task.priority,
+      assignee_id: task.assignee_id  ?? '',
+      approver_id: (task as any).approver_id ?? '',
+      client_id:   task.client_id    ?? '',
     })
   }
 
@@ -63,6 +64,7 @@ export function RecurringView({ tasks: initialTasks, members, projects, clients,
       title:       editForm.title?.trim() ?? t.title,
       priority:    editForm.priority as any ?? t.priority,
       assignee_id: editForm.assignee_id || null,
+      approver_id: (editForm as any).approver_id || null,
       client_id:   editForm.client_id   || null,
       frequency:   editForm.frequency   ?? (t as any).frequency,
     } : t))
@@ -71,7 +73,7 @@ export function RecurringView({ tasks: initialTasks, members, projects, clients,
     const [res] = await Promise.all([
       fetch(`/api/tasks/${id}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: editForm.title?.trim(), priority: editForm.priority, assignee_id: editForm.assignee_id || null, client_id: editForm.client_id || null }),
+        body: JSON.stringify({ title: editForm.title?.trim(), priority: editForm.priority, assignee_id: editForm.assignee_id || null, approver_id: (editForm as any).approver_id || null, client_id: editForm.client_id || null }),
       }),
       fetch(`/api/recurring/${id}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },

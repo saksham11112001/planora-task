@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
 
   const body = await request.json()
-  const { title, priority = 'medium', frequency, assignee_id,
+  const { title, priority = 'medium', frequency, assignee_id, approver_id,
           project_id, client_id, start_date, subtasks } = body
 
   if (!title?.trim()) return NextResponse.json({ error: 'Title required' }, { status: 400 })
@@ -64,6 +64,7 @@ export async function POST(request: NextRequest) {
     frequency:            dbFrequency,
     next_occurrence_date: nextDate,
     assignee_id:          assignee_id  || null,
+    approver_id:          approver_id  || null,
     project_id:           project_id   || null,
     client_id:            client_id    || null,
     created_by:           user.id,

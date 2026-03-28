@@ -17,7 +17,7 @@ export default async function RecurringPage() {
 
 
   const { data: tasks } = await supabase.from('tasks')
-    .select('id, title, status, priority, frequency, next_occurrence_date, assignee_id, client_id, assignee:users!tasks_assignee_id_fkey(id, name), projects(id, name, color), clients(id, name, color)')
+    .select('id, title, status, priority, frequency, next_occurrence_date, assignee_id, approver_id, client_id, assignee:users!tasks_assignee_id_fkey(id, name), projects(id, name, color), clients(id, name, color)')
     .eq('org_id', mb.org_id).eq('is_recurring', true).neq('is_archived', true)
     .order('next_occurrence_date', { ascending: true })
 

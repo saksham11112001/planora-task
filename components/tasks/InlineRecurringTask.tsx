@@ -1,7 +1,7 @@
 'use client'
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, X, RefreshCw, User, Flag, Briefcase, Paperclip } from 'lucide-react'
+import { Plus, X, RefreshCw, User, Flag, Briefcase, Paperclip, Shield } from 'lucide-react'
 import { toast } from '@/store/appStore'
 import { useOrgSettings }         from '@/lib/hooks/useOrgSettings'
 import { ComplianceTaskPicker }   from '@/components/tasks/ComplianceTaskPicker'
@@ -42,7 +42,7 @@ interface Props {
   currentUserId?: string
   editTask?: {
     id: string; title: string; frequency: string; priority: string
-    assignee_id: string | null; client_id?: string | null
+    assignee_id: string | null; client_id?: string | null; approver_id?: string | null
   }
   onCreated?:    (task?: any) => void
   onEdited?:     () => void
@@ -73,6 +73,7 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, edit
   const [frequency, setFrequency] = useState(editTask?.frequency ?? 'weekly_mon')
   const [priority,  setPriority]  = useState(editTask?.priority ?? 'medium')
   const [assignee,  setAssignee]  = useState(editTask?.assignee_id ?? currentUserId ?? '')
+  const [approverId,setApproverId] = useState(editTask?.approver_id ?? '')
   const [clientId,  setClientId]  = useState(editTask?.client_id ?? '')
   const [files,     setFiles]     = useState<File[]>([])
 
@@ -92,7 +93,7 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, edit
   function close() {
     if (isEdit) { onCancelEdit?.(); return }
     setOpen(false); setTitle(''); setFrequency('weekly_mon'); setPriority('medium')
-    setClientId(''); setAssignee(currentUserId ?? ''); setFiles([])
+    setClientId(''); setAssignee(currentUserId ?? ''); setApproverId(''); setFiles([])
   }
 
   function validate(): boolean {
@@ -114,8 +115,9 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, edit
         title:         title.trim(),
         frequency,
         priority,
-        assignee_id:   assignee  || null,
-        client_id:     clientId  || null,
+        assignee_id:   assignee     || null,
+        approver_id:   approverId   || null,
+        client_id:     clientId     || null,
         start_date:    new Date().toISOString().split('T')[0],
         custom_fields: Object.keys(customValues).length > 0 ? customValues : undefined,
         subtasks:      compSubtasks.length > 0 ? compSubtasks : undefined,
@@ -255,6 +257,25 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, edit
               cursor:'pointer', appearance:'none' }}>
             <option value="">Unassigned</option>
             {members.map(m => <option key={m.id} value={m.id}>{m.name}{m.id===currentUserId?' (me)':''}</option>)}
+          </select>
+        </label>
+
+        {/* Approver */}
+        <label style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px',
+          borderRadius:20,
+          border: approverId ? '1px solid #7c3aed55' : '1px solid var(--border)',
+          background: approverId ? '#f5f3ff' : 'var(--surface-subtle)',
+          cursor:'pointer' }}>
+          <Shield style={{ width:11, height:11, color: approverId ? '#7c3aed' : 'var(--text-muted)', flexShrink:0 }}/>
+          <select value={approverId} onChange={e => setApproverId(e.target.value)}
+            style={{ fontSize:12, border:'none', outline:'none',
+              background:'transparent',
+              color: approverId ? '#7c3aed' : 'var(--text-secondary)',
+              cursor:'pointer', appearance:'none', fontWeight: approverId ? 600 : 400 }}>
+            <option value="">Approver…</option>
+            {members.filter(m => m.id !== assignee).map(m => (
+              <option key={m.id} value={m.id}>{m.name}{m.id===currentUserId?' (me)':''}</option>
+            ))}
           </select>
         </label>
 
