@@ -29,6 +29,7 @@ export function ImportView() {
   const [results, setResults] = useState<ImportResults | null>(null)
   const [errMsg,  setErrMsg]  = useState('')
   const [expanded,setExpanded]= useState<Record<string, boolean>>({})
+  const [progress, setProgress] = useState<{step: string; done: boolean; count?: number}[]>([])
 
   /* ── drag & drop ──────────────────────────────────────────────── */
   const onDragOver = useCallback((e: React.DragEvent) => {
@@ -56,22 +57,56 @@ export function ImportView() {
   async function upload() {
     if (!file) return
     setState('uploading')
+    const steps = [
+      { step: 'Reading file…', done: false },
+      { step: 'Importing team members…', done: false },
+      { step: 'Importing clients…', done: false },
+      { step: 'Importing projects…', done: false },
+      { step: 'Importing tasks…', done: false },
+      { step: 'Importing one-time tasks…', done: false },
+      { step: 'Importing recurring tasks…', done: false },
+    ]
+    setProgress(steps.map(s => ({ ...s })))
+
+    // Animate steps while waiting (1 step every ~700ms)
+    let stepIdx = 0
+    const interval = setInterval(() => {
+      if (stepIdx < steps.length) {
+        setProgress(prev => prev.map((s, i) => i <= stepIdx ? { ...s, done: true } : s))
+        stepIdx++
+      }
+    }, 700)
+
     try {
       const fd = new FormData()
       fd.append('file', file)
       const res = await fetch('/api/import', { method: 'POST', body: fd })
       const d   = await res.json()
+      clearInterval(interval)
       if (!res.ok) {
         setErrMsg(d.error ?? 'Import failed')
         setState('error')
+        setProgress([])
       } else {
+        // Mark all done with real counts
+        setProgress([
+          { step: 'File read successfully', done: true },
+          { step: `Team members`, done: true, count: d.results?.members?.created },
+          { step: `Clients`, done: true, count: d.results?.clients?.created },
+          { step: `Projects`, done: true, count: d.results?.projects?.created },
+          { step: `Tasks`, done: true, count: d.results?.tasks?.created },
+          { step: `One-time tasks`, done: true, count: d.results?.onetasks?.created },
+          { step: `Recurring tasks`, done: true, count: d.results?.recurring?.created },
+        ])
         setResults(d.results)
         setState('done')
         router.refresh()
       }
     } catch {
+      clearInterval(interval)
       setErrMsg('Network error — please try again')
       setState('error')
+      setProgress([])
     }
   }
 
@@ -172,10 +207,36 @@ export function ImportView() {
             />
 
             {isUploading ? (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
-                <Loader2 style={{ width: 32, height: 32, color: 'var(--brand)', animation: 'spin 1s linear infinite' }} />
-                <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--brand)', margin: 0 }}>Importing your data…</p>
-                <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>This may take a few seconds</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 0, width: '100%', textAlign: 'left' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                  <Loader2 style={{ width: 18, height: 18, color: 'var(--brand)', animation: 'spin 1s linear infinite', flexShrink: 0 }} />
+                  <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--brand)', margin: 0 }}>Importing your data…</p>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {progress.map((p, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{
+                        width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
+                        background: p.done ? '#16a34a' : 'var(--border)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        transition: 'background 0.3s',
+                      }}>
+                        {p.done
+                          ? <span style={{ color: '#fff', fontSize: 10, fontWeight: 700 }}>✓</span>
+                          : <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff', display: 'block' }}/>
+                        }
+                      </div>
+                      <span style={{ fontSize: 13, color: p.done ? 'var(--text-primary)' : 'var(--text-muted)', fontWeight: p.done ? 500 : 400, transition: 'color 0.3s' }}>
+                        {p.step}
+                        {p.done && p.count !== undefined && (
+                          <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--brand)', fontWeight: 700 }}>
+                            {p.count} imported
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
             ) : file ? (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>

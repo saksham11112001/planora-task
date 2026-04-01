@@ -53,5 +53,27 @@ export async function POST(request: NextRequest) {
     status:      'active',
   }).select('*').single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Create template tasks if provided
+  const templateTasks: { title: string; priority: string }[] = body.template_tasks ?? []
+  if (templateTasks.length > 0 && data?.id) {
+    try {
+      const taskInserts = templateTasks.map(t => ({
+        org_id:      mb.org_id,
+        project_id:  data.id,
+        title:       t.title,
+        priority:    ['low','medium','high','urgent'].includes(t.priority) ? t.priority : 'medium',
+        status:      'todo' as const,
+        created_by:  user.id,
+        is_recurring: false,
+        approval_required: false,
+      }))
+      await supabase.from('tasks').insert(taskInserts)
+    } catch (e) {
+      console.error('[project template tasks]', e)
+      // Don't fail project creation if template tasks fail
+    }
+  }
+
   return NextResponse.json({ data }, { status: 201 })
 }

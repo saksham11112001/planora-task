@@ -4,7 +4,7 @@ import { CustomFieldsPanel } from '@/components/tasks/CustomFieldsPanel'
 import type { CustomFieldDef } from '@/components/tasks/CustomFieldsPanel'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { X, ThumbsUp, ThumbsDown, Flag, Calendar, User, Briefcase, Send, Clock, Sparkles, ShieldCheck } from 'lucide-react'
+import { X, ThumbsUp, ThumbsDown, Flag, Calendar, User, Briefcase, Send, Clock, Sparkles, ShieldCheck, RefreshCw, FolderPlus, ArrowRightLeft } from 'lucide-react'
 import { cn }             from '@/lib/utils/cn'
 import { PRIORITY_CONFIG, STATUS_CONFIG } from '@/types'
 import type { Task }      from '@/types'
@@ -61,6 +61,8 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [aiLoading, setAiLoading] = useState(false)
   const [isSaving,  setIsSaving]  = useState(false)
+  const [converting, setConverting] = useState(false)
+  const [showConvert, setShowConvert] = useState(false)
   const titleRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
@@ -143,6 +145,70 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
     saveTimerRef.current = setTimeout(() => patch(fields), delay)
   }, [patch, task])
+
+
+  /* convert one-time task to recurring */
+  async function convertToRecurring() {
+    if (!task || converting) return
+    const freq = prompt('Frequency? (daily / weekly / monthly / quarterly / annual)', 'weekly')
+    if (!freq) return
+    const allowed = ['daily','weekly','bi_weekly','monthly','quarterly','annual']
+    if (!allowed.includes(freq.trim().toLowerCase())) {
+      toast.error('Invalid frequency. Use: daily, weekly, monthly, quarterly, annual')
+      return
+    }
+    setConverting(true)
+    try {
+      const res = await fetch(`/api/tasks/${task.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          is_recurring: true,
+          frequency: freq.trim().toLowerCase(),
+          next_occurrence_date: task.due_date ?? new Date().toISOString().split('T')[0],
+        }),
+      })
+      if (res.ok) {
+        toast.success('Task converted to recurring ✓')
+        onUpdated?.()
+        onClose()
+      } else {
+        const d = await res.json().catch(() => ({}))
+        toast.error(d.error ?? 'Conversion failed')
+      }
+    } finally { setConverting(false) }
+  }
+
+  /* add one-time task to a project */
+  async function addToProject() {
+    if (!task || converting) return
+    const projectName = prompt('Enter the project name to add this task to:')
+    if (!projectName?.trim()) return
+    setConverting(true)
+    try {
+      // Look up project by name
+      const res = await fetch(`/api/projects?search=${encodeURIComponent(projectName.trim())}`)
+      const d = await res.json()
+      const projects: any[] = d.data ?? []
+      const match = projects.find((p: any) => p.name.toLowerCase() === projectName.trim().toLowerCase())
+      if (!match) {
+        toast.error(`Project "${projectName}" not found. Check the name and try again.`)
+        setConverting(false)
+        return
+      }
+      const patchRes = await fetch(`/api/tasks/${task.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project_id: match.id }),
+      })
+      if (patchRes.ok) {
+        toast.success(`Added to "${match.name}" ✓`)
+        onUpdated?.()
+        onClose()
+      } else {
+        const err = await patchRes.json().catch(() => ({}))
+        toast.error(err.error ?? 'Failed to move task')
+      }
+    } finally { setConverting(false) }
+  }
 
   /* complete toggle */
   async function handleComplete() {
@@ -493,6 +559,42 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                   </FieldRow>
                 )}
               </div>
+
+              {/* ── Convert task actions ── */
+              {!task.is_recurring && (
+                <div className="px-5 pb-4 pt-2">
+                  <button
+                    onClick={() => setShowConvert(p => !p)}
+                    className="flex items-center gap-1.5 text-xs font-medium"
+                    style={{ color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                    <ArrowRightLeft className="h-3 w-3"/>
+                    Convert this task
+                    <span style={{ fontSize: 10, marginLeft: 2 }}>{showConvert ? '▲' : '▼'}</span>
+                  </button>
+                  {showConvert && (
+                    <div className="mt-2 flex gap-2 flex-wrap">
+                      <button
+                        onClick={convertToRecurring}
+                        disabled={converting}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-colors"
+                        style={{ background: '#f0fdfa', color: '#0d9488', border: '1px solid #5eead4', cursor: 'pointer', opacity: converting ? 0.6 : 1 }}>
+                        <RefreshCw className="h-3 w-3"/>
+                        Make recurring
+                      </button>
+                      {!task.project_id && (
+                        <button
+                          onClick={addToProject}
+                          disabled={converting}
+                          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-colors"
+                          style={{ background: '#faf5ff', color: '#7c3aed', border: '1px solid #c4b5fd', cursor: 'pointer', opacity: converting ? 0.6 : 1 }}>
+                          <FolderPlus className="h-3 w-3"/>
+                          Add to project
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
               {/* ── Custom fields ── */}
               {customFieldDefs.length > 0 && task && (
                 <div className="px-5 pb-3">

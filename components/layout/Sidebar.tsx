@@ -113,7 +113,7 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
         {projectsOpen && (
           <>
             <SI href="/projects" active={pathname === '/projects'} icon={<FolderOpen className="h-3.5 w-3.5"/>} label="All projects"/>
-            {projects.map(p => (
+            {projects.slice(0, 4).map(p => (
               <Link key={p.id} href={`/projects/${p.id}`}
                 className={cn('flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm transition-colors',
                   pathname.startsWith(`/projects/${p.id}`)
@@ -123,6 +123,14 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
                 <span className="truncate text-xs">{p.name}</span>
               </Link>
             ))}
+            {projects.length > 4 && (
+              <Link href="/projects"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-md transition-colors text-white/40 hover:text-white/70 hover:bg-white/5"
+                style={{ fontSize: 11 }}>
+                <span style={{ fontSize: 10 }}>•••</span>
+                <span>{projects.length - 4} more project{projects.length - 4 > 1 ? 's' : ''}</span>
+              </Link>
+            )}
           </>
         )}
         {nav.clients && <SI href="/clients"  active={isActive('/clients')}  icon={<Users2   className="h-4 w-4"/>} label="Clients"/>}
@@ -237,7 +245,8 @@ function LogoutButton() {
   async function logout() {
     const sb = createClient()
     await sb.auth.signOut()
-    router.push('/login')
+    // Use hard redirect to landing page — clears all client state and avoids middleware loop
+    window.location.href = '/'
   }
   return (
     <button onClick={logout}

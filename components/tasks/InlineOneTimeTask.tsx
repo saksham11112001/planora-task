@@ -15,7 +15,7 @@ interface Props {
   members:        Member[]
   clients:        { id: string; name: string; color: string }[]
   currentUserId?: string
-  onCreated?:     () => void
+  onCreated?:     (task?: any) => void
 }
 
 const PRIORITY_OPTIONS = [
@@ -39,6 +39,7 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated }
   const [saving,     setSaving]     = useState(false)
   const [title,      setTitle]      = useState('')
   const [assignee,   setAssignee]   = useState(currentUserId ?? '')
+  const [coAssignees, setCoAssignees] = useState<string[]>([])
   const [priority,   setPriority]   = useState('medium')
   const [dueDate,    setDueDate]    = useState('')
   const [clientId,   setClientId]   = useState('')
@@ -107,7 +108,13 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated }
           client_id:         clientId     || null,
           approver_id:       approverId   || null,
           approval_required: !!approverId,
-          custom_fields:     Object.keys(customValues).length > 0 ? customValues : undefined,
+          is_recurring:      makeRecurring || undefined,
+          frequency:         makeRecurring ? recurringFreq : undefined,
+          project_id:        addToProjectId || undefined,
+          custom_fields:     {
+            ...(Object.keys(customValues).length > 0 ? customValues : {}),
+            ...(coAssignees.length > 0 ? { _co_assignees: coAssignees } : {}),
+          },
           subtasks:          compSubtasks.length > 0 ? compSubtasks.map(s => ({ title: s.title, required: s.required })) : undefined,
         }),
       })
@@ -123,7 +130,7 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated }
 
       toast.success('Task created')
       reset()
-      onCreated ? onCreated() : router.refresh()
+      onCreated ? onCreated(d.data) : router.refresh()
     } finally { setSaving(false) }
   }
 
@@ -205,6 +212,28 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated }
               {members.map(m => <option key={m.id} value={m.id}>{m.name}{m.id === currentUserId ? ' (me)' : ''}</option>)}
             </select>
           </label>
+        )}
+
+        {/* Co-assignees multi-select */}
+        {members.length > 1 && (
+          <div style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px',
+            borderRadius:20, border: coAssignees.length > 0 ? '1.5px solid var(--brand)' : '1px solid var(--border)',
+            background: coAssignees.length > 0 ? 'var(--brand-light)' : 'var(--surface-subtle)', flexWrap:'wrap', maxWidth:240 }}>
+            <User style={{ width:11, height:11, color: coAssignees.length>0?'var(--brand)':'var(--text-muted)', flexShrink:0 }}/>
+            <span style={{ fontSize:11, color: coAssignees.length>0?'var(--brand)':'var(--text-muted)', fontWeight:600, flexShrink:0 }}>
+              {coAssignees.length > 0 ? `+${coAssignees.length} co-assignee${coAssignees.length>1?'s':''}` : 'Add co-assignee'}
+            </span>
+            {members.filter(m => m.id !== assignee).map(m => (
+              <button key={m.id} type="button"
+                onClick={() => setCoAssignees(p => p.includes(m.id) ? p.filter(id=>id!==m.id) : [...p, m.id])}
+                style={{ fontSize:10, padding:'1px 7px', borderRadius:99, border:'none', cursor:'pointer',
+                  background: coAssignees.includes(m.id) ? 'var(--brand)' : '#e2e8f0',
+                  color: coAssignees.includes(m.id) ? '#fff' : '#374151',
+                  fontFamily:'inherit', fontWeight:600, flexShrink:0 }}>
+                {m.name.split(' ')[0]}
+              </button>
+            ))}
+          </div>
         )}
 
         {/* Priority */}

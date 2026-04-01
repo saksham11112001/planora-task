@@ -1,3 +1,74 @@
+
+const PROJECT_TEMPLATES: Record<string, { icon: string; desc: string; tasks: { title: string; priority: 'medium' | 'high' | 'low' }[] }> = {
+  'Restaurant Consultancy': {
+    icon: '🍽️', desc: 'Menu review, SOP setup, staff training, compliance audit',
+    tasks: [
+      { title: 'Initial site visit & assessment', priority: 'high' },
+      { title: 'Menu engineering & costing', priority: 'high' },
+      { title: 'SOP documentation', priority: 'medium' },
+      { title: 'Staff training plan', priority: 'medium' },
+      { title: 'FSSAI compliance audit', priority: 'high' },
+      { title: 'Marketing & branding review', priority: 'low' },
+      { title: 'Final recommendations report', priority: 'high' },
+    ],
+  },
+  'Website Development': {
+    icon: '🌐', desc: 'Discovery, design, build, QA, and launch',
+    tasks: [
+      { title: 'Requirements gathering & discovery', priority: 'high' },
+      { title: 'Wireframes & UX design', priority: 'high' },
+      { title: 'UI design (desktop + mobile)', priority: 'high' },
+      { title: 'Frontend development', priority: 'medium' },
+      { title: 'Backend / CMS setup', priority: 'medium' },
+      { title: 'Content upload & SEO setup', priority: 'medium' },
+      { title: 'QA testing & bug fixes', priority: 'high' },
+      { title: 'Launch & handover', priority: 'high' },
+    ],
+  },
+  'Audit Engagement': {
+    icon: '📋', desc: 'Statutory audit planning through report issuance',
+    tasks: [
+      { title: 'Engagement letter & terms', priority: 'high' },
+      { title: 'Preliminary assessment & risk analysis', priority: 'high' },
+      { title: 'Audit plan preparation', priority: 'medium' },
+      { title: 'Fieldwork — vouching & verification', priority: 'high' },
+      { title: 'Internal control testing', priority: 'medium' },
+      { title: 'Queries & management responses', priority: 'medium' },
+      { title: 'Audit report drafting', priority: 'high' },
+      { title: 'Partner review & sign-off', priority: 'high' },
+    ],
+  },
+  'Marketing Campaign': {
+    icon: '📣', desc: 'Strategy, content, execution, and reporting',
+    tasks: [
+      { title: 'Campaign brief & objectives', priority: 'high' },
+      { title: 'Target audience research', priority: 'medium' },
+      { title: 'Content calendar creation', priority: 'high' },
+      { title: 'Creative assets (graphics, copy)', priority: 'high' },
+      { title: 'Ad setup & targeting', priority: 'medium' },
+      { title: 'Campaign launch', priority: 'high' },
+      { title: 'Mid-campaign review & optimisation', priority: 'medium' },
+      { title: 'Final report & learnings', priority: 'medium' },
+    ],
+  },
+  'Event Management': {
+    icon: '🎪', desc: 'Planning, logistics, execution, and post-event review',
+    tasks: [
+      { title: 'Event concept & brief', priority: 'high' },
+      { title: 'Venue finalisation', priority: 'high' },
+      { title: 'Vendor bookings (catering, AV, decor)', priority: 'high' },
+      { title: 'Guest list & invitations', priority: 'medium' },
+      { title: 'Run-of-show document', priority: 'medium' },
+      { title: 'Day-of coordination', priority: 'high' },
+      { title: 'Post-event feedback & report', priority: 'low' },
+    ],
+  },
+  'Blank project': {
+    icon: '⬜', desc: 'Start from scratch — no pre-built tasks',
+    tasks: [],
+  },
+}
+
 'use client'
 import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -21,6 +92,8 @@ export function NewProjectForm({ clients, members }: {
   const [budget,     setBudget]     = useState('')
   const [hoursBudget,setHoursBudget]= useState('')
   const [error,      setError]      = useState('')
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null)
+  const [templateTasksPreview, setTemplateTasksPreview] = useState<{ title: string; priority: string }[]>([])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -29,7 +102,7 @@ export function NewProjectForm({ clients, members }: {
     try {
       const res = await fetch('/api/projects', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), description: description || null, color, client_id: clientId || null, owner_id: ownerId || null, due_date: dueDate || null, budget: budget ? parseFloat(budget) : null, hours_budget: hoursBudget ? parseFloat(hoursBudget) : null }),
+        body: JSON.stringify({ name: name.trim(), description: description || null, color, client_id: clientId || null, owner_id: ownerId || null, due_date: dueDate || null, budget: budget ? parseFloat(budget) : null, hours_budget: hoursBudget ? parseFloat(hoursBudget) : null, template_tasks: templateTasksPreview.length > 0 ? templateTasksPreview : undefined }),
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error ?? 'Failed'); return }
@@ -41,6 +114,47 @@ export function NewProjectForm({ clients, members }: {
   return (
     <form onSubmit={handleSubmit} className="card p-6 space-y-5">
       {error && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>}
+
+      {/* Template picker */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Start from a template</label>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(160px, 1fr))', gap:8 }}>
+          {Object.entries(PROJECT_TEMPLATES).map(([tName, tData]) => (
+            <button
+              key={tName}
+              type="button"
+              onClick={() => {
+                setSelectedTemplate(tName)
+                setTemplateTasksPreview(tData.tasks)
+                if (!name) setName(tName === 'Blank project' ? '' : tName)
+              }}
+              style={{
+                padding:'12px', borderRadius:10, border: selectedTemplate === tName ? '2px solid var(--brand)' : '1px solid #e5e7eb',
+                background: selectedTemplate === tName ? 'var(--brand-light)' : '#fafafa',
+                cursor:'pointer', textAlign:'left', transition:'all 0.15s', fontFamily:'inherit',
+              }}>
+              <div style={{ fontSize:20, marginBottom:4 }}>{tData.icon}</div>
+              <div style={{ fontSize:12, fontWeight:700, color: selectedTemplate === tName ? 'var(--brand)' : '#374151', marginBottom:2 }}>{tName}</div>
+              <div style={{ fontSize:10, color:'#9ca3af', lineHeight:1.4 }}>{tData.desc}</div>
+            </button>
+          ))}
+        </div>
+        {templateTasksPreview.length > 0 && (
+          <div style={{ marginTop:10, padding:'10px 14px', borderRadius:8, background:'#f0fdfa', border:'1px solid #99f6e4' }}>
+            <p style={{ fontSize:11, fontWeight:700, color:'#0d9488', marginBottom:6 }}>
+              {templateTasksPreview.length} tasks will be created automatically
+            </p>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+              {templateTasksPreview.slice(0,5).map((t,i) => (
+                <span key={i} style={{ fontSize:10, background:'#fff', color:'#374151', padding:'2px 8px', borderRadius:99, border:'1px solid #ccfbf1' }}>{t.title}</span>
+              ))}
+              {templateTasksPreview.length > 5 && (
+                <span style={{ fontSize:10, color:'#0d9488', fontWeight:600 }}>+{templateTasksPreview.length-5} more</span>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1.5">Project name *</label>
