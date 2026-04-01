@@ -54,24 +54,41 @@ export async function POST(request: NextRequest) {
   }).select('*').single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Create template tasks if provided
-  const templateTasks: { title: string; priority: string }[] = body.template_tasks ?? []
+  // Create template tasks (with subtasks) if provided
+  const templateTasks: { title: string; priority: string; subtasks?: string[] }[] = body.template_tasks ?? []
   if (templateTasks.length > 0 && data?.id) {
     try {
-      const taskInserts = templateTasks.map(t => ({
-        org_id:      mb.org_id,
-        project_id:  data.id,
-        title:       t.title,
-        priority:    ['low','medium','high','urgent'].includes(t.priority) ? t.priority : 'medium',
-        status:      'todo' as const,
-        created_by:  user.id,
-        is_recurring: false,
-        approval_required: false,
-      }))
-      await supabase.from('tasks').insert(taskInserts)
+      for (const t of templateTasks) {
+        const validPriority = ['low','medium','high','urgent'].includes(t.priority) ? t.priority : 'medium'
+        const { data: newTask } = await supabase.from('tasks').insert({
+          org_id:      mb.org_id,
+          project_id:  data.id,
+          title:       t.title,
+          priority:    validPriority,
+          status:      'todo' as const,
+          created_by:  user.id,
+          is_recurring: false,
+          approval_required: false,
+        }).select('id').single()
+
+        // Create subtasks if any
+        if (newTask?.id && t.subtasks && t.subtasks.length > 0) {
+          const subtaskInserts = t.subtasks.map(st => ({
+            org_id:         mb.org_id,
+            project_id:     data.id,
+            parent_task_id: newTask.id,
+            title:          st,
+            priority:       validPriority,
+            status:         'todo' as const,
+            created_by:     user.id,
+            is_recurring:   false,
+            approval_required: false,
+          }))
+          await supabase.from('tasks').insert(subtaskInserts)
+        }
+      }
     } catch (e) {
       console.error('[project template tasks]', e)
-      // Don't fail project creation if template tasks fail
     }
   }
 

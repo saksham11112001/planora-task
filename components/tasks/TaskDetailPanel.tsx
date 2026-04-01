@@ -560,7 +560,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                 )}
               </div>
 
-              {/* ── Convert task actions ── */
+              {/* ── Convert task actions ── */}
               {!task.is_recurring && (
                 <div className="px-5 pb-4 pt-2">
                   <button
