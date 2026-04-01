@@ -303,24 +303,29 @@ button:focus:not(:focus-visible), a:focus:not(:focus-visible) { outline: none; }
 @layer components {
   .detail-panel {
     position: fixed;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    width: 440px;
-    max-width: 95vw;
+    top: 50%;
+    left: 50%;
+    width: 680px;
+    max-width: 94vw;
+    max-height: 88vh;
     background: var(--surface);
-    border-left: 1px solid var(--border);
-    box-shadow: -4px 0 24px rgba(0,0,0,0.08);
-    z-index: 40;           /* above backdrop (z-20) */
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.18), 0 4px 16px rgba(0,0,0,0.08);
+    z-index: 200;
     display: flex;
     flex-direction: column;
     overflow-y: auto;
-    transform: translateX(100%);
-    transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
-    will-change: transform;
+    transform: translate(-50%, -50%) scale(0.96);
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 0.2s cubic-bezier(0.34, 1.2, 0.64, 1), opacity 0.18s ease;
+    will-change: transform, opacity;
   }
   .detail-panel.open {
-    transform: translateX(0);
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+    pointer-events: all;
   }
 }
 
@@ -404,6 +409,16 @@ button:focus:not(:focus-visible), a:focus:not(:focus-visible) { outline: none; }
    DARK MODE — all token overrides under html.dark
    ══════════════════════════════════════════════════════════════════ */
 html.dark {
+  --brand-amber:        #fbbf24;
+  --warning-surface:   #2d2010;
+  --overdue-surface:    #2d1515;
+  --overdue-border:     #7f1d1d;
+  --pending-surface:   #1e1535;
+  --pending-border:    #4c1d95;
+  --inprogress-surface:#0d2a1a;
+  --inprogress-border: #14532d;
+  --completed-surface: #0d2a1a;
+  --completed-border:  #166534;
   /* Surface */
   --surface:        #1e2433;
   --surface-subtle: #161b27;
@@ -717,6 +732,9 @@ html.dark [role="listbox"] { background: var(--surface); }
 /* Inline task creators */
 html.dark .border-t.border-dashed { border-color: var(--border); }
 
+/* Show delete button on task row hover */
+.mytasks-row:hover .delete-task-btn { opacity: 1 !important; }
+
 /* Column headers in task list */
 html.dark [style*="background: 'var(--surface)'"],
 html.dark [style*="background:var(--surface)"] {
@@ -1025,3 +1043,225 @@ html.dark .task-title[style*="#94a3b8"] {
     flex-wrap: wrap;
   }
 }
+
+/* ── InboxView dark mode fixes ──────────────────────────────── */
+html.dark [style*="background: '#fff9f9'"],
+html.dark [style*="background:'#fff9f9'"],
+html.dark [style*="background: #fff9f9"] {
+  background: #2d1515 !important;
+}
+html.dark [style*="background: '#fffbeb'"],
+html.dark [style*="background: #fffbeb"] {
+  background: #2d2010 !important;
+}
+html.dark [style*="background: '#f0fdfa'"],
+html.dark [style*="background: #f0fdfa"],
+html.dark [style*="background:'#f0fdfa'"] {
+  background: var(--brand-light) !important;
+}
+/* Section dividers */
+html.dark [style*="color: '#dc2626'"],
+html.dark [style*="color:#dc2626"] {
+  /* Keep red for overdue but ensure it's visible */
+  color: #f87171 !important;
+}
+/* Subtask rows */
+html.dark [style*="background: 'var(--surface-subtle)'"] {
+  background: var(--surface-subtle) !important;
+}
+/* Inline style green highlights */  
+html.dark [style*="background: 'rgba(13,148,136"] {
+  background: var(--brand-light) !important;
+}
+/* White subtask section */
+html.dark [style*="background:'var(--surface)'"],
+html.dark [style*="background: var(--surface)"] {
+  background: var(--surface) !important;
+}
+/* Upload pill in dark */
+html.dark [style*="background:'rgba(13,148,136,0.1)'"],
+html.dark [style*="background: rgba(13,148,136"] {
+  background: var(--brand-light) !important;
+  border-color: var(--brand-border) !important;
+}
+/* Fix MyTasksView subtask white boxes */
+html.dark [style*="background:'var(--surface-subtle)'"] {
+  background: var(--surface-subtle) !important;
+}
+/* Recurring view subtask area */
+html.dark [style*="background:'var(--surface)'"] {
+  background: var(--surface) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   COMPREHENSIVE DARK MODE — inline style overrides
+   All hardcoded hex colors used throughout the app
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Light surface colors ── */
+html.dark [style*="#fff9f9"],
+html.dark [style*="'#fff9f9'"] { background: #2d1515 !important; }
+
+html.dark [style*="#fffbeb"],
+html.dark [style*="'#fffbeb'"] { background: #2d2010 !important; }
+
+html.dark [style*="#f0fdf4"],
+html.dark [style*="'#f0fdf4'"] { background: #0d2a14 !important; }
+
+html.dark [style*="#fdf4ff"],
+html.dark [style*="'#fdf4ff'"] { background: #1e1535 !important; }
+
+html.dark [style*="#eff6ff"],
+html.dark [style*="'#eff6ff'"] { background: #0f1e35 !important; }
+
+html.dark [style*="#fff7ed"],
+html.dark [style*="'#fff7ed'"] { background: #2d1f0a !important; }
+
+html.dark [style*="#fef2f2"],
+html.dark [style*="'#fef2f2'"] { background: #2d1010 !important; }
+
+html.dark [style*="#f0fdfa"],
+html.dark [style*="'#f0fdfa'"] { background: var(--brand-light) !important; }
+
+html.dark [style*="#ecfdf5"],
+html.dark [style*="'#ecfdf5'"] { background: #0d2a1f !important; }
+
+/* ── White / near-white backgrounds ── */
+html.dark [style*="background:#fff"],
+html.dark [style*="background: #fff"],
+html.dark [style*="background: 'white'"],
+html.dark [style*="background:white"],
+html.dark [style*="background: white"] { background: var(--surface) !important; }
+
+html.dark [style*="background:#f8fafc"],
+html.dark [style*="background: #f8fafc"],
+html.dark [style*="background: 'var(--surface-subtle)'"],
+html.dark [style*="background:'var(--surface-subtle)'"] { background: var(--surface-subtle) !important; }
+
+html.dark [style*="background:#f1f5f9"],
+html.dark [style*="background: #f1f5f9"] { background: var(--border-light) !important; }
+
+html.dark [style*="background:#e2e8f0"],
+html.dark [style*="background: #e2e8f0"] { background: var(--border) !important; }
+
+/* ── Text colors - dark text invisible in dark mode ── */
+html.dark [style*="color:#0f172a"],
+html.dark [style*="color: #0f172a"],
+html.dark [style*="color: '#0f172a'"],
+html.dark [style*="color:'#0f172a'"] { color: var(--text-primary) !important; }
+
+html.dark [style*="color:#1e293b"],
+html.dark [style*="color: #1e293b"] { color: var(--text-primary) !important; }
+
+html.dark [style*="color:#374151"],
+html.dark [style*="color: #374151"],
+html.dark [style*="color: '#374151'"],
+html.dark [style*="color:'#374151'"] { color: var(--text-secondary) !important; }
+
+html.dark [style*="color:#475569"],
+html.dark [style*="color: #475569"] { color: var(--text-secondary) !important; }
+
+html.dark [style*="color:#64748b"],
+html.dark [style*="color: #64748b"],
+html.dark [style*="color: '#64748b'"],
+html.dark [style*="color:'#64748b'"] { color: var(--text-secondary) !important; }
+
+html.dark [style*="color:#6b7280"],
+html.dark [style*="color: #6b7280"] { color: var(--text-secondary) !important; }
+
+html.dark [style*="color:#9ca3af"],
+html.dark [style*="color: #9ca3af"],
+html.dark [style*="color:#94a3b8"],
+html.dark [style*="color: #94a3b8"] { color: var(--text-muted) !important; }
+
+html.dark [style*="color:#111827"],
+html.dark [style*="color: #111827"] { color: var(--text-primary) !important; }
+
+/* Red text - lighten slightly for dark bg */
+html.dark [style*="color:#dc2626"],
+html.dark [style*="color: #dc2626"] { color: #f87171 !important; }
+
+/* ── Borders ── */
+html.dark [style*="border:1px solid #e2e8f0"],
+html.dark [style*="border: 1px solid #e2e8f0"],
+html.dark [style*="borderBottom:1px solid #e2e8f0"],
+html.dark [style*="borderBottom: 1px solid #e2e8f0"],
+html.dark [style*="borderTop:1px solid #e2e8f0"],
+html.dark [style*="borderTop: 1px solid #e2e8f0"] { border-color: var(--border) !important; }
+
+html.dark [style*="border:1px solid #f1f5f9"],
+html.dark [style*="border: 1px solid #f1f5f9"],
+html.dark [style*="borderBottom:1px solid #f1f5f9"],
+html.dark [style*="borderBottom: 1px solid #f1f5f9"] { border-color: var(--border-light) !important; }
+
+html.dark [style*="border:1px solid #e5e7eb"],
+html.dark [style*="border: 1px solid #e5e7eb"] { border-color: var(--border) !important; }
+
+/* ── Specific component patterns ── */
+
+/* MyTasksView / InboxView overdue row */
+html.dark .mytasks-row,
+html.dark .inbox-task-row {
+  background: var(--surface) !important;
+  border-color: var(--border-light) !important;
+}
+html.dark .mytasks-row:hover,
+html.dark .inbox-task-row:hover {
+  background: var(--surface-hover, #252d3d) !important;
+}
+
+/* Subtask expand areas */
+html.dark [style*="background:'var(--surface-subtle)'"],
+html.dark [style*="background: var(--surface-subtle)"] {
+  background: var(--surface-subtle) !important;
+}
+
+/* Upload pill */
+html.dark [style*="rgba(13,148,136,0.1)"] {
+  background: var(--brand-light) !important;
+  border-color: var(--brand-border) !important;
+  color: var(--brand) !important;
+}
+
+/* Section group headers (OVERDUE, IN PROGRESS etc) */
+html.dark [style*="background: '#fff9f9'"],
+html.dark [style*="background:'#fff9f9'"] { background: rgba(220,38,38,0.08) !important; }
+
+/* Compliance picker and CA task cards */
+html.dark [style*="background:'#f0fdfa'"],
+html.dark [style*="background: '#f0fdfa'"],
+html.dark [style*="background: 'rgba(13,148,136"] { 
+  background: var(--brand-light) !important; 
+}
+
+/* Priority badge backgrounds - keep bright colors */
+html.dark [style*="background:'#fef2f2'"] { background: #2d1010 !important; }
+html.dark [style*="background:'#fff7ed'"] { background: #2d1f0a !important; }
+html.dark [style*="background:'#fefce8'"] { background: #2d2910 !important; }
+html.dark [style*="background:'#f0fdf4'"] { background: #0d2a14 !important; }
+
+/* Table/grid header rows */
+html.dark [style*="background: 'var(--surface)'"],
+html.dark [style*="background:'var(--surface)'"] {
+  background: var(--surface) !important;
+}
+
+/* Inline add task rows */
+html.dark [class*="inline-task"],
+html.dark [class*="add-task"] { background: var(--surface) !important; }
+
+/* Panel/drawer backgrounds */
+html.dark [style*="background: '#ffffff'"],
+html.dark [style*="background:'#ffffff'"] { background: var(--surface) !important; }
+
+/* KPI cards with tinted backgrounds */
+html.dark [style*="bg: '#f0fdfa'"] { background: var(--brand-light) !important; }
+
+/* Dark mode for react-select / custom dropdowns */
+html.dark [style*="background: 'var(--surface-subtle)'"] { background: var(--surface-subtle) !important; }
+
+/* Fix all remaining white inline backgrounds in task views */
+html.dark div[style*="background:#fff"],
+html.dark div[style*="background: #fff"],
+html.dark span[style*="background:#fff"],
+html.dark span[style*="background: #fff"] { background: var(--surface) !important; }

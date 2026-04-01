@@ -150,8 +150,6 @@ const PROJECT_TEMPLATES: Record<string, ProjectTemplate> = {
   },
 }
 
-
-
 const COLORS = ['#0d9488','#7c3aed','#dc2626','#ca8a04','#16a34a','#0891b2','#db2777','#ea580c','#4f46e5','#374151']
 
 export function NewProjectForm({ clients, members }: {
@@ -159,19 +157,19 @@ export function NewProjectForm({ clients, members }: {
   members: { id: string; name: string }[]
 }) {
   const router = useRouter()
-  const [saving,     setSaving]     = useState(false)
-  const [name,       setName]       = useState('')
-  const [description,setDescription]= useState('')
-  const [color,      setColor]      = useState('#0d9488')
-  const searchParams = useSearchParams()
-  const [clientId,   setClientId]   = useState(searchParams.get('client') ?? '')
-  const [ownerId,    setOwnerId]    = useState('')
-  const [dueDate,    setDueDate]    = useState('')
-  const [budget,     setBudget]     = useState('')
-  const [hoursBudget,setHoursBudget]= useState('')
-  const [error,      setError]      = useState('')
-  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null)
-  const [templateTasksPreview, setTemplateTasksPreview] = useState<{ title: string; priority: string }[]>([])
+  const [saving,      setSaving]      = useState(false)
+  const [name,        setName]        = useState('')
+  const [description, setDescription] = useState('')
+  const [color,       setColor]       = useState('#0d9488')
+  const searchParams  = useSearchParams()
+  const [clientId,    setClientId]    = useState(searchParams.get('client') ?? '')
+  const [ownerId,     setOwnerId]     = useState('')
+  const [dueDate,     setDueDate]     = useState('')
+  const [budget,      setBudget]      = useState('')
+  const [hoursBudget, setHoursBudget] = useState('')
+  const [error,       setError]       = useState('')
+  const [selectedTemplate,     setSelectedTemplate]     = useState<string | null>(null)
+  const [templateTasksPreview, setTemplateTasksPreview] = useState<TemplateTask[]>([])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -180,7 +178,14 @@ export function NewProjectForm({ clients, members }: {
     try {
       const res = await fetch('/api/projects', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), description: description || null, color, client_id: clientId || null, owner_id: ownerId || null, due_date: dueDate || null, budget: budget ? parseFloat(budget) : null, hours_budget: hoursBudget ? parseFloat(hoursBudget) : null, template_tasks: templateTasksPreview.length > 0 ? templateTasksPreview : undefined }),
+        body: JSON.stringify({
+          name: name.trim(), description: description || null, color,
+          client_id: clientId || null, owner_id: ownerId || null,
+          due_date: dueDate || null,
+          budget: budget ? parseFloat(budget) : null,
+          hours_budget: hoursBudget ? parseFloat(hoursBudget) : null,
+          template_tasks: templateTasksPreview.length > 0 ? templateTasksPreview : undefined,
+        }),
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error ?? 'Failed'); return }
@@ -193,59 +198,50 @@ export function NewProjectForm({ clients, members }: {
     <form onSubmit={handleSubmit} className="card p-6 space-y-5">
       {error && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>}
 
-      {/* Template picker */}
+      {/* ── Template picker — single horizontal scrollable row ── */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">Start from a template</label>
-        {/* Group by industry */}
-        {Array.from(new Set(Object.values(PROJECT_TEMPLATES).map((t: any) => t.industry))).map(industry => (
-          <div key={industry} style={{ marginBottom:12 }}>
-            <p style={{ fontSize:10, fontWeight:700, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:6 }}>{industry}</p>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(155px, 1fr))', gap:8 }}>
-              {Object.entries(PROJECT_TEMPLATES).filter(([,td]: any) => td.industry === industry).map(([tName, tData]: any) => (
-                <button
-                  key={tName}
-                  type="button"
-                  onClick={() => {
-                    setSelectedTemplate(tName)
-                    setTemplateTasksPreview(tData.tasks as any)
-                    if (!name) setName(tName === 'Blank project' ? '' : tName)
-                  }}
-                  style={{
-                    padding:'12px', borderRadius:10,
-                    border: selectedTemplate === tName ? `2px solid ${tData.color}` : '1px solid #e5e7eb',
-                    background: selectedTemplate === tName ? `${tData.color}12` : '#fafafa',
-                    cursor:'pointer', textAlign:'left', transition:'all 0.15s', fontFamily:'inherit',
-                  }}>
-                  <div style={{ fontSize:20, marginBottom:4 }}>{tData.icon}</div>
-                  <div style={{ fontSize:11, fontWeight:700, color: selectedTemplate === tName ? tData.color : '#374151', marginBottom:2 }}>{tName}</div>
-                  <div style={{ fontSize:10, color:'#9ca3af', lineHeight:1.4 }}>{tData.desc}</div>
-                  {tData.tasks.length > 0 && (
-                    <div style={{ marginTop:6, fontSize:10, color: selectedTemplate === tName ? tData.color : '#94a3b8', fontWeight:600 }}>
-                      {tData.tasks.length} tasks · {tData.tasks.reduce((n: number, t: any) => n + (t.subtasks?.length ?? 0), 0)} subtasks
-                    </div>
-                  )}
-                </button>
-              ))}
-            </div>
+        <div style={{ overflowX: 'auto', paddingBottom: 8 }}>
+          <div style={{ display: 'flex', gap: 10, minWidth: 'max-content' }}>
+            {Object.entries(PROJECT_TEMPLATES).map(([tName, tData]) => (
+              <button
+                key={tName}
+                type="button"
+                onClick={() => {
+                  const same = selectedTemplate === tName
+                  setSelectedTemplate(same ? null : tName)
+                  setTemplateTasksPreview(same ? [] : tData.tasks)
+                  if (!name && !same && tName !== 'Blank project') setName(tName)
+                }}
+                style={{
+                  width: 154, flexShrink: 0, padding: '12px 14px', borderRadius: 12, textAlign: 'left',
+                  border: selectedTemplate === tName ? `2px solid ${tData.color}` : '1.5px solid #e5e7eb',
+                  background: selectedTemplate === tName ? `${tData.color}12` : '#fafafa',
+                  cursor: 'pointer', transition: 'all 0.15s', fontFamily: 'inherit',
+                  boxShadow: selectedTemplate === tName ? `0 4px 14px ${tData.color}25` : 'none',
+                }}>
+                <div style={{ fontSize: 22, marginBottom: 6 }}>{tData.icon}</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: selectedTemplate === tName ? tData.color : '#374151', marginBottom: 3, lineHeight: 1.3 }}>{tName}</div>
+                {tData.tasks.length > 0
+                  ? <div style={{ fontSize: 10, color: '#9ca3af' }}>{tData.tasks.length} tasks · {tData.tasks.reduce((n, t) => n + (t.subtasks?.length ?? 0), 0)} subtasks</div>
+                  : <div style={{ fontSize: 10, color: '#9ca3af' }}>Start blank</div>
+                }
+              </button>
+            ))}
           </div>
-        ))}
-        {templateTasksPreview.length > 0 && (
-          <div style={{ marginTop:4, padding:'12px 14px', borderRadius:10, background:'#f0fdfa', border:'1px solid #99f6e4' }}>
-            <p style={{ fontSize:11, fontWeight:700, color:'#0d9488', marginBottom:8 }}>
-              Will create {templateTasksPreview.length} tasks with {(templateTasksPreview as any[]).reduce((n: number, t: any) => n + (t.subtasks?.length ?? 0), 0)} subtasks automatically
+        </div>
+        {selectedTemplate && selectedTemplate !== 'Blank project' && templateTasksPreview.length > 0 && (
+          <div style={{ marginTop: 8, padding: '10px 14px', borderRadius: 10, background: '#f0fdfa', border: '1px solid #99f6e4' }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: '#0d9488', marginBottom: 6 }}>
+              Will auto-create {templateTasksPreview.length} tasks · {templateTasksPreview.reduce((n, t) => n + (t.subtasks?.length ?? 0), 0)} subtasks
             </p>
-            <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-              {(templateTasksPreview as any[]).slice(0, 5).map((t: any, i: number) => (
-                <div key={i} style={{ display:'flex', alignItems:'center', gap:6 }}>
-                  <span style={{ fontSize:11, color:'#374151', fontWeight:500 }}>• {t.title}</span>
-                  {t.subtasks?.length > 0 && (
-                    <span style={{ fontSize:10, color:'#0d9488' }}>({t.subtasks.length} subtasks)</span>
-                  )}
-                </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+              {templateTasksPreview.slice(0, 6).map((t, i) => (
+                <span key={i} style={{ fontSize: 10, background: '#fff', color: '#374151', padding: '2px 8px', borderRadius: 99, border: '1px solid #ccfbf1', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                  {t.title}{t.subtasks?.length ? <span style={{ color: '#0d9488', fontWeight: 700 }}>+{t.subtasks.length}</span> : null}
+                </span>
               ))}
-              {templateTasksPreview.length > 5 && (
-                <span style={{ fontSize:10, color:'#0d9488', fontWeight:600 }}>+{templateTasksPreview.length - 5} more tasks</span>
-              )}
+              {templateTasksPreview.length > 6 && <span style={{ fontSize: 10, color: '#0d9488', fontWeight: 600 }}>+{templateTasksPreview.length - 6} more</span>}
             </div>
           </div>
         )}
@@ -258,7 +254,7 @@ export function NewProjectForm({ clients, members }: {
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1.5">Description</label>
-        <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} className="input resize-none" placeholder="What is this project about?"/>
+        <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} className="input resize-none" placeholder="What is this project about?"/>
       </div>
 
       <div>
@@ -291,7 +287,7 @@ export function NewProjectForm({ clients, members }: {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5">Due date</label>
           <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="input"/>
@@ -300,18 +296,12 @@ export function NewProjectForm({ clients, members }: {
           <label className="block text-sm font-medium text-gray-700 mb-1.5">Budget (₹)</label>
           <input type="number" value={budget} onChange={e => setBudget(e.target.value)} className="input" placeholder="0"/>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">Hours budget</label>
-          <input type="number" value={hoursBudget} onChange={e => setHoursBudget(e.target.value)} className="input" placeholder="0"/>
-        </div>
       </div>
 
-      <div className="flex items-center gap-3 pt-2">
-        <button type="submit" disabled={saving} className="btn btn-brand flex-1">
-          {saving ? 'Creating...' : 'Create project'}
-        </button>
-        <button type="button" onClick={() => router.back()} className="btn btn-outline">Cancel</button>
-      </div>
+      <button type="submit" disabled={saving}
+        className="w-full py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-60">
+        {saving ? 'Creating…' : selectedTemplate && selectedTemplate !== 'Blank project' ? `Create project with ${templateTasksPreview.length} tasks →` : 'Create project'}
+      </button>
     </form>
   )
 }

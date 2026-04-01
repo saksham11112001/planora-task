@@ -305,6 +305,27 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
 
         {/* Task list */}
         <div style={{ flex: 1, overflowY: 'auto', background:'var(--surface)' }}>
+          {/* ── Quick add bar pinned at top ── */}
+          {canCreate && (
+            <div style={{ borderBottom: '1px solid var(--border-light)', background: 'var(--surface)' }}>
+              <InlineOneTimeTask
+                members={members} clients={clients} currentUserId={currentUserId}
+                onCreated={(newTask) => {
+                  if (newTask?.id) {
+                    const enriched = {
+                      ...newTask,
+                      assignee: members.find(m => m.id === newTask.assignee_id) ?? null,
+                      client: clients.find(cl => cl.id === newTask.client_id) ?? null,
+                      subtasks: [],
+                    }
+                    setLocalTasks(prev => [enriched as any, ...prev])
+                  }
+                  startT(() => router.refresh())
+                }}
+              />
+            </div>
+          )}
+
           {sections.map(section => (
             <div key={section.key}>
               {/* Section header */}
@@ -604,25 +625,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                 )
               })}
 
-              {/* Inline add row for In-progress section */}
-              {section.addRow && canCreate && (
-                <InlineOneTimeTask
-                  members={members} clients={clients} currentUserId={currentUserId}
-                  onCreated={(newTask) => {
-                    if (newTask?.id) {
-                      // Optimistically add to local list immediately
-                      const enriched = {
-                        ...newTask,
-                        assignee: members.find(m => m.id === newTask.assignee_id) ?? null,
-                        client: clients.find(c => c.id === newTask.client_id) ?? null,
-                        subtasks: [],
-                      }
-                      setLocalTasks(prev => [enriched as any, ...prev])
-                    }
-                    startT(() => router.refresh())
-                  }}
-                />
-              )}
+              {/* Add task via the top bar */}
             </div>
           ))}
 

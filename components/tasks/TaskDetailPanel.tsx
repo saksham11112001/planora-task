@@ -354,10 +354,10 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
   return (
     <>
       {isOpen && (
-        <div className="fixed inset-0 z-40 bg-black/50" onClick={onClose} style={{ backdropFilter: "blur(2px)" }} />
+        <div className="fixed inset-0 bg-black/50" onClick={onClose} style={{ zIndex: 199, backdropFilter: "blur(2px)" }} />
       )}
 
-      <aside className={cn('detail-panel', isOpen && 'open')} onClick={e => e.stopPropagation()}>
+      <div className={cn('detail-panel', isOpen && 'open')} onClick={e => e.stopPropagation()} role="dialog" aria-modal="true">
         {task && (
           <>
             {/* ── Panel header ── */}
@@ -863,7 +863,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
             )}
           </>
         )}
-      </aside>
+      </div>
     </>
   )
 }

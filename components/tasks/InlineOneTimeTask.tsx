@@ -75,9 +75,10 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated }
   }, [title])
 
   useEffect(() => {
+    if (!open) return  // only listen when form is actually open
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [handleClickOutside])
+  }, [open, handleClickOutside])
 
   function openRow() { setOpen(true); setTimeout(() => inputRef.current?.focus(), 50) }
 
@@ -149,8 +150,12 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated }
         }}
         onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = 'var(--brand)'; el.style.background = 'var(--brand-light)' }}
         onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = 'var(--text-muted)'; el.style.background = 'transparent' }}>
-          <Plus style={{ width: 14, height: 14, flexShrink: 0 }} />
-          <span style={{ fontSize: 13 }}>Add task</span>
+          <div style={{ width: 18, height: 18, borderRadius: '50%', border: '1.5px dashed currentColor',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Plus style={{ width: 10, height: 10 }} />
+          </div>
+          <span style={{ fontSize: 13, fontWeight: 500 }}>Add task</span>
+          <span style={{ fontSize: 10, opacity: 0.5, marginLeft: 'auto' }}>↵ Enter</span>
         </div>
         {caComplianceMode && (
           <div style={{ display:'flex', alignItems:'center', gap:8, padding:'5px 14px',

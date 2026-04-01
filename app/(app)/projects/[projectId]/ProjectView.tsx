@@ -602,10 +602,23 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
                     {section.label} <span className="opacity-40 font-normal normal-case text-xs">({section.tasks.length})</span>
                   </button>
                   {!isCollapsed && (
-                    <>{section.tasks.map(t => <TaskRow key={t.id} task={t}/>)}
+                    <>
+                      {section.tasks.map(t => <TaskRow key={t.id} task={t}/>)}
                       {section.creator && canManage && (
                         <InlineTaskRow projectId={project.id} defaultClientId={defaultClientId} members={members} clients={clients}
-                          currentUserId={currentUserId} defaultStatus="todo" onCreated={() => startT(() => router.refresh())}/>
+                          currentUserId={currentUserId} defaultStatus="todo" onCreated={(newTask) => {
+                          if (newTask?.id) {
+                            setTasks(prev => [{
+                              ...newTask,
+                              status: newTask.status ?? 'todo',
+                              priority: newTask.priority ?? 'medium',
+                              assignee: members.find(m => m.id === newTask.assignee_id) ?? null,
+                              client: clients.find(cl => cl.id === newTask.client_id) ?? null,
+                              subtasks: [],
+                            } as any, ...prev])
+                          }
+                          startT(() => router.refresh())
+                        }}/>
                       )}</>
                   )}
                 </div>
@@ -721,7 +734,19 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
                     })}
                     {col.status === 'todo' && canManage && (
                       <InlineTaskRow projectId={project.id} defaultClientId={defaultClientId} members={members} clients={clients}
-                        currentUserId={currentUserId} defaultStatus="todo" onCreated={() => startT(() => router.refresh())}/>
+                        currentUserId={currentUserId} defaultStatus="todo" onCreated={(newTask) => {
+                          if (newTask?.id) {
+                            setTasks(prev => [{
+                              ...newTask,
+                              status: newTask.status ?? 'todo',
+                              priority: newTask.priority ?? 'medium',
+                              assignee: members.find(m => m.id === newTask.assignee_id) ?? null,
+                              client: clients.find(cl => cl.id === newTask.client_id) ?? null,
+                              subtasks: [],
+                            } as any, ...prev])
+                          }
+                          startT(() => router.refresh())
+                        }}/>
                     )}
                     {colTasks.length === 0 && col.status !== 'todo' && (
                       <div className="text-center py-8 text-xs text-gray-300">No tasks</div>

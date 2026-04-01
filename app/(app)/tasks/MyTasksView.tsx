@@ -6,6 +6,7 @@ import { RefreshCw, CheckCheck, Clock, FolderOpen, Filter, X, Trash2 } from 'luc
 import { cn }           from '@/lib/utils/cn'
 import { PriorityBadge, Avatar } from '@/components/ui/Badge'
 import { TaskDetailPanel }       from '@/components/tasks/TaskDetailPanel'
+import { InlineOneTimeTask }     from '@/components/tasks/InlineOneTimeTask'
 import { CompletionAttachModal }  from '@/components/tasks/CompletionAttachModal'
 import { fmtDate, isOverdue, todayStr } from '@/lib/utils/format'
 import { PRIORITY_CONFIG } from '@/types'
@@ -19,6 +20,7 @@ interface Props {
   clients:       { id: string; name: string; color: string }[]
   currentUserId?: string
   userRole?:      string
+  canCreate?:     boolean
 }
 
 const LIST_SECS = [
@@ -222,6 +224,30 @@ export function MyTasksView({ tasks: initialTasks, pendingApprovalTasks = [], me
     <>
       <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden', background:'var(--surface)' }}>
         <Tabs/>
+
+        {/* ── Quick add task bar at top of list ── */}
+        {canCreate && (
+          <div style={{ borderBottom: '1px solid var(--border-light)', background: 'var(--surface)' }}>
+            <InlineOneTimeTask
+              members={members} clients={clients} currentUserId={currentUserId}
+              onCreated={(newTask) => {
+                if (newTask?.id) {
+                  const enriched = {
+                    ...newTask, description: null, project_id: null, project: null,
+                    is_archived: false, created_at: '', approval_required: false,
+                    completed_at: null, is_recurring: false, estimated_hours: null,
+                    approval_status: null, approver: null, approver_id: null,
+                    assignee: members.find(m => m.id === newTask.assignee_id) ?? null,
+                    client: clients.find(cl => cl.id === newTask.client_id) ?? null,
+                  }
+                  setTasks(prev => [enriched as any, ...prev])
+                }
+                refresh()
+              }}
+            />
+          </div>
+        )}
+
         {checked.size > 0 && (
           <div style={{ display:'flex', alignItems:'center', gap:12, padding:'8px 20px',
             background:'var(--brand-light)', borderBottom:`1px solid var(--brand-border)`, flexShrink:0 }}>
