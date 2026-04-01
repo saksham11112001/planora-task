@@ -1,8 +1,8 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { ThemeProvider }       from '@/components/theme/ThemeProvider'
-import { NavigationProgress }
-import { KeyboardShortcuts }    from '@/components/ui/KeyboardShortcuts'  from '@/components/ui/NavigationProgress'
+import { NavigationProgress }  from '@/components/ui/NavigationProgress'
+import { KeyboardShortcuts }    from '@/components/ui/KeyboardShortcuts'
 
 export const metadata: Metadata = {
   title:       { default: 'Planora', template: '%s | Planora' },

@@ -214,6 +214,7 @@ export default async function LandingPage() {
           </div>
         </div>
       </div>
+      </div>
 
       {/* TRUST BAR — stats + social proof */}
       <div style={{ borderTop: '1px solid #f1f5f9', borderBottom: '1px solid #f1f5f9', padding: '18px 5%', background: S }}>
@@ -477,6 +478,8 @@ export default async function LandingPage() {
         </div>
         <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: 12, margin: 0 }}>© 2026 SNG Advisers. All rights reserved.</p>
       </footer>
+
+    </div>
 
     </div>
   )
