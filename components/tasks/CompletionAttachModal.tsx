@@ -115,8 +115,8 @@ export function CompletionAttachModal({ taskId, taskTitle, onConfirm, onCancel }
           <button onClick={handleConfirm} disabled={uploading}
             style={{
               flex: 1, padding: '10px', borderRadius: 8, border: 'none',
-              background: '#16a34a', color: '#fff', fontSize: 13, fontWeight: 600,
-              cursor: uploading ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
+              background: files.length > 0 ? '#16a34a' : '#94a3b8', color: '#fff', fontSize: 13, fontWeight: 600,
+              cursor: uploading || files.length === 0 ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
               opacity: uploading ? 0.7 : 1, transition: 'all 0.15s',
             }}>
             {uploading ? 'Uploading…' : files.length > 0 ? `Attach & mark complete` : 'Select a file to continue'}

@@ -1,8 +1,5 @@
-export const dynamic = 'force-dynamic'
-
 import { redirect }  from 'next/navigation'
-import { AppShell }          from './AppShell'
-import { AuthErrorBoundary } from '@/components/auth/AuthErrorBoundary'
+import { AppShell }  from './AppShell'
 import { createClient } from '@/lib/supabase/server'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -30,7 +27,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
     // No active membership — check for pending/inactive membership
     if (!membership) {
-      const { createAdminClient } = await import('@/lib/supabase/admin')
+      const { createClient: createAdminClient } = await import('@/lib/supabase/admin')
       const admin = createAdminClient()
 
       const { data: pending } = await admin
@@ -55,7 +52,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     if (!org) redirect('/onboarding')
 
     return (
-      <AuthErrorBoundary>
       <AppShell
         user={{
           id:         user!.id,
@@ -77,7 +73,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       >
         {children}
       </AppShell>
-      </AuthErrorBoundary>
     )
   } catch (err: any) {
     // If it's a redirect, re-throw it (Next.js redirects are thrown internally)

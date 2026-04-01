@@ -2,13 +2,6 @@ import { createClient }      from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse }       from 'next/server'
 import type { NextRequest }   from 'next/server'
-import { COMPLIANCE_TASKS }   from '@/lib/data/complianceTasks'
-
-// Build a lookup map for compliance tasks by title (case-insensitive)
-const COMPLIANCE_MAP = new Map(COMPLIANCE_TASKS.map(t => [t.title.toLowerCase().trim(), t]))
-function findComplianceTask(title: string) {
-  return COMPLIANCE_MAP.get(title.toLowerCase().trim()) ?? null
-}
 
 async function parseXlsx(buffer: ArrayBuffer): Promise<Record<string, string[][]>> {
   const XLSX = await import('xlsx')
@@ -31,30 +24,7 @@ function findCol(headers: string[], ...keys: string[]): number {
   return -1
 }
 function cell(row: string[], idx: number): string {
-  if (idx < 0) return ''
-  const raw = String(row[idx] ?? '')
-  // Strip common formatting artifacts from paste: zero-width spaces, non-breaking spaces,
-  // smart quotes, leading/trailing whitespace, and multiple internal spaces
-  return raw
-    .replace(/[​‌‍﻿ ]/g, ' ')  // zero-width + non-breaking spaces
-    .replace(/[‘’]/g, "'")   // smart single quotes
-    .replace(/[“”]/g, '"')   // smart double quotes
-    .replace(/\s+/g, ' ')              // collapse multiple spaces
-    .trim()
-}
-
-const VALID_ROLES     = ['owner','admin','manager','member','viewer']
-const VALID_PRIORITY  = ['none','low','medium','high','urgent']
-const VALID_STATUS    = ['todo','in_progress','completed','blocked','cancelled']
-const VALID_FREQ      = ['daily','weekly','bi_weekly','monthly','quarterly','annual']
-const VALID_CL_STATUS = ['active','inactive','lead']
-
-function validateDropdown(value: string, allowed: string[], fieldName: string, rowNum: number): string | null {
-  if (!value) return null  // empty is ok (will use default)
-  if (!allowed.includes(value.toLowerCase())) {
-    return `Row ${rowNum}: "${fieldName}" must be one of: ${allowed.join(', ')} (got "${value}")`
-  }
-  return null
+  return idx >= 0 ? String(row[idx] ?? '').trim() : ''
 }
 // Skip sample/hint rows: contain placeholder text or @yourcompany.com
 function isSampleRow(row: string[]): boolean {
@@ -159,11 +129,7 @@ export async function POST(request: NextRequest) {
         if (isSampleRow(row)) continue
         const email = cell(row, iEmail).toLowerCase().trim()
         const name  = cell(row, iName)
-        const rawRole = cell(row, iRole).toLowerCase().trim()
-        const role    = VALID_ROLES.includes(rawRole) ? rawRole : 'member'
-        if (rawRole && !VALID_ROLES.includes(rawRole)) {
-          errors.push(`Row ${i + 2}: role "${rawRole}" invalid — using "member". Valid: ${VALID_ROLES.join(', ')}`)
-        }
+        const role  = cell(row, iRole).toLowerCase().trim() || 'member'
         if (!email || !email.includes('@')) continue
         if (!['admin', 'manager', 'member', 'viewer'].includes(role)) {
           results.members.errors.push(`${email}: invalid role "${role}"`)
@@ -385,8 +351,7 @@ export async function POST(request: NextRequest) {
         }
         const projectId  = await resolveProject(cell(row, iProject))
         const clientId   = await resolveClient(cell(row, iClient))
-        const assigneeData = cell(row, iAssignee) ? await resolveEmails(cell(row, iAssignee)) : { primary: null, coAssignees: [] }
-        const assigneeId = assigneeData.primary
+        const assigneeId = cell(row, iAssignee) ? await resolveEmail(cell(row, iAssignee)) : null
         const status     = cell(row, iStatus) || 'todo'
         const { error: tErr } = await admin.from('tasks').insert({
           org_id: orgId, title: title.trim(),
@@ -396,7 +361,6 @@ export async function POST(request: NextRequest) {
           due_date: cell(row, iDue) || null,
           estimated_hours: cell(row, iHours) ? parseFloat(cell(row, iHours)) : null,
           created_by: user.id, is_recurring: false, approval_required: false,
-          custom_fields: assigneeData.coAssignees.length > 0 ? { _co_assignees: assigneeData.coAssignees } : null,
         })
         if (tErr) { results.tasks.errors.push(`"${title}": ${tErr.message}`); results.tasks.skipped++ }
         else results.tasks.created++
@@ -429,43 +393,20 @@ export async function POST(request: NextRequest) {
           results.onetasks.errors.push(`"${title}": invalid priority "${priority}"`); results.onetasks.skipped++; continue
         }
         const clientId   = await resolveClient(cell(row, iClient))
-        const assigneeData2 = cell(row, iAssignee) ? await resolveEmails(cell(row, iAssignee)) : { primary: null, coAssignees: [] }
-        const assigneeId = assigneeData2.primary
-        // Check for compliance_task_type column
-        const iCompliance = findCol(headers, 'compliancetasktype', 'compliance', 'compliancetask')
-        const complianceType = cell(row, iCompliance)
-        const compTask = complianceType ? findComplianceTask(complianceType) : null
-        // If compliance type found, use its title and priority
-        const finalTitle    = compTask ? compTask.title : title.trim()
-        const finalPriority = compTask ? compTask.priority : priority
-
-        const { data: newTask, error: tErr } = await admin.from('tasks').insert({
-          org_id: orgId, title: finalTitle,
+        const assigneeId = cell(row, iAssignee) ? await resolveEmail(cell(row, iAssignee)) : null
+        const { error: tErr } = await admin.from('tasks').insert({
+          org_id: orgId, title: title.trim(),
           description: cell(row, iDesc) || null,
-          status: 'todo', priority: finalPriority,
-          project_id: null,
+          status: 'todo', priority,
+          project_id: null,   // no project → one-time task
           client_id: clientId,
           assignee_id: assigneeId,
           due_date: cell(row, iDue) || null,
           estimated_hours: cell(row, iHours) ? parseFloat(cell(row, iHours)) : null,
           created_by: user.id, is_recurring: false, approval_required: false,
-          custom_fields: assigneeData2.coAssignees.length > 0 ? { _co_assignees: assigneeData2.coAssignees } : null,
-        }).select('id').single()
-        if (tErr) { results.onetasks.errors.push(`"${finalTitle}": ${tErr.message}`); results.onetasks.skipped++ }
-        else {
-          results.onetasks.created++
-          // Create compliance subtasks if compliance task type matched
-          if (compTask && newTask?.id && compTask.subtasks.length > 0) {
-            const subtaskInserts = compTask.subtasks.map(s => ({
-              org_id: orgId, title: s.title, status: 'todo' as const,
-              priority: compTask.priority, assignee_id: assigneeId || null,
-              client_id: clientId || null, due_date: cell(row, iDue) || null,
-              parent_task_id: newTask.id, created_by: user.id, is_recurring: false,
-              custom_fields: s.required ? { _compliance_subtask: true } : null,
-            }))
-            await admin.from('tasks').insert(subtaskInserts)
-          }
-        }
+        })
+        if (tErr) { results.onetasks.errors.push(`"${title}": ${tErr.message}`); results.onetasks.skipped++ }
+        else results.onetasks.created++
       }
     }
   }
@@ -500,8 +441,7 @@ export async function POST(request: NextRequest) {
         }
         const projectId  = await resolveProject(cell(row, iProject))
         const clientId   = await resolveClient(cell(row, iClient))
-        const assigneeData3 = cell(row, iAssignee) ? await resolveEmails(cell(row, iAssignee)) : { primary: null, coAssignees: [] }
-        const assigneeId = assigneeData3.primary
+        const assigneeId = cell(row, iAssignee) ? await resolveEmail(cell(row, iAssignee)) : null
         const startDate  = cell(row, iStart) || new Date().toISOString().split('T')[0]
         const { error: rErr } = await admin.from('tasks').insert({
           org_id: orgId, title: title.trim(),
@@ -512,7 +452,6 @@ export async function POST(request: NextRequest) {
           assignee_id: assigneeId, project_id: projectId,
           client_id: clientId,
           created_by: user.id, approval_required: false,
-          custom_fields: assigneeData3.coAssignees.length > 0 ? { _co_assignees: assigneeData3.coAssignees } : null,
         })
         if (rErr) { results.recurring.errors.push(`"${title}": ${rErr.message}`); results.recurring.skipped++ }
         else results.recurring.created++
@@ -521,71 +460,5 @@ export async function POST(request: NextRequest) {
   }
 
   const totalCreated = Object.values(results).reduce((s, r) => s + r.created, 0)
-  // ── 7. CA COMPLIANCE TASKS SHEET ─────────────────────────────
-  const caSheet = Object.keys(sheets).find(k =>
-    norm(k).includes('cacompliance') || (norm(k).includes('compliance') && !norm(k).includes('non'))
-  )
-  if (caSheet) {
-    const caResults = { created: 0, skipped: 0, errors: [] as string[] }
-    const rows = sheets[caSheet]
-    const hdrIdx = rows.findIndex(r =>
-      r.some(cc => norm(cc).includes('compliance') || norm(cc).includes('tasktype'))
-    )
-    if (hdrIdx !== -1) {
-      const headers = rows[hdrIdx]
-      const iType     = findCol(headers, 'compliancetasktype', 'tasktype', 'compliance')
-      const iClient   = findCol(headers, 'clientname', 'client')
-      const iAssignee = findCol(headers, 'assigneeemail', 'assignee')
-      const iDue      = findCol(headers, 'duedate', 'due')
-      const iPriority = findCol(headers, 'priority')
-      const iFreq     = findCol(headers, 'frequency', 'freq')
-      for (const row of rows.slice(hdrIdx + 2)) {
-        if (isSampleRow(row)) continue
-        const typeName = cell(row, iType); if (!typeName) continue
-        const compTask = findComplianceTask(typeName)
-        if (!compTask) { caResults.errors.push(`"${typeName}": not recognised`); caResults.skipped++; continue }
-        const clientId   = await resolveClient(cell(row, iClient))
-        const assigneeData4 = cell(row, iAssignee) ? await resolveEmails(cell(row, iAssignee)) : { primary: null, coAssignees: [] }
-        const assigneeId = assigneeData4.primary
-        const priority   = cell(row, iPriority) || compTask.priority
-        const dueDate    = cell(row, iDue) || null
-        const freqRaw    = cell(row, iFreq)
-        const freqMap: Record<string,string> = { daily:'daily',weekly:'weekly',monthly:'monthly',quarterly:'quarterly',annual:'annual',yearly:'annual',biweekly:'bi_weekly',fortnightly:'bi_weekly' }
-        const frequency  = freqRaw ? (freqMap[norm(freqRaw)] ?? 'monthly') : null
-        const { data: newTask, error: tErr } = await admin.from('tasks').insert({
-          org_id: orgId, title: compTask.title, status: 'todo', priority,
-          client_id: clientId, assignee_id: assigneeId, due_date: dueDate,
-          is_recurring: !!frequency, frequency: frequency ?? undefined,
-          next_occurrence_date: frequency && dueDate ? dueDate : null,
-          created_by: user.id, approval_required: false,
-          custom_fields: assigneeData4.coAssignees.length > 0 ? { _co_assignees: assigneeData4.coAssignees } : null,
-        }).select('id').single()
-        if (tErr) { caResults.errors.push(`"${compTask.title}": ${tErr.message}`); caResults.skipped++ }
-        else {
-          caResults.created++
-          if (newTask?.id && compTask.subtasks.length > 0) {
-            await admin.from('tasks').insert(compTask.subtasks.map(s => ({
-              org_id: orgId, title: s.title, status: 'todo' as const, priority,
-              assignee_id: assigneeId || null, client_id: clientId || null, due_date: dueDate,
-              parent_task_id: newTask.id, created_by: user.id, is_recurring: false,
-              custom_fields: s.required ? { _compliance_subtask: true } : null,
-            })))
-          }
-        }
-      }
-    }
-    ;(results as any).compliance = caResults
-    totalCreated += caResults.created
-  }
-
   return NextResponse.json({ success: true, results, totalCreated })
 }
-
-async function resolveEmails(emailStr: string): Promise<{ primary: string | null; coAssignees: string[] }> {
-  if (!emailStr.trim()) return { primary: null, coAssignees: [] }
-  const emails = emailStr.split(',').map(e => e.trim()).filter(Boolean)
-  const ids = await Promise.all(emails.map(e => resolveEmail(e)))
-  const validIds = ids.filter(Boolean) as string[]
-  return { primary: validIds[0] ?? null, coAssignees: validIds.slice(1) }
-}
-

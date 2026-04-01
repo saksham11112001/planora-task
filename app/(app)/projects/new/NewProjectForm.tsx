@@ -148,75 +148,8 @@ const PROJECT_TEMPLATES: Record<string, ProjectTemplate> = {
     icon: '⬜', industry: 'General', desc: 'Start from scratch — no pre-built tasks', color: '#64748b',
     tasks: [],
   },
-}> = {
-  'Restaurant Consultancy': {
-    icon: '🍽️', desc: 'Menu review, SOP setup, staff training, compliance audit',
-    tasks: [
-      { title: 'Initial site visit & assessment', priority: 'high' },
-      { title: 'Menu engineering & costing', priority: 'high' },
-      { title: 'SOP documentation', priority: 'medium' },
-      { title: 'Staff training plan', priority: 'medium' },
-      { title: 'FSSAI compliance audit', priority: 'high' },
-      { title: 'Marketing & branding review', priority: 'low' },
-      { title: 'Final recommendations report', priority: 'high' },
-    ],
-  },
-  'Website Development': {
-    icon: '🌐', desc: 'Discovery, design, build, QA, and launch',
-    tasks: [
-      { title: 'Requirements gathering & discovery', priority: 'high' },
-      { title: 'Wireframes & UX design', priority: 'high' },
-      { title: 'UI design (desktop + mobile)', priority: 'high' },
-      { title: 'Frontend development', priority: 'medium' },
-      { title: 'Backend / CMS setup', priority: 'medium' },
-      { title: 'Content upload & SEO setup', priority: 'medium' },
-      { title: 'QA testing & bug fixes', priority: 'high' },
-      { title: 'Launch & handover', priority: 'high' },
-    ],
-  },
-  'Audit Engagement': {
-    icon: '📋', desc: 'Statutory audit planning through report issuance',
-    tasks: [
-      { title: 'Engagement letter & terms', priority: 'high' },
-      { title: 'Preliminary assessment & risk analysis', priority: 'high' },
-      { title: 'Audit plan preparation', priority: 'medium' },
-      { title: 'Fieldwork — vouching & verification', priority: 'high' },
-      { title: 'Internal control testing', priority: 'medium' },
-      { title: 'Queries & management responses', priority: 'medium' },
-      { title: 'Audit report drafting', priority: 'high' },
-      { title: 'Partner review & sign-off', priority: 'high' },
-    ],
-  },
-  'Marketing Campaign': {
-    icon: '📣', desc: 'Strategy, content, execution, and reporting',
-    tasks: [
-      { title: 'Campaign brief & objectives', priority: 'high' },
-      { title: 'Target audience research', priority: 'medium' },
-      { title: 'Content calendar creation', priority: 'high' },
-      { title: 'Creative assets (graphics, copy)', priority: 'high' },
-      { title: 'Ad setup & targeting', priority: 'medium' },
-      { title: 'Campaign launch', priority: 'high' },
-      { title: 'Mid-campaign review & optimisation', priority: 'medium' },
-      { title: 'Final report & learnings', priority: 'medium' },
-    ],
-  },
-  'Event Management': {
-    icon: '🎪', desc: 'Planning, logistics, execution, and post-event review',
-    tasks: [
-      { title: 'Event concept & brief', priority: 'high' },
-      { title: 'Venue finalisation', priority: 'high' },
-      { title: 'Vendor bookings (catering, AV, decor)', priority: 'high' },
-      { title: 'Guest list & invitations', priority: 'medium' },
-      { title: 'Run-of-show document', priority: 'medium' },
-      { title: 'Day-of coordination', priority: 'high' },
-      { title: 'Post-event feedback & report', priority: 'low' },
-    ],
-  },
-  'Blank project': {
-    icon: '⬜', desc: 'Start from scratch — no pre-built tasks',
-    tasks: [],
-  },
 }
+
 
 
 const COLORS = ['#0d9488','#7c3aed','#dc2626','#ca8a04','#16a34a','#0891b2','#db2777','#ea580c','#4f46e5','#374151']

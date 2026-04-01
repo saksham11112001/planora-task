@@ -513,6 +513,26 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                   </select>
                 </FieldRow>
 
+                {/* Co-assignees from custom_fields */}
+                {(() => {
+                  const coIds: string[] = (task as any)?.custom_fields?._co_assignees ?? []
+                  if (!coIds.length) return null
+                  const coNames = coIds.map((id: string) => members.find(m => m.id === id)?.name).filter(Boolean)
+                  if (!coNames.length) return null
+                  return (
+                    <FieldRow label="Co-assignees">
+                      <User className="h-3.5 w-3.5" style={{ color: 'var(--text-muted)' }} />
+                      <div className="flex gap-1 flex-wrap">
+                        {coNames.map((name, i) => (
+                          <span key={i} style={{ fontSize: 11, padding: '1px 8px', borderRadius: 99, background: 'var(--surface-subtle)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>
+                            {name as string}
+                          </span>
+                        ))}
+                      </div>
+                    </FieldRow>
+                  )
+                })()}
+
                 <FieldRow label="Due date">
                   <Calendar className="h-3.5 w-3.5" style={{ color: 'var(--text-muted)' }} />
                   <input type="date" value={dueDate}
