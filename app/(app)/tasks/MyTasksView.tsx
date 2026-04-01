@@ -42,7 +42,15 @@ const BOARD_COLS = [
   { status:'completed',   label:'Done',        color:'#16a34a' },
 ]
 
-export function MyTasksView({ tasks: initialTasks, pendingApprovalTasks = [], members, clients, currentUserId, userRole }: Props) {
+export function MyTasksView({
+  tasks: initialTasks,
+  pendingApprovalTasks = [],
+  members,
+  clients,
+  currentUserId,
+  userRole,
+  canCreate = false,
+}: Props) {
   const router     = useRouter()
   const [,startT]  = useTransition()
   const today      = todayStr()
@@ -60,6 +68,7 @@ export function MyTasksView({ tasks: initialTasks, pendingApprovalTasks = [], me
   const [filterClient,   setFilterClient]   = useState('')
   const [filterStatus,   setFilterStatus]   = useState('')
   const [filterOpen,     setFilterOpen]     = useState(false)
+  
 
   // Apply filters
   const filteredTasks = tasks.filter(t => {
