@@ -476,12 +476,11 @@ export default async function LandingPage() {
           <a href="mailto:support@sngadvisers.com" style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13, textDecoration: 'none' }}>Contact</a>
         </div>
         <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: 12, margin: 0 }}>© 2026 SNG Advisers. All rights reserved.</p>
-    </div>
-
-  </div>
-
       </footer>
 
     </div>
+    </div>
+    </div>
+
   )
 }
