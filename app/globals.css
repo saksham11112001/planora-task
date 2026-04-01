@@ -299,6 +299,77 @@ button:focus:not(:focus-visible), a:focus:not(:focus-visible) { outline: none; }
   }
 }
 
+
+/* ── Global page loading indicator ─────────────────────────────── */
+.page-loading-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--brand), #7c3aed, var(--brand));
+  background-size: 200% 100%;
+  z-index: 9999;
+  animation: loadingBar 1.4s ease infinite;
+}
+
+@keyframes loadingBar {
+  0%   { width: 0%;   opacity: 1; background-position: 0% 0; }
+  50%  { width: 70%;  background-position: 100% 0; }
+  90%  { width: 95%;  opacity: 1; }
+  100% { width: 100%; opacity: 0; }
+}
+
+/* ── Skeleton loader ────────────────────────────────────────────── */
+.skeleton {
+  background: linear-gradient(90deg, var(--border) 25%, var(--surface-subtle) 50%, var(--border) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 6px;
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+/* ── Spinner ────────────────────────────────────────────────────── */
+.spin-smooth {
+  animation: spinSmooth 0.8s linear infinite;
+}
+@keyframes spinSmooth {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* ── Button loading state ───────────────────────────────────────── */
+.btn-loading {
+  position: relative;
+  pointer-events: none;
+  opacity: 0.75;
+}
+.btn-loading::after {
+  content: '';
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 12px;
+  height: 12px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spinSmooth 0.7s linear infinite;
+}
+
+/* ── Page transition fade ───────────────────────────────────────── */
+@keyframes pageFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.page-enter {
+  animation: pageFadeIn 0.2s ease-out forwards;
+}
+
 /* ── Task detail slide-in panel ────────────────────────────────── */
 @layer components {
   .detail-panel {
@@ -1265,3 +1336,303 @@ html.dark div[style*="background:#fff"],
 html.dark div[style*="background: #fff"],
 html.dark span[style*="background:#fff"],
 html.dark span[style*="background: #fff"] { background: var(--surface) !important; }
+
+/* ── Plane.so-inspired improvements ────────────────────────────── */
+
+/* Smooth transitions on interactive elements */
+button, a, [role="button"] {
+  transition: opacity 0.1s, background 0.12s, border-color 0.12s, box-shadow 0.12s, transform 0.1s;
+}
+
+/* Better focus ring */
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Task row hover — consistent across all views */
+.task-row-hover:hover {
+  background: var(--surface-subtle) !important;
+}
+
+/* Checkbox animation */
+.task-check {
+  width: 18px; height: 18px; border-radius: 50%;
+  border: 2px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; cursor: pointer; transition: all 0.15s;
+  background: transparent;
+}
+.task-check:hover { border-color: var(--brand); background: var(--brand-light); }
+.task-check.done  { background: var(--brand); border-color: var(--brand); }
+.task-check.done::after {
+  content: ''; width: 5px; height: 9px;
+  border: 2px solid #fff; border-top: none; border-left: none;
+  transform: rotate(45deg) translateY(-1px); display: block;
+}
+
+/* Smooth page entrance */
+.app-page { animation: pageFadeIn 0.18s ease-out; }
+
+/* Priority chip consistent sizing */
+.priority-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 600; padding: 2px 8px;
+  border-radius: 99px; white-space: nowrap;
+}
+
+/* Tooltip */
+[data-tooltip] { position: relative; }
+[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute; bottom: calc(100% + 6px); left: 50%;
+  transform: translateX(-50%); white-space: nowrap;
+  background: #0f172a; color: #fff; font-size: 11px; font-weight: 500;
+  padding: 4px 8px; border-radius: 6px; pointer-events: none;
+  opacity: 0; transition: opacity 0.15s; z-index: 999;
+}
+[data-tooltip]:hover::after { opacity: 1; }
+
+/* Scroll bar styling */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+
+/* ════════════════════════════════════════════════════════════════════
+   COMPREHENSIVE DARK MODE PATCH — covers every hardcoded color
+   that inline styles use throughout the app
+   ════════════════════════════════════════════════════════════════════ */
+
+/* ── Inline style color overrides ────────────────────────────────── */
+/* These patterns catch hardcoded values in TSX inline styles */
+
+/* All common near-white backgrounds */
+html.dark [style*="background: '#fafafa'"],
+html.dark [style*="background: #fafafa"],
+html.dark [style*="background:'#fafafa'"] {
+  background: var(--surface) !important;
+}
+html.dark [style*="background: '#f9fafb'"],
+html.dark [style*="background: #f9fafb"],
+html.dark [style*="background: '#f8fafc'"] {
+  background: var(--surface-subtle) !important;
+}
+
+/* Hard white that CSS attr selectors miss (space variants) */
+html.dark *[style*="background: white"] {
+  background: var(--surface) !important;
+}
+html.dark *[style*="background:white"] {
+  background: var(--surface) !important;
+}
+
+/* Dark text on white → light text in dark mode */
+html.dark [style*="color: '#111827'"],
+html.dark [style*="color:#111827"] {
+  color: var(--text-primary) !important;
+}
+html.dark [style*="color: '#1f2937'"],
+html.dark [style*="color:#1f2937"] {
+  color: var(--text-primary) !important;
+}
+html.dark [style*="color: '#030712'"],
+html.dark [style*="color:#030712"] {
+  color: var(--text-primary) !important;
+}
+
+/* Border light variants */
+html.dark [style*="border: '1px solid #e5e7eb'"],
+html.dark [style*="border:1px solid #e5e7eb"],
+html.dark [style*="borderBottom: '1px solid #e5e7eb'"],
+html.dark [style*="border-bottom: 1px solid #e5e7eb"] {
+  border-color: var(--border) !important;
+}
+html.dark [style*="border: '1px solid #f3f4f6'"],
+html.dark [style*="border: '1px solid #f1f5f9'"],
+html.dark [style*="borderColor: '#f1f5f9'"] {
+  border-color: var(--border-light) !important;
+}
+
+/* ── Dropdown / popover / floating panel backgrounds ─────────────── */
+html.dark [style*="position: 'absolute'"][style*="background"],
+html.dark [style*="position: 'fixed'"][style*="background: '#fff"],
+html.dark [style*="position: 'fixed'"][style*="background: 'white"],
+html.dark [style*="boxShadow"][style*="background: '#fff"],
+html.dark [style*="box-shadow"][style*="background: white"] {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+}
+
+/* ── Select options (native dropdowns) ───────────────────────────── */
+html.dark select,
+html.dark select option {
+  background: var(--surface) !important;
+  color: var(--text-primary) !important;
+}
+
+/* ── Date inputs in dark mode ────────────────────────────────────── */
+html.dark input[type="date"],
+html.dark input[type="datetime-local"],
+html.dark input[type="time"] {
+  color-scheme: dark;
+  background: var(--surface) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border) !important;
+}
+
+/* ── Inline task creation rows ───────────────────────────────────── */
+html.dark [style*="borderTop: '1px dashed"],
+html.dark [style*="border-top: 1px dashed"] {
+  border-color: var(--border) !important;
+}
+
+/* ── Team page role popover ──────────────────────────────────────── */
+html.dark [style*="background: 'var(--surface)'"][style*="boxShadow"] {
+  background: var(--surface) !important;
+}
+
+/* ── Import view progress steps ─────────────────────────────────── */
+html.dark [style*="background: '#f0fdf4'"] { background: #0f2d1a !important; }
+html.dark [style*="background: '#f0fdfa'"] { background: var(--brand-light) !important; }
+html.dark [style*="background: '#fff7ed'"] { background: #2d1800 !important; }
+html.dark [style*="background: '#faf5ff'"] { background: #1e1535 !important; }
+html.dark [style*="background: '#eff6ff'"] { background: #0f1e35 !important; }
+html.dark [style*="background: '#fef2f2'"] { background: #2d1515 !important; }
+html.dark [style*="background: '#f5f3ff'"] { background: #1e1535 !important; }
+html.dark [style*="background: '#ecfeff'"] { background: #0f2535 !important; }
+
+/* ── Text color overrides for light-mode palettes ────────────────── */
+html.dark [style*="color: '#15803d'"] { color: #4ade80 !important; }
+html.dark [style*="color: '#166534'"] { color: #4ade80 !important; }
+html.dark [style*="color: '#ea580c'"] { color: #fb923c !important; }
+html.dark [style*="color: '#b91c1c'"] { color: #f87171 !important; }
+html.dark [style*="color: '#dc2626'"] { color: #f87171 !important; }
+html.dark [style*="color: '#0891b2'"] { color: #22d3ee !important; }
+html.dark [style*="color: '#0369a1'"] { color: #38bdf8 !important; }
+
+/* Light mode pastel badge text stays readable */
+html.dark [style*="color: '#16a34a'"] { color: #4ade80 !important; }
+
+/* ── Compliance subtask teal highlights ──────────────────────────── */
+html.dark [style*="background: 'rgba(13,148,136,0.06)'"],
+html.dark [style*="background:'rgba(13,148,136,0.06)'"] {
+  background: rgba(13,148,136,0.15) !important;
+}
+html.dark [style*="background: 'rgba(13,148,136,0.12)'"] {
+  background: rgba(13,148,136,0.2) !important;
+}
+
+/* ── Stats and progress bars ─────────────────────────────────────── */
+html.dark [style*="background: '#f1f5f9'"][style*="borderRadius: 99"] {
+  background: var(--border-light) !important;
+}
+
+/* ── Modal/dialog overlays ───────────────────────────────────────── */
+html.dark [role="dialog"] {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+}
+
+/* ── Sticky table headers ────────────────────────────────────────── */
+html.dark [style*="position: 'sticky'"],
+html.dark [style*="position:sticky"] {
+  background: var(--surface) !important;
+}
+
+/* ── Whitebox fix for inline styles with W constant ─────────────── */
+/* W = '#ffffff' → these patterns catch remaining inline whites */
+html.dark [style*="background: '#ffffff'"],
+html.dark [style*='background: "#ffffff"'],
+html.dark [style*="background: #ffffff"],
+html.dark [style*="background:#ffffff"] {
+  background: var(--surface) !important;
+}
+
+/* ── Task detail panel all inner divs ───────────────────────────── */
+html.dark .detail-panel * {
+  border-color: var(--border-light);
+}
+html.dark .detail-panel [style*="background: '#f8fafc'"],
+html.dark .detail-panel [style*="background: #f8fafc"] {
+  background: var(--surface-subtle) !important;
+}
+
+/* ── Plan/upgrade banner ─────────────────────────────────────────── */
+html.dark [style*="background: 'linear-gradient"][style*="fff"] {
+  color: var(--text-primary) !important;
+}
+
+/* ── Tag chips and badges ────────────────────────────────────────── */
+html.dark [style*="background: '#e2e8f0'"] {
+  background: var(--border) !important;
+  color: var(--text-primary) !important;
+}
+html.dark [style*="background: '#f1f5f9'"][style*="borderRadius: 99"],
+html.dark [style*="background: '#f1f5f9'"][style*="borderRadius:99"] {
+  background: var(--border-light) !important;
+  color: var(--text-secondary) !important;
+}
+
+/* ── Project/client color swatch dots ───────────────────────────── */
+/* These tiny colored dots should keep their brand colors in dark mode */
+html.dark [style*="borderRadius: '50%'"][style*="width: 8"],
+html.dark [style*="borderRadius: '50%'"][style*="width: 6"] {
+  /* Keep colored — no override */
+}
+
+/* ── All fixed/absolute positioned menus ────────────────────────── */
+html.dark [style*="zIndex: 9999"],
+html.dark [style*="z-index: 9999"],
+html.dark [style*="zIndex: 1000"],
+html.dark [style*="zIndex: 200"] {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+}
+/* But exclude colored toast/notification overlays */
+html.dark [style*="background: '#16a34a'"][style*="zIndex"],
+html.dark [style*="background: '#dc2626'"][style*="zIndex"],
+html.dark [style*="background: '#0d9488'"][style*="zIndex"] {
+  background: initial !important;
+}
+
+/* ── Co-assignee multi-select chips ─────────────────────────────── */
+html.dark [style*="background: '#e2e8f0'"][style*="borderRadius: 99"] {
+  background: var(--border) !important;
+  color: var(--text-primary) !important;
+}
+
+/* ── Pill buttons (recurring, priority etc) ─────────────────────── */
+html.dark [style*="borderRadius: 20"][style*="background: 'var(--surface-subtle)'"] {
+  background: var(--surface-hover) !important;
+}
+
+/* ── Profile/avatar circles ─────────────────────────────────────── */
+/* Keep avatar bg colors — they're intentional brand colors */
+
+/* ── Inline date pickers in task form ───────────────────────────── */
+html.dark input[type="date"][style*="colorScheme: 'light'"],
+html.dark input[type="date"][style*="colorScheme: 'light dark'"] {
+  color-scheme: dark !important;
+}
+
+/* ── App shell main content area ────────────────────────────────── */
+html.dark main,
+html.dark [style*="background: 'var(--surface-subtle)'"] {
+  background: var(--surface-subtle) !important;
+}
+
+/* ── Tooltip (our custom CSS tooltip) ───────────────────────────── */
+html.dark [data-tooltip]::after {
+  background: var(--surface) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border);
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   VIEW PERMISSIONS — task visibility chip
+   ════════════════════════════════════════════════════════════════════ */
+html.dark .perm-row { background: var(--surface) !important; }
+html.dark .perm-row:hover { background: var(--surface-hover) !important; }

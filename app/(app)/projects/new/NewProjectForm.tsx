@@ -237,7 +237,7 @@ export function NewProjectForm({ clients, members }: {
             </p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
               {templateTasksPreview.slice(0, 6).map((t, i) => (
-                <span key={i} style={{ fontSize: 10, background: '#fff', color: '#374151', padding: '2px 8px', borderRadius: 99, border: '1px solid #ccfbf1', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                <span key={i} style={{ fontSize: 10, background: 'var(--surface)', color: 'var(--text-primary)', padding: '2px 8px', borderRadius: 99, border: '1px solid #ccfbf1', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
                   {t.title}{t.subtasks?.length ? <span style={{ color: '#0d9488', fontWeight: 700 }}>+{t.subtasks.length}</span> : null}
                 </span>
               ))}

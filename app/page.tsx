@@ -94,7 +94,7 @@ export default async function LandingPage() {
   ]
 
   return (
-    <div style={{ minHeight: '100vh', background: W, colorScheme: 'light', fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", overflowX: 'hidden', color: D }}>
+    <div style={{ minHeight: '100vh', background: '#fafaf9', colorScheme: 'light', fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", overflowX: 'hidden', color: D }}>
 
       {/* STICKY NAV */}
       <nav style={{ position: 'sticky', top: 0, zIndex: 100, background: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(12px)', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', padding: '0 5%', height: 64, gap: 24 }}>
@@ -116,7 +116,7 @@ export default async function LandingPage() {
       </nav>
 
       {/* HERO */}
-      <div style={{ maxWidth: 1160, margin: '0 auto', padding: '72px 5% 52px', display: 'flex', alignItems: 'center', gap: 56, flexWrap: 'wrap' }}>
+      <div style={{ maxWidth: 1160, margin: '0 auto', padding: '44px 5% 36px', display: 'flex', alignItems: 'center', gap: 56, flexWrap: 'wrap' }}>
         <div style={{ flex: '1 1 360px' }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 99, padding: '5px 14px', marginBottom: 24 }}>
             <span style={{ fontSize: 13 }}>💬</span>
@@ -215,19 +215,29 @@ export default async function LandingPage() {
         </div>
       </div>
 
-      {/* TRUST BAR */}
-      <div style={{ borderTop: '1px solid #f1f5f9', borderBottom: '1px solid #f1f5f9', padding: '16px 5%', background: S }}>
-        <div style={{ maxWidth: 860, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 500, marginRight: 6 }}>Trusted by teams at</span>
-          {['CA firms','Startups','Agencies','Legal teams','Ops teams','Consultancies'].map(s => (
-            <span key={s} style={{ fontSize: 12, fontWeight: 700, color: '#475569', background: W, border: '1px solid #e2e8f0', padding: '4px 12px', borderRadius: 99 }}>{s}</span>
-          ))}
+      {/* TRUST BAR — stats + social proof */}
+      <div style={{ borderTop: '1px solid #f1f5f9', borderBottom: '1px solid #f1f5f9', padding: '18px 5%', background: S }}>
+        <div style={{ maxWidth: 960, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 28, flexWrap: 'wrap' }}>
+            {([['200+','teams'],['15k+','tasks done'],['4.9★','rating'],['99.9%','uptime']] as [string,string][]).map(([num,lbl]) => (
+              <div key={lbl}>
+                <div style={{ fontSize: 17, fontWeight: 800, color: F, letterSpacing: '-0.5px' }}>{num}</div>
+                <div style={{ fontSize: 10, color: '#94a3b8' }}>{lbl}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 11, color: '#94a3b8' }}>Used by</span>
+            {['CA firms','Agencies','Startups','Legal teams'].map(s => (
+              <span key={s} style={{ fontSize: 11, fontWeight: 600, color: '#475569', background: W, border: '1px solid #e2e8f0', padding: '3px 10px', borderRadius: 99 }}>{s}</span>
+            ))}
+          </div>
         </div>
       </div>
 
       {/* 3 HERO FEATURES — Z-pattern alternating layout */}
-      <div id="features" style={{ maxWidth: 1100, margin: '0 auto', padding: '88px 5% 40px' }}>
-        <div style={{ textAlign: 'center', marginBottom: 60 }}>
+      <div id="features" style={{ maxWidth: 1100, margin: '0 auto', padding: '52px 5% 32px' }}>
+        <div style={{ textAlign: 'center', marginBottom: 36 }}>
           <div style={{ display: 'inline-block', background: '#fff7ed', color: F, fontSize: 12, fontWeight: 700, padding: '4px 16px', borderRadius: 99, border: '1px solid #fed7aa', marginBottom: 16 }}>CORE FEATURES</div>
           <h2 style={{ fontSize: 'clamp(26px,4vw,40px)', fontWeight: 900, letterSpacing: '-1.5px', marginBottom: 12 }}>
             Built for teams who can&apos;t afford to miss deadlines
@@ -237,91 +247,36 @@ export default async function LandingPage() {
           </p>
         </div>
 
-        {heroFeatures.map((f, i) => (
-          <div key={f.title} style={{ display: 'flex', alignItems: 'center', gap: 64, marginBottom: 80, flexWrap: 'wrap', flexDirection: i % 2 === 1 ? 'row-reverse' : 'row' }}>
-            <div style={{ flex: '1 1 320px' }}>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: f.accentBg, border: `1px solid ${f.accentBorder}`, borderRadius: 99, padding: '4px 14px', marginBottom: 20 }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: f.accentColor }}>{f.badge}</span>
-              </div>
-              <h3 style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.8px', marginBottom: 14, lineHeight: 1.15 }}>{f.title}</h3>
-              <p style={{ fontSize: 16, color: M, lineHeight: 1.75, marginBottom: 28, maxWidth: 400 }}>{f.desc}</p>
-              <Link href="/login" style={{ ...primaryCTA, padding: '11px 24px', fontSize: 14 }}>Try it free →</Link>
-            </div>
-
-            <div style={{ flex: '1 1 300px', maxWidth: 420 }}>
-              <div style={{ background: f.accentBg, border: `1.5px solid ${f.accentBorder}`, borderRadius: 20, padding: 28, boxShadow: `0 12px 40px ${f.accentColor}18` }}>
-                <div style={{ fontSize: 40, marginBottom: 20 }}>{f.icon}</div>
-                {i === 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {[
-                      { text: '⏰ Invoice approval due in 2 hrs — Rahul', type: 'Reminder' },
-                      { text: '✅ Task completed: Q3 Report — Priya', type: 'Update' },
-                      { text: '🔴 Escalation: Deadline overdue by 1 day', type: 'Alert' },
-                    ].map((msg, mi) => (
-                      <div key={mi} style={{ background: W, borderRadius: 10, padding: '10px 14px', border: '1px solid #e2e8f0' }}>
-                        <div style={{ fontSize: 11, color: '#25D366', fontWeight: 700, marginBottom: 3 }}>WhatsApp · {msg.type}</div>
-                        <div style={{ fontSize: 13, color: D, fontWeight: 500 }}>{msg.text}</div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {i === 1 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {[
-                      { task: 'Team standup', freq: 'Every Monday', color: T },
-                      { task: 'Monthly billing report', freq: '1st of every month', color: F },
-                      { task: 'Quarterly review', freq: 'Every 3 months', color: P },
-                    ].map((r, ri) => (
-                      <div key={ri} style={{ background: W, borderRadius: 10, padding: '11px 14px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <div>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: D }}>{r.task}</div>
-                          <div style={{ fontSize: 11, color: M, marginTop: 2 }}>🔁 {r.freq}</div>
-                        </div>
-                        <div style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 99, background: `${r.color}18`, color: r.color, border: `1px solid ${r.color}40` }}>AUTO</div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {i === 2 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: M, marginBottom: 2 }}>Your custom workflow</div>
-                    {[
-                      { step: '1', label: 'Staff submits work', done: true },
-                      { step: '2', label: 'Manager reviews & approves', done: true },
-                      { step: '3', label: 'Client notified via WhatsApp', done: false, active: true },
-                      { step: '4', label: 'Invoice auto-generated', done: false },
-                    ].map((step) => (
-                      <div key={step.step} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <div style={{ width: 24, height: 24, borderRadius: '50%', flexShrink: 0, background: step.done ? P : step.active ? `${P}20` : '#f1f5f9', border: step.active ? `2px solid ${P}` : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <span style={{ fontSize: 10, fontWeight: 700, color: step.done ? W : step.active ? P : '#94a3b8' }}>{step.done ? '✓' : step.step}</span>
-                        </div>
-                        <span style={{ fontSize: 13, fontWeight: step.active ? 700 : 500, color: step.done ? '#94a3b8' : D, textDecoration: step.done ? 'line-through' : 'none' }}>{step.label}</span>
-                        {step.active && <span style={{ fontSize: 10, background: `${P}18`, color: P, padding: '2px 8px', borderRadius: 99, fontWeight: 700, border: `1px solid ${P}40` }}>Live</span>}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* SECONDARY FEATURES GRID */}
-      <div style={{ background: S, borderTop: '1px solid #f1f5f9', padding: '56px 5%' }}>
-        <div style={{ maxWidth: 1000, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
-          {secondaryFeatures.map(f => (
-            <div key={f.title} style={{ background: W, border: '1px solid #f1f5f9', borderRadius: 16, padding: '28px 24px', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
-              <div style={{ fontSize: 28, marginBottom: 14 }}>{f.icon}</div>
-              <h3 style={{ fontWeight: 700, fontSize: 16, marginBottom: 8, letterSpacing: '-0.3px' }}>{f.title}</h3>
-              <p style={{ color: M, fontSize: 14, lineHeight: 1.7, margin: 0 }}>{f.desc}</p>
+        {/* Feature grid — all features in one scannable view */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 20, marginBottom: 0 }}>
+          {[...heroFeatures.map(f => ({ icon: f.icon, title: f.title, desc: f.desc, color: f.accentColor, bg: f.accentBg, border: f.accentBorder, badge: f.badge })),
+            ...secondaryFeatures.map(f => ({ icon: f.icon, title: f.title, desc: f.desc, color: '#64748b', bg: S, border: '#e2e8f0', badge: '' }))
+          ].map((f, i) => (
+            <div key={i} style={{
+              background: W, border: `1px solid #f1f5f9`,
+              borderRadius: 16, padding: '24px', transition: 'all 0.2s',
+              boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
+            }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = `0 8px 28px rgba(0,0,0,0.09)`; (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)' }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = '0 1px 4px rgba(0,0,0,0.04)'; (e.currentTarget as HTMLElement).style.transform = 'none' }}
+            >
+              {f.badge && (
+                <div style={{ display: 'inline-block', fontSize: 9, fontWeight: 700, color: f.color,
+                  background: f.bg, border: `1px solid ${f.border}`, borderRadius: 99,
+                  padding: '2px 10px', marginBottom: 14, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  {f.badge}
+                </div>
+              )}
+              <div style={{ fontSize: 28, marginBottom: 12 }}>{f.icon}</div>
+              <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 8, letterSpacing: '-0.3px', color: D }}>{f.title}</h3>
+              <p style={{ color: M, fontSize: 14, lineHeight: 1.68, margin: 0 }}>{f.desc}</p>
             </div>
           ))}
         </div>
-      </div>
+
 
       {/* DIVERSE USE CASES */}
-      <div id="solutions" style={{ maxWidth: 1000, margin: '0 auto', padding: '80px 5%' }}>
+      <div id="solutions" style={{ maxWidth: 1000, margin: '0 auto', padding: '48px 5%' }}>
         <div style={{ textAlign: 'center', marginBottom: 48 }}>
           <div style={{ display: 'inline-block', background: '#f0fdfa', color: T, fontSize: 12, fontWeight: 700, padding: '4px 16px', borderRadius: 99, border: `1px solid #5eead4`, marginBottom: 16 }}>WHO IT&apos;S FOR</div>
           <h2 style={{ fontSize: 'clamp(24px,4vw,36px)', fontWeight: 900, letterSpacing: '-1px', marginBottom: 12 }}>One platform, every team</h2>
@@ -387,7 +342,7 @@ export default async function LandingPage() {
       </div>
 
       {/* TESTIMONIALS */}
-      <div style={{ background: S, borderTop: '1px solid #f1f5f9', padding: '80px 5%' }}>
+      <div style={{ background: S, borderTop: '1px solid #f1f5f9', padding: '48px 5%' }}>
         <div style={{ maxWidth: 960, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 52 }}>
             <div style={{ display: 'flex', justifyContent: 'center', gap: 3, marginBottom: 12 }}>
@@ -425,7 +380,7 @@ export default async function LandingPage() {
       </div>
 
       {/* PRICING */}
-      <div id="pricing" style={{ maxWidth: 1060, margin: '0 auto', padding: '88px 5%' }}>
+      <div id="pricing" style={{ maxWidth: 1060, margin: '0 auto', padding: '52px 5%' }}>
         <div style={{ textAlign: 'center', marginBottom: 52 }}>
           <div style={{ display: 'inline-block', background: '#fff7ed', color: F, fontSize: 12, fontWeight: 700, padding: '4px 16px', borderRadius: 99, border: '1px solid #fed7aa', marginBottom: 16 }}>SIMPLE PRICING</div>
           <h2 style={{ fontSize: 'clamp(26px,4vw,40px)', fontWeight: 900, letterSpacing: '-1.5px', marginBottom: 10 }}>No USD. No surprises.</h2>
@@ -490,7 +445,7 @@ export default async function LandingPage() {
       </div>
 
       {/* FINAL CTA */}
-      <div style={{ background: T, padding: '72px 24px', textAlign: 'center' }}>
+      <div style={{ background: T, padding: '52px 24px', textAlign: 'center' }}>
         <div style={{ maxWidth: 560, margin: '0 auto' }}>
           <div style={{ fontSize: 40, marginBottom: 16 }}>🚀</div>
           <h2 style={{ fontSize: 'clamp(26px,4vw,38px)', fontWeight: 900, color: W, letterSpacing: '-1px', marginBottom: 12, lineHeight: 1.15 }}>

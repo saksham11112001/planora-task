@@ -28,6 +28,8 @@ const FEATURE_GROUPS = [
       { key: 'tasks.bulk_actions',  label: 'Bulk complete/delete',    desc: 'Act on multiple tasks at once' },
       { key: 'tasks.assign',        label: 'Assign tasks to others',  desc: 'Set assignee to another member' },
       { key: 'tasks.approve',       label: 'Approve tasks',           desc: 'Approve tasks in review state' },
+      { key: 'tasks.view_all',      label: 'View all tasks',          desc: 'See every task in the org, not just assigned ones' },
+      { key: 'tasks.view_my',       label: 'View my tasks only',      desc: 'Can only see tasks assigned to themselves' },
     ],
   },
   {
@@ -96,6 +98,8 @@ const DEFAULT_PERMISSIONS: RolePermissions = {
   'tasks.edit_own':     { admin: true,  manager: true,  member: true,  viewer: false },
   'tasks.delete':       { admin: true,  manager: true,  member: false, viewer: false },
   'tasks.complete':     { admin: true,  manager: true,  member: true,  viewer: false },
+  'tasks.view_all':     { admin: true,  manager: true,  member: false, viewer: false },
+  'tasks.view_my':      { admin: true,  manager: true,  member: true,  viewer: true  },
   'tasks.bulk_actions': { admin: true,  manager: true,  member: false, viewer: false },
   'tasks.assign':       { admin: true,  manager: true,  member: false, viewer: false },
   'tasks.approve':      { admin: true,  manager: true,  member: false, viewer: false },

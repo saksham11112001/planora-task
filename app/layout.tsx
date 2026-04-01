@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
-import { ThemeProvider } from '@/components/theme/ThemeProvider'
+import { ThemeProvider }       from '@/components/theme/ThemeProvider'
+import { NavigationProgress }
+import { KeyboardShortcuts }    from '@/components/ui/KeyboardShortcuts'  from '@/components/ui/NavigationProgress'
 
 export const metadata: Metadata = {
   title:       { default: 'Planora', template: '%s | Planora' },
@@ -51,6 +53,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         `}}/>
       </head>
       <body style={{ fontSize: '15px' }}>
+        <NavigationProgress />
+        <KeyboardShortcuts />
         <ThemeProvider>
           {children}
         </ThemeProvider>

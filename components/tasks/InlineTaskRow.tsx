@@ -242,7 +242,7 @@ export function InlineTaskRow({
               fontSize: 12, border: 'none', outline: 'none',
               background: 'transparent',
               color: dueDate ? 'var(--text-primary)' : 'var(--text-muted)',
-              cursor: 'pointer', colorScheme: 'light',
+              cursor: 'pointer', colorScheme: 'light dark',
               width: dueDate ? 'auto' : 76,
             }}
           />

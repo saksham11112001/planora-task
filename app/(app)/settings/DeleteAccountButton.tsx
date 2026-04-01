@@ -14,7 +14,7 @@ export function DeleteAccountButton({ userId, orgId, isOwner }: { userId: string
     return (
       <button onClick={() => setConfirm(true)}
         style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px',
-          borderRadius: 8, border: '1px solid #fecaca', background: '#fff',
+          borderRadius: 8, border: '1px solid #fecaca', background: 'var(--surface)',
           color: '#b91c1c', fontSize: 13, fontWeight: 600, cursor: 'pointer',
           fontFamily: 'inherit', flexShrink: 0, transition: 'all 0.15s' }}
         onMouseEnter={e => { (e.currentTarget as any).style.background = '#fef2f2' }}
@@ -26,7 +26,7 @@ export function DeleteAccountButton({ userId, orgId, isOwner }: { userId: string
 
   return (
     <div style={{ width: '100%', marginTop: 12, padding: '14px', borderRadius: 10,
-      background: '#fff', border: '1px solid #fecaca' }}>
+      background: 'var(--surface)', border: '1px solid #fecaca' }}>
       <p style={{ fontSize: 13, color: '#b91c1c', marginBottom: 10, fontWeight: 500 }}>
         {isOwner
           ? 'This will delete your account AND the entire organisation including all tasks, projects, clients, and team data.'
@@ -38,7 +38,7 @@ export function DeleteAccountButton({ userId, orgId, isOwner }: { userId: string
           placeholder="Type DELETE to confirm"
           style={{ flex: 1, padding: '8px 12px', borderRadius: 8,
             border: '1.5px solid #fecaca', outline: 'none',
-            fontSize: 13, background: '#fff', color: '#b91c1c',
+            fontSize: 13, background: 'var(--surface)', color: '#b91c1c',
             fontFamily: 'inherit' }}/>
         <button
           disabled={input !== 'DELETE' || deleting}

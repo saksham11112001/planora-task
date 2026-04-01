@@ -39,7 +39,10 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated }
   const [saving,     setSaving]     = useState(false)
   const [title,      setTitle]      = useState('')
   const [assignee,   setAssignee]   = useState(currentUserId ?? '')
-  const [coAssignees, setCoAssignees] = useState<string[]>([])
+  const [coAssignees,   setCoAssignees]   = useState<string[]>([])
+  const [makeRecurring, setMakeRecurring] = useState(false)
+  const [recurringFreq, setRecurringFreq] = useState('weekly')
+  const [addToProjectId, setAddToProjectId] = useState('')
   const [priority,   setPriority]   = useState('medium')
   const [dueDate,    setDueDate]    = useState('')
   const [clientId,   setClientId]   = useState('')
@@ -66,6 +69,7 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated }
     setOpen(false); setTitle(''); setAssignee(currentUserId ?? '')
     setPriority('medium'); setDueDate(''); setClientId('')
     setApproverId(''); setFiles([]); setErrors({})
+    setCoAssignees([]); setMakeRecurring(false); setRecurringFreq('weekly'); setAddToProjectId('')
   }
 
   const handleClickOutside = useCallback((e: MouseEvent) => {
@@ -383,6 +387,45 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated }
               * mandatory · Leave date blank to use parent task date · File must be named as shown
             </p>
           </div>
+        )}
+
+        {/* Make recurring / add to project pills */}
+        <button type="button"
+          onClick={() => { setMakeRecurring(p => !p); if (addToProjectId) setAddToProjectId('') }}
+          style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px',
+            borderRadius:20, border: makeRecurring ? '1.5px solid #0d9488' : '1px solid var(--border)',
+            background: makeRecurring ? '#f0fdfa' : 'var(--surface-subtle)',
+            cursor:'pointer', fontSize:12, color: makeRecurring ? '#0d9488' : 'var(--text-secondary)',
+            fontWeight: makeRecurring ? 700 : 400, fontFamily:'inherit' }}>
+          🔁 {makeRecurring ? 'Recurring ✓' : 'Make recurring'}
+        </button>
+        {makeRecurring && (
+          <select value={recurringFreq} onChange={e => setRecurringFreq(e.target.value)}
+            style={{ fontSize:12, padding:'4px 8px', borderRadius:20, border:'1.5px solid #0d9488',
+              background:'#f0fdfa', color:'#0d9488', fontWeight:600, outline:'none', cursor:'pointer',
+              fontFamily:'inherit' }}>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="bi_weekly">Every 2 weeks</option>
+            <option value="monthly">Monthly</option>
+            <option value="quarterly">Quarterly</option>
+            <option value="annual">Annual</option>
+          </select>
+        )}
+        {!makeRecurring && (
+          <label style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px',
+            borderRadius:20, border: addToProjectId ? '1.5px solid #7c3aed' : '1px solid var(--border)',
+            background: addToProjectId ? '#faf5ff' : 'var(--surface-subtle)', cursor:'text' }}>
+            <span style={{ fontSize:11 }}>📁</span>
+            <input
+              value={addToProjectId}
+              onChange={e => setAddToProjectId(e.target.value)}
+              placeholder="Project name…"
+              style={{ fontSize:12, border:'none', outline:'none', background:'transparent',
+                color: addToProjectId ? '#7c3aed' : 'var(--text-primary)',
+                width: addToProjectId ? 120 : 90, fontFamily:'inherit' }}
+            />
+          </label>
         )}
 
         {/* Save */}

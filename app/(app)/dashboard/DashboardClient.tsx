@@ -25,11 +25,11 @@ const QUICK_ACTIONS = [
 
 function MiniAppCard({ title, color, tasks }: { title: string; color: string; tasks: string[] }) {
   return (
-    <div style={{ background: '#fff', borderRadius: 12, padding: '12px 14px', minWidth: 160,
+    <div style={{ background: 'var(--surface)', borderRadius: 12, padding: '12px 14px', minWidth: 160,
       boxShadow: '0 4px 20px rgba(0,0,0,0.12)', border: '1px solid rgba(255,255,255,0.3)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
         <div style={{ width: 8, height: 8, borderRadius: '50%', background: color }}/>
-        <span style={{ fontSize: 11, fontWeight: 700, color: '#0f172a', overflow: 'hidden',
+        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden',
           whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{title}</span>
       </div>
       {tasks.map((t, i) => (

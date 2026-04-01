@@ -19,9 +19,10 @@ interface Props {
   currentUserId?: string
   userRole?:      string
   canCreate:      boolean
+  canViewAllTasks?: boolean
 }
 
-export function InboxView({ tasks, members, clients, currentUserId, userRole, canCreate }: Props) {
+export function InboxView({ tasks, members, clients, currentUserId, userRole, canCreate, canViewAllTasks }: Props) {
   const canManage = ['owner','admin','manager'].includes(userRole ?? '')
   const [clientFilter, setClientFilter] = useState<string>('')
   const router = useRouter()
@@ -31,6 +32,8 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
   const [completing,   setCompleting]   = useState<Set<string>>(new Set())
   const [, startT]                      = useTransition()
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set())
+  const [searchQuery,   setSearchQuery]   = useState('')
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set(['done']))
 
   // Auto-load subtasks for all tasks on mount
   const [subtaskMap,    setSubtaskMap]    = useState<Record<string, {id:string;title:string;status:string}[]>>({})
@@ -230,11 +233,18 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
   const inReview = visibleTasks.filter(t => t.approval_status === 'pending')
   const done     = visibleTasks.filter(t => t.status === 'completed')
 
+  // Apply search filter
+  const filterTasks = (list: Task[]) => !searchQuery.trim() ? list : list.filter(t =>
+    t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (t.assignee as any)?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (t.client as any)?.name?.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
   const sections = [
-    { key: 'overdue',  label: 'Overdue',          color: '#dc2626', bg: '#fff9f9', tasks: overdue,   addRow: false },
-    { key: 'inprog',   label: 'In progress',       color: '#0d9488', bg: '#fff',   tasks: inProg,    addRow: true  },
-    { key: 'review',   label: 'Pending approval',  color: '#7c3aed', bg: '#faf5ff',tasks: inReview,  addRow: false },
-    { key: 'done',     label: 'Completed',          color: '#16a34a', bg: '#fff',   tasks: done,      addRow: false },
+    { key: 'overdue',  label: 'Overdue',          color: '#dc2626', bg: '#fff9f9', tasks: filterTasks(overdue),   addRow: false },
+    { key: 'inprog',   label: 'In progress',       color: '#0d9488', bg: '#fff',   tasks: filterTasks(inProg),    addRow: true  },
+    { key: 'review',   label: 'Pending approval',  color: '#7c3aed', bg: '#faf5ff',tasks: filterTasks(inReview),  addRow: false },
+    { key: 'done',     label: 'Completed',          color: '#16a34a', bg: '#fff',   tasks: filterTasks(done),      addRow: false },
   ].filter(s => s.tasks.length > 0 || s.addRow)
 
   return (
@@ -303,6 +313,24 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
           <div/>
         </div>
 
+        {/* Search bar */}
+        <div style={{ padding: '8px 16px', borderBottom: '1px solid var(--border-light)', background: 'var(--surface-subtle)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 12px' }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ color: 'var(--text-muted)', flexShrink: 0 }}>
+              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+            </svg>
+            <input
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search tasks, assignees, clients…"
+              style={{ flex: 1, fontSize: 13, border: 'none', outline: 'none', background: 'transparent', color: 'var(--text-primary)', fontFamily: 'inherit' }}
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 16, lineHeight: 1, padding: 0, display: 'flex' }}>×</button>
+            )}
+          </div>
+        </div>
+
         {/* Task list */}
         <div style={{ flex: 1, overflowY: 'auto', background:'var(--surface)' }}>
           {/* ── Quick add bar pinned at top ── */}
@@ -328,18 +356,24 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
 
           {sections.map(section => (
             <div key={section.key}>
-              {/* Section header */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6,
-                padding: '13px 18px 5px', fontSize: 11, fontWeight: 700,
-                textTransform: 'uppercase', letterSpacing: '0.06em', color: section.color }}>
-                ▾ {section.label}
+              {/* Section header — clickable to collapse */}
+              <div
+                onClick={() => setCollapsedSections(p => {
+                  const n = new Set(p); n.has(section.key) ? n.delete(section.key) : n.add(section.key); return n
+                })}
+                style={{ display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '13px 18px 5px', fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                  textTransform: 'uppercase', letterSpacing: '0.06em', color: section.color, userSelect: 'none' }}>
+                <span style={{ transition: 'transform 0.15s', display: 'inline-block',
+                  transform: collapsedSections.has(section.key) ? 'rotate(-90deg)' : 'none' }}>▾</span>
+                {section.label}
                 <span style={{ opacity: 0.45, fontWeight: 400, textTransform: 'none', fontSize: 11 }}>
                   ({section.tasks.length})
                 </span>
               </div>
 
-              {/* Task rows */}
-              {section.tasks.map(task => {
+              {/* Task rows — hidden when section collapsed */}
+              {!collapsedSections.has(section.key) && section.tasks.map(task => {
                 const ov      = isOverdue(task.due_date, task.status)
                 const isComp  = task.status === 'completed'
                 const assignee = task.assignee as unknown as { id: string; name: string } | null
@@ -625,7 +659,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                 )
               })}
 
-              {/* Add task via the top bar */}
+              {!collapsedSections.has(section.key) && null /* Add task via the top bar */}
             </div>
           ))}
 

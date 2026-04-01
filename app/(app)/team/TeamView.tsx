@@ -7,6 +7,13 @@ import { toast }      from '@/store/appStore'
 import { fmtDate }    from '@/lib/utils/format'
 
 const ROLES = ['admin','manager','member','viewer'] as const
+const ROLE_DESC: Record<string, string> = {
+  owner:   'Full access, billing, can delete org',
+  admin:   'Full access except billing & org deletion',
+  manager: 'Create/assign tasks, invite members, view reports',
+  member:  'Create own tasks, update assigned tasks',
+  viewer:  'Read-only — can view but not edit anything',
+}
 const ROLE_ICONS: Record<string, any> = { owner: Crown, admin: Shield, manager: UserPlus, member: User, viewer: User }
 const ROLE_COLORS: Record<string, string> = {
   owner: '#ca8a04', admin: '#7c3aed', manager: '#0d9488', member: '#64748b', viewer: '#94a3b8'
@@ -241,12 +248,16 @@ export function TeamView({
                       <button
                         onClick={() => setRoleEditing(isEditing ? null : m.id)}
                         disabled={isSaving}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors"
+                        title="Click to change role"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
                         style={{
-                          borderColor: 'var(--border)',
+                          border: isEditing ? `1.5px solid ${ROLE_COLORS[m.role]}` : '1.5px dashed var(--border)',
                           color: isSaving ? 'var(--text-muted)' : ROLE_COLORS[m.role],
-                          background: isEditing ? 'var(--surface-subtle)' : 'transparent',
+                          background: isEditing ? `${ROLE_COLORS[m.role]}10` : 'transparent',
+                          cursor: 'pointer',
                         }}
+                        onMouseEnter={e => { if (!isEditing) { (e.currentTarget as HTMLElement).style.borderColor = ROLE_COLORS[m.role]; (e.currentTarget as HTMLElement).style.background = `${ROLE_COLORS[m.role]}10` } }}
+                        onMouseLeave={e => { if (!isEditing) { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLElement).style.background = 'transparent' } }}
                       >
                         <RoleIcon className="h-3.5 w-3.5" />
                         {isSaving ? 'Saving…' : m.role.charAt(0).toUpperCase() + m.role.slice(1)}
@@ -269,7 +280,7 @@ export function TeamView({
                           <div
                             style={{
                               position: 'absolute', right: 0, top: '100%', marginTop: 6,
-                              borderRadius: 12, padding: '4px 0', minWidth: 160,
+                              borderRadius: 12, padding: '4px 0', minWidth: 240,
                               background: 'var(--surface)',
                               border: '1px solid var(--border)',
                               boxShadow: '0 16px 40px rgba(0,0,0,0.18)',
@@ -287,22 +298,30 @@ export function TeamView({
                                 <button
                                   key={r}
                                   onClick={() => changeRole(m.id, r)}
-                                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors"
+                                  className="w-full flex items-start gap-2.5 px-3 py-2.5 transition-colors text-left"
                                   style={{
-                                    color: isCurrent ? ROLE_COLORS[r] : 'var(--text-primary)',
-                                    background: isCurrent ? `${ROLE_COLORS[r]}12` : 'transparent',
-                                    fontWeight: isCurrent ? 600 : 400,
+                                    background: isCurrent ? `${ROLE_COLORS[r]}10` : 'transparent',
+                                    borderBottom: '1px solid var(--border-light)',
                                   }}
                                   onMouseEnter={e => {
                                     if (!isCurrent) (e.currentTarget as HTMLElement).style.background = 'var(--surface-subtle)'
                                   }}
                                   onMouseLeave={e => {
-                                    if (!isCurrent) (e.currentTarget as HTMLElement).style.background = 'transparent'
+                                    if (!isCurrent) (e.currentTarget as HTMLElement).style.background = isCurrent ? `${ROLE_COLORS[r]}10` : 'transparent'
                                   }}
                                 >
-                                  <Icon className="h-3.5 w-3.5" style={{ color: ROLE_COLORS[r] }} />
-                                  {r.charAt(0).toUpperCase() + r.slice(1)}
-                                  {isCurrent && <Check className="h-3 w-3 ml-auto" style={{ color: ROLE_COLORS[r] }} />}
+                                  <Icon className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" style={{ color: ROLE_COLORS[r] }} />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-xs font-semibold" style={{ color: isCurrent ? ROLE_COLORS[r] : 'var(--text-primary)' }}>
+                                        {r.charAt(0).toUpperCase() + r.slice(1)}
+                                      </span>
+                                      {isCurrent && <Check className="h-3 w-3" style={{ color: ROLE_COLORS[r] }} />}
+                                    </div>
+                                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)', fontSize: 10, lineHeight: 1.4 }}>
+                                      {ROLE_DESC[r]}
+                                    </p>
+                                  </div>
                                 </button>
                               )
                             })}

@@ -19,7 +19,7 @@ interface Project { id: string; name: string; color: string }
 
 let _projectCache: Project[] = []
 let _cacheTime    = 0
-const CACHE_TTL   = 30_000
+const CACHE_TTL   = 60_000
 
 export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
   const pathname    = usePathname()
@@ -35,7 +35,7 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
     }
     if (fetchRef.current) return
     fetchRef.current = true
-    fetch('/api/projects?limit=8')
+    fetch('/api/projects?limit=5')
       .then(r => r.json()).then(d => {
         if (Array.isArray(d.data)) { _projectCache = d.data; _cacheTime = Date.now(); setProjects(d.data) }
       }).catch(() => {}).finally(() => { fetchRef.current = false })
@@ -205,6 +205,23 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
             <p style={{ color: '#fff', fontSize: 12, fontWeight: 500, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{userName}</p>
             <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{session?.user.email}</p>
           </div>
+          {/* Role badge — tap to manage roles if manager */}
+          {canManage
+            ? <Link href="/team" style={{ textDecoration: 'none', flexShrink: 0 }}>
+                <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 8px', borderRadius: 99,
+                  background: role === 'owner' ? 'rgba(249,115,22,0.25)' : 'rgba(13,148,136,0.25)',
+                  color: role === 'owner' ? '#fb923c' : '#2dd4bf',
+                  textTransform: 'uppercase', letterSpacing: '0.05em', cursor: 'pointer' }}
+                  title="Click to manage team roles">
+                  {role}
+                </span>
+              </Link>
+            : <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 8px', borderRadius: 99,
+                background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.35)',
+                textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0 }}>
+                {role}
+              </span>
+          }
         </Link>
         <LogoutButton/>
       </div>
@@ -241,21 +258,28 @@ function SI({ href, active, icon, label }: { href: string; active: boolean; icon
 }
 
 function LogoutButton() {
-  const router = useRouter()
+  const [signingOut, setSigningOut] = useState(false)
   async function logout() {
-    const sb = createClient()
-    await sb.auth.signOut()
-    // Use hard redirect to landing page — clears all client state and avoids middleware loop
+    if (signingOut) return  // prevent double-click
+    setSigningOut(true)
+    try {
+      const sb = createClient()
+      await Promise.race([
+        sb.auth.signOut(),
+        new Promise(resolve => setTimeout(resolve, 3000)) // 3s timeout fallback
+      ])
+    } catch {}
+    // Hard redirect regardless — always clears state
     window.location.href = '/'
   }
   return (
-    <button onClick={logout}
+    <button onClick={logout} disabled={signingOut}
       style={{ display:'flex', alignItems:'center', gap:9, padding:'7px 10px', borderRadius:7,
         fontSize:13, color:'rgba(255,100,100,0.75)', background:'transparent', border:'none',
         cursor:'pointer', width:'100%', textAlign:'left', transition:'all 0.12s', margin:'1px 4px' }}
       onMouseEnter={e=>{(e.currentTarget as HTMLElement).style.background='rgba(239,68,68,0.12)';(e.currentTarget as HTMLElement).style.color='#f87171'}}
       onMouseLeave={e=>{(e.currentTarget as HTMLElement).style.background='transparent';(e.currentTarget as HTMLElement).style.color='rgba(255,100,100,0.75)'}}>
-      <LogOut style={{ width:15, height:15, flexShrink:0 }}/> Sign out
+      <LogOut style={{ width:15, height:15, flexShrink:0 }}/> {signingOut ? 'Signing out…' : 'Sign out'}
     </button>
   )
 }

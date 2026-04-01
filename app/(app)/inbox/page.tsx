@@ -17,11 +17,21 @@ export default async function InboxPage() {
     .select('org_id, role').eq('user_id', user.id).eq('is_active', true).maybeSingle()
   if (!mb) redirect('/onboarding')
 
+  // Determine task visibility: managers+ see all; members see own by default
+  const canViewAll = ['owner', 'admin', 'manager'].includes(mb.role)
+
   // Fetch tasks NOT in any project — no clients() join
-  const { data: tasks, error } = await supabase.from('tasks')
+  let taskQuery = supabase.from('tasks')
     .select('id, title, status, priority, due_date, approval_status, approval_required, client_id, assignee_id, is_recurring, estimated_hours, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url)')
     .eq('org_id', mb.org_id).is('project_id', null).is('parent_task_id', null).neq('is_archived', true)
     .order('created_at', { ascending: false })
+
+  // Members only see their own tasks unless canViewAll
+  if (!canViewAll) {
+    taskQuery = taskQuery.eq('assignee_id', user.id)
+  }
+
+  const { data: tasks, error } = await taskQuery
 
   if (error) console.error('[inbox]', error.message)
 
@@ -36,6 +46,7 @@ export default async function InboxPage() {
   const memberList = (members ?? []).map(m => ({ id: (m.users as any)?.id ?? m.user_id, name: (m.users as any)?.name ?? 'Unknown', role: (m as any).role ?? 'member' }))
   const clientList = (allClients ?? []).map(c => ({ id: c.id, name: c.name, color: c.color }))
   const canCreate  = ['owner','admin','manager','member'].includes(mb.role)
+  const canViewAllTasks = canViewAll
 
   const enriched = (tasks ?? []).map(t => ({
     ...t, description: null, project_id: null, project: null, is_archived: false, created_at: '',
@@ -47,7 +58,7 @@ export default async function InboxPage() {
     client: t.client_id ? (clientMap[t.client_id] ? { id: t.client_id, ...clientMap[t.client_id] } : null) : null,
   }))
 
-  return <InboxView tasks={enriched as any} members={memberList} clients={clientList} currentUserId={user.id} userRole={mb.role} canCreate={canCreate}/>
+  return <InboxView tasks={enriched as any} members={memberList} clients={clientList} currentUserId={user.id} userRole={mb.role} canCreate={canCreate} canViewAllTasks={canViewAllTasks}/>
   } catch (err: any) {
     console.error('[InboxPage crash]', err?.message ?? err)
     throw err

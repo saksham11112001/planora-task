@@ -16,14 +16,19 @@ export default function AppError({ error, reset }: { error: Error & { digest?: s
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: '#f8fafc', fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+      background: 'var(--surface-subtle)', fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       <div style={{ textAlign: 'center', padding: '0 24px', maxWidth: 440 }}>
         <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
-        <h1 style={{ fontSize: 20, fontWeight: 700, color: '#0f172a', marginBottom: 8 }}>
+        <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>
           Something went wrong
         </h1>
-        <p style={{ fontSize: 14, color: '#64748b', marginBottom: 8, lineHeight: 1.6 }}>
+        <p style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 8, lineHeight: 1.6 }}>
           Your workspace couldn't load. This is usually fixed by signing out and back in.
+        </p>
+        <p style={{ fontFamily: 'monospace', fontSize: 11, color: '#dc2626',
+          marginBottom: 12, wordBreak: 'break-all', background: 'var(--surface-subtle)',
+          padding: '8px 12px', borderRadius: 6, textAlign: 'left' }}>
+          {error.message || 'Unknown error'}
         </p>
         {error.digest && (
           <p style={{ fontFamily: 'monospace', fontSize: 11, color: '#94a3b8', marginBottom: 24 }}>
@@ -37,7 +42,7 @@ export default function AppError({ error, reset }: { error: Error & { digest?: s
             Sign out and sign back in
           </button>
           <button onClick={reset}
-            style={{ background: '#f1f5f9', color: '#374151', border: '1px solid #e2e8f0',
+            style={{ background: 'var(--surface-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border)',
               padding: '10px 20px', borderRadius: 8, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }}>
             Try again
           </button>
