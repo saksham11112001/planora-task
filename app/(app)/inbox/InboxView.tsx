@@ -2,7 +2,7 @@
 import React from 'react'
 import { useState, useEffect, useTransition } from 'react'
 import { useRouter }          from 'next/navigation'
-import { CheckCheck, Clock, Trash2 } from 'lucide-react'
+import { CheckCheck, Clock, Trash2, RefreshCw } from 'lucide-react'
 import { InlineOneTimeTask }  from '@/components/tasks/InlineOneTimeTask'
 import { CompletionAttachModal } from '@/components/tasks/CompletionAttachModal'
 import { TaskDetailPanel }    from '@/components/tasks/TaskDetailPanel'
@@ -33,6 +33,12 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
   const [, startT]                      = useTransition()
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set())
   const [searchQuery,   setSearchQuery]   = useState('')
+  const [viewTab,       setViewTab]       = useState<'List'|'Board'>('List')
+  const [boardClient,   setBoardClient]   = useState('')
+  const [doneBoardExp,  setDoneBoardExp]  = useState(false)
+  const [dragTaskId,    setDragTaskId]    = useState<string|null>(null)
+  const [dragOverCol,   setDragOverCol]   = useState<string|null>(null)
+  const BOARD_DONE_PAGE = 5
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set(['done', 'overdue']))
 
   // Auto-load subtasks for all tasks on mount
@@ -247,6 +253,29 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
     { key: 'done',     label: 'Completed',          color: '#16a34a', bg: '#fff',   tasks: filterTasks(done),      addRow: false },
   ].filter(s => s.tasks.length > 0 || s.addRow)
 
+  const INBOX_BOARD_COLS = [
+    { status:'overdue',   label:'Overdue',          color:'#dc2626' },
+    { status:'todo',      label:'To do',             color:'var(--text-muted)' },
+    { status:'in_review', label:'Pending approval',  color:'#7c3aed' },
+    { status:'completed', label:'Done',              color:'#16a34a' },
+  ]
+
+  async function handleBoardDrop(targetStatus: string) {
+    if (!dragTaskId) return
+    const task = localTasks.find(t => t.id === dragTaskId)
+    if (!task || task.status === targetStatus) { setDragTaskId(null); setDragOverCol(null); return }
+    setDragTaskId(null); setDragOverCol(null)
+    setLocalTasks(prev => prev.map(t => t.id === dragTaskId ? { ...t, status: targetStatus as any } : t))
+    const res = await fetch(`/api/tasks/${dragTaskId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: targetStatus }),
+    })
+    if (!res.ok) {
+      setLocalTasks(prev => prev.map(t => t.id === dragTaskId ? { ...t, status: task.status } : t))
+      toast.error('Could not move task')
+    }
+  }
+
   return (
     <>
     <style>{`
@@ -257,6 +286,135 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
         }
       }
     `}</style>
+
+    {/* ── Tab bar ─────────────────────────────────────────────── */}
+    <div style={{ display:'flex', borderBottom:'1px solid var(--border)', padding:'0 20px',
+      background:'var(--surface)', flexShrink:0 }}>
+      {(['List','Board'] as const).map(t => (
+        <button key={t} onClick={() => setViewTab(t)}
+          style={{ padding:'10px 15px', fontSize:14, fontWeight:500, border:'none',
+            background:'transparent', cursor:'pointer', marginBottom:-1,
+            borderBottom:`2px solid ${viewTab===t?'var(--brand)':'transparent'}`,
+            color: viewTab===t?'var(--brand)':'var(--text-muted)' }}>
+          {t}
+        </button>
+      ))}
+    </div>
+
+    {/* ── BOARD VIEW ─────────────────────────────────────────── */}
+    {viewTab === 'Board' && (
+      <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+        {/* Client filter */}
+        {clients.length > 0 && (
+          <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 20px',
+            borderBottom:'1px solid var(--border-light)', background:'var(--surface)', flexShrink:0 }}>
+            <span style={{ fontSize:11, color:'var(--text-muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em' }}>Client</span>
+            <select value={boardClient} onChange={e => setBoardClient(e.target.value)}
+              style={{ padding:'4px 10px', borderRadius:20, fontSize:12, cursor:'pointer', outline:'none',
+                border: boardClient?'1px solid var(--brand)':'1px solid var(--border)',
+                background: boardClient?'rgba(13,148,136,0.08)':'var(--surface-subtle)',
+                color: boardClient?'var(--brand)':'var(--text-secondary)', fontFamily:'inherit', appearance:'none' }}>
+              <option value=''>All clients</option>
+              {clients.map(cl => <option key={cl.id} value={cl.id}>{cl.name}</option>)}
+            </select>
+            {boardClient && <button onClick={() => setBoardClient('')}
+              style={{ fontSize:11, color:'var(--text-muted)', background:'none', border:'none', cursor:'pointer' }}>✕</button>}
+          </div>
+        )}
+        <div style={{ flex:1, overflowX:'auto', overflowY:'hidden', padding:'14px 20px',
+          background:'var(--surface-subtle)', display:'flex', gap:12, alignItems:'flex-start' }}>
+          {INBOX_BOARD_COLS.map(col => {
+            const today2 = todayStr()
+            let colTasks = col.status === 'overdue'
+              ? localTasks.filter(t => !!t.due_date && t.due_date < today2 && !['completed','in_review'].includes(t.status))
+              : col.status === 'in_review'
+              ? localTasks.filter(t => t.approval_status === 'pending' || t.status === 'in_review')
+              : col.status === 'todo'
+              ? localTasks.filter(t => ['todo','in_progress'].includes(t.status) && t.approval_status !== 'pending' && !(!!t.due_date && t.due_date < today2))
+              : localTasks.filter(t => t.status === col.status && t.approval_status !== 'pending')
+            if (boardClient) colTasks = colTasks.filter(t => (t as any).client?.id === boardClient)
+            const allColDone = colTasks
+            if (col.status === 'completed' && !doneBoardExp) colTasks = colTasks.slice(0, BOARD_DONE_PAGE)
+            return (
+              <div key={col.status}
+                onDragOver={e => { e.preventDefault(); setDragOverCol(col.status) }}
+                onDragLeave={() => setDragOverCol(null)}
+                onDrop={() => handleBoardDrop(col.status)}
+                style={{ width:260, flexShrink:0, borderRadius:10, overflow:'hidden', maxHeight:'100%',
+                  display:'flex', flexDirection:'column',
+                  background: dragOverCol===col.status ? 'var(--brand-light)' : 'var(--border-light)',
+                  border: dragOverCol===col.status ? '2px solid var(--brand)' : '1px solid var(--border)',
+                  transition:'all 0.15s' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:7, padding:'10px 12px',
+                  borderBottom:'1px solid var(--border)' }}>
+                  <div style={{ width:8, height:8, borderRadius:'50%', background:col.color, flexShrink:0 }}/>
+                  <span style={{ fontSize:13, fontWeight:600, color:'var(--text-primary)', flex:1 }}>{col.label}</span>
+                  <span style={{ fontSize:12, color:'var(--text-muted)' }}>{colTasks.length}</span>
+                </div>
+                <div style={{ padding:7, display:'flex', flexDirection:'column', gap:6, overflowY:'auto', flex:1 }}>
+                  {colTasks.map(task => {
+                    const pri = PRIORITY_CONFIG[task.priority]
+                    const isDone = task.status === 'completed'
+                    const ov = !!task.due_date && task.due_date < todayStr()
+                    return (
+                      <div key={task.id}
+                        draggable
+                        onDragStart={() => setDragTaskId(task.id)}
+                        onDragEnd={() => { setDragTaskId(null); setDragOverCol(null) }}
+                        onClick={() => setSelectedTask(selectedTask?.id===task.id ? null : task)}
+                        style={{ background:'var(--surface)', borderRadius:8, padding:'9px 10px',
+                          cursor:'grab', border:`1px solid ${selectedTask?.id===task.id?'var(--brand)':'var(--border)'}`,
+                          opacity: isDone ? 0.65 : dragTaskId===task.id ? 0.5 : 1,
+                          boxShadow:'0 1px 3px rgba(0,0,0,0.05)', transition:'opacity 0.15s' }}>
+                        <div style={{ fontSize:12, fontWeight:500, color: isDone?'var(--text-muted)':'var(--text-primary)',
+                          textDecoration: isDone?'line-through':'none', marginBottom:6, lineHeight:1.4 }}>
+                          {task.title}
+                        </div>
+                        {(task as any).client && (
+                          <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:5 }}>
+                            <span style={{ width:6, height:6, borderRadius:1, background:(task as any).client.color??'#0d9488', display:'inline-block' }}/>
+                            <span style={{ fontSize:10, color:'var(--text-muted)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                              {(task as any).client.name}
+                            </span>
+                          </div>
+                        )}
+                        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                          <span style={{ display:'inline-flex', alignItems:'center', gap:3, padding:'2px 7px',
+                            borderRadius:5, fontSize:10, fontWeight:600,
+                            background: pri?.bg??'#f8fafc', color: pri?.color??'#94a3b8' }}>
+                            {pri?.icon} {task.priority}
+                          </span>
+                          {task.due_date && (
+                            <span style={{ fontSize:10, color: ov?'#dc2626':'var(--text-muted)', fontWeight: ov?600:400 }}>
+                              {fmtDate(task.due_date)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                  {col.status === 'completed' && allColDone.length > BOARD_DONE_PAGE && (
+                    <button onClick={() => setDoneBoardExp(v => !v)}
+                      style={{ width:'100%', padding:'7px', fontSize:11, fontWeight:600,
+                        color:'var(--text-muted)', background:'transparent', border:'none',
+                        cursor:'pointer', borderTop:'1px solid var(--border-light)' }}>
+                      {doneBoardExp ? '▲ Show fewer' : `▼ ${allColDone.length - BOARD_DONE_PAGE} more`}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+        <TaskDetailPanel task={selectedTask} members={members} clients={clients}
+          currentUserId={currentUserId} userRole={userRole}
+          onClose={() => setSelectedTask(null)}
+          onUpdated={() => { setSelectedTask(null); startT(() => { window.location.reload() }) }}/>
+      </div>
+    )}
+
+    {/* ── LIST VIEW ──────────────────────────────────────────── */}
+    {viewTab === 'List' && (
     <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
       {/* Main list */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>

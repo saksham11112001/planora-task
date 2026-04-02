@@ -41,6 +41,10 @@ export function RecurringView({ tasks: initialTasks, members, projects, clients,
   const router = useRouter()
   const [, startT]         = useTransition()
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+  const [viewTab,      setViewTab]      = useState<'List'|'Board'>('List')
+  const [boardClient,  setBoardClient]  = useState('')
+  const [dragTaskId,   setDragTaskId]   = useState<string|null>(null)
+  const [dragOverCol,  setDragOverCol]  = useState<string|null>(null)
   const [editingId, setEditingId] = useState<string|null>(null)
   const [editForm, setEditForm] = useState<Partial<Task & { frequency: string }>>({})
 
@@ -154,8 +158,110 @@ export function RecurringView({ tasks: initialTasks, members, projects, clients,
     setNewSubInputs(p => ({ ...p, [taskId]: '' }))
   }
 
+  const REC_BOARD_COLS = [
+    { freq:'daily',     label:'Daily',     color:'#dc2626' },
+    { freq:'weekly',    label:'Weekly',    color:'#ea580c' },
+    { freq:'monthly',   label:'Monthly',   color:'#0d9488' },
+    { freq:'quarterly', label:'Quarterly', color:'#7c3aed' },
+    { freq:'annual',    label:'Annual',    color:'#0891b2' },
+  ]
+
   return (
     <div className="page-container">
+      {/* Tab bar */}
+      <div style={{ display:'flex', borderBottom:'1px solid var(--border)', marginBottom:0,
+        background:'var(--surface)', margin:'0 -0px 0', flexShrink:0 }}>
+        {(['List','Board'] as const).map(t => (
+          <button key={t} onClick={() => setViewTab(t)}
+            style={{ padding:'10px 15px', fontSize:14, fontWeight:500, border:'none',
+              background:'transparent', cursor:'pointer', marginBottom:-1,
+              borderBottom:`2px solid ${viewTab===t?'var(--brand)':'transparent'}`,
+              color: viewTab===t?'var(--brand)':'var(--text-muted)' }}>
+            {t}
+          </button>
+        ))}
+      </div>
+
+      {/* BOARD VIEW */}
+      {viewTab === 'Board' && (
+        <div style={{ display:'flex', flexDirection:'column', flex:1, overflow:'hidden' }}>
+          {clients.length > 0 && (
+            <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 20px',
+              borderBottom:'1px solid var(--border-light)', background:'var(--surface)' }}>
+              <span style={{ fontSize:11, color:'var(--text-muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em' }}>Client</span>
+              <select value={boardClient} onChange={e => setBoardClient(e.target.value)}
+                style={{ padding:'4px 10px', borderRadius:20, fontSize:12, cursor:'pointer', outline:'none',
+                  border: boardClient?'1px solid var(--brand)':'1px solid var(--border)',
+                  background: boardClient?'rgba(13,148,136,0.08)':'var(--surface-subtle)',
+                  color: boardClient?'var(--brand)':'var(--text-secondary)', fontFamily:'inherit', appearance:'none' }}>
+                <option value=''>All clients</option>
+                {clients.map(cl => <option key={cl.id} value={cl.id}>{cl.name}</option>)}
+              </select>
+              {boardClient && <button onClick={() => setBoardClient('')}
+                style={{ fontSize:11, color:'var(--text-muted)', background:'none', border:'none', cursor:'pointer' }}>✕</button>}
+            </div>
+          )}
+          <div style={{ flex:1, overflowX:'auto', overflowY:'hidden', padding:'14px 20px',
+            background:'var(--surface-subtle)', display:'flex', gap:12, alignItems:'flex-start' }}>
+            {REC_BOARD_COLS.map(col => {
+              let colTasks = localTasks.filter(t =>
+                (t.frequency ?? '').toLowerCase() === col.freq ||
+                (col.freq === 'annual' && (t.frequency ?? '').toLowerCase() === 'yearly')
+              )
+              if (boardClient) colTasks = colTasks.filter(t => t.client?.id === boardClient)
+              return (
+                <div key={col.freq}
+                  style={{ width:240, flexShrink:0, borderRadius:10, overflow:'hidden',
+                    maxHeight:'calc(100vh - 260px)', display:'flex', flexDirection:'column',
+                    background:'var(--border-light)', border:'1px solid var(--border)' }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:7, padding:'10px 12px',
+                    borderBottom:'1px solid var(--border)' }}>
+                    <div style={{ width:8, height:8, borderRadius:'50%', background:col.color, flexShrink:0 }}/>
+                    <span style={{ fontSize:13, fontWeight:600, color:'var(--text-primary)', flex:1 }}>{col.label}</span>
+                    <span style={{ fontSize:12, color:'var(--text-muted)' }}>{colTasks.length}</span>
+                  </div>
+                  <div style={{ padding:7, display:'flex', flexDirection:'column', gap:6, overflowY:'auto', flex:1 }}>
+                    {colTasks.map(task => (
+                      <div key={task.id}
+                        onClick={() => setSelectedTask(selectedTask?.id===task.id ? null : task as any)}
+                        style={{ background:'var(--surface)', borderRadius:8, padding:'9px 10px',
+                          cursor:'pointer', border:`1px solid ${selectedTask?.id===task.id?'var(--brand)':'var(--border)'}`,
+                          boxShadow:'0 1px 3px rgba(0,0,0,0.05)' }}>
+                        <div style={{ fontSize:12, fontWeight:500, color:'var(--text-primary)',
+                          marginBottom:5, lineHeight:1.4 }}>{task.title}</div>
+                        {task.client && (
+                          <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:4 }}>
+                            <span style={{ width:6, height:6, borderRadius:1, background:task.client.color??'#0d9488', display:'inline-block' }}/>
+                            <span style={{ fontSize:10, color:'var(--text-muted)' }}>{task.client.name}</span>
+                          </div>
+                        )}
+                        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                          <span style={{ fontSize:10, fontWeight:600, color: task.priority==='urgent'?'#dc2626':task.priority==='high'?'#ea580c':'var(--text-muted)' }}>
+                            {task.priority}
+                          </span>
+                          {task.next_occurrence_date && (
+                            <span style={{ fontSize:10, color:'var(--text-muted)' }}>
+                              Next: {task.next_occurrence_date.slice(0,10)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    {colTasks.length === 0 && (
+                      <div style={{ fontSize:12, color:'var(--text-muted)', textAlign:'center', padding:'20px 0', opacity:0.5 }}>
+                        No {col.label.toLowerCase()} tasks
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* LIST VIEW */}
+      {viewTab === 'List' && (
       <div style={{ marginBottom: 24 }}>
         <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 0 }}>Recurring tasks</h1>
@@ -414,6 +520,8 @@ export function RecurringView({ tasks: initialTasks, members, projects, clients,
         onClose={() => setSelectedTask(null)}
         onUpdated={() => { setSelectedTask(null); startT(() => router.refresh()) }}
       />
+      </div>
+      )}
     </div>
   )
 }

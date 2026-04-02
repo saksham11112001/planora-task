@@ -6,91 +6,93 @@ import type { Metadata } from 'next'
 export const dynamic = 'force-dynamic'
 export const metadata: Metadata = { title: 'My tasks' }
 
-
 export default async function MyTasksPage() {
   try {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) redirect('/login')
 
-  const { data: mb } = await supabase.from('org_members')
-    .select('org_id, role').eq('user_id', user.id).eq('is_active', true).maybeSingle()
-  if (!mb) redirect('/onboarding')
+    const { data: mb } = await supabase.from('org_members')
+      .select('org_id, role').eq('user_id', user.id).eq('is_active', true).maybeSingle()
+    if (!mb) redirect('/onboarding')
 
-  // Fetch tasks assigned to me — NO clients() join to avoid FK issues
-  const { data: clients } = await supabase
-    .from('clients').select('id, name, color').eq('org_id', mb.org_id).eq('status', 'active').order('name')
+    const isManager = ['owner','admin','manager'].includes(mb.role)
 
-  const { data: tasks } = await supabase.from('tasks')
-    .select('id, title, description, status, priority, due_date, assignee_id, approver_id, client_id, project_id, approval_status, approval_required, estimated_hours, is_recurring, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), projects(id, name, color)')
-    .eq('org_id', mb.org_id).eq('assignee_id', user.id).neq('is_archived', true).is('parent_task_id', null)
-    .order('due_date', { ascending: true, nullsFirst: false })
+    // ── ALL data fetched in parallel ──────────────────────────────
+    const [
+      { data: tasks },
+      { data: approvalTasks },
+      { data: members },
+      { data: allClients },
+      { data: clientsData },
+    ] = await Promise.all([
+      // My tasks (all statuses for board view)
+      supabase.from('tasks')
+        .select('id, title, description, status, priority, due_date, assignee_id, approver_id, client_id, project_id, approval_status, approval_required, estimated_hours, is_recurring, custom_fields, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), projects(id, name, color)')
+        .eq('org_id', mb.org_id).eq('assignee_id', user.id).neq('is_archived', true).is('parent_task_id', null)
+        .order('due_date', { ascending: true, nullsFirst: false }),
 
-  // Fetch clients separately
-  const { data: clientsData } = await supabase.from('clients').select('id, name, color').eq('org_id', mb.org_id)
-  const clientMap: Record<string, { id: string; name: string; color: string }> = {}
-  clientsData?.forEach(c => { clientMap[c.id] = c })
+      // Tasks needing my approval
+      supabase.from('tasks')
+        .select('id, title, description, status, priority, due_date, assignee_id, approver_id, client_id, project_id, approval_status, approval_required, estimated_hours, is_recurring, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), projects(id, name, color)')
+        .eq('org_id', mb.org_id).eq('status', 'in_review').eq('approval_status', 'pending')
+        .neq('is_archived', true).is('parent_task_id', null)
+        .order('due_date', { ascending: true, nullsFirst: false }),
 
-  // Fetch tasks where this user is the designated approver AND they are in_review
-  // For managers with no specific approver set, fetch all org tasks in_review
-  const isManager = ['owner','admin','manager'].includes(mb.role)
-  const { data: approvalTasks, error: approvalError } = await supabase.from('tasks')
-    .select('id, title, description, status, priority, due_date, assignee_id, approver_id, client_id, project_id, approval_status, approval_required, estimated_hours, is_recurring, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), projects(id, name, color)')
-    .eq('org_id', mb.org_id)
-    .eq('status', 'in_review')
-    .eq('approval_status', 'pending')
-    .neq('is_archived', true)
-    .is('parent_task_id', null)
-    .order('due_date', { ascending: true, nullsFirst: false })
-  if (approvalError) console.error('[approvalTasks]', approvalError.message)
+      // Team members
+      supabase.from('org_members')
+        .select('user_id, users(id, name)').eq('org_id', mb.org_id).eq('is_active', true),
 
-  const { data: members } = await supabase.from('org_members')
-    .select('user_id, users(id, name)').eq('org_id', mb.org_id).eq('is_active', true)
-  const { data: allClients } = await supabase.from('clients').select('id, name, color').eq('org_id', mb.org_id).eq('status', 'active').order('name')
+      // All active clients
+      supabase.from('clients')
+        .select('id, name, color').eq('org_id', mb.org_id).eq('status', 'active').order('name'),
 
-  const memberList = (members ?? []).map(m => ({ id: (m.users as any)?.id ?? m.user_id, name: (m.users as any)?.name ?? 'Unknown' }))
-  const clientList = (allClients ?? []).map(c => ({ id: c.id, name: c.name, color: c.color }))
+      // Client lookup map
+      supabase.from('clients').select('id, name, color').eq('org_id', mb.org_id),
+    ])
 
-  const taskList = (tasks ?? []).map(t => ({
-    ...t,
-    description: t.description ?? null, due_date: t.due_date ?? null,
-    assignee_id: t.assignee_id ?? null, client_id: t.client_id ?? null,
-    project_id: t.project_id ?? null, approval_status: t.approval_status ?? null,
-    approval_required: t.approval_required ?? false, estimated_hours: t.estimated_hours ?? null,
-    is_recurring: t.is_recurring ?? false, completed_at: null,
-    is_archived: false, created_at: '',
-    assignee: (t.assignee as any) ?? null,
-    approver: null,
-    approver_id: null,
-    client: t.client_id ? (clientMap[t.client_id] ?? null) : null,
-    project: (t.projects as any) ?? null,
-  }))
+    const clientMap: Record<string, { id: string; name: string; color: string }> = {}
+    clientsData?.forEach(c => { clientMap[c.id] = c })
 
-  const approvalList = (approvalTasks ?? [])
-    .filter(t => {
-      // Only show to the designated approver, or any manager if no approver set
-      const approverId = (t as any).approver_id
-      if (approverId) return approverId === user.id
-      return isManager
-    })
-    .map(t => ({
+    const memberList = (members ?? []).map(m => ({
+      id: (m.users as any)?.id ?? m.user_id,
+      name: (m.users as any)?.name ?? 'Unknown',
+    }))
+    const clientList = (allClients ?? []).map(c => ({ id: c.id, name: c.name, color: c.color }))
+
+    const enrich = (t: any) => ({
       ...t,
       description: t.description ?? null, due_date: t.due_date ?? null,
       assignee_id: t.assignee_id ?? null, client_id: t.client_id ?? null,
       project_id: t.project_id ?? null, approval_status: t.approval_status ?? null,
-      approval_required: t.approval_required ?? true, estimated_hours: t.estimated_hours ?? null,
+      approval_required: t.approval_required ?? false, estimated_hours: t.estimated_hours ?? null,
       is_recurring: t.is_recurring ?? false, completed_at: null,
-      is_archived: false, created_at: '',
+      is_archived: false, created_at: '', approver: null, approver_id: null,
       assignee: (t.assignee as any) ?? null,
-      approver: (t.approver as any) ?? null,
-      approver_id: (t as any).approver_id ?? null,
       client: t.client_id ? (clientMap[t.client_id] ?? null) : null,
       project: (t.projects as any) ?? null,
-    }))
+    })
 
-  return <MyTasksView tasks={taskList as any} pendingApprovalTasks={approvalList as any} members={memberList} clients={clientList} currentUserId={user.id} userRole={mb.role}/>
+    const taskList     = (tasks ?? []).map(enrich)
+    const approvalList = (approvalTasks ?? [])
+      .filter(t => {
+        const approverId = (t as any).approver_id
+        if (approverId) return approverId === user.id
+        return isManager
+      })
+      .map(enrich)
+
+    return <MyTasksView
+      tasks={taskList as any}
+      pendingApprovalTasks={approvalList as any}
+      members={memberList}
+      clients={clientList}
+      currentUserId={user.id}
+      userRole={mb.role}
+      canCreate={['owner','admin','manager','member'].includes(mb.role)}
+    />
   } catch (err: any) {
-    console.error('[MyTasksPage crash]', err?.message ?? err)
-    throw err  // re-throw so error boundary catches it
+    console.error('[MyTasksPage]', err?.message ?? err)
+    throw err
   }
 }

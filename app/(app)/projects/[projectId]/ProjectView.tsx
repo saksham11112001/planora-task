@@ -342,7 +342,29 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
           {subs.length > 0 ? `${subsDone}/${subs.length}` : '+'}
         </button>
         <div className="w-36 hidden md:flex items-center gap-2 pl-2" onClick={() => setSelectedTask(task)}>
-          {assignee ? <><Avatar name={assignee.name} size="xs"/><span className="text-xs text-gray-500 truncate">{assignee.name}</span></> : <div className="h-5 w-5 rounded-full border border-dashed border-gray-300 opacity-0 group-hover:opacity-100"/>}
+          {assignee
+            ? <><Avatar name={assignee.name} size="xs"/><span className="text-xs text-gray-500 truncate">{assignee.name}</span></>
+            : currentUserId
+              ? <button
+                  onClick={async e => {
+                    e.stopPropagation()
+                    setTasks(prev => prev.map(t => t.id === task.id
+                      ? { ...t, assignee_id: currentUserId, assignee: members.find(m => m.id === currentUserId) ?? null as any }
+                      : t))
+                    await fetch(`/api/tasks/${task.id}`, {
+                      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ assignee_id: currentUserId }),
+                    })
+                    toast.success('Assigned to you ✓')
+                  }}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity"
+                  style={{ fontSize:11, color:'var(--brand)', background:'var(--brand-light)',
+                    border:'1px solid var(--brand-border)', borderRadius:6, padding:'2px 8px',
+                    cursor:'pointer', fontFamily:'inherit', fontWeight:600, whiteSpace:'nowrap' }}>
+                  + Assign to me
+                </button>
+              : <div className="h-5 w-5 rounded-full border border-dashed border-gray-300 opacity-0 group-hover:opacity-100"/>
+          }
         </div>
         <div className="w-24 hidden md:block text-center" onClick={() => setSelectedTask(task)}>
           {task.due_date && <span className="text-xs" style={{ color: ov ? '#dc2626' : '#94a3b8' }}>{fmtDate(task.due_date)}</span>}

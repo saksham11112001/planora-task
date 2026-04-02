@@ -2,6 +2,9 @@ import { createClient }      from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse }       from 'next/server'
 import type { NextRequest }   from 'next/server'
+export const maxDuration = 60  // Vercel Pro: up to 300s; Hobby: 10s
+export const dynamic = 'force-dynamic'
+
 import { COMPLIANCE_TASKS }   from '@/lib/data/complianceTasks'
 
 // Build a lookup map for compliance tasks by title (case-insensitive)
@@ -56,24 +59,61 @@ function validateDropdown(value: string, allowed: string[], fieldName: string, r
   }
   return null
 }
-// Skip sample/hint rows: contain placeholder text or @yourcompany.com
+// Skip ONLY rows that are the exact template sample rows
+// NEVER skip real data rows — if a cell has a real value, trust it
+const SAMPLE_TITLES = new Set([
+  // Task templates
+  'task — replace me', 'task - replace me',
+  'design wireframes', 'review documents', 'review docs',
+  'audit fieldwork', 'review q3 proposals', 'team budget meeting',
+  'client onboarding call', 'weekly standup', 'monthly review',
+  'weekly team standup', 'monthly gst filing', 'quarterly review',
+  // Project templates
+  'project alpha', 'project beta',
+  // Member templates (if user didn't touch Team Members sheet)
+])
+// Template client names that should be skipped unless user filled their own
+const SAMPLE_CLIENT_NAMES = new Set(['acme corp', 'garg sons', 'mehra & co'])
+const SAMPLE_MEMBER_NAMES = new Set(['alex johnson', 'priya sharma', 'sam gupta', 'riya nair'])
+// Template's pre-filled project/member/client names that users shouldn't import by default
+const TEMPLATE_SAMPLE_DATA = new Set([
+  'project alpha', 'project beta',
+  'alex johnson', 'priya sharma', 'sam gupta', 'riya nair',
+  'acme corp', 'garg sons', 'mehra & co',
+])
 function isSampleRow(row: string[]): boolean {
-  // Only skip rows that are clearly template hint/example rows
-  // Check ALL cells — if >60% contain template placeholders, skip the row
   const totalCells = row.filter(r => r.trim()).length
-  if (totalCells === 0) return true  // empty row
-  const hintCells = row.filter(r => {
-    const v = r.toLowerCase().trim()
-    return v.includes('yourcompany.com') ||
-           v === 'yyyy-mm-dd' ||
-           v === 'must match projects' ||
-           v === 'must match clients' ||
-           v === 'clear title' ||
-           v === 'unique name' ||
-           (v === 'optional' && totalCells < 3)
-  }).length
-  // Skip only if more than half the non-empty cells look like hints
-  return totalCells > 0 && hintCells / totalCells > 0.5
+  if (totalCells === 0) return true  // empty row — always skip
+
+  // Skip rows with @yourcompany.com placeholder emails
+  if (row.some(r => r.toLowerCase().includes('@yourcompany.com'))) return true
+
+  // Skip exact template sample task titles
+  const firstCell = row[0]?.toLowerCase().trim() ?? ''
+  if (firstCell && SAMPLE_TITLES.has(firstCell)) return true
+
+  return false
+}
+
+// Check if an entire sheet appears to be the unmodified template sample
+// Returns true if the sheet should be skipped entirely
+function isUnmodifiedTemplateSheet(rows: string[][], sheetType: 'members'|'clients'|'projects'|'tasks'|'onetasks'|'recurring'): boolean {
+  // Get all non-header, non-empty rows
+  const dataRows = rows.slice(1).filter(r => r.some(c => c.trim()))
+  if (dataRows.length === 0) return true // empty sheet — skip
+
+  // For task sheets: if there's ANY real data row, don't skip
+  if (sheetType === 'tasks' || sheetType === 'onetasks' || sheetType === 'recurring') {
+    // Check if all rows are sample rows
+    return dataRows.every(row => isSampleRow(row))
+  }
+
+  // For members/clients/projects: check if ALL names match template samples
+  const allTemplateData = dataRows.every(row => {
+    const first = row[0]?.toLowerCase().trim()
+    return TEMPLATE_SAMPLE_DATA.has(first) || isSampleRow(row)
+  })
+  return allTemplateData
 }
 function nextOccurrence(freq: string, from: string): string {
   const d = new Date(from || new Date().toISOString().split('T')[0])
@@ -130,46 +170,43 @@ export async function POST(request: NextRequest) {
   }
 
   // ── Email → user_id cache (checks app users table) ───────────
+  // ── PRE-BUILD email→userId map in ONE batch call (eliminates per-row DB calls) ──
   const emailCache: Record<string, string | null> = {}
-  async function resolveEmail(email: string): Promise<string | null> {
+
+  // Fetch all org users at once — O(1) per email lookup instead of O(n) DB calls
+  try {
+    const { data: allOrgMembers } = await admin
+      .from('org_members')
+      .select('user_id, users(id, email)')
+      .eq('org_id', orgId)
+    for (const m of allOrgMembers ?? []) {
+      const email = (m.users as any)?.email?.toLowerCase()
+      if (email && m.user_id) emailCache[email] = m.user_id
+    }
+    // Also fetch any users not yet in org_members (invited but not joined)
+    const { data: allUsers } = await admin.from('users').select('id, email').limit(2000)
+    for (const u of allUsers ?? []) {
+      const email = u.email?.toLowerCase()
+      if (email && !emailCache[email]) emailCache[email] = u.id
+    }
+  } catch {}
+
+  function resolveEmail(email: string): Promise<string | null> {
     const e = email.toLowerCase().trim()
-    if (!e || !e.includes('@')) return null
-    if (e in emailCache) return emailCache[e]
+    if (!e || !e.includes('@')) return Promise.resolve(null)
+    return Promise.resolve(emailCache[e] ?? null)
+  }
 
-    // 1. Check public.users table (fastest)
-    const { data: appUser } = await admin.from('users').select('id').eq('email', e).maybeSingle()
-    if (appUser?.id) { emailCache[e] = appUser.id; return appUser.id }
-
-    // 2. Fall back to Supabase auth (covers users who haven't signed in yet)
+  // Fallback for auth-only users (invited but no users row yet)
+  async function resolveAuthUser(email: string): Promise<string | null> {
+    const e = email.toLowerCase().trim()
+    if (emailCache[e]) return emailCache[e]
     try {
       const { data: authData } = await admin.auth.admin.listUsers({ perPage: 1000 })
       const authUser = authData?.users?.find((u: any) => u.email?.toLowerCase() === e)
       if (authUser?.id) { emailCache[e] = authUser.id; return authUser.id }
     } catch {}
-
-    // 3. Check org_members joined with auth — some orgs store emails differently
-    const { data: member } = await admin
-      .from('org_members')
-      .select('user_id, users!inner(email)')
-      .eq('users.email', e)
-      .eq('org_id', orgId)
-      .maybeSingle()
-    if ((member as any)?.user_id) {
-      emailCache[e] = (member as any).user_id
-      return (member as any).user_id
-    }
-
-    emailCache[e] = null
     return null
-  }
-
-  // ── Resolve user from Supabase auth (fallback for auth-only users) ──
-  async function resolveAuthUser(email: string): Promise<string | null> {
-    try {
-      const { data } = await admin.auth.admin.listUsers({ perPage: 1000 })
-      const authUser = data?.users?.find(u => u.email?.toLowerCase() === email.toLowerCase())
-      return authUser?.id ?? null
-    } catch { return null }
   }
 
   // ── 1. MEMBERS ────────────────────────────────────────────────
@@ -302,6 +339,8 @@ export async function POST(request: NextRequest) {
         if (isSampleRow(row)) continue
         const name = cell(row, iName)
         if (!name) continue
+        // Skip template sample clients (acme corp, garg sons, mehra & co) if email looks fake
+        if (SAMPLE_CLIENT_NAMES.has(name.toLowerCase()) && cell(row, iEmail).includes('@acme.com')) continue
         const rawColor = cell(row, iColor) || '#0d9488'
         const color    = rawColor.startsWith('#') ? rawColor : `#${rawColor}`
         const status   = cell(row, iStatus) || 'active'
@@ -374,7 +413,7 @@ export async function POST(request: NextRequest) {
         const clientId = await resolveClient(cell(row, iClient))
         const { data: proj, error: pErr } = await admin.from('projects').insert({
           org_id: orgId, name: name.trim(), color, status,
-          due_date:     cell(row, iDue)    || null,
+          due_date:     cellDate(row, iDue) || null,
           owner_id:     ownerId,
           client_id:    clientId,
           budget:       cell(row, iBudget) ? parseFloat(cell(row, iBudget)) : null,
@@ -423,7 +462,7 @@ export async function POST(request: NextRequest) {
           description: cell(row, iDesc) || null,
           status: ['todo','in_progress','completed','blocked'].includes(status) ? status : 'todo',
           priority, project_id: projectId, client_id: clientId, assignee_id: assigneeId,
-          due_date: cell(row, iDue) || null,
+          due_date: cellDate(row, iDue) || null,
           estimated_hours: cell(row, iHours) ? parseFloat(cell(row, iHours)) : null,
           created_by: user.id, is_recurring: false, approval_required: false,
           custom_fields: assigneeData.coAssignees.length > 0 ? { _co_assignees: assigneeData.coAssignees } : null,
@@ -476,7 +515,7 @@ export async function POST(request: NextRequest) {
           project_id: null,
           client_id: clientId,
           assignee_id: assigneeId,
-          due_date: cell(row, iDue) || null,
+          due_date: cellDate(row, iDue) || null,
           estimated_hours: cell(row, iHours) ? parseFloat(cell(row, iHours)) : null,
           created_by: user.id, is_recurring: false, approval_required: false,
           custom_fields: assigneeData2.coAssignees.length > 0 ? { _co_assignees: assigneeData2.coAssignees } : null,
@@ -489,7 +528,7 @@ export async function POST(request: NextRequest) {
             const subtaskInserts = compTask.subtasks.map(s => ({
               org_id: orgId, title: s.title, status: 'todo' as const,
               priority: compTask.priority, assignee_id: assigneeId || null,
-              client_id: clientId || null, due_date: cell(row, iDue) || null,
+              client_id: clientId || null, due_date: cellDate(row, iDue) || null,
               parent_task_id: newTask.id, created_by: user.id, is_recurring: false,
               custom_fields: s.required ? { _compliance_subtask: true } : null,
             }))
@@ -532,7 +571,7 @@ export async function POST(request: NextRequest) {
         const clientId   = await resolveClient(cell(row, iClient))
         const assigneeData3 = cell(row, iAssignee) ? await resolveEmails(cell(row, iAssignee)) : { primary: null, coAssignees: [] }
         const assigneeId = assigneeData3.primary
-        const startDate  = cell(row, iStart) || new Date().toISOString().split('T')[0]
+        const startDate  = cellDate(row, iStart) || new Date().toISOString().split('T')[0]
         const { error: rErr } = await admin.from('tasks').insert({
           org_id: orgId, title: title.trim(),
           description: cell(row, iDesc) || null,
@@ -584,9 +623,9 @@ export async function POST(request: NextRequest) {
         const frequency  = freqRaw ? (freqMap[norm(freqRaw)] ?? 'monthly') : null
         const { data: newTask, error: tErr } = await admin.from('tasks').insert({
           org_id: orgId, title: compTask.title, status: 'todo', priority,
-          client_id: clientId, assignee_id: assigneeId, due_date: dueDate,
+          client_id: clientId, assignee_id: assigneeId, due_date: dueDate ? dueDate.split('T')[0] : null,
           is_recurring: !!frequency, frequency: frequency ?? undefined,
-          next_occurrence_date: frequency && dueDate ? dueDate : null,
+          next_occurrence_date: frequency && dueDate ? dueDate.split('T')[0] : null,
           created_by: user.id, approval_required: false,
           custom_fields: assigneeData4.coAssignees.length > 0 ? { _co_assignees: assigneeData4.coAssignees } : null,
         }).select('id').single()
@@ -596,7 +635,7 @@ export async function POST(request: NextRequest) {
           if (newTask?.id && compTask.subtasks.length > 0) {
             await admin.from('tasks').insert(compTask.subtasks.map(s => ({
               org_id: orgId, title: s.title, status: 'todo' as const, priority,
-              assignee_id: assigneeId || null, client_id: clientId || null, due_date: dueDate,
+              assignee_id: assigneeId || null, client_id: clientId || null, due_date: dueDate ? dueDate.split('T')[0] : null,
               parent_task_id: newTask.id, created_by: user.id, is_recurring: false,
               custom_fields: s.required ? { _compliance_subtask: true } : null,
             })))

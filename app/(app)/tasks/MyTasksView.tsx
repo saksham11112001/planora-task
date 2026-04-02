@@ -35,10 +35,10 @@ const LIST_SECS = [
     filter:(t:Task,today:string)=>{ const end=new Date(today); end.setDate(end.getDate()+7); return (t.due_date===null || (!!t.due_date && new Date(t.due_date)>end)) && !['completed','cancelled','in_review'].includes(t.status) && t.approval_status !== 'pending' } },
 ]
 const BOARD_COLS = [
-  { status:'todo',        label:'To do',       color:'var(--text-muted)' },
-  { status:'in_progress', label:'In progress', color:'#0d9488' },
-  { status:'in_review',   label:'Pending approval', color:'#7c3aed' },
-  { status:'completed',   label:'Done',        color:'#16a34a' },
+  { status:'overdue',     label:'Overdue',          color:'#dc2626' },
+  { status:'todo',        label:'To do',             color:'var(--text-muted)' },
+  { status:'in_review',   label:'Pending approval',  color:'#7c3aed' },
+  { status:'completed',   label:'Done',              color:'#16a34a' },
 ]
 
 export function MyTasksView({
@@ -62,7 +62,11 @@ export function MyTasksView({
   const [checked,    setChecked]    = useState<Set<string>>(new Set())
   const [completing, setCompleting] = useState<Set<string>>(new Set())
   const [completingTask,  setCompletingTask]  = useState<Task | null>(null)
+  
   const [dragOverCol,    setDragOverCol]    = useState<string | null>(null)
+  const [boardClient,    setBoardClient]    = useState('')
+  const [doneExpanded,   setDoneExpanded]   = useState(false)
+  const DONE_PAGE = 5
   const [subtaskMap,     setSubtaskMap]     = useState<Record<string, any[]>>({})
   const [expandedTasks,  setExpandedTasks]  = useState<Set<string>>(new Set())
   const [filterPriority, setFilterPriority] = useState('')
@@ -738,14 +742,48 @@ export function MyTasksView({
         />
       )}
       <Tabs/>
+      {/* Board client filter */}
+      {clients && clients.length > 0 && (
+        <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 20px',
+          borderBottom:'1px solid var(--border-light)', background:'var(--surface)', flexShrink:0 }}>
+          <span style={{ fontSize:11, color:'var(--text-muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em' }}>Client</span>
+          <select value={boardClient} onChange={e => setBoardClient(e.target.value)}
+            style={{ padding:'4px 10px', borderRadius:20, fontSize:12, cursor:'pointer', outline:'none',
+              border: boardClient ? '1px solid var(--brand)' : '1px solid var(--border)',
+              background: boardClient ? 'rgba(13,148,136,0.08)' : 'var(--surface-subtle)',
+              color: boardClient ? 'var(--brand)' : 'var(--text-secondary)',
+              fontFamily:'inherit', appearance:'none', paddingRight:20 }}>
+            <option value=''>All clients</option>
+            {(clients ?? []).map(cl => <option key={cl.id} value={cl.id}>{cl.name}</option>)}
+          </select>
+          {boardClient && <button onClick={() => setBoardClient('')}
+            style={{ fontSize:11, color:'var(--text-muted)', background:'none', border:'none', cursor:'pointer' }}>
+            ✕ Clear
+          </button>}
+        </div>
+      )}
       <div style={{ flex:1, overflowX:'auto', overflowY:'hidden', padding:'14px 20px',
         background:'var(--surface-subtle)', display:'flex', gap:12, alignItems:'flex-start' }}>
         {BOARD_COLS.map(col => {
-          const colTasks = tasks.filter(t =>
-            col.status === 'in_review'
-              ? (t.status === 'in_review' || t.approval_status === 'pending')
-              : t.status === col.status && t.approval_status !== 'pending'
-          )
+          const today2 = todayStr()
+          // Build base list for this column
+          let colTasks = col.status === 'overdue'
+            ? tasks.filter(t => !!t.due_date && t.due_date < today2
+                && !['completed','cancelled','in_review'].includes(t.status)
+                && t.approval_status !== 'pending')
+            : col.status === 'in_review'
+            ? tasks.filter(t => t.status === 'in_review' || t.approval_status === 'pending')
+            : tasks.filter(t => t.status === col.status && t.approval_status !== 'pending'
+                && !(!!t.due_date && t.due_date < today2 && t.status !== 'completed'))
+
+          // Apply client filter
+          if (boardClient) colTasks = colTasks.filter(t => (t as any).client?.id === boardClient)
+
+          // Paginate done column
+          const allDoneTasks = colTasks
+          if (col.status === 'completed' && !doneExpanded) {
+            colTasks = colTasks.slice(0, DONE_PAGE)
+          }
           return (
             <div key={col.status}
               onDragOver={e => { e.preventDefault(); setDragOverCol(col.status) }}
@@ -833,6 +871,17 @@ export function MyTasksView({
                     </div>
                   )
                 })}
+              {col.status === 'completed' && allDoneTasks.length > DONE_PAGE && (
+                <button
+                  onClick={() => setDoneExpanded(v => !v)}
+                  style={{ width:'100%', padding:'8px', fontSize:11, fontWeight:600,
+                    color:'var(--text-muted)', background:'transparent', border:'none',
+                    cursor:'pointer', borderTop:'1px solid var(--border-light)', marginTop:2 }}>
+                  {doneExpanded
+                    ? `▲ Show fewer`
+                    : `▼ ${allDoneTasks.length - DONE_PAGE} more completed tasks`}
+                </button>
+              )}
               </div>
             </div>
           )
