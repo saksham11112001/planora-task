@@ -905,6 +905,8 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
         />
       )}
     </div>
+    </div>
+    )}
     </>
   )
 }

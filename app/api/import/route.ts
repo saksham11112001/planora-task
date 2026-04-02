@@ -88,9 +88,29 @@ function isSampleRow(row: string[]): boolean {
   // Skip rows with @yourcompany.com placeholder emails
   if (row.some(r => r.toLowerCase().includes('@yourcompany.com'))) return true
 
-  // Skip exact template sample task titles
+  // Always skip "replace me" placeholder tasks regardless of email
+  const titleLower = (row[0] ?? '').toLowerCase().trim()
+  if (titleLower.includes('replace me') || titleLower.includes('— replace') || titleLower === '') {
+    if (!row.some(r => r.trim() && !['replace me','todo','high','medium','low'].includes(r.toLowerCase().trim()))) return true
+  }
+
+  // For sample-titled rows, only skip if there are NO real (non-placeholder) emails
+  // If the user put their real email on a sample-titled row, it means they edited it
   const firstCell = row[0]?.toLowerCase().trim() ?? ''
-  if (firstCell && SAMPLE_TITLES.has(firstCell)) return true
+  if (firstCell && SAMPLE_TITLES.has(firstCell)) {
+    const hasRealEmail = row.some(r => {
+      const v = r.toLowerCase().trim()
+      // A real email is one that's not a known placeholder
+      return v.includes('@') &&
+             !v.includes('@yourcompany.com') &&
+             !v.includes('@acme.com') &&
+             !v.includes('@gargsons.com') &&
+             !v.includes('@mehraandco.com') &&
+             v.length > 5
+    })
+    if (!hasRealEmail) return true  // sample title + no real email = skip
+    // If they put a real email, treat it as real data they want to import
+  }
 
   return false
 }
@@ -170,43 +190,44 @@ export async function POST(request: NextRequest) {
   }
 
   // ── Email → user_id cache (checks app users table) ───────────
-  // ── PRE-BUILD email→userId map in ONE batch call (eliminates per-row DB calls) ──
+  // ── PRE-BUILD email→userId map in ONE batch (eliminates per-row DB calls) ──
   const emailCache: Record<string, string | null> = {}
 
-  // Fetch all org users at once — O(1) per email lookup instead of O(n) DB calls
+  // Fetch ALL users in parallel: org members + app users + auth users (invited-only)
+  // This single upfront cost eliminates ALL per-row lookups
   try {
-    const { data: allOrgMembers } = await admin
-      .from('org_members')
-      .select('user_id, users(id, email)')
-      .eq('org_id', orgId)
-    for (const m of allOrgMembers ?? []) {
+    const [orgMembersRes, appUsersRes, authUsersRes] = await Promise.all([
+      admin.from('org_members').select('user_id, users(id, email)').eq('org_id', orgId),
+      admin.from('users').select('id, email').limit(5000),
+      admin.auth.admin.listUsers({ perPage: 1000 }),
+    ])
+    // Priority: org_members → app users → auth-only users
+    for (const m of orgMembersRes.data ?? []) {
       const email = (m.users as any)?.email?.toLowerCase()
       if (email && m.user_id) emailCache[email] = m.user_id
     }
-    // Also fetch any users not yet in org_members (invited but not joined)
-    const { data: allUsers } = await admin.from('users').select('id, email').limit(2000)
-    for (const u of allUsers ?? []) {
+    for (const u of appUsersRes.data ?? []) {
       const email = u.email?.toLowerCase()
       if (email && !emailCache[email]) emailCache[email] = u.id
     }
-  } catch {}
+    for (const u of (authUsersRes.data?.users ?? [])) {
+      const email = u.email?.toLowerCase()
+      if (email && !emailCache[email]) emailCache[email] = u.id
+    }
+  } catch (e) {
+    console.error('[import] pre-build cache error:', e)
+  }
 
+  // All lookups are now instant (in-memory map)
   function resolveEmail(email: string): Promise<string | null> {
     const e = email.toLowerCase().trim()
     if (!e || !e.includes('@')) return Promise.resolve(null)
     return Promise.resolve(emailCache[e] ?? null)
   }
 
-  // Fallback for auth-only users (invited but no users row yet)
   async function resolveAuthUser(email: string): Promise<string | null> {
-    const e = email.toLowerCase().trim()
-    if (emailCache[e]) return emailCache[e]
-    try {
-      const { data: authData } = await admin.auth.admin.listUsers({ perPage: 1000 })
-      const authUser = authData?.users?.find((u: any) => u.email?.toLowerCase() === e)
-      if (authUser?.id) { emailCache[e] = authUser.id; return authUser.id }
-    } catch {}
-    return null
+    // Cache already includes auth users — no more per-email listUsers calls
+    return emailCache[email.toLowerCase().trim()] ?? null
   }
 
   // ── 1. MEMBERS ────────────────────────────────────────────────
@@ -238,9 +259,9 @@ export async function POST(request: NextRequest) {
         }
 
         // Check if already a member
+        // resolveEmail already checks org_members, users table, AND auth users
+        // via the pre-built cache — no additional DB calls needed
         let uid = await resolveEmail(email)
-
-        // If not in app users table, check Supabase auth directly
         if (!uid) uid = await resolveAuthUser(email)
 
         if (uid) {
@@ -339,8 +360,12 @@ export async function POST(request: NextRequest) {
         if (isSampleRow(row)) continue
         const name = cell(row, iName)
         if (!name) continue
-        // Skip template sample clients (acme corp, garg sons, mehra & co) if email looks fake
-        if (SAMPLE_CLIENT_NAMES.has(name.toLowerCase()) && cell(row, iEmail).includes('@acme.com')) continue
+        // Skip template sample clients if they still use placeholder/fake emails
+        const clientEmail = cell(row, iEmail).toLowerCase()
+        const isFakeClientEmail = clientEmail.includes('@acme.com') || 
+          clientEmail.includes('@gargsons.com') || clientEmail.includes('@mehraandco.com') || 
+          clientEmail === ''
+        if (SAMPLE_CLIENT_NAMES.has(name.toLowerCase()) && isFakeClientEmail) continue
         const rawColor = cell(row, iColor) || '#0d9488'
         const color    = rawColor.startsWith('#') ? rawColor : `#${rawColor}`
         const status   = cell(row, iStatus) || 'active'
