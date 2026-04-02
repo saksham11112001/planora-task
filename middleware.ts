@@ -10,7 +10,8 @@ const PUBLIC_PATHS = [
   '/terms',
   '/api/inngest',           // Inngest webhook — no auth
   '/api/webhooks',          // Razorpay webhook — no auth
-  '/api/onboarding',        // Called during onboarding before full session
+  '/api/onboarding',  
+  '/auth/callback'      // Called during onboarding before full session
 ]
 
 export async function middleware(request: NextRequest) {
