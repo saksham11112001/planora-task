@@ -1,86 +1,120 @@
 'use client'
-import { useEffect, useState } from 'react'
 
-/**
- * Branded splash shown during initial hydration / compilation.
- * Fades out once the app is interactive.
- */
-export function AppLoader() {
-  const [visible, setVisible] = useState(true)
-  const [fading,  setFading]  = useState(false)
+import { useEffect, useState } from 'react'
+import { cn } from '@/lib/utils/cn'
+
+interface AppLoaderProps {
+  message?: string
+  className?: string
+}
+
+export default function AppLoader({ message = 'Loading...', className }: AppLoaderProps) {
+  const [dots, setDots] = useState(0)
 
   useEffect(() => {
-    // Fade out once the page has hydrated
-    const t = setTimeout(() => {
-      setFading(true)
-      setTimeout(() => setVisible(false), 500)
-    }, 600)
-    return () => clearTimeout(t)
+    const t = setInterval(() => setDots(d => (d + 1) % 4), 400)
+    return () => clearInterval(t)
   }, [])
 
-  if (!visible) return null
-
   return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 99999,
-      background: '#0f172a',
-      display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center',
-      opacity: fading ? 0 : 1,
-      transition: 'opacity 0.5s ease',
-      pointerEvents: fading ? 'none' : 'auto',
-    }}>
-      {/* Logo */}
-      <div style={{ marginBottom: 28, position: 'relative' }}>
-        <div style={{
-          width: 64, height: 64, borderRadius: 18,
-          background: 'linear-gradient(135deg, #0d9488, #14b8a6)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 0 40px rgba(13,148,136,0.4)',
-          animation: 'logoPulse 1.8s ease-in-out infinite',
-        }}>
-          <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-            <path d="M8 24V12L16 8L24 12V24" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M12 24V17L16 15L20 17V24" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-            <circle cx="16" cy="8" r="2" fill="white"/>
-          </svg>
+    <div className={cn(
+      'fixed inset-0 z-50 flex flex-col items-center justify-center',
+      'bg-white dark:bg-slate-900',
+      className
+    )}>
+      {/* Animated logo mark */}
+      <div className="relative mb-8">
+        {/* Outer ring */}
+        <div className="absolute inset-0 rounded-full border-4 border-teal-200 dark:border-teal-900" />
+        {/* Spinning arc */}
+        <div
+          className="w-16 h-16 rounded-full border-4 border-transparent border-t-teal-500 border-r-orange-400
+                     animate-spin"
+          style={{ animationDuration: '0.8s' }}
+        />
+        {/* Center dot */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-3 h-3 rounded-full bg-teal-500 animate-pulse" />
         </div>
       </div>
 
       {/* Brand name */}
-      <div style={{
-        fontSize: 26, fontWeight: 800, color: '#fff',
-        letterSpacing: '-0.5px', marginBottom: 8,
-        fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-      }}>
-        Planora
-      </div>
-      <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', marginBottom: 40 }}>
-        Project management for modern teams
+      <div className="flex items-baseline gap-0.5 mb-3">
+        <span className="text-2xl font-bold text-teal-600 dark:text-teal-400 tracking-tight">Plan</span>
+        <span className="text-2xl font-bold text-orange-500 tracking-tight">ora</span>
       </div>
 
-      {/* Animated progress dots */}
-      <div style={{ display: 'flex', gap: 7 }}>
-        {[0, 1, 2].map(i => (
-          <div key={i} style={{
-            width: 7, height: 7, borderRadius: '50%',
-            background: '#14b8a6',
-            animation: `dotBounce 1.2s ease-in-out infinite`,
-            animationDelay: `${i * 0.18}s`,
-          }}/>
+      {/* Message */}
+      <p className="text-sm text-slate-500 dark:text-slate-400 font-medium min-w-[120px] text-center">
+        {message}{''.padEnd(dots, '.')}
+      </p>
+
+      {/* Progress bar */}
+      <div className="mt-6 w-48 h-1 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+        <div className="h-full bg-gradient-to-r from-teal-500 to-orange-400 rounded-full animate-progress-bar" />
+      </div>
+    </div>
+  )
+}
+
+// ─── Inline skeleton loader for page sections ─────────────────────────────
+
+export function PageSkeleton() {
+  return (
+    <div className="flex flex-col gap-4 p-6 animate-pulse">
+      {/* Title bar */}
+      <div className="flex items-center justify-between">
+        <div className="h-7 w-48 bg-slate-200 dark:bg-slate-700 rounded-lg" />
+        <div className="h-9 w-32 bg-slate-200 dark:bg-slate-700 rounded-lg" />
+      </div>
+
+      {/* Stats row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="h-20 bg-slate-100 dark:bg-slate-800 rounded-xl" />
         ))}
       </div>
 
-      <style>{`
-        @keyframes logoPulse {
-          0%, 100% { transform: scale(1); box-shadow: 0 0 40px rgba(13,148,136,0.4); }
-          50%       { transform: scale(1.05); box-shadow: 0 0 60px rgba(13,148,136,0.6); }
-        }
-        @keyframes dotBounce {
-          0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
-          40%            { transform: scale(1.2); opacity: 1; }
-        }
-      `}</style>
+      {/* Kanban columns */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="flex flex-col gap-2">
+            <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded-lg" />
+            {[...Array(3)].map((_, j) => (
+              <div key={j} className="h-20 bg-slate-100 dark:bg-slate-800 rounded-lg" />
+            ))}
+          </div>
+        ))}
+      </div>
     </div>
+  )
+}
+
+// ─── Inline spinner for buttons/actions ──────────────────────────────────
+
+export function Spinner({ size = 16, className }: { size?: number; className?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      className={cn('animate-spin', className)}
+    >
+      <circle
+        cx="12" cy="12" r="10"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeDasharray="30 70"
+        className="opacity-30"
+      />
+      <path
+        d="M12 2a10 10 0 0 1 10 10"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
+    </svg>
   )
 }
