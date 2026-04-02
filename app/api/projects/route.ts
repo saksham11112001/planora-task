@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import { effectivePlan, isAtProjectLimit, projectLimit } from '@/lib/utils/planGate'
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse }  from 'next/server'
