@@ -36,7 +36,7 @@ const ROLE_CONFIG = {
   viewer: { label: 'Viewer', icon: Shield, color: 'text-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/30' },
 }
 
-export default function TeamView({ members: initialMembers, currentUserId, currentRole, orgId }: Props) {
+export function TeamView({ members: initialMembers, currentUserId, currentRole, orgId }: Props) {
   const [members, setMembers] = useState(initialMembers)
   const [editingRole, setEditingRole] = useState<string | null>(null)
   const [confirmRemove, setConfirmRemove] = useState<Member | null>(null)

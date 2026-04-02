@@ -4,7 +4,6 @@ import { useRouter }   from 'next/navigation'
 import { Plus, X, Flag, User, Briefcase, ShieldCheck, ChevronDown } from 'lucide-react'
 import { cn }          from '@/lib/utils/cn'
 import { toast }       from '@/store/appStore'
-import { DatePicker }  from '@/components/ui/DatePicker'
 
 interface Member { id: string; name: string; role?: string }
 interface Props {
@@ -184,7 +183,13 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated }
 
         {/* Due date */}
         <div className="inline-flex items-center px-2.5 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition-colors text-xs font-medium text-gray-600">
-          <DatePicker value={dueDate} onChange={setDueDate} placeholder="Due date" />
+          <input
+            type="date"
+            value={dueDate}
+            onChange={e => setDueDate(e.target.value)}
+            className="text-xs bg-transparent outline-none text-gray-600 cursor-pointer"
+            style={{ colorScheme: 'light' }}
+          />
         </div>
 
         {/* Client — only if org has clients */}

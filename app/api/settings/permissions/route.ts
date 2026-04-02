@@ -12,7 +12,7 @@ export async function GET() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ data: null })
-  const { data: mb } = await supabase.from('org_members').select('org_id').eq('user_id', user.id).eq('is_active', true).single()
+  const { data: mb } = await supabase.from('org_members').select('org_id').eq('user_id', user.id).eq('is_active', true).maybeSingle()
   if (!mb) return NextResponse.json({ data: null })
   const { data: s } = await supabase.from('org_settings').select('role_permissions').eq('org_id', mb.org_id).maybeSingle()
   return NextResponse.json({ data: s?.role_permissions ?? null })
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
   const { data: mb } = await supabase
     .from('org_members')
     .select('org_id, role, organisations(plan_tier, status, trial_ends_at)')
-    .eq('user_id', user.id).eq('is_active', true).single()
+    .eq('user_id', user.id).eq('is_active', true).maybeSingle()
 
   if (!mb || !['owner', 'admin'].includes(mb.role))
     return NextResponse.json({ error: 'Admins only' }, { status: 403 })

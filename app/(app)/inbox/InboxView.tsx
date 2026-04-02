@@ -3,7 +3,7 @@
 import { useState, useOptimistic, useTransition, useMemo, useCallback } from 'react'
 import { Task, Client } from '@/types'
 import { StatusBadge, PriorityBadge } from '@/components/ui/Badge'
-import TaskDetailPanel from '@/components/tasks/TaskDetailPanel'
+import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
 import InlineOneTimeTask from '@/components/tasks/InlineOneTimeTask'
 import { useKanbanDnd } from '@/lib/hooks/useKanbanDnd'
 import { cn } from '@/lib/utils/cn'
@@ -67,7 +67,7 @@ const COLUMNS = [
 
 const DONE_PAGE_SIZE = 5
 
-export default function InboxView({ tasks, clients, members, currentUserId, orgId, canApprove }: Props) {
+export function InboxView({ tasks, clients, members, currentUserId, orgId, canApprove }: Props) {
   const [view, setView] = useState<'board' | 'list'>('board')
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [clientFilter, setClientFilter] = useState<string>('all')

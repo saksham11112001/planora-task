@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
   const { data: mb } = await supabase.from('org_members')
-    .select('org_id, role').eq('user_id', user.id).eq('is_active', true).single()
+    .select('org_id, role').eq('user_id', user.id).eq('is_active', true).maybeSingle()
   if (!mb || !['owner','admin'].includes(mb.role))
     return NextResponse.json({ error: 'Admin only' }, { status: 403 })
 

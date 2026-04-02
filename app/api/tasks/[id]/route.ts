@@ -12,7 +12,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const { data: mb } = await supabase
     .from('org_members').select('org_id, role')
-    .eq('user_id', user.id).eq('is_active', true).single()
+    .eq('user_id', user.id).eq('is_active', true).maybeSingle()
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
 
   const { data: task } = await supabase
@@ -158,7 +158,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   const { data: mb } = await supabase
     .from('org_members').select('org_id, role')
-    .eq('user_id', user.id).eq('is_active', true).single()
+    .eq('user_id', user.id).eq('is_active', true).maybeSingle()
   if (!mb || !['owner','admin','manager'].includes(mb.role))
     return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
   // Soft delete — move to trash with deleted_at timestamp

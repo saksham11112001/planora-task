@@ -26,40 +26,36 @@ interface Props {
   orgId: string
 }
 
-export default function ProjectsView({ projects, clients, members, currentUserId, canManage, orgId }: Props) {
+function getProjectMembers(project: Project): string[] {
+  try {
+    const cf = project.custom_fields as Record<string, unknown> | null
+    if (!cf) return []
+    const m = cf._members
+    if (Array.isArray(m)) return m as string[]
+  } catch {}
+  return []
+}
+
+export function ProjectsView({ projects, clients, members, currentUserId, canManage, orgId }: Props) {
   const [search, setSearch] = useState('')
-  const [editingMembers, setEditingMembers] = useState<string | null>(null) // projectId being edited
+  const [editingMembers, setEditingMembers] = useState<string | null>(null)
   const [memberSearch, setMemberSearch] = useState('')
   const [saving, setSaving] = useState(false)
-
-  // Derive local member assignments (stored in project.custom_fields._members)
   const [localProjects, setLocalProjects] = useState<Project[]>(projects)
 
-  const getProjectMembers = (project: Project): string[] => {
-    try {
-      const cf = project.custom_fields as Record<string, unknown> | null
-      if (!cf) return []
-      const m = cf._members
-      if (Array.isArray(m)) return m as string[]
-    } catch {}
-    return []
-  }
-
-  // Filter projects: owner always sees, members see if in list, admins see all
   const visibleProjects = useMemo(() => {
     return localProjects.filter(p => {
-      const isOwner = p.owner_id === currentUserId
-      const projectMembers = getProjectMembers(p)
-      const isMember = projectMembers.includes(currentUserId)
-      const isAdmin = members.find(m => m.id === currentUserId)?.role === 'admin'
-      return isOwner || isMember || isAdmin || projectMembers.length === 0
+      const projectMemberIds = getProjectMembers(p)
+      const isOwner  = p.owner_id === currentUserId
+      const isMember = projectMemberIds.includes(currentUserId)
+      const isAdmin  = members.find(m => m.id === currentUserId)?.role === 'admin'
+      // No restriction = visible to all; otherwise only owner/member/admin
+      return isOwner || isMember || isAdmin || projectMemberIds.length === 0
     })
   }, [localProjects, currentUserId, members])
 
   const filtered = useMemo(() =>
-    visibleProjects.filter(p =>
-      p.name.toLowerCase().includes(search.toLowerCase())
-    ),
+    visibleProjects.filter(p => p.name.toLowerCase().includes(search.toLowerCase())),
     [visibleProjects, search]
   )
 
@@ -118,11 +114,11 @@ export default function ProjectsView({ projects, clients, members, currentUserId
       {/* Project grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {filtered.map(project => {
-          const client = clients.find(c => c.id === project.client_id)
+          // All values derived here — NO useState inside map (illegal hook call)
+          const client           = clients.find(c => c.id === project.client_id)
           const projectMemberIds = getProjectMembers(project)
-          const projectMembers = members.filter(m => projectMemberIds.includes(m.id))
-          const isEditingThis = editingMembers === project.id
-          const [pendingMembers, setPendingMembers] = useState<string[]>(projectMemberIds)
+          const projectMembers   = members.filter(m => projectMemberIds.includes(m.id))
+          const isEditingThis    = editingMembers === project.id
 
           return (
             <div
@@ -155,7 +151,7 @@ export default function ProjectsView({ projects, clients, members, currentUserId
                 </Link>
               </div>
 
-              {/* Team Members section */}
+              {/* Team Members */}
               <div className="px-4 pb-3">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1">
@@ -184,9 +180,7 @@ export default function ProjectsView({ projects, clients, members, currentUserId
                     {projectMembers.length === 0 ? (
                       <span className="text-xs text-slate-400 italic">All members (no restriction)</span>
                     ) : (
-                      projectMembers.map(m => (
-                        <MemberChip key={m.id} name={m.name} />
-                      ))
+                      projectMembers.map(m => <MemberChip key={m.id} name={m.name} />)
                     )}
                   </div>
                 )}
@@ -194,8 +188,8 @@ export default function ProjectsView({ projects, clients, members, currentUserId
                 {isEditingThis && (
                   <MemberPicker
                     members={members}
-                    selected={projectMemberIds}
-                    onSave={(ids) => saveMembers(project.id, ids)}
+                    initialSelected={projectMemberIds}
+                    onSave={ids => saveMembers(project.id, ids)}
                     saving={saving}
                     memberSearch={memberSearch}
                     setMemberSearch={setMemberSearch}
@@ -235,10 +229,7 @@ export default function ProjectsView({ projects, clients, members, currentUserId
               {search ? 'No projects match your search' : 'No projects yet'}
             </p>
             {canManage && !search && (
-              <Link
-                href="/projects/new"
-                className="mt-3 text-sm text-teal-600 hover:text-teal-700 font-medium"
-              >
+              <Link href="/projects/new" className="mt-3 text-sm text-teal-600 hover:text-teal-700 font-medium">
                 Create your first project →
               </Link>
             )}
@@ -248,8 +239,6 @@ export default function ProjectsView({ projects, clients, members, currentUserId
     </div>
   )
 }
-
-// ─── Member Chip ─────────────────────────────────────────────────────────────
 
 function MemberChip({ name }: { name: string }) {
   return (
@@ -261,25 +250,22 @@ function MemberChip({ name }: { name: string }) {
   )
 }
 
-// ─── Member Picker ────────────────────────────────────────────────────────────
-
+// MemberPicker is its own component so useState is legal here
 function MemberPicker({
-  members, selected, onSave, saving, memberSearch, setMemberSearch
+  members, initialSelected, onSave, saving, memberSearch, setMemberSearch,
 }: {
-  members: Member[]
-  selected: string[]
-  onSave: (ids: string[]) => void
-  saving: boolean
-  memberSearch: string
-  setMemberSearch: (s: string) => void
+  members:        Member[]
+  initialSelected: string[]
+  onSave:         (ids: string[]) => void
+  saving:         boolean
+  memberSearch:   string
+  setMemberSearch:(s: string) => void
 }) {
-  const [localSelected, setLocalSelected] = useState<string[]>(selected)
+  // useState is legal here — MemberPicker is a proper component, not inside .map()
+  const [localSelected, setLocalSelected] = useState<string[]>(initialSelected)
 
-  const toggle = (id: string) => {
-    setLocalSelected(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    )
-  }
+  const toggle = (id: string) =>
+    setLocalSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
 
   const filtered = members.filter(m =>
     m.name.toLowerCase().includes(memberSearch.toLowerCase())

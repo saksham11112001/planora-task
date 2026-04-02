@@ -14,7 +14,7 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
   const { data: mb } = await supabase.from('org_members')
-    .select('org_id, role').eq('user_id', user.id).eq('is_active', true).single()
+    .select('org_id, role').eq('user_id', user.id).eq('is_active', true).maybeSingle()
   if (!mb) return NextResponse.json({ data: [] })
 
   const from30 = new Date(Date.now() - 30*86400000).toISOString()
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
 
   const { data: mb } = await supabase.from('org_members')
     .select('org_id, role, organisations(plan_tier, status, trial_ends_at)')
-    .eq('user_id', user.id).eq('is_active', true).single()
+    .eq('user_id', user.id).eq('is_active', true).maybeSingle()
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
 
   // Check paid plan
