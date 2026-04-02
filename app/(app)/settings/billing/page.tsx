@@ -4,7 +4,7 @@ import { BillingView }  from './BillingView'
 import type { Metadata } from 'next'
 export const metadata: Metadata = { title: 'Billing' }
 
-export const revalidate = 20
+export const dynamic = 'force-dynamic'
 
 export default async function BillingPage() {
   const supabase = await createClient()

@@ -4,7 +4,7 @@ import { NotifView }      from './NotifView'
 import type { Metadata }  from 'next'
 export const metadata: Metadata = { title: 'Notifications' }
 
-export const revalidate = 20
+export const dynamic = 'force-dynamic'
 
 export default async function NotificationsPage() {
   const supabase = await createClient()

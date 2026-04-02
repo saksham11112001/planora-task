@@ -3,7 +3,7 @@ import { redirect }     from 'next/navigation'
 import { TaskSettingsForm } from './TaskSettingsForm'
 import type { Metadata }   from 'next'
 export const metadata: Metadata = { title: 'Task settings' }
-export const revalidate = 20
+export const dynamic = 'force-dynamic'
 
 export default async function TaskSettingsPage() {
   const supabase = await createClient()

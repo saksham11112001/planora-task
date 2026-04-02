@@ -4,7 +4,7 @@ import { OrgForm }      from './OrgForm'
 import type { Metadata } from 'next'
 export const metadata: Metadata = { title: 'Organisation settings' }
 
-export const revalidate = 20
+export const dynamic = 'force-dynamic'
 
 export default async function OrgSettingsPage() {
   const supabase = await createClient()

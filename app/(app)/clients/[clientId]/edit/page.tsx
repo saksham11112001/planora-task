@@ -4,7 +4,7 @@ import { ClientEditForm } from './ClientEditForm'
 import type { Metadata }  from 'next'
 export const metadata: Metadata = { title: 'Edit Client' }
 
-export const revalidate = 20
+export const dynamic = 'force-dynamic'
 
 export default async function ClientEditPage({ params }: { params: Promise<{ clientId: string }> }) {
   const { clientId } = await params
