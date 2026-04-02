@@ -1,37 +1,28 @@
-import { createServerClient } from '@supabase/ssr'
-import { NextResponse, type NextRequest } from 'next/server'
-
-// Public routes that never need a session
-const PUBLIC_PATHS = [
-  '/login',
-  '/signup',
-  '/onboarding',
-  '/privacy',
-  '/terms',
-  '/api/inngest',           // Inngest webhook — no auth
-  '/api/webhooks',          // Razorpay webhook — no auth
-  '/api/onboarding',  
-  '/auth/callback'      // Called during onboarding before full session
-]
+import { NextRequest, NextResponse } from 'next/server'
+import { createServerClient }       from '@supabase/ssr'
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // ── 1. Always allow static assets and Next.js internals ──────────────────
+  // Static assets, API and auth paths — always let through
   if (
-    pathname.startsWith('/_next') ||
-    pathname.startsWith('/favicon') ||
-    pathname.match(/\.(ico|png|jpg|jpeg|svg|webp|css|js|woff2?)$/)
+    pathname.startsWith('/auth/') ||
+    pathname.startsWith('/login') ||
+    pathname.startsWith('/privacy') ||
+    pathname.startsWith('/terms') ||
+    pathname.startsWith('/onboarding') ||
+    pathname.startsWith('/_next/') ||
+    pathname.startsWith('/api/') ||
+    pathname.includes('.')
   ) {
-    return NextResponse.next()
+    return NextResponse.next({ request })
   }
 
-  // ── 2. Build a response we can mutate cookies on ─────────────────────────
-  //    CRITICAL: must pass request + response into createServerClient so
-  //    Supabase can refresh the session cookie. Without this the session
-  //    never persists and every request looks unauthenticated.
+  // Create a response we can mutate cookies on
   let response = NextResponse.next({ request })
 
+  // Create Supabase client that reads from request cookies
+  // and writes refreshed tokens back to response cookies
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -40,78 +31,47 @@ export async function middleware(request: NextRequest) {
         getAll() {
           return request.cookies.getAll()
         },
-        setAll(cookiesToSet) {
-          // Write cookies to both the outgoing request and the response
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          )
-          // Re-create the response with the mutated request cookies so the
-          // refreshed session is written back to the browser
+        setAll(toSet) {
+          // Write to request so downstream server components see fresh cookies
+          toSet.forEach(({ name, value }) => request.cookies.set(name, value))
+          // Write to response so browser receives refreshed token cookies
           response = NextResponse.next({ request })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
+          toSet.forEach(({ name, value, options }) =>
+            response.headers.append(
+              'Set-Cookie',
+              `${name}=${value}; Path=/; HttpOnly; SameSite=Lax${options?.secure ? '; Secure' : ''}${options?.maxAge ? `; Max-Age=${options.maxAge}` : ''}`
+            )
           )
         },
       },
     }
   )
 
-  // ── 3. Refresh the session — this is what actually keeps users logged in ─
-  //    getUser() validates the JWT and silently refreshes if near-expiry.
-  //    NEVER use getSession() here — it trusts the local cookie without
-  //    re-validating against Supabase, so an expired token looks valid.
+  // getUser() validates the JWT AND triggers a token refresh if needed
+  // The refreshed token is written back via setAll above
   const { data: { user }, error } = await supabase.auth.getUser()
 
-  const isPublicPath = PUBLIC_PATHS.some(p => pathname.startsWith(p))
-  const isRootPath = pathname === '/'
-
-  // ── 4. Not logged in ──────────────────────────────────────────────────────
-  if (!user || error) {
-    // Allow public pages through
-    if (isPublicPath || isRootPath) return response
-
-    // Redirect everything else to login, preserving the intended destination
-    const redirectUrl = request.nextUrl.clone()
-    redirectUrl.pathname = '/login'
-    // Only set next param for non-API routes (avoids leaking API URLs)
-    if (!pathname.startsWith('/api/')) {
-      redirectUrl.searchParams.set('next', pathname)
+  if (error || !user) {
+    // Landing page: not logged in — show it normally
+    if (pathname === '/') {
+      return NextResponse.next({ request })
     }
-    return NextResponse.redirect(redirectUrl)
+    // Protected page: not logged in — send to login
+    const loginUrl = new URL('/login', request.url)
+    loginUrl.searchParams.set('redirect', pathname)
+    return NextResponse.redirect(loginUrl)
   }
 
-  // ── 5. Logged in — redirect away from auth pages ─────────────────────────
-  if (pathname === '/login' || pathname === '/signup') {
-    const redirectUrl = request.nextUrl.clone()
-    redirectUrl.pathname = '/dashboard'
-    redirectUrl.search = ''
-    return NextResponse.redirect(redirectUrl)
+  // Logged-in user hitting the landing page → straight to dashboard
+  if (pathname === '/') {
+    return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
-  // ── 6. Logged in — redirect root to dashboard ────────────────────────────
-  if (isRootPath) {
-    const redirectUrl = request.nextUrl.clone()
-    redirectUrl.pathname = '/dashboard'
-    return NextResponse.redirect(redirectUrl)
-  }
-
-  // ── 7. Return the response with refreshed session cookies ─────────────────
   return response
 }
 
 export const config = {
   matcher: [
-    /*
-     * Match ALL paths EXCEPT:
-     * - _next/static  (static files)
-     * - _next/image   (image optimisation)
-     * - favicon.ico
-     * - public folder files
-     *
-     * This ensures the middleware runs on every route so the session cookie
-     * is always refreshed. Without this, navigating to an unmatched route
-     * clears the session from middleware context.
-     */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|favicon.svg|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
   ],
 }
