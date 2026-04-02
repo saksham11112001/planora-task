@@ -4,7 +4,7 @@ import { MembersView }  from './MembersView'
 import type { Metadata } from 'next'
 export const metadata: Metadata = { title: 'Team members' }
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 20
 
 export default async function MembersPage() {
   const supabase = await createClient()

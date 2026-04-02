@@ -5,7 +5,7 @@ import { Sidebar }        from '@/components/layout/Sidebar'
 import { Header }         from '@/components/layout/Header'
 import { ToastContainer } from '@/components/ui/Toast'
 import { RouteLoader }   from '@/components/ui/RouteLoader'
-import AppLoader from '@/components/ui/AppLoader'
+import { AppLoader }     from '@/components/ui/AppLoader'
 import { SearchModal }    from '@/components/search/SearchModal'
 import { useAppStore }    from '@/store/appStore'
 
@@ -90,8 +90,8 @@ export function AppShell({ user, org, role, workspaceId, children }: Props) {
       </div>
 
       <ToastContainer/>
-      <Suspense fallback={null}><SearchModal/></Suspense>
-      <Suspense fallback={null}><RouteLoader/></Suspense>
+      <SearchModal/>
+      <RouteLoader/>
     </div>
   )
 }

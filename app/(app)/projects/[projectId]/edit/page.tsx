@@ -4,7 +4,7 @@ import { ProjectEditForm } from './ProjectEditForm'
 import type { Metadata }   from 'next'
 export const metadata: Metadata = { title: 'Edit Project' }
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 20
 
 export default async function ProjectEditPage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params

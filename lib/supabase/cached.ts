@@ -1,17 +1,20 @@
 /**
- * Data fetchers for server components.
- * NOTE: React cache() removed — it conflicts with Next.js 15 async cookies() context.
- * Each call creates a fresh client. The overhead is negligible (<1ms per request).
+ * Cached data fetchers — use React cache() to deduplicate
+ * identical queries within a single request lifecycle.
+ * This means the layout + a page component can both call
+ * getSessionUser() and only ONE database query fires.
  */
+import { cache }        from 'react'
 import { createClient } from './server'
 
-export async function getSessionUser() {
+// Deduped: returns the same result if called multiple times per request
+export const getSessionUser = cache(async () => {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   return user
-}
+})
 
-export async function getOrgMembership(userId: string) {
+export const getOrgMembership = cache(async (userId: string) => {
   const supabase = await createClient()
   const { data } = await supabase
     .from('org_members')
@@ -20,9 +23,9 @@ export async function getOrgMembership(userId: string) {
     .eq('is_active', true)
     .maybeSingle()
   return data
-}
+})
 
-export async function getUserProfile(userId: string) {
+export const getUserProfile = cache(async (userId: string) => {
   const supabase = await createClient()
   const { data } = await supabase
     .from('users')
@@ -30,4 +33,4 @@ export async function getUserProfile(userId: string) {
     .eq('id', userId)
     .maybeSingle()
   return data
-}
+})

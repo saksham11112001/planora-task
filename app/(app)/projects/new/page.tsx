@@ -5,7 +5,7 @@ import { NewProjectForm } from './NewProjectForm'
 import type { Metadata }  from 'next'
 export const metadata: Metadata = { title: 'New project' }
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 20
 
 export default async function NewProjectPage() {
   const supabase = await createClient()

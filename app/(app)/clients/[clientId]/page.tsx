@@ -6,7 +6,7 @@ import { ProjectStatusBadge } from '@/components/ui/Badge'
 import { fmtDate, fmtHours }  from '@/lib/utils/format'
 import type { Metadata }      from 'next'
 export const metadata: Metadata = { title: 'Client' }
-export const dynamic = 'force-dynamic'
+export const revalidate = 30
 
 export default async function ClientDetailPage({ params }: { params: Promise<{ clientId: string }> }) {
   const { clientId } = await params

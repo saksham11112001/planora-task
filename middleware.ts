@@ -1,92 +1,77 @@
-import { createServerClient } from '@supabase/ssr'
-import { NextResponse, type NextRequest } from 'next/server'
-
-const PUBLIC_PATHS = [
-  '/login',
-  '/signup',
-  '/onboarding',
-  '/privacy',
-  '/terms',
-  '/auth',          // covers /auth/callback
-  '/api/inngest',
-  '/api/webhooks',
-  '/api/onboarding',
-]
+import { NextRequest, NextResponse } from 'next/server'
+import { createServerClient }       from '@supabase/ssr'
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Skip static assets
+  // Static assets, API and auth paths — always let through
   if (
-    pathname.startsWith('/_next') ||
-    pathname.startsWith('/favicon') ||
-    pathname.match(/\.(ico|png|jpg|jpeg|svg|webp|css|js|woff2?)$/)
+    pathname.startsWith('/auth/') ||
+    pathname.startsWith('/login') ||
+    pathname.startsWith('/privacy') ||
+    pathname.startsWith('/terms') ||
+    pathname.startsWith('/onboarding') ||
+    pathname.startsWith('/_next/') ||
+    pathname.startsWith('/api/') ||
+    pathname.includes('.')
   ) {
-    return NextResponse.next()
+    return NextResponse.next({ request })
   }
 
-  // Always allow public paths through — no Supabase call needed
-  const isPublicPath = PUBLIC_PATHS.some(p => pathname.startsWith(p))
-  const isRootPath   = pathname === '/'
-  if (isPublicPath || isRootPath) {
-    return NextResponse.next()
-  }
-
-  // Build a mutable response for cookie refreshing
+  // Create a response we can mutate cookies on
   let response = NextResponse.next({ request })
 
-  try {
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() { return request.cookies.getAll() },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-            response = NextResponse.next({ request })
-            cookiesToSet.forEach(({ name, value, options }) =>
-              response.cookies.set(name, value, {
-                ...options,
-                path: '/',
-                sameSite: 'lax',
-                secure: process.env.NODE_ENV === 'production',
-              })
-            )
-          },
+  // Create Supabase client that reads from request cookies
+  // and writes refreshed tokens back to response cookies
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll()
         },
-      }
-    )
-
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      // Not logged in — redirect to login preserving destination
-      const url = request.nextUrl.clone()
-      url.pathname = '/login'
-      if (!pathname.startsWith('/api/')) url.searchParams.set('next', pathname)
-      return NextResponse.redirect(url)
+        setAll(toSet) {
+          // Write to request so downstream server components see fresh cookies
+          toSet.forEach(({ name, value }) => request.cookies.set(name, value))
+          // Write to response so browser receives refreshed token cookies
+          response = NextResponse.next({ request })
+          toSet.forEach(({ name, value, options }) =>
+            response.headers.append(
+              'Set-Cookie',
+              `${name}=${value}; Path=/; HttpOnly; SameSite=Lax${options?.secure ? '; Secure' : ''}${options?.maxAge ? `; Max-Age=${options.maxAge}` : ''}`
+            )
+          )
+        },
+      },
     }
+  )
 
-    // Logged-in user hitting login/signup — send to dashboard
-    if (pathname === '/login' || pathname === '/signup') {
-      const url = request.nextUrl.clone()
-      url.pathname = '/dashboard'
-      url.search = ''
-      return NextResponse.redirect(url)
+  // getUser() validates the JWT AND triggers a token refresh if needed
+  // The refreshed token is written back via setAll above
+  const { data: { user }, error } = await supabase.auth.getUser()
+
+  if (error || !user) {
+    // Landing page: not logged in — show it normally
+    if (pathname === '/') {
+      return NextResponse.next({ request })
     }
-
-    return response
-  } catch {
-    // If Supabase call fails entirely, let the request through.
-    // The page/layout will handle missing auth gracefully.
-    // NEVER redirect here — that causes infinite loops.
-    return NextResponse.next()
+    // Protected page: not logged in — send to login
+    const loginUrl = new URL('/login', request.url)
+    loginUrl.searchParams.set('redirect', pathname)
+    return NextResponse.redirect(loginUrl)
   }
+
+  // Logged-in user hitting the landing page → straight to dashboard
+  if (pathname === '/') {
+    return NextResponse.redirect(new URL('/dashboard', request.url))
+  }
+
+  return response
 }
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|favicon.svg|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
   ],
 }
