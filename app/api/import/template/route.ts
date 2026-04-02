@@ -148,7 +148,9 @@ export async function GET() {
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition':
           'attachment; filename="planora_import_template_v2.xlsx"',
-        'Cache-Control': 'public, max-age=86400',
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+         Pragma: 'no-cache',
+         Expires: '0',
       },
     })
   } catch (e: any) {
