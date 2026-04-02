@@ -91,7 +91,7 @@ export function AppShell({ user, org, role, workspaceId, children }: Props) {
 
       <ToastContainer/>
       <SearchModal/>
-      <RouteLoader/>
+      <Suspense fallback={null}><RouteLoader/></Suspense>
     </div>
   )
 }
