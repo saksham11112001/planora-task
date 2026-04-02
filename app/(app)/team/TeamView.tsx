@@ -1,317 +1,354 @@
 'use client'
+import { useState }   from 'react'
+import { useRouter }  from 'next/navigation'
+import { UserPlus, Mail, Crown, Shield, User, ChevronDown, Check } from 'lucide-react'
+import { cn }         from '@/lib/utils/cn'
+import { toast }      from '@/store/appStore'
+import { fmtDate }    from '@/lib/utils/format'
 
-import { useState } from 'react'
-import { cn } from '@/lib/utils/cn'
-import { Avatar } from '@/components/ui/Badge'
-import {
-  UserMinus, ShieldCheck, Shield, User, Crown,
-  AlertTriangle, X, Check, Mail, Phone, MoreVertical
-} from 'lucide-react'
+const ROLES = ['admin','manager','member','viewer'] as const
+const ROLE_DESC: Record<string, string> = {
+  owner:   'Full access, billing, can delete org',
+  admin:   'Full access except billing & org deletion',
+  manager: 'Create/assign tasks, invite members, view reports',
+  member:  'Create own tasks, update assigned tasks',
+  viewer:  'Read-only — can view but not edit anything',
+}
+const ROLE_ICONS: Record<string, any> = { owner: Crown, admin: Shield, manager: UserPlus, member: User, viewer: User }
+const ROLE_COLORS: Record<string, string> = {
+  owner: '#ca8a04', admin: '#7c3aed', manager: '#0d9488', member: '#64748b', viewer: '#94a3b8'
+}
 
 interface Member {
-  id: string
-  user_id: string
-  role: 'admin' | 'manager' | 'member' | 'viewer'
-  users: {
-    id: string
-    email: string
-    full_name: string
-    avatar_url?: string
-    phone?: string
-  }
-  joined_at?: string
+  id: string          // users.id  (the UUID we send to API as user_id)
+  name: string
+  email: string
+  avatar_url: string | null
+  role: string
+  joined_at: string
+  tasks_30d: number
+  done_30d: number
+  inprog_30d?: number
 }
 
-interface Props {
+export function TeamView({
+  members,
+  canManage,
+  currentUserId,
+}: {
   members: Member[]
+  canManage: boolean
   currentUserId: string
-  currentRole: string
-  orgId: string
-}
+}) {
+  const router = useRouter()
+  const [showInvite, setShowInvite] = useState(false)
+  const [invEmail,   setInvEmail]   = useState('')
+  const [invRole,    setInvRole]    = useState<'manager' | 'member' | 'viewer'>('member')
+  const [inviting,   setInviting]   = useState(false)
+  const [roleEditing,setRoleEditing]= useState<string | null>(null)
+  const [saving,     setSaving]     = useState<string | null>(null)
 
-const ROLE_CONFIG = {
-  admin: { label: 'Admin', icon: Crown, color: 'text-orange-600', bg: 'bg-orange-100 dark:bg-orange-900/30' },
-  manager: { label: 'Manager', icon: ShieldCheck, color: 'text-teal-600', bg: 'bg-teal-100 dark:bg-teal-900/30' },
-  member: { label: 'Member', icon: User, color: 'text-slate-600', bg: 'bg-slate-100 dark:bg-slate-700' },
-  viewer: { label: 'Viewer', icon: Shield, color: 'text-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/30' },
-}
-
-export default function TeamView({ members: initialMembers, currentUserId, currentRole, orgId }: Props) {
-  const [members, setMembers] = useState(initialMembers)
-  const [editingRole, setEditingRole] = useState<string | null>(null)
-  const [confirmRemove, setConfirmRemove] = useState<Member | null>(null)
-  const [removing, setRemoving] = useState(false)
-  const [savingRole, setSavingRole] = useState<string | null>(null)
-  const [openMenu, setOpenMenu] = useState<string | null>(null)
-
-  const canManage = currentRole === 'admin'
-
-  const handleRoleChange = async (memberId: string, userId: string, newRole: string) => {
-    setSavingRole(memberId)
-    try {
-      const res = await fetch('/api/team', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: userId, role: newRole, org_id: orgId }),
-      })
-      if (!res.ok) throw new Error('Failed to update role')
-
-      setMembers(prev => prev.map(m =>
-        m.id === memberId ? { ...m, role: newRole as Member['role'] } : m
-      ))
-      setEditingRole(null)
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setSavingRole(null)
+  async function invite(e: React.FormEvent) {
+    e.preventDefault()
+    if (!invEmail.trim()) return
+    setInviting(true)
+    const res = await fetch('/api/team', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: invEmail.trim(), role: invRole }),
+    })
+    setInviting(false)
+    const d = await res.json()
+    if (res.ok) {
+      toast.success('Invite sent!')
+      setInvEmail('')
+      setShowInvite(false)
+      router.refresh()
+    } else {
+      toast.error(d.error ?? 'Failed to invite')
     }
   }
 
-  const handleRemove = async () => {
-    if (!confirmRemove) return
-    setRemoving(true)
-    try {
-      const res = await fetch('/api/team', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: confirmRemove.user_id, org_id: orgId }),
-      })
-      if (!res.ok) throw new Error('Failed to remove member')
-
-      setMembers(prev => prev.filter(m => m.id !== confirmRemove.id))
-      setConfirmRemove(null)
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setRemoving(false)
+  async function changeRole(userId: string, newRole: string) {
+    // Guard: userId must be a valid non-empty string (not 'undefined' or '')
+    if (!userId || userId === 'undefined') {
+      toast.error('Cannot identify member — please refresh and try again.')
+      return
+    }
+    setSaving(userId)
+    const res = await fetch('/api/team', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId, role: newRole }),
+    })
+    setSaving(null)
+    setRoleEditing(null)
+    if (res.ok) {
+      toast.success('Role updated')
+      router.refresh()
+    } else {
+      const d = await res.json()
+      toast.error(d.error ?? 'Failed to update role')
     }
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* Header stats */}
-      <div className="flex items-center gap-4 p-4 bg-white dark:bg-slate-800 rounded-xl
-                      border border-slate-200 dark:border-slate-700">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center">
-            <User size={16} className="text-teal-600" />
-          </div>
+    <div className="flex-1 overflow-y-auto p-6" style={{ background: 'var(--surface-subtle)' }}>
+      <div className="max-w-3xl mx-auto">
+
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
           <div>
-            <p className="text-2xl font-bold text-slate-800 dark:text-slate-100">{members.length}</p>
-            <p className="text-xs text-slate-500">Team Members</p>
+            <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Team</h1>
+            <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
+              {members.length} member{members.length !== 1 ? 's' : ''}
+            </p>
           </div>
-        </div>
-        <div className="h-10 w-px bg-slate-200 dark:bg-slate-700" />
-        {Object.entries(ROLE_CONFIG).map(([role, cfg]) => {
-          const count = members.filter(m => m.role === role).length
-          if (count === 0) return null
-          const Icon = cfg.icon
-          return (
-            <div key={role} className="flex items-center gap-1.5">
-              <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full flex items-center gap-1', cfg.bg, cfg.color)}>
-                <Icon size={10} /> {count} {cfg.label}{count > 1 ? 's' : ''}
-              </span>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Member list */}
-      <div className="flex flex-col gap-2">
-        {members.map(member => {
-          const isMe = member.user_id === currentUserId
-          const roleCfg = ROLE_CONFIG[member.role] ?? ROLE_CONFIG.member
-          const RoleIcon = roleCfg.icon
-          const isEditing = editingRole === member.id
-
-          return (
-            <div
-              key={member.id}
-              className="flex items-center gap-4 px-4 py-3 bg-white dark:bg-slate-800
-                         border border-slate-200 dark:border-slate-700 rounded-xl
-                         hover:shadow-sm transition-all"
+          {canManage && (
+            <button
+              onClick={() => setShowInvite(v => !v)}
+              className="btn btn-brand flex items-center gap-2"
             >
-              {/* Avatar */}
-              <div className="relative flex-shrink-0">
-                {member.users.avatar_url ? (
-                  <img
-                    src={member.users.avatar_url}
-                    alt={member.users.full_name}
-                    className="w-10 h-10 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-400 to-orange-400
-                                  flex items-center justify-center text-white font-bold text-sm">
-                    {(member.users.full_name || member.users.email || '?')[0].toUpperCase()}
-                  </div>
-                )}
-                {isMe && (
-                  <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500
-                                  rounded-full border-2 border-white dark:border-slate-800" />
-                )}
-              </div>
+              <UserPlus className="h-4 w-4" /> Invite member
+            </button>
+          )}
+        </div>
 
-              {/* Info */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">
-                    {member.users.full_name || 'Unknown'}
-                    {isMe && <span className="text-xs text-teal-600 ml-1.5">(you)</span>}
-                  </p>
+        {/* Invite form */}
+        {showInvite && (
+          <form
+            onSubmit={invite}
+            className="card p-5 mb-6 flex gap-3 items-end flex-wrap"
+          >
+            <div className="flex-1 min-w-[200px]">
+              <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
+                Email address
+              </label>
+              <input
+                type="email"
+                value={invEmail}
+                onChange={e => setInvEmail(e.target.value)}
+                placeholder="colleague@company.com"
+                required
+                className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-all"
+                style={{
+                  border: '1px solid var(--border)',
+                  background: 'var(--surface)',
+                  color: 'var(--text-primary)',
+                }}
+                onFocus={e => (e.currentTarget.style.borderColor = 'var(--brand)')}
+                onBlur={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
+                Role
+              </label>
+              <select
+                value={invRole}
+                onChange={e => setInvRole(e.target.value as any)}
+                className="px-3 py-2 rounded-lg text-sm outline-none"
+                style={{
+                  border: '1px solid var(--border)',
+                  background: 'var(--surface)',
+                  color: 'var(--text-primary)',
+                }}
+              >
+                <option value="manager">Manager</option>
+                <option value="member">Member</option>
+                <option value="viewer">Viewer</option>
+              </select>
+            </div>
+            <button
+              type="submit"
+              disabled={inviting}
+              className="btn btn-brand flex items-center gap-2 disabled:opacity-50"
+            >
+              <Mail className="h-4 w-4" /> {inviting ? 'Sending…' : 'Send invite'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowInvite(false)}
+              className="btn btn-outline"
+            >
+              Cancel
+            </button>
+          </form>
+        )}
+
+        {/* Members list */}
+        <div className="card" style={{ overflow: "visible" }}>
+          {members.map((m, i) => {
+            const RoleIcon = ROLE_ICONS[m.role] ?? User
+            const rate = m.tasks_30d ? Math.round((m.done_30d / m.tasks_30d) * 100) : 0
+            const isMe = m.id === currentUserId
+            const isOwner = m.role === 'owner'
+            const isSaving = saving === m.id
+            const isEditing = roleEditing === m.id
+
+            return (
+              <div
+                key={m.id}
+                className="flex items-center gap-4 px-5 py-4"
+                style={{
+                  borderBottom: i < members.length - 1 ? '1px solid var(--border-light)' : 'none',
+                }}
+              >
+                {/* Avatar */}
+                <div
+                  className="h-10 w-10 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0"
+                  style={{ background: ROLE_COLORS[m.role] ?? '#94a3b8', fontSize: 15 }}
+                >
+                  {m.name?.[0]?.toUpperCase() ?? '?'}
                 </div>
-                <div className="flex items-center gap-3 mt-0.5">
-                  <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                    <Mail size={10} />
-                    {member.users.email}
-                  </span>
-                  {member.users.phone && (
-                    <span className="text-xs text-slate-400 flex items-center gap-1">
-                      <Phone size={10} />
-                      {member.users.phone}
+
+                {/* Name + email */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                      {m.name}
+                    </span>
+                    {isMe && (
+                      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>(you)</span>
+                    )}
+                  </div>
+                  <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>{m.email}</p>
+                </div>
+
+                {/* Task stats */}
+                <div className="hidden md:block text-center w-24">
+                  <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                    {m.done_30d}/{m.tasks_30d}
+                  </p>
+                  {(m.inprog_30d ?? 0) > 0 && (
+                    <p className="text-xs font-medium" style={{ color: 'var(--brand)' }}>
+                      {m.inprog_30d} in progress
+                    </p>
+                  )}
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>tasks done</p>
+                  {m.tasks_30d > 0 && (
+                    <div className="h-1 rounded-full mt-1.5 overflow-hidden" style={{ background: 'var(--border-light)' }}>
+                      <div
+                        className="h-full rounded-full"
+                        style={{ width: `${rate}%`, background: 'var(--brand)' }}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Joined date */}
+                <div className="hidden md:block text-xs w-20 text-right" style={{ color: 'var(--text-muted)' }}>
+                  {fmtDate(m.joined_at)}
+                </div>
+
+                {/* Role badge / editable dropdown */}
+                <div style={{ position: "relative", flexShrink: 0 }}>
+                  {canManage && !isMe && !isOwner ? (
+                    <>
+                      <button
+                        onClick={() => setRoleEditing(isEditing ? null : m.id)}
+                        disabled={isSaving}
+                        title="Click to change role"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                        style={{
+                          border: isEditing ? `1.5px solid ${ROLE_COLORS[m.role]}` : '1.5px dashed var(--border)',
+                          color: isSaving ? 'var(--text-muted)' : ROLE_COLORS[m.role],
+                          background: isEditing ? `${ROLE_COLORS[m.role]}10` : 'transparent',
+                          cursor: 'pointer',
+                        }}
+                        onMouseEnter={e => { if (!isEditing) { (e.currentTarget as HTMLElement).style.borderColor = ROLE_COLORS[m.role]; (e.currentTarget as HTMLElement).style.background = `${ROLE_COLORS[m.role]}10` } }}
+                        onMouseLeave={e => { if (!isEditing) { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLElement).style.background = 'transparent' } }}
+                      >
+                        <RoleIcon className="h-3.5 w-3.5" />
+                        {isSaving ? 'Saving…' : m.role.charAt(0).toUpperCase() + m.role.slice(1)}
+                        <ChevronDown
+                          className="h-3 w-3 transition-transform"
+                          style={{
+                            color: 'var(--text-muted)',
+                            transform: isEditing ? 'rotate(180deg)' : 'rotate(0deg)',
+                          }}
+                        />
+                      </button>
+
+                      {isEditing && (
+                        <>
+                          {/* Click-outside backdrop */}
+                          <div
+                            style={{ position: 'fixed', inset: 0, zIndex: 9998 }}
+                            onClick={() => setRoleEditing(null)}
+                          />
+                          <div
+                            style={{
+                              position: 'absolute', right: 0, top: '100%', marginTop: 6,
+                              borderRadius: 12, padding: '4px 0', minWidth: 240,
+                              background: 'var(--surface)',
+                              border: '1px solid var(--border)',
+                              boxShadow: '0 16px 40px rgba(0,0,0,0.18)',
+                              zIndex: 9999,
+                            }}
+                          >
+                            <p className="px-3 pb-1.5 pt-0.5 text-xs font-semibold uppercase tracking-wide"
+                              style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>
+                              Change role
+                            </p>
+                            {ROLES.map(r => {
+                              const Icon = ROLE_ICONS[r] ?? User
+                              const isCurrent = r === m.role
+                              return (
+                                <button
+                                  key={r}
+                                  onClick={() => changeRole(m.id, r)}
+                                  className="w-full flex items-start gap-2.5 px-3 py-2.5 transition-colors text-left"
+                                  style={{
+                                    background: isCurrent ? `${ROLE_COLORS[r]}10` : 'transparent',
+                                    borderBottom: '1px solid var(--border-light)',
+                                  }}
+                                  onMouseEnter={e => {
+                                    if (!isCurrent) (e.currentTarget as HTMLElement).style.background = 'var(--surface-subtle)'
+                                  }}
+                                  onMouseLeave={e => {
+                                    if (!isCurrent) (e.currentTarget as HTMLElement).style.background = isCurrent ? `${ROLE_COLORS[r]}10` : 'transparent'
+                                  }}
+                                >
+                                  <Icon className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" style={{ color: ROLE_COLORS[r] }} />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-xs font-semibold" style={{ color: isCurrent ? ROLE_COLORS[r] : 'var(--text-primary)' }}>
+                                        {r.charAt(0).toUpperCase() + r.slice(1)}
+                                      </span>
+                                      {isCurrent && <Check className="h-3 w-3" style={{ color: ROLE_COLORS[r] }} />}
+                                    </div>
+                                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)', fontSize: 10, lineHeight: 1.4 }}>
+                                      {ROLE_DESC[r]}
+                                    </p>
+                                  </div>
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </>
+                      )}
+                    </>
+                  ) : (
+                    /* Non-editable badge (owner, self, or viewer-level viewer) */
+                    <span
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold"
+                      style={{
+                        color: ROLE_COLORS[m.role],
+                        background: `${ROLE_COLORS[m.role]}15`,
+                      }}
+                    >
+                      <RoleIcon className="h-3.5 w-3.5" />
+                      {m.role.charAt(0).toUpperCase() + m.role.slice(1)}
                     </span>
                   )}
                 </div>
               </div>
-
-              {/* Role badge / editor */}
-              <div className="flex-shrink-0">
-                {isEditing ? (
-                  <select
-                    defaultValue={member.role}
-                    disabled={!!savingRole}
-                    onChange={e => handleRoleChange(member.id, member.user_id, e.target.value)}
-                    className="text-xs border border-slate-300 dark:border-slate-600 rounded-lg
-                               px-2 py-1.5 bg-white dark:bg-slate-700 focus:outline-none
-                               focus:ring-2 focus:ring-teal-500"
-                  >
-                    <option value="admin">Admin</option>
-                    <option value="manager">Manager</option>
-                    <option value="member">Member</option>
-                    <option value="viewer">Viewer</option>
-                  </select>
-                ) : (
-                  <span
-                    onClick={() => canManage && !isMe && setEditingRole(member.id)}
-                    className={cn(
-                      'text-xs font-medium px-2.5 py-1 rounded-full flex items-center gap-1',
-                      roleCfg.bg, roleCfg.color,
-                      canManage && !isMe && 'cursor-pointer hover:opacity-80 border border-dashed border-current/30',
-                    )}
-                    title={canManage && !isMe ? 'Click to change role' : undefined}
-                  >
-                    <RoleIcon size={10} />
-                    {roleCfg.label}
-                  </span>
-                )}
-              </div>
-
-              {/* Actions menu */}
-              {canManage && !isMe && (
-                <div className="relative flex-shrink-0">
-                  <button
-                    onClick={() => setOpenMenu(openMenu === member.id ? null : member.id)}
-                    className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-                  >
-                    <MoreVertical size={15} className="text-slate-400" />
-                  </button>
-
-                  {openMenu === member.id && (
-                    <>
-                      <div
-                        className="fixed inset-0 z-10"
-                        onClick={() => setOpenMenu(null)}
-                      />
-                      <div className="absolute right-0 top-8 z-20 bg-white dark:bg-slate-800
-                                      border border-slate-200 dark:border-slate-700 rounded-xl
-                                      shadow-lg py-1 min-w-[160px]">
-                        <button
-                          onClick={() => {
-                            setEditingRole(member.id)
-                            setOpenMenu(null)
-                          }}
-                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700
-                                     dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50"
-                        >
-                          <Shield size={14} /> Change Role
-                        </button>
-                        <div className="h-px bg-slate-100 dark:bg-slate-700 my-1" />
-                        <button
-                          onClick={() => {
-                            setConfirmRemove(member)
-                            setOpenMenu(null)
-                          }}
-                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600
-                                     hover:bg-red-50 dark:hover:bg-red-950/30"
-                        >
-                          <UserMinus size={14} /> Remove Member
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Confirm remove modal */}
-      {confirmRemove && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setConfirmRemove(null)} />
-          <div className="relative bg-white dark:bg-slate-800 rounded-2xl shadow-2xl
-                          border border-slate-200 dark:border-slate-700 w-full max-w-sm p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30
-                              flex items-center justify-center flex-shrink-0">
-                <AlertTriangle size={20} className="text-red-500" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-slate-800 dark:text-slate-100">Remove Team Member</h3>
-                <p className="text-sm text-slate-500 dark:text-slate-400">This action cannot be undone</p>
-              </div>
-            </div>
-
-            <p className="text-sm text-slate-700 dark:text-slate-300 mb-6">
-              Are you sure you want to remove{' '}
-              <span className="font-semibold text-slate-900 dark:text-white">
-                {confirmRemove.users.full_name || confirmRemove.users.email}
-              </span>{' '}
-              from the team? They will lose access to all projects and tasks.
-            </p>
-
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setConfirmRemove(null)}
-                disabled={removing}
-                className="flex-1 px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300
-                           border border-slate-300 dark:border-slate-600 rounded-lg
-                           hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleRemove}
-                disabled={removing}
-                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-red-600
-                           hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50
-                           flex items-center justify-center gap-2"
-              >
-                {removing ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Removing...
-                  </>
-                ) : (
-                  <>
-                    <UserMinus size={14} /> Remove
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
+            )
+          })}
         </div>
-      )}
+
+      </div>
     </div>
   )
 }

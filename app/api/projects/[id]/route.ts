@@ -1,94 +1,56 @@
-import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-
-export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const { data, error } = await supabase
-    .from('projects')
-    .select('*, clients(id, name), tasks(count)')
-    .eq('id', id)
-    .maybeSingle()
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  return NextResponse.json(data)
-}
+import { NextResponse }  from 'next/server'
+import type { NextRequest } from 'next/server'
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+  const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).single()
+  if (!mb || !['owner','admin','manager'].includes(mb.role))
+    return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
 
   const body = await req.json()
-
-  // Whitelist updatable fields
-  const allowed = [
-    'name', 'description', 'status', 'due_date', 'client_id',
-    'priority', 'custom_fields', 'owner_id',
-  ]
+  const ALLOWED = ['name','description','color','status','client_id','owner_id','due_date','start_date','budget','hours_budget','is_archived']
   const updates: Record<string, unknown> = {}
-  for (const key of allowed) {
-    if (key in body) updates[key] = body[key]
-  }
+  for (const k of ALLOWED) { if (k in body) updates[k] = body[k] }
+  if (!Object.keys(updates).length) return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
 
-  // For custom_fields: merge with existing rather than replace
-  if ('custom_fields' in updates) {
-    const { data: existing } = await supabase
-      .from('projects')
-      .select('custom_fields')
-      .eq('id', id)
-      .maybeSingle()
-
-    if (existing?.custom_fields && typeof existing.custom_fields === 'object') {
-      updates.custom_fields = {
-        ...(existing.custom_fields as object),
-        ...(updates.custom_fields as object),
-      }
-    }
-  }
-
-  const { data, error } = await supabase
-    .from('projects')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .maybeSingle()
-
+  const { data, error } = await supabase.from('projects').update(updates).eq('id', id).eq('org_id', mb.org_id).select('*').single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data)
+  // Fire project status change notification if status changed
+  try {
+    if (body.status && body.status !== existingProject?.status) {
+      const { data: mb2 } = await supabase.from('org_members')
+        .select('users(name), organisations(name)').eq('user_id', user.id).maybeSingle()
+      await inngest.send({
+        name: 'project/status-updated',
+        data: {
+          project_id: id, project_name: data.name,
+          old_status: existingProject?.status ?? '', new_status: body.status,
+          updated_by_id: user.id,
+          updated_by_name: (mb2 as any)?.users?.name ?? 'Someone',
+          org_id: mb.org_id,
+          org_name: (mb2 as any)?.organisations?.name ?? '',
+        },
+      })
+    }
+  } catch {}
+  return NextResponse.json({ data })
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+  const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).single()
+  if (!mb || !['owner','admin'].includes(mb.role))
+    return NextResponse.json({ error: 'Only owners/admins can delete projects' }, { status: 403 })
 
-  // Verify ownership or admin
-  const { data: project } = await supabase
-    .from('projects')
-    .select('owner_id, org_id')
-    .eq('id', id)
-    .maybeSingle()
-
-  if (!project) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-
-  const { data: member } = await supabase
-    .from('org_members')
-    .select('role')
-    .eq('user_id', user.id)
-    .eq('org_id', project.org_id)
-    .maybeSingle()
-
-  const canDelete = project.owner_id === user.id || member?.role === 'admin'
-  if (!canDelete) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-
-  const { error } = await supabase.from('projects').delete().eq('id', id)
+  // Soft delete (archive)
+  const { error } = await supabase.from('projects').update({ is_archived: true }).eq('id', id).eq('org_id', mb.org_id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ success: true })
 }
