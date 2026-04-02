@@ -1,101 +1,125 @@
-import { createClient }      from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
-import { NextResponse }      from 'next/server'
-import type { NextRequest }  from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-  const { data: mb } = await supabase.from('org_members').select('org_id').eq('user_id', user.id).eq('is_active', true).single()
-  if (!mb) return NextResponse.json({ data: [] })
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data, error } = await supabase.from('org_members')
-    .select('id, role, joined_at, user_id, users(id, name, email, avatar_url)')
-    .eq('org_id', mb.org_id).eq('is_active', true).order('joined_at')
+  const { data: self } = await supabase
+    .from('org_members')
+    .select('org_id, role')
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (!self) return NextResponse.json({ error: 'Not in org' }, { status: 403 })
+
+  const { data, error } = await supabase
+    .from('org_members')
+    .select('id, user_id, role, joined_at, users(id, email, full_name, avatar_url, phone)')
+    .eq('org_id', self.org_id)
+    .order('joined_at', { ascending: true })
+
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ data })
+  return NextResponse.json(data)
 }
 
-export async function POST(request: NextRequest) {
+export async function PATCH(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-  const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).single()
-  if (!mb || !['owner','admin','manager'].includes(mb.role))
-    return NextResponse.json({ error: 'Only owners/admins/managers can invite' }, { status: 403 })
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { email, role = 'member' } = await request.json()
-  if (!email?.trim()) return NextResponse.json({ error: 'Email required' }, { status: 400 })
-  if (!['admin','manager','member','viewer'].includes(role))
-    return NextResponse.json({ error: 'Invalid role' }, { status: 400 })
+  const { user_id, role, org_id } = await req.json()
 
-  const admin = createAdminClient()
+  // Verify requester is admin of this org
+  const { data: self } = await supabase
+    .from('org_members')
+    .select('role, org_id')
+    .eq('user_id', user.id)
+    .eq('org_id', org_id)
+    .maybeSingle()
 
-  // Check member limit for this org's plan
-  const { data: orgData } = await admin.from('organisations')
-    .select('plan_tier, status, trial_ends_at').eq('id', mb.org_id).single()
-  const { count: currentMembers } = await admin.from('org_members')
-    .select('id', { count: 'exact', head: true })
-    .eq('org_id', mb.org_id).eq('is_active', true)
-  const plan = effectivePlan(orgData ?? { plan_tier: 'free', status: 'active' })
-  if (isAtMemberLimit(plan, currentMembers ?? 0)) {
-    return NextResponse.json({
-      error: `Your ${plan} plan allows up to ${memberLimit(plan)} members. Upgrade to add more.`
-    }, { status: 403 })
+  if (!self || self.role !== 'admin') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
-  // Find existing user by email
-  const { data: existingUser } = await admin.from('users').select('id').eq('email', email.toLowerCase().trim()).maybeSingle()
 
-  if (existingUser) {
-    // Check not already a member
-    const { data: existing } = await admin.from('org_members').select('id, is_active').eq('org_id', mb.org_id).eq('user_id', existingUser.id).maybeSingle()
-    if (existing?.is_active) return NextResponse.json({ error: 'User is already a member' }, { status: 409 })
+  // Prevent demoting yourself
+  if (user_id === user.id) {
+    return NextResponse.json({ error: 'Cannot change your own role' }, { status: 400 })
+  }
 
-    if (existing) {
-      // Reactivate
-      await admin.from('org_members').update({ is_active: true, role }).eq('id', existing.id)
-    } else {
-      await admin.from('org_members').insert({ org_id: mb.org_id, user_id: existingUser.id, role, is_active: true })
+  const { error } = await supabase
+    .from('org_members')
+    .update({ role })
+    .eq('user_id', user_id)
+    .eq('org_id', org_id)
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ success: true })
+}
+
+export async function DELETE(req: NextRequest) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { user_id, org_id } = await req.json()
+
+  // Verify requester is admin
+  const { data: self } = await supabase
+    .from('org_members')
+    .select('role, org_id')
+    .eq('user_id', user.id)
+    .eq('org_id', org_id)
+    .maybeSingle()
+
+  if (!self || self.role !== 'admin') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  // Cannot remove yourself
+  if (user_id === user.id) {
+    return NextResponse.json({ error: 'Cannot remove yourself' }, { status: 400 })
+  }
+
+  // Check if target is also an admin — only allow if multiple admins exist
+  const { data: targetMember } = await supabase
+    .from('org_members')
+    .select('role')
+    .eq('user_id', user_id)
+    .eq('org_id', org_id)
+    .maybeSingle()
+
+  if (targetMember?.role === 'admin') {
+    const { count } = await supabase
+      .from('org_members')
+      .select('*', { count: 'exact', head: true })
+      .eq('org_id', org_id)
+      .eq('role', 'admin')
+
+    if ((count ?? 0) <= 1) {
+      return NextResponse.json(
+        { error: 'Cannot remove the last admin. Promote another admin first.' },
+        { status: 400 }
+      )
     }
-    return NextResponse.json({ success: true, message: 'Member added' })
   }
 
-  // User doesn't exist — send invite via Supabase Auth
-  const { error: inviteErr } = await admin.auth.admin.inviteUserByEmail(email.trim(), {
-    data: { invited_to_org: mb.org_id, invited_role: role },
-    redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
-  })
-  if (inviteErr) return NextResponse.json({ error: inviteErr.message }, { status: 500 })
-  return NextResponse.json({ success: true, message: 'Invitation sent' })
-}
+  // Remove the member
+  const { error } = await supabase
+    .from('org_members')
+    .delete()
+    .eq('user_id', user_id)
+    .eq('org_id', org_id)
 
-export async function PATCH(request: NextRequest) {
-  // Note: managers can only change roles of members/viewers, not admins/owners
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-  const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).single()
-  if (!mb || !['owner','admin'].includes(mb.role))
-    return NextResponse.json({ error: 'Only owners/admins can change roles' }, { status: 403 })
-
-  const { member_id, user_id, role } = await request.json()
-  if (!['admin','manager','member','viewer'].includes(role))
-    return NextResponse.json({ error: 'Invalid role' }, { status: 400 })
-
-  // Validate that whichever ID we got is a non-empty UUID-shaped string
-  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-  const idToCheck = member_id || user_id
-  if (!idToCheck || !UUID_RE.test(idToCheck))
-    return NextResponse.json({ error: 'Valid member_id or user_id is required' }, { status: 400 })
-
-  // Use admin client so RLS doesn't interfere with cross-user updates
-  const admin = createAdminClient()
-  let query = admin.from('org_members').update({ role }).eq('org_id', mb.org_id)
-  if (member_id) query = query.eq('id', member_id)
-  else           query = query.eq('user_id', user_id)
-
-  const { error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Unassign their tasks within this org (set to null)
+  await supabase
+    .from('tasks')
+    .update({ assignee_id: null })
+    .eq('org_id', org_id)
+    .eq('assignee_id', user_id)
+
   return NextResponse.json({ success: true })
 }
