@@ -1,97 +1,84 @@
-# Planora v2 — Patch Bundle
+# Planora v2 — Patch Bundle (Build-Fixed)
 ## April 2026
 
-This zip contains all changed files. Extract and **replace** corresponding files in your repo.
-File paths inside the zip mirror your repo structure exactly.
+Extract this zip and **replace** files in your repo. Paths mirror your repo exactly.
 
 ---
 
-## Files Changed
+## Files in This Patch
 
-| File | Issue Fixed |
-|------|-------------|
-| `app/(app)/tasks/MyTasksView.tsx` | #1 Kanban DnD fix + client filter + done pagination |
-| `app/(app)/inbox/InboxView.tsx` | #1 #5 #6 Kanban DnD fix + client filter + rich cards + done pagination |
+| File | Fix |
+|------|-----|
+| `app/(app)/tasks/MyTasksView.tsx` | #1 Kanban DnD + client filter + done pagination |
+| `app/(app)/inbox/InboxView.tsx` | #1 #5 #6 Kanban DnD + client filter + rich cards + done pagination |
 | `app/(app)/projects/ProjectsView.tsx` | #3 Team member multi-checkbox + project visibility |
 | `app/(app)/team/TeamView.tsx` | #7 Remove member with confirmation modal |
 | `app/(app)/loading.tsx` | #2 Page skeleton loader |
 | `app/api/tasks/[id]/approve/route.ts` | #1 Approval drag-to-column Inngest sync |
 | `app/api/projects/[id]/route.ts` | #3 custom_fields PATCH merge support |
 | `app/api/team/route.ts` | #7 DELETE member endpoint |
-| `app/api/import/route.ts` | #4 Robust sample row detection |
-| `components/tasks/InlineOneTimeTask.tsx` | #6 Always-visible client/assignee/due date |
+| `app/api/import/route.ts` | #4 Robust sample row skip |
+| `components/tasks/InlineOneTimeTask.tsx` | #6 Client + assignee + due date inline |
 | `components/ui/AppLoader.tsx` | #2 Fancy loader + Spinner + PageSkeleton |
 | `components/layout/NavigationProgress.tsx` | #2 Route-change progress bar |
-| `app/loader-animations.css` | #2 Progress bar keyframe animations |
+| `lib/hooks/useKanbanDnd.ts` | NEW — zero-dependency native HTML5 DnD hook |
+| `app/loader-animations.css` | #2 CSS keyframe animations |
+
+**No new npm packages required.** DnD uses native HTML5 drag events.
 
 ---
 
-## Setup Steps
+## Two Manual Steps After Copy
 
-### 1. Install `@hello-pangea/dnd` (if not already)
-```bash
-npm install @hello-pangea/dnd
-```
+### 1. Add CSS animations
+Paste the contents of `app/loader-animations.css` into your `app/globals.css`.
 
-### 2. Add CSS animations
-In your `app/globals.css` or `tailwind.css`, paste the contents of `app/loader-animations.css`.
-
-### 3. Add NavigationProgress to AppShell
-In `app/(app)/AppShell.tsx`, add:
-```tsx
-import NavigationProgress from '@/components/layout/NavigationProgress'
-// Inside the JSX return:
-<NavigationProgress />
-```
-Wrap in `<Suspense>` since it uses `useSearchParams`:
+### 2. Add NavigationProgress to AppShell
+In `app/(app)/AppShell.tsx`, add near the top of the JSX:
 ```tsx
 import { Suspense } from 'react'
-<Suspense fallback={null}><NavigationProgress /></Suspense>
-```
+import NavigationProgress from '@/components/layout/NavigationProgress'
 
-### 4. Supabase: No schema changes needed
-Team member assignments are stored as `custom_fields._members` (JSON array of user IDs) on the `projects` table — no migration needed.
+// Inside return():
+<Suspense fallback={null}>
+  <NavigationProgress />
+</Suspense>
+```
 
 ---
 
-## What Each Fix Does
+## Fix Details
 
-### #1 — Kanban Drag-to-Approval Fix
-**Root cause:** Dragging to "Pending Approval" column was calling a plain `PATCH /api/tasks/:id` with `status: 'in_review'`, but the Inngest `onApproval` function expects the task to come through `/api/tasks/:id/approve` with `decision: 'submit'` to properly notify the approver.
+### #1 — Kanban drag-to-approval
+**Root cause:** Dragging to "Pending Approval" called plain PATCH, so Inngest never fired and the approver never saw the task.
+**Fix:** Drop onto `in_review` now calls `POST /api/tasks/:id/approve { decision: 'submit' }` — runs the full approval flow with Inngest email. Both MyTasksView and InboxView fixed.
+**DnD:** Switched to a custom `useKanbanDnd` hook using native HTML5 drag events — no new npm package needed.
 
-**Fix:** When the drop target is `in_review`, the kanban now calls `POST /api/tasks/:id/approve { decision: 'submit' }` instead of a plain PATCH — ensuring Inngest fires the approver email.
+### #2 — Loaders
+- `AppLoader` (full-page spinner with Planora branding)
+- `PageSkeleton` (shimmer kanban skeleton in `loading.tsx`)
+- `NavigationProgress` (teal→orange top bar on every route change)
 
-### #2 — Fancy Loaders
-- `AppLoader.tsx` exports: `AppLoader` (full-page spinner), `PageSkeleton` (shimmer layout), `Spinner` (inline)
-- `loading.tsx` uses `PageSkeleton` for all route transitions
-- `NavigationProgress` shows a teal→orange progress bar at the top on route changes
+### #3 — Project team members
+Multi-checkbox picker on each project card. Stored in `projects.custom_fields._members` (JSON array). No DB migration needed. Admins see all; owners + assigned members see theirs.
 
-### #3 — Project Team Members
-- Multi-checkbox picker inside each project card
-- Member IDs stored in `projects.custom_fields._members` (JSON array)
-- Project visibility: admins see all; owners and assigned members see their projects; unassigned projects visible to all
-- No database migration needed
+### #4 — Import sample row skip
+12 regex patterns: "yourcompany.com", "Sample", "Example", "Replace me", "John Doe", decoration rows, blank rows, etc. Skipped count returned in response.
 
-### #4 — Import Sample Row Skip
-Enhanced `isSampleRow()` function with 12 regex patterns catches: "yourcompany.com", "Sample", "Example", "replace me", "John Doe", "test client", decoration rows, and blank rows. Skipped rows are counted and returned in the response.
+### #5 — Done column pagination
+5 tasks shown with "Load more". Counter shows full total.
 
-### #5 — Done Column Pagination
-Both `MyTasksView` and `InboxView` Done columns show 5 tasks with a "Load more" button. Counter shows total count.
+### #6 — Inline task rich info
+InlineOneTimeTask expands to show Client, Assign To, Due Date, Priority. Enter = save, Escape = cancel.
 
-### #6 — Inline Task Rich Info
-`InlineOneTimeTask` now shows Client, Assign To, Due Date, and Priority fields inline — always visible when focused, with keyboard support (Enter = save, Escape = cancel).
-
-### #7 — Remove Team Member
-- `TeamView` has a ⋮ menu per member with "Remove Member" option
-- Confirmation modal prevents accidental removal
-- Cannot remove yourself or the last admin
-- `DELETE /api/team` unassigns all their tasks (sets assignee_id = null)
+### #7 — Remove team member
+⋮ menu per member → confirmation modal → DELETE /api/team. Guards: cannot remove yourself or the last admin. Unassigns their tasks on removal.
 
 ---
 
 ## Critical Rules Preserved
 - ✅ No `approver:users!tasks_approver_id_fkey` joins
-- ✅ `.maybeSingle()` everywhere
-- ✅ `'use client'` is first line of every client component
-- ✅ InboxView uses `&&` not ternaries
+- ✅ `.maybeSingle()` everywhere  
+- ✅ `'use client'` is FIRST line of every client component
+- ✅ InboxView uses `&&` not ternaries (SWC-safe)
 - ✅ Approval maps `'approve'→'approved'`, `'reject'→'rejected'` before Inngest
