@@ -259,9 +259,6 @@ export function RecurringView({ tasks: initialTasks, members, projects, clients,
           </div>
         </div>
       </div>
-      </div>
-      </div>
-      </div>
       ) : null}
 
       {/* LIST VIEW */}
@@ -524,6 +521,9 @@ export function RecurringView({ tasks: initialTasks, members, projects, clients,
         onClose={() => setSelectedTask(null)}
         onUpdated={() => { setSelectedTask(null); startT(() => router.refresh()) }}
       />
+      </div>
+      </div>
+      </div>
       </div>
       ) : null}
     </div>

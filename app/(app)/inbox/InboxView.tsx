@@ -411,6 +411,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
           onClose={() => setSelectedTask(null)}
           onUpdated={() => { setSelectedTask(null); startT(() => { window.location.reload() }) }}/>
       </div>
+      </div>
     ) : null}
 
     {/* ── LIST VIEW ──────────────────────────────────────────── */}
