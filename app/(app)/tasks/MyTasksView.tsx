@@ -56,7 +56,7 @@ export function MyTasksView({ tasks: initialTasks, pendingApprovalTasks = [], me
   const [checked,    setChecked]    = useState<Set<string>>(new Set())
   const [completing, setCompleting] = useState<Set<string>>(new Set())
   const [completingTask,  setCompletingTask]  = useState<Task | null>(null)
-  const [dragTaskId,     setDragTaskId]     = useState<string | null>(null)
+  
   const [dragOverCol,    setDragOverCol]    = useState<string | null>(null)
   const [subtaskMap,     setSubtaskMap]     = useState<Record<string, any[]>>({})
   const [expandedTasks,  setExpandedTasks]  = useState<Set<string>>(new Set())
