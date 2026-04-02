@@ -156,7 +156,7 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
         {/* TOOLS */}
         <GL>Tools</GL>
         {nav.import_data && <SI href="/import"   active={isActive('/import')}   icon={<Upload   className="h-4 w-4"/>} label="Import data"/>}
-        {canManage && nav.permissions && (
+        {canManage && (
           <SI href="/settings/permissions" active={isActive('/settings/permissions')} icon={<Shield className="h-4 w-4"/>} label="Permissions"/>
         )}
       </nav>

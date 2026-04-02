@@ -42,15 +42,7 @@ const BOARD_COLS = [
   { status:'completed',   label:'Done',        color:'#16a34a' },
 ]
 
-export function MyTasksView({
-  tasks: initialTasks,
-  pendingApprovalTasks = [],
-  members,
-  clients,
-  currentUserId,
-  userRole,
-  canCreate = false,
-}: Props) {
+export function MyTasksView({ tasks: initialTasks, pendingApprovalTasks = [], members, clients, currentUserId, userRole }: Props) {
   const router     = useRouter()
   const [,startT]  = useTransition()
   const today      = todayStr()
@@ -59,16 +51,19 @@ export function MyTasksView({
   const [tasks,      setTasks]      = useState<Task[]>(initialTasks)
   const [tab,        setTab]        = useState<'List'|'Board'>('List')
   const [selTask,    setSelTask]    = useState<Task | null>(null)
+  const [dragTaskId, setDragTaskId] = useState<string | null>(null)
+  const [dragOver,   setDragOver]   = useState<string | null>(null)
   const [checked,    setChecked]    = useState<Set<string>>(new Set())
   const [completing, setCompleting] = useState<Set<string>>(new Set())
   const [completingTask,  setCompletingTask]  = useState<Task | null>(null)
+  const [dragTaskId,     setDragTaskId]     = useState<string | null>(null)
+  const [dragOverCol,    setDragOverCol]    = useState<string | null>(null)
   const [subtaskMap,     setSubtaskMap]     = useState<Record<string, any[]>>({})
   const [expandedTasks,  setExpandedTasks]  = useState<Set<string>>(new Set())
   const [filterPriority, setFilterPriority] = useState('')
   const [filterClient,   setFilterClient]   = useState('')
   const [filterStatus,   setFilterStatus]   = useState('')
   const [filterOpen,     setFilterOpen]     = useState(false)
-  
 
   // Apply filters
   const filteredTasks = tasks.filter(t => {
@@ -133,8 +128,81 @@ export function MyTasksView({
       refresh(); return
     }
 
-    // Show attachment modal before completing
-    setCompletingTask(task)
+    // Only show attachment modal for CA compliance tasks that require it
+    // Regular tasks complete immediately without forcing an attachment
+    const hasComplianceSubtasks = task.custom_fields?._compliance_subtask
+    const isCACompliance = !!(task as any).custom_fields?._ca_compliance
+    
+    if (hasComplianceSubtasks || isCACompliance) {
+      setCompletingTask(task)
+    } else {
+      // Regular task — complete directly without attachment requirement
+      setCompleting(p => new Set(p).add(task.id))
+      setTasks(prev => prev.map(t => t.id === task.id
+        ? { ...t, status: 'completed', completed_at: new Date().toISOString() } : t))
+      setSelTask(prev => prev?.id === task.id
+        ? { ...prev, status: 'completed', completed_at: new Date().toISOString() } : prev)
+      const res = await fetch(`/api/tasks/${task.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'completed', completed_at: new Date().toISOString() }),
+      })
+      setCompleting(p => { const s = new Set(p); s.delete(task.id); return s })
+      if (res.ok) {
+        toast.success('Done! ✅')
+        refresh()
+      } else {
+        const snapshot = tasks.map(t => t)
+        setTasks(snapshot)
+        toast.error('Could not complete task')
+      }
+    }
+  }
+
+  function handleDragStart(taskId: string) {
+    setDragTaskId(taskId)
+  }
+
+  async function handleDrop(targetStatus: string) {
+    if (!dragTaskId) return
+    const task = tasks.find(t => t.id === dragTaskId)
+    if (!task || task.status === targetStatus) { setDragTaskId(null); setDragOverCol(null); return }
+    
+    // Map board column status to actual task status
+    const statusMap: Record<string, string> = {
+      'todo': 'todo', 'in_progress': 'in_progress',
+      'in_review': 'in_review', 'completed': 'completed',
+    }
+    const newStatus = statusMap[targetStatus] ?? targetStatus
+
+    // Don't allow dragging to completed if approval required
+    if (newStatus === 'completed' && task.approval_required && task.approval_status !== 'approved') {
+      toast.error('This task requires approval before completion')
+      setDragTaskId(null); setDragOverCol(null); return
+    }
+
+    // Optimistic update
+    setTasks(prev => prev.map(t => t.id === dragTaskId
+      ? { ...t, status: newStatus as any, approval_status: newStatus === 'in_review' ? 'pending' : t.approval_status }
+      : t
+    ))
+    setDragTaskId(null)
+    setDragOverCol(null)
+    
+    const patchBody: any = { status: newStatus }
+    if (newStatus === 'completed') patchBody.completed_at = new Date().toISOString()
+    if (newStatus === 'in_progress') patchBody.completed_at = null
+    
+    const res = await fetch(`/api/tasks/${dragTaskId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patchBody),
+    })
+    if (!res.ok) {
+      setTasks(prev => prev.map(t => t.id === dragTaskId ? { ...t, status: task.status as any } : t))
+      toast.error('Could not move task')
+    } else {
+      toast.success(`Moved to ${targetStatus.replace('_', ' ')}`)
+      refresh()
+    }
   }
 
   async function bulkComplete() {
@@ -629,6 +697,28 @@ export function MyTasksView({
     </>
   )
 
+  // Drag & drop: update task status when dropped to new column
+  async function handleDrop(newStatus: string) {
+    if (!dragTaskId || !newStatus) return
+    const task = tasks.find(t => t.id === dragTaskId)
+    if (!task || task.status === newStatus) return
+    setDragTaskId(null)
+    setDragOver(null)
+    // Optimistic update
+    setTasks(prev => prev.map(t => t.id === dragTaskId ? { ...t, status: newStatus as any } : t))
+    const res = await fetch(`/api/tasks/${dragTaskId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: newStatus }),
+    })
+    if (!res.ok) {
+      // Revert on failure
+      setTasks(prev => prev.map(t => t.id === dragTaskId ? { ...t, status: task.status } : t))
+      toast.error('Could not move task')
+    } else {
+      refresh()
+    }
+  }
+
   // BOARD VIEW
   return (
     <>
@@ -674,9 +764,15 @@ export function MyTasksView({
               : t.status === col.status && t.approval_status !== 'pending'
           )
           return (
-            <div key={col.status} style={{ width:268, flexShrink:0, background:'var(--border-light)',
-              borderRadius:10, overflow:'hidden', maxHeight:'100%', display:'flex', flexDirection:'column',
-              border:'1px solid var(--border)' }}>
+            <div key={col.status}
+              onDragOver={e => { e.preventDefault(); setDragOverCol(col.status) }}
+              onDragLeave={() => setDragOverCol(null)}
+              onDrop={() => handleDrop(col.status)}
+              style={{ width:268, flexShrink:0, borderRadius:10, overflow:'hidden',
+                maxHeight:'100%', display:'flex', flexDirection:'column',
+                background: dragOverCol === col.status ? 'var(--brand-light)' : 'var(--border-light)',
+                border: dragOverCol === col.status ? '2px solid var(--brand)' : '1px solid var(--border)',
+                transition: 'all 0.15s' }}>
               <div style={{ display:'flex', alignItems:'center', gap:7, padding:'11px 13px',
                 borderBottom:`1px solid var(--border)` }}>
                 <div style={{ width:9, height:9, borderRadius:'50%', background:col.color, flexShrink:0 }}/>
@@ -691,11 +787,16 @@ export function MyTasksView({
                   const isPending = task.status === 'in_review' || task.approval_status === 'pending'
                   return (
                     <div key={task.id}
+                      draggable
+                      onDragStart={() => handleDragStart(task.id)}
+                      onDragEnd={() => { setDragTaskId(null); setDragOverCol(null) }}
                       onClick={() => setSelTask(selTask?.id === task.id ? null : task)}
                       style={{ background:'var(--surface)', borderRadius:8, padding:'10px 11px',
-                        cursor:'pointer', border:`1px solid ${selTask?.id===task.id?'var(--brand)':isPending?'#ddd6fe':'var(--border)'}`,
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-                        opacity: isDone ? 0.65 : 1 }}>
+                        cursor:'grab', border:`1px solid ${dragTaskId===task.id?'var(--brand)':selTask?.id===task.id?'var(--brand)':isPending?'#ddd6fe':'var(--border)'}`,
+                        boxShadow: dragTaskId===task.id ? '0 4px 14px rgba(0,0,0,0.12)' : '0 1px 3px rgba(0,0,0,0.05)',
+                        opacity: isDone ? 0.65 : dragTaskId===task.id ? 0.5 : 1,
+                        transform: dragTaskId===task.id ? 'scale(1.02)' : 'none',
+                        transition: 'opacity 0.15s, transform 0.1s' }}>
                       <div style={{ display:'flex', alignItems:'flex-start', gap:7, marginBottom:8 }}>
                         {isPending
                           ? <div style={{ width:15, height:15, borderRadius:'50%', flexShrink:0, marginTop:1,

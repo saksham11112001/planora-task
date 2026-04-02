@@ -58,7 +58,7 @@ export function ImportView() {
     if (!file) return
     setState('uploading')
     const steps = [
-      { step: 'Reading file…', done: false },
+      { step: 'Reading & parsing file…', done: false },
       { step: 'Importing team members…', done: false },
       { step: 'Importing clients…', done: false },
       { step: 'Importing projects…', done: false },
@@ -68,14 +68,14 @@ export function ImportView() {
     ]
     setProgress(steps.map(s => ({ ...s })))
 
-    // Animate steps while waiting (1 step every ~700ms)
+    // Animate steps while waiting (~800ms per step)
     let stepIdx = 0
     const interval = setInterval(() => {
       if (stepIdx < steps.length) {
         setProgress(prev => prev.map((s, i) => i <= stepIdx ? { ...s, done: true } : s))
         stepIdx++
       }
-    }, 700)
+    }, 800)
 
     try {
       const fd = new FormData()
@@ -207,36 +207,10 @@ export function ImportView() {
             />
 
             {isUploading ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 0, width: '100%', textAlign: 'left' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-                  <Loader2 style={{ width: 18, height: 18, color: 'var(--brand)', animation: 'spin 1s linear infinite', flexShrink: 0 }} />
-                  <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--brand)', margin: 0 }}>Importing your data…</p>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {progress.map((p, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{
-                        width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
-                        background: p.done ? '#16a34a' : 'var(--border)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        transition: 'background 0.3s',
-                      }}>
-                        {p.done
-                          ? <span style={{ color: '#fff', fontSize: 10, fontWeight: 700 }}>✓</span>
-                          : <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff', display: 'block' }}/>
-                        }
-                      </div>
-                      <span style={{ fontSize: 13, color: p.done ? 'var(--text-primary)' : 'var(--text-muted)', fontWeight: p.done ? 500 : 400, transition: 'color 0.3s' }}>
-                        {p.step}
-                        {p.done && p.count !== undefined && (
-                          <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--brand)', fontWeight: 700 }}>
-                            {p.count} imported
-                          </span>
-                        )}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+                <Loader2 style={{ width: 32, height: 32, color: 'var(--brand)', animation: 'spin 1s linear infinite' }} />
+                <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--brand)', margin: 0 }}>Uploading and importing…</p>
+                <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>Please don&apos;t close this page</p>
               </div>
             ) : file ? (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
@@ -256,6 +230,85 @@ export function ImportView() {
               </div>
             )}
           </div>
+
+          {/* ── Live import progress — shown during upload ── */}
+          {isUploading && progress.length > 0 && (
+            <div style={{
+              marginTop: 16, padding: '18px 20px',
+              background: 'var(--surface)',
+              border: '1.5px solid var(--brand-border)',
+              borderRadius: 12,
+              boxShadow: '0 4px 20px rgba(13,148,136,0.12)',
+            }}>
+              {/* Header with animated loader */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+                <Loader2 style={{ width: 16, height: 16, color: 'var(--brand)', animation: 'spin 1s linear infinite', flexShrink: 0 }} />
+                <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--brand)' }}>
+                  Importing your data — please wait…
+                </span>
+              </div>
+
+              {/* Progress bar */}
+              <div style={{ background: 'var(--border-light)', borderRadius: 99, height: 6, marginBottom: 16, overflow: 'hidden' }}>
+                <div style={{
+                  height: '100%', borderRadius: 99,
+                  background: 'linear-gradient(90deg, var(--brand), #7c3aed)',
+                  width: `${Math.round((progress.filter(p => p.done).length / progress.length) * 100)}%`,
+                  transition: 'width 0.5s ease',
+                }}/>
+              </div>
+
+              {/* Step checklist */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {progress.map((p, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    {/* Circle indicator */}
+                    <div style={{
+                      width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
+                      background: p.done ? '#16a34a' : 'var(--border-light)',
+                      border: p.done ? 'none' : '2px solid var(--border)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      transition: 'all 0.3s ease',
+                    }}>
+                      {p.done
+                        ? <svg viewBox="0 0 10 10" fill="none" style={{ width: 10, height: 10 }}>
+                            <path d="M1.5 5L4 7.5L8.5 2.5" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+                          </svg>
+                        : <span style={{ width: 6, height: 6, borderRadius: '50%',
+                            background: 'var(--text-muted)', display: 'block', opacity: 0.4 }}/>
+                      }
+                    </div>
+                    {/* Step label */}
+                    <span style={{
+                      fontSize: 13, fontWeight: p.done ? 600 : 400,
+                      color: p.done ? 'var(--text-primary)' : 'var(--text-muted)',
+                      transition: 'all 0.3s',
+                    }}>
+                      {p.step}
+                    </span>
+                    {/* Count badge when done */}
+                    {p.done && p.count !== undefined && (
+                      <span style={{
+                        marginLeft: 'auto', fontSize: 11, fontWeight: 700,
+                        color: p.count > 0 ? 'var(--brand)' : 'var(--text-muted)',
+                        background: p.count > 0 ? 'var(--brand-light)' : 'var(--surface-subtle)',
+                        padding: '1px 8px', borderRadius: 99,
+                        border: '1px solid var(--border-light)',
+                        flexShrink: 0,
+                      }}>
+                        {p.count > 0 ? `${p.count} imported` : 'none'}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Footer note */}
+              <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 14, marginBottom: 0 }}>
+                ⚡ Large files may take 15–30 seconds. Do not close or refresh this page.
+              </p>
+            </div>
+          )}
 
           {/* Error message */}
           {state === 'error' && (

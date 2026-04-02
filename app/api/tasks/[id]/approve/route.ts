@@ -104,7 +104,7 @@ export async function POST(
           name: 'task/approval-completed',
           data: {
             task_id: id, task_title: task.title,
-            decision:       decision as 'approved' | 'rejected',
+            decision:       (decision === 'approve' ? 'approved' : 'rejected') as 'approved' | 'rejected',
             assignee_id:    task.assignee_id,
             assignee_email: assigneeProfile.email,
             assignee_phone: assigneeProfile.phone_number ?? null,

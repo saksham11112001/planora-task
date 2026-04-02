@@ -16,29 +16,23 @@ export function CompletionAttachModal({ taskId, taskTitle, onConfirm, onCancel }
   const [uploading, setUploading] = useState(false)
 
   async function handleConfirm() {
-    // Attachment is REQUIRED — block if no file selected
-    if (files.length === 0) {
-      toast.error('📎 Please attach a document before marking complete')
-      fileRef.current?.click()
-      return
-    }
-    setUploading(true)
-    try {
-      const fd = new FormData()
-      files.forEach(f => fd.append('files', f))
-      const res = await fetch(`/api/tasks/${taskId}/attachments`, { method: 'POST', body: fd })
-      if (!res.ok) {
-        toast.error('File upload failed — please try again')
-        setUploading(false)
-        return  // Don't mark complete if upload fails
+    // If files selected, upload them first; otherwise just mark complete
+    if (files.length > 0) {
+      setUploading(true)
+      try {
+        const fd = new FormData()
+        files.forEach(f => fd.append('files', f))
+        const res = await fetch(`/api/tasks/${taskId}/attachments`, { method: 'POST', body: fd })
+        if (!res.ok) {
+          toast.error('File upload failed — marking complete anyway')
+        } else {
+          toast.success(`${files.length} file${files.length > 1 ? 's' : ''} attached ✓`)
+        }
+      } catch {
+        toast.error('Upload failed — marking complete anyway')
       }
-      toast.success(`${files.length} file${files.length > 1 ? 's' : ''} attached ✓`)
-    } catch {
-      toast.error('Upload failed — please try again')
       setUploading(false)
-      return
     }
-    setUploading(false)
     onConfirm()
   }
 
@@ -115,11 +109,11 @@ export function CompletionAttachModal({ taskId, taskTitle, onConfirm, onCancel }
           <button onClick={handleConfirm} disabled={uploading}
             style={{
               flex: 1, padding: '10px', borderRadius: 8, border: 'none',
-              background: files.length > 0 ? '#16a34a' : '#94a3b8', color: '#fff', fontSize: 13, fontWeight: 600,
-              cursor: uploading || files.length === 0 ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
+              background: '#16a34a', color: '#fff', fontSize: 13, fontWeight: 600,
+              cursor: uploading ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
               opacity: uploading ? 0.7 : 1, transition: 'all 0.15s',
             }}>
-            {uploading ? 'Uploading…' : files.length > 0 ? `Attach & mark complete` : 'Select a file to continue'}
+            {uploading ? 'Uploading…' : files.length > 0 ? 'Attach & mark complete' : 'Mark as complete'}
           </button>
           <button onClick={onCancel} style={{
             padding: '10px 16px', borderRadius: 8,

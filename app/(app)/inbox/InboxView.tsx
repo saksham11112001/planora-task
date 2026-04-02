@@ -33,7 +33,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
   const [, startT]                      = useTransition()
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set())
   const [searchQuery,   setSearchQuery]   = useState('')
-  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set(['done']))
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set(['done', 'overdue']))
 
   // Auto-load subtasks for all tasks on mount
   const [subtaskMap,    setSubtaskMap]    = useState<Record<string, {id:string;title:string;status:string}[]>>({})
@@ -313,6 +313,17 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
           <div/>
         </div>
 
+        {/* Summary bar */}
+        {localTasks.length > 0 && (
+          <div style={{ padding: '6px 16px', borderBottom: '1px solid var(--border-light)', background: 'var(--surface-subtle)', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+            {overdue.length > 0 && <span style={{ fontSize: 11, fontWeight: 600, color: '#dc2626' }}>⚠ {overdue.length} overdue</span>}
+            {inProg.length > 0  && <span style={{ fontSize: 11, fontWeight: 600, color: '#0d9488' }}>● {inProg.length} in progress</span>}
+            {inReview.length > 0 && <span style={{ fontSize: 11, fontWeight: 600, color: '#7c3aed' }}>◎ {inReview.length} pending approval</span>}
+            {done.length > 0    && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>✓ {done.length} completed</span>}
+            <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 'auto' }}>{localTasks.length} total</span>
+          </div>
+        )}
+
         {/* Search bar */}
         <div style={{ padding: '8px 16px', borderBottom: '1px solid var(--border-light)', background: 'var(--surface-subtle)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 12px' }}>
@@ -329,6 +340,27 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
               <button onClick={() => setSearchQuery('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 16, lineHeight: 1, padding: 0, display: 'flex' }}>×</button>
             )}
           </div>
+        </div>
+
+        {/* Task summary bar */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '8px 18px',
+          borderBottom: '1px solid var(--border-light)', background: 'var(--surface-subtle)',
+          flexWrap: 'wrap' }}>
+          {[
+            { label: 'Overdue', count: overdue.length, color: '#dc2626' },
+            { label: 'In progress', count: inProg.length, color: '#0d9488' },
+            { label: 'Pending approval', count: inReview.length, color: '#7c3aed' },
+            { label: 'Completed', count: done.length, color: '#16a34a' },
+          ].filter(s => s.count > 0).map(s => (
+            <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: s.color, display: 'inline-block' }}/>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{s.label}</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: s.color }}>{s.count}</span>
+            </div>
+          ))}
+          {localTasks.length === 0 && (
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>No tasks yet</span>
+          )}
         </div>
 
         {/* Task list */}
@@ -361,15 +393,23 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                 onClick={() => setCollapsedSections(p => {
                   const n = new Set(p); n.has(section.key) ? n.delete(section.key) : n.add(section.key); return n
                 })}
-                style={{ display: 'flex', alignItems: 'center', gap: 6,
-                  padding: '13px 18px 5px', fontSize: 11, fontWeight: 700, cursor: 'pointer',
-                  textTransform: 'uppercase', letterSpacing: '0.06em', color: section.color, userSelect: 'none' }}>
-                <span style={{ transition: 'transform 0.15s', display: 'inline-block',
+                style={{ display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '10px 18px 8px', cursor: 'pointer', userSelect: 'none',
+                  borderBottom: collapsedSections.has(section.key) ? 'none' : '1px solid var(--border-light)' }}>
+                <span style={{ transition: 'transform 0.15s', display: 'inline-block', fontSize: 10,
+                  color: 'var(--text-muted)',
                   transform: collapsedSections.has(section.key) ? 'rotate(-90deg)' : 'none' }}>▾</span>
-                {section.label}
-                <span style={{ opacity: 0.45, fontWeight: 400, textTransform: 'none', fontSize: 11 }}>
-                  ({section.tasks.length})
+                <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase',
+                  letterSpacing: '0.07em', color: section.color }}>{section.label}</span>
+                <span style={{ fontSize: 11, fontWeight: 700, padding: '1px 7px', borderRadius: 99,
+                  background: `${section.color}18`, color: section.color, marginLeft: 2 }}>
+                  {section.tasks.length}
                 </span>
+                {collapsedSections.has(section.key) && section.tasks.length > 0 && (
+                  <span style={{ fontSize: 10, color: 'var(--text-muted)', marginLeft: 'auto' }}>
+                    click to expand
+                  </span>
+                )}
               </div>
 
               {/* Task rows — hidden when section collapsed */}
