@@ -57,7 +57,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body style={{ fontSize: '15px' }}>
         <CookieCleaner />
         <Suspense fallback={null}><NavigationProgress /></Suspense>
-        <KeyboardShortcuts />
+        <Suspense fallback={null}><KeyboardShortcuts /></Suspense>
         <ThemeProvider>
           {children}
         </ThemeProvider>

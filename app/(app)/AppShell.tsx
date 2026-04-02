@@ -90,7 +90,7 @@ export function AppShell({ user, org, role, workspaceId, children }: Props) {
       </div>
 
       <ToastContainer/>
-      <SearchModal/>
+      <Suspense fallback={null}><SearchModal/></Suspense>
       <Suspense fallback={null}><RouteLoader/></Suspense>
     </div>
   )
