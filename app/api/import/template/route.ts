@@ -1,378 +1,1070 @@
-import { NextResponse } from 'next/server'
-import ExcelJS from 'exceljs'
+import { createClient }      from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { NextResponse }       from 'next/server'
+import type { NextRequest }   from 'next/server'
+import { COMPLIANCE_TASKS }   from '@/lib/data/complianceTasks'
 
+export const maxDuration = 60
 export const dynamic = 'force-dynamic'
-export const revalidate = 0
 
-function setHeader(row: ExcelJS.Row) {
-  row.font = { bold: true }
+const COMPLIANCE_MAP = new Map(
+  COMPLIANCE_TASKS.map(t => [t.title.toLowerCase().trim(), t])
+)
+
+function findComplianceTask(title: string) {
+  return COMPLIANCE_MAP.get(title.toLowerCase().trim()) ?? null
 }
 
-function addListValidation(
-  ws: ExcelJS.Worksheet,
-  range: string,
-  formula: string,
-  promptTitle: string,
-  prompt: string
-) {
-  const [start, end] = range.split(':')
-  const startRow = Number(start.match(/\d+/)?.[0] || 2)
-  const endRow = Number(end.match(/\d+/)?.[0] || startRow)
-  const col = start.replace(/\d+/g, '')
+type SheetMap = Record<string, string[][]>
 
-  for (let r = startRow; r <= endRow; r++) {
-    ws.getCell(`${col}${r}`).dataValidation = {
-      type: 'list',
-      allowBlank: true,
-      formulae: [formula],
-      showErrorMessage: true,
-      errorStyle: 'error',
-      errorTitle: 'Invalid value',
-      error: 'Please select a value from the dropdown.',
-      showInputMessage: true,
-      promptTitle,
-      prompt,
-    }
+type ImportBucket = {
+  created: number
+  skipped: number
+  errors: string[]
+}
+
+type ImportResults = {
+  members: ImportBucket
+  clients: ImportBucket
+  projects: ImportBucket
+  tasks: ImportBucket
+  onetasks: ImportBucket
+  recurring: ImportBucket
+  compliance: ImportBucket
+}
+
+async function parseXlsx(buffer: ArrayBuffer): Promise<SheetMap> {
+  const XLSX = await import('xlsx')
+  const wb = XLSX.read(new Uint8Array(buffer), {
+    type: 'array',
+    raw: false,
+    cellDates: true,
+  })
+
+  const result: SheetMap = {}
+  for (const sheetName of wb.SheetNames) {
+    const ws = wb.Sheets[sheetName]
+    const rows = XLSX.utils.sheet_to_json<string[]>(ws, {
+      header: 1,
+      defval: '',
+      raw: false,
+    })
+    result[sheetName] = rows as string[][]
   }
+  return result
 }
 
-function addDateFormatting(
-  ws: ExcelJS.Worksheet,
-  colLetter: string,
-  fromRow = 2,
-  toRow = 500
-) {
-  for (let r = fromRow; r <= toRow; r++) {
-    ws.getCell(`${colLetter}${r}`).numFmt = 'yyyy-mm-dd'
+function initBucket(): ImportBucket {
+  return { created: 0, skipped: 0, errors: [] }
+}
+
+function norm(s: string) {
+  return (s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '')
+}
+
+function cleanText(s: string) {
+  return (s ?? '')
+    .replace(/[\u200B-\u200D\uFEFF\u00A0]/g, ' ')
+    .replace(/[‘’]/g, "'")
+    .replace(/[“”]/g, '"')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function findCol(headers: string[], ...keys: string[]): number {
+  for (const key of keys) {
+    const idx = headers.findIndex(h => norm(h).includes(norm(key)))
+    if (idx !== -1) return idx
   }
+  return -1
 }
 
-function addBlankRows(ws: ExcelJS.Worksheet, cols: number, count = 40) {
-  for (let i = 0; i < count; i++) {
-    ws.addRow(new Array(cols).fill(''))
+function cell(row: string[], idx: number): string {
+  return idx >= 0 ? cleanText(String(row[idx] ?? '')) : ''
+}
+
+function parseNumber(value: string): number | null {
+  if (!value) return null
+  const n = Number(value.replace(/,/g, ''))
+  return Number.isFinite(n) ? n : null
+}
+
+function isBlankRow(row: string[]): boolean {
+  return row.every(c => cleanText(String(c ?? '')).trim() === '')
+}
+
+const SAMPLE_EMAILS = new Set([
+  'alex@yourcompany.com',
+  'priya@yourcompany.com',
+  'manager@yourcompany.com',
+  'owner@yourcompany.com',
+  'alex@company.com',
+  'priya@company.com',
+  'manager@company.com',
+])
+
+const SAMPLE_FIRST_COL_VALUES = new Set([
+  'alex johnson',
+  'priya sharma',
+  'acme corp',
+  'website redesign',
+  'design wireframes',
+  'review q3 proposals',
+  'weekly standup',
+  'gst filing',
+])
+
+function isInstructionRow(row: string[]): boolean {
+  const joined = row.map(c => cleanText(String(c ?? ''))).join(' ').toLowerCase()
+
+  return (
+    joined.includes('yyyy-mm-dd') ||
+    joined.includes('must match') ||
+    joined.includes('select from team') ||
+    joined.includes('select client') ||
+    joined.includes('choose from team members') ||
+    joined.includes('choose owner/admin/manager') ||
+    joined.includes('select priority') ||
+    joined.includes('choose priority') ||
+    joined.includes('choose status') ||
+    joined.includes('choose frequency') ||
+    joined.includes('optional') ||
+    joined.includes('clear title') ||
+    joined.includes('clear action') ||
+    joined.includes('unique name') ||
+    joined.includes("person's display name")
+  )
+}
+
+function isOldTemplateExampleRow(row: string[]): boolean {
+  const cleaned = row.map(c => cleanText(String(c ?? '')))
+  const joined = cleaned.join(' ').toLowerCase()
+  const first = (cleaned[0] ?? '').toLowerCase()
+
+  if (joined.includes('@yourcompany.com')) return true
+  if (joined.includes('@company.com') && joined.includes('website redesign')) return true
+  if (joined.includes('acme corp') && joined.includes('design wireframes')) return true
+
+  if (SAMPLE_FIRST_COL_VALUES.has(first)) {
+    const hasSampleEmail = cleaned.some(v => SAMPLE_EMAILS.has(v.toLowerCase()))
+    if (hasSampleEmail) return true
   }
+
+  return false
 }
 
-export async function GET() {
+function shouldSkipImportedRow(row: string[], requiredValue?: string): boolean {
+  if (isBlankRow(row)) return true
+  if (isInstructionRow(row)) return true
+  if (isOldTemplateExampleRow(row)) return true
+  if (requiredValue !== undefined && !cleanText(requiredValue)) return true
+  return false
+}
+
+function normalizeDateOutput(d: Date): string {
+  const yyyy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd}`
+}
+
+function cellDate(row: string[], idx: number): string | null {
+  const raw = cell(row, idx)
+  if (!raw) return null
+  const v = raw.trim()
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v
+
+  let m = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+  if (m) {
+    const dd = m[1].padStart(2, '0')
+    const mm = m[2].padStart(2, '0')
+    const yyyy = m[3]
+    return `${yyyy}-${mm}-${dd}`
+  }
+
+  m = v.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/)
+  if (m) {
+    const dd = m[1].padStart(2, '0')
+    const mm = m[2].padStart(2, '0')
+    const yyyy = m[3]
+    return `${yyyy}-${mm}-${dd}`
+  }
+
+  const d = new Date(v)
+  if (!Number.isNaN(d.getTime())) return normalizeDateOutput(d)
+
+  return null
+}
+
+function nextOccurrence(freq: string, from: string): string {
+  const d = new Date((from || new Date().toISOString().split('T')[0]) + 'T00:00:00')
+  switch (freq) {
+    case 'daily':      d.setDate(d.getDate() + 1); break
+    case 'weekly':     d.setDate(d.getDate() + 7); break
+    case 'bi_weekly':  d.setDate(d.getDate() + 14); break
+    case 'monthly':    d.setMonth(d.getMonth() + 1); break
+    case 'quarterly':  d.setMonth(d.getMonth() + 3); break
+    case 'annual':     d.setFullYear(d.getFullYear() + 1); break
+  }
+  return normalizeDateOutput(d)
+}
+
+function parseEmailList(raw: string): string[] {
+  return raw
+    .split(/[;,]/g)
+    .map(s => s.trim().toLowerCase())
+    .filter(Boolean)
+    .filter(v => v.includes('@'))
+}
+
+function findSheetName(
+  sheets: SheetMap,
+  predicates: Array<(name: string) => boolean>
+): string | undefined {
+  return Object.keys(sheets).find(name => predicates.some(fn => fn(name)))
+}
+
+function dataRows(rows: string[][], headerIndex: number) {
+  const out = rows.slice(headerIndex + 1)
+  if (out.length > 0 && isInstructionRow(out[0])) return out.slice(1)
+  return out
+}
+
+export async function POST(request: NextRequest) {
   try {
-    const wb = new ExcelJS.Workbook()
-    wb.creator = 'Planora'
-    wb.created = new Date()
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
 
-    const readme = wb.addWorksheet('READ ME')
-    const team = wb.addWorksheet('Team Members')
-    const clients = wb.addWorksheet('Clients')
-    const projects = wb.addWorksheet('Projects')
-    const tasks = wb.addWorksheet('Tasks')
-    const oneTime = wb.addWorksheet('One-Time Tasks')
-    const recurring = wb.addWorksheet('Recurring Tasks')
-    const compliance = wb.addWorksheet('CA Compliance Tasks')
-    const lists = wb.addWorksheet('Lists')
-
-    lists.state = 'veryHidden'
-
-    // READ ME
-    readme.addRows([
-      ['Planora Smart Bulk Import Template'],
-      ['1. Fill Team Members first.'],
-      ['2. Then fill Clients and Projects.'],
-      ['3. Then fill Tasks / One-Time Tasks / Recurring Tasks / Compliance Tasks.'],
-      ['4. Assignee dropdown comes from Team Members.'],
-      ['5. Approver dropdown comes only from owner/admin/manager in Team Members.'],
-      ['6. Client dropdown comes from Clients sheet.'],
-      ['7. Project dropdown comes from Projects sheet.'],
-      ['8. Dates are displayed as YYYY-MM-DD.'],
-      ['9. Upload this file in Planora Bulk Import.'],
-    ])
-    readme.columns = [{ width: 90 }]
-
-    // TEAM MEMBERS
-    team.addRow(['Full Name *', 'Email *', 'Role *', 'Notes'])
-    setHeader(team.getRow(1))
-    addBlankRows(team, 4, 40)
-    team.columns = [
-      { width: 24 },
-      { width: 30 },
-      { width: 18 },
-      { width: 28 },
-    ]
-    team.views = [{ state: 'frozen', ySplit: 1 }]
-
-    addListValidation(
-      team,
-      'C2:C500',
-      '"owner,admin,manager,member,viewer"',
-      'Role',
-      'Choose a role'
-    )
-
-    // CLIENTS
-    clients.addRow([
-      'Client Name *',
-      'Contact Email',
-      'Phone',
-      'Company',
-      'Website',
-      'Industry',
-      'Color',
-      'Status',
-      'Notes',
-    ])
-    setHeader(clients.getRow(1))
-    addBlankRows(clients, 9, 40)
-    clients.columns = [
-      { width: 24 },
-      { width: 28 },
-      { width: 18 },
-      { width: 22 },
-      { width: 28 },
-      { width: 18 },
-      { width: 14 },
-      { width: 16 },
-      { width: 24 },
-    ]
-    clients.views = [{ state: 'frozen', ySplit: 1 }]
-
-    addListValidation(
-      clients,
-      'H2:H500',
-      '"active,inactive,lead"',
-      'Client status',
-      'Choose client status'
-    )
-
-    // PROJECTS
-    projects.addRow([
-      'Project Name *',
-      'Color',
-      'Status',
-      'Due Date',
-      'Owner Email',
-      'Client Name',
-      'Budget',
-      'Hours Budget',
-      'Description',
-    ])
-    setHeader(projects.getRow(1))
-    addBlankRows(projects, 9, 40)
-    projects.columns = [
-      { width: 24 },
-      { width: 14 },
-      { width: 18 },
-      { width: 16 },
-      { width: 28 },
-      { width: 22 },
-      { width: 14 },
-      { width: 14 },
-      { width: 30 },
-    ]
-    projects.views = [{ state: 'frozen', ySplit: 1 }]
-
-    addListValidation(
-      projects,
-      'C2:C500',
-      '"active,on_hold,completed"',
-      'Project status',
-      'Choose project status'
-    )
-    addDateFormatting(projects, 'D', 2, 500)
-
-    // TASKS
-    tasks.addRow([
-      'Task Title *',
-      'Project Name',
-      'Assignee Email',
-      'Approver Email',
-      'Priority',
-      'Due Date',
-      'Status',
-      'Client Name',
-      'Est. Hours',
-      'Description',
-    ])
-    setHeader(tasks.getRow(1))
-    addBlankRows(tasks, 10, 60)
-    tasks.columns = [
-      { width: 28 },
-      { width: 24 },
-      { width: 28 },
-      { width: 28 },
-      { width: 16 },
-      { width: 16 },
-      { width: 18 },
-      { width: 22 },
-      { width: 12 },
-      { width: 28 },
-    ]
-    tasks.views = [{ state: 'frozen', ySplit: 1 }]
-
-    // ONE-TIME TASKS
-    oneTime.addRow([
-      'Task Title *',
-      'Assignee Email',
-      'Approver Email',
-      'Priority',
-      'Due Date',
-      'Client Name',
-      'Est. Hours',
-      'Description',
-    ])
-    setHeader(oneTime.getRow(1))
-    addBlankRows(oneTime, 8, 60)
-    oneTime.columns = [
-      { width: 28 },
-      { width: 28 },
-      { width: 28 },
-      { width: 16 },
-      { width: 16 },
-      { width: 22 },
-      { width: 12 },
-      { width: 28 },
-    ]
-    oneTime.views = [{ state: 'frozen', ySplit: 1 }]
-
-    // RECURRING TASKS
-    recurring.addRow([
-      'Task Title *',
-      'Frequency *',
-      'Assignee Email',
-      'Approver Email',
-      'Priority',
-      'Project Name',
-      'Client Name',
-      'Start Date',
-      'Description',
-    ])
-    setHeader(recurring.getRow(1))
-    addBlankRows(recurring, 9, 60)
-    recurring.columns = [
-      { width: 28 },
-      { width: 18 },
-      { width: 28 },
-      { width: 28 },
-      { width: 16 },
-      { width: 24 },
-      { width: 22 },
-      { width: 16 },
-      { width: 28 },
-    ]
-    recurring.views = [{ state: 'frozen', ySplit: 1 }]
-
-    // CA COMPLIANCE TASKS
-    compliance.addRow([
-      'Compliance Task Type *',
-      'Client Name',
-      'Assignee Email',
-      'Approver Email',
-      'Due Date',
-      'Priority',
-      'Frequency',
-    ])
-    setHeader(compliance.getRow(1))
-    addBlankRows(compliance, 7, 60)
-    compliance.columns = [
-      { width: 28 },
-      { width: 22 },
-      { width: 28 },
-      { width: 28 },
-      { width: 16 },
-      { width: 16 },
-      { width: 18 },
-    ]
-    compliance.views = [{ state: 'frozen', ySplit: 1 }]
-
-    // Hidden helper list formulas
-    lists.getCell('A1').value = 'TeamEmails'
-    lists.getCell('B1').value = 'ApproverEmails'
-    lists.getCell('C1').value = 'ClientNames'
-    lists.getCell('D1').value = 'ProjectNames'
-    lists.getCell('E1').value = 'ComplianceTypes'
-
-    lists.getCell('A2').value = {
-      formula: `FILTER('Team Members'!B2:B500,'Team Members'!B2:B500<>"","")`,
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
     }
 
-    lists.getCell('B2').value = {
-      formula: `FILTER('Team Members'!B2:B500,ISNUMBER(MATCH(LOWER('Team Members'!C2:C500),{"owner","admin","manager"},0)),"")`,
+    const { data: mb } = await supabase
+      .from('org_members')
+      .select('org_id, role')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .single()
+
+    if (!mb || !['owner', 'admin', 'manager'].includes(mb.role)) {
+      return NextResponse.json(
+        { error: 'Only managers and above can import' },
+        { status: 403 }
+      )
     }
 
-    lists.getCell('C2').value = {
-      formula: `FILTER('Clients'!A2:A500,'Clients'!A2:A500<>"","")`,
+    let formData: FormData
+    try {
+      formData = await request.formData()
+    } catch {
+      return NextResponse.json({ error: 'Could not read form data' }, { status: 400 })
     }
 
-    lists.getCell('D2').value = {
-      formula: `FILTER('Projects'!A2:A500,'Projects'!A2:A500<>"","")`,
+    const file = formData.get('file') as File | null
+    if (!file) return NextResponse.json({ error: 'No file uploaded' }, { status: 400 })
+    if (!file.name.toLowerCase().endsWith('.xlsx')) {
+      return NextResponse.json({ error: 'Please upload an .xlsx file' }, { status: 400 })
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      return NextResponse.json({ error: 'File too large (max 5 MB)' }, { status: 400 })
     }
 
-    lists.getCell('E2').value = {
-      formula: `{"GST Filing";"TDS Return";"ROC Filing";"Audit Review"}`,
+    let sheets: SheetMap
+    try {
+      sheets = await parseXlsx(await file.arrayBuffer())
+    } catch (e: any) {
+      return NextResponse.json(
+        { error: 'Could not parse file: ' + (e?.message ?? 'unknown') },
+        { status: 400 }
+      )
     }
 
-    // Project owner dropdown from team
-    addListValidation(
-      projects,
-      'E2:E500',
-      '=Lists!$A$2#',
-      'Owner Email',
-      'Choose from Team Members'
-    )
+    const admin = createAdminClient()
+    const orgId = mb.org_id
 
-    addListValidation(
-      projects,
-      'F2:F500',
-      '=Lists!$C$2#',
-      'Client Name',
-      'Choose from Clients'
-    )
+    const results: ImportResults = {
+      members: initBucket(),
+      clients: initBucket(),
+      projects: initBucket(),
+      tasks: initBucket(),
+      onetasks: initBucket(),
+      recurring: initBucket(),
+      compliance: initBucket(),
+    }
 
-    // TASKS dropdowns
-    addListValidation(tasks, 'B2:B500', '=Lists!$D$2#', 'Project', 'Choose from Projects')
-    addListValidation(tasks, 'C2:C500', '=Lists!$A$2#', 'Assignee', 'Choose from Team Members')
-    addListValidation(tasks, 'D2:D500', '=Lists!$B$2#', 'Approver', 'Choose owner/admin/manager')
-    addListValidation(tasks, 'E2:E500', '"none,low,medium,high,urgent"', 'Priority', 'Choose priority')
-    addListValidation(tasks, 'G2:G500', '"todo,in_progress,completed,blocked"', 'Status', 'Choose status')
-    addListValidation(tasks, 'H2:H500', '=Lists!$C$2#', 'Client', 'Choose from Clients')
-    addDateFormatting(tasks, 'F', 2, 500)
+    const emailCache: Record<string, string | null> = {}
+    const roleCache: Record<string, string | null> = {}
+    let authUsersCache: { id: string; email?: string }[] | null = null
 
-    // ONE-TIME TASKS dropdowns
-    addListValidation(oneTime, 'B2:B500', '=Lists!$A$2#', 'Assignee', 'Choose from Team Members')
-    addListValidation(oneTime, 'C2:C500', '=Lists!$B$2#', 'Approver', 'Choose owner/admin/manager')
-    addListValidation(oneTime, 'D2:D500', '"none,low,medium,high,urgent"', 'Priority', 'Choose priority')
-    addListValidation(oneTime, 'F2:F500', '=Lists!$C$2#', 'Client', 'Choose from Clients')
-    addDateFormatting(oneTime, 'E', 2, 500)
+    const clientNameToId: Record<string, string> = {}
+    const projectNameToId: Record<string, string> = {}
 
-    // RECURRING TASKS dropdowns
-    addListValidation(recurring, 'B2:B500', '"daily,weekly,bi_weekly,monthly,quarterly,annual"', 'Frequency', 'Choose frequency')
-    addListValidation(recurring, 'C2:C500', '=Lists!$A$2#', 'Assignee', 'Choose from Team Members')
-    addListValidation(recurring, 'D2:D500', '=Lists!$B$2#', 'Approver', 'Choose owner/admin/manager')
-    addListValidation(recurring, 'E2:E500', '"none,low,medium,high,urgent"', 'Priority', 'Choose priority')
-    addListValidation(recurring, 'F2:F500', '=Lists!$D$2#', 'Project', 'Choose from Projects')
-    addListValidation(recurring, 'G2:G500', '=Lists!$C$2#', 'Client', 'Choose from Clients')
-    addDateFormatting(recurring, 'H', 2, 500)
+    async function loadAuthUsers() {
+      if (authUsersCache) return authUsersCache
+      try {
+        const { data } = await admin.auth.admin.listUsers({ perPage: 1000 })
+        authUsersCache = (data?.users ?? []).map(u => ({ id: u.id, email: u.email ?? undefined }))
+        return authUsersCache
+      } catch {
+        authUsersCache = []
+        return authUsersCache
+      }
+    }
 
-    // COMPLIANCE dropdowns
-    addListValidation(compliance, 'A2:A500', '=Lists!$E$2#', 'Compliance Type', 'Choose compliance type')
-    addListValidation(compliance, 'B2:B500', '=Lists!$C$2#', 'Client', 'Choose from Clients')
-    addListValidation(compliance, 'C2:C500', '=Lists!$A$2#', 'Assignee', 'Choose from Team Members')
-    addListValidation(compliance, 'D2:D500', '=Lists!$B$2#', 'Approver', 'Choose owner/admin/manager')
-    addListValidation(compliance, 'F2:F500', '"none,low,medium,high,urgent"', 'Priority', 'Choose priority')
-    addListValidation(compliance, 'G2:G500', '"daily,weekly,bi_weekly,monthly,quarterly,annual"', 'Frequency', 'Choose frequency')
-    addDateFormatting(compliance, 'E', 2, 500)
+    async function resolveEmail(email: string): Promise<string | null> {
+      const e = email.toLowerCase().trim()
+      if (!e || !e.includes('@')) return null
+      if (e in emailCache) return emailCache[e]
 
-    const buf = await wb.xlsx.writeBuffer()
+      const { data: appUser } = await admin
+        .from('users')
+        .select('id')
+        .eq('email', e)
+        .maybeSingle()
 
-    return new NextResponse(Buffer.from(buf), {
-      headers: {
-        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Disposition': 'attachment; filename="planora_import_template.xlsx"',
-        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-        Pragma: 'no-cache',
-        Expires: '0',
-      },
+      if (appUser?.id) {
+        emailCache[e] = appUser.id
+        return appUser.id
+      }
+
+      const { data: memberUser } = await admin
+        .from('org_members')
+        .select('user_id, users!inner(email)')
+        .eq('org_id', orgId)
+        .eq('users.email', e)
+        .maybeSingle()
+
+      if (memberUser?.user_id) {
+        emailCache[e] = memberUser.user_id
+        return memberUser.user_id
+      }
+
+      const authUsers = await loadAuthUsers()
+      const authUser = authUsers.find(u => u.email?.toLowerCase() === e)
+      if (authUser?.id) {
+        emailCache[e] = authUser.id
+        return authUser.id
+      }
+
+      emailCache[e] = null
+      return null
+    }
+
+    async function resolveAuthUser(email: string): Promise<string | null> {
+      const users = await loadAuthUsers()
+      const u = users.find(x => x.email?.toLowerCase() === email.toLowerCase())
+      return u?.id ?? null
+    }
+
+    async function getOrgRoleByUserId(userId: string): Promise<string | null> {
+      if (userId in roleCache) return roleCache[userId]
+      const { data } = await admin
+        .from('org_members')
+        .select('role')
+        .eq('org_id', orgId)
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .maybeSingle()
+
+      roleCache[userId] = data?.role ?? null
+      return roleCache[userId]
+    }
+
+    async function resolveApprover(email: string): Promise<string | null> {
+      if (!email) return null
+      const uid = await resolveEmail(email)
+      if (!uid) return null
+      const role = await getOrgRoleByUserId(uid)
+      if (!role) return null
+      if (!['owner', 'admin', 'manager'].includes(role)) return null
+      return uid
+    }
+
+    async function resolveAssignees(raw: string): Promise<{ primary: string | null; extra: string[] }> {
+      const emails = parseEmailList(raw)
+      if (emails.length === 0) return { primary: null, extra: [] }
+
+      const ids = await Promise.all(emails.map(e => resolveEmail(e)))
+      const valid = ids.filter(Boolean) as string[]
+      return {
+        primary: valid[0] ?? null,
+        extra: valid.slice(1),
+      }
+    }
+
+    async function resolveClient(rawName: string): Promise<string | null> {
+      const n = rawName.toLowerCase().trim()
+      if (!n) return null
+      if (clientNameToId[n]) return clientNameToId[n]
+
+      const { data } = await admin
+        .from('clients')
+        .select('id')
+        .eq('org_id', orgId)
+        .ilike('name', rawName.trim())
+        .maybeSingle()
+
+      if (data?.id) clientNameToId[n] = data.id
+      return data?.id ?? null
+    }
+
+    async function resolveProject(rawName: string): Promise<string | null> {
+      const n = rawName.toLowerCase().trim()
+      if (!n) return null
+      if (projectNameToId[n]) return projectNameToId[n]
+
+      const { data } = await admin
+        .from('projects')
+        .select('id')
+        .eq('org_id', orgId)
+        .ilike('name', rawName.trim())
+        .maybeSingle()
+
+      if (data?.id) projectNameToId[n] = data.id
+      return data?.id ?? null
+    }
+
+    // 1) MEMBERS
+    const memberSheet = findSheetName(sheets, [
+      k => norm(k).includes('member'),
+      k => norm(k).startsWith('team'),
+    ])
+
+    if (memberSheet) {
+      const rows = sheets[memberSheet]
+      const hdrIdx = rows.findIndex(r => r.some(c => norm(c) === 'email'))
+
+      if (hdrIdx !== -1) {
+        const headers = rows[hdrIdx]
+        const iName  = findCol(headers, 'fullname', 'name')
+        const iEmail = findCol(headers, 'email')
+        const iRole  = findCol(headers, 'role')
+
+        for (const row of dataRows(rows, hdrIdx)) {
+          const email = cell(row, iEmail).toLowerCase().trim()
+          if (shouldSkipImportedRow(row, email)) continue
+
+          const name = cell(row, iName)
+          const role = (cell(row, iRole).toLowerCase().trim() || 'member')
+
+          if (!['owner', 'admin', 'manager', 'member', 'viewer'].includes(role)) {
+            results.members.errors.push(`${email}: invalid role "${role}"`)
+            results.members.skipped++
+            continue
+          }
+
+          let uid = await resolveEmail(email)
+          if (!uid) uid = await resolveAuthUser(email)
+
+          if (uid) {
+            await admin.from('users').upsert(
+              { id: uid, email, name: name || email.split('@')[0] },
+              { onConflict: 'id', ignoreDuplicates: true }
+            )
+
+            const { data: existingMember } = await admin.from('org_members')
+              .select('id, is_active')
+              .eq('org_id', orgId)
+              .eq('user_id', uid)
+              .maybeSingle()
+
+            if (existingMember?.is_active) {
+              results.members.skipped++
+              continue
+            }
+
+            if (existingMember) {
+              await admin.from('org_members')
+                .update({ is_active: true, role })
+                .eq('id', existingMember.id)
+            } else {
+              await admin.from('org_members').insert({
+                org_id: orgId,
+                user_id: uid,
+                role,
+                is_active: true,
+              })
+            }
+
+            if (name) await admin.from('users').update({ name }).eq('id', uid)
+            results.members.created++
+          } else {
+            const { error: invErr } = await admin.auth.admin.inviteUserByEmail(email, {
+              data: { invited_to_org: orgId, invited_role: role, full_name: name || null },
+              redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
+            })
+
+            if (invErr) {
+              if (
+                invErr.message?.toLowerCase().includes('already') ||
+                invErr.message?.toLowerCase().includes('registered')
+              ) {
+                const authId = await resolveAuthUser(email)
+                if (authId) {
+                  await admin.from('users').upsert(
+                    { id: authId, email, name: name || email.split('@')[0] },
+                    { onConflict: 'id', ignoreDuplicates: true }
+                  )
+
+                  await admin.from('org_members').upsert(
+                    { org_id: orgId, user_id: authId, role, is_active: true },
+                    { onConflict: 'org_id,user_id', ignoreDuplicates: false }
+                  )
+
+                  results.members.created++
+                } else {
+                  results.members.errors.push(`${email}: user exists in auth but could not be resolved`)
+                  results.members.skipped++
+                }
+              } else {
+                results.members.errors.push(`${email}: ${invErr.message}`)
+                results.members.skipped++
+              }
+            } else {
+              results.members.created++
+            }
+          }
+        }
+      }
+    }
+
+    // 2) CLIENTS
+    const clientSheet = findSheetName(sheets, [
+      k => norm(k).includes('client'),
+    ])
+
+    if (clientSheet) {
+      const rows = sheets[clientSheet]
+      const hdrIdx = rows.findIndex(r =>
+        r.some(c => norm(c) === 'name' || norm(c).includes('clientname'))
+      )
+
+      if (hdrIdx !== -1) {
+        const headers = rows[hdrIdx]
+        const iName     = findCol(headers, 'clientname', 'name')
+        const iEmail    = findCol(headers, 'email', 'contactemail')
+        const iPhone    = findCol(headers, 'phone number', 'phone', 'mobile')
+        const iCompany  = findCol(headers, 'company')
+        const iWebsite  = findCol(headers, 'website')
+        const iIndustry = findCol(headers, 'industry')
+        const iColor    = findCol(headers, 'color', 'colour')
+        const iStatus   = findCol(headers, 'status')
+        const iNotes    = findCol(headers, 'notes')
+
+        for (const row of dataRows(rows, hdrIdx)) {
+          const name = cell(row, iName)
+          if (shouldSkipImportedRow(row, name)) continue
+
+          const status = cell(row, iStatus) || 'active'
+          const rawColor = cell(row, iColor) || '#0d9488'
+          const color = rawColor.startsWith('#') ? rawColor : `#${rawColor}`
+
+          const { data: existing } = await admin
+            .from('clients')
+            .select('id')
+            .eq('org_id', orgId)
+            .ilike('name', name)
+            .maybeSingle()
+
+          if (existing?.id) {
+            clientNameToId[name.toLowerCase()] = existing.id
+            results.clients.skipped++
+            continue
+          }
+
+          const { data: created, error } = await admin.from('clients').insert({
+            org_id: orgId,
+            name: name.trim(),
+            email: cell(row, iEmail) || null,
+            phone_number: cell(row, iPhone) || null,
+            company: cell(row, iCompany) || null,
+            website: cell(row, iWebsite) || null,
+            industry: cell(row, iIndustry) || null,
+            color,
+            status: ['active', 'inactive', 'lead'].includes(status) ? status : 'active',
+            notes: cell(row, iNotes) || null,
+            created_by: user.id,
+          }).select('id').single()
+
+          if (error) {
+            results.clients.errors.push(`"${name}": ${error.message}`)
+            results.clients.skipped++
+          } else {
+            clientNameToId[name.toLowerCase()] = created.id
+            results.clients.created++
+          }
+        }
+      }
+    }
+
+    // 3) PROJECTS
+    const projectSheet = findSheetName(sheets, [
+      k => norm(k).includes('project'),
+    ])
+
+    if (projectSheet) {
+      const rows = sheets[projectSheet]
+      const hdrIdx = rows.findIndex(r =>
+        r.some(c => norm(c).includes('projectname') || norm(c) === 'name')
+      )
+
+      if (hdrIdx !== -1) {
+        const headers = rows[hdrIdx]
+        const iName   = findCol(headers, 'projectname', 'name')
+        const iColor  = findCol(headers, 'color', 'colour')
+        const iStatus = findCol(headers, 'status')
+        const iDue    = findCol(headers, 'duedate', 'due')
+        const iOwner  = findCol(headers, 'owneremail', 'owner')
+        const iClient = findCol(headers, 'clientname', 'client')
+        const iBudget = findCol(headers, 'budget')
+        const iHours  = findCol(headers, 'hoursbudget', 'hours')
+        const iDesc   = findCol(headers, 'description', 'desc')
+
+        for (const row of dataRows(rows, hdrIdx)) {
+          const name = cell(row, iName)
+          if (shouldSkipImportedRow(row, name)) continue
+
+          const status = cell(row, iStatus) || 'active'
+          if (!['active', 'on_hold', 'completed'].includes(status)) {
+            results.projects.errors.push(`"${name}": invalid status "${status}"`)
+            results.projects.skipped++
+            continue
+          }
+
+          const rawColor = cell(row, iColor) || '#0d9488'
+          const color = rawColor.startsWith('#') ? rawColor : `#${rawColor}`
+          const ownerId = cell(row, iOwner)
+            ? (await resolveEmail(cell(row, iOwner))) ?? user.id
+            : user.id
+          const clientId = await resolveClient(cell(row, iClient))
+
+          const { data: proj, error } = await admin.from('projects').insert({
+            org_id: orgId,
+            name: name.trim(),
+            color,
+            status,
+            due_date: cellDate(row, iDue),
+            owner_id: ownerId,
+            client_id: clientId,
+            budget: parseNumber(cell(row, iBudget)),
+            hours_budget: parseNumber(cell(row, iHours)),
+            description: cell(row, iDesc) || null,
+          }).select('id').single()
+
+          if (error) {
+            results.projects.errors.push(`"${name}": ${error.message}`)
+            results.projects.skipped++
+          } else {
+            projectNameToId[name.toLowerCase()] = proj.id
+            results.projects.created++
+          }
+        }
+      }
+    }
+
+    // 4) TASKS
+    const taskSheet = findSheetName(sheets, [
+      k => norm(k).includes('task') && !norm(k).includes('recurring') && !norm(k).includes('one') && !norm(k).includes('onetim'),
+    ])
+
+    if (taskSheet) {
+      const rows = sheets[taskSheet]
+      const hdrIdx = rows.findIndex(r =>
+        r.some(c => norm(c).includes('tasktitle') || norm(c) === 'title')
+      )
+
+      if (hdrIdx !== -1) {
+        const headers = rows[hdrIdx]
+        const iTitle    = findCol(headers, 'tasktitle', 'title')
+        const iProject  = findCol(headers, 'projectname', 'project')
+        const iAssignee = findCol(headers, 'assigneeemail', 'assignee')
+        const iApprover = findCol(headers, 'approveremail', 'approver')
+        const iPriority = findCol(headers, 'priority')
+        const iDue      = findCol(headers, 'duedate', 'due')
+        const iStatus   = findCol(headers, 'status')
+        const iHours    = findCol(headers, 'esthours', 'estimatedhours', 'hours')
+        const iDesc     = findCol(headers, 'description', 'desc')
+        const iClient   = findCol(headers, 'clientname', 'client')
+
+        for (const row of dataRows(rows, hdrIdx)) {
+          const title = cell(row, iTitle)
+          if (shouldSkipImportedRow(row, title)) continue
+
+          const priority = cell(row, iPriority) || 'medium'
+          if (!['none', 'low', 'medium', 'high', 'urgent'].includes(priority)) {
+            results.tasks.errors.push(`"${title}": invalid priority "${priority}"`)
+            results.tasks.skipped++
+            continue
+          }
+
+          const status = cell(row, iStatus) || 'todo'
+          const validStatus = ['todo', 'in_progress', 'completed', 'blocked'].includes(status)
+            ? status
+            : 'todo'
+
+          const assigneeData = await resolveAssignees(cell(row, iAssignee))
+          const approverId = cell(row, iApprover) ? await resolveApprover(cell(row, iApprover)) : null
+          const dueDate = cellDate(row, iDue)
+          const projectId = await resolveProject(cell(row, iProject))
+          const clientId = await resolveClient(cell(row, iClient))
+
+          if (cell(row, iApprover) && !approverId) {
+            results.tasks.errors.push(
+              `"${title}": approver must be an active owner/admin/manager in this organisation`
+            )
+          }
+
+          const customFields =
+            assigneeData.extra.length > 0
+              ? { _co_assignees: assigneeData.extra }
+              : null
+
+          const { error } = await admin.from('tasks').insert({
+            org_id: orgId,
+            title: title.trim(),
+            description: cell(row, iDesc) || null,
+            status: validStatus,
+            priority,
+            project_id: projectId,
+            client_id: clientId,
+            assignee_id: assigneeData.primary,
+            approver_id: approverId,
+            approval_required: !!approverId,
+            due_date: dueDate,
+            estimated_hours: parseNumber(cell(row, iHours)),
+            created_by: user.id,
+            is_recurring: false,
+            custom_fields: customFields,
+          })
+
+          if (error) {
+            results.tasks.errors.push(`"${title}": ${error.message}`)
+            results.tasks.skipped++
+          } else {
+            results.tasks.created++
+          }
+        }
+      }
+    }
+
+    // 5) ONE-TIME TASKS
+    const oneTimeSheet = findSheetName(sheets, [
+      k => norm(k).includes('onetime') || norm(k).includes('onetim') || norm(k).includes('inbox') || norm(k).includes('one'),
+    ])
+
+    if (oneTimeSheet) {
+      const rows = sheets[oneTimeSheet]
+      const hdrIdx = rows.findIndex(r =>
+        r.some(c => norm(c).includes('tasktitle') || norm(c) === 'title')
+      )
+
+      if (hdrIdx !== -1) {
+        const headers = rows[hdrIdx]
+        const iTitle      = findCol(headers, 'tasktitle', 'title')
+        const iAssignee   = findCol(headers, 'assigneeemail', 'assignee')
+        const iApprover   = findCol(headers, 'approveremail', 'approver')
+        const iPriority   = findCol(headers, 'priority')
+        const iDue        = findCol(headers, 'duedate', 'due')
+        const iClient     = findCol(headers, 'clientname', 'client')
+        const iHours      = findCol(headers, 'esthours', 'estimatedhours', 'hours')
+        const iDesc       = findCol(headers, 'description', 'desc')
+        const iCompliance = findCol(headers, 'compliancetasktype', 'compliance', 'compliancetask')
+
+        for (const row of dataRows(rows, hdrIdx)) {
+          const title = cell(row, iTitle)
+          if (shouldSkipImportedRow(row, title)) continue
+
+          const priority = cell(row, iPriority) || 'medium'
+          if (!['none', 'low', 'medium', 'high', 'urgent'].includes(priority)) {
+            results.onetasks.errors.push(`"${title}": invalid priority "${priority}"`)
+            results.onetasks.skipped++
+            continue
+          }
+
+          const assigneeData = await resolveAssignees(cell(row, iAssignee))
+          const approverId = cell(row, iApprover) ? await resolveApprover(cell(row, iApprover)) : null
+          const dueDate = cellDate(row, iDue)
+          const clientId = await resolveClient(cell(row, iClient))
+
+          const complianceType = cell(row, iCompliance)
+          const compTask = complianceType ? findComplianceTask(complianceType) : null
+          const finalTitle = compTask ? compTask.title : title.trim()
+          const finalPriority = compTask ? compTask.priority : priority
+
+          if (cell(row, iApprover) && !approverId) {
+            results.onetasks.errors.push(
+              `"${finalTitle}": approver must be an active owner/admin/manager in this organisation`
+            )
+          }
+
+          const customFields =
+            assigneeData.extra.length > 0
+              ? { _co_assignees: assigneeData.extra }
+              : null
+
+          const { data: newTask, error } = await admin.from('tasks').insert({
+            org_id: orgId,
+            title: finalTitle,
+            description: cell(row, iDesc) || null,
+            status: 'todo',
+            priority: finalPriority,
+            project_id: null,
+            client_id: clientId,
+            assignee_id: assigneeData.primary,
+            approver_id: approverId,
+            approval_required: !!approverId,
+            due_date: dueDate,
+            estimated_hours: parseNumber(cell(row, iHours)),
+            created_by: user.id,
+            is_recurring: false,
+            custom_fields: customFields,
+          }).select('id').single()
+
+          if (error) {
+            results.onetasks.errors.push(`"${finalTitle}": ${error.message}`)
+            results.onetasks.skipped++
+          } else {
+            results.onetasks.created++
+
+            if (compTask && newTask?.id && compTask.subtasks.length > 0) {
+              const subtaskInserts = compTask.subtasks.map(s => ({
+                org_id: orgId,
+                title: s.title,
+                status: 'todo' as const,
+                priority: compTask.priority,
+                assignee_id: assigneeData.primary || null,
+                approver_id: approverId || null,
+                approval_required: !!approverId,
+                client_id: clientId || null,
+                due_date: dueDate,
+                parent_task_id: newTask.id,
+                created_by: user.id,
+                is_recurring: false,
+                custom_fields: s.required
+                  ? { ...(customFields ?? {}), _compliance_subtask: true }
+                  : customFields,
+              }))
+              await admin.from('tasks').insert(subtaskInserts)
+            }
+          }
+        }
+      }
+    }
+
+    // 6) RECURRING TASKS
+    const recurringSheet = findSheetName(sheets, [
+      k => norm(k).includes('recurring'),
+    ])
+
+    if (recurringSheet) {
+      const rows = sheets[recurringSheet]
+      const hdrIdx = rows.findIndex(r =>
+        r.some(c => norm(c) === 'title' || norm(c).includes('tasktitle'))
+      )
+
+      if (hdrIdx !== -1) {
+        const headers = rows[hdrIdx]
+        const iTitle    = findCol(headers, 'tasktitle', 'title')
+        const iFreq     = findCol(headers, 'frequency', 'freq')
+        const iAssignee = findCol(headers, 'assigneeemail', 'assignee')
+        const iApprover = findCol(headers, 'approveremail', 'approver')
+        const iPriority = findCol(headers, 'priority')
+        const iProject  = findCol(headers, 'projectname', 'project')
+        const iClient   = findCol(headers, 'clientname', 'client')
+        const iStart    = findCol(headers, 'startdate', 'start')
+        const iDesc     = findCol(headers, 'description', 'desc')
+
+        const VALID_FREQS = ['daily', 'weekly', 'bi_weekly', 'monthly', 'quarterly', 'annual']
+
+        for (const row of dataRows(rows, hdrIdx)) {
+          const title = cell(row, iTitle)
+          if (shouldSkipImportedRow(row, title)) continue
+
+          const freq = norm(cell(row, iFreq))
+          if (!VALID_FREQS.includes(freq)) {
+            results.recurring.errors.push(`"${title}": invalid frequency "${freq}"`)
+            results.recurring.skipped++
+            continue
+          }
+
+          const priority = cell(row, iPriority) || 'medium'
+          if (!['none', 'low', 'medium', 'high', 'urgent'].includes(priority)) {
+            results.recurring.errors.push(`"${title}": invalid priority "${priority}"`)
+            results.recurring.skipped++
+            continue
+          }
+
+          const assigneeData = await resolveAssignees(cell(row, iAssignee))
+          const approverId = cell(row, iApprover) ? await resolveApprover(cell(row, iApprover)) : null
+          const startDate = cellDate(row, iStart) || new Date().toISOString().split('T')[0]
+          const projectId = await resolveProject(cell(row, iProject))
+          const clientId = await resolveClient(cell(row, iClient))
+
+          if (cell(row, iApprover) && !approverId) {
+            results.recurring.errors.push(
+              `"${title}": approver must be an active owner/admin/manager in this organisation`
+            )
+          }
+
+          const customFields =
+            assigneeData.extra.length > 0
+              ? { _co_assignees: assigneeData.extra }
+              : null
+
+          const { error } = await admin.from('tasks').insert({
+            org_id: orgId,
+            title: title.trim(),
+            description: cell(row, iDesc) || null,
+            priority,
+            status: 'todo',
+            is_recurring: true,
+            frequency: freq,
+            next_occurrence_date: nextOccurrence(freq, startDate),
+            assignee_id: assigneeData.primary,
+            approver_id: approverId,
+            approval_required: !!approverId,
+            project_id: projectId,
+            client_id: clientId,
+            created_by: user.id,
+            custom_fields: customFields,
+          })
+
+          if (error) {
+            results.recurring.errors.push(`"${title}": ${error.message}`)
+            results.recurring.skipped++
+          } else {
+            results.recurring.created++
+          }
+        }
+      }
+    }
+
+    // 7) COMPLIANCE TASKS
+    const caSheet = findSheetName(sheets, [
+      k => norm(k).includes('cacompliance') || (norm(k).includes('compliance') && !norm(k).includes('non')),
+    ])
+
+    if (caSheet) {
+      const rows = sheets[caSheet]
+      const hdrIdx = rows.findIndex(r =>
+        r.some(cc => norm(cc).includes('compliance') || norm(cc).includes('tasktype'))
+      )
+
+      if (hdrIdx !== -1) {
+        const headers = rows[hdrIdx]
+        const iType     = findCol(headers, 'compliancetasktype', 'tasktype', 'compliance')
+        const iClient   = findCol(headers, 'clientname', 'client')
+        const iAssignee = findCol(headers, 'assigneeemail', 'assignee')
+        const iApprover = findCol(headers, 'approveremail', 'approver')
+        const iDue      = findCol(headers, 'duedate', 'due')
+        const iPriority = findCol(headers, 'priority')
+        const iFreq     = findCol(headers, 'frequency', 'freq')
+
+        for (const row of dataRows(rows, hdrIdx)) {
+          const typeName = cell(row, iType)
+          if (shouldSkipImportedRow(row, typeName)) continue
+
+          const compTask = findComplianceTask(typeName)
+          if (!compTask) {
+            results.compliance.errors.push(`"${typeName}": not recognised`)
+            results.compliance.skipped++
+            continue
+          }
+
+          const clientId = await resolveClient(cell(row, iClient))
+          const assigneeData = await resolveAssignees(cell(row, iAssignee))
+          const approverId = cell(row, iApprover) ? await resolveApprover(cell(row, iApprover)) : null
+          const dueDate = cellDate(row, iDue)
+          const priority = cell(row, iPriority) || compTask.priority
+
+          const freqRaw = cell(row, iFreq)
+          const freqMap: Record<string, string> = {
+            daily: 'daily',
+            weekly: 'weekly',
+            monthly: 'monthly',
+            quarterly: 'quarterly',
+            annual: 'annual',
+            yearly: 'annual',
+            biweekly: 'bi_weekly',
+            fortnightly: 'bi_weekly',
+          }
+          const frequency = freqRaw ? (freqMap[norm(freqRaw)] ?? 'monthly') : null
+
+          if (cell(row, iApprover) && !approverId) {
+            results.compliance.errors.push(
+              `"${compTask.title}": approver must be an active owner/admin/manager in this organisation`
+            )
+          }
+
+          const customFields =
+            assigneeData.extra.length > 0
+              ? { _co_assignees: assigneeData.extra }
+              : null
+
+          const { data: newTask, error } = await admin.from('tasks').insert({
+            org_id: orgId,
+            title: compTask.title,
+            status: 'todo',
+            priority,
+            client_id: clientId,
+            assignee_id: assigneeData.primary,
+            approver_id: approverId,
+            approval_required: !!approverId,
+            due_date: dueDate,
+            is_recurring: !!frequency,
+            frequency: frequency ?? undefined,
+            next_occurrence_date: frequency && dueDate ? dueDate : null,
+            created_by: user.id,
+            custom_fields: customFields,
+          }).select('id').single()
+
+          if (error) {
+            results.compliance.errors.push(`"${compTask.title}": ${error.message}`)
+            results.compliance.skipped++
+          } else {
+            results.compliance.created++
+
+            if (newTask?.id && compTask.subtasks.length > 0) {
+              await admin.from('tasks').insert(
+                compTask.subtasks.map(s => ({
+                  org_id: orgId,
+                  title: s.title,
+                  status: 'todo' as const,
+                  priority,
+                  assignee_id: assigneeData.primary || null,
+                  approver_id: approverId || null,
+                  approval_required: !!approverId,
+                  client_id: clientId || null,
+                  due_date: dueDate,
+                  parent_task_id: newTask.id,
+                  created_by: user.id,
+                  is_recurring: false,
+                  custom_fields: s.required
+                    ? { ...(customFields ?? {}), _compliance_subtask: true }
+                    : customFields,
+                }))
+              )
+            }
+          }
+        }
+      }
+    }
+
+    const totalCreated = Object.values(results).reduce((sum, bucket) => sum + bucket.created, 0)
+
+    return NextResponse.json({
+      success: true,
+      results,
+      totalCreated,
     })
   } catch (e: any) {
+    console.error('[bulk-import] fatal error:', e)
     return NextResponse.json(
-      { error: 'Could not generate template: ' + (e?.message ?? 'unknown') },
+      {
+        error: e?.message || 'Import failed unexpectedly',
+        detail: String(e),
+      },
       { status: 500 }
     )
   }
