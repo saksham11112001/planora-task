@@ -2,9 +2,11 @@
   "name": "planora-v2",
   "version": "0.2.0",
   "private": true,
+  
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "buildCommand": "pip install openpyxl --break-system-packages && npm run build",
     "start": "next start",
     "lint": "next lint"
   },

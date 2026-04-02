@@ -1,9 +1,8 @@
 'use client'
 import React from 'react'
-import { useState, useTransition, useCallback, useEffect } from 'react'
+import { useState, useTransition } from 'react'
 import { useRouter }    from 'next/navigation'
-import { RefreshCw, CheckCheck, Clock, FolderOpen, Filter, X, Trash2 } from 'lucide-react'
-import { cn }           from '@/lib/utils/cn'
+import { RefreshCw, CheckCheck, Clock, FolderOpen, Trash2 } from 'lucide-react'
 import { PriorityBadge, Avatar } from '@/components/ui/Badge'
 import { TaskDetailPanel }       from '@/components/tasks/TaskDetailPanel'
 import { InlineOneTimeTask }     from '@/components/tasks/InlineOneTimeTask'
@@ -50,21 +49,19 @@ export function MyTasksView({
   currentUserId,
   userRole,
   canCreate = false,
-}: Props)  {
+}: Props) {
   const router     = useRouter()
   const [,startT]  = useTransition()
   const today      = todayStr()
   const canManage  = ['owner','admin','manager'].includes(userRole ?? '')
 
   const [tasks,      setTasks]      = useState<Task[]>(initialTasks)
-  const [tab,        setTab]        = useState<'List'|'Board'>('List')
+  const [tab,        setTab]        = useState<'List'|'Board'>('Board')
   const [selTask,    setSelTask]    = useState<Task | null>(null)
   const [dragTaskId, setDragTaskId] = useState<string | null>(null)
-  const [dragOver,   setDragOver]   = useState<string | null>(null)
   const [checked,    setChecked]    = useState<Set<string>>(new Set())
   const [completing, setCompleting] = useState<Set<string>>(new Set())
   const [completingTask,  setCompletingTask]  = useState<Task | null>(null)
-  
   const [dragOverCol,    setDragOverCol]    = useState<string | null>(null)
   const [subtaskMap,     setSubtaskMap]     = useState<Record<string, any[]>>({})
   const [expandedTasks,  setExpandedTasks]  = useState<Set<string>>(new Set())
@@ -705,28 +702,6 @@ export function MyTasksView({
     </>
   )
 
-  // Drag & drop: update task status when dropped to new column
-  async function handleDrop(newStatus: string) {
-    if (!dragTaskId || !newStatus) return
-    const task = tasks.find(t => t.id === dragTaskId)
-    if (!task || task.status === newStatus) return
-    setDragTaskId(null)
-    setDragOver(null)
-    // Optimistic update
-    setTasks(prev => prev.map(t => t.id === dragTaskId ? { ...t, status: newStatus as any } : t))
-    const res = await fetch(`/api/tasks/${dragTaskId}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: newStatus }),
-    })
-    if (!res.ok) {
-      // Revert on failure
-      setTasks(prev => prev.map(t => t.id === dragTaskId ? { ...t, status: task.status } : t))
-      toast.error('Could not move task')
-    } else {
-      refresh()
-    }
-  }
-
   // BOARD VIEW
   return (
     <>
@@ -824,6 +799,16 @@ export function MyTasksView({
                           color: isDone?'var(--text-muted)':isPending?'#7c3aed':'var(--text-primary)',
                           textDecoration: isDone?'line-through':'none' }}>{task.title}</span>
                       </div>
+                      {/* Client name */}
+                      {(task as any).client && (
+                        <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:6 }}>
+                          <span style={{ width:7, height:7, borderRadius:2, flexShrink:0, display:'inline-block',
+                            background:(task as any).client.color ?? '#0d9488' }}/>
+                          <span style={{ fontSize:10, color:'var(--text-muted)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:180 }}>
+                            {(task as any).client.name}
+                          </span>
+                        </div>
+                      )}
                       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
                         <span style={{ display:'inline-flex', alignItems:'center', gap:4,
                           padding:'3px 8px', borderRadius:5, fontSize:11, fontWeight:600,

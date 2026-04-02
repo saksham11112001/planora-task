@@ -40,7 +40,8 @@ export async function POST(request: NextRequest) {
   const body = await request.json()
   const { title, description, status = 'todo', priority = 'medium', assignee_id, approver_id,
           client_id, project_id, due_date, estimated_hours, approval_required = false,
-          parent_task_id } = body
+          parent_task_id, is_recurring = false, frequency, next_occurrence_date,
+          custom_fields } = body
   if (!title?.trim()) return NextResponse.json({ error: 'Title required' }, { status: 400 })
 
   const { data: task, error } = await supabase.from('tasks').insert({
@@ -88,11 +89,12 @@ export async function POST(request: NextRequest) {
         assignee_id:    body.assignee_id || null,
         client_id:      body.client_id || null,
         project_id:     body.project_id || null,
-        // Per-subtask due date if set, otherwise inherit parent due date
         due_date:       s.due_date || body.due_date || null,
         parent_task_id: task.id,
         created_by:     user.id,
         is_recurring:   false,
+        // Flag compliance subtasks so attachment is enforced on completion
+        custom_fields:  s.required ? { _compliance_subtask: true } : null,
       }))
       await supabase.from('tasks').insert(subtaskInserts)
     } catch {}
