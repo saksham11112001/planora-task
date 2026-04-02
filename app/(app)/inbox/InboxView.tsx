@@ -302,7 +302,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
     </div>
 
     {/* ── BOARD VIEW ─────────────────────────────────────────── */}
-    {viewTab === 'Board' && (
+    {viewTab === 'Board' ? (
       <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
         {/* Client filter */}
         {clients.length > 0 && (
@@ -411,10 +411,10 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
           onClose={() => setSelectedTask(null)}
           onUpdated={() => { setSelectedTask(null); startT(() => { window.location.reload() }) }}/>
       </div>
-    )}
+    ) : null}
 
     {/* ── LIST VIEW ──────────────────────────────────────────── */}
-    {viewTab === 'List' && (
+    {viewTab === 'List' ? (
     <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
       {/* Main list */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -906,7 +906,8 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
       )}
     </div>
     </div>
-    )}
+    </div>
+    ) : null}
     </>
   )
 }

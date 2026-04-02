@@ -183,7 +183,7 @@ export function RecurringView({ tasks: initialTasks, members, projects, clients,
       </div>
 
       {/* BOARD VIEW */}
-      {viewTab === 'Board' && (
+      {viewTab === 'Board' ? (
         <div style={{ display:'flex', flexDirection:'column', flex:1, overflow:'hidden' }}>
           {clients.length > 0 && (
             <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 20px',
@@ -258,10 +258,14 @@ export function RecurringView({ tasks: initialTasks, members, projects, clients,
             })}
           </div>
         </div>
-      )}
+      </div>
+      </div>
+      </div>
+      </div>
+      ) : null}
 
       {/* LIST VIEW */}
-      {viewTab === 'List' && (
+      {viewTab === 'List' ? (
       <div style={{ marginBottom: 24 }}>
         <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 0 }}>Recurring tasks</h1>
@@ -521,7 +525,7 @@ export function RecurringView({ tasks: initialTasks, members, projects, clients,
         onUpdated={() => { setSelectedTask(null); startT(() => router.refresh()) }}
       />
       </div>
-      )}
+      ) : null}
     </div>
   )
 }
