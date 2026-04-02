@@ -15,9 +15,9 @@ interface Member {
   users: {
     id: string
     email: string
-    full_name: string
+    name: string
     avatar_url?: string
-    phone?: string
+    phone_number?: string
   }
   joined_at?: string
 }
@@ -136,13 +136,13 @@ export function TeamView({ members: initialMembers, currentUserId, currentRole, 
                 {member.users.avatar_url ? (
                   <img
                     src={member.users.avatar_url}
-                    alt={member.users.full_name}
+                    alt={member.users.name}
                     className="w-10 h-10 rounded-full object-cover"
                   />
                 ) : (
                   <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-400 to-orange-400
                                   flex items-center justify-center text-white font-bold text-sm">
-                    {(member.users.full_name || member.users.email || '?')[0].toUpperCase()}
+                    {(member.users.name || member.users.email || '?')[0].toUpperCase()}
                   </div>
                 )}
                 {isMe && (
@@ -155,7 +155,7 @@ export function TeamView({ members: initialMembers, currentUserId, currentRole, 
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">
-                    {member.users.full_name || 'Unknown'}
+                    {member.users.name || 'Unknown'}
                     {isMe && <span className="text-xs text-teal-600 ml-1.5">(you)</span>}
                   </p>
                 </div>
@@ -164,10 +164,10 @@ export function TeamView({ members: initialMembers, currentUserId, currentRole, 
                     <Mail size={10} />
                     {member.users.email}
                   </span>
-                  {member.users.phone && (
+                  {member.users.phone_number && (
                     <span className="text-xs text-slate-400 flex items-center gap-1">
                       <Phone size={10} />
-                      {member.users.phone}
+                      {member.users.phone_number}
                     </span>
                   )}
                 </div>
@@ -275,7 +275,7 @@ export function TeamView({ members: initialMembers, currentUserId, currentRole, 
             <p className="text-sm text-slate-700 dark:text-slate-300 mb-6">
               Are you sure you want to remove{' '}
               <span className="font-semibold text-slate-900 dark:text-white">
-                {confirmRemove.users.full_name || confirmRemove.users.email}
+                {confirmRemove.users.name || confirmRemove.users.email}
               </span>{' '}
               from the team? They will lose access to all projects and tasks.
             </p>

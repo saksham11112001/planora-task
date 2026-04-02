@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await supabase
     .from('org_members')
-    .select('id, user_id, role, joined_at, users(id, email, full_name, avatar_url, phone)')
+    .select('id, user_id, role, joined_at, users(id, email, name, avatar_url, phone_number)')
     .eq('org_id', self.org_id)
     .order('joined_at', { ascending: true })
 

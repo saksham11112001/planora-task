@@ -33,7 +33,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       .from('org_members')
       .select('id, org_id, role, organisations(id, name, slug, plan_tier, logo_color, status, trial_ends_at)')
       .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
+      .order('joined_at', { ascending: false })
       .limit(1)
       .maybeSingle()
 

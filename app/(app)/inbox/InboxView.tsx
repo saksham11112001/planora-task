@@ -88,13 +88,13 @@ export function InboxView({ tasks, clients, members, currentUserId, orgId, canAp
   const getColTasks = useCallback((colId: string): Task[] => {
     if (colId === 'overdue') {
       return filteredTasks.filter(
-        t => isOverdue(t.due_date) && !['completed', 'approved', 'in_review'].includes(t.status)
+        t => isOverdue(t.due_date, t.status)
       )
     }
     if (colId === 'todo') {
       return filteredTasks.filter(
         t => ['todo', 'in_progress'].includes(t.status) &&
-          !(isOverdue(t.due_date) && !['completed', 'approved', 'in_review'].includes(t.status))
+          !(isOverdue(t.due_date, t.status))
       )
     }
     if (colId === 'in_review') return filteredTasks.filter(t => t.status === 'in_review')
@@ -314,7 +314,7 @@ function RichTaskCard({ task, clients, members, onClick, isDragging }: {
 }) {
   const client = clients.find(c => c.id === task.client_id)
   const assignee = members.find(m => m.id === task.assignee_id)
-  const over = isOverdue(task.due_date) && !['completed', 'approved'].includes(task.status)
+  const over = isOverdue(task.due_date, task.status)
 
   return (
     <div
@@ -367,7 +367,7 @@ function RichListView({ tasks, clients, members, onSelectTask }: {
       {tasks.map(task => {
         const client = clients.find(c => c.id === task.client_id)
         const assignee = members.find(m => m.id === task.assignee_id)
-        const over = isOverdue(task.due_date) && !['completed', 'approved'].includes(task.status)
+        const over = isOverdue(task.due_date, task.status)
         return (
           <div
             key={task.id}

@@ -47,10 +47,10 @@ export default async function TeamPage() {
       joined_at:  m.joined_at,
       users: {
         id:         uid,
-        full_name:  u?.name  ?? 'Unknown',
+        name:       u?.name  ?? 'Unknown',
         email:      u?.email ?? '',
         avatar_url: u?.avatar_url ?? undefined,
-        phone:      undefined,
+        phone_number: u?.phone_number ?? undefined,
       },
       // Extra stats passed through (TeamView ignores unknown props)
       tasks_30d:  countMap[uid]?.total     ?? 0,
