@@ -104,11 +104,10 @@ export async function PATCH(request: NextRequest) {
   const { data: mb } = await supabase.from('org_members')
     .select('org_id, role').eq('user_id', user.id).eq('is_active', true).single()
   if (!mb || !['owner', 'admin'].includes(mb.role))
-    return NextResponse.json({ error: 'Only owners/admins can change roles' }, { status: 403 })
+    return NextResponse.json({ error: 'Only owners/admins can perform this action' }, { status: 403 })
 
-  const { member_id, user_id, role } = await request.json()
-  if (!['admin', 'manager', 'member', 'viewer'].includes(role))
-    return NextResponse.json({ error: 'Invalid role' }, { status: 400 })
+  const body = await request.json()
+  const { member_id, user_id, role, is_active } = body
 
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
   const idToCheck = member_id || user_id
@@ -116,6 +115,26 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'Valid member_id or user_id is required' }, { status: 400 })
 
   const admin = createAdminClient()
+
+  // ── Remove member (soft-deactivate) ──────────────────────────────────────
+  if (is_active === false) {
+    if (user_id === user.id) return NextResponse.json({ error: 'Cannot remove yourself' }, { status: 400 })
+    const { data: targetMember } = await admin.from('org_members')
+      .select('role').eq('org_id', mb.org_id).eq('user_id', user_id).maybeSingle()
+    if (targetMember?.role === 'owner')
+      return NextResponse.json({ error: 'Cannot remove an owner' }, { status: 403 })
+    let removeQuery = admin.from('org_members').update({ is_active: false }).eq('org_id', mb.org_id)
+    if (member_id) removeQuery = removeQuery.eq('id', member_id)
+    else           removeQuery = removeQuery.eq('user_id', user_id)
+    const { error: removeErr } = await removeQuery
+    if (removeErr) return NextResponse.json({ error: removeErr.message }, { status: 500 })
+    return NextResponse.json({ success: true, message: 'Member removed' })
+  }
+
+  // ── Change role ───────────────────────────────────────────────────────────
+  if (!role || !['admin', 'manager', 'member', 'viewer'].includes(role))
+    return NextResponse.json({ error: 'Invalid role' }, { status: 400 })
+
   let query = admin.from('org_members').update({ role }).eq('org_id', mb.org_id)
   if (member_id) query = query.eq('id', member_id)
   else           query = query.eq('user_id', user_id)

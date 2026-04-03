@@ -48,6 +48,8 @@ export function TeamView({ members, canManage, currentUserId }: {
 
   const [roleEditing, setRoleEditing] = useState<string | null>(null)
   const [saving,      setSaving]      = useState<string | null>(null)
+  const [removingId,  setRemovingId]  = useState<string | null>(null)  // user_id being removed
+  const [removeConfirm, setRemoveConfirm] = useState<string | null>(null) // user_id in confirm state
 
   // ── Single invite ──────────────────────────────────────────────────────
   async function invite(e: React.FormEvent) {
@@ -115,6 +117,31 @@ export function TeamView({ members, canManage, currentUserId }: {
     } else {
       // Keep failed rows for retry
       setBulkRows(bulkRows.filter((r, i) => !results[i]?.ok))
+    }
+  }
+
+  // ── Remove member ──────────────────────────────────────────────────────
+  async function removeMember(userId: string, memberName: string) {
+    // Two-step confirm: first click shows confirm state, second click executes
+    if (removeConfirm !== userId) {
+      setRemoveConfirm(userId)
+      // Auto-reset after 4 seconds if user doesn't confirm
+      setTimeout(() => setRemoveConfirm(c => c === userId ? null : c), 4000)
+      return
+    }
+    setRemovingId(userId)
+    setRemoveConfirm(null)
+    const res = await fetch('/api/team', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId, is_active: false }),
+    })
+    setRemovingId(null)
+    if (res.ok) {
+      toast.success(`${memberName} removed from the workspace`)
+      router.refresh()
+    } else {
+      const d = await res.json().catch(() => ({}))
+      toast.error(d.error ?? 'Failed to remove member')
     }
   }
 
@@ -416,10 +443,64 @@ export function TeamView({ members, canManage, currentUserId }: {
                     </span>
                   )}
                 </div>
+
+                {/* Remove member button — owners/admins only, not self, not other owners */}
+                {canManage && !isMe && !isOwner && (
+                  <div style={{ marginLeft: 8, flexShrink: 0 }}>
+                    {removeConfirm === m.id ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 11, color: '#dc2626', fontWeight: 500 }}>Remove?</span>
+                        <button
+                          onClick={() => removeMember(m.id, m.name)}
+                          disabled={removingId === m.id}
+                          style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, border: 'none',
+                            background: '#dc2626', color: '#fff', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>
+                          {removingId === m.id ? '…' : 'Yes, remove'}
+                        </button>
+                        <button onClick={() => setRemoveConfirm(null)}
+                          style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6,
+                            border: '1px solid var(--border)', background: 'var(--surface)',
+                            color: 'var(--text-muted)', cursor: 'pointer', fontFamily: 'inherit' }}>
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => removeMember(m.id, m.name)}
+                        title="Remove member"
+                        style={{ width: 28, height: 28, borderRadius: 7, border: '1px solid var(--border)',
+                          background: 'var(--surface-subtle)', cursor: 'pointer', display: 'flex',
+                          alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)',
+                          transition: 'all 0.15s', flexShrink: 0 }}
+                        onMouseEnter={e => {
+                          (e.currentTarget as HTMLElement).style.background = '#fef2f2'
+                          ;(e.currentTarget as HTMLElement).style.borderColor = '#fecaca'
+                          ;(e.currentTarget as HTMLElement).style.color = '#dc2626'
+                        }}
+                        onMouseLeave={e => {
+                          (e.currentTarget as HTMLElement).style.background = 'var(--surface-subtle)'
+                          ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'
+                          ;(e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'
+                        }}>
+                        <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
+                          <path d="M9.5 3.5L7 6M7 6L4.5 3.5M7 6L4.5 8.5M7 6L9.5 8.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                          <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.2"/>
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             )
           })}
         </div>
+
+        {/* Empty state */}
+        {members.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '40px 24px', color: 'var(--text-muted)', fontSize: 13 }}>
+            No team members yet. Invite your colleagues above.
+          </div>
+        )}
 
       </div>
     </div>

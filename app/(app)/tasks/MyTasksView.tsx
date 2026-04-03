@@ -66,7 +66,9 @@ export function MyTasksView({
   const [dragOverCol,    setDragOverCol]    = useState<string | null>(null)
   const [boardClient,    setBoardClient]    = useState('')
   const [doneExpanded,   setDoneExpanded]   = useState(false)
+  const [listDoneExpanded, setListDoneExpanded] = useState(false)
   const DONE_PAGE = 5
+  const LIST_DONE_PAGE = 5
   const [subtaskMap,     setSubtaskMap]     = useState<Record<string, any[]>>({})
   const [expandedTasks,  setExpandedTasks]  = useState<Set<string>>(new Set())
   const [filterPriority, setFilterPriority] = useState('')
@@ -174,8 +176,8 @@ export function MyTasksView({
   async function handleDrop(targetStatus: string) {
     if (!dragTaskId) return
     const task = tasks.find(t => t.id === dragTaskId)
-    if (!task) { setDragTaskId(null); setDragOverCol(null); return }
-
+    if (!task || task.status === targetStatus) { setDragTaskId(null); setDragOverCol(null); return }
+    
     // Map board column status to actual task status
     const statusMap: Record<string, string> = {
       'todo': 'todo', 'in_progress': 'in_progress',
@@ -183,67 +185,33 @@ export function MyTasksView({
     }
     const newStatus = statusMap[targetStatus] ?? targetStatus
 
-    // No-op if already in that state
-    if (task.status === newStatus && !(newStatus === 'in_review' && task.approval_status !== 'pending')) {
-      setDragTaskId(null); setDragOverCol(null); return
-    }
-
-    // Don't allow dragging to completed if approval required and not yet approved
+    // Don't allow dragging to completed if approval required
     if (newStatus === 'completed' && task.approval_required && task.approval_status !== 'approved') {
-      toast.error('This task requires approval before completion — drag to Pending approval first')
+      toast.error('This task requires approval before completion')
       setDragTaskId(null); setDragOverCol(null); return
     }
-
-    setDragTaskId(null)
-    setDragOverCol(null)
-
-    // ── Dragging to "Pending approval" column ──────────────────────────────
-    // Must go through the /approve submit flow — not a plain PATCH —
-    // so that approval_status is set to 'pending' AND the approver is notified.
-    if (newStatus === 'in_review') {
-      // Only the assignee can submit for approval
-      if (task.assignee_id && task.assignee_id !== currentUserId) {
-        toast.error('Only the task assignee can submit it for approval')
-        return
-      }
-      // Optimistic update
-      setTasks(prev => prev.map(t => t.id === task.id
-        ? { ...t, status: 'in_review' as any, approval_status: 'pending' } : t))
-      const res = await fetch(`/api/tasks/${task.id}/approve`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ decision: 'submit' }),
-      })
-      if (res.ok) {
-        toast.success('Submitted for approval ✓')
-        refresh()
-      } else {
-        // Revert optimistic update
-        setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: task.status as any, approval_status: task.approval_status } : t))
-        const d = await res.json().catch(() => ({}))
-        toast.error(d.error ?? 'Could not submit for approval')
-      }
-      return
-    }
-
-    // ── All other status transitions — plain PATCH ─────────────────────────
-    const patchBody: any = { status: newStatus }
-    if (newStatus === 'completed') patchBody.completed_at = new Date().toISOString()
-    if (newStatus === 'todo' || newStatus === 'in_progress') patchBody.completed_at = null
 
     // Optimistic update
-    setTasks(prev => prev.map(t => t.id === task.id
-      ? { ...t, status: newStatus as any } : t))
-
-    const res = await fetch(`/api/tasks/${task.id}`, {
+    setTasks(prev => prev.map(t => t.id === dragTaskId
+      ? { ...t, status: newStatus as any, approval_status: newStatus === 'in_review' ? 'pending' : t.approval_status }
+      : t
+    ))
+    setDragTaskId(null)
+    setDragOverCol(null)
+    
+    const patchBody: any = { status: newStatus }
+    if (newStatus === 'completed') patchBody.completed_at = new Date().toISOString()
+    if (newStatus === 'in_progress') patchBody.completed_at = null
+    
+    const res = await fetch(`/api/tasks/${dragTaskId}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(patchBody),
     })
     if (!res.ok) {
-      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: task.status as any } : t))
-      const d = await res.json().catch(() => ({}))
-      toast.error(d.error ?? 'Could not move task')
+      setTasks(prev => prev.map(t => t.id === dragTaskId ? { ...t, status: task.status as any } : t))
+      toast.error('Could not move task')
     } else {
-      toast.success(`Moved to ${newStatus.replace('_', ' ')}`)
+      toast.success(`Moved to ${targetStatus.replace('_', ' ')}`)
       refresh()
     }
   }
@@ -685,17 +653,29 @@ export function MyTasksView({
             )
           })}
 
-          {/* Completed */}
+          {/* Completed — paginated to LIST_DONE_PAGE */}
           {(() => {
-            const done = filteredTasks.filter(t => t.status === 'completed')
-            if (!done.length) return null
+            const allDone = filteredTasks.filter(t => t.status === 'completed')
+            if (!allDone.length) return null
+            const visibleDone = listDoneExpanded ? allDone : allDone.slice(0, LIST_DONE_PAGE)
+            const hiddenCount = allDone.length - LIST_DONE_PAGE
             return (
               <div>
                 <div style={{ display:'flex', alignItems:'center', gap:6, padding:'13px 18px 5px',
                   fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'#16a34a' }}>
-                  ▾ Completed <span style={{ opacity:0.4, fontWeight:400, textTransform:'none', fontSize:11 }}>({done.length})</span>
+                  <button onClick={() => setListDoneExpanded(v => !v)}
+                    style={{ background:'none', border:'none', cursor:'pointer', fontSize:11, color:'#16a34a',
+                      display:'flex', alignItems:'center', gap:4, padding:0, fontFamily:'inherit', fontWeight:700 }}>
+                    {listDoneExpanded ? '▾' : '▸'} Completed
+                    <span style={{ opacity:0.4, fontWeight:400, textTransform:'none' }}>({allDone.length})</span>
+                  </button>
+                  {!listDoneExpanded && allDone.length > LIST_DONE_PAGE && (
+                    <span style={{ fontSize:10, color:'#16a34a', opacity:0.6, fontWeight:400, textTransform:'none' }}>
+                      showing {LIST_DONE_PAGE} of {allDone.length}
+                    </span>
+                  )}
                 </div>
-                {done.map(task => {
+                {listDoneExpanded && visibleDone.map(task => {
                   const assignee = task.assignee as {id:string;name:string}|null
                   return (
                     <React.Fragment key={task.id}>
@@ -727,6 +707,30 @@ export function MyTasksView({
                     </React.Fragment>
                   )
                 })}
+                {/* Collapsed view — show just count with expand prompt */}
+                {!listDoneExpanded && (
+                  <button onClick={() => setListDoneExpanded(true)}
+                    style={{ width:'100%', padding:'10px 18px', fontSize:12, fontWeight:500,
+                      color:'#16a34a', background:'rgba(22,163,74,0.04)', border:'none',
+                      borderTop:'1px solid rgba(22,163,74,0.1)', cursor:'pointer',
+                      display:'flex', alignItems:'center', gap:6, fontFamily:'inherit',
+                      borderBottom:'1px solid var(--border-light)' }}>
+                    <span style={{ width:16, height:16, borderRadius:'50%', background:'rgba(22,163,74,0.15)',
+                      display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, fontWeight:800, flexShrink:0 }}>
+                      ✓
+                    </span>
+                    {allDone.length} completed task{allDone.length !== 1 ? 's' : ''}
+                    {hiddenCount > 0 && ` · click to expand`}
+                  </button>
+                )}
+                {listDoneExpanded && allDone.length > LIST_DONE_PAGE && (
+                  <button onClick={() => setListDoneExpanded(false)}
+                    style={{ width:'100%', padding:'8px 18px', fontSize:11, fontWeight:500,
+                      color:'var(--text-muted)', background:'transparent', border:'none',
+                      borderTop:'1px solid var(--border-light)', cursor:'pointer', fontFamily:'inherit' }}>
+                    ▲ Collapse completed
+                  </button>
+                )}
               </div>
             )
           })()}
