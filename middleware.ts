@@ -34,13 +34,15 @@ export async function middleware(request: NextRequest) {
         setAll(toSet) {
           // Write to request so downstream server components see fresh cookies
           toSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          // Write to response so browser receives refreshed token cookies
+          // FIX: Re-create the response from the mutated request (carries new cookies forward),
+          // then append Set-Cookie headers so the browser also receives them.
+          // Previously, response was re-created BEFORE appending headers, which meant
+          // the Set-Cookie loop below wrote to the *old* response object — the one that
+          // got thrown away — so refreshed tokens were never sent to the browser and
+          // the next request looked unauthenticated.
           response = NextResponse.next({ request })
           toSet.forEach(({ name, value, options }) =>
-            response.headers.append(
-              'Set-Cookie',
-              `${name}=${value}; Path=/; HttpOnly; SameSite=Lax${options?.secure ? '; Secure' : ''}${options?.maxAge ? `; Max-Age=${options.maxAge}` : ''}`
-            )
+            response.cookies.set(name, value, options)
           )
         },
       },

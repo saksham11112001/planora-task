@@ -25,11 +25,44 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       .eq('id', user!.id)
       .maybeSingle()
 
-    // No active membership — check for pending/inactive membership
+    // No active membership — try to recover
     if (!membership) {
       const { createClient: createAdminClient } = await import('@/lib/supabase/admin')
       const admin = createAdminClient()
 
+      // FIX: Check if the user has a pending invite in their auth metadata
+      // that wasn't provisioned yet (e.g. they signed in via a different device
+      // before the callback could write the org_members row).
+      const { data: authUser } = await admin.auth.admin.getUserById(user!.id)
+      const pendingOrgId = authUser?.user?.user_metadata?.invited_to_org as string | undefined
+      const pendingRole  = (authUser?.user?.user_metadata?.invited_role as string | undefined) ?? 'member'
+
+      if (pendingOrgId) {
+        // Provision the membership now
+        const { data: existingMember } = await admin
+          .from('org_members')
+          .select('id, is_active')
+          .eq('org_id', pendingOrgId)
+          .eq('user_id', user!.id)
+          .maybeSingle()
+
+        if (!existingMember) {
+          await admin.from('org_members').insert({
+            org_id: pendingOrgId, user_id: user!.id, role: pendingRole, is_active: true,
+          })
+        } else if (!existingMember.is_active) {
+          await admin.from('org_members').update({ is_active: true, role: pendingRole }).eq('id', existingMember.id)
+        }
+
+        // Clear metadata
+        await admin.auth.admin.updateUserById(user!.id, {
+          user_metadata: { ...authUser?.user?.user_metadata, invited_to_org: null, invited_role: null },
+        })
+
+        redirect('/dashboard')
+      }
+
+      // Check for pending/inactive membership (existing fallback)
       const { data: pending } = await admin
         .from('org_members')
         .select('id, org_id, role, organisations(id, name, slug, plan_tier, logo_color, status, trial_ends_at)')
