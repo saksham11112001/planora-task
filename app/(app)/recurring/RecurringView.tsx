@@ -1,11 +1,12 @@
 'use client'
 
-import { useRef, useState, useTransition } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, RefreshCw, X, Pencil } from 'lucide-react'
+import { RefreshCw, X, Pencil } from 'lucide-react'
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
-import { toast } from '@/store/appStore'
+import { InlineRecurringTask, FREQ_LABEL } from '@/components/tasks/InlineRecurringTask'
 import { fmtDate } from '@/lib/utils/format'
+import { toast } from '@/store/appStore'
 import { PriorityBadge, Avatar } from '@/components/ui/Badge'
 
 interface Task {
@@ -29,46 +30,32 @@ interface Member {
   role?: string | null
 }
 
-interface Client {
-  id: string
-  name: string
-  color: string
-}
-
 interface Props {
   tasks: Task[]
   members: Member[]
   projects: { id: string; name: string; color: string }[]
-  clients: Client[]
+  clients: { id: string; name: string; color: string }[]
   currentUserId: string
   canManage: boolean
   userRole?: string
 }
 
-const FREQ_LABELS: Record<string, string> = {
-  daily: 'Daily',
-  weekly: 'Weekly',
-  bi_weekly: 'Bi-weekly',
-  monthly: 'Monthly',
-  quarterly: 'Quarterly',
-  annual: 'Annual',
-  yearly: 'Annual',
-}
+const BOARD_COLUMNS = [
+  { key: 'daily', label: 'Daily', color: '#dc2626' },
+  { key: 'weekly', label: 'Weekly', color: '#ea580c' },
+  { key: 'monthly', label: 'Monthly', color: '#0d9488' },
+  { key: 'quarterly', label: 'Quarterly', color: '#7c3aed' },
+  { key: 'annual', label: 'Annual', color: '#0891b2' },
+]
 
-const FREQ_COLORS: Record<string, string> = {
-  daily: '#dc2626',
-  weekly: '#ea580c',
-  bi_weekly: '#d97706',
-  monthly: '#0d9488',
-  quarterly: '#7c3aed',
-  annual: '#0891b2',
-  yearly: '#0891b2',
-}
-
-function defaultNextOccurrence() {
-  const d = new Date()
-  d.setDate(d.getDate() + 1)
-  return d.toISOString().slice(0, 10)
+function normalizeFrequency(freq: string | null | undefined): string {
+  if (!freq) return 'other'
+  if (freq === 'daily') return 'daily'
+  if (freq.startsWith('weekly_') || freq === 'bi_weekly' || freq === 'weekly') return 'weekly'
+  if (freq.startsWith('monthly_') || freq === 'monthly') return 'monthly'
+  if (freq === 'quarterly') return 'quarterly'
+  if (freq === 'annual' || freq === 'yearly') return 'annual'
+  return 'other'
 }
 
 export function RecurringView({
@@ -82,202 +69,24 @@ export function RecurringView({
 }: Props) {
   const router = useRouter()
   const [, startT] = useTransition()
-  const titleRef = useRef<HTMLInputElement>(null)
 
   const [localTasks, setLocalTasks] = useState<Task[]>(initialTasks)
   const [clientFilter, setClientFilter] = useState('')
+  const [boardClient, setBoardClient] = useState('')
+  const [viewTab, setViewTab] = useState<'List' | 'Board'>('List')
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [editForm, setEditForm] = useState<
-    Partial<Task & { frequency: string }>
-  >({})
+
   const [subtaskMap, setSubtaskMap] = useState<Record<string, any[]>>({})
   const [expandedSubs, setExpandedSubs] = useState<Set<string>>(new Set())
   const [newSubInputs, setNewSubInputs] = useState<Record<string, string>>({})
-  const [viewTab, setViewTab] = useState<'List' | 'Board'>('List')
-  const [boardClient, setBoardClient] = useState('')
 
-  const [showCreate, setShowCreate] = useState(false)
-  const [creating, setCreating] = useState(false)
-  const [newTitle, setNewTitle] = useState('')
-  const [newFreq, setNewFreq] = useState('weekly')
-  const [newAssignee, setNewAssignee] = useState('')
-  const [newApprover, setNewApprover] = useState('')
-  const [newClient, setNewClient] = useState('')
-  const [newPriority, setNewPriority] = useState('medium')
-  const [newNextDate, setNewNextDate] = useState(defaultNextOccurrence)
-
-  function openCreate() {
-    setShowCreate(true)
-    setNewTitle('')
-    setNewFreq('weekly')
-    setNewAssignee('')
-    setNewApprover('')
-    setNewClient('')
-    setNewPriority('medium')
-    setNewNextDate(defaultNextOccurrence())
-    setTimeout(() => titleRef.current?.focus(), 50)
-  }
-
-  async function createRecurring() {
-    if (!newTitle.trim()) {
-      toast.error('Title is required')
-      return
-    }
-
-    setCreating(true)
-
-    const res = await fetch('/api/tasks', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title: newTitle.trim(),
-        is_recurring: true,
-        frequency: newFreq,
-        next_occurrence_date: newNextDate || null,
-        assignee_id: newAssignee || null,
-        approver_id: newApprover || null,
-        approval_required: !!newApprover,
-        client_id: newClient || null,
-        priority: newPriority,
-        status: 'todo',
-      }),
-    })
-
-    const d = await res.json().catch(() => ({}))
-    setCreating(false)
-
-    if (!res.ok) {
-      toast.error(d.error ?? 'Could not create task')
-      return
-    }
-
-    toast.success('Recurring task created')
-
-    if (d.data) {
-      const created = d.data
-      setLocalTasks((prev) => [
-        ...prev,
-        {
-          id: created.id,
-          title: created.title,
-          status: created.status,
-          priority: created.priority,
-          frequency: created.frequency,
-          next_occurrence_date: created.next_occurrence_date,
-          assignee_id: created.assignee_id,
-          approver_id: created.approver_id ?? null,
-          client_id: created.client_id,
-          assignee: members.find((m) => m.id === created.assignee_id) ?? null,
-          project: null,
-          client: clients.find((c) => c.id === created.client_id) ?? null,
-        },
-      ])
-    }
-
-    setShowCreate(false)
-    startT(() => router.refresh())
-  }
-
-  function startEdit(task: Task) {
-    setEditingId(task.id)
-    setEditForm({
-      title: task.title,
-      frequency: task.frequency ?? 'weekly',
-      priority: task.priority,
-      assignee_id: task.assignee_id ?? '',
-      approver_id: task.approver_id ?? '',
-      client_id: task.client_id ?? '',
-    })
-  }
-
-  async function saveEdit(id: string) {
-    const snapshot = localTasks.map((t) => ({ ...t }))
-
-    setLocalTasks((prev) =>
-      prev.map((t) =>
-        t.id === id
-          ? {
-              ...t,
-              title: editForm.title?.trim() ?? t.title,
-              priority: (editForm.priority as string) ?? t.priority,
-              frequency: editForm.frequency ?? t.frequency,
-              assignee_id: (editForm.assignee_id as string) || null,
-              approver_id: (editForm.approver_id as string) || null,
-              client_id: (editForm.client_id as string) || null,
-              assignee:
-                members.find((m) => m.id === editForm.assignee_id) ?? null,
-              client: clients.find((c) => c.id === editForm.client_id) ?? null,
-            }
-          : t,
-      ),
+  const visibleTasks = useMemo(() => {
+    if (!clientFilter) return localTasks
+    return localTasks.filter(
+      (t) => t.client_id === clientFilter || t.client?.id === clientFilter,
     )
-
-    setEditingId(null)
-
-    const [taskRes, recurringRes] = await Promise.all([
-      fetch(`/api/tasks/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: editForm.title?.trim(),
-          priority: editForm.priority,
-          assignee_id: editForm.assignee_id || null,
-          approver_id: editForm.approver_id || null,
-          approval_required: !!editForm.approver_id,
-          client_id: editForm.client_id || null,
-        }),
-      }),
-      fetch(`/api/recurring/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          frequency: editForm.frequency,
-        }),
-      }).catch(() => null),
-    ])
-
-    if (taskRes.ok) {
-      toast.success('Saved')
-      startT(() => router.refresh())
-      return
-    }
-
-    setLocalTasks(snapshot)
-    setEditingId(id)
-
-    const err = await taskRes.json().catch(() => ({}))
-    toast.error(err.error ?? 'Could not save')
-  }
-
-  async function deleteTask(id: string) {
-    if (!confirm('Delete this recurring task? All future instances will stop being created.')) {
-      return
-    }
-
-    const snapshot = localTasks.map((t) => ({ ...t }))
-    setLocalTasks((prev) => prev.filter((t) => t.id !== id))
-
-    const res = await fetch(`/api/tasks/${id}`, { method: 'DELETE' })
-
-    if (!res.ok) {
-      setLocalTasks(snapshot)
-      const d = await res.json().catch(() => ({}))
-      toast.error(d.error ?? 'Could not delete')
-      return
-    }
-
-    toast.success('Deleted')
-    startT(() => router.refresh())
-  }
-
-  async function loadSubs(taskId: string) {
-    if (subtaskMap[taskId]) return
-
-    const r = await fetch(`/api/tasks?parent_id=${taskId}&limit=50`)
-    const d = await r.json().catch(() => ({}))
-    setSubtaskMap((prev) => ({ ...prev, [taskId]: d.data ?? [] }))
-  }
+  }, [localTasks, clientFilter])
 
   async function refreshSubs(taskId: string) {
     const r = await fetch(`/api/tasks?parent_id=${taskId}&limit=50`)
@@ -288,21 +97,20 @@ export function RecurringView({
   async function toggleSubExpand(taskId: string) {
     setExpandedSubs((prev) => {
       const next = new Set(prev)
-      if (next.has(taskId)) next.delete(taskId)
-      else next.add(taskId)
+      if (next.has(taskId)) {
+        next.delete(taskId)
+      } else {
+        next.add(taskId)
+      }
       return next
     })
 
     if (!subtaskMap[taskId]) {
-      await loadSubs(taskId)
+      await refreshSubs(taskId)
     }
   }
 
-  async function toggleSubDone(
-    taskId: string,
-    subId: string,
-    status: string,
-  ) {
+  async function toggleSubDone(taskId: string, subId: string, status: string) {
     const newStatus = status === 'completed' ? 'todo' : 'completed'
 
     if (newStatus === 'completed') {
@@ -312,11 +120,8 @@ export function RecurringView({
       if (isComplianceSub) {
         const attRes = await fetch(`/api/tasks/${subId}/attachments`)
         const attData = await attRes.json().catch(() => ({ data: [] }))
-
         if ((attData.data ?? []).length === 0) {
-          toast.error(
-            '📎 Upload the required document before completing this CA compliance subtask',
-          )
+          toast.error('📎 Upload the required document before completing this CA compliance subtask')
           return
         }
       }
@@ -325,12 +130,7 @@ export function RecurringView({
     setSubtaskMap((prev) => ({
       ...prev,
       [taskId]: (prev[taskId] ?? []).map((s: any) =>
-        s.id === subId
-          ? {
-              ...s,
-              status: newStatus,
-            }
-          : s,
+        s.id === subId ? { ...s, status: newStatus } : s,
       ),
     }))
 
@@ -339,8 +139,7 @@ export function RecurringView({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         status: newStatus,
-        completed_at:
-          newStatus === 'completed' ? new Date().toISOString() : null,
+        completed_at: newStatus === 'completed' ? new Date().toISOString() : null,
       }),
     })
 
@@ -384,199 +183,25 @@ export function RecurringView({
     setNewSubInputs((prev) => ({ ...prev, [taskId]: '' }))
   }
 
-  const visibleTasks = clientFilter
-    ? localTasks.filter((t) => t.client_id === clientFilter || t.client?.id === clientFilter)
-    : localTasks
+  async function handleDelete(id: string) {
+    if (!confirm('Delete this recurring task? All future instances will stop being created.')) {
+      return
+    }
 
-  const REC_BOARD_COLS = [
-    { freq: 'daily', label: 'Daily', color: '#dc2626' },
-    { freq: 'weekly', label: 'Weekly', color: '#ea580c' },
-    { freq: 'monthly', label: 'Monthly', color: '#0d9488' },
-    { freq: 'quarterly', label: 'Quarterly', color: '#7c3aed' },
-    { freq: 'annual', label: 'Annual', color: '#0891b2' },
-  ]
+    const snapshot = localTasks.map((t) => ({ ...t }))
+    setLocalTasks((prev) => prev.filter((t) => t.id !== id))
 
-  const CreateRow = () => (
-    <div
-      style={{
-        display: 'grid',
-        gridTemplateColumns: '1fr 7rem 5rem 6rem 6rem 5rem 4.5rem',
-        alignItems: 'center',
-        padding: '8px 16px',
-        borderBottom: '1px solid var(--border)',
-        background: 'rgba(13,148,136,0.04)',
-        borderLeft: '3px solid var(--brand)',
-      }}
-    >
-      <input
-        ref={titleRef}
-        value={newTitle}
-        onChange={(e) => setNewTitle(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') createRecurring()
-          if (e.key === 'Escape') setShowCreate(false)
-        }}
-        placeholder="Task title… (Enter to save, Esc to cancel)"
-        style={{
-          fontSize: 13,
-          border: '1px solid var(--brand)',
-          borderRadius: 6,
-          padding: '5px 8px',
-          background: 'var(--surface)',
-          color: 'var(--text-primary)',
-          fontFamily: 'inherit',
-          outline: 'none',
-          width: '100%',
-          boxSizing: 'border-box',
-        }}
-      />
+    const res = await fetch(`/api/tasks/${id}`, { method: 'DELETE' })
 
-      <select
-        value={newFreq}
-        onChange={(e) => setNewFreq(e.target.value)}
-        style={{
-          fontSize: 12,
-          border: '1px solid var(--border)',
-          borderRadius: 6,
-          padding: '4px 6px',
-          background: 'var(--surface)',
-          fontFamily: 'inherit',
-          cursor: 'pointer',
-        }}
-      >
-        {Object.entries(FREQ_LABELS).map(([k, v]) => (
-          <option key={k} value={k}>
-            {v}
-          </option>
-        ))}
-      </select>
-
-      <input
-        type="date"
-        value={newNextDate}
-        onChange={(e) => setNewNextDate(e.target.value)}
-        title="First occurrence date"
-        style={{
-          fontSize: 11,
-          border: '1px solid var(--border)',
-          borderRadius: 6,
-          padding: '4px 4px',
-          background: 'var(--surface)',
-          fontFamily: 'inherit',
-          color: 'var(--text-primary)',
-          outline: 'none',
-          width: '100%',
-          boxSizing: 'border-box',
-        }}
-      />
-
-      <select
-        value={newAssignee}
-        onChange={(e) => setNewAssignee(e.target.value)}
-        style={{
-          fontSize: 12,
-          border: '1px solid var(--border)',
-          borderRadius: 6,
-          padding: '4px 6px',
-          background: 'var(--surface)',
-          fontFamily: 'inherit',
-          cursor: 'pointer',
-        }}
-      >
-        <option value="">Unassigned</option>
-        {members.map((m) => (
-          <option key={m.id} value={m.id}>
-            {m.name}
-          </option>
-        ))}
-      </select>
-
-      <select
-        value={newApprover}
-        onChange={(e) => setNewApprover(e.target.value)}
-        style={{
-          fontSize: 12,
-          border: newApprover
-            ? '1px solid #7c3aed'
-            : '1px solid var(--border)',
-          borderRadius: 6,
-          padding: '4px 6px',
-          background: newApprover ? '#f5f3ff' : 'var(--surface)',
-          fontFamily: 'inherit',
-          cursor: 'pointer',
-          color: newApprover ? '#7c3aed' : 'inherit',
-        }}
-      >
-        <option value="">No approver</option>
-        {members
-          .filter(
-            (m) => m.role && ['owner', 'admin', 'manager'].includes(m.role),
-          )
-          .map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name}
-            </option>
-          ))}
-      </select>
-
-      <select
-        value={newClient}
-        onChange={(e) => setNewClient(e.target.value)}
-        style={{
-          fontSize: 12,
-          border: '1px solid var(--border)',
-          borderRadius: 6,
-          padding: '4px 6px',
-          background: 'var(--surface)',
-          fontFamily: 'inherit',
-          cursor: 'pointer',
-        }}
-      >
-        <option value="">No client</option>
-        {clients.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.name}
-          </option>
-        ))}
-      </select>
-
-      <div style={{ display: 'flex', gap: 4 }}>
-        <button
-          onClick={createRecurring}
-          disabled={creating}
-          style={{
-            padding: '4px 10px',
-            background: 'var(--brand)',
-            color: '#fff',
-            border: 'none',
-            borderRadius: 6,
-            fontSize: 12,
-            cursor: creating ? 'not-allowed' : 'pointer',
-            fontFamily: 'inherit',
-            opacity: creating ? 0.7 : 1,
-          }}
-        >
-          {creating ? '…' : 'Save'}
-        </button>
-
-        <button
-          onClick={() => setShowCreate(false)}
-          style={{
-            padding: '4px 8px',
-            background: 'var(--surface-subtle)',
-            color: 'var(--text-secondary)',
-            border: '1px solid var(--border)',
-            borderRadius: 6,
-            fontSize: 12,
-            cursor: 'pointer',
-            fontFamily: 'inherit',
-          }}
-        >
-          ✕
-        </button>
-      </div>
-    </div>
-  )
+    if (res.ok) {
+      toast.success('Deleted')
+      startT(() => router.refresh())
+    } else {
+      setLocalTasks(snapshot)
+      const d = await res.json().catch(() => ({}))
+      toast.error(d.error ?? 'Failed')
+    }
+  }
 
   return (
     <div className="page-container">
@@ -601,9 +226,7 @@ export function RecurringView({
               background: 'transparent',
               cursor: 'pointer',
               marginBottom: -1,
-              borderBottom: `2px solid ${
-                viewTab === tab ? 'var(--brand)' : 'transparent'
-              }`,
+              borderBottom: `2px solid ${viewTab === tab ? 'var(--brand)' : 'transparent'}`,
               color: viewTab === tab ? 'var(--brand)' : 'var(--text-muted)',
             }}
           >
@@ -613,14 +236,7 @@ export function RecurringView({
       </div>
 
       {viewTab === 'Board' && (
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            flex: 1,
-            overflow: 'hidden',
-          }}
-        >
+        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
           {clients.length > 0 && (
             <div
               style={{
@@ -653,12 +269,8 @@ export function RecurringView({
                   fontSize: 12,
                   cursor: 'pointer',
                   outline: 'none',
-                  border: boardClient
-                    ? '1px solid var(--brand)'
-                    : '1px solid var(--border)',
-                  background: boardClient
-                    ? 'rgba(13,148,136,0.08)'
-                    : 'var(--surface-subtle)',
+                  border: boardClient ? '1px solid var(--brand)' : '1px solid var(--border)',
+                  background: boardClient ? 'rgba(13,148,136,0.08)' : 'var(--surface-subtle)',
                   color: boardClient ? 'var(--brand)' : 'var(--text-secondary)',
                   fontFamily: 'inherit',
                   appearance: 'none',
@@ -686,19 +298,19 @@ export function RecurringView({
               alignItems: 'flex-start',
             }}
           >
-            {REC_BOARD_COLS.map((col) => {
+            {BOARD_COLUMNS.map((col) => {
               const colTasks = localTasks.filter(
                 (t) =>
-                  t.frequency === col.freq &&
+                  normalizeFrequency(t.frequency) === col.key &&
                   (!boardClient || t.client_id === boardClient || t.client?.id === boardClient),
               )
 
               return (
                 <div
-                  key={col.freq}
+                  key={col.key}
                   style={{
-                    minWidth: 200,
-                    flex: '0 0 200px',
+                    minWidth: 220,
+                    flex: '0 0 220px',
                     background: 'var(--surface)',
                     borderRadius: 10,
                     border: '1px solid var(--border)',
@@ -725,22 +337,10 @@ export function RecurringView({
                         flexShrink: 0,
                       }}
                     />
-                    <span
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 700,
-                        color: 'var(--text-primary)',
-                      }}
-                    >
+                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>
                       {col.label}
                     </span>
-                    <span
-                      style={{
-                        marginLeft: 'auto',
-                        fontSize: 11,
-                        color: 'var(--text-muted)',
-                      }}
-                    >
+                    <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-muted)' }}>
                       {colTasks.length}
                     </span>
                   </div>
@@ -758,20 +358,14 @@ export function RecurringView({
                     {colTasks.map((task) => (
                       <div
                         key={task.id}
-                        onClick={() =>
-                          setSelectedTask(
-                            selectedTask?.id === task.id ? null : task,
-                          )
-                        }
+                        onClick={() => setSelectedTask(selectedTask?.id === task.id ? null : task)}
                         style={{
                           background: 'var(--surface)',
                           borderRadius: 8,
                           padding: '9px 10px',
                           cursor: 'pointer',
                           border: `1px solid ${
-                            selectedTask?.id === task.id
-                              ? 'var(--brand)'
-                              : 'var(--border)'
+                            selectedTask?.id === task.id ? 'var(--brand)' : 'var(--border)'
                           }`,
                           boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
                         }}
@@ -794,12 +388,7 @@ export function RecurringView({
                                 display: 'inline-block',
                               }}
                             />
-                            <span
-                              style={{
-                                fontSize: 10,
-                                color: 'var(--text-muted)',
-                              }}
-                            >
+                            <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
                               {task.client.name}
                             </span>
                           </div>
@@ -816,14 +405,23 @@ export function RecurringView({
                           {task.title}
                         </p>
 
-                        {task.assignee && (
-                          <p
+                        <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                          <span
                             style={{
-                              fontSize: 11,
-                              color: 'var(--text-muted)',
-                              marginTop: 4,
+                              fontSize: 10,
+                              padding: '2px 6px',
+                              borderRadius: 99,
+                              background: `${col.color}18`,
+                              color: col.color,
+                              fontWeight: 600,
                             }}
                           >
+                            {FREQ_LABEL[task.frequency ?? ''] ?? task.frequency ?? '—'}
+                          </span>
+                        </div>
+
+                        {task.assignee && (
+                          <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
                             {task.assignee.name}
                           </p>
                         )}
@@ -852,14 +450,7 @@ export function RecurringView({
       )}
 
       {viewTab === 'List' && (
-        <div
-          style={{
-            flex: 1,
-            overflowY: 'auto',
-            display: 'flex',
-            flexDirection: 'column',
-          }}
-        >
+        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
           <div
             style={{
               display: 'flex',
@@ -871,23 +462,9 @@ export function RecurringView({
               flexShrink: 0,
             }}
           >
-            <div
-              style={{
-                flex: 1,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-              }}
-            >
-              <span
-                style={{
-                  fontSize: 12,
-                  color: 'var(--text-muted)',
-                  fontWeight: 500,
-                }}
-              >
-                {visibleTasks.length} active · instances spawn automatically each
-                morning at 7 AM IST
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>
+                {visibleTasks.length} active · instances spawn automatically each morning at 7 AM IST
               </span>
 
               {clients.length > 0 && (
@@ -900,15 +477,9 @@ export function RecurringView({
                     fontSize: 12,
                     cursor: 'pointer',
                     outline: 'none',
-                    border: clientFilter
-                      ? '1px solid var(--brand)'
-                      : '1px solid var(--border)',
-                    background: clientFilter
-                      ? 'rgba(13,148,136,0.08)'
-                      : 'var(--surface-subtle)',
-                    color: clientFilter
-                      ? 'var(--brand)'
-                      : 'var(--text-secondary)',
+                    border: clientFilter ? '1px solid var(--brand)' : '1px solid var(--border)',
+                    background: clientFilter ? 'rgba(13,148,136,0.08)' : 'var(--surface-subtle)',
+                    color: clientFilter ? 'var(--brand)' : 'var(--text-secondary)',
                     fontWeight: clientFilter ? 600 : 400,
                     fontFamily: 'inherit',
                     appearance: 'none',
@@ -924,35 +495,12 @@ export function RecurringView({
                 </select>
               )}
             </div>
-
-            {canManage && (
-              <button
-                onClick={openCreate}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  padding: '6px 14px',
-                  borderRadius: 8,
-                  background: 'var(--brand)',
-                  color: '#fff',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: 13,
-                  fontWeight: 600,
-                  fontFamily: 'inherit',
-                }}
-              >
-                <Plus style={{ width: 15, height: 15 }} />
-                New recurring task
-              </button>
-            )}
           </div>
 
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: '1fr 7rem 5rem 6rem 6rem 5rem 4.5rem',
+              gridTemplateColumns: '1fr 10rem 6rem 6rem 6rem 5rem 4.5rem',
               padding: '10px 16px',
               borderBottom: '1px solid var(--border)',
               background: 'var(--surface-subtle)',
@@ -973,9 +521,7 @@ export function RecurringView({
             <span />
           </div>
 
-          {showCreate && <CreateRow />}
-
-          {visibleTasks.length === 0 && !showCreate && (
+          {visibleTasks.length === 0 && !canManage && (
             <div style={{ textAlign: 'center', padding: '48px 24px' }}>
               <RefreshCw
                 style={{
@@ -985,251 +531,52 @@ export function RecurringView({
                   margin: '0 auto 12px',
                 }}
               />
-              <p
-                style={{
-                  fontSize: 14,
-                  color: 'var(--text-muted)',
-                  marginBottom: 12,
-                }}
-              >
-                No recurring tasks yet
-              </p>
-
-              {canManage && (
-                <button
-                  onClick={openCreate}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    padding: '8px 18px',
-                    borderRadius: 8,
-                    background: 'var(--brand)',
-                    color: '#fff',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontSize: 13,
-                    fontWeight: 600,
-                    fontFamily: 'inherit',
-                  }}
-                >
-                  <Plus style={{ width: 15, height: 15 }} />
-                  Create your first recurring task
-                </button>
-              )}
+              <p style={{ fontSize: 14, color: 'var(--text-muted)' }}>No recurring tasks yet</p>
             </div>
           )}
 
           {visibleTasks.map((task) => {
             const isEditing = editingId === task.id
-            const freqColor = FREQ_COLORS[task.frequency ?? ''] ?? 'var(--text-muted)'
-            const freqLabel =
-              FREQ_LABELS[task.frequency ?? ''] ?? task.frequency ?? '—'
+            const approver = members.find((m) => m.id === task.approver_id)
 
             if (isEditing) {
               return (
-                <div
+                <InlineRecurringTask
                   key={task.id}
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 7rem 5rem 6rem 6rem 5rem 4.5rem',
-                    alignItems: 'center',
-                    padding: '8px 16px',
-                    borderBottom: '1px solid var(--border)',
-                    background: 'var(--brand-light)',
+                  members={members}
+                  clients={clients}
+                  currentUserId={currentUserId}
+                  editTask={{
+                    id: task.id,
+                    title: task.title,
+                    frequency: task.frequency ?? 'weekly_mon',
+                    priority: task.priority,
+                    assignee_id: task.assignee_id,
+                    client_id: task.client_id,
+                    approver_id: task.approver_id ?? null,
                   }}
-                >
-                  <input
-                    value={editForm.title ?? ''}
-                    onChange={(e) =>
-                      setEditForm((prev) => ({ ...prev, title: e.target.value }))
-                    }
-                    style={{
-                      fontSize: 13,
-                      border: '1px solid var(--brand)',
-                      borderRadius: 6,
-                      padding: '4px 8px',
-                      background: 'var(--surface)',
-                      color: 'var(--text-primary)',
-                      fontFamily: 'inherit',
-                      outline: 'none',
-                    }}
-                  />
-
-                  <select
-                    value={editForm.frequency ?? 'weekly'}
-                    onChange={(e) =>
-                      setEditForm((prev) => ({
-                        ...prev,
-                        frequency: e.target.value,
-                      }))
-                    }
-                    style={{
-                      fontSize: 12,
-                      border: '1px solid var(--border)',
-                      borderRadius: 6,
-                      padding: '3px 6px',
-                      background: 'var(--surface)',
-                      fontFamily: 'inherit',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {Object.keys(FREQ_LABELS).map((f) => (
-                      <option key={f} value={f}>
-                        {FREQ_LABELS[f]}
-                      </option>
-                    ))}
-                  </select>
-
-                  <div />
-
-                  <select
-                    value={editForm.assignee_id ?? ''}
-                    onChange={(e) =>
-                      setEditForm((prev) => ({
-                        ...prev,
-                        assignee_id: e.target.value,
-                      }))
-                    }
-                    style={{
-                      fontSize: 12,
-                      border: '1px solid var(--border)',
-                      borderRadius: 6,
-                      padding: '3px 6px',
-                      background: 'var(--surface)',
-                      fontFamily: 'inherit',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <option value="">Unassigned</option>
-                    {members.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.name}
-                      </option>
-                    ))}
-                  </select>
-
-                  <select
-                    value={editForm.approver_id ?? ''}
-                    onChange={(e) =>
-                      setEditForm((prev) => ({
-                        ...prev,
-                        approver_id: e.target.value,
-                      }))
-                    }
-                    style={{
-                      fontSize: 12,
-                      border: '1px solid var(--border)',
-                      borderRadius: 6,
-                      padding: '3px 6px',
-                      background: 'var(--surface)',
-                      fontFamily: 'inherit',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <option value="">No approver</option>
-                    {members
-                      .filter(
-                        (m) =>
-                          m.role &&
-                          ['owner', 'admin', 'manager'].includes(m.role),
-                      )
-                      .map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.name}
-                        </option>
-                      ))}
-                  </select>
-
-                  <select
-                    value={editForm.client_id ?? ''}
-                    onChange={(e) =>
-                      setEditForm((prev) => ({
-                        ...prev,
-                        client_id: e.target.value,
-                      }))
-                    }
-                    style={{
-                      fontSize: 12,
-                      border: '1px solid var(--border)',
-                      borderRadius: 6,
-                      padding: '3px 6px',
-                      background: 'var(--surface)',
-                      fontFamily: 'inherit',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <option value="">No client</option>
-                    {clients.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    <button
-                      onClick={() => saveEdit(task.id)}
-                      style={{
-                        padding: '4px 10px',
-                        background: 'var(--brand)',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: 6,
-                        fontSize: 12,
-                        cursor: 'pointer',
-                        fontFamily: 'inherit',
-                      }}
-                    >
-                      Save
-                    </button>
-
-                    <button
-                      onClick={() => setEditingId(null)}
-                      style={{
-                        padding: '4px 8px',
-                        background: 'var(--surface-subtle)',
-                        color: 'var(--text-secondary)',
-                        border: '1px solid var(--border)',
-                        borderRadius: 6,
-                        fontSize: 12,
-                        cursor: 'pointer',
-                        fontFamily: 'inherit',
-                      }}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </div>
+                  onEdited={() => {
+                    setEditingId(null)
+                    startT(() => router.refresh())
+                  }}
+                  onCancelEdit={() => setEditingId(null)}
+                />
               )
             }
 
             return (
-              <div
-                key={task.id}
-                className="group"
-                style={{ borderBottom: '1px solid var(--border-light)' }}
-              >
+              <div key={task.id} className="group" style={{ borderBottom: '1px solid var(--border-light)' }}>
                 <div
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: '1fr 7rem 5rem 6rem 6rem 5rem 4.5rem',
+                    gridTemplateColumns: '1fr 10rem 6rem 6rem 6rem 5rem 4.5rem',
                     alignItems: 'center',
                     padding: '10px 16px',
                     cursor: 'pointer',
                   }}
-                  onClick={() =>
-                    setSelectedTask(selectedTask?.id === task.id ? null : task)
-                  }
+                  onClick={() => setSelectedTask(selectedTask?.id === task.id ? null : task)}
                 >
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 10,
-                      minWidth: 0,
-                    }}
-                  >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                     <button
                       onClick={async (e) => {
                         e.stopPropagation()
@@ -1254,13 +601,7 @@ export function RecurringView({
                     </button>
 
                     <div style={{ minWidth: 0 }}>
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 6,
-                        }}
-                      >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <span
                           style={{
                             fontSize: 13,
@@ -1293,12 +634,7 @@ export function RecurringView({
                               background: task.project.color,
                             }}
                           />
-                          <span
-                            style={{
-                              fontSize: 11,
-                              color: 'var(--text-muted)',
-                            }}
-                          >
+                          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                             {task.project.name}
                           </span>
                         </div>
@@ -1313,24 +649,17 @@ export function RecurringView({
                         fontWeight: 700,
                         padding: '2px 8px',
                         borderRadius: 20,
-                        background: `${freqColor}18`,
-                        color: freqColor,
+                        background: 'var(--brand-light)',
+                        color: 'var(--brand)',
+                        whiteSpace: 'nowrap',
                       }}
                     >
-                      {freqLabel}
+                      {FREQ_LABEL[task.frequency ?? ''] ?? task.frequency ?? '—'}
                     </span>
                   </div>
 
-                  <div
-                    style={{
-                      textAlign: 'center',
-                      fontSize: 12,
-                      color: 'var(--text-muted)',
-                    }}
-                  >
-                    {task.next_occurrence_date
-                      ? fmtDate(task.next_occurrence_date)
-                      : '—'}
+                  <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-muted)' }}>
+                    {task.next_occurrence_date ? fmtDate(task.next_occurrence_date) : '—'}
                   </div>
 
                   <div style={{ display: 'flex', justifyContent: 'center' }}>
@@ -1349,8 +678,7 @@ export function RecurringView({
                   </div>
 
                   <div style={{ display: 'flex', justifyContent: 'center' }}>
-                    {task.approver_id &&
-                    members.find((m) => m.id === task.approver_id) ? (
+                    {approver ? (
                       <div
                         style={{
                           width: 20,
@@ -1364,14 +692,9 @@ export function RecurringView({
                           fontSize: 8,
                           fontWeight: 700,
                         }}
-                        title={
-                          members.find((m) => m.id === task.approver_id)?.name
-                        }
+                        title={approver.name}
                       >
-                        {members
-                          .find((m) => m.id === task.approver_id)
-                          ?.name?.[0]
-                          ?.toUpperCase()}
+                        {approver.name?.[0]?.toUpperCase()}
                       </div>
                     ) : (
                       <div
@@ -1417,14 +740,7 @@ export function RecurringView({
                         </span>
                       </div>
                     ) : (
-                      <span
-                        style={{
-                          fontSize: 11,
-                          color: 'var(--text-muted)',
-                        }}
-                      >
-                        —
-                      </span>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>—</span>
                     )}
                   </div>
 
@@ -1434,7 +750,7 @@ export function RecurringView({
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
-                            startEdit(task)
+                            setEditingId(task.id)
                           }}
                           style={{
                             width: 26,
@@ -1455,7 +771,7 @@ export function RecurringView({
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
-                            deleteTask(task.id)
+                            handleDelete(task.id)
                           }}
                           style={{
                             width: 26,
@@ -1496,23 +812,16 @@ export function RecurringView({
                         }}
                       >
                         <button
-                          onClick={() =>
-                            toggleSubDone(task.id, sub.id, sub.status)
-                          }
+                          onClick={() => toggleSubDone(task.id, sub.id, sub.status)}
                           style={{
                             width: 13,
                             height: 13,
                             borderRadius: '50%',
                             flexShrink: 0,
                             border: 'none',
-                            background:
-                              sub.status === 'completed'
-                                ? 'var(--brand)'
-                                : 'transparent',
+                            background: sub.status === 'completed' ? 'var(--brand)' : 'transparent',
                             outline: `2px solid ${
-                              sub.status === 'completed'
-                                ? 'var(--brand)'
-                                : 'var(--border)'
+                              sub.status === 'completed' ? 'var(--brand)' : 'var(--border)'
                             }`,
                             cursor: 'pointer',
                             display: 'flex',
@@ -1521,11 +830,7 @@ export function RecurringView({
                           }}
                         >
                           {sub.status === 'completed' && (
-                            <svg
-                              viewBox="0 0 10 10"
-                              fill="none"
-                              style={{ width: 7, height: 7 }}
-                            >
+                            <svg viewBox="0 0 10 10" fill="none" style={{ width: 7, height: 7 }}>
                               <path
                                 d="M1.5 5L4 7.5L8.5 2.5"
                                 stroke="white"
@@ -1545,19 +850,14 @@ export function RecurringView({
                                 ? 'var(--text-muted)'
                                 : 'var(--text-primary)',
                             textDecoration:
-                              sub.status === 'completed'
-                                ? 'line-through'
-                                : 'none',
+                              sub.status === 'completed' ? 'line-through' : 'none',
                           }}
                         >
                           {sub.title}
                         </span>
 
                         {sub.status !== 'completed' && (
-                          <label
-                            title="Upload document"
-                            style={{ cursor: 'pointer', flexShrink: 0 }}
-                          >
+                          <label title="Upload document" style={{ cursor: 'pointer', flexShrink: 0 }}>
                             <input
                               type="file"
                               style={{ display: 'none' }}
@@ -1571,11 +871,7 @@ export function RecurringView({
                             <svg
                               viewBox="0 0 16 16"
                               fill="none"
-                              style={{
-                                width: 13,
-                                height: 13,
-                                color: 'var(--text-muted)',
-                              }}
+                              style={{ width: 13, height: 13, color: 'var(--text-muted)' }}
                               stroke="currentColor"
                               strokeWidth="1.5"
                               strokeLinecap="round"
@@ -1608,23 +904,14 @@ export function RecurringView({
                       <input
                         value={newSubInputs[task.id] ?? ''}
                         onChange={(e) =>
-                          setNewSubInputs((prev) => ({
-                            ...prev,
-                            [task.id]: e.target.value,
-                          }))
+                          setNewSubInputs((prev) => ({ ...prev, [task.id]: e.target.value }))
                         }
                         onKeyDown={async (e) => {
-                          if (
-                            e.key === 'Enter' &&
-                            (newSubInputs[task.id] ?? '').trim()
-                          ) {
+                          if (e.key === 'Enter' && (newSubInputs[task.id] ?? '').trim()) {
                             await addSubtask(task.id, newSubInputs[task.id])
                           }
                           if (e.key === 'Escape') {
-                            setNewSubInputs((prev) => ({
-                              ...prev,
-                              [task.id]: '',
-                            }))
+                            setNewSubInputs((prev) => ({ ...prev, [task.id]: '' }))
                           }
                         }}
                         placeholder="Add subtask… (Enter)"
@@ -1644,26 +931,17 @@ export function RecurringView({
             )
           })}
 
-          {canManage && visibleTasks.length > 0 && !showCreate && (
-            <button
-              onClick={openCreate}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '10px 16px',
-                border: 'none',
-                background: 'transparent',
-                cursor: 'pointer',
-                color: 'var(--text-muted)',
-                fontSize: 13,
-                fontFamily: 'inherit',
-                borderTop: '1px solid var(--border-light)',
+          {canManage && (
+            <InlineRecurringTask
+              members={members}
+              clients={clients}
+              currentUserId={currentUserId}
+              onCreated={(newTask?: any) => {
+                if (newTask) {
+                  setLocalTasks((prev) => [...prev, newTask])
+                }
               }}
-            >
-              <Plus style={{ width: 14, height: 14 }} />
-              Add recurring task
-            </button>
+            />
           )}
 
           <p
