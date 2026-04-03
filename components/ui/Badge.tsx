@@ -41,7 +41,7 @@ export function PlanBadge({ plan }: { plan: string }) {
     free:     { label: 'Free',     bg: '#f1f5f9', color:'var(--text-secondary)' },
     starter:  { label: 'Starter',  bg: '#eff6ff', color: '#1d4ed8' },
     pro:      { label: 'Pro',      bg: '#faf5ff', color: '#7c3aed' },
-    business: { label: 'Business', bg: '#f0fdfa', color: '#0d9488' },
+    business: { label: 'Business', bg: 'rgba(13,148,136,0.12)', color: '#0d9488' },
   }
   const c = cfg[plan] ?? cfg.free
   return (
@@ -53,11 +53,11 @@ export function PlanBadge({ plan }: { plan: string }) {
 
 export function RoleBadge({ role }: { role: string }) {
   const cfg: Record<string, { label: string; color: string; bg: string }> = {
-    owner:   { label: 'Owner',   color: '#0d9488', bg: '#f0fdfa' },
-    admin:   { label: 'Admin',   color: '#7c3aed', bg: '#faf5ff' },
-    manager: { label: 'Manager', color: '#ca8a04', bg: '#fffbeb' },
-    member:  { label: 'Member',  color:'var(--text-secondary)', bg: '#f1f5f9' },
-    viewer:  { label: 'Viewer',  color:'var(--text-muted)', bg: '#f8fafc' },
+    owner:   { label: 'Owner',   color: '#0d9488', bg: 'rgba(13,148,136,0.12)' },
+    admin:   { label: 'Admin',   color: '#7c3aed', bg: 'rgba(124,58,237,0.12)' },
+    manager: { label: 'Manager', color: '#ca8a04', bg: 'rgba(202,138,4,0.12)' },
+    member:  { label: 'Member',  color:'var(--text-secondary)', bg: 'var(--surface-subtle)' },
+    viewer:  { label: 'Viewer',  color:'var(--text-muted)', bg: 'var(--surface-subtle)' },
   }
   const c = cfg[role] ?? cfg.member
   return (

@@ -15,34 +15,40 @@ interface Props {
 }
 
 const QUICK_ACTIONS = [
-  { icon: CheckSquare, label: 'Add task',       href: '/inbox',        color: '#0d9488', bg: '#f0fdfa', border: '#99f6e4' },
-  { icon: FolderOpen,  label: 'New project',    href: '/projects/new', color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' },
-  { icon: Users2,      label: 'Add client',     href: '/clients/new',  color: '#0891b2', bg: '#ecfeff', border: '#a5f3fc' },
-  { icon: RefreshCw,   label: 'Recurring task', href: '/recurring',    color: '#ea580c', bg: '#fff7ed', border: '#fed7aa' },
-  { icon: Calendar,    label: 'Calendar',        href: '/calendar',     color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0' },
-  { icon: BarChart2,   label: 'Reports',         href: '/reports',      color: '#ca8a04', bg: '#fffbeb', border: '#fde68a' },
+  { icon: CheckSquare, label: 'Add task',       href: '/inbox',        color: '#0d9488' },
+  { icon: FolderOpen,  label: 'New project',    href: '/projects/new', color: '#7c3aed' },
+  { icon: Users2,      label: 'Add client',     href: '/clients/new',  color: '#0891b2' },
+  { icon: RefreshCw,   label: 'Recurring task', href: '/recurring',    color: '#ea580c' },
+  { icon: Calendar,    label: 'Calendar',        href: '/calendar',     color: '#16a34a' },
+  { icon: BarChart2,   label: 'Reports',         href: '/reports',      color: '#ca8a04' },
 ]
 
 function MiniAppCard({ title, color, tasks }: { title: string; color: string; tasks: string[] }) {
   return (
-    <div style={{ background: 'var(--surface)', borderRadius: 12, padding: '12px 14px', minWidth: 160,
-      boxShadow: '0 4px 20px rgba(0,0,0,0.12)', border: '1px solid rgba(255,255,255,0.3)' }}>
+    <div style={{
+      background: 'rgba(255,255,255,0.07)',
+      backdropFilter: 'blur(12px)',
+      borderRadius: 12, padding: '12px 14px', minWidth: 160,
+      boxShadow: '0 4px 24px rgba(0,0,0,0.25)',
+      border: '1px solid rgba(255,255,255,0.12)',
+    }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
         <div style={{ width: 8, height: 8, borderRadius: '50%', background: color }}/>
-        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden',
+        <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.9)', overflow: 'hidden',
           whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{title}</span>
       </div>
       {tasks.map((t, i) => (
         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
           <div style={{ width: 13, height: 13, borderRadius: '50%', flexShrink: 0,
             background: i === 0 ? color : 'transparent',
-            border: i === 0 ? 'none' : '1.5px solid #cbd5e1' }}/>
-          <span style={{ fontSize: 10, color: i === 0 ? '#94a3b8' : '#374151',
+            border: i === 0 ? 'none' : '1.5px solid rgba(255,255,255,0.2)' }}/>
+          <span style={{ fontSize: 10,
+            color: i === 0 ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.75)',
             textDecoration: i === 0 ? 'line-through' : 'none',
             overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', flex: 1 }}>{t}</span>
         </div>
       ))}
-      <div style={{ marginTop: 8, height: 3, background: '#e2e8f0', borderRadius: 99 }}>
+      <div style={{ marginTop: 8, height: 3, background: 'rgba(255,255,255,0.12)', borderRadius: 99 }}>
         <div style={{ width: `${Math.round(100 / tasks.length)}%`, height: '100%',
           background: color, borderRadius: 99 }}/>
       </div>
@@ -169,16 +175,16 @@ export function DashboardClient({
 
       {/* ── Quick actions ─────────────────────────────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 10, marginBottom: 24 }}>
-        {QUICK_ACTIONS.map(({ icon: Icon, label, href, color, bg, border }) => (
+        {QUICK_ACTIONS.map(({ icon: Icon, label, href, color }) => (
           <Link key={href} href={href} style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
             padding: '14px 10px', background: 'var(--surface)',
             border: `1px solid var(--border)`, borderRadius: 12,
             textDecoration: 'none', transition: 'all 0.15s',
           }}
-          onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.borderColor = border; el.style.background = bg; el.style.transform = 'translateY(-2px)'; el.style.boxShadow = `0 6px 20px ${color}20` }}
+          onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.borderColor = `${color}60`; el.style.background = `${color}12`; el.style.transform = 'translateY(-2px)'; el.style.boxShadow = `0 6px 20px ${color}20` }}
           onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.borderColor = 'var(--border)'; el.style.background = 'var(--surface)'; el.style.transform = ''; el.style.boxShadow = '' }}>
-            <div style={{ width: 38, height: 38, borderRadius: 10, background: bg,
+            <div style={{ width: 38, height: 38, borderRadius: 10, background: `${color}18`,
               display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Icon style={{ width: 17, height: 17, color }}/>
             </div>
@@ -239,7 +245,7 @@ export function DashboardClient({
               )
             }) : (
               <div style={{ padding: '32px 16px', textAlign: 'center' }}>
-                <CheckCircle2 style={{ width: 32, height: 32, color: '#e2e8f0', margin: '0 auto 10px' }}/>
+                <CheckCircle2 style={{ width: 32, height: 32, color: 'var(--border)', margin: '0 auto 10px' }}/>
                 <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 8 }}>
                   No tasks assigned to you yet
                 </p>

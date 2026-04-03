@@ -408,7 +408,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
             {/* Designated approver info */}
             {task.approval_required && approverInfo && (
               <div className="mb-3 flex items-center gap-2 px-3 py-2 rounded-lg text-xs"
-                style={{ background: '#f5f3ff', border: '1px solid #ddd6fe' }}>
+                style={{ background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.25)' }}>
                 <ShieldCheck className="h-3.5 w-3.5 text-violet-500 flex-shrink-0"/>
                 <span className="text-violet-700">
                   Approver: <strong>{approverInfo.name}</strong>
@@ -417,25 +417,25 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
             )}
             {task.approval_required && !approverInfo && (
               <div className="mb-3 flex items-center gap-2 px-3 py-2 rounded-lg text-xs"
-                style={{ background: '#f5f3ff', border: '1px solid #ddd6fe' }}>
+                style={{ background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.25)' }}>
                 <ShieldCheck className="h-3.5 w-3.5 text-violet-500 flex-shrink-0"/>
                 <span className="text-violet-700">Any manager can approve this task</span>
               </div>
             )}
             {task.approval_status === 'rejected' && (
-              <div className="px-4 py-2.5 border-b border-red-200" style={{ background: '#fef2f2' }}>
+              <div className="px-4 py-2.5 border-b" style={{ background: 'rgba(220,38,38,0.1)', borderColor:'rgba(220,38,38,0.25)' }}>
                 <p className="text-xs font-semibold text-red-700">❌ Rejected — please revise and resubmit</p>
               </div>
             )}
 
             {task.approval_status === 'approved' && (
-              <div className="px-4 py-2.5 border-b border-green-200" style={{ background: '#f0fdf4' }}>
+              <div className="px-4 py-2.5 border-b" style={{ background: 'rgba(22,163,74,0.1)', borderColor:'rgba(22,163,74,0.25)' }}>
                 <p className="text-xs font-semibold text-green-700">✅ Approved</p>
               </div>
             )}
 
             {task.approval_required && !task.approval_status && isAssignee && status !== 'completed' && (
-              <div className="px-4 py-2.5 border-b border-blue-200" style={{ background: '#eff6ff' }}>
+              <div className="px-4 py-2.5 border-b" style={{ background: 'rgba(59,130,246,0.1)', borderColor:'rgba(59,130,246,0.25)' }}>
                 <div className="flex items-center justify-between">
                   <p className="text-xs text-blue-700">This task requires approval before it can be completed</p>
                   <button onClick={() => callApproveAPI('submit')} disabled={approving}
@@ -597,7 +597,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                         onClick={convertToRecurring}
                         disabled={converting}
                         className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-colors"
-                        style={{ background: '#f0fdfa', color: '#0d9488', border: '1px solid #5eead4', cursor: 'pointer', opacity: converting ? 0.6 : 1 }}>
+                        style={{ background: 'rgba(13,148,136,0.12)', color: 'var(--brand)', border: '1px solid rgba(13,148,136,0.3)', cursor: 'pointer', opacity: converting ? 0.6 : 1 }}>
                         <RefreshCw className="h-3 w-3"/>
                         Make recurring
                       </button>
@@ -606,7 +606,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                           onClick={addToProject}
                           disabled={converting}
                           className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-colors"
-                          style={{ background: '#faf5ff', color: '#7c3aed', border: '1px solid #c4b5fd', cursor: 'pointer', opacity: converting ? 0.6 : 1 }}>
+                          style={{ background: 'rgba(124,58,237,0.12)', color: '#7c3aed', border: '1px solid rgba(124,58,237,0.3)', cursor: 'pointer', opacity: converting ? 0.6 : 1 }}>
                           <FolderPlus className="h-3 w-3"/>
                           Add to project
                         </button>

@@ -184,7 +184,7 @@ export function ApprovalsView({ pending: initialPending, history, members, clien
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                         <PriorityBadge priority={task.priority}/>
                         <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 99, fontWeight: 600,
-                          background: '#f5f3ff', color: '#7c3aed', border: '1px solid #ddd6fe' }}>
+                          background: 'rgba(124,58,237,0.12)', color: '#7c3aed', border: '1px solid rgba(124,58,237,0.3)' }}>
                           <Clock style={{ width: 9, height: 9, display: 'inline', marginRight: 3 }}/>
                           Awaiting review
                         </span>
@@ -278,7 +278,7 @@ export function ApprovalsView({ pending: initialPending, history, members, clien
                     </div>
                     <div>
                       <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 99, fontWeight: 600,
-                        background: task.approval_status === 'approved' ? '#dcfce7' : '#fee2e2',
+                        background: task.approval_status === 'approved' ? 'rgba(22,163,74,0.12)' : 'rgba(220,38,38,0.12)',
                         color: task.approval_status === 'approved' ? '#16a34a' : '#dc2626' }}>
                         {task.approval_status === 'approved' ? '✓ Approved' : '✕ Returned'}
                       </span>

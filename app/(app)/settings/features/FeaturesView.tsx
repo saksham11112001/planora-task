@@ -124,7 +124,18 @@ const SECTION_LABELS: Record<string, string> = {
   tools:      'Tools & features',
 }
 
-export function FeaturesView({ features: initial }: { features: Record<string, boolean> }) {
+export function FeaturesView({ features: initial, plan = 'free' }: { features: Record<string, boolean>; plan?: string }) {
+  const PLAN_ORDER = ['free', 'starter', 'pro', 'business']
+  const FEATURE_MIN_PLAN: Record<string, string> = {
+    ca_compliance_mode: 'pro', time_tracking: 'starter', reports: 'starter',
+    import_export: 'pro', custom_fields: 'starter', approvals: 'starter',
+  }
+  function isPlanSufficient(featureKey: string): boolean {
+    const required = FEATURE_MIN_PLAN[featureKey]
+    if (!required) return true
+    return PLAN_ORDER.indexOf(plan) >= PLAN_ORDER.indexOf(required)
+  }
+  const PLAN_LABELS: Record<string, string> = { starter: 'Starter', pro: 'Pro', business: 'Business' }
   // Apply defaults for features not yet in DB
   const withDefaults: Record<string, boolean> = {}
   ALL_FEATURES.forEach(f => {
@@ -135,6 +146,10 @@ export function FeaturesView({ features: initial }: { features: Record<string, b
   const [saving,   setSaving]   = useState<string | null>(null)
 
   async function toggle(key: string) {
+    if (!isPlanSufficient(key)) {
+      toast.error(`This feature requires the ${PLAN_LABELS[FEATURE_MIN_PLAN[key] ?? ''] ?? 'higher'} plan. Upgrade at Settings → Billing.`)
+      return
+    }
     const newVal = !features[key]
     setSaving(key)
     try {
@@ -170,12 +185,14 @@ export function FeaturesView({ features: initial }: { features: Record<string, b
           <div style={{ display:'flex', flexDirection:'column', gap:8, border:'1px solid var(--border)',
             borderRadius:14, overflow:'hidden' }}>
             {ALL_FEATURES.filter(f => f.section === section).map((f, idx, arr) => {
-              const Icon    = f.icon
-              const enabled = !!features[f.key]
+              const Icon     = f.icon
+              const enabled  = !!features[f.key]
               const isSaving = saving === f.key
+              const locked   = !isPlanSufficient(f.key)
+              const reqPlan  = FEATURE_MIN_PLAN[f.key]
               return (
                 <div key={f.key} style={{ padding:'14px 16px', display:'flex', alignItems:'center',
-                  gap:12, background:'var(--surface)',
+                  gap:12, background: locked ? 'var(--surface-subtle)' : 'var(--surface)', opacity: locked ? 0.85 : 1,
                   borderBottom: idx < arr.length-1 ? '1px solid var(--border-light)' : 'none',
                   opacity: isSaving ? 0.7 : 1, transition:'opacity 0.15s' }}>
                   <div style={{ width:32, height:32, borderRadius:8, flexShrink:0,
@@ -194,7 +211,14 @@ export function FeaturesView({ features: initial }: { features: Record<string, b
                     </div>
                     <p style={{ fontSize:11, color:'var(--text-muted)', margin:0, lineHeight:1.5 }}>{f.desc}</p>
                   </div>
-                  <button onClick={() => toggle(f.key)} disabled={isSaving}
+                  {locked && reqPlan && (
+                    <span style={{ fontSize:10, fontWeight:700, padding:'3px 8px', borderRadius:99,
+                      background:'rgba(202,138,4,0.15)', color:'#ca8a04', border:'1px solid rgba(202,138,4,0.3)',
+                      flexShrink:0, marginRight:8 }}>
+                      🔒 {PLAN_LABELS[reqPlan]} plan
+                    </span>
+                  )}
+                  <button onClick={() => toggle(f.key)} disabled={isSaving || locked}
                     style={{ flexShrink:0, width:40, height:22, borderRadius:99, border:'none',
                       background: enabled ? f.color : 'var(--border)',
                       cursor: isSaving ? 'not-allowed' : 'pointer',

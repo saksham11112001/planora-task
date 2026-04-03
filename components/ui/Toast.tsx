@@ -7,10 +7,10 @@ export function ToastContainer() {
   if (!toasts.length) return null
 
   const cfg = {
-    success: { bg: '#f0fdf4', border: '#bbf7d0', color: '#15803d', icon: CheckCircle },
-    error:   { bg: '#fef2f2', border: '#fecaca', color: '#b91c1c', icon: XCircle     },
-    info:    { bg: '#eff6ff', border: '#bfdbfe', color: '#1d4ed8', icon: Info         },
-    warning: { bg: '#fffbeb', border: '#fde68a', color: '#92400e', icon: AlertTriangle},
+    success: { bg: 'rgba(22,163,74,0.1)',    border: 'rgba(22,163,74,0.3)',    color: '#16a34a', icon: CheckCircle },
+    error:   { bg: 'rgba(220,38,38,0.1)',    border: 'rgba(220,38,38,0.3)',    color: '#dc2626', icon: XCircle     },
+    info:    { bg: 'rgba(59,130,246,0.1)',   border: 'rgba(59,130,246,0.3)',   color: '#2563eb', icon: Info         },
+    warning: { bg: 'rgba(202,138,4,0.1)',    border: 'rgba(202,138,4,0.3)',    color: '#ca8a04', icon: AlertTriangle},
   }
 
   return (

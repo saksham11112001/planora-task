@@ -237,7 +237,7 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void } = {}) {
                     onMouseLeave={e=>(e.currentTarget.style.background='transparent')}
                     onClick={() => { if (n.task_id) { router.push(`/tasks`); setBellOpen(false) } }}>
                     <div className="h-7 w-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
-                      style={{ background: n.action.includes('reject') ? '#fef2f2' : n.action.includes('approv') ? '#f0fdf4' : '#f0fdfa' }}>
+                      style={{ background: n.action.includes('reject') ? 'rgba(220,38,38,0.12)' : n.action.includes('approv') ? 'rgba(22,163,74,0.12)' : 'rgba(13,148,136,0.12)' }}>
                       {n.action.includes('reject') ? <AlertCircle className="h-3.5 w-3.5 text-red-500"/> :
                        n.action.includes('approv') ? <CheckCheck className="h-3.5 w-3.5 text-green-500"/> :
                        <Zap className="h-3.5 w-3.5 text-teal-500"/>}

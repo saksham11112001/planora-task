@@ -24,7 +24,8 @@ const PRIORITY_COLORS: Record<string,string> = {
   urgent:'#dc2626', high:'#ea580c', medium:'#ca8a04', low:'#16a34a', none:'#94a3b8',
 }
 const PRIORITY_BG: Record<string,string> = {
-  urgent:'#fef2f2', high:'#fff7ed', medium:'#fffbeb', low:'#f0fdf4', none:'#f8fafc',
+  urgent:'rgba(220,38,38,0.12)', high:'rgba(234,88,12,0.12)', medium:'rgba(202,138,4,0.12)',
+  low:'rgba(22,163,74,0.12)', none:'var(--surface-subtle)',
 }
 const STATUS_DOT: Record<string,string> = {
   todo:'#94a3b8', in_progress:'#0d9488', in_review:'#7c3aed', completed:'#16a34a',
@@ -78,10 +79,10 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
   const selectedTasks = selected ? (byDate[selected]??[]) : []
 
   const FILTERS = [
-    { v:'all'       as Filter, label:'All',        icon:CheckSquare, color:'#0d9488', bg:'#f0fdfa' },
-    { v:'project'   as Filter, label:'Projects',   icon:FolderOpen,  color:'#7c3aed', bg:'#f5f3ff' },
-    { v:'one-time'  as Filter, label:'One-time',   icon:CheckSquare, color:'#0891b2', bg:'#ecfeff' },
-    { v:'recurring' as Filter, label:'Recurring',  icon:RefreshCw,   color:'#ea580c', bg:'#fff7ed' },
+    { v:'all'       as Filter, label:'All',        icon:CheckSquare, color:'#0d9488', bg:'rgba(13,148,136,0.12)' },
+    { v:'project'   as Filter, label:'Projects',   icon:FolderOpen,  color:'#7c3aed', bg:'rgba(124,58,237,0.12)' },
+    { v:'one-time'  as Filter, label:'One-time',   icon:CheckSquare, color:'#0891b2', bg:'rgba(8,145,178,0.12)' },
+    { v:'recurring' as Filter, label:'Recurring',  icon:RefreshCw,   color:'#ea580c', bg:'rgba(234,88,12,0.12)' },
   ]
 
   // Month-level stats
@@ -201,11 +202,11 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
         {/* Month stats strip */}
         <div style={{ display:'flex', gap:10, marginBottom:14 }}>
           {[
-            { label:'Tasks this month', value:monthTasks.length, color:'#0d9488', bg:'#f0fdfa', border:'#99f6e4' },
-            { label:'Completed',        value:completedCount,   color:'#16a34a', bg:'#f0fdf4', border:'#bbf7d0' },
-            { label:'Pending',          value:pendingCount,     color:'#0891b2', bg:'#ecfeff', border:'#a5f3fc' },
+            { label:'Tasks this month', value:monthTasks.length, color:'#0d9488', bg:'rgba(13,148,136,0.1)', border:'rgba(13,148,136,0.25)' },
+            { label:'Completed',        value:completedCount,   color:'#16a34a', bg:'rgba(22,163,74,0.1)', border:'rgba(22,163,74,0.25)' },
+            { label:'Pending',          value:pendingCount,     color:'#0891b2', bg:'rgba(8,145,178,0.1)', border:'rgba(8,145,178,0.25)' },
             { label:'Overdue',          value:overdueCount,     color: overdueCount>0?'#dc2626':'#94a3b8',
-              bg: overdueCount>0?'#fef2f2':'var(--surface)', border: overdueCount>0?'#fecaca':'var(--border)' },
+              bg: overdueCount>0?'rgba(220,38,38,0.1)':'var(--surface)', border: overdueCount>0?'rgba(220,38,38,0.25)':'var(--border)' },
           ].map(s => (
             <div key={s.label} style={{ flex:1,padding:'8px 12px',borderRadius:8,
               background:s.bg,border:`1px solid ${s.border}` }}>
@@ -250,7 +251,7 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
                     : isHovered && dayTasks.length>0 ? '1px solid var(--brand-border)'
                     : '1px solid var(--border)',
                   background: isSelected ? 'var(--brand-light)'
-                    : isToday ? '#f0fdfa'
+                    : isToday ? 'rgba(13,148,136,0.08)'
                     : isWeekend ? 'var(--surface-subtle)'
                     : dayTasks.length>0 ? DAY_HEAT[heatIdx]
                     : 'var(--surface)',
@@ -271,7 +272,7 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
                     <div style={{ display:'flex',alignItems:'center',gap:2 }}>
                       {overdueT.length>0&&isPast&&<AlertTriangle style={{width:9,height:9,color:'#dc2626'}}/>}
                       <span style={{ fontSize:9,fontWeight:700,padding:'1px 5px',borderRadius:99,
-                        background: overdueT.length>0&&isPast?'#fef2f2':'var(--brand-light)',
+                        background: overdueT.length>0&&isPast?'rgba(220,38,38,0.12)':'var(--brand-light)',
                         color: overdueT.length>0&&isPast?'#dc2626':'var(--brand)' }}>
                         {dayTasks.length}
                       </span>
@@ -388,7 +389,7 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
                           )}
                           <span style={{ display:'inline-flex',alignItems:'center',gap:3,fontSize:10,
                             padding:'1px 6px',borderRadius:4,
-                            background:t.status==='completed'?'#f0fdf4':t.status==='in_progress'?'#f0fdfa':t.status==='in_review'?'#f5f3ff':'#f1f5f9',
+                            background:t.status==='completed'?'rgba(22,163,74,0.1)':t.status==='in_progress'?'rgba(13,148,136,0.1)':t.status==='in_review'?'rgba(124,58,237,0.1)':'var(--surface-subtle)',
                             color:STATUS_DOT[t.status]??'#94a3b8',fontWeight:500 }}>
                             <span style={{ width:5,height:5,borderRadius:'50%',background:STATUS_DOT[t.status]??'#94a3b8',display:'inline-block' }}/>
                             {t.status.replace('_',' ')}

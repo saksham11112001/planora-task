@@ -274,7 +274,7 @@ export function MyTasksView({
     if (isPending) return (
       <div title="Pending approval"
         style={{ width:16, height:16, borderRadius:'50%', flexShrink:0,
-          border:'1.5px solid #7c3aed', background:'#f5f3ff',
+          border:'1.5px solid #7c3aed', background:'rgba(124,58,237,0.1)',
           display:'flex', alignItems:'center', justifyContent:'center' }}>
         <Clock style={{ width:8, height:8, color:'#7c3aed' }}/>
       </div>
@@ -283,7 +283,7 @@ export function MyTasksView({
       <div onClick={e => toggleDone(task, e)}
         style={{ width:16, height:16, borderRadius:'50%', flexShrink:0,
           border:`1.5px solid ${isDone?'var(--brand)':ov?'#dc2626':'#cbd5e1'}`,
-          background: isDone?'var(--brand)':isComp?'#e2e8f0':'transparent',
+          background: isDone?'var(--brand)':isComp?'var(--border)':'transparent',
           display:'flex', alignItems:'center', justifyContent:'center',
           cursor:'pointer', transition:'all 0.15s' }}>
         {(isDone||isComp) && <svg viewBox="0 0 10 10" fill="none" style={{width:8,height:8}}>
@@ -445,7 +445,7 @@ export function MyTasksView({
                           color: sub.status==='completed' ? 'var(--text-muted)' : 'var(--text-primary)',
                           textDecoration: sub.status==='completed' ? 'line-through' : 'none' }}>{sub.title}</span>
                         <span style={{ fontSize:11, padding:'1px 8px', borderRadius:99,
-                          background: sub.status==='completed' ? 'rgba(13,148,136,0.1)' : '#f1f5f9',
+                          background: sub.status==='completed' ? 'rgba(13,148,136,0.1)' : 'var(--surface-subtle)',
                           color: sub.status==='completed' ? 'var(--brand)' : 'var(--text-muted)' }}>
                           {sub.status === 'completed' ? '✓ Done' : 'Pending'}
                         </span>
@@ -527,7 +527,7 @@ export function MyTasksView({
                           {task.is_recurring && <RefreshCw style={{ flexShrink:0, width:11, height:11, color:'var(--brand)', marginRight:2 }} title="Recurring task"/>}
                           {task.project_id && !task.is_recurring && <FolderOpen style={{ flexShrink:0, width:11, height:11, color:'#7c3aed', marginRight:2 }} title="Project task"/>}
                           <span className="task-title" style={{ overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis', flex:1 }}>{task.title}</span>
-                          {isPending && <span style={{ flexShrink:0, fontSize:11, background:'#ede9fe',
+                          {isPending && <span style={{ flexShrink:0, fontSize:11, background:'rgba(124,58,237,0.12)',
                             color:'#7c3aed', padding:'1px 5px', borderRadius:3, fontWeight:500 }}>
                             Pending
                           </span>}
@@ -635,7 +635,7 @@ export function MyTasksView({
                           }}
                           className="delete-task-btn"
                           onMouseEnter={e => {
-                            (e.currentTarget as HTMLElement).style.background = '#fef2f2'
+                            (e.currentTarget as HTMLElement).style.background = 'rgba(220,38,38,0.1)'
                             ;(e.currentTarget as HTMLElement).style.color = '#dc2626'
                           }}
                           onMouseLeave={e => {
@@ -859,7 +859,7 @@ export function MyTasksView({
                       <div style={{ display:'flex', alignItems:'flex-start', gap:7, marginBottom:8 }}>
                         {isPending
                           ? <div style={{ width:15, height:15, borderRadius:'50%', flexShrink:0, marginTop:1,
-                              background:'#f5f3ff', border:'1.5px solid #7c3aed',
+                              background:'rgba(124,58,237,0.1)', border:'1.5px solid #7c3aed',
                               display:'flex', alignItems:'center', justifyContent:'center' }}>
                               <Clock style={{ width:8, height:8, color:'#7c3aed' }}/>
                             </div>
