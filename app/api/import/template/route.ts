@@ -99,8 +99,12 @@ export async function GET() {
     // Sheet 1 — READ ME
     // ══════════════════════════════════════════════════════════════════════════
     const wsRM = wb.addWorksheet('📖 READ ME')
-    wsRM.getColumn(1).width = 82
-    wsRM.sheetView.showGridLines = false
+wsRM.getColumn(1).width = 82
+wsRM.views = [
+  {
+    showGridLines: false,
+  },
+]
 
     const instructions: [string, any][] = [
       ['Planora Bulk Import Template',
