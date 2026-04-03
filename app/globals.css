@@ -1636,3 +1636,193 @@ html.dark [data-tooltip]::after {
    ════════════════════════════════════════════════════════════════════ */
 html.dark .perm-row { background: var(--surface) !important; }
 html.dark .perm-row:hover { background: var(--surface-hover) !important; }
+
+/* ── Settings page — hardcoded light tint backgrounds ─────────────
+   The settings card hover + icon containers use light-mode-only
+   hex tints. In dark mode they render as bright white boxes.
+   We override every tint to the dark-surface equivalent.         */
+html.dark [style*="background: '#f5f3ff'"],
+html.dark [style*="background: #f5f3ff"],
+html.dark [style*="background:'#f5f3ff'"] { background: rgba(124,58,237,0.12) !important; }
+
+html.dark [style*="background: '#f0fdfa'"],
+html.dark [style*="background: #f0fdfa"],
+html.dark [style*="background:'#f0fdfa'"] { background: rgba(13,148,136,0.12) !important; }
+
+html.dark [style*="background: '#ecfeff'"],
+html.dark [style*="background: #ecfeff"],
+html.dark [style*="background:'#ecfeff'"] { background: rgba(8,145,178,0.12) !important; }
+
+html.dark [style*="background: '#fffbeb'"],
+html.dark [style*="background: #fffbeb"],
+html.dark [style*="background:'#fffbeb'"] { background: rgba(202,138,4,0.12) !important; }
+
+html.dark [style*="background: '#fff7ed'"],
+html.dark [style*="background: #fff7ed"],
+html.dark [style*="background:'#fff7ed'"] { background: rgba(234,88,12,0.12) !important; }
+
+html.dark [style*="background: '#f0fdf4'"],
+html.dark [style*="background: #f0fdf4"],
+html.dark [style*="background:'#f0fdf4'"] { background: rgba(22,163,74,0.12) !important; }
+
+html.dark [style*="background: '#fdf2f8'"],
+html.dark [style*="background: #fdf2f8"],
+html.dark [style*="background:'#fdf2f8'"] { background: rgba(219,39,119,0.12) !important; }
+
+html.dark [style*="background: '#fef2f2'"],
+html.dark [style*="background: #fef2f2"],
+html.dark [style*="background:'#fef2f2'"] { background: rgba(220,38,38,0.12) !important; }
+
+html.dark [style*="background: '#fef9c3'"],
+html.dark [style*="background: #fef9c3"],
+html.dark [style*="background:'#fef9c3'"] { background: rgba(202,138,4,0.12) !important; }
+
+html.dark [style*="background: '#faf5ff'"],
+html.dark [style*="background: #faf5ff"],
+html.dark [style*="background:'#faf5ff'"] { background: rgba(124,58,237,0.12) !important; }
+
+html.dark [style*="background: '#ede9fe'"],
+html.dark [style*="background: #ede9fe"],
+html.dark [style*="background:'#ede9fe'"] { background: rgba(124,58,237,0.15) !important; }
+
+/* Light-tinted text must stay readable over dark backgrounds */
+html.dark [style*="background: '#f0fdfa'"] *,
+html.dark [style*="background: #f0fdfa"] *,
+html.dark [style*="background: '#ecfeff'"] *,
+html.dark [style*="background: #ecfeff"] *,
+html.dark [style*="background: '#f5f3ff'"] *,
+html.dark [style*="background: #f5f3ff"] * { color: var(--text-primary); }
+
+/* Skeleton shimmer — dark mode */
+html.dark .animate-pulse,
+html.dark [class*="bg-gray-100"] { background: var(--border) !important; }
+
+/* Kanban task cards in dark mode — white box fix */
+html.dark .kanban-col,
+html.dark [class*="kanban"] {
+  background: var(--surface-subtle) !important;
+}
+
+/* White text on white bg fix — project page header hardcoded color */
+html.dark [style*="color: 'var(--text-primary)'"] { color: var(--text-primary); }
+html.dark h1, html.dark h2, html.dark h3 { color: var(--text-primary); }
+
+/* Delete task hover in dark — #fef2f2 bg override already covered above */
+html.dark .delete-task-btn:hover { color: #f87171 !important; background: rgba(220,38,38,0.15) !important; }
+
+/* Member remove button hover in dark */
+html.dark [title="Remove member"]:hover { background: rgba(220,38,38,0.15) !important; border-color: rgba(220,38,38,0.3) !important; }
+
+/* ═══════════════════════════════════════════════════════════════
+   PLANORA DARK MODE COMPREHENSIVE PATCH
+   Fixes all hardcoded light-mode colours that break in dark mode
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Skeleton shimmer in dark mode */
+html.dark [style*="background: 'var(--border)'"],
+html.dark [style*="background:var(--border)"] {
+  opacity: 0.6;
+}
+
+/* Settings card hover — already using var(--surface-hover) after fix,
+   but catch any remaining inline bg tints from other pages */
+html.dark [style*="background: '#f5f3ff'"],
+html.dark [style*="background: #f5f3ff"] { background: rgba(124,58,237,0.12) !important; }
+html.dark [style*="background: '#f0fdfa'"],
+html.dark [style*="background: #f0fdfa"] { background: rgba(13,148,136,0.1) !important; }
+html.dark [style*="background: '#ecfeff'"],
+html.dark [style*="background: #ecfeff"] { background: rgba(8,145,178,0.1) !important; }
+html.dark [style*="background: '#fffbeb'"],
+html.dark [style*="background: #fffbeb"] { background: rgba(202,138,4,0.1) !important; }
+html.dark [style*="background: '#fff7ed'"],
+html.dark [style*="background: #fff7ed"] { background: rgba(234,88,12,0.1) !important; }
+html.dark [style*="background: '#f0fdf4'"],
+html.dark [style*="background: #f0fdf4"] { background: rgba(22,163,74,0.1) !important; }
+html.dark [style*="background: '#fdf2f8'"],
+html.dark [style*="background: #fdf2f8"] { background: rgba(219,39,119,0.1) !important; }
+html.dark [style*="background: '#fef2f2'"],
+html.dark [style*="background: #fef2f2"] { background: rgba(220,38,38,0.1) !important; }
+html.dark [style*="background: '#faf5ff'"],
+html.dark [style*="background: #faf5ff"] { background: rgba(124,58,237,0.1) !important; }
+html.dark [style*="background: '#ede9fe'"],
+html.dark [style*="background: #ede9fe"] { background: rgba(124,58,237,0.15) !important; }
+html.dark [style*="background: '#fef9c3'"],
+html.dark [style*="background: #fef9c3"] { background: rgba(202,138,4,0.12) !important; }
+html.dark [style*="background: '#fef3c7'"],
+html.dark [style*="background: #fef3c7"] { background: rgba(202,138,4,0.12) !important; }
+html.dark [style*="background: '#dcfce7'"],
+html.dark [style*="background: #dcfce7"] { background: rgba(22,163,74,0.15) !important; }
+html.dark [style*="background: '#dbeafe'"],
+html.dark [style*="background: #dbeafe"] { background: rgba(59,130,246,0.12) !important; }
+
+/* Fix text colors on tinted backgrounds in dark mode */
+html.dark [style*="background: '#fef2f2'"] *:not(button),
+html.dark [style*="background: #fef2f2"] *:not(button) { color: #fca5a5; }
+
+/* Approvals page — purple pending surface in dark */
+html.dark [style*="background: 'var(--pending-surface"] { background: var(--pending-surface) !important; }
+
+/* White inline styles that escape the global catch */
+html.dark [style*="background: white"],
+html.dark [style*="background:white"] { background: var(--surface) !important; }
+html.dark [style*="background: '#fafafa'"],
+html.dark [style*="background: #fafafa"] { background: var(--surface-subtle) !important; }
+html.dark [style*="background: '#f9fafb'"],
+html.dark [style*="background: #f9fafb"] { background: var(--surface-subtle) !important; }
+html.dark [style*="background: '#e5e7eb'"],
+html.dark [style*="background: #e5e7eb"] { background: var(--border) !important; }
+html.dark [style*="background: '#e2e8f0'"],
+html.dark [style*="background: #e2e8f0"] { background: var(--border) !important; }
+
+/* Gray text on light backgrounds — make them use CSS vars */
+html.dark [style*="color: '#374151'"],
+html.dark [style*="color: #374151"] { color: var(--text-secondary) !important; }
+html.dark [style*="color: '#6b7280'"],
+html.dark [style*="color: #6b7280"] { color: var(--text-muted) !important; }
+html.dark [style*="color: '#9ca3af'"],
+html.dark [style*="color: #9ca3af"] { color: var(--text-muted) !important; }
+html.dark [style*="color: '#4b5563'"],
+html.dark [style*="color: #4b5563"] { color: var(--text-secondary) !important; }
+html.dark [style*="color: 'gray'"],
+html.dark [style*="color: gray"] { color: var(--text-muted) !important; }
+
+/* Border overrides for hardcoded light borders */
+html.dark [style*="border: '1px solid #e5e7eb'"],
+html.dark [style*="border: 1px solid #e5e7eb"] { border-color: var(--border) !important; }
+html.dark [style*="border: '1.5px solid #e2e8f0'"],
+html.dark [style*="border: 1.5px solid #e2e8f0"] { border-color: var(--border) !important; }
+html.dark [style*="borderColor: '#e5e7eb'"],
+html.dark [style*="borderColor: #e5e7eb"] { border-color: var(--border) !important; }
+
+/* Project page header hardcoded colors */
+html.dark [style*="color: '#0f172a'"],
+html.dark [style*="color: #0f172a"] { color: var(--text-primary) !important; }
+html.dark [style*="color: '#1e293b'"],
+html.dark [style*="color: #1e293b"] { color: var(--text-primary) !important; }
+
+/* Danger zone in settings — always red-on-red, keep readable */
+html.dark [style*="background: #fef2f2"][style*="border: '1px solid #fecaca'"],
+html.dark [style*="border: 1px solid #fecaca"] {
+  background: rgba(220,38,38,0.08) !important;
+  border-color: rgba(220,38,38,0.3) !important;
+}
+
+/* Delete / remove buttons hover */
+html.dark .delete-task-btn:hover { color: #f87171 !important; background: rgba(220,38,38,0.12) !important; }
+
+/* Scrollbar dark mode */
+html.dark ::-webkit-scrollbar-thumb { background: var(--border); }
+html.dark ::-webkit-scrollbar-thumb:hover { background: #4a5568; }
+
+/* Navigation progress bar */
+html.dark .page-loading-bar { background: var(--brand); }
+
+/* Task detail panel and modals */
+html.dark [class*="modal"],
+html.dark [class*="panel"],
+html.dark [class*="overlay"] { background: var(--surface) !important; }
+
+/* Inline task row teal highlight */
+html.dark [style*="borderLeft: '3px solid var(--brand)'"] {
+  background: rgba(13,148,136,0.06) !important;
+}

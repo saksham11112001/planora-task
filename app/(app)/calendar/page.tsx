@@ -17,18 +17,28 @@ export default async function CalendarPage() {
   const orgId = mb.org_id
   const canViewAll = ['owner','admin','manager'].includes(mb.role)
 
-  // Fetch 3 months of tasks with due dates
+  // Fetch 3 months of tasks with due dates — parallel with clients
   const from = new Date(); from.setMonth(from.getMonth() - 1)
   const to   = new Date(); to.setMonth(to.getMonth() + 2)
 
-  const q = supabase.from('tasks')
-    .select('id, title, status, priority, due_date, is_recurring, project_id, assignee_id, frequency, projects(id,name,color), assignee:users!tasks_assignee_id_fkey(id,name)')
+  const taskQuery = supabase.from('tasks')
+    .select('id, title, status, priority, due_date, is_recurring, project_id, assignee_id, client_id, frequency, projects(id,name,color), assignee:users!tasks_assignee_id_fkey(id,name)')
     .eq('org_id', orgId).not('due_date', 'is', null)
     .gte('due_date', from.toISOString().split('T')[0])
     .lte('due_date', to.toISOString().split('T')[0])
 
-  const { data: clients } = await supabase.from('clients').select('id, name, color').eq('org_id', mb.org_id).eq('status','active').order('name')
-  const { data: tasks } = canViewAll ? await q : await q.eq('assignee_id', user.id)
+  const [tasksResult, { data: clients }, { data: members }] = await Promise.all([
+    canViewAll ? taskQuery : taskQuery.eq('assignee_id', user.id),
+    supabase.from('clients').select('id, name, color').eq('org_id', mb.org_id).eq('status','active').order('name'),
+    supabase.from('org_members').select('user_id, users(id, name)').eq('org_id', mb.org_id).eq('is_active', true),
+  ])
+  const { data: tasks } = tasksResult
+  const memberList = (members ?? []).map((m: any) => ({ id: m.users?.id ?? m.user_id, name: m.users?.name ?? 'Unknown' }))
 
-  return <CalendarView tasks={(tasks ?? []) as any} canViewAll={canViewAll} currentUserId={user.id}/>
+  // Build client map for task enrichment
+  const clientMap: Record<string, { id: string; name: string; color: string }> = {}
+  ;(clients ?? []).forEach((c: any) => { clientMap[c.id] = c })
+  const enrichedTasks = (tasks ?? []).map((t: any) => ({ ...t, client: t.client_id ? (clientMap[t.client_id] ?? null) : null }))
+
+  return <CalendarView tasks={enrichedTasks as any} clients={clients ?? []} members={memberList} canViewAll={canViewAll} currentUserId={user.id}/>
 }
