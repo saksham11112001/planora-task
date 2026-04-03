@@ -150,11 +150,47 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
   async function handleBoardDrop(targetStatus: string) {
     if (!dragTaskId) return
     const task = localTasks.find(t => t.id===dragTaskId)
-    if (!task || task.status===targetStatus) { setDragTaskId(null); setDragOverCol(null); return }
+    if (!task) { setDragTaskId(null); setDragOverCol(null); return }
+    const taskId = dragTaskId
     setDragTaskId(null); setDragOverCol(null)
-    setLocalTasks(prev => prev.map(t => t.id===dragTaskId ? { ...t, status:targetStatus as any } : t))
-    const res = await fetch(`/api/tasks/${dragTaskId}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ status:targetStatus }) })
-    if (!res.ok) { setLocalTasks(prev => prev.map(t => t.id===dragTaskId ? { ...t, status:task.status } : t)); toast.error('Could not move task') }
+
+    // Don't allow dragging to completed if approval required and not yet approved
+    if (targetStatus === 'completed' && task.approval_required && task.approval_status !== 'approved') {
+      toast.error('This task requires approval before completion — drag to Pending approval first')
+      return
+    }
+
+    // Dragging to "Pending approval" must use the /approve submit flow
+    // so approval_status is set to 'pending' AND the approver is notified.
+    if (targetStatus === 'in_review') {
+      if (task.assignee_id && task.assignee_id !== currentUserId) {
+        toast.error('Only the task assignee can submit it for approval')
+        return
+      }
+      setLocalTasks(prev => prev.map(t => t.id===taskId ? { ...t, status:'in_review' as any, approval_status:'pending' } : t))
+      const res = await fetch(`/api/tasks/${taskId}/approve`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ decision:'submit' }) })
+      if (res.ok) { toast.success('Submitted for approval ✓'); startT(() => router.refresh()) }
+      else {
+        setLocalTasks(prev => prev.map(t => t.id===taskId ? { ...t, status:task.status, approval_status:task.approval_status } : t))
+        const d = await res.json().catch(() => ({}))
+        toast.error(d.error ?? 'Could not submit for approval')
+      }
+      return
+    }
+
+    // All other transitions — plain PATCH
+    const patchBody: any = { status: targetStatus }
+    if (targetStatus === 'completed') patchBody.completed_at = new Date().toISOString()
+    if (targetStatus === 'todo' || targetStatus === 'in_progress') patchBody.completed_at = null
+
+    setLocalTasks(prev => prev.map(t => t.id===taskId ? { ...t, status:targetStatus as any } : t))
+    const res = await fetch(`/api/tasks/${taskId}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(patchBody) })
+    if (!res.ok) {
+      setLocalTasks(prev => prev.map(t => t.id===taskId ? { ...t, status:task.status } : t))
+      toast.error('Could not move task')
+    } else {
+      startT(() => router.refresh())
+    }
   }
 
   const visibleTasks = clientFilter ? localTasks.filter(t => (t as any).client?.id===clientFilter) : localTasks

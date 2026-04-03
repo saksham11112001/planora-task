@@ -23,6 +23,7 @@ export function ProjectEditForm({ project, clients, members }: { project: any; c
     budget:      project.budget      ?? '',
     hours_budget:project.hours_budget?? '',
   })
+  const [memberIds, setMemberIds] = useState<string[]>(project.member_ids ?? [])
 
   function set(k: string, v: string) { setForm(f => ({ ...f, [k]: v })) }
 
@@ -40,6 +41,7 @@ export function ProjectEditForm({ project, clients, members }: { project: any; c
         due_date:     form.due_date     || null,
         budget:       form.budget       ? parseFloat(form.budget)       : null,
         hours_budget: form.hours_budget ? parseFloat(form.hours_budget) : null,
+        member_ids:   memberIds.length > 0 ? memberIds : null,
       }),
     })
     setSaving(false)
@@ -128,6 +130,39 @@ export function ProjectEditForm({ project, clients, members }: { project: any; c
               <div><Label>Due date</Label><Input k="due_date" type="date"/></div>
               <div><Label>Budget (₹)</Label><Input k="budget" type="number" placeholder="e.g. 50000"/></div>
               <div><Label>Hours budget</Label><Input k="hours_budget" type="number" placeholder="e.g. 120"/></div>
+            </div>
+
+            {/* Team member visibility */}
+            <div>
+              <Label>Visible to members <span style={{ fontWeight: 400, color:'var(--text-muted)' }}>(leave empty = whole org)</span></Label>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:6, padding:'10px 12px', border:'1.5px solid #e2e8f0', borderRadius:8, background:'var(--surface-subtle)', minHeight:44 }}>
+                {members.map((m: any) => {
+                  const selected = memberIds.includes(m.id)
+                  return (
+                    <button key={m.id} type="button"
+                      onClick={() => setMemberIds(p => selected ? p.filter((id: string) => id !== m.id) : [...p, m.id])}
+                      style={{
+                        display:'flex', alignItems:'center', gap:5, padding:'4px 10px', borderRadius:20,
+                        border: selected ? '1.5px solid #0d9488' : '1.5px solid #e2e8f0',
+                        background: selected ? 'rgba(13,148,136,0.1)' : '#fff',
+                        cursor:'pointer', fontSize:12, fontWeight: selected ? 600 : 400,
+                        color: selected ? '#0d9488' : '#6b7280', transition:'all 0.12s', fontFamily:'inherit',
+                      }}>
+                      <div style={{ width:18, height:18, borderRadius:'50%', background:selected?'#0d9488':'#e5e7eb', display:'flex', alignItems:'center', justifyContent:'center', color:selected?'#fff':'#6b7280', fontSize:9, fontWeight:700, flexShrink:0 }}>
+                        {m.name[0]?.toUpperCase()}
+                      </div>
+                      {m.name}
+                      {selected && <span style={{ fontSize:10 }}>✓</span>}
+                    </button>
+                  )
+                })}
+                {members.length === 0 && <span style={{ fontSize:12, color:'#9ca3af' }}>No team members</span>}
+              </div>
+              {memberIds.length > 0 && (
+                <p style={{ fontSize:11, color:'#6b7280', marginTop:4 }}>
+                  {memberIds.length} member{memberIds.length > 1 ? 's' : ''} selected — only they (and admins/owners) will see this project
+                </p>
+              )}
             </div>
 
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', paddingTop: 4 }}>

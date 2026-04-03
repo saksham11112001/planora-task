@@ -7,14 +7,22 @@ export async function GET(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-  const { data: mb } = await supabase.from('org_members').select('org_id').eq('user_id', user.id).eq('is_active', true).single()
+  const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).single()
   if (!mb) return NextResponse.json({ data: [] })
   const sp  = request.nextUrl.searchParams
   const lim = parseInt(sp.get('limit') ?? '100')
-  const { data, error } = await supabase.from('projects')
-    .select('id, name, color, status, due_date, client_id')
+  // Members see: projects where member_ids is NULL (whole org) OR they are in member_ids
+  // Admins/owners/managers see all projects
+  const isManager = ['owner', 'admin', 'manager'].includes(mb.role ?? '')
+  let projectQuery = supabase.from('projects')
+    .select('id, name, color, status, due_date, client_id, member_ids')
     .eq('org_id', mb.org_id).neq('is_archived', true)
     .order('updated_at', { ascending: false }).limit(lim)
+  // Non-managers can only see projects where they're a member or project is org-wide
+  if (!isManager) {
+    projectQuery = projectQuery.or(`member_ids.is.null,member_ids.cs.{${user.id}}`)
+  }
+  const { data, error } = await projectQuery
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ data })
 }
@@ -51,6 +59,7 @@ export async function POST(request: NextRequest) {
     budget:      body.budget      ?? null,
     hours_budget:body.hours_budget ?? null,
     status:      'active',
+    member_ids:  Array.isArray(body.member_ids) && body.member_ids.length > 0 ? body.member_ids : null,
   }).select('*').single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 

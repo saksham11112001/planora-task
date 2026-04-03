@@ -174,8 +174,8 @@ export function MyTasksView({
   async function handleDrop(targetStatus: string) {
     if (!dragTaskId) return
     const task = tasks.find(t => t.id === dragTaskId)
-    if (!task || task.status === targetStatus) { setDragTaskId(null); setDragOverCol(null); return }
-    
+    if (!task) { setDragTaskId(null); setDragOverCol(null); return }
+
     // Map board column status to actual task status
     const statusMap: Record<string, string> = {
       'todo': 'todo', 'in_progress': 'in_progress',
@@ -183,33 +183,67 @@ export function MyTasksView({
     }
     const newStatus = statusMap[targetStatus] ?? targetStatus
 
-    // Don't allow dragging to completed if approval required
-    if (newStatus === 'completed' && task.approval_required && task.approval_status !== 'approved') {
-      toast.error('This task requires approval before completion')
+    // No-op if already in that state
+    if (task.status === newStatus && !(newStatus === 'in_review' && task.approval_status !== 'pending')) {
       setDragTaskId(null); setDragOverCol(null); return
     }
 
-    // Optimistic update
-    setTasks(prev => prev.map(t => t.id === dragTaskId
-      ? { ...t, status: newStatus as any, approval_status: newStatus === 'in_review' ? 'pending' : t.approval_status }
-      : t
-    ))
+    // Don't allow dragging to completed if approval required and not yet approved
+    if (newStatus === 'completed' && task.approval_required && task.approval_status !== 'approved') {
+      toast.error('This task requires approval before completion — drag to Pending approval first')
+      setDragTaskId(null); setDragOverCol(null); return
+    }
+
     setDragTaskId(null)
     setDragOverCol(null)
-    
+
+    // ── Dragging to "Pending approval" column ──────────────────────────────
+    // Must go through the /approve submit flow — not a plain PATCH —
+    // so that approval_status is set to 'pending' AND the approver is notified.
+    if (newStatus === 'in_review') {
+      // Only the assignee can submit for approval
+      if (task.assignee_id && task.assignee_id !== currentUserId) {
+        toast.error('Only the task assignee can submit it for approval')
+        return
+      }
+      // Optimistic update
+      setTasks(prev => prev.map(t => t.id === task.id
+        ? { ...t, status: 'in_review' as any, approval_status: 'pending' } : t))
+      const res = await fetch(`/api/tasks/${task.id}/approve`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decision: 'submit' }),
+      })
+      if (res.ok) {
+        toast.success('Submitted for approval ✓')
+        refresh()
+      } else {
+        // Revert optimistic update
+        setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: task.status as any, approval_status: task.approval_status } : t))
+        const d = await res.json().catch(() => ({}))
+        toast.error(d.error ?? 'Could not submit for approval')
+      }
+      return
+    }
+
+    // ── All other status transitions — plain PATCH ─────────────────────────
     const patchBody: any = { status: newStatus }
     if (newStatus === 'completed') patchBody.completed_at = new Date().toISOString()
-    if (newStatus === 'in_progress') patchBody.completed_at = null
-    
-    const res = await fetch(`/api/tasks/${dragTaskId}`, {
+    if (newStatus === 'todo' || newStatus === 'in_progress') patchBody.completed_at = null
+
+    // Optimistic update
+    setTasks(prev => prev.map(t => t.id === task.id
+      ? { ...t, status: newStatus as any } : t))
+
+    const res = await fetch(`/api/tasks/${task.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(patchBody),
     })
     if (!res.ok) {
-      setTasks(prev => prev.map(t => t.id === dragTaskId ? { ...t, status: task.status as any } : t))
-      toast.error('Could not move task')
+      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: task.status as any } : t))
+      const d = await res.json().catch(() => ({}))
+      toast.error(d.error ?? 'Could not move task')
     } else {
-      toast.success(`Moved to ${targetStatus.replace('_', ' ')}`)
+      toast.success(`Moved to ${newStatus.replace('_', ' ')}`)
       refresh()
     }
   }

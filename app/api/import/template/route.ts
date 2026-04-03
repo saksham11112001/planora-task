@@ -22,7 +22,7 @@ export async function GET() {
         data: [
           ['Full Name *', 'Email *', 'Role *', 'Notes'],
           ["Person's display name", 'Work email', 'manager|member|viewer', 'Optional'],
-          ['Alex Johnson', 'alex@yourcompany.com', 'manager', ''],
+          ['[SAMPLE] Alex Johnson', 'alex@yourcompany.com', 'manager', ''],
         ],
       },
       {
@@ -30,7 +30,7 @@ export async function GET() {
         data: [
           ['Client Name *', 'Contact Email', 'Phone', 'Company', 'Website', 'Industry', 'Color', 'Status', 'Notes'],
           ['Unique name', 'contact@client.com', '+91 9876543210', 'Company Ltd', 'https://company.com', 'Technology', '#6366f1', 'active|inactive|lead', 'Optional'],
-          ['Acme Corp', 'hello@acme.com', '', 'Acme Corp Ltd', '', 'Technology', '#6366f1', 'active', ''],
+          ['[SAMPLE] Acme Corp', 'hello@acme.com', '', 'Acme Corp Ltd', '', 'Technology', '#6366f1', 'active', ''],
         ],
       },
       {
@@ -38,7 +38,7 @@ export async function GET() {
         data: [
           ['Project Name *', 'Color', 'Status', 'Due Date', 'Owner Email', 'Client Name', 'Budget', 'Hours Budget', 'Description'],
           ['Unique name', '#hex', 'active|on_hold|completed', 'YYYY-MM-DD', 'owner@yourcompany.com', 'Must match clients', 'Optional', 'Optional', 'Optional'],
-          ['Website Redesign', '#6366f1', 'active', '2025-08-31', 'alex@yourcompany.com', 'Acme Corp', '', '', ''],
+          ['[SAMPLE] Website Redesign', '#6366f1', 'active', '2025-08-31', 'alex@yourcompany.com', 'Acme Corp', '', '', ''],
         ],
       },
       {
@@ -46,7 +46,7 @@ export async function GET() {
         data: [
           ['Task Title *', 'Project Name', 'Assignee Email', 'Approver Email', 'Priority', 'Due Date', 'Status', 'Client Name', 'Est. Hours', 'Description'],
           ['Clear title', 'Must match projects', 'email', 'email', 'none|low|medium|high|urgent', 'YYYY-MM-DD', 'todo|in_progress|completed|blocked', 'Optional', 'Number', 'Optional'],
-          ['Design wireframes', 'Website Redesign', 'alex@yourcompany.com', 'manager@yourcompany.com', 'high', '2025-07-15', 'todo', 'Acme Corp', '8', ''],
+          ['[SAMPLE] Design wireframes', '[SAMPLE] Website Redesign', 'alex@yourcompany.com', 'manager@yourcompany.com', 'high', '2025-07-15', 'todo', 'Acme Corp', '8', ''],
         ],
       },
       {
@@ -54,7 +54,7 @@ export async function GET() {
         data: [
           ['Task Title *', 'Assignee Email', 'Approver Email', 'Priority', 'Due Date', 'Client Name', 'Est. Hours', 'Description'],
           ['Clear title', 'email', 'email', 'none|low|medium|high|urgent', 'YYYY-MM-DD', 'Must match clients', 'Number', 'Optional'],
-          ['Review Q3 proposals', 'alex@yourcompany.com', 'manager@yourcompany.com', 'high', '2025-07-10', 'Acme Corp', '2', ''],
+          ['[SAMPLE] Review Q3 proposals', 'alex@yourcompany.com', 'manager@yourcompany.com', 'high', '2025-07-10', 'Acme Corp', '2', ''],
         ],
       },
       {
@@ -62,7 +62,7 @@ export async function GET() {
         data: [
           ['Task Title *', 'Frequency *', 'Assignee Email', 'Approver Email', 'Priority', 'Project Name', 'Client Name', 'Start Date', 'Description'],
           ['Clear title', 'daily|weekly|bi_weekly|monthly|quarterly|annual', 'email', 'email', 'none|low|medium|high|urgent', 'Must match projects', 'Optional', 'YYYY-MM-DD', 'Optional'],
-          ['Weekly standup', 'weekly', 'alex@yourcompany.com', 'manager@yourcompany.com', 'medium', '', '', '2025-07-07', ''],
+          ['[SAMPLE] Weekly standup', 'weekly', 'alex@yourcompany.com', 'manager@yourcompany.com', 'medium', '', '', '2025-07-07', ''],
         ],
       },
       {
@@ -70,7 +70,7 @@ export async function GET() {
         data: [
           ['Compliance Task Type *', 'Client Name', 'Assignee Email', 'Approver Email', 'Due Date', 'Priority', 'Frequency'],
           ['Must match supported compliance task title', 'Must match clients', 'email', 'email', 'YYYY-MM-DD', 'Optional', 'Optional'],
-          ['GST Filing', 'Acme Corp', 'alex@yourcompany.com', 'manager@yourcompany.com', '2025-07-31', 'high', 'monthly'],
+          ['[SAMPLE] GST Filing', 'Acme Corp', 'alex@yourcompany.com', 'manager@yourcompany.com', '2025-07-31', 'high', 'monthly'],
         ],
       },
     ]

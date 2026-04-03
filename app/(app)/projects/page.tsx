@@ -16,9 +16,14 @@ export default async function ProjectsPage() {
     .select('org_id, role').eq('user_id', user.id).eq('is_active', true).maybeSingle()
   if (!mb) redirect('/onboarding')
 
+  const isManager = ['owner','admin','manager'].includes(mb.role)
+  let projectsQuery = supabase.from('projects').select('*, clients(id, name, color), member_ids')
+    .eq('org_id', mb.org_id).neq('is_archived', true).order('updated_at', { ascending: false })
+  if (!isManager) {
+    projectsQuery = projectsQuery.or(`member_ids.is.null,member_ids.cs.{${user.id}}`)
+  }
   const [{ data: projects }, { data: taskCounts }, { data: clients }] = await Promise.all([
-    supabase.from('projects').select('*, clients(id, name, color)')
-      .eq('org_id', mb.org_id).neq('is_archived', true).order('updated_at', { ascending: false }),
+    projectsQuery,
     supabase.from('tasks').select('project_id, status').eq('org_id', mb.org_id).not('project_id', 'is', null),
     supabase.from('clients').select('id, name, color').eq('org_id', mb.org_id).eq('status', 'active').order('name'),
   ])
@@ -37,6 +42,7 @@ export default async function ProjectsPage() {
       counts={counts}
       clients={clients ?? []}
       canManage={['owner','admin','manager'].includes(mb.role)}
+      currentUserId={user.id}
     />
   )
   } catch (err: any) {

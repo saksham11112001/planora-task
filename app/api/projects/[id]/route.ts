@@ -12,7 +12,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
 
   const body = await req.json()
-  const ALLOWED = ['name','description','color','status','client_id','owner_id','due_date','start_date','budget','hours_budget','is_archived']
+  const ALLOWED = ['name','description','color','status','client_id','owner_id','due_date','start_date','budget','hours_budget','is_archived','member_ids']
   const updates: Record<string, unknown> = {}
   for (const k of ALLOWED) { if (k in body) updates[k] = body[k] }
   if (!Object.keys(updates).length) return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })

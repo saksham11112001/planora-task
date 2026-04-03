@@ -168,6 +168,7 @@ export function NewProjectForm({ clients, members }: {
   const [budget,      setBudget]      = useState('')
   const [hoursBudget, setHoursBudget] = useState('')
   const [error,       setError]       = useState('')
+  const [memberIds,    setMemberIds]    = useState<string[]>([])
   const [selectedTemplate,     setSelectedTemplate]     = useState<string | null>(null)
   const [templateTasksPreview, setTemplateTasksPreview] = useState<TemplateTask[]>([])
 
@@ -185,6 +186,7 @@ export function NewProjectForm({ clients, members }: {
           budget: budget ? parseFloat(budget) : null,
           hours_budget: hoursBudget ? parseFloat(hoursBudget) : null,
           template_tasks: templateTasksPreview.length > 0 ? templateTasksPreview : undefined,
+          member_ids: memberIds.length > 0 ? memberIds : null,
         }),
       })
       const data = await res.json()
@@ -285,6 +287,42 @@ export function NewProjectForm({ clients, members }: {
             {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
           </select>
         </div>
+      </div>
+
+      {/* Team members — who can see this project */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+          Visible to members
+          <span className="ml-1.5 text-xs font-normal text-gray-400">(leave empty = whole org)</span>
+        </label>
+        <div style={{ display:'flex', flexWrap:'wrap', gap:6, padding:'10px 12px', border:'1px solid #e5e7eb', borderRadius:8, background:'#fafafa', minHeight:44 }}>
+          {members.map(m => {
+            const selected = memberIds.includes(m.id)
+            return (
+              <button key={m.id} type="button"
+                onClick={() => setMemberIds(p => selected ? p.filter(id => id !== m.id) : [...p, m.id])}
+                style={{
+                  display:'flex', alignItems:'center', gap:5, padding:'4px 10px', borderRadius:20,
+                  border: selected ? '1.5px solid #0d9488' : '1.5px solid #e5e7eb',
+                  background: selected ? 'rgba(13,148,136,0.1)' : '#fff',
+                  cursor:'pointer', fontSize:12, fontWeight: selected ? 600 : 400,
+                  color: selected ? '#0d9488' : '#6b7280', transition:'all 0.12s', fontFamily:'inherit',
+                }}>
+                <div style={{ width:18, height:18, borderRadius:'50%', background:selected?'#0d9488':'#e5e7eb', display:'flex', alignItems:'center', justifyContent:'center', color:selected?'#fff':'#6b7280', fontSize:9, fontWeight:700, flexShrink:0 }}>
+                  {m.name[0]?.toUpperCase()}
+                </div>
+                {m.name}
+                {selected && <span style={{ fontSize:10 }}>✓</span>}
+              </button>
+            )
+          })}
+          {members.length === 0 && <span style={{ fontSize:12, color:'#9ca3af' }}>No team members yet</span>}
+        </div>
+        {memberIds.length > 0 && (
+          <p style={{ fontSize:11, color:'#6b7280', marginTop:4 }}>
+            {memberIds.length} member{memberIds.length > 1 ? 's' : ''} selected — only they (and admins/owners) will see this project
+          </p>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-4">

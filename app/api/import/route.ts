@@ -116,6 +116,8 @@ function isSampleRow(row: string[]): boolean {
   const filled = row.filter(v => cleanText(v).length > 0).length
 
   if (filled === 0) return true
+  // Explicit [SAMPLE] marker added to all template example rows
+  if (joined.includes('[sample]')) return true
   if (joined.includes('@yourcompany.com')) return true
   if (joined.includes('must match')) return true
   if (joined.includes('yyyy-mm-dd')) return true
