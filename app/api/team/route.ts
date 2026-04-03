@@ -3,6 +3,20 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse }      from 'next/server'
 import type { NextRequest }  from 'next/server'
 
+// ── Plan limits ───────────────────────────────────────────────────────────
+function memberLimit(plan: string) {
+  return { free: 3, starter: 10, pro: 25, business: 100 }[plan] ?? 3
+}
+function isAtMemberLimit(plan: string, count: number) {
+  return count >= memberLimit(plan)
+}
+function effectivePlan(org: { plan_tier: string; status: string; trial_ends_at?: string | null }) {
+  if (org.status === 'trialing') return 'pro'
+  return org.plan_tier
+}
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://sng-adwisers.com'
+
 export async function GET() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -21,18 +35,20 @@ export async function POST(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-  const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).single()
-  if (!mb || !['owner','admin','manager'].includes(mb.role))
+
+  const { data: mb } = await supabase.from('org_members')
+    .select('org_id, role').eq('user_id', user.id).eq('is_active', true).single()
+  if (!mb || !['owner', 'admin', 'manager'].includes(mb.role))
     return NextResponse.json({ error: 'Only owners/admins/managers can invite' }, { status: 403 })
 
   const { email, role = 'member' } = await request.json()
   if (!email?.trim()) return NextResponse.json({ error: 'Email required' }, { status: 400 })
-  if (!['admin','manager','member','viewer'].includes(role))
+  if (!['admin', 'manager', 'member', 'viewer'].includes(role))
     return NextResponse.json({ error: 'Invalid role' }, { status: 400 })
 
   const admin = createAdminClient()
 
-  // Check member limit for this org's plan
+  // Check member limit
   const { data: orgData } = await admin.from('organisations')
     .select('plan_tier, status, trial_ends_at').eq('id', mb.org_id).single()
   const { count: currentMembers } = await admin.from('org_members')
@@ -44,52 +60,61 @@ export async function POST(request: NextRequest) {
       error: `Your ${plan} plan allows up to ${memberLimit(plan)} members. Upgrade to add more.`
     }, { status: 403 })
   }
-  // Find existing user by email
-  const { data: existingUser } = await admin.from('users').select('id').eq('email', email.toLowerCase().trim()).maybeSingle()
+
+  // Check if user already exists in public.users
+  const { data: existingUser } = await admin
+    .from('users').select('id').eq('email', email.toLowerCase().trim()).maybeSingle()
 
   if (existingUser) {
-    // Check not already a member
-    const { data: existing } = await admin.from('org_members').select('id, is_active').eq('org_id', mb.org_id).eq('user_id', existingUser.id).maybeSingle()
-    if (existing?.is_active) return NextResponse.json({ error: 'User is already a member' }, { status: 409 })
+    // User exists — check membership
+    const { data: existing } = await admin.from('org_members')
+      .select('id, is_active').eq('org_id', mb.org_id).eq('user_id', existingUser.id).maybeSingle()
+    if (existing?.is_active)
+      return NextResponse.json({ error: 'User is already a member' }, { status: 409 })
 
     if (existing) {
-      // Reactivate
       await admin.from('org_members').update({ is_active: true, role }).eq('id', existing.id)
     } else {
       await admin.from('org_members').insert({ org_id: mb.org_id, user_id: existingUser.id, role, is_active: true })
     }
-    return NextResponse.json({ success: true, message: 'Member added' })
+    return NextResponse.json({ success: true, message: 'Member added to your workspace' })
   }
 
-  // User doesn't exist — send invite via Supabase Auth
+  // New user — send Supabase invite email.
+  // FIX: redirectTo points to /auth/confirm (handles implicit flow token in hash)
+  // and includes the org/role so the callback can provision membership.
   const { error: inviteErr } = await admin.auth.admin.inviteUserByEmail(email.trim(), {
     data: { invited_to_org: mb.org_id, invited_role: role },
-    redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
+    redirectTo: `${APP_URL}/auth/confirm`,
   })
-  if (inviteErr) return NextResponse.json({ error: inviteErr.message }, { status: 500 })
-  return NextResponse.json({ success: true, message: 'Invitation sent' })
+
+  if (inviteErr) {
+    console.error('[/api/team POST] inviteUserByEmail failed:', inviteErr.message)
+    return NextResponse.json({ error: inviteErr.message }, { status: 500 })
+  }
+
+  return NextResponse.json({ success: true, message: 'Invitation sent!' })
 }
 
 export async function PATCH(request: NextRequest) {
-  // Note: managers can only change roles of members/viewers, not admins/owners
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-  const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).single()
-  if (!mb || !['owner','admin'].includes(mb.role))
+
+  const { data: mb } = await supabase.from('org_members')
+    .select('org_id, role').eq('user_id', user.id).eq('is_active', true).single()
+  if (!mb || !['owner', 'admin'].includes(mb.role))
     return NextResponse.json({ error: 'Only owners/admins can change roles' }, { status: 403 })
 
   const { member_id, user_id, role } = await request.json()
-  if (!['admin','manager','member','viewer'].includes(role))
+  if (!['admin', 'manager', 'member', 'viewer'].includes(role))
     return NextResponse.json({ error: 'Invalid role' }, { status: 400 })
 
-  // Validate that whichever ID we got is a non-empty UUID-shaped string
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
   const idToCheck = member_id || user_id
   if (!idToCheck || !UUID_RE.test(idToCheck))
     return NextResponse.json({ error: 'Valid member_id or user_id is required' }, { status: 400 })
 
-  // Use admin client so RLS doesn't interfere with cross-user updates
   const admin = createAdminClient()
   let query = admin.from('org_members').update({ role }).eq('org_id', mb.org_id)
   if (member_id) query = query.eq('id', member_id)
