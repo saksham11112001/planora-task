@@ -11,15 +11,14 @@ export async function GET(request: NextRequest) {
   if (!mb) return NextResponse.json({ data: [] })
   const sp  = request.nextUrl.searchParams
   const lim = parseInt(sp.get('limit') ?? '100')
-  // Members see: projects where member_ids is NULL (whole org) OR they are in member_ids
-  // Admins/owners/managers see all projects
-  const isManager = ['owner', 'admin', 'manager'].includes(mb.role ?? '')
+  // Strict project visibility: everyone only sees org-wide projects OR projects they're in
+  // Only the org owner sees all projects (safety net)
+  const isOwner = mb.role === 'owner'
   let projectQuery = supabase.from('projects')
     .select('id, name, color, status, due_date, client_id, member_ids')
     .eq('org_id', mb.org_id).neq('is_archived', true)
     .order('updated_at', { ascending: false }).limit(lim)
-  // Non-managers can only see projects where they're a member or project is org-wide
-  if (!isManager) {
+  if (!isOwner) {
     projectQuery = projectQuery.or(`member_ids.is.null,member_ids.cs.{${user.id}}`)
   }
   const { data, error } = await projectQuery

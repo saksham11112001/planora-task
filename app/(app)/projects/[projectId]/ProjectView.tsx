@@ -627,7 +627,7 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
                     <>
                       {section.tasks.map(t => <TaskRow key={t.id} task={t}/>)}
                       {section.creator && canManage && (
-                        <InlineTaskRow projectId={project.id} defaultClientId={defaultClientId} members={members} clients={clients}
+                        <InlineTaskRow projectId={project.id} projectOwnerId={projectOwnerId} defaultClientId={defaultClientId} members={members} clients={clients}
                           currentUserId={currentUserId} defaultStatus="todo" onCreated={(newTask) => {
                           if (newTask?.id) {
                             setTasks(prev => [{
@@ -755,7 +755,7 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
                       )
                     })}
                     {col.status === 'todo' && canManage && (
-                      <InlineTaskRow projectId={project.id} defaultClientId={defaultClientId} members={members} clients={clients}
+                      <InlineTaskRow projectId={project.id} projectOwnerId={projectOwnerId} defaultClientId={defaultClientId} members={members} clients={clients}
                         currentUserId={currentUserId} defaultStatus="todo" onCreated={(newTask) => {
                           if (newTask?.id) {
                             setTasks(prev => [{

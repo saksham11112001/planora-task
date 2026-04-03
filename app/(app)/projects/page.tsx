@@ -16,10 +16,13 @@ export default async function ProjectsPage() {
     .select('org_id, role').eq('user_id', user.id).eq('is_active', true).maybeSingle()
   if (!mb) redirect('/onboarding')
 
-  const isManager = ['owner','admin','manager'].includes(mb.role)
+  const isOwner = mb.role === 'owner'
   let projectsQuery = supabase.from('projects').select('*, clients(id, name, color), member_ids')
     .eq('org_id', mb.org_id).neq('is_archived', true).order('updated_at', { ascending: false })
-  if (!isManager) {
+  // Strict visibility: every user (including admins/managers) can only see projects where:
+  // - member_ids is NULL (visible to whole org), OR they are listed in member_ids
+  // Exception: org owners see all projects regardless (safety net for billing/admin)
+  if (!isOwner) {
     projectsQuery = projectsQuery.or(`member_ids.is.null,member_ids.cs.{${user.id}}`)
   }
   const [{ data: projects }, { data: taskCounts }, { data: clients }] = await Promise.all([

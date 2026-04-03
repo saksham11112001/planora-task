@@ -66,13 +66,14 @@ export function RecurringView({ tasks: initialTasks, members, projects, clients,
   const [newTitle,    setNewTitle]    = useState('')
   const [newFreq,     setNewFreq]     = useState('weekly')
   const [newAssignee, setNewAssignee] = useState('')
+  const [newApprover, setNewApprover] = useState('')
   const [newClient,   setNewClient]   = useState('')
   const [newPriority, setNewPriority] = useState('medium')
   const [newNextDate, setNewNextDate] = useState(defaultNextOccurrence)
 
   function openCreate() {
     setShowCreate(true)
-    setNewTitle(''); setNewFreq('weekly'); setNewAssignee('')
+    setNewTitle(''); setNewFreq('weekly'); setNewAssignee(''); setNewApprover('')
     setNewClient(''); setNewPriority('medium'); setNewNextDate(defaultNextOccurrence())
     setTimeout(() => titleRef.current?.focus(), 50)
   }
@@ -87,8 +88,10 @@ export function RecurringView({ tasks: initialTasks, members, projects, clients,
         is_recurring:         true,
         frequency:            newFreq,
         next_occurrence_date: newNextDate || null,
-        assignee_id:          newAssignee || null,
-        client_id:            newClient   || null,
+        assignee_id:          newAssignee  || null,
+        approver_id:          newApprover  || null,
+        approval_required:    !!newApprover,
+        client_id:            newClient    || null,
         priority:             newPriority,
         status:               'todo',
       }),
@@ -163,7 +166,7 @@ export function RecurringView({ tasks: initialTasks, members, projects, clients,
 
   // ── Inline create row ────────────────────────────────────────────────
   const CreateRow = () => (
-    <div style={{ display:'grid', gridTemplateColumns:'1fr 7rem 5rem 6rem 5rem 4.5rem', alignItems:'center', padding:'8px 16px', borderBottom:'1px solid var(--border)', background:'rgba(13,148,136,0.04)', borderLeft:'3px solid var(--brand)' }}>
+    <div style={{ display:'grid', gridTemplateColumns:'1fr 7rem 5rem 6rem 6rem 5rem 4.5rem', alignItems:'center', padding:'8px 16px', borderBottom:'1px solid var(--border)', background:'rgba(13,148,136,0.04)', borderLeft:'3px solid var(--brand)' }}>
       <input
         ref={titleRef}
         value={newTitle}
@@ -183,6 +186,11 @@ export function RecurringView({ tasks: initialTasks, members, projects, clients,
         style={{ fontSize:12, border:'1px solid var(--border)', borderRadius:6, padding:'4px 6px', background:'var(--surface)', fontFamily:'inherit', cursor:'pointer' }}>
         <option value=''>Unassigned</option>
         {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+      </select>
+      <select value={newApprover} onChange={e => setNewApprover(e.target.value)}
+        style={{ fontSize:12, border: newApprover ? '1px solid #7c3aed' : '1px solid var(--border)', borderRadius:6, padding:'4px 6px', background: newApprover ? '#f5f3ff' : 'var(--surface)', fontFamily:'inherit', cursor:'pointer', color: newApprover ? '#7c3aed' : 'inherit' }}>
+        <option value=''>No approver</option>
+        {members.filter(m => (m as any).role && ['owner','admin','manager'].includes((m as any).role)).map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
       </select>
       <select value={newClient} onChange={e => setNewClient(e.target.value)}
         style={{ fontSize:12, border:'1px solid var(--border)', borderRadius:6, padding:'4px 6px', background:'var(--surface)', fontFamily:'inherit', cursor:'pointer' }}>
@@ -281,10 +289,10 @@ export function RecurringView({ tasks: initialTasks, members, projects, clients,
           </div>
 
           {/* Column headers */}
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 7rem 5rem 6rem 5rem 4.5rem', padding:'10px 16px', borderBottom:'1px solid var(--border)', background:'var(--surface-subtle)', fontSize:11, fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.05em', flexShrink:0 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 7rem 5rem 6rem 6rem 5rem 4.5rem', padding:'10px 16px', borderBottom:'1px solid var(--border)', background:'var(--surface-subtle)', fontSize:11, fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.05em', flexShrink:0 }}>
             <span>Task</span><span style={{textAlign:'center'}}>Frequency</span>
             <span style={{textAlign:'center'}}>Next due</span><span style={{textAlign:'center'}}>Assignee</span>
-            <span style={{textAlign:'center'}}>Client</span><span/>
+            <span style={{textAlign:'center'}}>Approver</span><span style={{textAlign:'center'}}>Client</span><span/>
           </div>
 
           {/* Inline create row — appears at the top */}
@@ -310,7 +318,7 @@ export function RecurringView({ tasks: initialTasks, members, projects, clients,
             const freqLabel = FREQ_LABELS[task.frequency??'']??task.frequency??'—'
 
             if (isEditing) return (
-              <div key={task.id} style={{ display:'grid', gridTemplateColumns:'1fr 7rem 5rem 6rem 5rem 4.5rem', alignItems:'center', padding:'8px 16px', borderBottom:'1px solid var(--border)', background:'var(--brand-light)' }}>
+              <div key={task.id} style={{ display:'grid', gridTemplateColumns:'1fr 7rem 5rem 6rem 6rem 5rem 4.5rem', alignItems:'center', padding:'8px 16px', borderBottom:'1px solid var(--border)', background:'var(--brand-light)' }}>
                 <input value={editForm.title??''} onChange={e => setEditForm(p => ({ ...p, title:e.target.value }))}
                   style={{ fontSize:13, border:'1px solid var(--brand)', borderRadius:6, padding:'4px 8px', background:'var(--surface)', color:'var(--text-primary)', fontFamily:'inherit', outline:'none' }}/>
                 <select value={editForm.frequency??'weekly'} onChange={e => setEditForm(p => ({ ...p, frequency:e.target.value }))}
@@ -337,7 +345,7 @@ export function RecurringView({ tasks: initialTasks, members, projects, clients,
 
             return (
               <div key={task.id} className="group" style={{ borderBottom:'1px solid var(--border-light)' }}>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 7rem 5rem 6rem 5rem 4.5rem', alignItems:'center', padding:'10px 16px', cursor:'pointer' }}
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 7rem 5rem 6rem 6rem 5rem 4.5rem', alignItems:'center', padding:'10px 16px', cursor:'pointer' }}
                   onClick={() => setSelectedTask(selectedTask?.id===task.id ? null : task as any)}>
                   <div style={{ display:'flex', alignItems:'center', gap:10, minWidth:0 }}>
                     <button onClick={e => { e.stopPropagation(); setExpandedSubs(p => { const n=new Set(p); n.has(task.id)?n.delete(task.id):n.add(task.id); return n }); loadSubs(task.id) }}
@@ -366,6 +374,15 @@ export function RecurringView({ tasks: initialTasks, members, projects, clients,
                   <div style={{ display:'flex', justifyContent:'center' }}>
                     {task.assignee
                       ? <div style={{ width:20, height:20, borderRadius:'50%', background:'#0d9488', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:8, fontWeight:700 }}>{task.assignee.name[0]?.toUpperCase()}</div>
+                      : <div style={{ width:20, height:20, borderRadius:'50%', border:'1.5px dashed var(--border)' }}/>
+                    }
+                  </div>
+                  {/* Approver */}
+                  <div style={{ display:'flex', justifyContent:'center' }}>
+                    {(task as any).approver_id && members.find(m => m.id === (task as any).approver_id)
+                      ? <div style={{ width:20, height:20, borderRadius:'50%', background:'#7c3aed', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:8, fontWeight:700, title: members.find(m => m.id === (task as any).approver_id)?.name }}>
+                          {members.find(m => m.id === (task as any).approver_id)?.name?.[0]?.toUpperCase()}
+                        </div>
                       : <div style={{ width:20, height:20, borderRadius:'50%', border:'1.5px dashed var(--border)' }}/>
                     }
                   </div>
