@@ -1,16 +1,9 @@
 'use client'
-// This page handles the implicit OAuth flow.
-// Google redirects back with the token in the URL hash:
-//   sng-adwisers.com/auth/callback#access_token=...
-// Since hashes never reach the server, the callback route redirects here.
-// The Supabase browser client reads window.location.hash automatically
-// via detectSessionInUrl: true and establishes the session client-side.
-
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
-export default function AuthConfirmPage() {
+function AuthConfirmInner() {
   const router  = useRouter()
   const params  = useSearchParams()
   const next    = params.get('next') ?? '/dashboard'
@@ -18,26 +11,21 @@ export default function AuthConfirmPage() {
 
   useEffect(() => {
     const supabase = createClient()
-
-    // onAuthStateChange fires immediately if detectSessionInUrl picks up
-    // the hash token. We give it up to 5s before showing an error.
-    const timeout = setTimeout(() => setError(true), 5000)
+    const timeout  = setTimeout(() => setError(true), 5000)
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         clearTimeout(timeout)
 
-        // Provision the public.users row for new Google sign-ins
-        // (server callback didn't run for implicit flow)
-        const user = session.user
-        const admin = await fetch('/api/auth/provision', {
+        // Provision public.users row — server callback didn't run for implicit flow
+        await fetch('/api/auth/provision', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            id:         user.id,
-            email:      user.email,
-            name:       user.user_metadata?.full_name ?? user.user_metadata?.name ?? user.email?.split('@')[0],
-            avatar_url: user.user_metadata?.avatar_url ?? null,
+            id:         session.user.id,
+            email:      session.user.email,
+            name:       session.user.user_metadata?.full_name ?? session.user.user_metadata?.name ?? session.user.email?.split('@')[0],
+            avatar_url: session.user.user_metadata?.avatar_url ?? null,
           }),
         })
 
@@ -45,10 +33,7 @@ export default function AuthConfirmPage() {
       }
     })
 
-    return () => {
-      clearTimeout(timeout)
-      subscription.unsubscribe()
-    }
+    return () => { clearTimeout(timeout); subscription.unsubscribe() }
   }, [router, next])
 
   if (error) {
@@ -95,5 +80,26 @@ export default function AuthConfirmPage() {
         <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
       </div>
     </div>
+  )
+}
+
+// useSearchParams() requires a Suspense boundary in Next.js 15
+export default function AuthConfirmPage() {
+  return (
+    <Suspense fallback={
+      <div style={{
+        minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'linear-gradient(135deg, #0f172a 0%, #134e4a 60%, #0d9488 100%)',
+      }}>
+        <div style={{
+          width: 44, height: 44, border: '3px solid rgba(255,255,255,0.3)',
+          borderTopColor: '#fff', borderRadius: '50%',
+          animation: 'spin 0.8s linear infinite',
+        }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+      </div>
+    }>
+      <AuthConfirmInner />
+    </Suspense>
   )
 }
