@@ -6,12 +6,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   try {
     const supabase = await createClient()
 
-    // Get user
+    // Get user — if no valid session, go to login
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) redirect('/login')
 
     // Get membership with org details in one query
-    const { data: membership, error: memberError } = await supabase
+    const { data: membership } = await supabase
       .from('org_members')
       .select('id, org_id, role, is_active, organisations(id, name, slug, plan_tier, logo_color, status, trial_ends_at)')
       .eq('user_id', user!.id)
@@ -25,20 +25,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       .eq('id', user!.id)
       .maybeSingle()
 
-    // No active membership — try to recover
+    // No active membership — try to recover before giving up
     if (!membership) {
-      const { createClient: createAdminClient } = await import('@/lib/supabase/admin')
+      const { createAdminClient } = await import('@/lib/supabase/admin')
       const admin = createAdminClient()
 
-      // FIX: Check if the user has a pending invite in their auth metadata
-      // that wasn't provisioned yet (e.g. they signed in via a different device
-      // before the callback could write the org_members row).
-      const { data: authUser } = await admin.auth.admin.getUserById(user!.id)
-      const pendingOrgId = authUser?.user?.user_metadata?.invited_to_org as string | undefined
-      const pendingRole  = (authUser?.user?.user_metadata?.invited_role as string | undefined) ?? 'member'
+      // 1. Check if the user has a pending invite in their auth metadata
+      //    (covers cross-device Google OAuth where callback ran but org_members wasn't written)
+      const { data: authUserData } = await admin.auth.admin.getUserById(user!.id)
+      const pendingOrgId = authUserData?.user?.user_metadata?.invited_to_org as string | undefined
+      const pendingRole  = (authUserData?.user?.user_metadata?.invited_role as string | undefined) ?? 'member'
 
       if (pendingOrgId) {
-        // Provision the membership now
         const { data: existingMember } = await admin
           .from('org_members')
           .select('id, is_active')
@@ -54,16 +52,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           await admin.from('org_members').update({ is_active: true, role: pendingRole }).eq('id', existingMember.id)
         }
 
-        // Clear metadata
         await admin.auth.admin.updateUserById(user!.id, {
-          user_metadata: { ...authUser?.user?.user_metadata, invited_to_org: null, invited_role: null },
+          user_metadata: { ...authUserData?.user?.user_metadata, invited_to_org: null, invited_role: null },
         })
 
         redirect('/dashboard')
       }
 
-      // Check for pending/inactive membership (existing fallback)
-      const { data: pending } = await admin
+      // 2. Check for any existing membership row (active or inactive)
+      //    This catches users added directly to org_members by an admin in Supabase dashboard
+      const { data: anyMembership } = await admin
         .from('org_members')
         .select('id, org_id, role, organisations(id, name, slug, plan_tier, logo_color, status, trial_ends_at)')
         .eq('user_id', user!.id)
@@ -71,13 +69,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         .limit(1)
         .maybeSingle()
 
-      if (pending) {
-        // Activate membership and go to dashboard
-        await admin.from('org_members').update({ is_active: true }).eq('id', pending.id)
+      if (anyMembership) {
+        // Reactivate and proceed
+        await admin.from('org_members').update({ is_active: true }).eq('id', anyMembership.id)
         redirect('/dashboard')
       }
 
-      // Truly no org — go to onboarding
+      // 3. Truly no org membership anywhere — send to onboarding to create one
+      //    (do NOT redirect to /login here — the user IS authenticated)
       redirect('/onboarding')
     }
 
@@ -108,10 +107,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </AppShell>
     )
   } catch (err: any) {
-    // If it's a redirect, re-throw it (Next.js redirects are thrown internally)
+    // IMPORTANT: Next.js throws redirects internally — always re-throw them
     if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err
-    // Any other error — send to login safely
+
+    // Log the actual error for debugging
     console.error('[AppLayout] crash:', err?.message ?? err)
-    redirect('/login')
+
+    // Do NOT redirect to /login on generic errors — that creates an infinite loop
+    // for authenticated users who have no org. /onboarding is a safer fallback.
+    redirect('/onboarding')
   }
 }
