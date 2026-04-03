@@ -1,4 +1,3 @@
-export const dynamic = 'force-dynamic'
 import { createClient }      from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse }       from 'next/server'
@@ -9,7 +8,7 @@ export async function DELETE() {
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
   const admin = createAdminClient()
-  const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).maybeSingle()
+  const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).single()
 
   if (mb) {
     if (mb.role === 'owner') {

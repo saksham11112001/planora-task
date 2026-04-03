@@ -1,4 +1,3 @@
-export const dynamic = 'force-dynamic'
 import { createClient }  from '@/lib/supabase/server'
 import { NextResponse }   from 'next/server'
 import type { NextRequest } from 'next/server'
@@ -8,7 +7,7 @@ export async function GET(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-  const { data: mb } = await supabase.from('org_members').select('org_id').eq('user_id', user.id).eq('is_active', true).maybeSingle()
+  const { data: mb } = await supabase.from('org_members').select('org_id').eq('user_id', user.id).eq('is_active', true).single()
   if (!mb) return NextResponse.json({ data: [] })
 
   const sp  = request.nextUrl.searchParams
@@ -35,7 +34,7 @@ export async function POST(request: NextRequest) {
 
   const { data: mb } = await supabase.from('org_members')
     .select('org_id, role, organisations(name), users(name)')
-    .eq('user_id', user.id).eq('is_active', true).maybeSingle()
+    .eq('user_id', user.id).eq('is_active', true).single()
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
 
   const body = await request.json()
@@ -50,10 +49,8 @@ export async function POST(request: NextRequest) {
     status, priority, assignee_id: assignee_id || null, client_id: client_id || null,
     project_id: project_id || null, due_date: due_date || null,
     estimated_hours: estimated_hours ?? null, approval_required: !!approval_required,
-    approver_id: approver_id || null, created_by: user.id, is_recurring: !!is_recurring,
+    approver_id: approver_id || null, created_by: user.id, is_recurring: false,
     parent_task_id: parent_task_id || null,
-    frequency: frequency || null,
-    next_occurrence_date: next_occurrence_date || null,
   }).select('*').single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

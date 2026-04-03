@@ -1,30 +1,123 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createServerClient } from '@supabase/ssr'
+import { createAdminClient }  from '@/lib/supabase/admin'
+import { cookies }            from 'next/headers'
+import { NextResponse }       from 'next/server'
+import type { NextRequest }   from 'next/server'
 
-/**
- * OAuth callback handler.
- *
- * After Google OAuth, Supabase redirects to:
- *   /auth/callback?code=xxx&next=/dashboard
- *
- * This route exchanges the code for a session and sets the auth cookie.
- * WITHOUT this route, Google OAuth users are always redirected to login.
- */
 export async function GET(request: NextRequest) {
-  const { searchParams, origin } = new URL(request.url)
-  const code = searchParams.get('code')
-  const next = searchParams.get('next') ?? '/dashboard'
+  const url  = new URL(request.url)
+  const code = url.searchParams.get('code')
+  const next = url.searchParams.get('next') ?? '/dashboard'
 
   if (code) {
-    const supabase = await createClient()
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    const cookieStore = await cookies()
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll: () => cookieStore.getAll(),
+          setAll: (cs) => cs.forEach(({ name, value, options }) => {
+            try { cookieStore.set(name, value, options) } catch {}
+          }),
+        },
+      }
+    )
 
-    if (!error) {
-      // Redirect to the intended destination after successful login
-      return NextResponse.redirect(`${origin}${next}`)
+    const { data: { user }, error } = await supabase.auth.exchangeCodeForSession(code)
+
+    if (!error && user) {
+      // Always ensure public.users row exists — Google OAuth creates auth.users
+      // but not public.users. Without this, getUserProfile throws for new users.
+      try {
+        const adminForProfile = createAdminClient()
+        await adminForProfile.from('users').upsert({
+          id:         user.id,
+          email:      user.email ?? '',
+          name: (
+            user.user_metadata?.full_name ??
+            user.user_metadata?.name ??
+            ((user.user_metadata?.given_name && user.user_metadata?.family_name)
+              ? `${user.user_metadata.given_name} ${user.user_metadata.family_name}`
+              : null) ??
+            user.user_metadata?.given_name ??
+            user.email?.split('@')[0] ?? 'User'
+          ),
+          avatar_url: user.user_metadata?.avatar_url ?? null,
+        }, { onConflict: 'id' })
+      } catch (_) {}
+
+      const invitedOrgId = user.user_metadata?.invited_to_org as string | undefined
+      const invitedRole  = (user.user_metadata?.invited_role as string | undefined) ?? 'member'
+
+      // ── Invited-user flow ─────────────────────────────────────────────────
+      // If this user was invited to an org (metadata set by /api/settings/members),
+      // provision their profile + org_members row now.
+      // Without this, the app layout sees no membership and redirects to /onboarding,
+      // causing them to accidentally create a second org.
+      if (invitedOrgId) {
+        const admin = createAdminClient()
+
+        // 1. Ensure user profile exists
+        await admin.from('users').upsert({
+          id:         user.id,
+          email:      user.email ?? '',
+          name:       (
+            user.user_metadata?.full_name ??
+            user.user_metadata?.name ??
+            ((user.user_metadata?.given_name && user.user_metadata?.family_name)
+              ? `${user.user_metadata.given_name} ${user.user_metadata.family_name}`
+              : null) ??
+            user.user_metadata?.given_name ??
+            user.email?.split('@')[0]?.replace(/[._]/g, ' ')?.replace(/\w/g, (l: string) => l.toUpperCase()) ??
+            'User'
+          ),
+          avatar_url: user.user_metadata?.avatar_url ?? null,
+        }, { onConflict: 'id' })
+
+        // 2. Check if already a member (edge case: re-clicking invite link)
+        const { data: existing } = await admin
+          .from('org_members')
+          .select('id, is_active')
+          .eq('org_id', invitedOrgId)
+          .eq('user_id', user.id)
+          .maybeSingle()
+
+        if (existing && !existing.is_active) {
+          // Reactivate
+          await admin.from('org_members')
+            .update({ is_active: true, role: invitedRole })
+            .eq('id', existing.id)
+        } else if (!existing) {
+          // Insert fresh membership
+          await admin.from('org_members').insert({
+            org_id:    invitedOrgId,
+            user_id:   user.id,
+            role:      invitedRole,
+            is_active: true,
+          })
+        }
+
+        // 3. Clear invite metadata so it doesn't re-trigger on token refresh
+        await admin.auth.admin.updateUserById(user.id, {
+          user_metadata: {
+            ...user.user_metadata,
+            invited_to_org: null,
+            invited_role:   null,
+          },
+        })
+
+        // 4. Send them to the dashboard — they are now a real member
+        return NextResponse.redirect(new URL('/dashboard', request.url))
+      }
+      // ── End invited-user flow ─────────────────────────────────────────────
+
+      const redirectUrl = new URL(next, request.url)
+      return NextResponse.redirect(redirectUrl)
     }
   }
 
-  // Something went wrong — send back to login with an error message
-  return NextResponse.redirect(`${origin}/login?error=oauth_failed`)
+  // Auth failed - code missing or session exchange failed
+  // Most common cause: browser cleared cookies between Google login and callback
+  return NextResponse.redirect(new URL('/login?error=auth_failed&hint=try_again', request.url))
 }

@@ -1,4 +1,3 @@
-export const dynamic = 'force-dynamic'
 import { createClient }  from '@/lib/supabase/server'
 import { NextResponse }   from 'next/server'
 import type { NextRequest } from 'next/server'
@@ -13,7 +12,7 @@ export async function POST(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-  const { data: mb } = await supabase.from('org_members').select('org_id, role, organisations(name, razorpay_customer_id, plan_tier)').eq('user_id', user.id).eq('is_active', true).maybeSingle()
+  const { data: mb } = await supabase.from('org_members').select('org_id, role, organisations(name, razorpay_customer_id, plan_tier)').eq('user_id', user.id).eq('is_active', true).single()
   if (!mb || !['owner','admin'].includes(mb.role)) return NextResponse.json({ error: 'Admins only' }, { status: 403 })
 
   const { plan_tier } = await request.json()

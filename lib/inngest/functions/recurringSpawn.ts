@@ -33,7 +33,7 @@ export const recurringSpawn = inngest.createFunction(
 
     const templates = await step.run('fetch-due-recurring-templates', async () => {
       const { data } = await admin.from('tasks')
-        .select('id, title, priority, assignee_id, approver_id, project_id, client_id, org_id, frequency, next_occurrence_date, approval_required')
+        .select('id, title, priority, assignee_id, project_id, client_id, org_id, frequency, next_occurrence_date, approval_required')
         .eq('is_recurring', true)
         .lte('next_occurrence_date', today)
         .neq('is_archived', true)
@@ -55,7 +55,6 @@ export const recurringSpawn = inngest.createFunction(
           project_id:        tmpl.project_id,
           client_id:         tmpl.client_id,
           approval_required: tmpl.approval_required,
-          approver_id:       tmpl.approver_id ?? null,
           is_recurring:      false,             // instance is NOT a template
           parent_recurring_id: tmpl.id,         // link back to template
           due_date:          tmpl.next_occurrence_date,

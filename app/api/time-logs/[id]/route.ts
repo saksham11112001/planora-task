@@ -1,4 +1,3 @@
-export const dynamic = 'force-dynamic'
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse }  from 'next/server'
 import type { NextRequest } from 'next/server'
@@ -8,7 +7,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-  const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).maybeSingle()
+  const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).single()
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
 
   // Users can delete their own logs; managers can delete any
@@ -27,7 +26,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-  const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).maybeSingle()
+  const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).single()
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
 
   const { data: log } = await supabase.from('time_logs').select('user_id').eq('id', id).eq('org_id', mb.org_id).single()
