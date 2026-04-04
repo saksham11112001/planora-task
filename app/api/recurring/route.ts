@@ -75,12 +75,12 @@ export async function POST(request: NextRequest) {
   // Create compliance subtasks if provided
   if (subtasks && subtasks.length > 0 && task?.id) {
     try {
-      const subtaskInserts = subtasks.map((s: { title: string; required: boolean; due_date?: string }) => ({
+      const subtaskInserts = subtasks.map((s: { title: string; required: boolean; due_date?: string; assignee_id?: string }) => ({
         org_id:         mb.org_id,
         title:          s.title,
         status:         'todo' as const,
         priority:       priority,
-        assignee_id:    assignee_id || null,
+        assignee_id:    s.assignee_id || assignee_id || null,
         client_id:      client_id   || null,
         project_id:     project_id  || null,
         due_date:       s.due_date  || null,

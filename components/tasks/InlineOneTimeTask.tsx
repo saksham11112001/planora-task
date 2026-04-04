@@ -1,13 +1,11 @@
 'use client'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, X, User, Flag, Calendar, Shield, Briefcase, Paperclip, AlertCircle } from 'lucide-react'
+import { Plus, X, User, Flag, Calendar, Shield, Briefcase, Paperclip, AlertCircle, ToggleLeft, ToggleRight, ListPlus, Trash2 } from 'lucide-react'
 import { toast } from '@/store/appStore'
 import { useOrgSettings } from '@/lib/hooks/useOrgSettings'
 import { InlineCustomFields }    from '@/components/tasks/InlineCustomFields'
 import { QuickAddClientModal }    from '@/components/clients/QuickAddClientModal'
-import { ComplianceTaskPicker }   from '@/components/tasks/ComplianceTaskPicker'
-import type { ComplianceTask }    from '@/lib/data/complianceTasks'
 
 interface Member { id: string; name: string; role?: string }
 
@@ -31,7 +29,7 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated }
   const inputRef = useRef<HTMLInputElement>(null)
   const rowRef   = useRef<HTMLDivElement>(null)
   const fileRef  = useRef<HTMLInputElement>(null)
-  const { customFields, taskFields, caComplianceMode, loading: settingsLoading } = useOrgSettings()
+  const { customFields, taskFields } = useOrgSettings()
   const show     = (key: string) => taskFields[key]?.visible !== false
   const required = (key: string) => taskFields[key]?.mandatory === true
 
@@ -52,15 +50,8 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated }
   const [customValues,  setCustomValues]  = useState<Record<string,any>>({})
   const [showAddClient, setShowAddClient] = useState(false)
   const [clientList,      setClientList]      = useState(clients)
-  const [compSubtasks,   setCompSubtasks]   = useState<{title:string;required:boolean;due_date?:string}[]>([])
-
-  function handleComplianceSelect(task: ComplianceTask) {
-    setTitle(task.title)
-    setPriority(task.priority)
-    setCompSubtasks(task.subtasks)
-    setOpen(true)
-    setTimeout(() => inputRef.current?.focus(), 50)
-  }
+  const [requireAttachment, setRequireAttachment] = useState(false)
+  const [compSubtasks, setCompSubtasks] = useState<{title:string;required:boolean;due_date?:string;assignee_id?:string}[]>([])
 
   const approvers = members.filter(m => m.role && ['owner','admin','manager'].includes(m.role))
   const priConf   = PRIORITY_OPTIONS.find(p => p.value === priority) ?? PRIORITY_OPTIONS[2]
@@ -70,6 +61,7 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated }
     setPriority('medium'); setDueDate(''); setClientId('')
     setApproverId(''); setFiles([]); setErrors({})
     setCoAssignees([]); setMakeRecurring(false); setRecurringFreq('weekly'); setAddToProjectId('')
+    setRequireAttachment(false); setCompSubtasks([])
   }
 
   const handleClickOutside = useCallback((e: MouseEvent) => {
@@ -119,8 +111,14 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated }
           custom_fields:     {
             ...(Object.keys(customValues).length > 0 ? customValues : {}),
             ...(coAssignees.length > 0 ? { _co_assignees: coAssignees } : {}),
+            ...(requireAttachment ? { _require_attachment: true } : {}),
           },
-          subtasks:          compSubtasks.length > 0 ? compSubtasks.map(s => ({ title: s.title, required: s.required })) : undefined,
+          subtasks: compSubtasks.filter(s => s.title.trim()).map(s => ({
+            title:       s.title.trim(),
+            required:    s.required,
+            due_date:    s.due_date,
+            assignee_id: s.assignee_id || null,
+          })),
         }),
       })
       const d = await res.json()
@@ -161,13 +159,6 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated }
           <span style={{ fontSize: 13, fontWeight: 500 }}>Add task</span>
           <span style={{ fontSize: 10, opacity: 0.5, marginLeft: 'auto' }}>↵ Enter</span>
         </div>
-        {caComplianceMode && (
-          <div style={{ display:'flex', alignItems:'center', gap:8, padding:'5px 14px',
-            background:'rgba(13,148,136,0.05)', borderTop:'1px solid var(--border-light)' }}>
-            <ComplianceTaskPicker onSelect={handleComplianceSelect}/>
-            <span style={{ fontSize:11, color:'var(--text-muted)' }}>or pick a CA compliance task</span>
-          </div>
-        )}
       </>
     )
   }
@@ -334,10 +325,18 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated }
         <input ref={fileRef} type="file" multiple style={{ display: 'none' }}
           onChange={e => { setFiles(Array.from(e.target.files ?? [])); setErrors(p => ({ ...p, attachment: '' })) }}/>
 
-        {/* CA Compliance picker — shown as a pill inside the open form */}
-        {caComplianceMode && (
-          <ComplianceTaskPicker onSelect={handleComplianceSelect}/>
-        )}
+        {/* Require attachment on complete toggle */}
+        <button type="button" onClick={() => setRequireAttachment(p => !p)}
+          style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px', borderRadius:20,
+            border: requireAttachment ? '1.5px solid #dc2626' : '1px solid var(--border)',
+            background: requireAttachment ? '#fef2f2' : 'var(--surface-subtle)',
+            color: requireAttachment ? '#dc2626' : 'var(--text-secondary)',
+            fontSize:12, cursor:'pointer', fontFamily:'inherit', fontWeight: requireAttachment ? 700 : 400 }}>
+          {requireAttachment
+            ? <ToggleRight style={{ width:13, height:13 }}/>
+            : <ToggleLeft  style={{ width:13, height:13 }}/>}
+          Require attachment on complete
+        </button>
 
         {/* Custom fields */}
         {customFields.length > 0 && (
@@ -348,46 +347,52 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated }
           />
         )}
 
-        {/* Compliance subtasks preview */}
-        {compSubtasks.length > 0 && (
-          <div style={{ width:'100%', marginTop:6, padding:'8px 12px', borderRadius:8,
-            background:'rgba(13,148,136,0.06)', border:'1px solid rgba(13,148,136,0.25)' }}>
-            <p style={{ fontSize:10, fontWeight:700, color:'var(--brand)', marginBottom:8,
-              textTransform:'uppercase', letterSpacing:'0.06em' }}>
-              📎 Subtasks — set individual due dates
-            </p>
-            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-              {compSubtasks.map((s,i) => (
-                <div key={i} style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-                  <span style={{ fontSize:11, padding:'3px 10px', borderRadius:99, flexShrink:0,
-                    background: s.required ? 'rgba(13,148,136,0.12)' : 'var(--surface-subtle)',
-                    border: `1px solid ${s.required ? 'rgba(13,148,136,0.35)' : 'var(--border)'}`,
-                    color: s.required ? 'var(--brand)' : 'var(--text-muted)' }}>
-                    {s.title}{s.required ? ' *' : ''}
-                  </span>
-                  <label style={{ display:'flex', alignItems:'center', gap:4, fontSize:11,
-                    color:'var(--text-muted)' }}>
-                    <span style={{ fontSize:10 }}>📅</span>
-                    <input
-                      type="date"
-                      value={s.due_date ?? ''}
-                      onChange={e => setCompSubtasks(prev =>
-                        prev.map((sub, idx) => idx === i ? { ...sub, due_date: e.target.value || undefined } : sub)
-                      )}
-                      placeholder={dueDate || 'same as task'}
-                      style={{ fontSize:11, border:'1px solid var(--border)', borderRadius:6,
-                        padding:'2px 6px', background:'var(--surface)', color:'var(--text-secondary)',
-                        outline:'none', colorScheme:'light dark', fontFamily:'inherit' }}
-                    />
-                  </label>
-                </div>
-              ))}
+        {/* Subtasks — per-subtask assignee + date */}
+        <div style={{ width:'100%', marginTop:4 }}>
+          {compSubtasks.length > 0 && (
+            <div style={{ padding:'8px 12px', borderRadius:8, marginBottom:6,
+              background:'rgba(13,148,136,0.04)', border:'1px solid rgba(13,148,136,0.2)' }}>
+              <p style={{ fontSize:10, fontWeight:700, color:'var(--brand)', marginBottom:8,
+                textTransform:'uppercase', letterSpacing:'0.06em' }}>
+                Subtasks
+              </p>
+              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                {compSubtasks.map((s, i) => (
+                  <div key={i} style={{ display:'grid', gridTemplateColumns:'1fr auto auto auto', gap:6, alignItems:'center' }}>
+                    <input value={s.title}
+                      onChange={e => setCompSubtasks(p => p.map((x, xi) => xi===i ? { ...x, title:e.target.value } : x))}
+                      placeholder="Subtask name…"
+                      style={{ fontSize:12, padding:'4px 8px', borderRadius:6, border:'1px solid var(--border)',
+                        outline:'none', background:'var(--surface)', color:'var(--text-primary)', fontFamily:'inherit' }}/>
+                    <select value={s.assignee_id ?? ''}
+                      onChange={e => setCompSubtasks(p => p.map((x, xi) => xi===i ? { ...x, assignee_id:e.target.value||undefined } : x))}
+                      style={{ fontSize:11, padding:'4px 8px', borderRadius:6, border:'1px solid var(--border)',
+                        outline:'none', background:'var(--surface)', color:'var(--text-secondary)', fontFamily:'inherit', cursor:'pointer' }}>
+                      <option value="">Assignee (same as task)</option>
+                      {members.map(m => <option key={m.id} value={m.id}>{m.name}{m.id===currentUserId?' (me)':''}</option>)}
+                    </select>
+                    <input type="date" value={s.due_date ?? ''}
+                      onChange={e => setCompSubtasks(p => p.map((x, xi) => xi===i ? { ...x, due_date:e.target.value||undefined } : x))}
+                      style={{ fontSize:11, padding:'4px 6px', borderRadius:6, border:'1px solid var(--border)',
+                        outline:'none', background:'var(--surface)', color:'var(--text-secondary)',
+                        colorScheme:'light dark', fontFamily:'inherit' }}/>
+                    <button onClick={() => setCompSubtasks(p => p.filter((_,xi) => xi!==i))}
+                      style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text-muted)', padding:3, display:'flex' }}>
+                      <Trash2 style={{ width:12, height:12 }}/>
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
-            <p style={{ fontSize:10, color:'var(--text-muted)', marginTop:6 }}>
-              * mandatory · Leave date blank to use parent task date · File must be named as shown
-            </p>
-          </div>
-        )}
+          )}
+          <button type="button"
+            onClick={() => setCompSubtasks(p => [...p, { title:'', required:false }])}
+            style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px', borderRadius:20,
+              border:'1px dashed var(--brand-border)', background:'transparent',
+              color:'var(--brand)', fontSize:11, fontWeight:500, cursor:'pointer', fontFamily:'inherit' }}>
+            <ListPlus style={{ width:12, height:12 }}/> Add subtask
+          </button>
+        </div>
 
         {/* Make recurring / add to project pills */}
         <button type="button"

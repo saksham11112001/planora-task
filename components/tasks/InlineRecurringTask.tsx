@@ -1,11 +1,9 @@
 'use client'
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, X, RefreshCw, User, Flag, Briefcase, Paperclip, Shield } from 'lucide-react'
+import { Plus, X, RefreshCw, User, Flag, Briefcase, Paperclip, Shield, ToggleLeft, ToggleRight, ListPlus, Trash2 } from 'lucide-react'
 import { toast } from '@/store/appStore'
 import { useOrgSettings }         from '@/lib/hooks/useOrgSettings'
-import { ComplianceTaskPicker }   from '@/components/tasks/ComplianceTaskPicker'
-import type { ComplianceTask }    from '@/lib/data/complianceTasks'
 import { QuickAddClientModal }   from '@/components/clients/QuickAddClientModal'
 import { InlineCustomFields } from '@/components/tasks/InlineCustomFields'
 
@@ -56,7 +54,7 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, edit
   const fileRef  = useRef<HTMLInputElement>(null)
 
   const isEdit = !!editTask
-  const { customFields, taskFields, caComplianceMode } = useOrgSettings()
+  const { customFields, taskFields } = useOrgSettings()
   // Keep clientList in sync with prop
   const [_prevClients, setPrevClients] = useState(clients)
   if (clients !== _prevClients) { setPrevClients(clients); setClientList(clients) }
@@ -66,7 +64,8 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, edit
   const [customValues,    setCustomValues]    = useState<Record<string,any>>({})
   const [showAddClient,   setShowAddClient]   = useState(false)
   const [clientList,      setClientList]      = useState(clients)
-  const [compSubtasks,   setCompSubtasks]   = useState<{title:string;required:boolean;due_date?:string}[]>([])
+  const [compSubtasks,   setCompSubtasks]   = useState<{title:string;required:boolean;due_date?:string;assignee_id?:string}[]>([])
+  const [requireAttachment, setRequireAttachment] = useState(false)
   const [open,      setOpen]      = useState(isEdit)
   const [saving,    setSaving]    = useState(false)
   const [title,     setTitle]     = useState(editTask?.title ?? '')
@@ -94,6 +93,7 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, edit
     if (isEdit) { onCancelEdit?.(); return }
     setOpen(false); setTitle(''); setFrequency('weekly_mon'); setPriority('medium')
     setClientId(''); setAssignee(currentUserId ?? ''); setApproverId(''); setFiles([])
+    setRequireAttachment(false); setCompSubtasks([])
   }
 
   function validate(): boolean {
@@ -111,6 +111,8 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, edit
     if (!title.trim()) { inputRef.current?.focus(); return }
     setSaving(true)
     try {
+      const cfBase = { ...customValues }
+      if (requireAttachment) cfBase._require_attachment = true
       const body = {
         title:         title.trim(),
         frequency,
@@ -119,7 +121,7 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, edit
         approver_id:   approverId   || null,
         client_id:     clientId     || null,
         start_date:    new Date().toISOString().split('T')[0],
-        custom_fields: Object.keys(customValues).length > 0 ? customValues : undefined,
+        custom_fields: Object.keys(cfBase).length > 0 ? cfBase : undefined,
         subtasks:      compSubtasks.length > 0 ? compSubtasks : undefined,
       }
       let res: Response
@@ -149,14 +151,6 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, edit
       close()
       onCreated ? onCreated(d.data) : router.refresh()
     } finally { setSaving(false) }
-  }
-
-  function handleComplianceSelect(task: import('@/lib/data/complianceTasks').ComplianceTask) {
-    setTitle(task.title)
-    setPriority(task.priority)
-    setCompSubtasks(task.subtasks)
-    setOpen(true)
-    setTimeout(() => inputRef.current?.focus(), 50)
   }
 
   const priConf = PRIORITY_OPTIONS.find(p => p.value === priority) ?? PRIORITY_OPTIONS[2]
@@ -339,11 +333,6 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, edit
         <input ref={fileRef} type="file" multiple style={{ display:'none' }}
           onChange={e => setFiles(Array.from(e.target.files ?? []))}/>
 
-        {/* CA Compliance picker */}
-        {caComplianceMode && (
-          <ComplianceTaskPicker onSelect={handleComplianceSelect}/>
-        )}
-
         {/* Custom fields */}
         {customFields.length > 0 && (
           <InlineCustomFields
@@ -365,40 +354,71 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, edit
         )}
       </div>
 
-      {/* Action row — always at bottom, full width */}
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'flex-end', gap:8,
-        padding:'8px 14px 10px', borderTop:'1px solid var(--border-light)' }}>
-        <span style={{ fontSize:11, color:'var(--text-muted)', flex:1 }}>
-          {title.trim() ? '' : 'Enter a task name to save'}
-        </span>
-        {/* Compliance subtasks preview */}
+      {/* Subtasks — editable grid with per-subtask assignee */}
+      <div style={{ padding:'0 14px 8px' }}>
         {compSubtasks.length > 0 && (
-          <div style={{ width:'100%', marginBottom:6, padding:'8px 12px', borderRadius:8,
-            background:'rgba(13,148,136,0.06)', border:'1px solid rgba(13,148,136,0.25)' }}>
-            <p style={{ fontSize:10, fontWeight:700, color:'var(--brand)', marginBottom:6,
-              textTransform:'uppercase', letterSpacing:'0.06em' }}>📎 Subtasks</p>
-            <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
-              {compSubtasks.map((s,i) => (
-                <div key={i} style={{ display:'flex', alignItems:'center', gap:8 }}>
-                  <span style={{ fontSize:11, padding:'2px 8px', borderRadius:99,
-                    background:'rgba(13,148,136,0.12)', color:'var(--brand)',
-                    border:'1px solid rgba(13,148,136,0.3)', flexShrink:0 }}>{s.title} *</span>
-                  <input type="date" value={s.due_date ?? ''}
-                    onChange={e => setCompSubtasks(prev =>
-                      prev.map((sub,idx) => idx===i ? {...sub, due_date: e.target.value||undefined} : sub)
-                    )}
+          <div style={{ padding:'8px 12px', borderRadius:8, marginBottom:6,
+            background:'rgba(13,148,136,0.04)', border:'1px solid rgba(13,148,136,0.2)' }}>
+            <p style={{ fontSize:10, fontWeight:700, color:'var(--brand)', marginBottom:8,
+              textTransform:'uppercase', letterSpacing:'0.06em' }}>Subtasks</p>
+            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+              {compSubtasks.map((s, i) => (
+                <div key={i} style={{ display:'grid', gridTemplateColumns:'1fr 140px 110px auto', gap:5, alignItems:'center' }}>
+                  <input value={s.title}
+                    onChange={e => setCompSubtasks(p => p.map((x,xi) => xi===i ? {...x, title:e.target.value} : x))}
+                    placeholder="Subtask name…"
+                    style={{ fontSize:12, border:'1px solid var(--border)', borderRadius:6,
+                      padding:'4px 8px', background:'var(--surface)',
+                      color:'var(--text-primary)', outline:'none', fontFamily:'inherit' }}/>
+                  <select value={s.assignee_id ?? ''}
+                    onChange={e => setCompSubtasks(p => p.map((x,xi) => xi===i ? {...x, assignee_id:e.target.value||undefined} : x))}
                     style={{ fontSize:11, border:'1px solid var(--border)', borderRadius:6,
-                      padding:'2px 6px', background:'var(--surface)',
-                      color:'var(--text-secondary)', outline:'none', fontFamily:'inherit' }}
-                  />
+                      padding:'4px 6px', background:'var(--surface)',
+                      color:'var(--text-secondary)', outline:'none', fontFamily:'inherit', cursor:'pointer' }}>
+                    <option value="">Assignee (task default)</option>
+                    {members.map(m => <option key={m.id} value={m.id}>{m.name}{m.id===currentUserId?' (me)':''}</option>)}
+                  </select>
+                  <input type="date" value={s.due_date ?? ''}
+                    onChange={e => setCompSubtasks(p => p.map((x,xi) => xi===i ? {...x, due_date:e.target.value||undefined} : x))}
+                    style={{ fontSize:11, border:'1px solid var(--border)', borderRadius:6,
+                      padding:'4px 6px', background:'var(--surface)',
+                      color:'var(--text-secondary)', outline:'none', fontFamily:'inherit' }}/>
+                  <button type="button" onClick={() => setCompSubtasks(p => p.filter((_,xi) => xi!==i))}
+                    style={{ background:'none', border:'none', cursor:'pointer', padding:4,
+                      color:'#94a3b8', display:'flex', alignItems:'center', borderRadius:4 }}>
+                    <Trash2 style={{ width:12, height:12 }}/>
+                  </button>
                 </div>
               ))}
             </div>
-            <p style={{ fontSize:10, color:'var(--text-muted)', marginTop:4 }}>
-              * Upload required to complete · Leave date blank for no specific due date
-            </p>
           </div>
         )}
+        <button type="button" onClick={() => setCompSubtasks(p => [...p, { title:'', required:false }])}
+          style={{ display:'flex', alignItems:'center', gap:5, fontSize:11,
+            color:'var(--brand)', background:'none', border:'none', cursor:'pointer',
+            padding:'2px 0', fontFamily:'inherit' }}>
+          <ListPlus style={{ width:12, height:12 }}/> Add subtask
+        </button>
+      </div>
+
+      {/* Action row */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'flex-end', gap:8,
+        padding:'8px 14px 10px', borderTop:'1px solid var(--border-light)' }}>
+        {/* Require attachment toggle */}
+        <button type="button" onClick={() => setRequireAttachment(v => !v)}
+          style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px',
+            borderRadius:20, border: requireAttachment ? '1px solid #0d9488' : '1px solid var(--border)',
+            background: requireAttachment ? 'rgba(13,148,136,0.08)' : 'var(--surface-subtle)',
+            cursor:'pointer', fontSize:11, color: requireAttachment ? 'var(--brand)' : 'var(--text-muted)',
+            fontFamily:'inherit', fontWeight: requireAttachment ? 600 : 400, flexShrink:0 }}>
+          {requireAttachment
+            ? <ToggleRight style={{ width:14, height:14, color:'var(--brand)' }}/>
+            : <ToggleLeft  style={{ width:14, height:14 }}/>}
+          Require attachment on complete
+        </button>
+        <span style={{ fontSize:11, color:'var(--text-muted)', flex:1 }}>
+          {title.trim() ? '' : 'Enter a task name to save'}
+        </span>
         <button onClick={close} style={{ padding:'5px 12px', borderRadius:20,
           border:'1px solid var(--border)', background:'transparent',
           color:'var(--text-secondary)', fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>

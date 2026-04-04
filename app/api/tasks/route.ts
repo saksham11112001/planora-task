@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
         title:          s.title,
         status:         'todo' as const,
         priority:       body.priority ?? 'medium',
-        assignee_id:    body.assignee_id || null,
+        assignee_id:    (s as any).assignee_id || body.assignee_id || null,
         client_id:      body.client_id || null,
         project_id:     body.project_id || null,
         due_date:       s.due_date || body.due_date || null,

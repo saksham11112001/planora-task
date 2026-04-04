@@ -1,7 +1,8 @@
 'use client'
-import { useState } from 'react'
-import Link from 'next/link'
+import { useState, useEffect } from 'react'
 import { ChevronLeft, ChevronRight, RefreshCw, FolderOpen, CheckSquare, Clock, AlertTriangle } from 'lucide-react'
+import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
+import type { Task } from '@/types'
 
 interface CalTask {
   id: string; title: string; status: string; priority: string
@@ -17,6 +18,7 @@ interface Props {
   members?: { id: string; name: string }[]
   canViewAll: boolean
   currentUserId: string
+  userRole?: string
 }
 type Filter = 'all' | 'project' | 'one-time' | 'recurring'
 
@@ -36,7 +38,7 @@ const MONTH_NAMES = ['January','February','March','April','May','June','July','A
 // Color palette for day cells based on task count / status
 const DAY_HEAT = ['','rgba(13,148,136,0.08)','rgba(13,148,136,0.16)','rgba(13,148,136,0.24)','rgba(13,148,136,0.34)']
 
-export function CalendarView({ tasks, clients = [], members = [], canViewAll, currentUserId }: Props) {
+export function CalendarView({ tasks, clients = [], members = [], canViewAll, currentUserId, userRole }: Props) {
   const now = new Date()
   const [year,     setYear]     = useState(now.getFullYear())
   const [month,    setMonth]    = useState(now.getMonth())
@@ -45,6 +47,17 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
   const [hovered,       setHovered]       = useState<string|null>(null)
   const [clientFilter,  setClientFilter]  = useState('')
   const [memberFilter,  setMemberFilter]  = useState('')
+  const [panelTask, setPanelTask] = useState<Task | null>(null)
+  const [panelLoading, setPanelLoading] = useState(false)
+
+  async function openTask(id: string) {
+    setPanelLoading(true)
+    try {
+      const res  = await fetch(`/api/tasks/${id}`)
+      const data = await res.json()
+      if (data?.data) setPanelTask(data.data as Task)
+    } finally { setPanelLoading(false) }
+  }
 
   function prevMonth() { if (month===0){setYear(y=>y-1);setMonth(11)}else setMonth(m=>m-1) }
   function nextMonth() { if (month===11){setYear(y=>y+1);setMonth(0)}else setMonth(m=>m+1) }
@@ -360,19 +373,17 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
                     const priClr = PRIORITY_COLORS[t.priority]??'#94a3b8'
                     const priBg  = PRIORITY_BG[t.priority]??'#f8fafc'
                     return (
-                      <Link key={t.id} href={t.project_id?`/projects/${t.project_id}`:'/inbox'}
-                        style={{ display:'block',textDecoration:'none',padding:'12px 14px',
-                          background:'var(--surface)',borderRadius:12,
-                          borderLeft:`3px solid ${dotClr}`,
-                          border:`1px solid var(--border)`,
-                          borderLeftColor:dotClr,
-                          transition:'all 0.1s' }}
+                      <button key={t.id} onClick={() => openTask(t.id)}
+                        style={{ display:'block',textAlign:'left',width:'100%',padding:'12px 14px',
+                          background:'var(--surface)',borderRadius:12,cursor:'pointer',
+                          border:`1px solid var(--border)`,borderLeft:`3px solid ${dotClr}`,
+                          fontFamily:'inherit',transition:'all 0.1s' }}
                         onMouseEnter={e=>{(e.currentTarget as any).style.boxShadow='0 2px 10px rgba(0,0,0,0.08)';(e.currentTarget as any).style.transform='translateY(-1px)'}}
                         onMouseLeave={e=>{(e.currentTarget as any).style.boxShadow='';(e.currentTarget as any).style.transform=''}}>
                         <div style={{ display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:8,marginBottom:6 }}>
                           <p style={{ fontSize:13,fontWeight:500,
                             color:t.status==='completed'?'var(--text-muted)':'var(--text-primary)',
-                            textDecoration:t.status==='completed'?'line-through':undefined,flex:1,lineHeight:1.4 }}>
+                            textDecoration:t.status==='completed'?'line-through':undefined,flex:1,lineHeight:1.4,margin:0 }}>
                             {t.title}
                           </p>
                           <span style={{ fontSize:10,padding:'2px 7px',borderRadius:99,flexShrink:0,
@@ -405,7 +416,7 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
                             </span>
                           )}
                         </div>
-                      </Link>
+                      </button>
                     )
                   })}
                 </div>
@@ -426,5 +437,25 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
         </div>
       </div>
     </div>
+
+    {/* ── Task detail panel (opened when clicking any task pill) ── */}
+    {panelLoading && (
+      <div style={{ position:'fixed',inset:0,zIndex:9998,display:'flex',alignItems:'center',justifyContent:'center',
+        background:'rgba(0,0,0,0.15)' }}>
+        <div style={{ background:'var(--surface)',borderRadius:12,padding:'20px 28px',fontSize:13,
+          color:'var(--text-muted)',boxShadow:'0 8px 32px rgba(0,0,0,0.15)' }}>
+          Loading task…
+        </div>
+      </div>
+    )}
+    <TaskDetailPanel
+      task={panelTask}
+      members={members}
+      clients={clients}
+      currentUserId={currentUserId}
+      userRole={userRole}
+      onClose={() => setPanelTask(null)}
+      onUpdated={() => setPanelTask(null)}
+    />
   )
 }

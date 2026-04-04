@@ -40,5 +40,5 @@ export default async function CalendarPage() {
   ;(clients ?? []).forEach((c: any) => { clientMap[c.id] = c })
   const enrichedTasks = (tasks ?? []).map((t: any) => ({ ...t, client: t.client_id ? (clientMap[t.client_id] ?? null) : null }))
 
-  return <CalendarView tasks={enrichedTasks as any} clients={clients ?? []} members={memberList} canViewAll={canViewAll} currentUserId={user.id}/>
+  return <CalendarView tasks={enrichedTasks as any} clients={clients ?? []} members={memberList} canViewAll={canViewAll} currentUserId={user.id} userRole={mb.role}/>
 }
