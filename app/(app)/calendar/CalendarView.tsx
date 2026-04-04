@@ -105,7 +105,7 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
   const completedCount = monthTasks.filter(t => t.status === 'completed').length
   const pendingCount   = monthTasks.filter(t => t.status !== 'completed').length
 
-  return (
+  return (<>
     <div className="page-container" style={{ display:'flex', gap:20, minHeight:'calc(100vh - 120px)' }}>
 
       {/* ── Main calendar ─────────────────────────────────────── */}
@@ -457,5 +457,5 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
       onClose={() => setPanelTask(null)}
       onUpdated={() => setPanelTask(null)}
     />
-  )
+  </>)
 }
