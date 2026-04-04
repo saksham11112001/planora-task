@@ -214,12 +214,13 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
   async function handleComplete() {
     if (!task) return
     setCompleting(true)
-    const newStatus = status === 'completed' ? 'todo' : 'completed'
-    setStatus(newStatus)
-    await patch({
-      status: newStatus,
-      completed_at: newStatus === 'completed' ? new Date().toISOString() : null,
-    })
+    const newStatus  = status === 'completed' ? 'todo' : 'completed'
+    const prevStatus = status
+    setStatus(newStatus)   // optimistic
+    await patch(
+      { status: newStatus, completed_at: newStatus === 'completed' ? new Date().toISOString() : null },
+      () => setStatus(prevStatus),   // rollback on API error
+    )
     if (newStatus === 'completed') toast.success('Task completed! 🎉')
     setCompleting(false)
   }

@@ -10,7 +10,9 @@ import {
 } from '@/lib/data/complianceTasks'
 import {
   loadOverrides, saveOverrides,
-  type AttachmentConfig, type TaskOverride, type OrgOverrides,
+  loadCustomTasks, saveCustomTasks,
+  COMPLIANCE_FREQUENCIES, getFreqLabel, getFreqColor,
+  type AttachmentConfig, type TaskOverride, type OrgOverrides, type CustomTask,
 } from '@/lib/compliance'
 
 /* ─── Constants ──────────────────────────────────────────────── */
@@ -27,15 +29,6 @@ const GROUP_COLORS: Record<string, string> = {
   'Other':             '#455A64',
 }
 
-const FREQ_LABELS: Record<ComplianceFrequency, string> = {
-  monthly:'Monthly', quarterly:'Quarterly', annual:'Annual', one_time:'One-time',
-}
-const FREQ_COLORS: Record<ComplianceFrequency, { bg: string; color: string }> = {
-  monthly:  { bg:'#eff6ff', color:'#1d4ed8' },
-  quarterly:{ bg:'#fef3c7', color:'#b45309' },
-  annual:   { bg:'#fdf4ff', color:'#7e22ce' },
-  one_time: { bg:'#f0fdf4', color:'#166534' },
-}
 const PRI_COLORS: Record<string, { bg: string; color: string }> = {
   high:  { bg:'#fef2f2', color:'#dc2626' },
   medium:{ bg:'#fffbeb', color:'#ca8a04' },
@@ -57,16 +50,23 @@ function taskDefaults(t: ComplianceTask): TaskOverride {
 
 /* ─── Component ──────────────────────────────────────────────── */
 
+const BLANK_CUSTOM: Omit<CustomTask,'_id'> = {
+  title:'', group:'GST', category:'', frequency:'monthly', priority:'medium', description:'', attachments:[],
+}
+
 export function CompliancePage() {
   const [search,         setSearch]         = useState('')
   const [activeGroup,    setActiveGroup]    = useState('All')
   const [overrides,      setOverrides]      = useState<OrgOverrides>({})
+  const [customTasks,    setCustomTasks]    = useState<CustomTask[]>([])
   const [editingKey,     setEditingKey]     = useState<string | null>(null)
   const [draft,          setDraft]          = useState<TaskOverride | null>(null)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(COMPLIANCE_GROUPS))
   const [showInfo,       setShowInfo]       = useState<string | null>(null)
+  const [showAddTask,    setShowAddTask]    = useState(false)
+  const [newTask,        setNewTask]        = useState<Omit<CustomTask,'_id'>>(BLANK_CUSTOM)
 
-  useEffect(() => { setOverrides(loadOverrides()) }, [])
+  useEffect(() => { setOverrides(loadOverrides()); setCustomTasks(loadCustomTasks()) }, [])
 
   function effective(t: ComplianceTask): TaskOverride {
     return overrides[t.title] ?? taskDefaults(t)
@@ -116,6 +116,17 @@ export function CompliancePage() {
     setOverrides(updated); saveOverrides(updated)
     if (editingKey === key) cancelEdit()
   }
+  function addCustomTask() {
+    if (!newTask.title.trim()) return
+    const task: CustomTask = { ...newTask, _id: crypto.randomUUID(), title: newTask.title.trim() }
+    const updated = [...customTasks, task]
+    setCustomTasks(updated); saveCustomTasks(updated)
+    setNewTask(BLANK_CUSTOM); setShowAddTask(false)
+  }
+  function deleteCustomTask(id: string) {
+    const updated = customTasks.filter(t => t._id !== id)
+    setCustomTasks(updated); saveCustomTasks(updated)
+  }
 
   /* ── Attachment helpers (inside draft) ── */
   function setAttachmentCount(n: number, task: ComplianceTask) {
@@ -154,8 +165,9 @@ export function CompliancePage() {
     })
   }
 
-  const overrideCount = Object.keys(overrides).length
+  const overrideCount = Object.keys(overrides).length + customTasks.length
   const totalAttachments = COMPLIANCE_TASKS.reduce((acc, t) => acc + effective(t).attachments.length, 0)
+    + customTasks.reduce((acc, t) => acc + t.attachments.length, 0)
 
   /* ── Coverage stats ── */
   const coverageStats = COMPLIANCE_GROUPS.map(g => ({
@@ -355,7 +367,7 @@ export function CompliancePage() {
                               gridTemplateColumns:'1fr 110px 80px 90px 36px 96px',
                               gap:12, padding:'10px 16px', alignItems:'center',
                               borderBottom: isLast && !isInfoOpen && !isEditing ? 'none' : '1px solid var(--border-light)',
-                              background: isEditing ? '#fffbf0' : isOverridden ? 'rgba(124,58,237,0.025)' : 'var(--surface)',
+                              background: isEditing ? 'rgba(245,158,11,0.06)' : isOverridden ? 'rgba(124,58,237,0.025)' : 'var(--surface)',
                             }}>
 
                               {/* Task name */}
@@ -365,7 +377,7 @@ export function CompliancePage() {
                                     onChange={e => setDraft(d => d ? { ...d, title:e.target.value } : d)}
                                     style={{ width:'100%', padding:'5px 8px', borderRadius:6,
                                       border:'1.5px solid #f59e0b', outline:'none', fontSize:13,
-                                      background:'#fff', color:'var(--text-primary)', fontFamily:'inherit' }}/>
+                                      background:'var(--surface)', color:'var(--text-primary)', fontFamily:'inherit' }}/>
                                 ) : (
                                   <div>
                                     <div style={{ display:'flex', alignItems:'center', gap:5 }}>
@@ -390,19 +402,22 @@ export function CompliancePage() {
 
                               {/* Frequency */}
                               {isEditing ? (
-                                <select value={draft?.frequency}
-                                  onChange={e => setDraft(d => d ? { ...d, frequency:e.target.value as ComplianceFrequency } : d)}
+                                <select value={draft?.frequency ?? 'monthly'}
+                                  onChange={e => setDraft(d => d ? { ...d, frequency:e.target.value } : d)}
                                   style={{ padding:'5px 8px', borderRadius:6, border:'1.5px solid #f59e0b',
-                                    outline:'none', fontSize:12, background:'#fff', color:'var(--text-primary)', fontFamily:'inherit' }}>
-                                  <option value="monthly">Monthly</option>
-                                  <option value="quarterly">Quarterly</option>
-                                  <option value="annual">Annual</option>
-                                  <option value="one_time">One-time</option>
+                                    outline:'none', fontSize:12, background:'var(--surface)', color:'var(--text-primary)', fontFamily:'inherit' }}>
+                                  {(['Monthly','Quarterly','Annual','One-time'] as const).map(grp => (
+                                    <optgroup key={grp} label={grp}>
+                                      {COMPLIANCE_FREQUENCIES.filter(f => f.group === grp).map(f => (
+                                        <option key={f.v} value={f.v}>{f.l}</option>
+                                      ))}
+                                    </optgroup>
+                                  ))}
                                 </select>
                               ) : (
                                 <span style={{ fontSize:11, fontWeight:600, padding:'3px 8px', borderRadius:99,
-                                  ...FREQ_COLORS[eff.frequency], width:'fit-content', whiteSpace:'nowrap' }}>
-                                  {FREQ_LABELS[eff.frequency]}
+                                  ...getFreqColor(eff.frequency), width:'fit-content', whiteSpace:'nowrap' }}>
+                                  {getFreqLabel(eff.frequency)}
                                 </span>
                               )}
 
@@ -411,7 +426,7 @@ export function CompliancePage() {
                                 <select value={draft?.priority}
                                   onChange={e => setDraft(d => d ? { ...d, priority:e.target.value as 'high'|'medium'|'low' } : d)}
                                   style={{ padding:'5px 8px', borderRadius:6, border:'1.5px solid #f59e0b',
-                                    outline:'none', fontSize:12, background:'#fff', color:'var(--text-primary)', fontFamily:'inherit' }}>
+                                    outline:'none', fontSize:12, background:'var(--surface)', color:'var(--text-primary)', fontFamily:'inherit' }}>
                                   <option value="high">High</option>
                                   <option value="medium">Medium</option>
                                   <option value="low">Low</option>
@@ -501,7 +516,7 @@ export function CompliancePage() {
                             {(isEditing || isInfoOpen) && (
                               <div style={{
                                 padding:'14px 16px 16px',
-                                background: isEditing ? '#fffbf0' : 'var(--surface-subtle)',
+                                background: isEditing ? 'rgba(245,158,11,0.05)' : 'var(--surface-subtle)',
                                 borderBottom: isLast ? 'none' : '1px solid var(--border-light)',
                               }}>
                                 {isEditing ? (
@@ -537,7 +552,7 @@ export function CompliancePage() {
                                           <select value={draft?.attachments.length ?? 0}
                                             onChange={e => setAttachmentCount(parseInt(e.target.value), task)}
                                             style={{ padding:'4px 8px', borderRadius:6, border:'1.5px solid #f59e0b',
-                                              outline:'none', fontSize:12, background:'#fff', color:'var(--text-primary)', fontFamily:'inherit' }}>
+                                              outline:'none', fontSize:12, background:'var(--surface)', color:'var(--text-primary)', fontFamily:'inherit' }}>
                                             {[0,1,2,3,4,5,6].map(n => (
                                               <option key={n} value={n}>{n === 0 ? '0 — None' : n}</option>
                                             ))}
@@ -570,7 +585,7 @@ export function CompliancePage() {
                                                 placeholder={`e.g. Computation sheet, Signed balance sheet…`}
                                                 style={{ flex:1, padding:'7px 10px', borderRadius:7,
                                                   border:'1.5px solid var(--border)', outline:'none', fontSize:12,
-                                                  background:'#fff', color:'var(--text-primary)', fontFamily:'inherit' }}
+                                                  background:'var(--surface)', color:'var(--text-primary)', fontFamily:'inherit' }}
                                                 onFocus={e => (e.target.style.borderColor = '#f59e0b')}
                                                 onBlur={e  => (e.target.style.borderColor = 'var(--border)')}
                                               />
@@ -652,6 +667,129 @@ export function CompliancePage() {
               )
             })}
           </div>
+        )}
+
+        {/* ── Custom tasks (org additions) ─────────────── */}
+        {customTasks.length > 0 && (
+          <div style={{ border:'1px solid var(--border)', borderRadius:12, overflow:'hidden', marginBottom:0 }}>
+            <div style={{ padding:'10px 16px', background:'rgba(124,58,237,0.06)',
+              borderBottom:'1px solid rgba(124,58,237,0.15)' }}>
+              <span style={{ fontSize:13, fontWeight:700, color:'#7c3aed' }}>Custom tasks ({customTasks.length})</span>
+              <span style={{ fontSize:11, color:'var(--text-muted)', marginLeft:8 }}>
+                — added by your organisation
+              </span>
+            </div>
+            {customTasks.map((ct, idx) => (
+              <div key={ct._id} style={{ display:'grid', gridTemplateColumns:'1fr 110px 80px 90px 36px 96px',
+                gap:12, padding:'10px 16px', alignItems:'center',
+                borderBottom: idx === customTasks.length - 1 ? 'none' : '1px solid var(--border-light)',
+                background:'var(--surface)' }}>
+                <div>
+                  <div style={{ fontSize:13, fontWeight:500, color:'var(--text-primary)' }}>{ct.title}</div>
+                  <div style={{ fontSize:11, color:'var(--text-muted)', marginTop:1 }}>{ct.category || ct.group}</div>
+                </div>
+                <span style={{ fontSize:11, fontWeight:600, padding:'3px 8px', borderRadius:99,
+                  ...getFreqColor(ct.frequency), width:'fit-content', whiteSpace:'nowrap' }}>
+                  {getFreqLabel(ct.frequency)}
+                </span>
+                <span style={{ fontSize:11, fontWeight:600, padding:'3px 8px', borderRadius:99,
+                  ...PRI_COLORS[ct.priority], textTransform:'capitalize', width:'fit-content' }}>
+                  {ct.priority}
+                </span>
+                <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                  <Paperclip style={{ width:11, height:11, color: ct.attachments.length > 0 ? '#0891b2' : 'var(--text-muted)' }}/>
+                  <span style={{ fontSize:12, fontWeight:600, color: ct.attachments.length > 0 ? '#0891b2' : 'var(--text-muted)' }}>
+                    {ct.attachments.length > 0 ? ct.attachments.length : '—'}
+                  </span>
+                </div>
+                <div/>
+                <div style={{ display:'flex', justifyContent:'flex-end' }}>
+                  <button onClick={() => deleteCustomTask(ct._id)}
+                    style={{ display:'flex', alignItems:'center', gap:4, padding:'5px 8px', borderRadius:6,
+                      border:'1px solid var(--border)', background:'var(--surface)', color:'#dc2626',
+                      fontSize:11, cursor:'pointer', fontFamily:'inherit' }}>
+                    <Trash2 style={{ width:11, height:11 }}/> Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ── Add custom task button/form ───────────────── */}
+        {showAddTask ? (
+          <div style={{ border:'1.5px dashed rgba(124,58,237,0.4)', borderRadius:12,
+            padding:'16px', background:'rgba(124,58,237,0.03)' }}>
+            <p style={{ fontSize:12, fontWeight:700, color:'#7c3aed', marginBottom:12 }}>New custom task</p>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10, marginBottom:10 }}>
+              <div style={{ gridColumn:'1/4' }}>
+                <input value={newTask.title}
+                  onChange={e => setNewTask(n => ({ ...n, title:e.target.value }))}
+                  placeholder="Task name *"
+                  style={{ width:'100%', padding:'7px 10px', borderRadius:7, border:'1.5px solid rgba(124,58,237,0.4)',
+                    outline:'none', fontSize:13, background:'var(--surface)', color:'var(--text-primary)', fontFamily:'inherit' }}/>
+              </div>
+              <div>
+                <label style={{ fontSize:10, fontWeight:600, color:'var(--text-muted)', display:'block', marginBottom:4 }}>Group</label>
+                <select value={newTask.group} onChange={e => setNewTask(n => ({ ...n, group:e.target.value }))}
+                  style={{ width:'100%', padding:'6px 8px', borderRadius:7, border:'1px solid var(--border)',
+                    fontSize:12, background:'var(--surface)', color:'var(--text-primary)', fontFamily:'inherit', outline:'none' }}>
+                  {COMPLIANCE_GROUPS.map(g => <option key={g} value={g}>{g}</option>)}
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize:10, fontWeight:600, color:'var(--text-muted)', display:'block', marginBottom:4 }}>Frequency</label>
+                <select value={newTask.frequency} onChange={e => setNewTask(n => ({ ...n, frequency:e.target.value }))}
+                  style={{ width:'100%', padding:'6px 8px', borderRadius:7, border:'1px solid var(--border)',
+                    fontSize:12, background:'var(--surface)', color:'var(--text-primary)', fontFamily:'inherit', outline:'none' }}>
+                  {(['Monthly','Quarterly','Annual','One-time'] as const).map(grp => (
+                    <optgroup key={grp} label={grp}>
+                      {COMPLIANCE_FREQUENCIES.filter(f => f.group === grp).map(f => (
+                        <option key={f.v} value={f.v}>{f.l}</option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize:10, fontWeight:600, color:'var(--text-muted)', display:'block', marginBottom:4 }}>Priority</label>
+                <select value={newTask.priority} onChange={e => setNewTask(n => ({ ...n, priority:e.target.value as 'high'|'medium'|'low' }))}
+                  style={{ width:'100%', padding:'6px 8px', borderRadius:7, border:'1px solid var(--border)',
+                    fontSize:12, background:'var(--surface)', color:'var(--text-primary)', fontFamily:'inherit', outline:'none' }}>
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
+                </select>
+              </div>
+            </div>
+            <div style={{ display:'flex', gap:8 }}>
+              <button onClick={addCustomTask} disabled={!newTask.title.trim()}
+                style={{ padding:'7px 16px', borderRadius:7, border:'none',
+                  background: newTask.title.trim() ? '#7c3aed' : 'var(--border)',
+                  color: newTask.title.trim() ? '#fff' : 'var(--text-muted)',
+                  fontSize:12, fontWeight:600, cursor: newTask.title.trim() ? 'pointer' : 'not-allowed', fontFamily:'inherit' }}>
+                <Check style={{ width:12, height:12, display:'inline', marginRight:4 }}/>Add task
+              </button>
+              <button onClick={() => { setShowAddTask(false); setNewTask(BLANK_CUSTOM) }}
+                style={{ padding:'7px 12px', borderRadius:7, border:'1px solid var(--border)',
+                  background:'var(--surface)', color:'var(--text-secondary)',
+                  fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button onClick={() => setShowAddTask(true)}
+            style={{ display:'flex', alignItems:'center', gap:8, width:'100%', padding:'12px 16px',
+              borderRadius:12, border:'1.5px dashed rgba(124,58,237,0.35)',
+              background:'rgba(124,58,237,0.03)', color:'#7c3aed',
+              fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit',
+              justifyContent:'center', transition:'all 0.15s' }}
+            onMouseEnter={e => (e.currentTarget as HTMLElement).style.background='rgba(124,58,237,0.08)'}
+            onMouseLeave={e => (e.currentTarget as HTMLElement).style.background='rgba(124,58,237,0.03)'}>
+            <Plus style={{ width:15, height:15 }}/> Add custom compliance task
+          </button>
         )}
 
         {/* ── Footer ──────────────────────────────────────── */}

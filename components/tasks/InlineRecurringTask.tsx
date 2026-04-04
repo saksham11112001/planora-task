@@ -9,19 +9,33 @@ import { InlineCustomFields } from '@/components/tasks/InlineCustomFields'
 
 // ── Granular frequency options ─────────────────────────────────
 const FREQUENCIES = [
-  { group: 'Daily',    v: 'daily',              l: 'Every day' },
-  { group: 'Weekly',   v: 'weekly_mon',         l: 'Every Monday' },
-  { group: 'Weekly',   v: 'weekly_tue',         l: 'Every Tuesday' },
-  { group: 'Weekly',   v: 'weekly_wed',         l: 'Every Wednesday' },
-  { group: 'Weekly',   v: 'weekly_thu',         l: 'Every Thursday' },
-  { group: 'Weekly',   v: 'weekly_fri',         l: 'Every Friday' },
-  { group: 'Weekly',   v: 'bi_weekly',          l: 'Every 2 weeks' },
-  { group: 'Monthly',  v: 'monthly_1',          l: '1st of every month' },
-  { group: 'Monthly',  v: 'monthly_15',         l: '15th of every month' },
-  { group: 'Monthly',  v: 'monthly_last',       l: 'Last day of month' },
-  { group: 'Monthly',  v: 'monthly',            l: 'Monthly (same date)' },
-  { group: 'Other',    v: 'quarterly',          l: 'Quarterly' },
-  { group: 'Other',    v: 'annual',             l: 'Annually' },
+  { group: 'Daily',     v: 'daily',            l: 'Every day' },
+  { group: 'Weekly',    v: 'weekly_mon',       l: 'Every Monday' },
+  { group: 'Weekly',    v: 'weekly_tue',       l: 'Every Tuesday' },
+  { group: 'Weekly',    v: 'weekly_wed',       l: 'Every Wednesday' },
+  { group: 'Weekly',    v: 'weekly_thu',       l: 'Every Thursday' },
+  { group: 'Weekly',    v: 'weekly_fri',       l: 'Every Friday' },
+  { group: 'Weekly',    v: 'bi_weekly',        l: 'Every 2 weeks' },
+  { group: 'Monthly',   v: 'monthly_1',        l: '1st of every month' },
+  { group: 'Monthly',   v: 'monthly_7',        l: '7th of every month' },
+  { group: 'Monthly',   v: 'monthly_10',       l: '10th of every month' },
+  { group: 'Monthly',   v: 'monthly_11',       l: '11th of every month' },
+  { group: 'Monthly',   v: 'monthly_13',       l: '13th of every month' },
+  { group: 'Monthly',   v: 'monthly_15',       l: '15th of every month' },
+  { group: 'Monthly',   v: 'monthly_20',       l: '20th of every month' },
+  { group: 'Monthly',   v: 'monthly_25',       l: '25th of every month' },
+  { group: 'Monthly',   v: 'monthly_last',     l: 'Last day of month' },
+  { group: 'Monthly',   v: 'monthly',          l: 'Monthly (same date)' },
+  { group: 'Quarterly', v: 'quarterly_13',     l: '13th of quarter-end' },
+  { group: 'Quarterly', v: 'quarterly_15',     l: '15th of quarter-end' },
+  { group: 'Quarterly', v: 'quarterly_25',     l: '25th of quarter-end' },
+  { group: 'Quarterly', v: 'quarterly_last',   l: 'Last day of quarter' },
+  { group: 'Quarterly', v: 'quarterly',        l: 'Quarterly (same date)' },
+  { group: 'Annual',    v: 'annual_31jul',     l: '31st July (annual)' },
+  { group: 'Annual',    v: 'annual_30sep',     l: '30th September (annual)' },
+  { group: 'Annual',    v: 'annual_31dec',     l: '31st December (annual)' },
+  { group: 'Annual',    v: 'annual_31mar',     l: '31st March (annual)' },
+  { group: 'Annual',    v: 'annual',           l: 'Annually (same date)' },
 ]
 
 const FREQ_LABEL: Record<string, string> = Object.fromEntries(FREQUENCIES.map(f => [f.v, f.l]))
@@ -230,7 +244,7 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, edit
             style={{ fontSize:12, border:'none', outline:'none',
               background:'transparent', color:'var(--brand)',
               cursor:'pointer', appearance:'none', fontWeight:500 }}>
-            {(['Daily','Weekly','Monthly','Other'] as const).map(group => (
+            {(['Daily','Weekly','Monthly','Quarterly','Annual'] as const).map(group => (
               <optgroup key={group} label={group}>
                 {FREQUENCIES.filter(f => f.group === group).map(f => (
                   <option key={f.v} value={f.v}>{f.l}</option>

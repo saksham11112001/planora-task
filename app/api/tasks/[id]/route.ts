@@ -4,6 +4,20 @@ import { inngest }            from '@/lib/inngest/client'
 import { NextResponse }       from 'next/server'
 import type { NextRequest }   from 'next/server'
 
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+  const { data: mb } = await supabase.from('org_members').select('org_id').eq('user_id', user.id).eq('is_active', true).single()
+  if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
+  const { data, error } = await supabase.from('tasks')
+    .select('*, assignee:users!tasks_assignee_id_fkey(id,name), approver:users!tasks_approver_id_fkey(id,name), projects(id,name,color), clients(id,name,color)')
+    .eq('id', id).eq('org_id', mb.org_id).single()
+  if (error || !data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  return NextResponse.json({ data })
+}
+
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createClient()
