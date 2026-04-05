@@ -57,9 +57,15 @@ export function BillingView({ orgName, currentPlan, status, subscriptionId, tria
       })
       const d = await res.json()
       if (res.ok) {
-        setCouponMsg({ ok:true, text:`✓ ${d.plan.charAt(0).toUpperCase()+d.plan.slice(1)} plan activated for ${d.months} month${d.months>1?'s':''}! Refreshing…` })
-        setCouponCode('')
-        setTimeout(() => window.location.reload(), 2000)
+        if (d.type === 'free_plan') {
+          setCouponMsg({ ok:true, text:`✓ ${(d.plan as string).charAt(0).toUpperCase()+(d.plan as string).slice(1)} plan activated for ${d.months} month${d.months>1?'s':''}! Refreshing…` })
+          setCouponCode('')
+          setTimeout(() => window.location.reload(), 2000)
+        } else {
+          // percent / fixed_inr — discount stored for checkout
+          setCouponMsg({ ok:true, text:`✓ ${d.message ?? 'Discount code applied!'}` })
+          setCouponCode('')
+        }
       } else {
         setCouponMsg({ ok:false, text:d.error ?? 'Invalid coupon' })
       }
