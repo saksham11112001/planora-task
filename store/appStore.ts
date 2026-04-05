@@ -46,3 +46,28 @@ export const toast = {
   error:   (message: string) => useToastStore.getState().push({ type: 'error',   message }),
   info:    (message: string) => useToastStore.getState().push({ type: 'info',     message }),
 }
+
+/* Universal Filter store */
+export interface FilterState {
+  search:      string
+  clientId:    string
+  priority:    string
+  status:      string
+  assigneeId:  string
+  dueDateFrom: string
+  dueDateTo:   string
+  setFilter:   (key: keyof Omit<FilterState, 'setFilter' | 'resetFilters'>, value: string) => void
+  resetFilters: () => void
+}
+
+export const useFilterStore = create<FilterState>((set) => ({
+  search:       '',
+  clientId:     '',
+  priority:     '',
+  status:       '',
+  assigneeId:   '',
+  dueDateFrom:  '',
+  dueDateTo:    '',
+  setFilter:    (key, value) => set({ [key]: value }),
+  resetFilters: () => set({ search: '', clientId: '', priority: '', status: '', assigneeId: '', dueDateFrom: '', dueDateTo: '' }),
+}))

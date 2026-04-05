@@ -4,7 +4,8 @@ import { useRouter }     from 'next/navigation'
 import { fmtDate, isOverdue } from '@/lib/utils/format'
 import { PriorityBadge, Avatar } from '@/components/ui/Badge'
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
-import { toast }          from '@/store/appStore'
+import { toast, useFilterStore } from '@/store/appStore'
+import { UniversalFilterBar } from '@/components/filters/UniversalFilterBar'
 import { CheckCheck, X, Clock, RefreshCw, FolderOpen, ChevronDown } from 'lucide-react'
 
 interface Task {
@@ -34,11 +35,16 @@ export function ApprovalsView({ pending: initialPending, history, members, clien
   const [selTask,    setSelTask]    = useState<Task | null>(null)
   const [processing, setProcessing] = useState<Set<string>>(new Set())
   const [showHistory, setShowHistory] = useState(false)
-  const [filterClient, setFilterClient] = useState('')
 
-  const visiblePending = filterClient
-    ? pending.filter(t => t.client_id === filterClient)
-    : pending
+  // Global filters
+  const { clientId: filterClient, search: filterSearch, priority: filterPriority } = useFilterStore()
+
+  const visiblePending = pending.filter(t => {
+    if (filterClient  && t.client_id !== filterClient) return false
+    if (filterPriority && t.priority  !== filterPriority) return false
+    if (filterSearch   && !t.title.toLowerCase().includes(filterSearch.toLowerCase())) return false
+    return true
+  })
 
   async function decide(taskId: string, decision: 'approve' | 'reject') {
     setProcessing(p => new Set(p).add(taskId))
@@ -59,10 +65,12 @@ export function ApprovalsView({ pending: initialPending, history, members, clien
     }
   }
 
-  const allClients = clients.filter(c => pending.some(t => t.client_id === c.id))
-
   return (
-    <div style={{ flex: 1, overflowY: 'auto', background: 'var(--surface-subtle)' }}>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--surface-subtle)' }}>
+      {/* Universal filter bar */}
+      <UniversalFilterBar clients={clients} showSearch showPriority/>
+
+      <div style={{ flex: 1, overflowY: 'auto' }}>
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '28px 24px 80px' }}>
 
         {/* Header */}
@@ -76,28 +84,6 @@ export function ApprovalsView({ pending: initialPending, history, members, clien
               : `${pending.length} task${pending.length === 1 ? '' : 's'} waiting for your review`}
           </p>
         </div>
-
-        {/* Client filter */}
-        {allClients.length > 1 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-            <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>Filter:</span>
-            <select value={filterClient} onChange={e => setFilterClient(e.target.value)}
-              style={{ padding: '5px 12px', borderRadius: 20, fontSize: 12, cursor: 'pointer',
-                border: filterClient ? '1px solid var(--brand)' : '1px solid var(--border)',
-                background: filterClient ? 'rgba(13,148,136,0.08)' : 'var(--surface)',
-                color: filterClient ? 'var(--brand)' : 'var(--text-secondary)',
-                fontWeight: filterClient ? 600 : 400, fontFamily: 'inherit', outline: 'none' }}>
-              <option value=''>All clients</option>
-              {allClients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-            {filterClient && (
-              <button onClick={() => setFilterClient('')}
-                style={{ fontSize: 11, color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}>
-                ✕ Clear
-              </button>
-            )}
-          </div>
-        )}
 
         {/* Empty state */}
         {pending.length === 0 && (
@@ -294,6 +280,7 @@ export function ApprovalsView({ pending: initialPending, history, members, clien
             )}
           </div>
         )}
+      </div>
       </div>
 
       {/* Task detail modal */}

@@ -10,7 +10,8 @@ import { CompletionAttachModal }  from '@/components/tasks/CompletionAttachModal
 import { fmtDate, isOverdue, todayStr } from '@/lib/utils/format'
 import { PRIORITY_CONFIG } from '@/types'
 import type { Task } from '@/types'
-import { toast } from '@/store/appStore'
+import { toast, useFilterStore } from '@/store/appStore'
+import { UniversalFilterBar } from '@/components/filters/UniversalFilterBar'
 
 interface Props {
   tasks:               Task[]
@@ -64,108 +65,82 @@ export function MyTasksView({
   const [completingTask,  setCompletingTask]  = useState<Task | null>(null)
   
   const [dragOverCol,    setDragOverCol]    = useState<string | null>(null)
-  const [boardClient,    setBoardClient]    = useState('')
   const [doneExpanded,   setDoneExpanded]   = useState(false)
   const [listDoneExpanded, setListDoneExpanded] = useState(false)
   const DONE_PAGE = 5
   const LIST_DONE_PAGE = 5
   const [subtaskMap,     setSubtaskMap]     = useState<Record<string, any[]>>({})
   const [expandedTasks,  setExpandedTasks]  = useState<Set<string>>(new Set())
-  const [filterPriority, setFilterPriority] = useState('')
-  const [filterClient,   setFilterClient]   = useState('')
-  const [filterStatus,   setFilterStatus]   = useState('')
-  const [filterOpen,     setFilterOpen]     = useState(false)
+
+  // Global filters from universal filter store
+  const { clientId: filterClient, priority: filterPriority, status: filterStatus, search: filterSearch, dueDateFrom, dueDateTo, assigneeId: filterAssignee } = useFilterStore()
 
   // Apply filters
   const filteredTasks = tasks.filter(t => {
-    if (filterClient && (t as any).client?.id !== filterClient) return false
-    if (filterPriority && t.priority !== filterPriority) return false
-    if (filterStatus   && t.status   !== filterStatus)   return false
+    if (filterClient   && (t as any).client?.id !== filterClient) return false
+    if (filterPriority && t.priority !== filterPriority)          return false
+    if (filterStatus   && t.status   !== filterStatus)            return false
+    if (filterAssignee && (t.assignee_id ?? (t.assignee as any)?.id) !== filterAssignee) return false
+    if (filterSearch   && !t.title.toLowerCase().includes(filterSearch.toLowerCase())) return false
+    if (dueDateFrom    && (!t.due_date || t.due_date < dueDateFrom)) return false
+    if (dueDateTo      && (!t.due_date || t.due_date > dueDateTo))   return false
     return true
   })
-  const activeFilters = [filterPriority, filterStatus].filter(Boolean).length
 
   // Subtasks load lazily on user click only
 
   function refresh() { startT(() => router.refresh()) }
 
-  // Smart toggle: approval-required tasks go to "in review" instead of completed
+  // Universal toggle: ALL tasks go through approval (no direct completion by anyone)
   async function toggleDone(task: Task, e?: React.MouseEvent) {
     e?.stopPropagation()
 
-    // If currently completed → reopen as todo
-    if (task.status === 'completed') {
-      // Optimistic: instantly mark as todo
+    // Reopen: completed or in_review → back to todo
+    if (task.status === 'completed' || task.status === 'in_review') {
       const snapshot = tasks.map(t => t)
-      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: 'todo', completed_at: null } : t))
-      setSelTask(prev => prev?.id === task.id ? { ...prev, status: 'todo' } : prev)
+      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: 'todo', completed_at: null, approval_status: null } : t))
+      setSelTask(prev => prev?.id === task.id ? { ...prev, status: 'todo', completed_at: null, approval_status: null } : prev)
       const res = await fetch(`/api/tasks/${task.id}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'todo', completed_at: null }),
       })
       if (!res.ok) {
-        setTasks(snapshot) // revert
-        toast.error('Could not reopen task')
-      } else {
-        refresh()
-      }
-      return
-    }
-
-    // If in_review already → no action (must be approved by approver)
-    if (task.status === 'in_review' || task.approval_status === 'pending') {
-      toast.info('This task is pending approval — waiting for your approver.')
-      return
-    }
-
-    // Needs approval → check subtasks first, then submit for review
-    if (task.approval_required) {
-      setCompleting(p => new Set(p).add(task.id))
-      const res = await fetch(`/api/tasks/${task.id}/approve`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ decision: 'submit' }),
-      })
-      setCompleting(p => { const s=new Set(p); s.delete(task.id); return s })
-      if (res.ok) {
-        setTasks(prev => prev.map(t => t.id === task.id
-          ? { ...t, status: 'in_review', approval_status: 'pending' } : t))
-        setSelTask(prev => prev?.id === task.id
-          ? { ...prev, status: 'in_review', approval_status: 'pending' } : prev)
-        toast.success('Submitted for approval ✓')
-      } else {
-        const d = await res.json().catch(() => ({}))
-        toast.error(d.error ?? 'Could not submit — please try again')
-      }
-      refresh(); return
-    }
-
-    // Only show attachment modal for CA compliance tasks that require it
-    // Regular tasks complete immediately without forcing an attachment
-    const hasComplianceSubtasks = task.custom_fields?._compliance_subtask
-    const isCACompliance = !!(task as any).custom_fields?._ca_compliance
-    
-    if (hasComplianceSubtasks || isCACompliance) {
-      setCompletingTask(task)
-    } else {
-      // Regular task — complete directly without attachment requirement
-      setCompleting(p => new Set(p).add(task.id))
-      setTasks(prev => prev.map(t => t.id === task.id
-        ? { ...t, status: 'completed', completed_at: new Date().toISOString() } : t))
-      setSelTask(prev => prev?.id === task.id
-        ? { ...prev, status: 'completed', completed_at: new Date().toISOString() } : prev)
-      const res = await fetch(`/api/tasks/${task.id}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'completed', completed_at: new Date().toISOString() }),
-      })
-      setCompleting(p => { const s = new Set(p); s.delete(task.id); return s })
-      if (res.ok) {
-        toast.success('Done! ✅')
-        refresh()
-      } else {
-        const snapshot = tasks.map(t => t)
         setTasks(snapshot)
-        toast.error('Could not complete task')
+        const d = await res.json().catch(() => ({}))
+        toast.error(d.error ?? 'Could not reopen task')
       }
+      return
+    }
+
+    // Already pending approval → inform user
+    if (task.approval_status === 'pending') {
+      toast.info('This task is already pending approval — waiting for your approver.')
+      return
+    }
+
+    // All tasks: submit for approval (in_review)
+    setCompleting(p => new Set(p).add(task.id))
+    // Optimistic: immediately move to pending
+    setTasks(prev => prev.map(t => t.id === task.id
+      ? { ...t, status: 'in_review', approval_status: 'pending' } : t))
+    setSelTask(prev => prev?.id === task.id
+      ? { ...prev, status: 'in_review', approval_status: 'pending' } : prev)
+
+    const res = await fetch(`/api/tasks/${task.id}/approve`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ decision: 'submit' }),
+    })
+    setCompleting(p => { const s = new Set(p); s.delete(task.id); return s })
+    if (res.ok) {
+      toast.success('Submitted for approval ✓')
+    } else {
+      // Rollback optimistic update on failure
+      setTasks(prev => prev.map(t => t.id === task.id
+        ? { ...t, status: task.status, approval_status: task.approval_status ?? null } : t))
+      setSelTask(prev => prev?.id === task.id
+        ? { ...prev, status: task.status, approval_status: task.approval_status ?? null } : prev)
+      const d = await res.json().catch(() => ({}))
+      toast.error(d.error ?? 'Could not submit — please try again')
     }
   }
 
@@ -185,68 +160,94 @@ export function MyTasksView({
     }
     const newStatus = statusMap[targetStatus] ?? targetStatus
 
-    // Don't allow dragging to completed if approval required
-    if (newStatus === 'completed' && task.approval_required && task.approval_status !== 'approved') {
-      toast.error('This task requires approval before completion')
-      setDragTaskId(null); setDragOverCol(null); return
+    // Dragging to completed or in_review → always submit for approval
+    if (newStatus === 'completed' || newStatus === 'in_review') {
+      setDragTaskId(null); setDragOverCol(null)
+      // Optimistic: show as pending immediately
+      setTasks(prev => prev.map(t => t.id === dragTaskId
+        ? { ...t, status: 'in_review' as any, approval_status: 'pending' } : t))
+      const res = await fetch(`/api/tasks/${dragTaskId}/approve`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decision: 'submit' }),
+      })
+      if (res.ok) {
+        toast.success('Submitted for approval ✓')
+      } else {
+        // Rollback
+        setTasks(prev => prev.map(t => t.id === dragTaskId
+          ? { ...t, status: task.status as any, approval_status: task.approval_status ?? null } : t))
+        const d = await res.json().catch(() => ({}))
+        toast.error(d.error ?? 'Could not submit for approval')
+      }
+      return
     }
 
-    // Optimistic update
-    setTasks(prev => prev.map(t => t.id === dragTaskId
-      ? { ...t, status: newStatus as any, approval_status: newStatus === 'in_review' ? 'pending' : t.approval_status }
-      : t
-    ))
+    // Other transitions (e.g. reopen from review → todo) — plain PATCH
+    setTasks(prev => prev.map(t => t.id === dragTaskId ? { ...t, status: newStatus as any } : t))
     setDragTaskId(null)
     setDragOverCol(null)
-    
+
     const patchBody: any = { status: newStatus }
-    if (newStatus === 'completed') patchBody.completed_at = new Date().toISOString()
     if (newStatus === 'in_progress') patchBody.completed_at = null
-    
+
     const res = await fetch(`/api/tasks/${dragTaskId}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(patchBody),
     })
     if (!res.ok) {
       setTasks(prev => prev.map(t => t.id === dragTaskId ? { ...t, status: task.status as any } : t))
-      toast.error('Could not move task')
+      const d = await res.json().catch(() => ({}))
+      toast.error(d.error ?? 'Could not move task')
     } else {
-      toast.success(`Moved to ${targetStatus.replace('_', ' ')}`)
-      refresh()
+      toast.success(`Moved to ${newStatus.replace('_', ' ')}`)
     }
   }
 
   async function bulkComplete() {
     const ids = [...checked]
-    // Only complete tasks that don't need approval
-    const canComplete = tasks.filter(t => ids.includes(t.id) && !t.approval_required)
-    const needsApproval = tasks.filter(t => ids.includes(t.id) && t.approval_required)
-    const bulkSnapshot = tasks.map(t => t) // snapshot for rollback
+    // ALL selected tasks → submit for approval (in_review)
+    const toSubmit = tasks.filter(t =>
+      ids.includes(t.id) && t.status !== 'in_review' && t.approval_status !== 'pending'
+    )
+    setChecked(new Set())
+    // Optimistic: mark all as pending
     setTasks(prev => prev.map(t =>
-      canComplete.find(c => c.id === t.id)
-        ? { ...t, status: 'completed', completed_at: new Date().toISOString() }
+      toSubmit.find(s => s.id === t.id)
+        ? { ...t, status: 'in_review', approval_status: 'pending' } as any
         : t
     ))
-    setChecked(new Set())
-    const results = await Promise.all(canComplete.map(t => fetch(`/api/tasks/${t.id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'completed', completed_at: new Date().toISOString() }),
+    const results = await Promise.all(toSubmit.map(t => fetch(`/api/tasks/${t.id}/approve`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ decision: 'submit' }),
     })))
-    if (needsApproval.length)
-      toast.info(`${needsApproval.length} task(s) require approval and were skipped`)
-    refresh()
+    const failed = results.filter(r => !r.ok).length
+    if (toSubmit.length - failed > 0) toast.success(`${toSubmit.length - failed} task(s) submitted for approval ✓`)
+    if (failed > 0) toast.error(`${failed} task(s) could not be submitted`)
   }
 
   // Approve or reject a task (for managers/approvers)
   async function handleApproveDecision(taskId: string, decision: 'approve' | 'reject') {
+    // Optimistic update
+    const task = tasks.find(t => t.id === taskId)
+    const newStatus = decision === 'approve' ? 'completed' : 'todo'
+    setTasks(prev => prev.map(t => t.id === taskId
+      ? { ...t, status: newStatus as any, approval_status: decision === 'approve' ? 'approved' : null,
+          completed_at: decision === 'approve' ? new Date().toISOString() : null } : t))
+    setSelTask(prev => prev?.id === taskId
+      ? { ...prev, status: newStatus as any, approval_status: decision === 'approve' ? 'approved' : null } : prev)
+
     const res = await fetch(`/api/tasks/${taskId}/approve`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ decision }),
     })
     if (res.ok) {
       toast.success(decision === 'approve' ? 'Task approved ✓' : 'Task returned to assignee')
-      refresh()
     } else {
+      // Rollback
+      if (task) {
+        setTasks(prev => prev.map(t => t.id === taskId ? task : t))
+        setSelTask(prev => prev?.id === taskId ? task : prev)
+      }
       const d = await res.json().catch(() => ({}))
       toast.error(d.error ?? 'Action failed')
     }
@@ -264,7 +265,7 @@ export function MyTasksView({
     }
   }
 
-  // Circle button appearance based on state
+  // Circle button: pending approval shows purple clock; completed shows green tick; others show submit-for-approval on click
   function CircleBtn({ task }: { task: Task }) {
     const isPending = task.approval_status === 'pending' || task.status === 'in_review'
     const isDone    = task.status === 'completed'
@@ -272,15 +273,16 @@ export function MyTasksView({
     const ov        = isOverdue(task.due_date, task.status)
 
     if (isPending) return (
-      <div title="Pending approval"
+      <div onClick={e => toggleDone(task, e)} title="Pending approval — click to reopen"
         style={{ width:16, height:16, borderRadius:'50%', flexShrink:0,
           border:'1.5px solid #7c3aed', background:'rgba(124,58,237,0.1)',
-          display:'flex', alignItems:'center', justifyContent:'center' }}>
+          display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
         <Clock style={{ width:8, height:8, color:'#7c3aed' }}/>
       </div>
     )
     return (
       <div onClick={e => toggleDone(task, e)}
+        title={isDone ? 'Mark incomplete' : 'Submit for approval'}
         style={{ width:16, height:16, borderRadius:'50%', flexShrink:0,
           border:`1.5px solid ${isDone?'var(--brand)':ov?'#dc2626':'#cbd5e1'}`,
           background: isDone?'var(--brand)':isComp?'var(--border)':'transparent',
@@ -343,7 +345,7 @@ export function MyTasksView({
             <button onClick={bulkComplete}
               style={{ background:'var(--brand)', color:'#fff', border:'none', padding:'6px 14px',
                 borderRadius:7, fontSize:13, fontWeight:500, cursor:'pointer', display:'flex', alignItems:'center', gap:6 }}>
-              <CheckCheck style={{width:13,height:13}}/> Mark complete
+              <CheckCheck style={{width:13,height:13}}/> Submit for approval
             </button>
             <button onClick={() => setChecked(new Set())}
               style={{ background:'none', border:'none', fontSize:12, color:'var(--text-muted)', cursor:'pointer' }}>
@@ -459,26 +461,8 @@ export function MyTasksView({
           </div>
         )}
 
-        {/* Client filter bar */}
-        {clients && clients.length > 0 && (
-          <div style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 18px',
-            borderBottom:'1px solid var(--border-light)', background:'var(--surface)', flexShrink:0 }}>
-            <span style={{ fontSize:11, color:'var(--text-muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em' }}>Client</span>
-            <select value={filterClient} onChange={e => setFilterClient(e.target.value)}
-              style={{ padding:'4px 10px', borderRadius:20, fontSize:12, cursor:'pointer', outline:'none',
-                border: filterClient ? '1px solid var(--brand)' : '1px solid var(--border)',
-                background: filterClient ? 'rgba(13,148,136,0.08)' : 'var(--surface-subtle)',
-                color: filterClient ? 'var(--brand)' : 'var(--text-secondary)',
-                fontWeight: filterClient ? 600 : 400, fontFamily:'inherit', appearance:'none', paddingRight:20 }}>
-              <option value=''>All clients</option>
-              {(clients ?? []).map(cl => <option key={cl.id} value={cl.id}>{cl.name}</option>)}
-            </select>
-            {filterClient && <button onClick={() => setFilterClient('')}
-              style={{ fontSize:11, color:'var(--text-muted)', background:'none', border:'none', cursor:'pointer' }}>
-              ✕ Clear
-            </button>}
-          </div>
-        )}
+        {/* Universal filter bar */}
+        <UniversalFilterBar clients={clients} members={members} showSearch showPriority showStatus showAssignee showDueDate/>
         <div style={{ display:'grid', gridTemplateColumns:'28px 22px 1fr 160px 100px 110px',
           alignItems:'center', padding:'8px 18px', borderBottom:`1px solid var(--border)`,
           background:'var(--surface-subtle)', flexShrink:0, fontSize:11, fontWeight:700,
@@ -780,26 +764,8 @@ export function MyTasksView({
         />
       )}
       <Tabs/>
-      {/* Board client filter */}
-      {clients && clients.length > 0 && (
-        <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 20px',
-          borderBottom:'1px solid var(--border-light)', background:'var(--surface)', flexShrink:0 }}>
-          <span style={{ fontSize:11, color:'var(--text-muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em' }}>Client</span>
-          <select value={boardClient} onChange={e => setBoardClient(e.target.value)}
-            style={{ padding:'4px 10px', borderRadius:20, fontSize:12, cursor:'pointer', outline:'none',
-              border: boardClient ? '1px solid var(--brand)' : '1px solid var(--border)',
-              background: boardClient ? 'rgba(13,148,136,0.08)' : 'var(--surface-subtle)',
-              color: boardClient ? 'var(--brand)' : 'var(--text-secondary)',
-              fontFamily:'inherit', appearance:'none', paddingRight:20 }}>
-            <option value=''>All clients</option>
-            {(clients ?? []).map(cl => <option key={cl.id} value={cl.id}>{cl.name}</option>)}
-          </select>
-          {boardClient && <button onClick={() => setBoardClient('')}
-            style={{ fontSize:11, color:'var(--text-muted)', background:'none', border:'none', cursor:'pointer' }}>
-            ✕ Clear
-          </button>}
-        </div>
-      )}
+      {/* Universal filter bar */}
+      <UniversalFilterBar clients={clients} members={members} showSearch showPriority showAssignee showDueDate/>
       <div style={{ flex:1, overflowX:'auto', overflowY:'hidden', padding:'14px 20px',
         background:'var(--surface-subtle)', display:'flex', gap:12, alignItems:'flex-start' }}>
         {BOARD_COLS.map(col => {
@@ -814,8 +780,13 @@ export function MyTasksView({
             : tasks.filter(t => t.status === col.status && t.approval_status !== 'pending'
                 && !(!!t.due_date && t.due_date < today2 && t.status !== 'completed'))
 
-          // Apply client filter
-          if (boardClient) colTasks = colTasks.filter(t => (t as any).client?.id === boardClient)
+          // Apply filters
+          if (filterClient)   colTasks = colTasks.filter(t => (t as any).client?.id === filterClient)
+          if (filterPriority) colTasks = colTasks.filter(t => t.priority === filterPriority)
+          if (filterAssignee) colTasks = colTasks.filter(t => (t.assignee_id ?? (t.assignee as any)?.id) === filterAssignee)
+          if (filterSearch)   colTasks = colTasks.filter(t => t.title.toLowerCase().includes(filterSearch.toLowerCase()))
+          if (dueDateFrom)    colTasks = colTasks.filter(t => t.due_date && t.due_date >= dueDateFrom)
+          if (dueDateTo)      colTasks = colTasks.filter(t => t.due_date && t.due_date <= dueDateTo)
 
           // Paginate done column
           const allDoneTasks = colTasks

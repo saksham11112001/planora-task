@@ -6,7 +6,8 @@ import { RefreshCw, X, Pencil } from 'lucide-react'
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
 import { InlineRecurringTask, FREQ_LABEL } from '@/components/tasks/InlineRecurringTask'
 import { fmtDate } from '@/lib/utils/format'
-import { toast } from '@/store/appStore'
+import { toast, useFilterStore } from '@/store/appStore'
+import { UniversalFilterBar } from '@/components/filters/UniversalFilterBar'
 import { PriorityBadge, Avatar } from '@/components/ui/Badge'
 
 interface Task {
@@ -71,8 +72,6 @@ export function RecurringView({
   const [, startT] = useTransition()
 
   const [localTasks, setLocalTasks] = useState<Task[]>(initialTasks)
-  const [clientFilter, setClientFilter] = useState('')
-  const [boardClient, setBoardClient] = useState('')
   const [viewTab, setViewTab] = useState<'List' | 'Board'>('List')
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -81,12 +80,18 @@ export function RecurringView({
   const [expandedSubs, setExpandedSubs] = useState<Set<string>>(new Set())
   const [newSubInputs, setNewSubInputs] = useState<Record<string, string>>({})
 
+  // Global filters
+  const { clientId: clientFilter, priority: filterPriority, search: filterSearch, assigneeId: filterAssignee } = useFilterStore()
+
   const visibleTasks = useMemo(() => {
-    if (!clientFilter) return localTasks
-    return localTasks.filter(
-      (t) => t.client_id === clientFilter || t.client?.id === clientFilter,
-    )
-  }, [localTasks, clientFilter])
+    return localTasks.filter(t => {
+      if (clientFilter  && t.client_id !== clientFilter && t.client?.id !== clientFilter) return false
+      if (filterPriority && t.priority !== filterPriority) return false
+      if (filterAssignee && (t.assignee_id ?? t.assignee?.id) !== filterAssignee) return false
+      if (filterSearch   && !t.title.toLowerCase().includes(filterSearch.toLowerCase())) return false
+      return true
+    })
+  }, [localTasks, clientFilter, filterPriority, filterSearch, filterAssignee])
 
   async function refreshSubs(taskId: string) {
     const r = await fetch(`/api/tasks?parent_id=${taskId}&limit=50`)
@@ -237,54 +242,8 @@ export function RecurringView({
 
       {viewTab === 'Board' && (
         <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-          {clients.length > 0 && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '8px 20px',
-                borderBottom: '1px solid var(--border-light)',
-                background: 'var(--surface)',
-              }}
-            >
-              <span
-                style={{
-                  fontSize: 11,
-                  color: 'var(--text-muted)',
-                  fontWeight: 600,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.06em',
-                }}
-              >
-                Client
-              </span>
-
-              <select
-                value={boardClient}
-                onChange={(e) => setBoardClient(e.target.value)}
-                style={{
-                  padding: '4px 10px',
-                  borderRadius: 20,
-                  fontSize: 12,
-                  cursor: 'pointer',
-                  outline: 'none',
-                  border: boardClient ? '1px solid var(--brand)' : '1px solid var(--border)',
-                  background: boardClient ? 'rgba(13,148,136,0.08)' : 'var(--surface-subtle)',
-                  color: boardClient ? 'var(--brand)' : 'var(--text-secondary)',
-                  fontFamily: 'inherit',
-                  appearance: 'none',
-                }}
-              >
-                <option value="">All clients</option>
-                {clients.map((cl) => (
-                  <option key={cl.id} value={cl.id}>
-                    {cl.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          {/* Universal filter bar */}
+          <UniversalFilterBar clients={clients} members={members} showSearch showPriority showAssignee/>
 
           <div
             style={{
@@ -302,7 +261,10 @@ export function RecurringView({
               const colTasks = localTasks.filter(
                 (t) =>
                   normalizeFrequency(t.frequency) === col.key &&
-                  (!boardClient || t.client_id === boardClient || t.client?.id === boardClient),
+                  (!clientFilter  || t.client_id === clientFilter  || t.client?.id === clientFilter) &&
+                  (!filterPriority || t.priority === filterPriority) &&
+                  (!filterAssignee || (t.assignee_id ?? t.assignee?.id) === filterAssignee) &&
+                  (!filterSearch   || t.title.toLowerCase().includes(filterSearch.toLowerCase())),
               )
 
               return (
@@ -451,6 +413,8 @@ export function RecurringView({
 
       {viewTab === 'List' && (
         <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+          {/* Universal filter bar */}
+          <UniversalFilterBar clients={clients} members={members} showSearch showPriority showAssignee/>
           <div
             style={{
               display: 'flex',
@@ -462,39 +426,9 @@ export function RecurringView({
               flexShrink: 0,
             }}
           >
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>
-                {visibleTasks.length} active · instances spawn automatically each morning at 7 AM IST
-              </span>
-
-              {clients.length > 0 && (
-                <select
-                  value={clientFilter}
-                  onChange={(e) => setClientFilter(e.target.value)}
-                  style={{
-                    padding: '4px 10px',
-                    borderRadius: 20,
-                    fontSize: 12,
-                    cursor: 'pointer',
-                    outline: 'none',
-                    border: clientFilter ? '1px solid var(--brand)' : '1px solid var(--border)',
-                    background: clientFilter ? 'rgba(13,148,136,0.08)' : 'var(--surface-subtle)',
-                    color: clientFilter ? 'var(--brand)' : 'var(--text-secondary)',
-                    fontWeight: clientFilter ? 600 : 400,
-                    fontFamily: 'inherit',
-                    appearance: 'none',
-                    paddingRight: 20,
-                  }}
-                >
-                  <option value="">All clients</option>
-                  {clients.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>
+              {visibleTasks.length} active · instances spawn automatically each morning at 7 AM IST
+            </span>
           </div>
 
           <div

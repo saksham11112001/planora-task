@@ -6,7 +6,8 @@ import { CheckCheck, Clock, Trash2 } from 'lucide-react'
 import { InlineOneTimeTask } from '@/components/tasks/InlineOneTimeTask'
 import { CompletionAttachModal } from '@/components/tasks/CompletionAttachModal'
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
-import { toast } from '@/store/appStore'
+import { toast, useFilterStore } from '@/store/appStore'
+import { UniversalFilterBar } from '@/components/filters/UniversalFilterBar'
 import { fmtDate, isOverdue, todayStr } from '@/lib/utils/format'
 import { PRIORITY_CONFIG } from '@/types'
 import type { Task } from '@/types'
@@ -32,10 +33,10 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
   const [completing,      setCompleting]      = useState<Set<string>>(new Set())
   const [, startT]                            = useTransition()
   const [expandedTasks,   setExpandedTasks]   = useState<Set<string>>(new Set())
-  const [searchQuery,     setSearchQuery]     = useState('')
-  const [clientFilter,    setClientFilter]    = useState('')
   const [viewTab,         setViewTab]         = useState<'List'|'Board'>('List')
-  const [boardClient,     setBoardClient]     = useState('')
+
+  // Global filters
+  const { search: searchQuery, clientId: clientFilter, priority: filterPriority, status: filterStatus, assigneeId: filterAssignee, dueDateFrom, dueDateTo } = useFilterStore()
   const [doneBoardExp,    setDoneBoardExp]    = useState(false)
   const [dragTaskId,      setDragTaskId]      = useState<string|null>(null)
   const [dragOverCol,     setDragOverCol]     = useState<string|null>(null)
@@ -103,29 +104,39 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
 
   async function toggleDone(task: Task, e: React.MouseEvent) {
     e.stopPropagation()
-    if (task.status === 'completed') {
-      setLocalTasks(prev => prev.map(t => t.id===task.id ? { ...t, status:'todo', completed_at:null } : t))
-      setSelectedTask(prev => prev?.id===task.id ? { ...prev, status:'todo' } : prev)
-      await fetch(`/api/tasks/${task.id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ status:'todo', completed_at:null }) })
-      startT(() => router.refresh()); return
+
+    // Reopen: completed or in_review → back to todo
+    if (task.status === 'completed' || task.status === 'in_review') {
+      setLocalTasks(prev => prev.map(t => t.id===task.id ? { ...t, status:'todo', completed_at:null, approval_status:null } : t))
+      setSelectedTask(prev => prev?.id===task.id ? { ...prev, status:'todo', completed_at:null, approval_status:null } : prev)
+      const res = await fetch(`/api/tasks/${task.id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ status:'todo', completed_at:null }) })
+      if (!res.ok) {
+        setLocalTasks(prev => prev.map(t => t.id===task.id ? { ...t, status:task.status, approval_status:task.approval_status } : t))
+        const d = await res.json().catch(() => ({}))
+        toast.error(d.error ?? 'Could not reopen task')
+      }
+      return
     }
-    if (task.status==='in_review' || task.approval_status==='pending') { toast.info('This task is pending approval.'); return }
-    if (task.approval_required) {
-      setCompleting(p => new Set(p).add(task.id))
-      const res = await fetch(`/api/tasks/${task.id}/approve`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ decision:'submit' }) })
-      setCompleting(p => { const s = new Set(p); s.delete(task.id); return s })
-      if (res.ok) {
-        setLocalTasks(prev => prev.map(t => t.id===task.id ? { ...t, status:'in_review', approval_status:'pending' } : t))
-        toast.success('Submitted for approval ✓')
-      } else { toast.error('Could not submit') }
-      startT(() => router.refresh()); return
-    }
-    setLocalTasks(prev => prev.map(t => t.id===task.id ? { ...t, status:'completed', completed_at:new Date().toISOString() } : t))
+
+    // Already pending → inform
+    if (task.approval_status === 'pending') { toast.info('Already pending approval — waiting for your approver.'); return }
+
+    // ALL tasks → submit for approval (optimistic)
     setCompleting(p => new Set(p).add(task.id))
-    const res = await fetch(`/api/tasks/${task.id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ status:'completed', completed_at:new Date().toISOString() }) })
+    setLocalTasks(prev => prev.map(t => t.id===task.id ? { ...t, status:'in_review' as any, approval_status:'pending' } : t))
+    setSelectedTask(prev => prev?.id===task.id ? { ...prev, status:'in_review', approval_status:'pending' } : prev)
+
+    const res = await fetch(`/api/tasks/${task.id}/approve`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ decision:'submit' }) })
     setCompleting(p => { const s = new Set(p); s.delete(task.id); return s })
-    if (!res.ok) { setLocalTasks(prev => prev.map(t => t.id===task.id ? { ...t, status:task.status } : t)); toast.error('Failed') }
-    else { toast.success('Task completed! ✓'); startT(() => router.refresh()) }
+    if (res.ok) {
+      toast.success('Submitted for approval ✓')
+    } else {
+      // Rollback optimistic update
+      setLocalTasks(prev => prev.map(t => t.id===task.id ? { ...t, status:task.status, approval_status:task.approval_status } : t))
+      setSelectedTask(prev => prev?.id===task.id ? { ...prev, status:task.status, approval_status:task.approval_status } : prev)
+      const d = await res.json().catch(() => ({}))
+      toast.error(d.error ?? 'Could not submit for approval')
+    }
   }
 
   async function deleteTask(taskId: string) {
@@ -138,13 +149,21 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
 
   async function bulkComplete() {
     const ids = [...checked]
-    const can = localTasks.filter(t => ids.includes(t.id) && !t.approval_required)
-    const needs = localTasks.filter(t => ids.includes(t.id) && t.approval_required)
-    await Promise.all(can.map(t => fetch(`/api/tasks/${t.id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ status:'completed', completed_at:new Date().toISOString() }) })))
+    // ALL → submit for approval
+    const toSubmit = localTasks.filter(t => ids.includes(t.id) && t.status !== 'in_review' && t.approval_status !== 'pending')
     setChecked(new Set())
-    if (can.length) toast.success(can.length + ' tasks completed')
-    if (needs.length) toast.info(needs.length + ' task(s) need approval — skipped')
-    startT(() => router.refresh())
+    // Optimistic
+    setLocalTasks(prev => prev.map(t =>
+      toSubmit.find(s => s.id === t.id)
+        ? { ...t, status:'in_review' as any, approval_status:'pending' }
+        : t
+    ))
+    const results = await Promise.all(toSubmit.map(t => fetch(`/api/tasks/${t.id}/approve`, {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ decision:'submit' })
+    })))
+    const failed = results.filter(r => !r.ok).length
+    if (toSubmit.length - failed > 0) toast.success(`${toSubmit.length - failed} task(s) submitted for approval ✓`)
+    if (failed > 0) toast.error(`${failed} task(s) could not be submitted`)
   }
 
   async function handleBoardDrop(targetStatus: string) {
@@ -154,22 +173,11 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
     const taskId = dragTaskId
     setDragTaskId(null); setDragOverCol(null)
 
-    // Don't allow dragging to completed if approval required and not yet approved
-    if (targetStatus === 'completed' && task.approval_required && task.approval_status !== 'approved') {
-      toast.error('This task requires approval before completion — drag to Pending approval first')
-      return
-    }
-
-    // Dragging to "Pending approval" must use the /approve submit flow
-    // so approval_status is set to 'pending' AND the approver is notified.
-    if (targetStatus === 'in_review') {
-      if (task.assignee_id && task.assignee_id !== currentUserId) {
-        toast.error('Only the task assignee can submit it for approval')
-        return
-      }
+    // Dragging to completed or in_review → submit for approval (approval-first for all)
+    if (targetStatus === 'completed' || targetStatus === 'in_review') {
       setLocalTasks(prev => prev.map(t => t.id===taskId ? { ...t, status:'in_review' as any, approval_status:'pending' } : t))
       const res = await fetch(`/api/tasks/${taskId}/approve`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ decision:'submit' }) })
-      if (res.ok) { toast.success('Submitted for approval ✓'); startT(() => router.refresh()) }
+      if (res.ok) { toast.success('Submitted for approval ✓') }
       else {
         setLocalTasks(prev => prev.map(t => t.id===taskId ? { ...t, status:task.status, approval_status:task.approval_status } : t))
         const d = await res.json().catch(() => ({}))
@@ -193,7 +201,15 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
     }
   }
 
-  const visibleTasks = clientFilter ? localTasks.filter(t => (t as any).client?.id===clientFilter) : localTasks
+  const visibleTasks = localTasks.filter(t => {
+    if (clientFilter  && (t as any).client?.id !== clientFilter) return false
+    if (filterPriority && t.priority !== filterPriority) return false
+    if (filterStatus   && t.status   !== filterStatus)   return false
+    if (filterAssignee && (t.assignee_id ?? (t.assignee as any)?.id) !== filterAssignee) return false
+    if (dueDateFrom    && (!t.due_date || t.due_date < dueDateFrom)) return false
+    if (dueDateTo      && (!t.due_date || t.due_date > dueDateTo))   return false
+    return true
+  })
   const overdue  = visibleTasks.filter(t => t.status!=='completed' && isOverdue(t.due_date, t.status))
   const inProg   = visibleTasks.filter(t => t.status!=='completed' && !isOverdue(t.due_date, t.status) && t.approval_status!=='pending')
   const inReview = visibleTasks.filter(t => t.approval_status==='pending')
@@ -228,17 +244,8 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
 
       {viewTab === 'Board' && (
         <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-          {clients.length > 0 && (
-            <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 20px', borderBottom:'1px solid var(--border-light)', background:'var(--surface)', flexShrink:0 }}>
-              <span style={{ fontSize:11, color:'var(--text-muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em' }}>Client</span>
-              <select value={boardClient} onChange={e => setBoardClient(e.target.value)}
-                style={{ padding:'4px 10px', borderRadius:20, fontSize:12, cursor:'pointer', outline:'none', border:boardClient?'1px solid var(--brand)':'1px solid var(--border)', background:boardClient?'rgba(13,148,136,0.08)':'var(--surface-subtle)', color:boardClient?'var(--brand)':'var(--text-secondary)', fontFamily:'inherit', appearance:'none' }}>
-                <option value=''>All clients</option>
-                {clients.map(cl => <option key={cl.id} value={cl.id}>{cl.name}</option>)}
-              </select>
-              {boardClient && <button onClick={() => setBoardClient('')} style={{ fontSize:11, color:'var(--text-muted)', background:'none', border:'none', cursor:'pointer' }}>✕</button>}
-            </div>
-          )}
+          {/* Universal filter bar for board */}
+          <UniversalFilterBar clients={clients} members={members} showSearch showPriority showAssignee showDueDate/>
           <div style={{ flex:1, overflowX:'auto', overflowY:'hidden', padding:'14px 20px', background:'var(--surface-subtle)', display:'flex', gap:12, alignItems:'flex-start' }}>
             {INBOX_BOARD_COLS.map(col => {
               const t2 = todayStr()
@@ -247,7 +254,12 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                 : col.status==='in_review' ? localTasks.filter(t => t.approval_status==='pending'||t.status==='in_review')
                 : col.status==='todo' ? localTasks.filter(t => ['todo','in_progress'].includes(t.status) && t.approval_status!=='pending' && !(!!t.due_date && t.due_date<t2))
                 : localTasks.filter(t => t.status===col.status && t.approval_status!=='pending')
-              if (boardClient) colTasks = colTasks.filter(t => (t as any).client?.id===boardClient)
+              if (clientFilter)   colTasks = colTasks.filter(t => (t as any).client?.id===clientFilter)
+              if (filterPriority) colTasks = colTasks.filter(t => t.priority===filterPriority)
+              if (filterAssignee) colTasks = colTasks.filter(t => (t.assignee_id ?? (t.assignee as any)?.id)===filterAssignee)
+              if (searchQuery)    colTasks = colTasks.filter(t => t.title.toLowerCase().includes(searchQuery.toLowerCase()))
+              if (dueDateFrom)    colTasks = colTasks.filter(t => t.due_date && t.due_date>=dueDateFrom)
+              if (dueDateTo)      colTasks = colTasks.filter(t => t.due_date && t.due_date<=dueDateTo)
               const allDone = colTasks
               if (col.status==='completed' && !doneBoardExp) colTasks = colTasks.slice(0, BOARD_DONE_PAGE)
               return (
@@ -308,27 +320,11 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
         <div style={{ flex:1, display:'flex', overflow:'hidden' }}>
           <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
             <div style={{ padding:'16px 20px 12px', background:'var(--surface)', borderBottom:'1px solid var(--border)', flexShrink:0 }}>
-              <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
-                <h1 style={{ fontSize:20, fontWeight:700, color:'var(--text-primary)', margin:0 }}>One-time tasks</h1>
-                {clients.length > 0 && (
-                  <select value={clientFilter} onChange={e => setClientFilter(e.target.value)}
-                    style={{ padding:'4px 10px', borderRadius:20, fontSize:12, cursor:'pointer', outline:'none', border:clientFilter?'1px solid var(--brand)':'1px solid var(--border)', background:clientFilter?'rgba(13,148,136,0.08)':'var(--surface-subtle)', color:clientFilter?'var(--brand)':'var(--text-secondary)', fontFamily:'inherit', appearance:'none' }}>
-                    <option value=''>All clients</option>
-                    {clients.map(cl => <option key={cl.id} value={cl.id}>{cl.name}</option>)}
-                  </select>
-                )}
-                {clientFilter && <button onClick={() => setClientFilter('')} style={{ fontSize:11, color:'var(--text-muted)', background:'none', border:'none', cursor:'pointer' }}>✕</button>}
-              </div>
+              <h1 style={{ fontSize:20, fontWeight:700, color:'var(--text-primary)', margin:0 }}>One-time tasks</h1>
             </div>
 
-            <div style={{ padding:'8px 16px', borderBottom:'1px solid var(--border-light)', background:'var(--surface-subtle)', flexShrink:0 }}>
-              <div style={{ display:'flex', alignItems:'center', gap:8, background:'var(--surface)', border:'1px solid var(--border)', borderRadius:8, padding:'5px 10px' }}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ color:'var(--text-muted)', flexShrink:0 }}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-                <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search tasks…"
-                  style={{ flex:1, fontSize:13, border:'none', outline:'none', background:'transparent', color:'var(--text-primary)', fontFamily:'inherit' }}/>
-                {searchQuery && <button onClick={() => setSearchQuery('')} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text-muted)', fontSize:16 }}>×</button>}
-              </div>
-            </div>
+            {/* Universal filter bar */}
+            <UniversalFilterBar clients={clients} members={members} showSearch showPriority showStatus showAssignee showDueDate/>
 
             {localTasks.length > 0 && (
               <div style={{ padding:'6px 16px', borderBottom:'1px solid var(--border-light)', background:'var(--surface-subtle)', display:'flex', alignItems:'center', gap:12, flexWrap:'wrap', flexShrink:0 }}>
@@ -344,7 +340,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
               <div style={{ display:'flex', alignItems:'center', gap:12, padding:'8px 20px', background:'#f0fdfa', borderBottom:'1px solid #99f6e4', flexShrink:0 }}>
                 <span style={{ fontSize:13, fontWeight:500, color:'#0f766e' }}>{checked.size} selected</span>
                 <button onClick={bulkComplete} style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 12px', background:'#0d9488', color:'#fff', border:'none', borderRadius:6, fontSize:12, fontWeight:600, cursor:'pointer' }}>
-                  <CheckCheck style={{ width:14, height:14 }}/> Mark complete
+                  <CheckCheck style={{ width:14, height:14 }}/> Submit for approval
                 </button>
                 <button onClick={() => setChecked(new Set())} style={{ padding:'4px 10px', background:'transparent', border:'none', fontSize:12, color:'var(--text-secondary)', cursor:'pointer' }}>Cancel</button>
               </div>

@@ -204,10 +204,13 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated }
           <label style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 20,
             border: `1px solid ${errors.assignee ? '#fca5a5' : 'var(--border)'}`,
             background: errors.assignee ? '#fef2f2' : 'var(--surface-subtle)', cursor: 'pointer' }}>
-            <User style={{ width: 11, height: 11, color: errors.assignee ? '#dc2626' : 'var(--text-muted)', flexShrink: 0 }} />
+            <User style={{ width: 11, height: 11, color: errors.assignee ? '#dc2626' : 'var(--brand)', flexShrink: 0 }} />
+            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', flexShrink: 0, letterSpacing: '0.02em' }}>Assignee</span>
+            <span style={{ fontSize: 11, color: 'var(--border)', flexShrink: 0 }}>·</span>
             <select value={assignee} onChange={e => { setAssignee(e.target.value); setErrors(p => ({ ...p, assignee: '' })) }}
               style={{ fontSize: 12, border: 'none', outline: 'none', background: 'transparent',
-                color: 'var(--text-secondary)', cursor: 'pointer', appearance: 'none', fontFamily: 'inherit' }}>
+                color: assignee ? 'var(--text-primary)' : 'var(--text-muted)', fontWeight: assignee ? 500 : 400,
+                cursor: 'pointer', appearance: 'none', fontFamily: 'inherit' }}>
               <option value="">Unassigned{required('assignee') ? ' *' : ''}</option>
               {members.map(m => <option key={m.id} value={m.id}>{m.name}{m.id === currentUserId ? ' (me)' : ''}</option>)}
             </select>

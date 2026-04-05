@@ -210,25 +210,60 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     } finally { setConverting(false) }
   }
 
-  /* complete toggle */
+  /* complete / reopen toggle — all completions go through approval (no direct complete) */
   async function handleComplete() {
     if (!task) return
     setCompleting(true)
-    const newStatus  = status === 'completed' ? 'todo' : 'completed'
+
+    // Reopen: completed or in_review → todo
+    if (status === 'completed' || status === 'in_review') {
+      const prevStatus = status
+      const prevApproval = task.approval_status
+      setStatus('todo')
+      await patch(
+        { status: 'todo', completed_at: null },
+        () => setStatus(prevStatus),
+      )
+      setCompleting(false)
+      return
+    }
+
+    // Already pending — just inform
+    if (task.approval_status === 'pending') {
+      toast.info('Already submitted — awaiting approver.')
+      setCompleting(false)
+      return
+    }
+
+    // All other tasks: submit for approval (optimistic → in_review)
     const prevStatus = status
-    setStatus(newStatus)   // optimistic
-    await patch(
-      { status: newStatus, completed_at: newStatus === 'completed' ? new Date().toISOString() : null },
-      () => setStatus(prevStatus),   // rollback on API error
-    )
-    if (newStatus === 'completed') toast.success('Task completed! 🎉')
+    setStatus('in_review')
+    const res = await fetch(`/api/tasks/${task.id}/approve`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ decision: 'submit' }),
+    })
+    if (res.ok) {
+      toast.success('Submitted for approval ✓')
+      onUpdated?.()
+    } else {
+      setStatus(prevStatus)   // rollback
+      const d = await res.json().catch(() => ({}))
+      toast.error(d.error ?? 'Could not submit — please try again')
+    }
     setCompleting(false)
   }
 
-  /* ── FIXED: approve / reject go through /approve endpoint ── */
+  /* ── approve / reject go through /approve endpoint with optimistic updates ── */
   async function callApproveAPI(decision: 'approve' | 'reject' | 'submit') {
     if (!task) return
     setApproving(true)
+
+    // Optimistic status update
+    const prevStatus = status
+    if (decision === 'approve') setStatus('completed')
+    if (decision === 'reject')  setStatus('todo')
+    if (decision === 'submit')  setStatus('in_review')
+
     const res = await fetch(`/api/tasks/${task.id}/approve`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -236,12 +271,15 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     })
     const d = await res.json()
     setApproving(false)
-    if (!res.ok) { toast.error(d.error ?? 'Action failed'); return }
+    if (!res.ok) {
+      setStatus(prevStatus)   // rollback
+      toast.error(d.error ?? 'Action failed')
+      return
+    }
     if (decision === 'approve') toast.success('Task approved! ✅')
     if (decision === 'reject')  toast.info('Task rejected — sent back to assignee')
-    if (decision === 'submit')  toast.info('Submitted for approval')
+    if (decision === 'submit')  toast.success('Submitted for approval ✓')
     onUpdated?.()
-    router.refresh()
   }
 
   /* comment */
@@ -345,7 +383,8 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
   }
 
   const isCompleted = status === 'completed'
-  const isPending   = task?.approval_status === 'pending'
+  const isInReview  = status === 'in_review'
+  const isPending   = task?.approval_status === 'pending' || isInReview
   const overdue     = isOverdue(task?.due_date, status)
   const priConf     = PRIORITY_CONFIG[priority as keyof typeof PRIORITY_CONFIG] ?? PRIORITY_CONFIG.medium
   const assignee    = members.find(m => m.id === assigneeId)
@@ -366,17 +405,17 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
               style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
               <button
                 onClick={handleComplete}
-                className={cn('task-check flex-shrink-0', isCompleted && 'done', completing && 'popping')}
-                title={isCompleted ? 'Mark incomplete' : 'Mark complete'}
+                className={cn('task-check flex-shrink-0', isCompleted && 'done', isInReview && 'popping', completing && 'popping')}
+                title={isCompleted ? 'Mark incomplete' : isInReview ? 'Pending approval — click to reopen' : 'Submit for approval'}
               >
-                {isCompleted && (
+                {(isCompleted || isInReview) && (
                   <svg viewBox="0 0 16 16" fill="none" className="h-2.5 w-2.5">
-                    <path d="M13 4L6.5 11 3 7.5" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M13 4L6.5 11 3 7.5" stroke={isInReview ? '#7c3aed' : 'white'} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 )}
               </button>
-              <span className="text-xs font-medium flex-1" style={{ color: isCompleted ? '#16a34a' : 'var(--text-muted)' }}>
-                {isCompleted ? '✓ Completed' : 'Mark complete'}
+              <span className="text-xs font-medium flex-1" style={{ color: isCompleted ? '#16a34a' : isInReview ? '#7c3aed' : 'var(--text-muted)' }}>
+                {isCompleted ? '✓ Completed' : isInReview ? '⏳ Pending approval' : 'Submit for approval'}
               </span>
               {isSaving && (
                 <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>Saving…</span>
