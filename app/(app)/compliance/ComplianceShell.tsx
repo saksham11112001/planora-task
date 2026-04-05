@@ -12,9 +12,9 @@ interface KanbanTask {
   id: string
   name: string
   group_name: string
-  task_type: string
-  assignee?: { id: string; name: string } | null
-  approver?: { id: string; name: string } | null
+  status: string
+  priority: string
+  due_date?: string | null
 }
 
 interface KanbanClient { id: string; name: string; color: string }
@@ -37,20 +37,20 @@ function CAKanbanView({ userRole }: { userRole: string }) {
     }).catch(() => {})
   }, [])
 
-  /* Load assignments for selected client */
+  /* Load tasks for selected client (from tasks table — covers both imported and manually created) */
   const loadTasks = useCallback(async (clientId: string) => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/ca/assignments?client_id=${clientId}`)
+      const res = await fetch(`/api/tasks?client_id=${clientId}&top_level=true&limit=200`)
       const json = await res.json()
-      const data = Array.isArray(json) ? json : (json.data ?? [])
-      const tasks: KanbanTask[] = data.map((a: any) => ({
-        id: a.master_task?.id ?? a.master_task_id,
-        name: a.master_task?.name ?? 'Unknown task',
-        group_name: a.master_task?.group_name ?? '',
-        task_type: a.master_task?.task_type ?? '',
-        assignee: a.assignee ?? null,
-        approver: a.approver ?? null,
+      const data: any[] = Array.isArray(json) ? json : (json.data ?? [])
+      const tasks: KanbanTask[] = data.map((t: any) => ({
+        id: t.id,
+        name: t.title,
+        group_name: '',
+        status: t.status ?? 'todo',
+        priority: t.priority ?? 'medium',
+        due_date: t.due_date ?? null,
       }))
       setAllTasks(tasks)
       /* restore board state from localStorage */
@@ -105,20 +105,24 @@ function CAKanbanView({ userRole }: { userRole: string }) {
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
           <GripVertical size={13} style={{ color: 'var(--text-muted)', flexShrink: 0, marginTop: 2 }} />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 3,
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4,
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {task.name}
             </div>
-            {task.group_name && (
-              <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 99,
-                background: 'var(--surface-alt)', color: 'var(--text-muted)',
-                border: '1px solid var(--border)', display: 'inline-block', marginBottom: 4 }}>
-                {task.group_name}
-              </span>
-            )}
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {task.assignee && <span>👤 {task.assignee.name}</span>}
-              {task.approver && <span>✓ {task.approver.name}</span>}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              {task.priority && (
+                <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 99, fontWeight: 600,
+                  background: task.priority === 'high' || task.priority === 'urgent' ? '#fef2f2' : task.priority === 'medium' ? '#fffbeb' : '#f0fdf4',
+                  color: task.priority === 'high' || task.priority === 'urgent' ? '#dc2626' : task.priority === 'medium' ? '#b45309' : '#16a34a',
+                }}>
+                  {task.priority}
+                </span>
+              )}
+              {task.due_date && (
+                <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                  Due {task.due_date.slice(0, 10)}
+                </span>
+              )}
             </div>
           </div>
         </div>

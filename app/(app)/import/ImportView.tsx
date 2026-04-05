@@ -10,12 +10,13 @@ import {
 import { toast } from '@/store/appStore'
 
 interface ImportResults {
-  members:   { created: number; skipped: number; errors: string[] }
-  clients:   { created: number; skipped: number; errors: string[] }
-  projects:  { created: number; skipped: number; errors: string[] }
-  tasks:     { created: number; skipped: number; errors: string[] }
-  onetasks:  { created: number; skipped: number; errors: string[] }
-  recurring: { created: number; skipped: number; errors: string[] }
+  members:    { created: number; skipped: number; errors: string[] }
+  clients:    { created: number; skipped: number; errors: string[] }
+  projects:   { created: number; skipped: number; errors: string[] }
+  tasks:      { created: number; skipped: number; errors: string[] }
+  onetasks:   { created: number; skipped: number; errors: string[] }
+  recurring:  { created: number; skipped: number; errors: string[] }
+  compliance: { created: number; skipped: number; errors: string[] }
 }
 
 type UploadState = 'idle' | 'dragging' | 'uploading' | 'done' | 'error'
@@ -65,6 +66,7 @@ export function ImportView() {
       { step: 'Importing tasks…', done: false },
       { step: 'Importing one-time tasks…', done: false },
       { step: 'Importing recurring tasks…', done: false },
+      { step: 'Importing CA compliance tasks…', done: false },
     ]
     setProgress(steps.map(s => ({ ...s })))
 
@@ -107,6 +109,7 @@ export function ImportView() {
           { step: `Tasks`, done: true, count: d.results?.tasks?.created },
           { step: `One-time tasks`, done: true, count: d.results?.onetasks?.created },
           { step: `Recurring tasks`, done: true, count: d.results?.recurring?.created },
+          { step: `CA compliance tasks`, done: true, count: d.results?.compliance?.created },
         ])
         setResults(d.results)
         setState('done')
@@ -419,10 +422,20 @@ export function ImportView() {
                 color="#ea580c"
                 bg="#fff7ed"
               />
+              {results.compliance && (
+                <SummaryCard
+                  icon={<CheckSquare style={{ width: 16, height: 16 }} />}
+                  label="CA Compliance Tasks"
+                  created={results.compliance.created}
+                  skipped={results.compliance.skipped}
+                  color="#0d9488"
+                  bg="#f0fdfa"
+                />
+              )}
             </div>
 
             {/* Error details (expandable) */}
-            {(['members', 'clients', 'projects', 'tasks', 'onetasks', 'recurring'] as const).map(key => {
+            {(['members', 'clients', 'projects', 'tasks', 'onetasks', 'recurring', 'compliance'] as const).map(key => {
               const section = results[key]
               if (!section.errors.length) return null
               const isOpen = expanded[key]

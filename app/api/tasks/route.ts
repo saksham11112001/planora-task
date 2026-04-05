@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
     .eq('org_id', mb.org_id).neq('is_archived', true)
   if (sp.get('project_id'))   q = q.eq('project_id', sp.get('project_id')!)
   if (sp.get('assignee_id'))  q = q.eq('assignee_id', sp.get('assignee_id')!)
+  if (sp.get('client_id'))    q = q.eq('client_id', sp.get('client_id')!)
   if (sp.get('status'))       q = q.eq('status', sp.get('status')!)
   if (sp.get('mine') === 'true') q = q.eq('assignee_id', user.id)
   if (sp.get('parent_id'))    q = q.eq('parent_task_id', sp.get('parent_id')!)
