@@ -68,7 +68,8 @@ function AddClientModal({ onClose, onCreated }: AddClientModalProps) {
         body: JSON.stringify({ name: name.trim(), color }),
       })
       if (!res.ok) throw new Error('Failed to create client')
-      const client: Client = await res.json()
+      const json = await res.json()
+      const client: Client = json.data ?? json
       toast.success('Client created')
       onCreated(client)
     } catch {
@@ -336,17 +337,17 @@ export function CAClientSetupView({ userRole, financialYear = '2026-27' }: Props
       try {
         const [cRes, mRes, mtRes] = await Promise.all([
           fetch('/api/clients'),
-          fetch('/api/team/members'),
+          fetch('/api/team'),
           fetch(`/api/ca/master?fy=${encodeURIComponent(financialYear)}`),
         ])
-        const [clientData, memberData, masterData] = await Promise.all([
-          cRes.ok ? (cRes.json() as Promise<Client[]>) : Promise.resolve([]),
-          mRes.ok ? (mRes.json() as Promise<Member[]>) : Promise.resolve([]),
-          mtRes.ok ? (mtRes.json() as Promise<CAMasterTask[]>) : Promise.resolve([]),
+        const [cJson, mJson, mtJson] = await Promise.all([
+          cRes.ok  ? cRes.json()  : { data: [] },
+          mRes.ok  ? mRes.json()  : { data: [] },
+          mtRes.ok ? mtRes.json() : { data: [] },
         ])
-        setClients(clientData)
-        setMembers(memberData)
-        setMasterTasks(masterData)
+        setClients(Array.isArray(cJson) ? cJson : (cJson.data ?? []))
+        setMembers(Array.isArray(mJson) ? mJson : (mJson.data ?? []))
+        setMasterTasks(Array.isArray(mtJson) ? mtJson : (mtJson.data ?? []))
       } catch {
         toast.error('Failed to load data')
       }
@@ -360,7 +361,8 @@ export function CAClientSetupView({ userRole, financialYear = '2026-27' }: Props
     try {
       const res = await fetch(`/api/ca/assignments?client_id=${clientId}`)
       if (!res.ok) throw new Error('Failed to load assignments')
-      const data: Assignment[] = await res.json()
+      const json = await res.json()
+      const data: Assignment[] = Array.isArray(json) ? json : (json.data ?? [])
       setAssignments(data)
 
       /* Build selections from existing assignments */
@@ -465,7 +467,7 @@ export function CAClientSetupView({ userRole, financialYear = '2026-27' }: Props
         const res = await fetch('/api/ca/assignments', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(toAdd),
+          body: JSON.stringify({ assignments: toAdd }),
         })
         if (!res.ok) throw new Error('Failed to save assignments')
       }
