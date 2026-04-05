@@ -8,7 +8,8 @@
       "Bash(ls -la \"/c/Users/saksh/Desktop/planora-task/app/\\(app\\)/clients/\")",
       "Bash(wc -l /c/Users/saksh/Desktop/planora-task/app/\\\\\\(app\\\\\\)/compliance/CAMasterView.tsx)",
       "Bash(cat /c/Users/saksh/Desktop/planora-task/app/\\\\\\(app\\\\\\)/compliance/CAMasterView.tsx)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(node -e \"const xlsx = require\\(''xlsx''\\); console.log\\(typeof xlsx.read\\)\")"
     ]
   }
 }

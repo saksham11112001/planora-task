@@ -13,6 +13,9 @@ const config: NextConfig = {
     optimizePackageImports: ['lucide-react', 'recharts', '@supabase/supabase-js'],
   },
 
+  // xlsx uses native Node.js modules — prevent webpack from bundling it
+  serverExternalPackages: ['xlsx'],
+
   // Images
   images: {
     formats: ['image/avif', 'image/webp'],

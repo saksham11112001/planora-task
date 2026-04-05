@@ -81,7 +81,17 @@ export function ImportView() {
       const fd = new FormData()
       fd.append('file', file)
       const res = await fetch('/api/import', { method: 'POST', body: fd })
-      const d   = await res.json()
+      let d: any
+      try {
+        d = await res.json()
+      } catch {
+        const text = await res.text().catch(() => '')
+        clearInterval(interval)
+        setErrMsg(`Server error (${res.status})${text ? ': ' + text.slice(0, 200) : ''}`)
+        setState('error')
+        setProgress([])
+        return
+      }
       clearInterval(interval)
       if (!res.ok) {
         setErrMsg(d.error ?? 'Import failed')
@@ -102,9 +112,9 @@ export function ImportView() {
         setState('done')
         router.refresh()
       }
-    } catch {
+    } catch (err: any) {
       clearInterval(interval)
-      setErrMsg('Network error — please try again')
+      setErrMsg(err?.message ?? 'Network error — please try again')
       setState('error')
       setProgress([])
     }
