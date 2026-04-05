@@ -42,6 +42,36 @@ const BOARD_COLS = [
   { status:'completed',   label:'Done',              color:'#16a34a' },
 ]
 
+// ── Board grouping helpers ──────────────────────────────────────────────────
+const PRIO_ORDER: Record<string, number> = { urgent:0, high:1, medium:2, low:3, none:4 }
+const GROUP_PAGE = 5   // cards shown per group before "Show more"
+
+function smartSort(a: Task, b: Task): number {
+  const pa = PRIO_ORDER[a.priority] ?? 4
+  const pb = PRIO_ORDER[b.priority] ?? 4
+  if (pa !== pb) return pa - pb
+  if (a.due_date && b.due_date) return a.due_date.localeCompare(b.due_date)
+  if (a.due_date) return -1
+  if (b.due_date) return  1
+  return 0
+}
+
+function groupByDue(tasks: Task[], today: string) {
+  const todayGroup: Task[] = [], weekGroup: Task[] = [], laterGroup: Task[] = []
+  const weekEnd = new Date(today); weekEnd.setDate(weekEnd.getDate() + 7)
+  for (const t of tasks) {
+    if (!t.due_date)                         { laterGroup.push(t); continue }
+    if (t.due_date === today)                { todayGroup.push(t); continue }
+    if (new Date(t.due_date) <= weekEnd)     { weekGroup.push(t);  continue }
+    laterGroup.push(t)
+  }
+  return [
+    { key:'today', label:'Due today',          color:'#0d9488',               tasks: todayGroup.sort(smartSort) },
+    { key:'week',  label:'Due this week',       color:'var(--text-secondary)', tasks: weekGroup.sort(smartSort)  },
+    { key:'later', label:'Later / No due date', color:'var(--text-muted)',     tasks: laterGroup.sort(smartSort) },
+  ].filter(g => g.tasks.length > 0)
+}
+
 export function MyTasksView({
   tasks: initialTasks,
   pendingApprovalTasks = [],
@@ -71,16 +101,23 @@ export function MyTasksView({
   const LIST_DONE_PAGE = 5
   const [subtaskMap,     setSubtaskMap]     = useState<Record<string, any[]>>({})
   const [expandedTasks,  setExpandedTasks]  = useState<Set<string>>(new Set())
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
+  const [groupPages,      setGroupPages]      = useState<Record<string, number>>({})
 
-  // Global filters from universal filter store
-  const { clientId: filterClient, priority: filterPriority, status: filterStatus, search: filterSearch, dueDateFrom, dueDateTo, assigneeId: filterAssignee } = useFilterStore()
+  function toggleGroup(key: string) {
+    setCollapsedGroups(prev => { const s = new Set(prev); s.has(key) ? s.delete(key) : s.add(key); return s })
+  }
+  function groupPage(key: string) { return groupPages[key] ?? 1 }
+  function showMoreGroup(key: string) { setGroupPages(prev => ({ ...prev, [key]: (prev[key] ?? 1) + 1 })) }
+
+  // Global filters (My Tasks never filters by assignee — already scoped to current user)
+  const { clientId: filterClient, priority: filterPriority, status: filterStatus, search: filterSearch, dueDateFrom, dueDateTo } = useFilterStore()
 
   // Apply filters
   const filteredTasks = tasks.filter(t => {
     if (filterClient   && (t as any).client?.id !== filterClient) return false
     if (filterPriority && t.priority !== filterPriority)          return false
     if (filterStatus   && t.status   !== filterStatus)            return false
-    if (filterAssignee && (t.assignee_id ?? (t.assignee as any)?.id) !== filterAssignee) return false
     if (filterSearch   && !t.title.toLowerCase().includes(filterSearch.toLowerCase())) return false
     if (dueDateFrom    && (!t.due_date || t.due_date < dueDateFrom)) return false
     if (dueDateTo      && (!t.due_date || t.due_date > dueDateTo))   return false
@@ -462,7 +499,7 @@ export function MyTasksView({
         )}
 
         {/* Universal filter bar */}
-        <UniversalFilterBar clients={clients} members={members} showSearch showPriority showStatus showAssignee showDueDate/>
+        <UniversalFilterBar clients={clients} showSearch showPriority showStatus showDueDate/>
         <div style={{ display:'grid', gridTemplateColumns:'28px 22px 1fr 160px 100px 110px',
           alignItems:'center', padding:'8px 18px', borderBottom:`1px solid var(--border)`,
           background:'var(--surface-subtle)', flexShrink:0, fontSize:11, fontWeight:700,
@@ -764,8 +801,8 @@ export function MyTasksView({
         />
       )}
       <Tabs/>
-      {/* Universal filter bar */}
-      <UniversalFilterBar clients={clients} members={members} showSearch showPriority showAssignee showDueDate/>
+      {/* Universal filter bar (no assignee — My Tasks is already user-scoped) */}
+      <UniversalFilterBar clients={clients} showSearch showPriority showDueDate/>
       <div style={{ flex:1, overflowX:'auto', overflowY:'hidden', padding:'14px 20px',
         background:'var(--surface-subtle)', display:'flex', gap:12, alignItems:'flex-start' }}>
         {BOARD_COLS.map(col => {
@@ -780,117 +817,186 @@ export function MyTasksView({
             : tasks.filter(t => t.status === col.status && t.approval_status !== 'pending'
                 && !(!!t.due_date && t.due_date < today2 && t.status !== 'completed'))
 
-          // Apply filters
+          // Apply global filters
           if (filterClient)   colTasks = colTasks.filter(t => (t as any).client?.id === filterClient)
           if (filterPriority) colTasks = colTasks.filter(t => t.priority === filterPriority)
-          if (filterAssignee) colTasks = colTasks.filter(t => (t.assignee_id ?? (t.assignee as any)?.id) === filterAssignee)
           if (filterSearch)   colTasks = colTasks.filter(t => t.title.toLowerCase().includes(filterSearch.toLowerCase()))
           if (dueDateFrom)    colTasks = colTasks.filter(t => t.due_date && t.due_date >= dueDateFrom)
           if (dueDateTo)      colTasks = colTasks.filter(t => t.due_date && t.due_date <= dueDateTo)
 
-          // Paginate done column
+          // Determine whether to render groups (todo + pending) or flat (overdue + done)
+          const useGroups = col.status === 'todo' || col.status === 'in_review'
+          const groups     = useGroups ? groupByDue(colTasks, today2) : []
+
+          // Paginate done column (flat)
           const allDoneTasks = colTasks
-          if (col.status === 'completed' && !doneExpanded) {
-            colTasks = colTasks.slice(0, DONE_PAGE)
+          const flatTasks    = (col.status === 'completed' && !doneExpanded)
+            ? colTasks.slice(0, DONE_PAGE)
+            : colTasks
+
+          // Total count for column header
+          const totalCount = colTasks.length
+
+          // ── Shared task card renderer ──────────────────────────────────────
+          const TaskCard = ({ task }: { task: Task }) => {
+            const assignee = task.assignee as {id:string;name:string}|null
+            const pri = PRIORITY_CONFIG[task.priority]
+            const isDone = task.status === 'completed'
+            const isPending = task.status === 'in_review' || task.approval_status === 'pending'
+            const ov = isOverdue(task.due_date, task.status)
+            return (
+              <div
+                draggable
+                onDragStart={() => handleDragStart(task.id)}
+                onDragEnd={() => { setDragTaskId(null); setDragOverCol(null) }}
+                onClick={() => setSelTask(selTask?.id === task.id ? null : task)}
+                style={{ background:'var(--surface)', borderRadius:8, padding:'10px 11px',
+                  cursor:'grab',
+                  border:`1px solid ${dragTaskId===task.id?'var(--brand)':selTask?.id===task.id?'var(--brand)':isPending?'#ddd6fe':'var(--border)'}`,
+                  boxShadow: dragTaskId===task.id ? '0 4px 14px rgba(0,0,0,0.12)' : '0 1px 3px rgba(0,0,0,0.05)',
+                  opacity: isDone ? 0.65 : dragTaskId===task.id ? 0.5 : 1,
+                  transform: dragTaskId===task.id ? 'scale(1.02)' : 'none',
+                  transition: 'opacity 0.15s, transform 0.1s' }}>
+                <div style={{ display:'flex', alignItems:'flex-start', gap:7, marginBottom:8 }}>
+                  {isPending
+                    ? <div style={{ width:15, height:15, borderRadius:'50%', flexShrink:0, marginTop:1,
+                        background:'rgba(124,58,237,0.1)', border:'1.5px solid #7c3aed',
+                        display:'flex', alignItems:'center', justifyContent:'center' }}>
+                        <Clock style={{ width:8, height:8, color:'#7c3aed' }}/>
+                      </div>
+                    : <div onClick={e => toggleDone(task, e)}
+                        style={{ width:15, height:15, borderRadius:'50%', flexShrink:0, marginTop:1,
+                          background: isDone?'var(--brand)':'transparent',
+                          border:`1.5px solid ${isDone?'var(--brand)':ov?'#dc2626':'#cbd5e1'}`,
+                          display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', transition:'all 0.15s' }}>
+                        {isDone && <svg viewBox="0 0 10 10" fill="none" style={{width:8,height:8}}><path d="M1.5 5L4 7.5L8.5 2.5" stroke="white" strokeWidth="1.5" strokeLinecap="round"/></svg>}
+                      </div>
+                  }
+                  <span style={{ fontSize:13, fontWeight:500, lineHeight:1.4,
+                    color: isDone?'var(--text-muted)':isPending?'#7c3aed':ov?'#dc2626':'var(--text-primary)',
+                    textDecoration: isDone?'line-through':'none' }}>{task.title}</span>
+                </div>
+                {(task as any).client && (
+                  <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:6 }}>
+                    <span style={{ width:7, height:7, borderRadius:2, flexShrink:0, display:'inline-block',
+                      background:(task as any).client.color ?? '#0d9488' }}/>
+                    <span style={{ fontSize:10, color:'var(--text-muted)', overflow:'hidden',
+                      textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:180 }}>
+                      {(task as any).client.name}
+                    </span>
+                  </div>
+                )}
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                  <span style={{ display:'inline-flex', alignItems:'center', gap:4,
+                    padding:'3px 8px', borderRadius:5, fontSize:11, fontWeight:600,
+                    background: pri?.bg ?? '#f8fafc', color: pri?.color ?? '#94a3b8' }}>
+                    {task.priority.charAt(0).toUpperCase()+task.priority.slice(1)}
+                  </span>
+                  <div style={{ display:'flex', alignItems:'center', gap:5 }}>
+                    {task.due_date && (
+                      <span style={{ fontSize:11, color: ov?'#dc2626':'var(--text-muted)' }}>
+                        {fmtDate(task.due_date)}
+                      </span>
+                    )}
+                    {task.is_recurring && <RefreshCw style={{width:9,height:9,color:'var(--brand)'}}/>}
+                    {assignee && <Avatar name={assignee.name} size="xs"/>}
+                    {canManage && (
+                      <button onClick={e => { e.stopPropagation(); deleteTask(task.id) }}
+                        title="Delete" style={{ background:'none', border:'none', cursor:'pointer',
+                          color:'var(--text-muted)', padding:2, display:'flex', alignItems:'center' }}
+                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#dc2626'}
+                        onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'}>
+                        <Trash2 style={{width:10,height:10}}/>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )
           }
+
           return (
             <div key={col.status}
               onDragOver={e => { e.preventDefault(); setDragOverCol(col.status) }}
               onDragLeave={() => setDragOverCol(null)}
               onDrop={() => handleDrop(col.status)}
-              style={{ width:268, flexShrink:0, borderRadius:10, overflow:'hidden',
+              style={{ width:272, flexShrink:0, borderRadius:10, overflow:'hidden',
                 maxHeight:'100%', display:'flex', flexDirection:'column',
                 background: dragOverCol === col.status ? 'var(--brand-light)' : 'var(--border-light)',
                 border: dragOverCol === col.status ? '2px solid var(--brand)' : '1px solid var(--border)',
                 transition: 'all 0.15s' }}>
+
+              {/* Column header */}
               <div style={{ display:'flex', alignItems:'center', gap:7, padding:'11px 13px',
-                borderBottom:`1px solid var(--border)` }}>
+                borderBottom:`1px solid var(--border)`, flexShrink:0 }}>
                 <div style={{ width:9, height:9, borderRadius:'50%', background:col.color, flexShrink:0 }}/>
                 <span style={{ fontSize:13, fontWeight:600, color:'var(--text-primary)', flex:1 }}>{col.label}</span>
-                <span style={{ fontSize:12, color:'var(--text-muted)' }}>{colTasks.length}</span>
+                <span style={{ fontSize:12, color:'var(--text-muted)' }}>{totalCount}</span>
               </div>
+
               <div style={{ padding:8, display:'flex', flexDirection:'column', gap:7, overflowY:'auto', flex:1 }}>
-                {colTasks.map(task => {
-                  const assignee = task.assignee as {id:string;name:string}|null
-                  const pri = PRIORITY_CONFIG[task.priority]
-                  const isDone = task.status === 'completed'
-                  const isPending = task.status === 'in_review' || task.approval_status === 'pending'
-                  return (
-                    <div key={task.id}
-                      draggable
-                      onDragStart={() => handleDragStart(task.id)}
-                      onDragEnd={() => { setDragTaskId(null); setDragOverCol(null) }}
-                      onClick={() => setSelTask(selTask?.id === task.id ? null : task)}
-                      style={{ background:'var(--surface)', borderRadius:8, padding:'10px 11px',
-                        cursor:'grab', border:`1px solid ${dragTaskId===task.id?'var(--brand)':selTask?.id===task.id?'var(--brand)':isPending?'#ddd6fe':'var(--border)'}`,
-                        boxShadow: dragTaskId===task.id ? '0 4px 14px rgba(0,0,0,0.12)' : '0 1px 3px rgba(0,0,0,0.05)',
-                        opacity: isDone ? 0.65 : dragTaskId===task.id ? 0.5 : 1,
-                        transform: dragTaskId===task.id ? 'scale(1.02)' : 'none',
-                        transition: 'opacity 0.15s, transform 0.1s' }}>
-                      <div style={{ display:'flex', alignItems:'flex-start', gap:7, marginBottom:8 }}>
-                        {isPending
-                          ? <div style={{ width:15, height:15, borderRadius:'50%', flexShrink:0, marginTop:1,
-                              background:'rgba(124,58,237,0.1)', border:'1.5px solid #7c3aed',
-                              display:'flex', alignItems:'center', justifyContent:'center' }}>
-                              <Clock style={{ width:8, height:8, color:'#7c3aed' }}/>
-                            </div>
-                          : <div onClick={e => toggleDone(task, e)}
-                              style={{ width:15, height:15, borderRadius:'50%', flexShrink:0, marginTop:1,
-                                background: isDone?'var(--brand)':'transparent',
-                                border:`1.5px solid ${isDone?'var(--brand)':isOverdue(task.due_date,task.status)?'#dc2626':'#cbd5e1'}`,
-                                display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', transition:'all 0.15s' }}>
-                              {isDone && <svg viewBox="0 0 10 10" fill="none" style={{width:8,height:8}}><path d="M1.5 5L4 7.5L8.5 2.5" stroke="white" strokeWidth="1.5" strokeLinecap="round"/></svg>}
-                            </div>
-                        }
-                        <span style={{ fontSize:13, fontWeight:500, lineHeight:1.4,
-                          color: isDone?'var(--text-muted)':isPending?'#7c3aed':'var(--text-primary)',
-                          textDecoration: isDone?'line-through':'none' }}>{task.title}</span>
-                      </div>
-                      {/* Client name */}
-                      {(task as any).client && (
-                        <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:6 }}>
-                          <span style={{ width:7, height:7, borderRadius:2, flexShrink:0, display:'inline-block',
-                            background:(task as any).client.color ?? '#0d9488' }}/>
-                          <span style={{ fontSize:10, color:'var(--text-muted)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:180 }}>
-                            {(task as any).client.name}
-                          </span>
-                        </div>
-                      )}
-                      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-                        <span style={{ display:'inline-flex', alignItems:'center', gap:4,
-                          padding:'3px 8px', borderRadius:5, fontSize:11, fontWeight:600,
-                          background: pri?.bg ?? '#f8fafc', color: pri?.color ?? '#94a3b8' }}>
-                          {pri?.icon} {task.priority.charAt(0).toUpperCase()+task.priority.slice(1)}
-                        </span>
-                        <div style={{ display:'flex', alignItems:'center', gap:5 }}>
-                          {task.due_date && <span style={{ fontSize:11, color:isOverdue(task.due_date,task.status)?'#dc2626':'var(--text-muted)' }}>{fmtDate(task.due_date)}</span>}
-                          {task.is_recurring && <RefreshCw style={{width:9,height:9,color:'var(--brand)'}}/>}
-                          {assignee && <Avatar name={assignee.name} size="xs"/>}
-                          {canManage && (
-                            <button onClick={e => { e.stopPropagation(); deleteTask(task.id) }}
-                              title="Delete" style={{ background:'none', border:'none', cursor:'pointer',
-                                color:'var(--text-muted)', padding:2, display:'flex', alignItems:'center' }}
-                              onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#dc2626'}
-                              onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'}>
-                              <Trash2 style={{width:10,height:10}}/>
+                {useGroups ? (
+                  /* ── Grouped columns: To do & Pending approval ── */
+                  groups.length === 0
+                    ? <p style={{ fontSize:12, color:'var(--text-muted)', textAlign:'center', padding:'20px 0' }}>Nothing here</p>
+                    : groups.map(grp => {
+                        const gKey = `${col.status}-${grp.key}`
+                        const isCollapsed = collapsedGroups.has(gKey)
+                        const page = groupPage(gKey)
+                        const visible = grp.tasks.slice(0, page * GROUP_PAGE)
+                        const hasMore = grp.tasks.length > visible.length
+                        return (
+                          <div key={grp.key}>
+                            {/* Group header */}
+                            <button
+                              onClick={() => toggleGroup(gKey)}
+                              style={{ width:'100%', display:'flex', alignItems:'center', gap:5,
+                                padding:'4px 2px 4px 0', background:'none', border:'none',
+                                cursor:'pointer', marginBottom: isCollapsed ? 0 : 4 }}>
+                              <span style={{ fontSize:10, color: isCollapsed ? 'var(--text-muted)' : grp.color,
+                                transition:'transform 0.15s', display:'inline-block',
+                                transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>▾</span>
+                              <span style={{ fontSize:10, fontWeight:700, textTransform:'uppercase',
+                                letterSpacing:'0.06em', color: isCollapsed ? 'var(--text-muted)' : grp.color }}>
+                                {grp.label}
+                              </span>
+                              <span style={{ fontSize:10, color:'var(--text-muted)', marginLeft:'auto' }}>
+                                {grp.tasks.length}
+                              </span>
                             </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              {col.status === 'completed' && allDoneTasks.length > DONE_PAGE && (
-                <button
-                  onClick={() => setDoneExpanded(v => !v)}
-                  style={{ width:'100%', padding:'8px', fontSize:11, fontWeight:600,
-                    color:'var(--text-muted)', background:'transparent', border:'none',
-                    cursor:'pointer', borderTop:'1px solid var(--border-light)', marginTop:2 }}>
-                  {doneExpanded
-                    ? `▲ Show fewer`
-                    : `▼ ${allDoneTasks.length - DONE_PAGE} more completed tasks`}
-                </button>
-              )}
+
+                            {!isCollapsed && (
+                              <>
+                                <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                                  {visible.map(task => <TaskCard key={task.id} task={task}/>)}
+                                </div>
+                                {hasMore && (
+                                  <button onClick={() => showMoreGroup(gKey)}
+                                    style={{ width:'100%', padding:'6px 0', fontSize:11, fontWeight:600,
+                                      color:'var(--text-muted)', background:'transparent', border:'none',
+                                      cursor:'pointer', marginTop:4 }}>
+                                    ▼ {grp.tasks.length - visible.length} more
+                                  </button>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        )
+                      })
+                ) : (
+                  /* ── Flat columns: Overdue & Done ── */
+                  <>
+                    {flatTasks.map(task => <TaskCard key={task.id} task={task}/>)}
+                    {col.status === 'completed' && allDoneTasks.length > DONE_PAGE && (
+                      <button onClick={() => setDoneExpanded(v => !v)}
+                        style={{ width:'100%', padding:'8px', fontSize:11, fontWeight:600,
+                          color:'var(--text-muted)', background:'transparent', border:'none',
+                          cursor:'pointer', borderTop:'1px solid var(--border-light)', marginTop:2 }}>
+                        {doneExpanded ? `▲ Show fewer` : `▼ ${allDoneTasks.length - DONE_PAGE} more`}
+                      </button>
+                    )}
+                  </>
+                )}
               </div>
             </div>
           )
