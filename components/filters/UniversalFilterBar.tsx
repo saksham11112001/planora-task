@@ -1,7 +1,25 @@
 'use client'
-import React from 'react'
+import React, { useState } from 'react'
 import { useFilterStore } from '@/store/appStore'
 import { PRIORITY_CONFIG, STATUS_CONFIG } from '@/types'
+
+/* ── Due date preset helpers ── */
+function todayIso() {
+  return new Date().toISOString().slice(0, 10)
+}
+function addDays(n: number) {
+  const d = new Date()
+  d.setDate(d.getDate() + n)
+  return d.toISOString().slice(0, 10)
+}
+
+const DUE_PRESETS = [
+  { value: '1d',   label: 'Due in 1 day',  from: () => todayIso(), to: () => addDays(1)  },
+  { value: '3d',   label: 'Due in 3 days', from: () => todayIso(), to: () => addDays(3)  },
+  { value: '1w',   label: 'Due in 1 week', from: () => todayIso(), to: () => addDays(7)  },
+  { value: '15d',  label: 'Due in 15 days',from: () => todayIso(), to: () => addDays(15) },
+  { value: 'custom', label: 'Custom range…', from: () => '', to: () => '' },
+] as const
 
 interface Props {
   clients?:      { id: string; name: string; color: string }[]
@@ -79,8 +97,10 @@ export function UniversalFilterBar({
   showAssignee = false,
 }: Props) {
   const { search, clientId, priority, status, assigneeId, dueDateFrom, dueDateTo, setFilter, resetFilters } = useFilterStore()
+  const [duePreset, setDuePreset] = useState<string>('')
+  const [showCustom, setShowCustom] = useState(false)
 
-  const activeCount = [clientId, priority, status, assigneeId, dueDateFrom, dueDateTo, search]
+  const activeCount = [clientId, priority, status, assigneeId, dueDateFrom, dueDateTo, duePreset, search]
     .filter(Boolean).length
 
   const priorityOpts = (Object.keys(PRIORITY_CONFIG) as string[])
@@ -165,26 +185,71 @@ export function UniversalFilterBar({
         />
       )}
 
-      {/* Due date range */}
+      {/* Due date — preset dropdown */}
       {showDueDate && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>Due:</span>
-          <input
-            type="date" value={dueDateFrom}
-            onChange={e => setFilter('dueDateFrom', e.target.value)}
-            style={{ ...(dueDateFrom ? PILL_ACTIVE : PILL), paddingRight: 8, fontSize: 11 }}
-          />
-          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>–</span>
-          <input
-            type="date" value={dueDateTo}
-            onChange={e => setFilter('dueDateTo', e.target.value)}
-            style={{ ...(dueDateTo ? PILL_ACTIVE : PILL), paddingRight: 8, fontSize: 11 }}
-          />
-          {(dueDateFrom || dueDateTo) && (
-            <button onClick={() => { setFilter('dueDateFrom', ''); setFilter('dueDateTo', '') }}
-              style={{ fontSize: 11, color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}>
-              ✕
-            </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <select
+              value={duePreset}
+              onChange={e => {
+                const v = e.target.value
+                setDuePreset(v)
+                if (v === '') {
+                  setFilter('dueDateFrom', '')
+                  setFilter('dueDateTo', '')
+                  setShowCustom(false)
+                } else if (v === 'custom') {
+                  setShowCustom(true)
+                } else {
+                  const preset = DUE_PRESETS.find(p => p.value === v)
+                  if (preset) {
+                    setFilter('dueDateFrom', preset.from())
+                    setFilter('dueDateTo', preset.to())
+                  }
+                  setShowCustom(false)
+                }
+              }}
+              style={{ ...(duePreset ? PILL_ACTIVE : PILL), paddingRight: 24 }}
+            >
+              <option value=''>Due date</option>
+              {DUE_PRESETS.map(p => (
+                <option key={p.value} value={p.value}>{p.label}</option>
+              ))}
+            </select>
+            {duePreset && (
+              <button
+                onClick={() => {
+                  setDuePreset('')
+                  setShowCustom(false)
+                  setFilter('dueDateFrom', '')
+                  setFilter('dueDateTo', '')
+                }}
+                style={{
+                  position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)',
+                  width: 14, height: 14, borderRadius: '50%', border: 'none',
+                  background: 'var(--brand)', color: '#fff',
+                  fontSize: 9, fontWeight: 700, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  lineHeight: 1, padding: 0,
+                }}
+                title="Clear"
+              >×</button>
+            )}
+          </div>
+          {showCustom && (
+            <>
+              <input
+                type="date" value={dueDateFrom}
+                onChange={e => setFilter('dueDateFrom', e.target.value)}
+                style={{ ...(dueDateFrom ? PILL_ACTIVE : PILL), paddingRight: 8, fontSize: 11 }}
+              />
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>–</span>
+              <input
+                type="date" value={dueDateTo}
+                onChange={e => setFilter('dueDateTo', e.target.value)}
+                style={{ ...(dueDateTo ? PILL_ACTIVE : PILL), paddingRight: 8, fontSize: 11 }}
+              />
+            </>
           )}
         </div>
       )}
@@ -192,7 +257,7 @@ export function UniversalFilterBar({
       {/* Clear all */}
       {activeCount > 0 && (
         <button
-          onClick={resetFilters}
+          onClick={() => { resetFilters(); setDuePreset(''); setShowCustom(false) }}
           style={{
             marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5,
             padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600,

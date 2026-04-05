@@ -5,7 +5,7 @@ import {
 } from 'react'
 import {
   ChevronDown, ChevronRight, Plus, Trash2, Pencil, Check, X,
-  RefreshCw, Calendar, Paperclip, AlertCircle,
+  RefreshCw, Calendar, Paperclip, AlertCircle, Save,
 } from 'lucide-react'
 import { MONTH_KEYS, MONTH_LABELS, CA_GROUP_NAMES } from '@/lib/data/caDefaultTasks'
 import type { MonthKey } from '@/lib/data/caDefaultTasks'
@@ -516,7 +516,7 @@ function AddTaskModal({
 }) {
   const [draft, setDraft] = useState<NewTaskDraft>({
     name: '', group_name: 'GST', task_type: '',
-    priority: 'medium', days_before_due: 7,
+    priority: 'high', days_before_due: 7,
   })
   const [saving, setSaving] = useState(false)
 
@@ -646,13 +646,15 @@ const inputStyle: React.CSSProperties = {
 
 function TaskRow({
   task, editable, fy,
-  onUpdate, onDelete,
+  onUpdate, onDelete, hasPendingChanges, onSave,
 }: {
   task: CAMasterTask
   editable: boolean
   fy: string
-  onUpdate: (patch: Partial<CAMasterTask>) => Promise<void>
+  onUpdate: (patch: Partial<CAMasterTask>) => void
   onDelete: () => void
+  hasPendingChanges: boolean
+  onSave: () => Promise<void>
 }) {
   const [hovered, setHovered] = useState(false)
   const [nameEditing, setNameEditing] = useState(false)
@@ -781,6 +783,14 @@ function TaskRow({
         )}
       </td>
 
+      {/* Quick fill — now before month cells */}
+      <QuickFillCell
+        taskId={task.id}
+        fy={fy}
+        editable={editable}
+        onApply={dates => onUpdate({ dates: { ...task.dates, ...dates } })}
+      />
+
       {/* Month date cells */}
       {MONTH_KEYS.map(mk => (
         <DateCell
@@ -793,28 +803,36 @@ function TaskRow({
         />
       ))}
 
-      {/* Quick fill */}
-      <QuickFillCell
-        taskId={task.id}
-        fy={fy}
-        editable={editable}
-        onApply={dates => onUpdate({ dates: { ...task.dates, ...dates } })}
-      />
-
       {/* Actions */}
       <td style={{ padding: '4px 8px', verticalAlign: 'middle', textAlign: 'center' }}>
         {editable && (
-          <button
-            onClick={onDelete}
-            title="Delete task"
-            style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              color: '#dc2626', opacity: hovered ? 1 : 0, transition: 'opacity 0.15s',
-              padding: 4, borderRadius: 6,
-            }}
-          >
-            <Trash2 size={14} />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
+            {hasPendingChanges && (
+              <button
+                onClick={onSave}
+                title="Save changes"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 3,
+                  padding: '3px 8px', borderRadius: 6, border: 'none',
+                  background: 'var(--brand)', color: '#fff',
+                  fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                }}
+              >
+                <Save size={11} /> Save
+              </button>
+            )}
+            <button
+              onClick={onDelete}
+              title="Delete task"
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: '#dc2626', opacity: hovered ? 1 : 0, transition: 'opacity 0.15s',
+                padding: 4, borderRadius: 6,
+              }}
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
         )}
       </td>
     </tr>
@@ -825,14 +843,16 @@ function TaskRow({
 
 function GroupSection({
   groupName, tasks, editable, fy,
-  onUpdate, onDelete,
+  pendingChanges, onUpdate, onDelete, onSaveRow,
 }: {
   groupName: string
   tasks: CAMasterTask[]
   editable: boolean
   fy: string
-  onUpdate: (id: string, patch: Partial<CAMasterTask>) => Promise<void>
+  pendingChanges: Record<string, Partial<CAMasterTask>>
+  onUpdate: (id: string, patch: Partial<CAMasterTask>) => void
   onDelete: (id: string) => void
+  onSaveRow: (id: string) => Promise<void>
 }) {
   const [expanded, setExpanded] = useState(true)
 
@@ -873,6 +893,8 @@ function GroupSection({
           fy={fy}
           onUpdate={patch => onUpdate(task.id, patch)}
           onDelete={() => onDelete(task.id)}
+          hasPendingChanges={!!pendingChanges[task.id]}
+          onSave={() => onSaveRow(task.id)}
         />
       ))}
     </>
@@ -891,6 +913,8 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
   const [groupFilter, setGroupFilter] = useState<GroupFilter>(GROUP_FILTER_ALL)
   const [showAddModal, setShowAddModal] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [pendingChanges, setPendingChanges] = useState<Record<string, Partial<CAMasterTask>>>({})
+  const [savingAll, setSavingAll] = useState(false)
 
   const canEdit = isAdmin(userRole)
 
@@ -931,11 +955,19 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
     }
   }
 
-  /* ── Optimistic update ── */
-  async function handleUpdate(id: string, patch: Partial<CAMasterTask>) {
-    const prev = tasks.find(t => t.id === id)
-    if (!prev) return
+  /* ── Pending change tracking (no API call until explicit save) ── */
+  function handleUpdate(id: string, patch: Partial<CAMasterTask>) {
     setTasks(ts => ts.map(t => t.id === id ? { ...t, ...patch } : t))
+    setPendingChanges(prev => ({
+      ...prev,
+      [id]: { ...(prev[id] ?? {}), ...patch },
+    }))
+  }
+
+  async function handleSaveRow(id: string) {
+    const patch = pendingChanges[id]
+    if (!patch) return
+    const prev = tasks.find(t => t.id === id)
     try {
       const res = await fetch(`/api/ca/master/${id}`, {
         method: 'PATCH',
@@ -944,10 +976,20 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
       })
       const json = (await res.json()) as { data?: CAMasterTask; error?: string }
       if (!res.ok) throw new Error(json.error ?? 'Update failed')
+      setPendingChanges(p => { const n = { ...p }; delete n[id]; return n })
+      toast.success('Task saved')
     } catch (err) {
-      setTasks(ts => ts.map(t => t.id === id ? prev : t))
-      toast.error(err instanceof Error ? err.message : 'Update failed')
+      if (prev) setTasks(ts => ts.map(t => t.id === id ? prev : t))
+      toast.error(err instanceof Error ? err.message : 'Save failed')
     }
+  }
+
+  async function handleSaveAll() {
+    const ids = Object.keys(pendingChanges)
+    if (ids.length === 0) return
+    setSavingAll(true)
+    await Promise.all(ids.map(id => handleSaveRow(id)))
+    setSavingAll(false)
   }
 
   /* ── Optimistic delete ── */
@@ -1031,6 +1073,20 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
           >
             <Plus size={14} />
             Add custom task
+          </button>
+        )}
+
+        {Object.keys(pendingChanges).length > 0 && (
+          <button
+            onClick={handleSaveAll}
+            disabled={savingAll}
+            style={{
+              ...btnPrimary, display: 'flex', alignItems: 'center', gap: 6,
+              background: '#0d9488', opacity: savingAll ? 0.7 : 1,
+            }}
+          >
+            <Save size={14} />
+            {savingAll ? 'Saving…' : `Bulk Save (${Object.keys(pendingChanges).length})`}
           </button>
         )}
 
@@ -1128,15 +1184,17 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
                     Task name
                   </th>
                   <th style={{ ...thStyle, minWidth: 60 }}>Attach#</th>
-                  <th style={{ ...thStyle, minWidth: 100 }}>Headers</th>
+                  <th style={{ ...thStyle, minWidth: 100 }} title="Attachment headers">
+                    <Paperclip size={12} />
+                  </th>
                   <th style={{ ...thStyle, minWidth: 68 }}>Days before</th>
                   <th style={{ ...thStyle, minWidth: 90 }}>Priority</th>
+                  <th style={{ ...thStyle, minWidth: 32, width: 32 }} title="Quick fill dates" />
                   {MONTH_KEYS.map(mk => (
                     <th key={mk} style={{ ...thStyle, minWidth: 52, width: 52, textAlign: 'center' }}>
                       {MONTH_LABELS[mk]}
                     </th>
                   ))}
-                  <th style={{ ...thStyle, minWidth: 32, width: 32 }} title="Quick fill dates" />
                   <th style={{ ...thStyle, minWidth: 44 }} />
                 </tr>
               </thead>
@@ -1149,8 +1207,10 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
                     tasks={groupTasks}
                     editable={canEdit}
                     fy={fy}
+                    pendingChanges={pendingChanges}
                     onUpdate={handleUpdate}
                     onDelete={requestDelete}
+                    onSaveRow={handleSaveRow}
                   />
                 ))}
               </tbody>

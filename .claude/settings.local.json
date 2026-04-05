@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc -l /c/Users/saksh/Desktop/planora-task/app/\\\\\\(app\\\\\\)/compliance/*.tsx)",
+      "Bash(head -300 /c/Users/saksh/Desktop/planora-task/app/\\\\\\(app\\\\\\)/compliance/CompliancePage.tsx)",
+      "Bash(tail -500 /c/Users/saksh/Desktop/planora-task/app/\\\\\\(app\\\\\\)/compliance/CompliancePage.tsx)",
+      "Bash(head -100 /c/Users/saksh/Desktop/planora-task/app/\\\\\\(app\\\\\\)/clients/[clientId]/ClientEditForm.tsx)",
+      "Bash(ls -la \"/c/Users/saksh/Desktop/planora-task/app/\\(app\\)/clients/\")",
+      "Bash(wc -l /c/Users/saksh/Desktop/planora-task/app/\\\\\\(app\\\\\\)/compliance/CAMasterView.tsx)",
+      "Bash(cat /c/Users/saksh/Desktop/planora-task/app/\\\\\\(app\\\\\\)/compliance/CAMasterView.tsx)",
+      "Bash(npx tsc:*)"
+    ]
+  }
+}

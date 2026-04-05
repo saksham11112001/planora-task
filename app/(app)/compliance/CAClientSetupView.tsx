@@ -20,6 +20,7 @@ interface Assignment {
 }
 interface TaskSelection {
   checked: boolean; assignee_id: string; approver_id: string
+  start_date: string; end_date: string
 }
 
 /* ─── Group colors ────────────────────────────────────────────── */
@@ -182,7 +183,7 @@ interface TaskGroupProps {
   selections: Record<string, TaskSelection>
   members: Member[]
   onToggle: (taskId: string) => void
-  onSelectChange: (taskId: string, field: 'assignee_id' | 'approver_id', value: string) => void
+  onSelectChange: (taskId: string, field: 'assignee_id' | 'approver_id' | 'start_date' | 'end_date', value: string) => void
 }
 
 function TaskGroup({ groupName, tasks, selections, members, onToggle, onSelectChange }: TaskGroupProps) {
@@ -262,43 +263,51 @@ function TaskGroup({ groupName, tasks, selections, members, onToggle, onSelectCh
               </div>
             </div>
 
-            {/* Assignee + Approver dropdowns (only when checked) */}
+            {/* Assignee + Approver + Dates (only when checked) */}
             {sel.checked && (
               <>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 130 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 120 }}>
                   <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600 }}>Assignee</span>
                   <select
                     value={sel.assignee_id}
                     onChange={e => onSelectChange(task.id, 'assignee_id', e.target.value)}
-                    style={{
-                      fontSize: 12, padding: '4px 8px', borderRadius: 6,
-                      border: '1px solid var(--border)', background: 'var(--surface-subtle)',
-                      color: 'var(--text-primary)', cursor: 'pointer', outline: 'none',
-                    }}
+                    style={{ fontSize: 12, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface-subtle)', color: 'var(--text-primary)', cursor: 'pointer', outline: 'none' }}
                   >
                     <option value="">Unassigned</option>
-                    {members.map(m => (
-                      <option key={m.id} value={m.id}>{m.name}</option>
-                    ))}
+                    {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                   </select>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 130 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 120 }}>
                   <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600 }}>Approver</span>
                   <select
                     value={sel.approver_id}
                     onChange={e => onSelectChange(task.id, 'approver_id', e.target.value)}
-                    style={{
-                      fontSize: 12, padding: '4px 8px', borderRadius: 6,
-                      border: '1px solid var(--border)', background: 'var(--surface-subtle)',
-                      color: 'var(--text-primary)', cursor: 'pointer', outline: 'none',
-                    }}
+                    style={{ fontSize: 12, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface-subtle)', color: 'var(--text-primary)', cursor: 'pointer', outline: 'none' }}
                   >
                     <option value="">None</option>
-                    {members.map(m => (
-                      <option key={m.id} value={m.id}>{m.name}</option>
-                    ))}
+                    {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                   </select>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600 }}>Start date</span>
+                  <input
+                    type="date"
+                    value={sel.start_date}
+                    onChange={e => onSelectChange(task.id, 'start_date', e.target.value)}
+                    style={{ fontSize: 11, padding: '4px 6px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface-subtle)', color: 'var(--text-primary)', outline: 'none', colorScheme: 'light dark' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600 }}>End date</span>
+                  <input
+                    type="date"
+                    value={sel.end_date}
+                    onChange={e => onSelectChange(task.id, 'end_date', e.target.value)}
+                    style={{ fontSize: 11, padding: '4px 6px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface-subtle)', color: 'var(--text-primary)', outline: 'none', colorScheme: 'light dark' }}
+                  />
                 </div>
               </>
             )}
@@ -327,6 +336,12 @@ export function CAClientSetupView({ userRole, financialYear = '2026-27' }: Props
   const [showAddModal,   setShowAddModal]   = useState(false)
   const [saving,         setSaving]         = useState(false)
   const [loadingTasks,   setLoadingTasks]   = useState(false)
+
+  /* Bulk fields */
+  const [bulkAssignee,   setBulkAssignee]   = useState('')
+  const [bulkApprover,   setBulkApprover]   = useState('')
+  const [bulkStartDate,  setBulkStartDate]  = useState('')
+  const [bulkEndDate,    setBulkEndDate]    = useState('')
 
   /* Assignment count per client */
   const [assignmentCounts, setAssignmentCounts] = useState<Record<string, number>>({})
@@ -395,6 +410,8 @@ export function CAClientSetupView({ userRole, financialYear = '2026-27' }: Props
           checked: true,
           assignee_id: a.assignee_id ?? '',
           approver_id: a.approver_id ?? '',
+          start_date: (a as any).start_date ?? '',
+          end_date: (a as any).end_date ?? '',
         }
       })
       setSelections(sel)
@@ -415,18 +432,46 @@ export function CAClientSetupView({ userRole, financialYear = '2026-27' }: Props
     setSelections(prev => {
       const existing = prev[taskId]
       if (existing?.checked) {
-        return { ...prev, [taskId]: { checked: false, assignee_id: '', approver_id: '' } }
+        return { ...prev, [taskId]: { checked: false, assignee_id: '', approver_id: '', start_date: '', end_date: '' } }
       }
-      return { ...prev, [taskId]: { checked: true, assignee_id: existing?.assignee_id ?? '', approver_id: existing?.approver_id ?? '' } }
+      return {
+        ...prev,
+        [taskId]: {
+          checked: true,
+          assignee_id: existing?.assignee_id ?? bulkAssignee,
+          approver_id: existing?.approver_id ?? bulkApprover,
+          start_date: existing?.start_date ?? bulkStartDate,
+          end_date: existing?.end_date ?? bulkEndDate,
+        },
+      }
     })
   }
 
-  /* Update assignee or approver in a selection */
-  function handleSelectChange(taskId: string, field: 'assignee_id' | 'approver_id', value: string) {
+  /* Update a field in a selection */
+  function handleSelectChange(taskId: string, field: 'assignee_id' | 'approver_id' | 'start_date' | 'end_date', value: string) {
     setSelections(prev => ({
       ...prev,
-      [taskId]: { ...(prev[taskId] ?? { checked: true, assignee_id: '', approver_id: '' }), [field]: value },
+      [taskId]: { ...(prev[taskId] ?? { checked: true, assignee_id: '', approver_id: '', start_date: '', end_date: '' }), [field]: value },
     }))
+  }
+
+  /* Apply bulk fields to all checked tasks */
+  function applyBulkFields() {
+    setSelections(prev => {
+      const next = { ...prev }
+      Object.keys(next).forEach(id => {
+        if (next[id]?.checked) {
+          next[id] = {
+            ...next[id],
+            ...(bulkAssignee  ? { assignee_id: bulkAssignee }  : {}),
+            ...(bulkApprover  ? { approver_id: bulkApprover }  : {}),
+            ...(bulkStartDate ? { start_date:  bulkStartDate } : {}),
+            ...(bulkEndDate   ? { end_date:    bulkEndDate }   : {}),
+          }
+        }
+      })
+      return next
+    })
   }
 
   /* Save assignments */
@@ -653,39 +698,58 @@ export function CAClientSetupView({ userRole, financialYear = '2026-27' }: Props
                   FY {financialYear}
                 </span>
               </div>
-              {/* Service date range */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
-                  <span style={{ color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>Service start:</span>
+              {/* Bulk controls row */}
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, flexWrap: 'wrap', marginTop: 4 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 130 }}>
+                  <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Bulk Assignee</span>
+                  <select
+                    value={bulkAssignee}
+                    onChange={e => setBulkAssignee(e.target.value)}
+                    style={{ fontSize: 12, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface-subtle)', color: 'var(--text-primary)', outline: 'none' }}
+                  >
+                    <option value="">— Unassigned —</option>
+                    {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                  </select>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 130 }}>
+                  <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Bulk Approver</span>
+                  <select
+                    value={bulkApprover}
+                    onChange={e => setBulkApprover(e.target.value)}
+                    style={{ fontSize: 12, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface-subtle)', color: 'var(--text-primary)', outline: 'none' }}
+                  >
+                    <option value="">— None —</option>
+                    {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                  </select>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Start Date</span>
                   <input
                     type="date"
-                    value={clientDates[selectedClient.id]?.start_date ?? ''}
-                    onChange={e => saveClientDate(selectedClient.id, 'start_date', e.target.value)}
-                    style={{
-                      fontSize: 12, padding: '3px 8px', borderRadius: 6,
-                      border: '1px solid var(--border)', background: 'var(--surface-subtle)',
-                      color: 'var(--text-primary)', outline: 'none', colorScheme: 'light dark',
-                    }}
+                    value={bulkStartDate}
+                    onChange={e => setBulkStartDate(e.target.value)}
+                    style={{ fontSize: 12, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface-subtle)', color: 'var(--text-primary)', outline: 'none', colorScheme: 'light dark' }}
                   />
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
-                  <span style={{ color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>Service end:</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>End Date</span>
                   <input
                     type="date"
-                    value={clientDates[selectedClient.id]?.end_date ?? ''}
-                    onChange={e => saveClientDate(selectedClient.id, 'end_date', e.target.value)}
-                    style={{
-                      fontSize: 12, padding: '3px 8px', borderRadius: 6,
-                      border: '1px solid var(--border)', background: 'var(--surface-subtle)',
-                      color: 'var(--text-primary)', outline: 'none', colorScheme: 'light dark',
-                    }}
+                    value={bulkEndDate}
+                    onChange={e => setBulkEndDate(e.target.value)}
+                    style={{ fontSize: 12, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface-subtle)', color: 'var(--text-primary)', outline: 'none', colorScheme: 'light dark' }}
                   />
-                </label>
-                {clientDates[selectedClient.id]?.start_date && (
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                    Tasks before service start will be marked overdue
-                  </span>
-                )}
+                </div>
+                <button
+                  onClick={applyBulkFields}
+                  style={{
+                    padding: '5px 14px', borderRadius: 7, border: 'none',
+                    background: 'var(--brand)', color: '#fff',
+                    fontSize: 12, fontWeight: 600, cursor: 'pointer', alignSelf: 'flex-end',
+                  }}
+                >
+                  Apply to checked
+                </button>
               </div>
             </div>
 

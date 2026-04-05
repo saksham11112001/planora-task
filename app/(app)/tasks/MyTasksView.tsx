@@ -553,14 +553,30 @@ export function MyTasksView({
                             Pending
                           </span>}
                         </div>
-                        {(task as any).project && (
-                          <div style={{ fontSize:11, color:'var(--text-muted)', marginTop:1,
-                            display:'flex', alignItems:'center', gap:3, overflow:'hidden', whiteSpace:'nowrap' }}>
-                            <span style={{ width:5, height:5, borderRadius:1,
-                              background:(task as any).project?.color??'#7c3aed', display:'inline-block', flexShrink:0 }}/>
-                            <span style={{ overflow:'hidden', textOverflow:'ellipsis' }}>{(task as any).project?.name}</span>
-                          </div>
-                        )}
+                        {/* Assignor (approver) + Client inline */}
+                        <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:2, flexWrap:'wrap' }}>
+                          {(task as any).approver && (
+                            <div style={{ fontSize:11, color:'var(--text-muted)', display:'flex', alignItems:'center', gap:3, overflow:'hidden', whiteSpace:'nowrap' }}>
+                              <span style={{ color:'var(--text-muted)', opacity:0.6 }}>Assignor:</span>
+                              <span style={{ color:'var(--text-secondary)', fontWeight:500 }}>{(task as any).approver.name}</span>
+                            </div>
+                          )}
+                          {(task as any).client && (
+                            <div style={{ fontSize:11, color:'var(--text-muted)', display:'flex', alignItems:'center', gap:3, overflow:'hidden', whiteSpace:'nowrap' }}>
+                              <span style={{ width:5, height:5, borderRadius:'50%',
+                                background:(task as any).client?.color??'#ccc', display:'inline-block', flexShrink:0 }}/>
+                              <span style={{ overflow:'hidden', textOverflow:'ellipsis' }}>{(task as any).client?.name}</span>
+                            </div>
+                          )}
+                          {(task as any).project && !((task as any).client) && (
+                            <div style={{ fontSize:11, color:'var(--text-muted)',
+                              display:'flex', alignItems:'center', gap:3, overflow:'hidden', whiteSpace:'nowrap' }}>
+                              <span style={{ width:5, height:5, borderRadius:1,
+                                background:(task as any).project?.color??'#7c3aed', display:'inline-block', flexShrink:0 }}/>
+                              <span style={{ overflow:'hidden', textOverflow:'ellipsis' }}>{(task as any).project?.name}</span>
+                            </div>
+                          )}
+                        </div>
                         {/* Mobile: show due date + priority inline */}
                         <div className="show-mobile-meta" style={{ display:'none', alignItems:'center', gap:6, marginTop:2 }}>
                           {task.due_date && <span style={{ fontSize:10, color:ov?'#dc2626':'var(--text-muted)', fontWeight:ov?600:400 }}>{fmtDate(task.due_date)}</span>}

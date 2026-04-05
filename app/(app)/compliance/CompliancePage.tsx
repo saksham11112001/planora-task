@@ -50,7 +50,7 @@ function taskDefaults(t: ComplianceTask): TaskOverride {
 /* ─── Component ──────────────────────────────────────────────── */
 
 const BLANK_CUSTOM: Omit<CustomTask,'_id'> = {
-  title:'', group:'GST', category:'', frequency:'monthly', priority:'medium', description:'', attachments:[],
+  title:'', group:'GST', category:'', frequency:'monthly', priority:'high', description:'', attachments:[],
 }
 
 export function CompliancePage() {
@@ -58,6 +58,7 @@ export function CompliancePage() {
 
   const [search,         setSearch]         = useState('')
   const [activeGroup,    setActiveGroup]    = useState('All')
+  const [savedTab,       setSavedTab]       = useState<'saved' | 'pending'>('pending')
   const [overrides,      setOverrides]      = useState<OrgOverrides>({})
   const [customTasks,    setCustomTasks]    = useState<CustomTask[]>([])
   const [editingKey,     setEditingKey]     = useState<string | null>(null)
@@ -107,6 +108,8 @@ export function CompliancePage() {
     const q = search.toLowerCase().trim()
     return COMPLIANCE_TASKS.filter(t => {
       if (activeGroup !== 'All' && t.group !== activeGroup) return false
+      if (savedTab === 'saved' && !overrides[t.title]) return false
+      if (savedTab === 'pending' && !!overrides[t.title]) return false
       if (!q) return true
       return (
         t.title.toLowerCase().includes(q) ||
@@ -115,7 +118,7 @@ export function CompliancePage() {
         (t.description ?? '').toLowerCase().includes(q)
       )
     })
-  }, [search, activeGroup])
+  }, [search, activeGroup, savedTab, overrides])
 
   const groupedTasks = useMemo(() => {
     const map: Record<string, ComplianceTask[]> = {}
@@ -325,13 +328,13 @@ export function CompliancePage() {
           </div>
         </div>
 
-        {/* ── Search + group filter ─────────────────────────── */}
-        <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:16, flexWrap:'wrap' }}>
+        {/* ── Search bar ───────────────────────────────────── */}
+        <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:12, flexWrap:'wrap' }}>
           <div style={{ display:'flex', alignItems:'center', gap:8, flex:'1 1 220px', minWidth:180,
             padding:'8px 12px', borderRadius:9, border:'1px solid var(--border)', background:'var(--surface)' }}>
             <Search style={{ width:13, height:13, color:'var(--text-muted)', flexShrink:0 }}/>
             <input value={search} onChange={e => setSearch(e.target.value)}
-              placeholder="Search GSTR, TDS, ITR, ROC…"
+              placeholder="Search GST, TDS, ITR, ROC, Audit…"
               style={{ flex:1, border:'none', outline:'none', background:'transparent',
                 fontSize:13, color:'var(--text-primary)', fontFamily:'inherit' }}/>
             {search && (
@@ -340,22 +343,40 @@ export function CompliancePage() {
               </button>
             )}
           </div>
-          <div style={{ display:'flex', alignItems:'center', gap:5, flexWrap:'wrap' }}>
-            {(['All', ...COMPLIANCE_GROUPS] as const).map(g => {
-              const isActive = activeGroup === g
-              const color = g === 'All' ? '#0d9488' : GROUP_COLORS[g as string]
-              return (
-                <button key={g} onClick={() => setActiveGroup(g as string)}
-                  style={{ padding:'5px 12px', borderRadius:99, fontSize:11, fontWeight:600,
-                    border: isActive ? `1.5px solid ${color}` : '1.5px solid var(--border)',
-                    background: isActive ? color + '18' : 'transparent',
-                    color: isActive ? color : 'var(--text-muted)',
-                    cursor:'pointer', fontFamily:'inherit', whiteSpace:'nowrap' }}>
-                  {g}
-                </button>
-              )
-            })}
-          </div>
+        </div>
+
+        {/* ── Saved / Pending tabs ─────────────────────────── */}
+        <div style={{ display:'flex', alignItems:'center', gap:0, marginBottom:16,
+          borderBottom:'1px solid var(--border)' }}>
+          {([
+            { key: 'pending', label: 'Pending', desc: 'Not yet customised' },
+            { key: 'saved',   label: 'Saved',   desc: 'Customised by your org' },
+          ] as const).map(tab => {
+            const isActive = savedTab === tab.key
+            const count = tab.key === 'saved'
+              ? COMPLIANCE_TASKS.filter(t => !!overrides[t.title]).length
+              : COMPLIANCE_TASKS.filter(t => !overrides[t.title]).length
+            return (
+              <button key={tab.key} onClick={() => setSavedTab(tab.key)}
+                style={{
+                  padding:'9px 20px', fontSize:13, fontWeight: isActive ? 700 : 500,
+                  border:'none', background:'transparent', cursor:'pointer',
+                  borderBottom: isActive ? '2px solid var(--brand)' : '2px solid transparent',
+                  color: isActive ? 'var(--brand)' : 'var(--text-muted)',
+                  marginBottom:-1, fontFamily:'inherit',
+                  display:'flex', alignItems:'center', gap:6,
+                }}>
+                {tab.label}
+                <span style={{
+                  fontSize:10, fontWeight:700, padding:'1px 7px', borderRadius:99,
+                  background: isActive ? 'rgba(13,148,136,0.12)' : 'var(--surface-alt)',
+                  color: isActive ? 'var(--brand)' : 'var(--text-muted)',
+                }}>
+                  {count}
+                </span>
+              </button>
+            )
+          })}
         </div>
 
         {/* ── Grid ─────────────────────────────────────────── */}

@@ -28,7 +28,7 @@ export default async function MyTasksPage() {
     ] = await Promise.all([
       // My tasks (all statuses for board view)
       supabase.from('tasks')
-        .select('id, title, description, status, priority, due_date, assignee_id, approver_id, client_id, project_id, approval_status, approval_required, estimated_hours, is_recurring, custom_fields, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), projects(id, name, color)')
+        .select('id, title, description, status, priority, due_date, assignee_id, approver_id, client_id, project_id, approval_status, approval_required, estimated_hours, is_recurring, custom_fields, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), approver:users!tasks_approver_id_fkey(id, name), projects(id, name, color)')
         .eq('org_id', mb.org_id).eq('assignee_id', user.id).neq('is_archived', true).is('parent_task_id', null)
         .order('due_date', { ascending: true, nullsFirst: false }),
 
@@ -67,7 +67,8 @@ export default async function MyTasksPage() {
       project_id: t.project_id ?? null, approval_status: t.approval_status ?? null,
       approval_required: t.approval_required ?? false, estimated_hours: t.estimated_hours ?? null,
       is_recurring: t.is_recurring ?? false, completed_at: null,
-      is_archived: false, created_at: '', approver: null, approver_id: null,
+      is_archived: false, created_at: '', approver_id: t.approver_id ?? null,
+      approver: (t.approver as any) ?? null,
       assignee: (t.assignee as any) ?? null,
       client: t.client_id ? (clientMap[t.client_id] ?? null) : null,
       project: (t.projects as any) ?? null,
