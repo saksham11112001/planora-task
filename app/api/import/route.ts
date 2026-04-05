@@ -11,8 +11,28 @@ const COMPLIANCE_MAP = new Map(
   COMPLIANCE_TASKS.map(t => [t.title.toLowerCase().trim(), t])
 )
 
+function alphaNum(s: string) { return s.toLowerCase().replace(/[^a-z0-9]/g, '') }
+
 function findComplianceTask(title: string) {
-  return COMPLIANCE_MAP.get(title.toLowerCase().trim()) ?? null
+  const q = title.toLowerCase().trim()
+  if (!q) return null
+
+  // 1. Exact match
+  const exact = COMPLIANCE_MAP.get(q)
+  if (exact) return exact
+
+  // 2. Normalised alphanumeric exact match
+  const qAlpha = alphaNum(q)
+  for (const [key, task] of COMPLIANCE_MAP) {
+    if (alphaNum(key) === qAlpha) return task
+  }
+
+  // 3. Input is contained in a task title (e.g. "GSTR 3B" matches "GSTR 3B (Monthly)")
+  for (const [key, task] of COMPLIANCE_MAP) {
+    if (alphaNum(key).includes(qAlpha) || qAlpha.includes(alphaNum(key))) return task
+  }
+
+  return null
 }
 
 type SheetMap = Record<string, string[][]>
@@ -101,7 +121,11 @@ function isLikelyInstructionRow(row: string[]): boolean {
     joined.includes('select from team') ||
     joined.includes('select client') ||
     joined.includes('select priority') ||
-    joined.includes('choose frequency')
+    joined.includes('choose frequency') ||
+    joined.includes('select from dropdown') ||
+    joined.includes('enter email') ||
+    joined.includes('enter here') ||
+    joined.includes('type here')
   )
 }
 
@@ -116,7 +140,6 @@ function isSampleRow(row: string[]): boolean {
   const filled = row.filter(v => cleanText(v).length > 0).length
 
   if (filled === 0) return true
-  // Explicit [SAMPLE] marker added to all template example rows
   if (joined.includes('[sample]')) return true
   if (joined.includes('@yourcompany.com')) return true
   if (joined.includes('must match')) return true
@@ -127,6 +150,16 @@ function isSampleRow(row: string[]): boolean {
   if (joined.includes("person's display name")) return true
   if (joined.includes('manager | member | viewer')) return true
   if (joined.includes('manager|member|viewer')) return true
+  // Template placeholder / dropdown instruction cells
+  if (joined.includes('select from dropdown')) return true
+  if (joined.includes('select compliance')) return true
+  if (joined.includes('select task')) return true
+  if (joined.includes('enter email')) return true
+  if (joined.includes('enter here')) return true
+  if (joined.includes('type here')) return true
+  if (joined.includes('e.g.')) return true
+  if (joined.includes('example:')) return true
+  if (joined.includes('(sample)')) return true
   return false
 }
 
@@ -276,46 +309,69 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    async function resolveEmail(email: string): Promise<string | null> {
-      const e = email.toLowerCase().trim()
-      if (!e || !e.includes('@')) return null
-      if (e in emailCache) return emailCache[e]
+    async function resolveEmail(emailOrName: string): Promise<string | null> {
+      const raw = emailOrName.trim()
+      if (!raw) return null
+      const key = raw.toLowerCase()
+      if (key in emailCache) return emailCache[key]
 
-      // 1) users table
-      const { data: appUser } = await admin
-        .from('users')
-        .select('id')
-        .eq('email', e)
-        .maybeSingle()
+      // ── Email path ────────────────────────────────────────────
+      if (raw.includes('@')) {
+        const e = key
 
-      if (appUser?.id) {
-        emailCache[e] = appUser.id
-        return appUser.id
+        // 1) users table
+        const { data: appUser } = await admin
+          .from('users')
+          .select('id')
+          .eq('email', e)
+          .maybeSingle()
+
+        if (appUser?.id) { emailCache[key] = appUser.id; return appUser.id }
+
+        // 2) org_members joined with users
+        const { data: memberUser } = await admin
+          .from('org_members')
+          .select('user_id, users!inner(email)')
+          .eq('org_id', orgId)
+          .eq('users.email', e)
+          .maybeSingle()
+
+        if (memberUser?.user_id) { emailCache[key] = memberUser.user_id; return memberUser.user_id }
+
+        // 3) auth users
+        const authUsers = await loadAuthUsers()
+        const authUser = authUsers.find(u => u.email?.toLowerCase() === e)
+        if (authUser?.id) { emailCache[key] = authUser.id; return authUser.id }
+
+        emailCache[key] = null
+        return null
       }
 
-      // 2) org_members joined with users
-      const { data: memberUser } = await admin
+      // ── Name path (non-technical users who type names instead of emails) ─
+      const { data: byName } = await admin
         .from('org_members')
-        .select('user_id, users!inner(email)')
+        .select('user_id, users!inner(id, name)')
         .eq('org_id', orgId)
-        .eq('users.email', e)
+        .eq('is_active', true)
+        .ilike('users.name', raw)
         .maybeSingle()
 
-      if (memberUser?.user_id) {
-        emailCache[e] = memberUser.user_id
-        return memberUser.user_id
-      }
+      if (byName?.user_id) { emailCache[key] = byName.user_id; return byName.user_id }
 
-      // 3) auth users
-      const authUsers = await loadAuthUsers()
-      const authUser = authUsers.find(u => u.email?.toLowerCase() === e)
-      if (authUser?.id) {
-        emailCache[e] = authUser.id
-        return authUser.id
-      }
+      // Partial name match
+      const { data: allMembers } = await admin
+        .from('org_members')
+        .select('user_id, users!inner(id, name)')
+        .eq('org_id', orgId)
+        .eq('is_active', true)
 
-      emailCache[e] = null
-      return null
+      const match = (allMembers ?? []).find((m: any) =>
+        (m.users?.name ?? '').toLowerCase().includes(key) ||
+        key.includes((m.users?.name ?? '').toLowerCase())
+      )
+      const uid = match?.user_id ?? null
+      emailCache[key] = uid
+      return uid
     }
 
     async function resolveAuthUser(email: string): Promise<string | null> {
@@ -349,6 +405,11 @@ export async function POST(request: NextRequest) {
     }
 
     async function resolveAssignees(raw: string): Promise<{ primary: string | null; extra: string[] }> {
+      // Ignore template placeholder text
+      const rawLower = raw.toLowerCase().trim()
+      if (!rawLower || rawLower.includes('select') || rawLower.includes('enter email') || rawLower.includes('assignee') || rawLower.includes('e.g')) {
+        return { primary: null, extra: [] }
+      }
       const emails = parseEmailList(raw)
       if (emails.length === 0) return { primary: null, extra: [] }
 
@@ -363,6 +424,8 @@ export async function POST(request: NextRequest) {
     async function resolveClient(rawName: string): Promise<string | null> {
       const n = rawName.toLowerCase().trim()
       if (!n) return null
+      // Ignore template placeholder text
+      if (n.includes('select') || n.includes('enter') || n.includes('client name') || n.includes('e.g')) return null
       if (clientNameToId[n]) return clientNameToId[n]
 
       const { data } = await admin
@@ -956,9 +1019,20 @@ export async function POST(request: NextRequest) {
           const typeName = cell(row, iType)
           if (!typeName) continue
 
+          // Skip obvious placeholder / instruction values silently
+          const typeNorm = typeName.toLowerCase()
+          if (
+            typeNorm.includes('select') || typeNorm.includes('dropdown') ||
+            typeNorm.includes('enter') || typeNorm.includes('type here') ||
+            typeNorm.includes('e.g') || typeNorm.includes('example')
+          ) {
+            results.compliance.skipped++
+            continue
+          }
+
           const compTask = findComplianceTask(typeName)
           if (!compTask) {
-            results.compliance.errors.push(`"${typeName}": not recognised`)
+            results.compliance.errors.push(`"${typeName}": not a recognised compliance task — check spelling or leave blank`)
             results.compliance.skipped++
             continue
           }
