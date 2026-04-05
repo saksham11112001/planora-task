@@ -5,7 +5,7 @@ import {
 } from 'react'
 import {
   ChevronDown, ChevronRight, Plus, Trash2, Pencil, Check, X,
-  RefreshCw, Calendar, Paperclip, AlertCircle, Save,
+  RefreshCw, Calendar, Paperclip, AlertCircle, Save, Search,
 } from 'lucide-react'
 import { MONTH_KEYS, MONTH_LABELS, CA_GROUP_NAMES } from '@/lib/data/caDefaultTasks'
 import type { MonthKey } from '@/lib/data/caDefaultTasks'
@@ -911,6 +911,8 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
   const [loading, setLoading] = useState(true)
   const [loadingDefaults, setLoadingDefaults] = useState(false)
   const [groupFilter, setGroupFilter] = useState<GroupFilter>(GROUP_FILTER_ALL)
+  const [search, setSearch] = useState('')
+  const [savedTab, setSavedTab] = useState<'all' | 'pending'>('all')
   const [showAddModal, setShowAddModal] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [pendingChanges, setPendingChanges] = useState<Record<string, Partial<CAMasterTask>>>({})
@@ -1014,16 +1016,20 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
 
   /* ── Grouped + filtered tasks ── */
   const grouped = useMemo(() => {
-    const filtered = groupFilter === GROUP_FILTER_ALL
-      ? tasks
-      : tasks.filter(t => t.group_name === groupFilter)
+    const q = search.toLowerCase().trim()
+    const filtered = tasks.filter(t => {
+      if (groupFilter !== GROUP_FILTER_ALL && t.group_name !== groupFilter) return false
+      if (savedTab === 'pending' && !pendingChanges[t.id]) return false
+      if (q && !t.name.toLowerCase().includes(q) && !t.group_name.toLowerCase().includes(q) && !t.code.toLowerCase().includes(q)) return false
+      return true
+    })
     const map = new Map<string, CAMasterTask[]>()
     for (const t of filtered) {
       if (!map.has(t.group_name)) map.set(t.group_name, [])
       map.get(t.group_name)!.push(t)
     }
     return map
-  }, [tasks, groupFilter])
+  }, [tasks, groupFilter, search, savedTab, pendingChanges])
 
   /* ─── Render ────────────────────────────────────────────────── */
 
@@ -1101,37 +1107,63 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
         </div>
       </div>
 
-      {/* ── Group filter pills ── */}
+      {/* ── Search + Saved/Pending tabs ── */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
+        display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
         padding: '10px 16px', borderBottom: '1px solid var(--border)',
         background: 'var(--surface)', flexShrink: 0,
-        overflowX: 'auto',
       }}>
-        {GROUP_FILTERS.map(g => {
-          const active = g === groupFilter
-          return (
-            <button
-              key={g}
-              onClick={() => setGroupFilter(g)}
-              style={{
-                fontSize: 12, fontWeight: active ? 700 : 500,
-                padding: '4px 12px', borderRadius: 999, whiteSpace: 'nowrap',
-                border: active ? '1.5px solid var(--brand)' : '1px solid var(--border)',
-                background: active ? 'var(--brand)' : 'var(--surface-alt)',
-                color: active ? '#fff' : 'var(--text-secondary)',
-                cursor: 'pointer', transition: 'all 0.12s',
-              }}
-            >
-              {g}
-              {g !== GROUP_FILTER_ALL && (
-                <span style={{ marginLeft: 4, opacity: 0.7 }}>
-                  {tasks.filter(t => t.group_name === g).length}
-                </span>
-              )}
+        {/* Search bar */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 7, flex: '1 1 200px', minWidth: 160, maxWidth: 320,
+          padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border)',
+          background: 'var(--surface-alt)',
+        }}>
+          <Search size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search tasks…"
+            style={{
+              flex: 1, border: 'none', outline: 'none', background: 'transparent',
+              fontSize: 13, color: 'var(--text-primary)', fontFamily: 'inherit',
+            }}
+          />
+          {search && (
+            <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+              <X size={12} style={{ color: 'var(--text-muted)' }} />
             </button>
-          )
-        })}
+          )}
+        </div>
+
+        {/* Saved / Pending tabs */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 0, borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border)', flexShrink: 0 }}>
+          {([
+            { key: 'all',     label: 'All',     count: tasks.length },
+            { key: 'pending', label: 'Unsaved', count: Object.keys(pendingChanges).length },
+          ] as const).map(tab => {
+            const active = savedTab === tab.key
+            return (
+              <button key={tab.key} onClick={() => setSavedTab(tab.key)}
+                style={{
+                  padding: '6px 14px', fontSize: 12, fontWeight: active ? 700 : 500,
+                  border: 'none', background: active ? 'var(--brand)' : 'var(--surface-alt)',
+                  color: active ? '#fff' : 'var(--text-secondary)',
+                  cursor: 'pointer', fontFamily: 'inherit',
+                  display: 'flex', alignItems: 'center', gap: 5,
+                }}>
+                {tab.label}
+                <span style={{
+                  fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 99,
+                  background: active ? 'rgba(255,255,255,0.25)' : 'var(--border)',
+                  color: active ? '#fff' : 'var(--text-muted)',
+                }}>
+                  {tab.count}
+                </span>
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       {/* ── Main content ── */}
