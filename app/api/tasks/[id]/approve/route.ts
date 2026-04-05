@@ -25,7 +25,6 @@ export async function POST(
 
   const { decision } = await req.json()
   const isAssignee   = task.assignee_id === user.id
-  const isOrgManager = ['owner', 'admin', 'manager'].includes(mb.role)
 
   // ── Who can do what ────────────────────────────────────────────────────────
   // submit: only the assignee
@@ -69,16 +68,12 @@ export async function POST(
     return NextResponse.json({ ok: true, message: 'Submitted for approval' })
   }
 
-  // approve / reject: only the designated approver OR any org manager if no approver set
-  const isDesignatedApprover = task.approver_id
-    ? task.approver_id === user.id
-    : isOrgManager
-
-  if (!isDesignatedApprover) {
-    const msg = task.approver_id
-      ? 'Only the designated approver can approve or reject this task'
-      : 'Only managers can approve or reject tasks'
-    return NextResponse.json({ error: msg }, { status: 403 })
+  // approve / reject: only the exact designated approver — no fallback to any manager
+  if (!task.approver_id) {
+    return NextResponse.json({ error: 'No approver assigned to this task' }, { status: 403 })
+  }
+  if (task.approver_id !== user.id) {
+    return NextResponse.json({ error: 'Only the designated approver can approve or reject this task' }, { status: 403 })
   }
 
   if (decision === 'approve') {

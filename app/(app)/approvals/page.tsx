@@ -17,11 +17,10 @@ export default async function ApprovalsPage() {
     .eq('user_id', user.id).eq('is_active', true).maybeSingle()
   if (!mb) redirect('/onboarding')
 
-  // Only managers+ can see approvals
-  const canApprove = ['owner','admin','manager'].includes(mb.role)
-  if (!canApprove) redirect('/dashboard')
+  // Only fetch tasks where this user is the designated approver
+  // (any role can be an approver; non-approvers see an empty list)
 
-  // Fetch ALL tasks currently pending approval in this org
+  // Fetch tasks pending approval where current user is the assigned approver
   const { data: pendingRaw } = await supabase
     .from('tasks')
     .select(`
@@ -34,11 +33,12 @@ export default async function ApprovalsPage() {
     .eq('org_id', mb.org_id)
     .eq('status', 'in_review')
     .eq('approval_status', 'pending')
+    .eq('approver_id', user.id)
     .neq('is_archived', true)
     .is('parent_task_id', null)
     .order('created_at', { ascending: false })
 
-  // Fetch recently approved/rejected (last 7 days) for history
+  // Fetch recently approved/rejected (last 7 days) by this user only
   const since = new Date(Date.now() - 7 * 86400000).toISOString()
   const { data: historyRaw } = await supabase
     .from('tasks')
@@ -50,6 +50,7 @@ export default async function ApprovalsPage() {
       projects(id, name, color)
     `)
     .eq('org_id', mb.org_id)
+    .eq('approver_id', user.id)
     .in('approval_status', ['approved','rejected'])
     .gte('completed_at', since)
     .neq('is_archived', true)
@@ -75,13 +76,7 @@ export default async function ApprovalsPage() {
     }
   }
 
-  const pending = (pendingRaw ?? [])
-    .filter(t => {
-      const approverId = (t as any).approver_id
-      if (approverId) return approverId === user.id
-      return true // managers see all unassigned approvals
-    })
-    .map(enrichTask)
+  const pending = (pendingRaw ?? []).map(enrichTask)
 
   const history = (historyRaw ?? []).map(enrichTask)
   const memberList = (members ?? []).map(m => ({ id: (m.users as any)?.id ?? m.user_id, name: (m.users as any)?.name ?? 'Unknown' }))
