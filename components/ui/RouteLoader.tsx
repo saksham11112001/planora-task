@@ -38,8 +38,8 @@ export function RouteLoader() {
     timerRef.current = setTimeout(() => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current)
       setProgress(100)
-      setTimeout(() => setVisible(false), 300)
-    }, 400)
+      setTimeout(() => setVisible(false), 200)
+    }, 200)
 
     return () => {
       clearTimeout(timerRef.current)

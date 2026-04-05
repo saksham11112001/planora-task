@@ -82,6 +82,16 @@ const FEATURE_GROUPS = [
       { key: 'settings.tasks',      label: 'Edit task field settings', desc: 'Show/hide and set mandatory fields' },
     ],
   },
+  {
+    group: 'CA Compliance',
+    color: '#0d9488',
+    features: [
+      { key: 'compliance.view',         label: 'View compliance tasks',     desc: 'Access the CA Compliance page' },
+      { key: 'compliance.edit',         label: 'Edit compliance settings',  desc: 'Modify task overrides (frequency, priority, attachments)' },
+      { key: 'compliance.assign',       label: 'Assign compliance tasks',   desc: 'Set assignees and approvers for compliance tasks' },
+      { key: 'compliance.manage_tasks', label: 'Manage custom tasks',       desc: 'Add or delete organisation-specific compliance tasks' },
+    ],
+  },
 ]
 
 const ROLES: { key: Role; label: string; color: string; icon: any }[] = [
@@ -121,8 +131,12 @@ const DEFAULT_PERMISSIONS: RolePermissions = {
   'team.invite':        { admin: true,  manager: false, member: false, viewer: false },
   'team.remove':        { admin: true,  manager: false, member: false, viewer: false },
   'team.change_role':   { admin: true,  manager: false, member: false, viewer: false },
-  'settings.org':       { admin: true,  manager: false, member: false, viewer: false },
-  'settings.tasks':     { admin: true,  manager: false, member: false, viewer: false },
+  'settings.org':             { admin: true,  manager: false, member: false, viewer: false },
+  'settings.tasks':           { admin: true,  manager: false, member: false, viewer: false },
+  'compliance.view':          { admin: true,  manager: true,  member: true,  viewer: false },
+  'compliance.edit':          { admin: true,  manager: true,  member: false, viewer: false },
+  'compliance.assign':        { admin: true,  manager: true,  member: false, viewer: false },
+  'compliance.manage_tasks':  { admin: true,  manager: false, member: false, viewer: false },
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────

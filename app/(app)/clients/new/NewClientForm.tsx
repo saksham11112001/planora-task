@@ -1,5 +1,5 @@
 'use client'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from '@/store/appStore'
 import {
@@ -11,9 +11,10 @@ import {
   type ComplianceTask,
 } from '@/lib/data/complianceTasks'
 import {
-  loadOverrides, COMPLIANCE_FREQUENCIES, getFreqLabel,
-  type AttachmentConfig,
+  COMPLIANCE_FREQUENCIES, getFreqLabel,
+  type AttachmentConfig, type OrgOverrides,
 } from '@/lib/compliance'
+import { useOrgSettings } from '@/lib/hooks/useOrgSettings'
 
 /* ─── Constants ──────────────────────────────────────────────── */
 
@@ -60,8 +61,8 @@ function defaultSelection(t: ComplianceTask): TaskSelection {
   }
 }
 
-function getAttachments(task: ComplianceTask): AttachmentConfig[] {
-  const ov = loadOverrides()[task.title]
+function getAttachments(task: ComplianceTask, overrides: OrgOverrides): AttachmentConfig[] {
+  const ov = overrides[task.title]
   if (ov?.attachments?.length) return ov.attachments
   return task.subtasks.map(s => ({ name: s.title }))
 }
@@ -70,9 +71,20 @@ function getAttachments(task: ComplianceTask): AttachmentConfig[] {
 
 export function NewClientForm({ members = [] }: { members?: Member[] }) {
   const router = useRouter()
-  const [step,   setStep]   = useState<1 | 2>(1)
-  const [saving, setSaving] = useState(false)
-  const [error,  setError]  = useState('')
+  const { caComplianceMode } = useOrgSettings()
+  const [step,       setStep]       = useState<1 | 2>(1)
+  const [saving,     setSaving]     = useState(false)
+  const [error,      setError]      = useState('')
+  const [orgOverrides, setOrgOverrides] = useState<OrgOverrides>({})
+
+  // Load org-scoped overrides from API (used when creating compliance tasks)
+  useEffect(() => {
+    if (!caComplianceMode) return
+    fetch('/api/compliance/overrides')
+      .then(r => r.json())
+      .then(d => setOrgOverrides(d.data ?? {}))
+      .catch(() => {})
+  }, [caComplianceMode])
 
   /* Step 1 */
   const [form, setForm] = useState({
@@ -143,11 +155,10 @@ export function NewClientForm({ members = [] }: { members?: Member[] }) {
       const clientId = clientData.data.id
 
       if (selectedCount > 0) {
-        const overrides = loadOverrides()
         const taskPromises = selectedTasks.map(task => {
           const sel = selection[task.title]
-          const ov  = overrides[task.title]
-          const attachments = getAttachments(task)
+          const ov  = orgOverrides[task.title]
+          const attachments = getAttachments(task, orgOverrides)
           const cf: Record<string,any> = {}
           if (sel.daysBeforeDue) cf._days_before_show = parseInt(sel.daysBeforeDue)
           return fetch('/api/recurring', {
@@ -261,27 +272,41 @@ export function NewClientForm({ members = [] }: { members?: Member[] }) {
         </div>
 
         <div className="flex gap-3 pt-2">
-          <button type="button"
-            onClick={() => {
-              if (!form.name.trim()) { setError('Client name is required'); return }
-              setError(''); setStep(2)
-            }}
-            className="btn btn-brand flex-1 flex items-center justify-center gap-2">
-            <FileCheck className="h-4 w-4"/> Set up Compliance Tasks
-            <ChevronRight className="h-4 w-4"/>
-          </button>
+          {caComplianceMode ? (
+            <button type="button"
+              onClick={() => {
+                if (!form.name.trim()) { setError('Client name is required'); return }
+                setError(''); setStep(2)
+              }}
+              className="btn btn-brand flex-1 flex items-center justify-center gap-2">
+              <FileCheck className="h-4 w-4"/> Set up Compliance Tasks
+              <ChevronRight className="h-4 w-4"/>
+            </button>
+          ) : (
+            <button type="button"
+              onClick={() => {
+                if (!form.name.trim()) { setError('Client name is required'); return }
+                setError(''); doSubmit()
+              }}
+              disabled={saving}
+              className="btn btn-brand flex-1 flex items-center justify-center gap-2">
+              {saving ? 'Adding…' : 'Add Client'}
+            </button>
+          )}
           <button type="button" onClick={() => router.back()} className="btn btn-outline">Cancel</button>
         </div>
 
-        <button type="button"
-          onClick={() => {
-            if (!form.name.trim()) { setError('Client name is required'); return }
-            setError(''); doSubmit()
-          }}
-          disabled={saving}
-          className="w-full text-xs text-gray-400 hover:text-gray-600 transition-colors">
-          Skip compliance setup → Add client directly
-        </button>
+        {caComplianceMode && (
+          <button type="button"
+            onClick={() => {
+              if (!form.name.trim()) { setError('Client name is required'); return }
+              setError(''); doSubmit()
+            }}
+            disabled={saving}
+            className="w-full text-xs text-gray-400 hover:text-gray-600 transition-colors">
+            Skip compliance setup → Add client directly
+          </button>
+        )}
       </div>
     )
   }
@@ -377,7 +402,7 @@ export function NewClientForm({ members = [] }: { members?: Member[] }) {
                 const sel           = selection[task.title]
                 const isSelected    = sel?.selected
                 const isExpanded    = expandedTasks.has(task.title)
-                const attachments   = getAttachments(task)
+                const attachments   = getAttachments(task, orgOverrides)
                 const isLast        = idx === groupTasks.length - 1
 
                 return (
@@ -402,7 +427,7 @@ export function NewClientForm({ members = [] }: { members?: Member[] }) {
                         <p style={{ fontSize:12, fontWeight: isSelected ? 600 : 400, margin:0,
                           color: isSelected ? 'var(--text-primary)' : 'var(--text-secondary)',
                           overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                          {loadOverrides()[task.title]?.title ?? task.title}
+                          {orgOverrides[task.title]?.title ?? task.title}
                         </p>
                         <p style={{ fontSize:10, color:'var(--text-muted)', margin:'1px 0 0' }}>
                           {task.category}

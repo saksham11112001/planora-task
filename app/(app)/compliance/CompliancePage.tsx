@@ -1,19 +1,18 @@
 'use client'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   Search, X, RotateCcw, Pencil, Check, ChevronDown, ChevronRight,
-  FileCheck, Info, Paperclip, Plus, Trash2, ShieldCheck, TrendingUp,
+  FileCheck, Info, Paperclip, Plus, Trash2, ShieldCheck, TrendingUp, Lock,
 } from 'lucide-react'
 import {
   COMPLIANCE_TASKS, COMPLIANCE_GROUPS,
   type ComplianceTask, type ComplianceFrequency,
 } from '@/lib/data/complianceTasks'
 import {
-  loadOverrides, saveOverrides,
-  loadCustomTasks, saveCustomTasks,
   COMPLIANCE_FREQUENCIES, getFreqLabel, getFreqColor,
   type AttachmentConfig, type TaskOverride, type OrgOverrides, type CustomTask,
 } from '@/lib/compliance'
+import { useOrgSettings } from '@/lib/hooks/useOrgSettings'
 
 /* ─── Constants ──────────────────────────────────────────────── */
 
@@ -55,6 +54,8 @@ const BLANK_CUSTOM: Omit<CustomTask,'_id'> = {
 }
 
 export function CompliancePage() {
+  const { caComplianceMode, loading: settingsLoading } = useOrgSettings()
+
   const [search,         setSearch]         = useState('')
   const [activeGroup,    setActiveGroup]    = useState('All')
   const [overrides,      setOverrides]      = useState<OrgOverrides>({})
@@ -65,8 +66,38 @@ export function CompliancePage() {
   const [showInfo,       setShowInfo]       = useState<string | null>(null)
   const [showAddTask,    setShowAddTask]    = useState(false)
   const [newTask,        setNewTask]        = useState<Omit<CustomTask,'_id'>>(BLANK_CUSTOM)
+  const [dataLoading,    setDataLoading]    = useState(true)
 
-  useEffect(() => { setOverrides(loadOverrides()); setCustomTasks(loadCustomTasks()) }, [])
+  // Load overrides + custom tasks from org-scoped API (not localStorage)
+  useEffect(() => {
+    if (!caComplianceMode && !settingsLoading) return
+    Promise.all([
+      fetch('/api/compliance/overrides').then(r => r.json()).catch(() => ({ data: {} })),
+      fetch('/api/compliance/custom').then(r => r.json()).catch(() => ({ data: [] })),
+    ]).then(([ov, ct]) => {
+      setOverrides(ov.data ?? {})
+      setCustomTasks(ct.data ?? [])
+      setDataLoading(false)
+    })
+  }, [caComplianceMode, settingsLoading])
+
+  const saveOverridesApi = useCallback(async (updated: OrgOverrides) => {
+    setOverrides(updated)
+    await fetch('/api/compliance/overrides', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ overrides: updated }),
+    })
+  }, [])
+
+  const saveCustomTasksApi = useCallback(async (updated: CustomTask[]) => {
+    setCustomTasks(updated)
+    await fetch('/api/compliance/custom', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tasks: updated }),
+    })
+  }, [])
 
   function effective(t: ComplianceTask): TaskOverride {
     return overrides[t.title] ?? taskDefaults(t)
@@ -107,25 +138,25 @@ export function CompliancePage() {
   function saveEdit() {
     if (!editingKey || !draft) return
     const updated = { ...overrides, [editingKey]: draft }
-    setOverrides(updated); saveOverrides(updated)
+    saveOverridesApi(updated)
     setEditingKey(null); setDraft(null)
   }
-  function resetAll() { setOverrides({}); saveOverrides({}); cancelEdit() }
+  function resetAll() { saveOverridesApi({}); cancelEdit() }
   function resetOne(key: string) {
     const updated = { ...overrides }; delete updated[key]
-    setOverrides(updated); saveOverrides(updated)
+    saveOverridesApi(updated)
     if (editingKey === key) cancelEdit()
   }
   function addCustomTask() {
     if (!newTask.title.trim()) return
     const task: CustomTask = { ...newTask, _id: crypto.randomUUID(), title: newTask.title.trim() }
     const updated = [...customTasks, task]
-    setCustomTasks(updated); saveCustomTasks(updated)
+    saveCustomTasksApi(updated)
     setNewTask(BLANK_CUSTOM); setShowAddTask(false)
   }
   function deleteCustomTask(id: string) {
     const updated = customTasks.filter(t => t._id !== id)
-    setCustomTasks(updated); saveCustomTasks(updated)
+    saveCustomTasksApi(updated)
   }
 
   /* ── Attachment helpers (inside draft) ── */
@@ -177,6 +208,45 @@ export function CompliancePage() {
   }))
 
   /* ───────────────────── RENDER ───────────────────────────────── */
+
+  // Feature not enabled for this org
+  if (!settingsLoading && !caComplianceMode) {
+    return (
+      <div className="page-container">
+        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+          minHeight:420, gap:16, textAlign:'center', padding:32 }}>
+          <div style={{ width:56, height:56, borderRadius:16, background:'#f1f5f9',
+            display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <Lock style={{ width:28, height:28, color:'#94a3b8' }}/>
+          </div>
+          <div>
+            <h2 style={{ fontSize:20, fontWeight:700, color:'var(--text-primary)', marginBottom:6 }}>
+              CA Compliance is not enabled
+            </h2>
+            <p style={{ fontSize:14, color:'var(--text-muted)', maxWidth:380, lineHeight:1.6 }}>
+              Enable <strong>CA Compliance mode</strong> in{' '}
+              <a href="/settings/features" style={{ color:'var(--brand)', textDecoration:'underline' }}>
+                Settings → Features
+              </a>{' '}
+              to access this page.
+            </p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (settingsLoading || dataLoading) {
+    return (
+      <div className="page-container">
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:300 }}>
+          <div style={{ width:28, height:28, border:'3px solid var(--brand)', borderTopColor:'transparent',
+            borderRadius:'50%', animation:'spin 0.7s linear infinite' }}/>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="page-container">
       <div className="content-max" style={{ maxWidth: 1100 }}>

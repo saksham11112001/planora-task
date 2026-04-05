@@ -133,7 +133,7 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
           </>
         )}
         {nav.clients && <SI href="/clients"   active={isActive('/clients')}    icon={<Users2     className="h-4 w-4"/>} label="Clients"/>}
-        <SI href="/compliance" active={isActive('/compliance')} icon={<FileCheck className="h-4 w-4"/>} label="CA Compliance"/>
+        {nav.ca_compliance_mode && <SI href="/compliance" active={isActive('/compliance')} icon={<FileCheck className="h-4 w-4"/>} label="CA Compliance"/>}
         <Div/>
 
         {/* ORGANISATION */}
