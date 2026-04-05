@@ -331,6 +331,24 @@ export function CAClientSetupView({ userRole, financialYear = '2026-27' }: Props
   /* Assignment count per client */
   const [assignmentCounts, setAssignmentCounts] = useState<Record<string, number>>({})
 
+  /* Per-client service date range */
+  const [clientDates, setClientDates] = useState<Record<string, { start_date: string; end_date: string }>>({})
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('ca_client_service_dates')
+      if (stored) setClientDates(JSON.parse(stored))
+    } catch {}
+  }, [])
+
+  function saveClientDate(clientId: string, field: 'start_date' | 'end_date', value: string) {
+    setClientDates(prev => {
+      const next = { ...prev, [clientId]: { ...(prev[clientId] ?? { start_date: '', end_date: '' }), [field]: value } }
+      try { localStorage.setItem('ca_client_service_dates', JSON.stringify(next)) } catch {}
+      return next
+    })
+  }
+
   /* Initial fetch */
   useEffect(() => {
     async function load() {
@@ -346,7 +364,12 @@ export function CAClientSetupView({ userRole, financialYear = '2026-27' }: Props
           mtRes.ok ? mtRes.json() : { data: [] },
         ])
         setClients(Array.isArray(cJson) ? cJson : (cJson.data ?? []))
-        setMembers(Array.isArray(mJson) ? mJson : (mJson.data ?? []))
+        const rawMembers = Array.isArray(mJson) ? mJson : (mJson.data ?? [])
+        setMembers(rawMembers.map((m: any) => ({
+          id: (m.users as any)?.id ?? m.user_id,
+          name: (m.users as any)?.name ?? 'Unknown',
+          role: m.role ?? 'member',
+        })))
         setMasterTasks(Array.isArray(mtJson) ? mtJson : (mtJson.data ?? []))
       } catch {
         toast.error('Failed to load data')
@@ -618,17 +641,52 @@ export function CAClientSetupView({ userRole, financialYear = '2026-27' }: Props
           <>
             {/* Right panel header */}
             <div style={{
-              padding: '14px 20px', borderBottom: '1px solid var(--border)',
-              flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10,
-              background: 'var(--surface)',
+              padding: '12px 20px', borderBottom: '1px solid var(--border)',
+              flexShrink: 0, background: 'var(--surface)',
             }}>
-              <div style={{ width: 12, height: 12, borderRadius: '50%', background: selectedClient.color }} />
-              <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', flex: 1 }}>
-                {selectedClient.name}
-              </span>
-              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                FY {financialYear}
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                <div style={{ width: 12, height: 12, borderRadius: '50%', background: selectedClient.color }} />
+                <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', flex: 1 }}>
+                  {selectedClient.name}
+                </span>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                  FY {financialYear}
+                </span>
+              </div>
+              {/* Service date range */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+                  <span style={{ color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>Service start:</span>
+                  <input
+                    type="date"
+                    value={clientDates[selectedClient.id]?.start_date ?? ''}
+                    onChange={e => saveClientDate(selectedClient.id, 'start_date', e.target.value)}
+                    style={{
+                      fontSize: 12, padding: '3px 8px', borderRadius: 6,
+                      border: '1px solid var(--border)', background: 'var(--surface-subtle)',
+                      color: 'var(--text-primary)', outline: 'none', colorScheme: 'light dark',
+                    }}
+                  />
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+                  <span style={{ color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>Service end:</span>
+                  <input
+                    type="date"
+                    value={clientDates[selectedClient.id]?.end_date ?? ''}
+                    onChange={e => saveClientDate(selectedClient.id, 'end_date', e.target.value)}
+                    style={{
+                      fontSize: 12, padding: '3px 8px', borderRadius: 6,
+                      border: '1px solid var(--border)', background: 'var(--surface-subtle)',
+                      color: 'var(--text-primary)', outline: 'none', colorScheme: 'light dark',
+                    }}
+                  />
+                </label>
+                {clientDates[selectedClient.id]?.start_date && (
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                    Tasks before service start will be marked overdue
+                  </span>
+                )}
+              </div>
             </div>
 
             {/* Task groups — scrollable */}

@@ -49,7 +49,9 @@ export async function POST(request: NextRequest) {
     status, priority, assignee_id: assignee_id || null, client_id: client_id || null,
     project_id: project_id || null, due_date: due_date || null,
     estimated_hours: estimated_hours ?? null, approval_required: !!approval_required,
-    approver_id: approver_id || null, created_by: user.id, is_recurring: false,
+    approver_id: approver_id || null, created_by: user.id, is_recurring: is_recurring ?? false,
+    frequency: (is_recurring && frequency) ? frequency : null,
+    next_occurrence_date: (is_recurring && next_occurrence_date) ? next_occurrence_date : null,
     parent_task_id: parent_task_id || null,
   }).select('*').single()
 

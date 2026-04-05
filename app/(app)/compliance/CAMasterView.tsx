@@ -54,6 +54,50 @@ type GroupFilter = typeof GROUP_FILTERS[number]
 
 const isAdmin = (role: string) => ['admin', 'owner'].includes(role)
 
+/* ─── Quick-fill helper ───────────────────────────────────────── */
+
+function parseYears(fy: string): [number, number] {
+  const parts = fy.split('-')
+  const start = parseInt(parts[0])
+  const end = parseInt(parts[0].slice(0, 2) + parts[1])
+  return [start, end]
+}
+
+const FY_MONTH_DEFS = (fy: string) => {
+  const [sy, ey] = parseYears(fy)
+  return [
+    { k: 'apr' as MonthKey, y: sy, m: 4 }, { k: 'may' as MonthKey, y: sy, m: 5 },
+    { k: 'jun' as MonthKey, y: sy, m: 6 }, { k: 'jul' as MonthKey, y: sy, m: 7 },
+    { k: 'aug' as MonthKey, y: sy, m: 8 }, { k: 'sep' as MonthKey, y: sy, m: 9 },
+    { k: 'oct' as MonthKey, y: sy, m: 10 }, { k: 'nov' as MonthKey, y: sy, m: 11 },
+    { k: 'dec' as MonthKey, y: sy, m: 12 }, { k: 'jan' as MonthKey, y: ey, m: 1 },
+    { k: 'feb' as MonthKey, y: ey, m: 2 }, { k: 'mar' as MonthKey, y: ey, m: 3 },
+  ]
+}
+
+function fmtDate(year: number, month: number, day: number): string {
+  const maxDay = new Date(year, month, 0).getDate()
+  const d = Math.min(day, maxDay)
+  return `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+}
+
+function autoFillDates(
+  freq: string, day: number, startMonth: MonthKey, fy: string
+): Record<string, string> {
+  const months = FY_MONTH_DEFS(fy)
+  const result: Record<string, string> = {}
+  const startIdx = months.findIndex(x => x.k === startMonth)
+  const base = startIdx >= 0 ? startIdx : 0
+
+  const step = freq === 'monthly' ? 1 : freq === 'quarterly' ? 3 : freq === 'half_yearly' ? 6 : 12
+
+  for (let i = base; i < months.length; i += step) {
+    const { k, y, m } = months[i]
+    result[k] = fmtDate(y, m, day)
+  }
+  return result
+}
+
 /* ─── Sub-components ──────────────────────────────────────────── */
 
 /** Small pill for task_type */
@@ -320,6 +364,125 @@ function NumberCell({
   )
 }
 
+/** Quick-fill popover: set frequency + day → auto-populate all month cells */
+function QuickFillCell({
+  taskId, fy, editable,
+  onApply,
+}: {
+  taskId: string
+  fy: string
+  editable: boolean
+  onApply: (dates: Record<string, string>) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [freq, setFreq] = useState('monthly')
+  const [day, setDay] = useState(7)
+  const [startMonth, setStartMonth] = useState<MonthKey>('apr')
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  if (!editable) return <td style={{ width: 32 }} />
+
+  return (
+    <td style={{ padding: '2px 4px', verticalAlign: 'middle', position: 'relative', width: 32 }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        title="Quick fill dates"
+        style={{
+          background: 'none', border: '1px solid var(--border)', cursor: 'pointer',
+          borderRadius: 6, padding: '2px 5px', fontSize: 11, color: 'var(--brand)',
+          display: 'flex', alignItems: 'center', gap: 2,
+        }}
+      >
+        ✦
+      </button>
+      {open && (
+        <div ref={ref} style={{
+          position: 'absolute', top: '100%', left: 0, zIndex: 60,
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: 10, boxShadow: '0 4px 24px rgba(0,0,0,0.15)',
+          padding: 14, minWidth: 220, marginTop: 4,
+        }}>
+          <div style={{ fontWeight: 700, fontSize: 12, color: 'var(--text-primary)', marginBottom: 10 }}>
+            Quick fill dates
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div>
+              <label style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, display: 'block', marginBottom: 3 }}>Frequency</label>
+              <select value={freq} onChange={e => setFreq(e.target.value)} style={{
+                width: '100%', fontSize: 12, padding: '4px 8px', borderRadius: 6,
+                border: '1px solid var(--border)', background: 'var(--surface-alt)',
+                color: 'var(--text-primary)', outline: 'none',
+              }}>
+                <option value="monthly">Monthly</option>
+                <option value="quarterly">Quarterly</option>
+                <option value="half_yearly">Half-yearly</option>
+                <option value="annual">Annual</option>
+              </select>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, display: 'block', marginBottom: 3 }}>Day of month</label>
+                <input
+                  type="number" min={1} max={31} value={day}
+                  onChange={e => setDay(Math.min(31, Math.max(1, parseInt(e.target.value) || 1)))}
+                  style={{
+                    width: '100%', fontSize: 12, padding: '4px 8px', borderRadius: 6,
+                    border: '1px solid var(--border)', background: 'var(--surface-alt)',
+                    color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, display: 'block', marginBottom: 3 }}>Start month</label>
+                <select value={startMonth} onChange={e => setStartMonth(e.target.value as MonthKey)} style={{
+                  width: '100%', fontSize: 12, padding: '4px 8px', borderRadius: 6,
+                  border: '1px solid var(--border)', background: 'var(--surface-alt)',
+                  color: 'var(--text-primary)', outline: 'none',
+                }}>
+                  <option value="apr">Apr</option>
+                  <option value="may">May</option>
+                  <option value="jun">Jun</option>
+                  <option value="jul">Jul</option>
+                  <option value="aug">Aug</option>
+                  <option value="sep">Sep</option>
+                  <option value="oct">Oct</option>
+                  <option value="nov">Nov</option>
+                  <option value="dec">Dec</option>
+                  <option value="jan">Jan</option>
+                  <option value="feb">Feb</option>
+                  <option value="mar">Mar</option>
+                </select>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 6, marginTop: 4, justifyContent: 'flex-end' }}>
+              <button onClick={() => setOpen(false)} style={{ padding: '4px 10px', borderRadius: 6, fontSize: 12, background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border)', cursor: 'pointer' }}>Cancel</button>
+              <button
+                onClick={() => {
+                  const dates = autoFillDates(freq, day, startMonth, fy)
+                  onApply(dates)
+                  setOpen(false)
+                }}
+                style={{ padding: '4px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600, background: 'var(--brand)', color: '#fff', border: 'none', cursor: 'pointer' }}
+              >
+                Apply
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </td>
+  )
+}
+
 /* ─── Shared button styles ────────────────────────────────────── */
 
 const btnPrimary: React.CSSProperties = {
@@ -482,11 +645,12 @@ const inputStyle: React.CSSProperties = {
 /* ─── TaskRow ─────────────────────────────────────────────────── */
 
 function TaskRow({
-  task, editable,
+  task, editable, fy,
   onUpdate, onDelete,
 }: {
   task: CAMasterTask
   editable: boolean
+  fy: string
   onUpdate: (patch: Partial<CAMasterTask>) => Promise<void>
   onDelete: () => void
 }) {
@@ -572,17 +736,6 @@ function TaskRow({
         </div>
       </td>
 
-      {/* Type — sticky */}
-      <td style={{
-        padding: '6px 8px', verticalAlign: 'middle',
-        position: 'sticky', left: 200, zIndex: 2,
-        background: hovered ? 'var(--surface-subtle)' : 'var(--surface)',
-        minWidth: 110, maxWidth: 130,
-        borderRight: '1px solid var(--border-light)',
-      }}>
-        <TypeBadge label={task.task_type} />
-      </td>
-
       {/* Attach count */}
       <NumberCell
         value={task.attachment_count}
@@ -640,6 +793,14 @@ function TaskRow({
         />
       ))}
 
+      {/* Quick fill */}
+      <QuickFillCell
+        taskId={task.id}
+        fy={fy}
+        editable={editable}
+        onApply={dates => onUpdate({ dates: { ...task.dates, ...dates } })}
+      />
+
       {/* Actions */}
       <td style={{ padding: '4px 8px', verticalAlign: 'middle', textAlign: 'center' }}>
         {editable && (
@@ -663,12 +824,13 @@ function TaskRow({
 /* ─── GroupSection ────────────────────────────────────────────── */
 
 function GroupSection({
-  groupName, tasks, editable,
+  groupName, tasks, editable, fy,
   onUpdate, onDelete,
 }: {
   groupName: string
   tasks: CAMasterTask[]
   editable: boolean
+  fy: string
   onUpdate: (id: string, patch: Partial<CAMasterTask>) => Promise<void>
   onDelete: (id: string) => void
 }) {
@@ -682,7 +844,7 @@ function GroupSection({
         style={{ cursor: 'pointer', userSelect: 'none' }}
       >
         <td
-          colSpan={6 + 12 + 1}
+          colSpan={5 + 12 + 2}
           style={{
             background: '#1e293b', color: '#fff',
             padding: '8px 14px', fontWeight: 700, fontSize: 13,
@@ -708,6 +870,7 @@ function GroupSection({
           key={task.id}
           task={task}
           editable={editable}
+          fy={fy}
           onUpdate={patch => onUpdate(task.id, patch)}
           onDelete={() => onDelete(task.id)}
         />
@@ -961,11 +1124,8 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
               {/* Header */}
               <thead>
                 <tr style={{ background: 'var(--surface-alt)', borderBottom: '2px solid var(--border)' }}>
-                  <th style={{ ...thStyle, position: 'sticky', left: 0, zIndex: 4, minWidth: 200, textAlign: 'left', background: 'var(--surface-alt)' }}>
+                  <th style={{ ...thStyle, position: 'sticky', left: 0, zIndex: 4, minWidth: 200, textAlign: 'left', background: 'var(--surface-alt)', borderRight: '1px solid var(--border-light)' }}>
                     Task name
-                  </th>
-                  <th style={{ ...thStyle, position: 'sticky', left: 200, zIndex: 4, minWidth: 110, background: 'var(--surface-alt)', borderRight: '1px solid var(--border-light)' }}>
-                    Type
                   </th>
                   <th style={{ ...thStyle, minWidth: 60 }}>Attach#</th>
                   <th style={{ ...thStyle, minWidth: 100 }}>Headers</th>
@@ -976,6 +1136,7 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
                       {MONTH_LABELS[mk]}
                     </th>
                   ))}
+                  <th style={{ ...thStyle, minWidth: 32, width: 32 }} title="Quick fill dates" />
                   <th style={{ ...thStyle, minWidth: 44 }} />
                 </tr>
               </thead>
@@ -987,6 +1148,7 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
                     groupName={groupName}
                     tasks={groupTasks}
                     editable={canEdit}
+                    fy={fy}
                     onUpdate={handleUpdate}
                     onDelete={requestDelete}
                   />

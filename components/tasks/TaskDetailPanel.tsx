@@ -310,12 +310,19 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
   async function toggleSubtask(sub: any) {
     const ns = sub.status === 'completed' ? 'todo' : 'completed'
 
-    // CA compliance subtasks REQUIRE an attachment before completing
+    // CA compliance subtasks REQUIRE an attachment (file or link) before completing.
+    // Accept attachments on the subtask itself OR on the parent task (users often
+    // attach a Drive folder link at the parent level to cover all subtasks).
     if (ns === 'completed' && sub.custom_fields?._compliance_subtask) {
-      const attRes = await fetch(`/api/tasks/${sub.id}/attachments`)
-      const attData = await attRes.json().catch(() => ({ data: [] }))
-      if ((attData.data ?? []).length === 0) {
-        toast.error('📎 Upload the required document before completing this subtask')
+      const [subAttRes, parentAttRes] = await Promise.all([
+        fetch(`/api/tasks/${sub.id}/attachments`),
+        task ? fetch(`/api/tasks/${task.id}/attachments`) : Promise.resolve(null),
+      ])
+      const subAtt    = await subAttRes.json().catch(() => ({ data: [] }))
+      const parentAtt = parentAttRes ? await parentAttRes.json().catch(() => ({ data: [] })) : { data: [] }
+      const total = (subAtt.data ?? []).length + (parentAtt.data ?? []).length
+      if (total === 0) {
+        toast.error('📎 Attach a document or Drive/Dropbox link before completing this subtask')
         return
       }
     }

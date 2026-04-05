@@ -45,8 +45,10 @@ export async function POST(req: NextRequest) {
       code: t.code, name: t.name, group_name: t.group_name,
       task_type: t.task_type, dates: t.dates,
       sort_order: t.sort_order,
-      days_before_due: 7, attachment_count: 0,
-      attachment_headers: [], priority: 'medium', is_active: true,
+      days_before_due: 7,
+      attachment_count: t.attachment_count ?? 0,
+      attachment_headers: t.attachment_headers ?? [],
+      priority: 'medium', is_active: true,
     }))
     // Upsert so existing customizations aren't overwritten for existing codes
     const { error } = await admin.from('ca_master_tasks')

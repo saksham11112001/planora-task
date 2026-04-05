@@ -52,6 +52,7 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated }
   const [clientList,      setClientList]      = useState(clients)
   const [requireAttachment, setRequireAttachment] = useState(false)
   const [compSubtasks, setCompSubtasks] = useState<{title:string;required:boolean;due_date?:string;assignee_id?:string}[]>([])
+  const [projectsList, setProjectsList] = useState<{id: string; name: string; color: string}[]>([])
 
   const approvers = members.filter(m => m.role && ['owner','admin','manager'].includes(m.role))
   const priConf   = PRIORITY_OPTIONS.find(p => p.value === priority) ?? PRIORITY_OPTIONS[2]
@@ -75,6 +76,14 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [open, handleClickOutside])
+
+  useEffect(() => {
+    if (!open) return
+    fetch('/api/projects?limit=100')
+      .then(r => r.json())
+      .then(j => setProjectsList(Array.isArray(j) ? j : (j.data ?? [])))
+      .catch(() => {})
+  }, [open])
 
   function openRow() { setOpen(true); setTimeout(() => inputRef.current?.focus(), 50) }
 
@@ -423,16 +432,20 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated }
         {!makeRecurring && (
           <label style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px',
             borderRadius:20, border: addToProjectId ? '1.5px solid #7c3aed' : '1px solid var(--border)',
-            background: addToProjectId ? '#faf5ff' : 'var(--surface-subtle)', cursor:'text' }}>
+            background: addToProjectId ? '#faf5ff' : 'var(--surface-subtle)', cursor:'pointer' }}>
             <span style={{ fontSize:11 }}>📁</span>
-            <input
+            <select
               value={addToProjectId}
               onChange={e => setAddToProjectId(e.target.value)}
-              placeholder="Project name…"
               style={{ fontSize:12, border:'none', outline:'none', background:'transparent',
-                color: addToProjectId ? '#7c3aed' : 'var(--text-primary)',
-                width: addToProjectId ? 120 : 90, fontFamily:'inherit' }}
-            />
+                color: addToProjectId ? '#7c3aed' : 'var(--text-secondary)',
+                cursor:'pointer', appearance:'none', fontWeight: addToProjectId ? 600 : 400,
+                fontFamily:'inherit', maxWidth:130 }}>
+              <option value="">Project…</option>
+              {projectsList.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
           </label>
         )}
 

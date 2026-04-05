@@ -1,4 +1,5 @@
-import { NextResponse } from 'next/server'
+import { NextResponse }    from 'next/server'
+import { COMPLIANCE_TASKS } from '@/lib/data/complianceTasks'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -20,7 +21,8 @@ const L_ROLE      = '"manager,member,viewer"'
 // Client    → every client name in Clients col A
 const R_ASSIGNEE = "'👥 Team Members'!$B$3:$B$202"
 const R_CLIENT   = "'🏢 Clients'!$A$3:$A$202"
-const R_APPROVER = '_helpers!$A$2:$A$101'
+const R_APPROVER    = '_helpers!$A$2:$A$101'
+const R_COMPLIANCE  = '_helpers!$B$2:$B$200'
 
 export async function GET() {
   try {
@@ -167,6 +169,7 @@ wsRM.views = [
     const wsHelp = wb.addWorksheet('_helpers')
     wsHelp.state = 'hidden'
     wsHelp.getRow(1).getCell(1).value = 'Manager / Admin emails (auto-filtered from Team Members — do not edit)'
+    wsHelp.getRow(1).getCell(2).value = 'Compliance Task Types (do not edit)'
 
     for (let i = 0; i < 100; i++) {
       const tmRow  = i + 3  // Team Members data starts at row 3
@@ -176,6 +179,11 @@ wsRM.views = [
         result  : '',
       }
     }
+
+    // Column B — static list of valid compliance task type titles
+    COMPLIANCE_TASKS.forEach((t, i) => {
+      wsHelp.getRow(i + 2).getCell(2).value = t.title
+    })
 
     // ══════════════════════════════════════════════════════════════════════════
     // Sheet 4 — Projects
@@ -243,11 +251,12 @@ wsRM.views = [
     // ══════════════════════════════════════════════════════════════════════════
     const wsCA = wb.addWorksheet('🧾 CA Compliance Tasks')
     setup(wsCA, [32, 24, 28, 28])
-    wsCA.addRow(['Task Code *', 'Client Name', 'Assignee Email', 'Approver Email'])
-    wsCA.addRow(['Task codes come from Compliance Master', 'select ▼', 'select ▼', 'select ▼ (managers)'])
+    wsCA.addRow(['Compliance Task Type *', 'Client Name', 'Assignee Email', 'Approver Email'])
+    wsCA.addRow(['Select from dropdown ▼', 'select ▼', 'select ▼', 'select ▼ (managers)'])
     wsCA.addRow(['[SAMPLE] GSTR 1 (Monthly)', 'Acme Corp', 'alex@yourcompany.com', 'alex@yourcompany.com'])
     styleHeader(wsCA, 4)
     styleHints(wsCA,  4)
+    dv(wsCA, 'A', [R_COMPLIANCE])
     dv(wsCA, 'B', [R_CLIENT])
     dv(wsCA, 'C', [R_ASSIGNEE])
     dv(wsCA, 'D', [R_APPROVER])
