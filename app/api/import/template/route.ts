@@ -242,17 +242,15 @@ wsRM.views = [
     // Sheet 8 — CA Compliance Tasks
     // ══════════════════════════════════════════════════════════════════════════
     const wsCA = wb.addWorksheet('🧾 CA Compliance Tasks')
-    setup(wsCA, [32, 24, 28, 28, 14, 14, 16])
-    wsCA.addRow(['Compliance Task Type *', 'Client Name', 'Assignee Email', 'Approver Email', 'Due Date', 'Priority', 'Frequency'])
-    wsCA.addRow(['Must match supported compliance task title', 'select ▼', 'select ▼', 'select ▼ (managers)', 'YYYY-MM-DD', 'select ▼', 'select ▼'])
-    wsCA.addRow(['[SAMPLE] GST Filing', 'Acme Corp', 'alex@yourcompany.com', 'alex@yourcompany.com', '2025-07-31', 'high', 'monthly'])
-    styleHeader(wsCA, 7)
-    styleHints(wsCA,  7)
+    setup(wsCA, [32, 24, 28, 28])
+    wsCA.addRow(['Task Code *', 'Client Name', 'Assignee Email', 'Approver Email'])
+    wsCA.addRow(['Task codes come from Compliance Master', 'select ▼', 'select ▼', 'select ▼ (managers)'])
+    wsCA.addRow(['[SAMPLE] GSTR 1 (Monthly)', 'Acme Corp', 'alex@yourcompany.com', 'alex@yourcompany.com'])
+    styleHeader(wsCA, 4)
+    styleHints(wsCA,  4)
     dv(wsCA, 'B', [R_CLIENT])
     dv(wsCA, 'C', [R_ASSIGNEE])
     dv(wsCA, 'D', [R_APPROVER])
-    dv(wsCA, 'F', [L_PRIORITY])
-    dv(wsCA, 'G', [L_FREQUENCY])
 
     // ── Write buffer ───────────────────────────────────────────────────────
     const buf = await wb.xlsx.writeBuffer()

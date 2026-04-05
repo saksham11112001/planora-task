@@ -1,0 +1,114 @@
+export interface CADefaultTask {
+  code:        string   // full name with type in parens
+  name:        string   // category/short name
+  group_name:  string   // one of: 'GST' | 'TDS / TCS' | 'Income Tax' | 'ROC / Company Law' | 'Accounting & MIS' | 'Audit' | 'Labour & Payroll' | 'NGO / FCRA' | 'Other'
+  task_type:   string   // subtype
+  dates:       Record<string, string>  // e.g. { apr: '2026-04-13', jul: '2026-07-13' }
+  sort_order:  number
+}
+
+export const CA_DEFAULT_TASKS: CADefaultTask[] = [
+  // GST GROUP (sort_order 1-20)
+  { code: 'GST R1 - IFF/ R1 Quaterly (QRMP)', name: 'GST R1 - IFF/ R1 Quaterly', group_name: 'GST', task_type: 'QRMP', sort_order: 1, dates: { apr:'2026-04-13', may:'2026-05-13', jun:'2026-06-13', jul:'2026-07-13', aug:'2026-08-13', sep:'2026-09-13', oct:'2026-10-13', nov:'2026-11-13', dec:'2026-12-13', jan:'2027-01-13', feb:'2027-02-13', mar:'2027-03-13' } },
+  { code: 'Quaterly Only GST R1 - IFF/ R1 (QRMP)', name: 'Quaterly Only GST R1 - IFF/ R1', group_name: 'GST', task_type: 'QRMP', sort_order: 2, dates: { apr:'2026-04-13', jul:'2026-07-13', oct:'2026-10-13', jan:'2027-01-13' } },
+  { code: 'Quaterly Only GST 3B only (QRMP North India)', name: 'Quaterly Only GST 3B only', group_name: 'GST', task_type: 'QRMP North India', sort_order: 3, dates: { apr:'2026-04-24', jul:'2026-07-24', oct:'2026-10-25', jan:'2027-01-25' } },
+  { code: 'GST 3B (QRMP North India)', name: 'GST 3B', group_name: 'GST', task_type: 'QRMP North India', sort_order: 4, dates: { apr:'2026-04-24', may:'2026-05-24', jun:'2026-06-24', jul:'2026-07-24', aug:'2026-08-24', sep:'2026-09-24', oct:'2026-10-25', nov:'2026-11-24', dec:'2026-12-24', jan:'2027-01-24', feb:'2027-02-24', mar:'2027-03-24' } },
+  { code: 'GST 3B (QRMP South India)', name: 'GST 3B', group_name: 'GST', task_type: 'QRMP South India', sort_order: 5, dates: { apr:'2026-04-22', may:'2026-05-22', jun:'2026-06-22', jul:'2026-07-22', aug:'2026-08-22', sep:'2026-09-22', oct:'2026-10-25', nov:'2026-11-22', dec:'2026-12-22', jan:'2027-01-22', feb:'2027-02-22', mar:'2027-03-22' } },
+  { code: 'GSTR 1 (Monthly)', name: 'GSTR 1', group_name: 'GST', task_type: 'Monthly', sort_order: 6, dates: { apr:'2026-04-11', may:'2026-05-11', jun:'2026-06-11', jul:'2026-07-11', aug:'2026-08-11', sep:'2026-09-11', oct:'2026-10-11', nov:'2026-11-11', dec:'2026-12-11', jan:'2027-01-11', feb:'2027-02-11', mar:'2027-03-11' } },
+  { code: 'GSTR 3B (Monthly)', name: 'GSTR 3B', group_name: 'GST', task_type: 'Monthly', sort_order: 7, dates: { apr:'2026-04-20', may:'2026-05-20', jun:'2026-06-20', jul:'2026-07-20', aug:'2026-08-20', sep:'2026-09-20', oct:'2026-10-25', nov:'2026-11-20', dec:'2026-12-20', jan:'2027-01-20', feb:'2027-02-20', mar:'2027-03-20' } },
+  { code: 'GSTR 9 (Annual Return)', name: 'GSTR 9', group_name: 'GST', task_type: 'Annual Return', sort_order: 8, dates: { dec:'2025-12-31' } },
+  { code: 'GSTR 9C (GST Audit - >5cr)', name: 'GSTR 9C', group_name: 'GST', task_type: 'GST Audit - >5cr', sort_order: 9, dates: { dec:'2025-12-31' } },
+  { code: 'GSTR CMP 08 (Quaterly)', name: 'GSTR CMP 08', group_name: 'GST', task_type: 'Quaterly', sort_order: 10, dates: { apr:'2026-04-18', jul:'2026-07-18', oct:'2026-10-18', jan:'2027-01-18' } },
+  { code: 'GSTR 4 for Composition (Annual Return)', name: 'GSTR 4 for Composition', group_name: 'GST', task_type: 'Annual Return', sort_order: 11, dates: { apr:'2026-04-30' } },
+  { code: 'LUT for Export (GST)', name: 'LUT for Export', group_name: 'GST', task_type: 'GST', sort_order: 12, dates: { apr:'2026-04-01' } },
+  { code: 'GST (ISD - R6)', name: 'GST', group_name: 'GST', task_type: 'ISD - R6', sort_order: 13, dates: { apr:'2026-04-13', may:'2026-05-13', jun:'2026-06-13', jul:'2026-07-13', aug:'2026-08-13', sep:'2026-09-13', oct:'2026-10-13', nov:'2026-11-13', dec:'2026-12-13', jan:'2027-01-13', feb:'2027-02-13', mar:'2027-03-13' } },
+  { code: 'GSTR 2B (Reconciliation)', name: 'GSTR 2B', group_name: 'GST', task_type: 'Reconciliation', sort_order: 14, dates: { apr:'2026-04-15', jul:'2026-07-15', oct:'2026-10-15', jan:'2027-01-15' } },
+
+  // TDS / TCS GROUP (sort_order 21-40)
+  { code: 'TDS (26Q Challan)', name: 'TDS', group_name: 'TDS / TCS', task_type: '26Q Challan', sort_order: 21, dates: { apr:'2026-04-30', may:'2026-05-07', jun:'2026-06-07', jul:'2026-07-07', aug:'2026-08-07', sep:'2026-09-07', oct:'2026-10-07', nov:'2026-11-07', dec:'2026-12-07', jan:'2027-01-07', feb:'2027-02-07', mar:'2027-03-07' } },
+  { code: 'TDS (26Q Return)', name: 'TDS', group_name: 'TDS / TCS', task_type: '26Q Return', sort_order: 22, dates: { may:'2026-05-31', jul:'2026-07-31', oct:'2026-10-31', jan:'2027-01-31' } },
+  { code: 'TDS (24Q Challan)', name: 'TDS', group_name: 'TDS / TCS', task_type: '24Q Challan', sort_order: 23, dates: { apr:'2026-04-30', may:'2026-05-07', jun:'2026-06-07', jul:'2026-07-07', aug:'2026-08-07', sep:'2026-09-07', oct:'2026-10-07', nov:'2026-11-07', dec:'2026-12-07', jan:'2027-01-07', feb:'2027-02-07', mar:'2027-03-07' } },
+  { code: 'TDS (24Q Return)', name: 'TDS', group_name: 'TDS / TCS', task_type: '24Q Return', sort_order: 24, dates: { may:'2026-05-31', jul:'2026-07-31', oct:'2026-10-31', jan:'2027-01-31' } },
+  { code: 'TDS (27EQ Challan)', name: 'TDS', group_name: 'TDS / TCS', task_type: '27EQ Challan', sort_order: 25, dates: { apr:'2026-04-30', may:'2026-05-07', jun:'2026-06-07', jul:'2026-07-07', aug:'2026-08-07', sep:'2026-09-07', oct:'2026-10-07', nov:'2026-11-07', dec:'2026-12-07', jan:'2027-01-07', feb:'2027-02-07', mar:'2027-03-07' } },
+  { code: 'TDS (27EQ Return)', name: 'TDS', group_name: 'TDS / TCS', task_type: '27EQ Return', sort_order: 26, dates: { may:'2026-05-31', jul:'2026-07-15', oct:'2026-10-15', jan:'2027-01-15' } },
+  { code: 'TDS Cert (u/s 197)', name: 'TDS Cert', group_name: 'TDS / TCS', task_type: 'u/s 197', sort_order: 27, dates: { jun:'2026-06-30' } },
+  { code: 'TDS on Rent ( Individual ) (Salary)', name: 'TDS on Rent ( Individual )', group_name: 'TDS / TCS', task_type: 'Salary', sort_order: 28, dates: { may:'2026-05-31' } },
+  { code: 'Issue of Form 16A (NON Sal)', name: 'Issue of Form 16A', group_name: 'TDS / TCS', task_type: 'NON Sal', sort_order: 29, dates: { jun:'2026-06-15', aug:'2026-08-15', nov:'2026-11-15', feb:'2027-02-15' } },
+  { code: 'Issue of Form 16 (Sal)', name: 'Issue of Form 16', group_name: 'TDS / TCS', task_type: 'Sal', sort_order: 30, dates: { jun:'2026-06-15' } },
+
+  // Income Tax GROUP (sort_order 41-55)
+  { code: 'Income Tax (Advance Tax)', name: 'Income Tax', group_name: 'Income Tax', task_type: 'Advance Tax', sort_order: 41, dates: { jun:'2026-06-15', sep:'2026-09-15', dec:'2026-12-15', mar:'2027-03-15' } },
+  { code: 'ITR (Individual)', name: 'ITR', group_name: 'Income Tax', task_type: 'Individual', sort_order: 42, dates: { sep:'2026-09-15' } },
+  { code: 'ITR (Unaudited)', name: 'ITR', group_name: 'Income Tax', task_type: 'Unaudited', sort_order: 43, dates: { sep:'2025-09-15' } },
+  { code: 'ITR (with Audit)', name: 'ITR', group_name: 'Income Tax', task_type: 'with Audit', sort_order: 44, dates: { oct:'2026-10-31' } },
+  { code: 'Balance Sheet (Unaudited)', name: 'Balance Sheet', group_name: 'Income Tax', task_type: 'Unaudited', sort_order: 45, dates: { sep:'2026-09-15' } },
+  { code: 'Certificate (UC)', name: 'Certificate', group_name: 'Income Tax', task_type: 'UC', sort_order: 46, dates: { jul:'2026-07-05', oct:'2026-10-05', jan:'2027-01-05' } },
+
+  // ROC / Company Law GROUP (sort_order 56-70)
+  { code: 'ROC for LLP (Form 11)', name: 'ROC for LLP', group_name: 'ROC / Company Law', task_type: 'Form 11', sort_order: 56, dates: { may:'2026-05-30' } },
+  { code: 'ROC (INC-22A)', name: 'ROC', group_name: 'ROC / Company Law', task_type: 'INC-22A', sort_order: 57, dates: { jul:'2026-07-31' } },
+  { code: 'ROC (DIR-3 KYC)', name: 'ROC', group_name: 'ROC / Company Law', task_type: 'DIR-3 KYC', sort_order: 58, dates: { sep:'2026-09-30' } },
+  { code: 'ROC (Form ADT-1)', name: 'ROC', group_name: 'ROC / Company Law', task_type: 'Form ADT-1', sort_order: 59, dates: { oct:'2026-10-15' } },
+  { code: 'ROC (DPT-3)', name: 'ROC', group_name: 'ROC / Company Law', task_type: 'DPT-3', sort_order: 60, dates: { jun:'2026-06-30' } },
+  { code: 'ROC for LLP (Form 8)', name: 'ROC for LLP', group_name: 'ROC / Company Law', task_type: 'Form 8', sort_order: 61, dates: { oct:'2026-10-30' } },
+  { code: 'ROC (With 30 days of AGM) (AOC-4)', name: 'ROC (With 30 days of AGM)', group_name: 'ROC / Company Law', task_type: 'AOC-4', sort_order: 62, dates: { dec:'2026-12-31' } },
+  { code: 'ROC (With 60 days of AGM) (MGT-7)', name: 'ROC (With 60 days of AGM)', group_name: 'ROC / Company Law', task_type: 'MGT-7', sort_order: 63, dates: { dec:'2026-12-31' } },
+  { code: 'ROC (MSME)', name: 'ROC', group_name: 'ROC / Company Law', task_type: 'MSME', sort_order: 64, dates: { apr:'2025-04-30', oct:'2025-07-30' } },
+  { code: 'INC 20A (120 days from Inc)', name: 'INC 20A', group_name: 'ROC / Company Law', task_type: '120 days from Inc', sort_order: 65, dates: {} },
+
+  // Accounting & MIS GROUP (sort_order 71-85)
+  { code: 'Accounting (Monthly )', name: 'Accounting', group_name: 'Accounting & MIS', task_type: 'Monthly', sort_order: 71, dates: { apr:'2026-04-05', may:'2026-05-05', jun:'2026-06-05', jul:'2026-07-05', aug:'2026-08-05', sep:'2026-09-05', oct:'2026-10-05', nov:'2026-11-05', dec:'2026-12-05', jan:'2027-01-05', feb:'2027-02-05', mar:'2027-03-05' } },
+  { code: 'Accounting (Quaterly)', name: 'Accounting', group_name: 'Accounting & MIS', task_type: 'Quaterly', sort_order: 72, dates: { apr:'2026-04-05', jul:'2026-07-05', oct:'2026-10-05', jan:'2027-01-05' } },
+  { code: 'Accounting (Weekly)', name: 'Accounting', group_name: 'Accounting & MIS', task_type: 'Weekly', sort_order: 73, dates: {} },
+  { code: 'Accounting (KPI)', name: 'Accounting', group_name: 'Accounting & MIS', task_type: 'KPI', sort_order: 74, dates: { apr:'2026-04-06', may:'2026-05-06', jun:'2026-06-06', jul:'2026-07-06', aug:'2026-08-06', sep:'2026-09-06', oct:'2026-10-06', nov:'2026-11-06', dec:'2026-12-06', jan:'2027-01-06', feb:'2027-02-06', mar:'2027-03-06' } },
+  { code: 'Accounts Review (10)', name: 'Accounts Review', group_name: 'Accounting & MIS', task_type: '10', sort_order: 75, dates: { apr:'2026-04-10', may:'2026-05-10', jun:'2026-06-10', jul:'2026-07-10', aug:'2026-08-10', sep:'2026-09-10', oct:'2026-10-10', nov:'2026-11-10', dec:'2026-12-10', jan:'2027-01-10', feb:'2027-02-10', mar:'2027-03-10' } },
+  { code: 'Accounts MIS (10)', name: 'Accounts MIS', group_name: 'Accounting & MIS', task_type: '10', sort_order: 76, dates: { apr:'2026-04-10', may:'2026-05-10', jun:'2026-06-10', jul:'2026-07-10', aug:'2026-08-10', sep:'2026-09-10', oct:'2026-10-10', nov:'2026-11-10', dec:'2026-12-10', jan:'2027-01-10', feb:'2027-02-10', mar:'2027-03-10' } },
+  { code: 'Accounts Review (15)', name: 'Accounts Review', group_name: 'Accounting & MIS', task_type: '15', sort_order: 77, dates: { apr:'2026-04-15', may:'2026-05-15', jun:'2026-06-15', jul:'2026-07-15', aug:'2026-08-15', sep:'2026-09-15', oct:'2026-10-15', nov:'2026-11-15', dec:'2026-12-15', jan:'2027-01-15', feb:'2027-02-15', mar:'2027-03-15' } },
+  { code: 'MIS (Monthly )', name: 'MIS', group_name: 'Accounting & MIS', task_type: 'Monthly', sort_order: 78, dates: {} },
+
+  // Audit GROUP (sort_order 86-100)
+  { code: 'TAX Audit ()', name: 'TAX Audit', group_name: 'Audit', task_type: '', sort_order: 86, dates: { oct:'2026-10-31' } },
+  { code: 'Statutory Audit ()', name: 'Statutory Audit', group_name: 'Audit', task_type: '', sort_order: 87, dates: { oct:'2026-10-31' } },
+  { code: 'Concurrent Audit PSB (Monthly )', name: 'Concurrent Audit PSB', group_name: 'Audit', task_type: 'Monthly', sort_order: 88, dates: { apr:'2026-04-07', may:'2026-05-07', jun:'2026-06-07', jul:'2026-07-07', aug:'2026-08-07', sep:'2026-09-07', oct:'2026-10-07', nov:'2026-11-07', dec:'2026-12-07', jan:'2027-01-07', feb:'2027-02-07', mar:'2027-03-07' } },
+  { code: 'Concurrent Audit PSB (Quarterly)', name: 'Concurrent Audit PSB', group_name: 'Audit', task_type: 'Quarterly', sort_order: 89, dates: { apr:'2026-04-15', jul:'2026-07-15', oct:'2026-10-15', jan:'2027-01-15' } },
+  { code: 'Concurrent Audit - IDBI (Monthly )', name: 'Concurrent Audit - IDBI', group_name: 'Audit', task_type: 'Monthly', sort_order: 90, dates: {} },
+  { code: 'Quaterly Review', name: 'Quarterly Review', group_name: 'Audit', task_type: 'Quaterly', sort_order: 91, dates: { jul:'2026-07-15', oct:'2026-10-15', jan:'2027-01-15' } },
+  { code: 'W1 Accounts Review (Weekly)', name: 'W1 Accounts Review', group_name: 'Audit', task_type: 'Weekly', sort_order: 92, dates: { apr:'2026-04-07', may:'2026-05-07', jun:'2026-06-07', jul:'2026-07-07', aug:'2026-08-07', sep:'2026-09-07', oct:'2026-10-07', nov:'2026-11-07', dec:'2026-12-07', jan:'2027-01-07', feb:'2027-02-07', mar:'2027-03-07' } },
+  { code: 'W2 Accounts Review (Weekly)', name: 'W2 Accounts Review', group_name: 'Audit', task_type: 'Weekly', sort_order: 93, dates: { apr:'2026-04-14', may:'2026-05-14', jun:'2026-06-14', jul:'2026-07-14', aug:'2026-08-14', sep:'2026-09-14', oct:'2026-10-14', nov:'2026-11-14', dec:'2026-12-14', jan:'2027-01-14', feb:'2027-02-14', mar:'2027-03-14' } },
+  { code: 'W3 Accounts Review (Weekly)', name: 'W3 Accounts Review', group_name: 'Audit', task_type: 'Weekly', sort_order: 94, dates: { apr:'2026-04-21', may:'2026-05-21', jun:'2026-06-21', jul:'2026-07-21', aug:'2026-08-21', sep:'2026-09-21', oct:'2026-10-21', nov:'2026-11-21', dec:'2026-12-21', jan:'2027-01-21', feb:'2027-02-21', mar:'2027-03-21' } },
+  { code: 'W4 Accounts Review (Weekly)', name: 'W4 Accounts Review', group_name: 'Audit', task_type: 'Weekly', sort_order: 95, dates: { apr:'2026-04-28', may:'2026-05-28', jun:'2026-06-28', jul:'2026-07-28', aug:'2026-08-28', sep:'2026-09-28', oct:'2026-10-28', nov:'2026-11-28', dec:'2026-12-28', jan:'2027-01-28', feb:'2027-02-28', mar:'2027-03-28' } },
+
+  // Labour & Payroll GROUP (sort_order 101-115)
+  { code: 'PF (Challan)', name: 'PF', group_name: 'Labour & Payroll', task_type: 'Challan', sort_order: 101, dates: { apr:'2026-04-15', may:'2026-05-15', jun:'2026-06-15', jul:'2026-07-15', aug:'2026-08-15', sep:'2026-09-15', oct:'2026-10-15', nov:'2026-11-15', dec:'2026-12-15', jan:'2027-01-15', feb:'2027-02-15', mar:'2027-03-15' } },
+  { code: 'PF (Return)', name: 'PF', group_name: 'Labour & Payroll', task_type: 'Return', sort_order: 102, dates: {} },
+  { code: 'ESI (Challan)', name: 'ESI', group_name: 'Labour & Payroll', task_type: 'Challan', sort_order: 103, dates: { apr:'2026-04-15', may:'2026-05-15', jun:'2026-06-15', jul:'2026-07-15', aug:'2026-08-15', sep:'2026-09-15', oct:'2026-10-15', nov:'2026-11-15', dec:'2026-12-15', jan:'2027-01-15', feb:'2027-02-15', mar:'2027-03-15' } },
+  { code: 'ESI (Return)', name: 'ESI', group_name: 'Labour & Payroll', task_type: 'Return', sort_order: 104, dates: {} },
+
+  // NGO / FCRA GROUP (sort_order 116-130)
+  { code: 'Form 10B (Tax Audit)', name: 'Form 10B', group_name: 'NGO / FCRA', task_type: 'Tax Audit', sort_order: 116, dates: { oct:'2025-10-31' } },
+  { code: 'FCRA (Quaterly)', name: 'FCRA', group_name: 'NGO / FCRA', task_type: 'Quaterly', sort_order: 117, dates: { jul:'2026-07-15', oct:'2026-10-15', jan:'2027-01-15' } },
+  { code: 'FCRA (Annual Return)', name: 'FCRA', group_name: 'NGO / FCRA', task_type: 'Annual Return', sort_order: 118, dates: { dec:'2025-12-31' } },
+  { code: 'Form 10BD (NGO)', name: 'Form 10BD', group_name: 'NGO / FCRA', task_type: 'NGO', sort_order: 119, dates: { may:'2026-05-31' } },
+  { code: 'f (NGO audit)', name: 'f', group_name: 'NGO / FCRA', task_type: 'NGO audit', sort_order: 120, dates: { oct:'2026-10-31' } },
+
+  // Other GROUP (sort_order 131-150)
+  { code: 'HVAT (Challan)', name: 'HVAT', group_name: 'Other', task_type: 'Challan', sort_order: 131, dates: { apr:'2026-04-15', may:'2026-05-15', jun:'2026-06-15', jul:'2026-07-15', aug:'2026-08-15', sep:'2026-09-15', oct:'2026-10-15', nov:'2026-11-15', dec:'2026-12-15', jan:'2027-01-15', feb:'2027-02-15', mar:'2027-03-15' } },
+  { code: 'HVAT (Return)', name: 'HVAT', group_name: 'Other', task_type: 'Return', sort_order: 132, dates: { jul:'2025-07-31', oct:'2025-10-31', jan:'2026-01-31' } },
+  { code: 'HVAT (Annual Return)', name: 'HVAT', group_name: 'Other', task_type: 'Annual Return', sort_order: 133, dates: { nov:'2026-11-30' } },
+  { code: 'DVAT (Challan)', name: 'DVAT', group_name: 'Other', task_type: 'Challan', sort_order: 134, dates: { apr:'2026-04-15', jul:'2026-07-15', oct:'2026-10-15', jan:'2027-01-15' } },
+  { code: 'DVAT (Return)', name: 'DVAT', group_name: 'Other', task_type: 'Return', sort_order: 135, dates: { apr:'2026-04-30', jul:'2026-07-31', oct:'2026-10-31', jan:'2027-01-31' } },
+  { code: 'IEC Code (Renewal for Export )', name: 'IEC Code', group_name: 'Other', task_type: 'Renewal for Export', sort_order: 136, dates: { jun:'2026-07-31' } },
+  { code: 'US Polo KH (Sale Report)', name: 'US Polo KH', group_name: 'Other', task_type: 'Sale Report', sort_order: 137, dates: { may:'2026-05-02', jun:'2026-06-02', jul:'2026-07-02', aug:'2026-08-02', sep:'2026-09-02', oct:'2026-10-02', nov:'2026-11-02', dec:'2026-12-02', jan:'2027-01-02', feb:'2027-02-02', mar:'2027-03-02' } },
+]
+
+export const CA_GROUP_NAMES = ['GST', 'TDS / TCS', 'Income Tax', 'ROC / Company Law', 'Accounting & MIS', 'Audit', 'Labour & Payroll', 'NGO / FCRA', 'Other'] as const
+export type CAGroupName = typeof CA_GROUP_NAMES[number]
+
+export const MONTH_KEYS = ['apr','may','jun','jul','aug','sep','oct','nov','dec','jan','feb','mar'] as const
+export type MonthKey = typeof MONTH_KEYS[number]
+
+export const MONTH_LABELS: Record<MonthKey, string> = {
+  apr: 'Apr', may: 'May', jun: 'Jun', jul: 'Jul',
+  aug: 'Aug', sep: 'Sep', oct: 'Oct', nov: 'Nov',
+  dec: 'Dec', jan: 'Jan', feb: 'Feb', mar: 'Mar',
+}

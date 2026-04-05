@@ -24,6 +24,26 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { data: mb } = await supabase.from('org_members').select('org_id').eq('user_id', user.id).eq('is_active', true).single()
   if (!mb) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
+  const contentType = req.headers.get('content-type') ?? ''
+
+  if (contentType.includes('application/json')) {
+    // Drive link / external URL attachment
+    const body = await req.json()
+    const { drive_url, file_name, attachment_type } = body
+    if (!drive_url) return NextResponse.json({ error: 'drive_url required' }, { status: 400 })
+    const { data: row, error: dbErr } = await supabase.from('task_attachments').insert({
+      task_id: id, org_id: mb.org_id, uploaded_by: user.id,
+      file_name: file_name || drive_url,
+      drive_url,
+      attachment_type: attachment_type ?? 'link',
+      file_size: 0,
+      mime_type: 'text/uri-list',
+      storage_path: '',
+    }).select('*').single()
+    if (dbErr) return NextResponse.json({ error: dbErr.message }, { status: 500 })
+    return NextResponse.json({ data: row }, { status: 201 })
+  }
+
   const formData = await req.formData()
   const file     = formData.get('file') as File | null
   if (!file) return NextResponse.json({ error: 'No file' }, { status: 400 })

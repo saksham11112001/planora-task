@@ -4,7 +4,7 @@ import { CustomFieldsPanel } from '@/components/tasks/CustomFieldsPanel'
 import type { CustomFieldDef } from '@/components/tasks/CustomFieldsPanel'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { X, ThumbsUp, ThumbsDown, Flag, Calendar, User, Briefcase, Send, Clock, Sparkles, ShieldCheck, RefreshCw, FolderPlus, ArrowRightLeft } from 'lucide-react'
+import { X, ThumbsUp, ThumbsDown, Flag, Calendar, User, Briefcase, Send, Clock, Sparkles, ShieldCheck, RefreshCw, FolderPlus, ArrowRightLeft, ExternalLink, Link2 } from 'lucide-react'
 import { cn }             from '@/lib/utils/cn'
 import { PRIORITY_CONFIG, STATUS_CONFIG } from '@/types'
 import type { Task }      from '@/types'
@@ -58,6 +58,9 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
   const [attachments,   setAttachments]   = useState<any[]>([])
   const [attLoaded,     setAttLoaded]     = useState(false)
   const [uploading,     setUploading]     = useState(false)
+  const [attachMode,    setAttachMode]    = useState<'file'|'link'>('file')
+  const [driveUrl,      setDriveUrl]      = useState('')
+  const [driveTitle,    setDriveTitle]    = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [aiLoading, setAiLoading] = useState(false)
   const [isSaving,  setIsSaving]  = useState(false)
@@ -368,6 +371,29 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     }
   }
 
+  async function addDriveLink() {
+    if (!task || !driveUrl.trim()) return
+    setUploading(true)
+    const r = await fetch(`/api/tasks/${task.id}/attachments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        drive_url: driveUrl.trim(),
+        file_name: driveTitle.trim() || driveUrl.trim(),
+        attachment_type: 'link',
+      }),
+    })
+    const d = await r.json()
+    if (r.ok) {
+      setAttachments(p => [d.data, ...p])
+      setDriveUrl(''); setDriveTitle('')
+      toast.success('Link added')
+    } else {
+      toast.error(d.error ?? 'Failed to add link')
+    }
+    setUploading(false)
+  }
+
   async function sendComment() {
     if (!comment.trim() || !task) return
     setSending(true)
@@ -552,6 +578,18 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                     ))}
                   </select>
                 </FieldRow>
+
+                {/* Assigned by */}
+                {(() => {
+                  const creator = members.find(m => m.id === (task as any).created_by)
+                  if (!creator) return null
+                  return (
+                    <FieldRow label="Assigned by">
+                      <Avatar name={creator.name} size="xs" />
+                      <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{creator.name}</span>
+                    </FieldRow>
+                  )
+                })()}
 
                 {/* Co-assignees from custom_fields */}
                 {(() => {
@@ -774,40 +812,101 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
             {/* ── Attachments ── */}
             {tab === 'attachments' && (
               <div className="px-5 py-4">
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  className="rounded-xl p-6 text-center cursor-pointer transition-colors mb-4"
-                  style={{
-                    border: '2px dashed var(--border)',
-                    background: 'var(--surface-subtle)',
-                  }}
-                  onMouseEnter={e => {
-                    (e.currentTarget as HTMLElement).style.borderColor = 'var(--brand)'
-                    ;(e.currentTarget as HTMLElement).style.background = 'var(--brand-light)'
-                  }}
-                  onMouseLeave={e => {
-                    (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'
-                    ;(e.currentTarget as HTMLElement).style.background = 'var(--surface-subtle)'
-                  }}>
-                  {uploading
-                    ? <p className="text-sm font-medium" style={{ color: 'var(--brand)' }}>Uploading…</p>
-                    : <>
-                      <div className="text-3xl mb-2">📎</div>
-                      <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Click to upload a file</p>
-                      <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>PDF, Word, Excel, images · Max 20 MB</p>
-                    </>
-                  }
-                  <input ref={fileInputRef} type="file" className="hidden" onChange={uploadFile}
-                    accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.gif,.webp,.txt,.csv"/>
+                {/* Mode toggle */}
+                <div className="flex gap-1 mb-3 p-1 rounded-lg" style={{ background: 'var(--surface-subtle)', border: '1px solid var(--border-light)', width: 'fit-content' }}>
+                  <button
+                    onClick={() => setAttachMode('file')}
+                    className="text-xs font-medium px-3 py-1.5 rounded-md transition-colors"
+                    style={{
+                      background: attachMode === 'file' ? 'var(--surface)' : 'transparent',
+                      color: attachMode === 'file' ? 'var(--text-primary)' : 'var(--text-muted)',
+                      border: attachMode === 'file' ? '1px solid var(--border)' : '1px solid transparent',
+                    }}>
+                    Upload file
+                  </button>
+                  <button
+                    onClick={() => setAttachMode('link')}
+                    className="text-xs font-medium px-3 py-1.5 rounded-md transition-colors flex items-center gap-1"
+                    style={{
+                      background: attachMode === 'link' ? 'var(--surface)' : 'transparent',
+                      color: attachMode === 'link' ? 'var(--text-primary)' : 'var(--text-muted)',
+                      border: attachMode === 'link' ? '1px solid var(--border)' : '1px solid transparent',
+                    }}>
+                    <Link2 className="h-3 w-3" />
+                    Paste link
+                  </button>
                 </div>
+
+                {attachMode === 'file' ? (
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="rounded-xl p-6 text-center cursor-pointer transition-colors mb-4"
+                    style={{
+                      border: '2px dashed var(--border)',
+                      background: 'var(--surface-subtle)',
+                    }}
+                    onMouseEnter={e => {
+                      (e.currentTarget as HTMLElement).style.borderColor = 'var(--brand)'
+                      ;(e.currentTarget as HTMLElement).style.background = 'var(--brand-light)'
+                    }}
+                    onMouseLeave={e => {
+                      (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'
+                      ;(e.currentTarget as HTMLElement).style.background = 'var(--surface-subtle)'
+                    }}>
+                    {uploading
+                      ? <p className="text-sm font-medium" style={{ color: 'var(--brand)' }}>Uploading…</p>
+                      : <>
+                        <div className="text-3xl mb-2">📎</div>
+                        <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Click to upload a file</p>
+                        <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>PDF, Word, Excel, images · Max 20 MB</p>
+                      </>
+                    }
+                    <input ref={fileInputRef} type="file" className="hidden" onChange={uploadFile}
+                      accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.gif,.webp,.txt,.csv"/>
+                  </div>
+                ) : (
+                  <div className="rounded-xl p-4 mb-4 space-y-2" style={{ border: '1px solid var(--border)', background: 'var(--surface-subtle)' }}>
+                    <input
+                      type="url"
+                      value={driveUrl}
+                      onChange={e => setDriveUrl(e.target.value)}
+                      placeholder="Paste Google Drive, Notion, or any link…"
+                      className="w-full text-sm rounded-lg px-3 py-2 outline-none"
+                      style={{ border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-primary)' }}
+                    />
+                    <input
+                      type="text"
+                      value={driveTitle}
+                      onChange={e => setDriveTitle(e.target.value)}
+                      placeholder="Title (optional)"
+                      className="w-full text-sm rounded-lg px-3 py-2 outline-none"
+                      style={{ border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-primary)' }}
+                    />
+                    <button
+                      onClick={addDriveLink}
+                      disabled={uploading || !driveUrl.trim()}
+                      className="w-full text-sm font-medium py-2 rounded-lg transition-colors"
+                      style={{
+                        background: 'var(--brand)',
+                        color: '#fff',
+                        border: 'none',
+                        cursor: uploading || !driveUrl.trim() ? 'not-allowed' : 'pointer',
+                        opacity: uploading || !driveUrl.trim() ? 0.6 : 1,
+                      }}>
+                      {uploading ? 'Adding…' : 'Add link'}
+                    </button>
+                  </div>
+                )}
+
                 {attachments.length === 0
                   ? <p className="text-xs text-center py-4" style={{ color: 'var(--text-muted)' }}>No files attached yet</p>
                   : <div className="space-y-2">
                     {attachments.map(att => {
-                      const isImg = att.mime_type?.startsWith('image/')
-                      const icon  = att.mime_type?.includes('pdf') ? '📄' : isImg ? '🖼️' :
-                                    att.mime_type?.includes('sheet') || att.mime_type?.includes('excel') ? '📊' :
-                                    att.mime_type?.includes('word') ? '📝' : '📎'
+                      const isLink = att.attachment_type === 'link' || att.drive_url
+                      const isImg  = att.mime_type?.startsWith('image/')
+                      const icon   = isLink ? null : att.mime_type?.includes('pdf') ? '📄' : isImg ? '🖼️' :
+                                     att.mime_type?.includes('sheet') || att.mime_type?.includes('excel') ? '📊' :
+                                     att.mime_type?.includes('word') ? '📝' : '📎'
                       const kb = att.file_size ? (att.file_size > 1024*1024
                         ? (att.file_size/1024/1024).toFixed(1) + ' MB'
                         : (att.file_size/1024).toFixed(0) + ' KB') : ''
@@ -815,16 +914,28 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                         <div key={att.id}
                           className="flex items-center gap-3 p-3 rounded-xl group transition-colors"
                           style={{ background: 'var(--surface-subtle)', border: '1px solid var(--border-light)' }}>
-                          <span className="text-2xl flex-shrink-0">{icon}</span>
+                          {isLink
+                            ? <ExternalLink className="h-5 w-5 flex-shrink-0" style={{ color: 'var(--brand)' }} />
+                            : <span className="text-2xl flex-shrink-0">{icon}</span>
+                          }
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{att.file_name}</p>
-                            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{kb}{att.uploader?.name ? ` · ${att.uploader.name}` : ''}</p>
+                            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                              {isLink ? 'Link' : kb}{att.uploader?.name ? ` · ${att.uploader.name}` : ''}
+                            </p>
                           </div>
-                          <button onClick={() => getSignedUrl(att.storage_path, att.file_name)}
-                            className="text-xs font-medium px-2 py-1 rounded transition-colors flex-shrink-0"
-                            style={{ color: 'var(--brand)' }}>
-                            Download
-                          </button>
+                          {isLink
+                            ? <a href={att.drive_url} target="_blank" rel="noopener noreferrer"
+                                className="text-xs font-medium px-2 py-1 rounded transition-colors flex-shrink-0"
+                                style={{ color: 'var(--brand)' }}>
+                                Open
+                              </a>
+                            : <button onClick={() => getSignedUrl(att.storage_path, att.file_name)}
+                                className="text-xs font-medium px-2 py-1 rounded transition-colors flex-shrink-0"
+                                style={{ color: 'var(--brand)' }}>
+                                Download
+                              </button>
+                          }
                           <button onClick={() => deleteAttachment(att.id, att.storage_path)}
                             className="text-xs px-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
                             style={{ color: '#f87171' }}>
