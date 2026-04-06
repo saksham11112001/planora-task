@@ -21,11 +21,7 @@ export async function GET(request: NextRequest) {
   if (!isOwner) {
     projectQuery = projectQuery.or(`member_ids.is.null,member_ids.cs.{${user.id}}`)
   }
-  if (sp.get('templates') === 'true') {
-    projectQuery = projectQuery.eq('status', 'template')
-  } else {
-    projectQuery = projectQuery.neq('status', 'template')
-  }
+  // templates are stored in org_feature_settings, not in projects table
   const { data, error } = await projectQuery
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ data })
@@ -63,7 +59,7 @@ export async function POST(request: NextRequest) {
     due_date:    body.due_date    || null,
     budget:      body.budget      ?? null,
     hours_budget:body.hours_budget ?? null,
-    status:      isTemplate ? 'template' : 'active',
+    status:      'active',
     member_ids:  Array.isArray(body.member_ids) && body.member_ids.length > 0 ? body.member_ids : null,
   }).select('*').single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -103,6 +99,33 @@ export async function POST(request: NextRequest) {
       }
     } catch (e) {
       console.error('[project template tasks]', e)
+    }
+  }
+
+  // If flagged as org template, save to org_feature_settings
+  if (isTemplate && data?.id) {
+    try {
+      const { data: existing } = await supabase
+        .from('org_feature_settings')
+        .select('config')
+        .eq('org_id', mb.org_id)
+        .eq('feature_key', 'project_templates')
+        .maybeSingle()
+      const currentTemplates: any[] = (existing?.config as any) ?? []
+      const newTemplate = {
+        id:             data.id,
+        name:           data.name,
+        color:          data.color,
+        template_tasks: body.template_tasks ?? [],
+      }
+      await supabase.from('org_feature_settings').upsert({
+        org_id:      mb.org_id,
+        feature_key: 'project_templates',
+        is_enabled:  true,
+        config:      [...currentTemplates, newTemplate],
+      }, { onConflict: 'org_id,feature_key' })
+    } catch (e) {
+      console.error('[save project template]', e)
     }
   }
 

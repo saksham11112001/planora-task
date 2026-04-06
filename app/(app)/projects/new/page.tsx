@@ -13,12 +13,13 @@ export default async function NewProjectPage() {
   if (!user) redirect('/login')
   const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).maybeSingle()
   if (!mb || !['owner','admin','manager'].includes(mb.role)) redirect('/projects')
-  const [{ data: clients }, { data: members }, { data: orgTemplates }] = await Promise.all([
+  const [{ data: clients }, { data: members }, { data: templateSettings }] = await Promise.all([
     supabase.from('clients').select('id, name, color').eq('org_id', mb.org_id).eq('status', 'active').order('name'),
     supabase.from('org_members').select('user_id, users(id, name)').eq('org_id', mb.org_id).eq('is_active', true),
-    supabase.from('projects').select('id, name, description').eq('org_id', mb.org_id).eq('status', 'template').order('name'),
+    supabase.from('org_feature_settings').select('config').eq('org_id', mb.org_id).eq('feature_key', 'project_templates').maybeSingle(),
   ])
-  const memberList = (members ?? []).map(m => ({ id: (m.users as any)?.id ?? m.user_id, name: (m.users as any)?.name ?? 'Unknown' }))
+  const memberList   = (members ?? []).map(m => ({ id: (m.users as any)?.id ?? m.user_id, name: (m.users as any)?.name ?? 'Unknown' }))
+  const orgTemplates = Array.isArray(templateSettings?.config) ? (templateSettings!.config as any[]) : []
   return (
     <div className="page-container">
       <h1 className="text-2xl font-bold text-gray-900 mb-6">New project</h1>
@@ -26,8 +27,7 @@ export default async function NewProjectPage() {
         <NewProjectForm
           clients={clients ?? []}
           members={memberList}
-          orgTemplates={(orgTemplates ?? []).map(t => ({ id: t.id, name: t.name, template_tasks: [] }))}
-        />
+          orgTemplates={orgTemplates}
       </Suspense>
     </div>
   )
