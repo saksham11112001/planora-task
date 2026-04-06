@@ -1001,12 +1001,26 @@ export async function POST(request: NextRequest) {
         // Pre-fetch all active CA master tasks once → O(1) map lookup per row
         const { data: allCaMasterTasks } = await admin
           .from('ca_master_tasks')
-          .select('id, name')
+          .select('id, name, dates')
           .eq('org_id', orgId)
           .eq('is_active', true)
-        const caMasterMap = new Map<string, string>(
-          (allCaMasterTasks ?? []).map((t: any) => [t.name.toLowerCase().trim(), t.id])
+
+        type MasterEntry = { id: string; dates: Record<string, string> }
+        const caMasterMap = new Map<string, MasterEntry>(
+          (allCaMasterTasks ?? []).map((t: any) => [
+            t.name.toLowerCase().trim(),
+            { id: t.id, dates: (t.dates ?? {}) as Record<string, string> },
+          ])
         )
+
+        // Returns the next upcoming due date from master dates JSONB,
+        // falling back to the latest past date if all have passed.
+        function nextDueDateFromMaster(dates: Record<string, string>): string | null {
+          const nowIST = new Date(Date.now() + 5.5 * 60 * 60 * 1000)
+          const today  = nowIST.toISOString().split('T')[0]
+          const all    = Object.values(dates).filter(Boolean).sort()
+          return all.find(d => d >= today) ?? all[all.length - 1] ?? null
+        }
 
         // Collect CA links to bulk-upsert after the row loop
         type CaLink = {
@@ -1046,8 +1060,11 @@ export async function POST(request: NextRequest) {
           const clientId = await resolveClient(cell(row, iClient))
           const assigneeData = await resolveAssignees(cell(row, iAssignee))
           const approverId = cell(row, iApprover) ? await resolveApprover(cell(row, iApprover)) : null
-          const dueDate = cellDate(row, iDue)
           const priority = cell(row, iPriority) || compTask.priority
+
+          // Due date comes from master task dates, not the sheet
+          const masterEntry = caMasterMap.get(compTask.title.toLowerCase().trim())
+          const dueDate = masterEntry ? nextDueDateFromMaster(masterEntry.dates) : null
 
           const freqRaw = cell(row, iFreq)
           const freqMap: Record<string, string> = {
@@ -1119,8 +1136,8 @@ export async function POST(request: NextRequest) {
             }
 
             // Collect CA link — will be bulk-upserted after the row loop
-            const masterTaskId = caMasterMap.get(compTask.title.toLowerCase().trim())
-            if (masterTaskId && clientId && newTask?.id) {
+            if (masterEntry?.id && clientId && newTask?.id) {
+              const masterTaskId = masterEntry.id
               caLinksToCreate.push({
                 masterTaskId,
                 clientId,
