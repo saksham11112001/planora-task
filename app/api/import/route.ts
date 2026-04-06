@@ -998,6 +998,27 @@ export async function POST(request: NextRequest) {
         const iPriority = findCol(headers, 'priority')
         const iFreq     = findCol(headers, 'frequency', 'freq')
 
+        // Pre-fetch all active CA master tasks once → O(1) map lookup per row
+        const { data: allCaMasterTasks } = await admin
+          .from('ca_master_tasks')
+          .select('id, name')
+          .eq('org_id', orgId)
+          .eq('is_active', true)
+        const caMasterMap = new Map<string, string>(
+          (allCaMasterTasks ?? []).map((t: any) => [t.name.toLowerCase().trim(), t.id])
+        )
+
+        // Collect CA links to bulk-upsert after the row loop
+        type CaLink = {
+          masterTaskId: string
+          clientId:     string
+          assigneeId:   string | null
+          approverId:   string | null
+          taskId:       string
+          dueDate:      string
+        }
+        const caLinksToCreate: CaLink[] = []
+
         for (const row of dataRows(rows, hdrIdx)) {
           if (isSampleRow(row)) continue
 
@@ -1097,45 +1118,61 @@ export async function POST(request: NextRequest) {
               )
             }
 
-            // Link to CA master assignment so the task appears in Step 3 Kanban
-            if (newTask?.id && clientId) {
-              const { data: masterTask } = await admin
-                .from('ca_master_tasks')
-                .select('id')
-                .eq('org_id', orgId)
-                .eq('name', compTask.title)
-                .eq('is_active', true)
-                .limit(1)
-                .maybeSingle()
+            // Collect CA link — will be bulk-upserted after the row loop
+            const masterTaskId = caMasterMap.get(compTask.title.toLowerCase().trim())
+            if (masterTaskId && clientId && newTask?.id) {
+              caLinksToCreate.push({
+                masterTaskId,
+                clientId,
+                assigneeId: assigneeData.primary ?? null,
+                approverId: approverId ?? null,
+                taskId:     newTask.id,
+                dueDate:    dueDate ?? '',
+              })
+            }
+          }
+        }
 
-              if (masterTask?.id) {
-                // Upsert assignment so client shows up in Step 3
-                const { data: assignment } = await admin
-                  .from('ca_client_assignments')
-                  .upsert({
-                    org_id:         orgId,
-                    master_task_id: masterTask.id,
-                    client_id:      clientId,
-                    assignee_id:    assigneeData.primary ?? null,
-                    approver_id:    approverId ?? null,
-                    created_by:     user.id,
-                    is_active:      true,
-                  }, { onConflict: 'master_task_id,client_id', ignoreDuplicates: false })
-                  .select('id')
-                  .single()
+        // ── Bulk upsert CA client assignments + task instances (2 queries total) ──
+        if (caLinksToCreate.length > 0) {
+          const { data: upsertedAssignments } = await admin
+            .from('ca_client_assignments')
+            .upsert(
+              caLinksToCreate.map(l => ({
+                org_id:         orgId,
+                master_task_id: l.masterTaskId,
+                client_id:      l.clientId,
+                assignee_id:    l.assigneeId,
+                approver_id:    l.approverId,
+                created_by:     user.id,
+                is_active:      true,
+              })),
+              { onConflict: 'master_task_id,client_id', ignoreDuplicates: false }
+            )
+            .select('id, master_task_id, client_id')
 
-                // Record the task instance to prevent duplicate spawning later
-                if (assignment?.id && dueDate) {
-                  await admin.from('ca_task_instances').upsert({
-                    org_id:        orgId,
-                    assignment_id: assignment.id,
-                    task_id:       newTask.id,
-                    due_date:      dueDate,
-                    month_key:     'imported',
-                    status:        'created',
-                  }, { onConflict: 'assignment_id,due_date', ignoreDuplicates: true })
-                }
-              }
+          if (upsertedAssignments) {
+            const instanceRows = caLinksToCreate
+              .filter(l => l.dueDate)
+              .flatMap(l => {
+                const asgn = upsertedAssignments.find(
+                  a => a.master_task_id === l.masterTaskId && a.client_id === l.clientId
+                )
+                if (!asgn) return []
+                return [{
+                  org_id:        orgId,
+                  assignment_id: asgn.id,
+                  task_id:       l.taskId,
+                  due_date:      l.dueDate,
+                  month_key:     'imported',
+                  status:        'created',
+                }]
+              })
+
+            if (instanceRows.length > 0) {
+              await admin
+                .from('ca_task_instances')
+                .upsert(instanceRows, { onConflict: 'assignment_id,due_date', ignoreDuplicates: true })
             }
           }
         }
