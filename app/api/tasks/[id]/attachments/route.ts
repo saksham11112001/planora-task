@@ -74,11 +74,15 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).single()
   if (!mb) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  const { data: att } = await supabase.from('task_attachments').select('storage_path, uploaded_by').eq('id', attId).eq('task_id', id).single()
+  const { data: att } = await supabase.from('task_attachments').select('storage_path, uploaded_by, attachment_type, drive_url').eq('id', attId).eq('task_id', id).single()
   if (!att) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const canDel = att.uploaded_by === user.id || ['owner','admin','manager'].includes(mb.role)
   if (!canDel) return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
-  await supabase.storage.from('attachments').remove([att.storage_path])
+  // Only remove from storage for real file uploads (drive links have no storage_path)
+  const isFileUpload = !att.drive_url && !att.attachment_type?.includes('link') && att.storage_path
+  if (isFileUpload) {
+    await supabase.storage.from('attachments').remove([att.storage_path])
+  }
   await supabase.from('task_attachments').delete().eq('id', attId)
   return NextResponse.json({ ok: true })
 }

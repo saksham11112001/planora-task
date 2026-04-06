@@ -380,6 +380,10 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
 
   async function addDriveLink() {
     if (!task || !driveUrl.trim()) return
+    try { new URL(driveUrl.trim()) } catch {
+      toast.error('Please enter a valid URL (must start with https://)')
+      return
+    }
     setUploading(true)
     const r = await fetch(`/api/tasks/${task.id}/attachments`, {
       method: 'POST',

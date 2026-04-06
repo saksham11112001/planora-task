@@ -169,7 +169,17 @@ export function MyTasksView({
     })
     setCompleting(p => { const s = new Set(p); s.delete(task.id); return s })
     if (res.ok) {
-      toast.success('Submitted for approval ✓')
+      const d = await res.json().catch(() => ({}))
+      if (d.auto_completed) {
+        // No approver + approval not required → auto-completed
+        setTasks(prev => prev.map(t => t.id === task.id
+          ? { ...t, status: 'completed', approval_status: 'approved', completed_at: new Date().toISOString() } : t))
+        setSelTask(prev => prev?.id === task.id
+          ? { ...prev, status: 'completed', approval_status: 'approved' } : prev)
+        toast.success('Task completed ✓')
+      } else {
+        toast.success('Submitted for approval ✓')
+      }
     } else {
       // Rollback optimistic update on failure
       setTasks(prev => prev.map(t => t.id === task.id
@@ -208,7 +218,14 @@ export function MyTasksView({
         body: JSON.stringify({ decision: 'submit' }),
       })
       if (res.ok) {
-        toast.success('Submitted for approval ✓')
+        const d = await res.json().catch(() => ({}))
+        if (d.auto_completed) {
+          setTasks(prev => prev.map(t => t.id === dragTaskId
+            ? { ...t, status: 'completed' as any, approval_status: 'approved', completed_at: new Date().toISOString() } : t))
+          toast.success('Task completed ✓')
+        } else {
+          toast.success('Submitted for approval ✓')
+        }
       } else {
         // Rollback
         setTasks(prev => prev.map(t => t.id === dragTaskId
@@ -268,10 +285,10 @@ export function MyTasksView({
     const task = tasks.find(t => t.id === taskId)
     const newStatus = decision === 'approve' ? 'completed' : 'todo'
     setTasks(prev => prev.map(t => t.id === taskId
-      ? { ...t, status: newStatus as any, approval_status: decision === 'approve' ? 'approved' : null,
+      ? { ...t, status: newStatus as any, approval_status: decision === 'approve' ? 'approved' : 'rejected',
           completed_at: decision === 'approve' ? new Date().toISOString() : null } : t))
     setSelTask(prev => prev?.id === taskId
-      ? { ...prev, status: newStatus as any, approval_status: decision === 'approve' ? 'approved' : null } : prev)
+      ? { ...prev, status: newStatus as any, approval_status: decision === 'approve' ? 'approved' : 'rejected' } : prev)
 
     const res = await fetch(`/api/tasks/${taskId}/approve`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
