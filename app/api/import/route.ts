@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse }       from 'next/server'
 import type { NextRequest }   from 'next/server'
 import { COMPLIANCE_TASKS }   from '@/lib/data/complianceTasks'
+import { CA_DEFAULT_TASKS }   from '@/lib/data/caDefaultTasks'
 
 export const maxDuration = 300
 export const dynamic = 'force-dynamic'
@@ -11,7 +12,29 @@ const COMPLIANCE_MAP = new Map(
   COMPLIANCE_TASKS.map(t => [t.title.toLowerCase().trim(), t])
 )
 
+// Static fallback: default dates keyed by normalised name
+const DEFAULT_DATES_MAP = new Map<string, Record<string, string>>(
+  CA_DEFAULT_TASKS.map(t => [t.name.toLowerCase().trim(), t.dates])
+)
+
 function alphaNum(s: string) { return s.toLowerCase().replace(/[^a-z0-9]/g, '') }
+
+/** Fuzzy lookup of dates from the static CA_DEFAULT_TASKS list */
+function findDefaultDates(name: string): Record<string, string> {
+  const q = name.toLowerCase().trim()
+  if (!q) return {}
+  const exact = DEFAULT_DATES_MAP.get(q)
+  if (exact) return exact
+  const qA = alphaNum(q)
+  for (const [key, dates] of DEFAULT_DATES_MAP) {
+    if (alphaNum(key) === qA) return dates
+  }
+  for (const [key, dates] of DEFAULT_DATES_MAP) {
+    const kA = alphaNum(key)
+    if (kA.includes(qA) || qA.includes(kA)) return dates
+  }
+  return {}
+}
 
 function findComplianceTask(title: string) {
   const q = title.toLowerCase().trim()
@@ -928,10 +951,15 @@ export async function POST(request: NextRequest) {
           const finalTitle = masterName ?? (compTask ? compTask.title : title.trim())
           const finalPriority = compTask?.priority ?? priority
 
-          // For compliance tasks: derive due date from master data, not the sheet
-          const dueDate = oneTimeMasterEntry
-            ? nextDueDateFromMaster(oneTimeMasterEntry.dates)
-            : cellDate(row, iDue)
+          // For compliance tasks: DB master dates → static default dates → sheet column
+          const dueDate = (() => {
+            if (!isComplianceRow) return cellDate(row, iDue)
+            const dbDates = oneTimeMasterEntry?.dates ?? {}
+            const effective = Object.keys(dbDates).length > 0
+              ? dbDates
+              : findDefaultDates(complianceType || finalTitle)
+            return nextDueDateFromMaster(effective)
+          })()
 
           if (cell(row, iApprover) && !approverId) {
             results.onetasks.errors.push(
@@ -1162,8 +1190,12 @@ export async function POST(request: NextRequest) {
           const approverId = cell(row, iApprover) ? await resolveApprover(cell(row, iApprover)) : null
           const priority = cell(row, iPriority) || compTask?.priority || 'medium'
 
-          // Due date comes from master task dates, not the sheet
-          const dueDate = masterEntry ? nextDueDateFromMaster(masterEntry.dates) : null
+          // Due date: DB master dates → static default dates → null
+          const masterDates   = masterEntry?.dates ?? {}
+          const effectiveDates = Object.keys(masterDates).length > 0
+            ? masterDates
+            : findDefaultDates(typeName)
+          const dueDate = nextDueDateFromMaster(effectiveDates)
 
           const freqRaw = cell(row, iFreq)
           const freqMap: Record<string, string> = {
