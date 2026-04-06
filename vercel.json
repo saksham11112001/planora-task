@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "app/api/import/route.ts": {
+      "maxDuration": 300
+    }
+  }
+}

@@ -4,7 +4,7 @@ import { NextResponse }       from 'next/server'
 import type { NextRequest }   from 'next/server'
 import { COMPLIANCE_TASKS }   from '@/lib/data/complianceTasks'
 
-export const maxDuration = 60
+export const maxDuration = 300
 export const dynamic = 'force-dynamic'
 
 const COMPLIANCE_MAP = new Map(
@@ -473,19 +473,24 @@ export async function POST(request: NextRequest) {
         const iEmail = findCol(headers, 'email')
         const iRole  = findCol(headers, 'role')
 
-        for (const row of dataRows(rows, hdrIdx)) {
-          if (isSampleRow(row)) continue
+        // Pre-warm the auth user cache before parallel processing
+        await loadAuthUsers()
 
-          const email = cell(row, iEmail).toLowerCase().trim()
-          const name  = cell(row, iName)
-          const role  = (cell(row, iRole).toLowerCase().trim() || 'member')
+        // Collect valid rows first, then process in parallel batches
+        const validMemberRows = dataRows(rows, hdrIdx)
+          .filter(row => !isSampleRow(row))
+          .map(row => ({
+            email: cell(row, iEmail).toLowerCase().trim(),
+            name:  cell(row, iName),
+            role:  cell(row, iRole).toLowerCase().trim() || 'member',
+          }))
+          .filter(({ email }) => email && email.includes('@'))
 
-          if (!email || !email.includes('@')) continue
-
+        async function processMember({ email, name, role }: { email: string; name: string; role: string }) {
           if (!['owner', 'admin', 'manager', 'member', 'viewer'].includes(role)) {
             results.members.errors.push(`${email}: invalid role "${role}"`)
             results.members.skipped++
-            continue
+            return
           }
 
           let uid = await resolveEmail(email)
@@ -496,31 +501,16 @@ export async function POST(request: NextRequest) {
               { id: uid, email, name: name || email.split('@')[0] },
               { onConflict: 'id', ignoreDuplicates: true }
             )
-
             const { data: existingMember } = await admin.from('org_members')
-              .select('id, is_active')
-              .eq('org_id', orgId)
-              .eq('user_id', uid)
-              .maybeSingle()
+              .select('id, is_active').eq('org_id', orgId).eq('user_id', uid).maybeSingle()
 
-            if (existingMember?.is_active) {
-              results.members.skipped++
-              continue
-            }
+            if (existingMember?.is_active) { results.members.skipped++; return }
 
             if (existingMember) {
-              await admin.from('org_members')
-                .update({ is_active: true, role })
-                .eq('id', existingMember.id)
+              await admin.from('org_members').update({ is_active: true, role }).eq('id', existingMember.id)
             } else {
-              await admin.from('org_members').insert({
-                org_id: orgId,
-                user_id: uid,
-                role,
-                is_active: true,
-              })
+              await admin.from('org_members').insert({ org_id: orgId, user_id: uid, role, is_active: true })
             }
-
             if (name) await admin.from('users').update({ name }).eq('id', uid)
             results.members.created++
           } else {
@@ -528,24 +518,12 @@ export async function POST(request: NextRequest) {
               data: { invited_to_org: orgId, invited_role: role, full_name: name || null },
               redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
             })
-
             if (invErr) {
-              if (
-                invErr.message?.toLowerCase().includes('already') ||
-                invErr.message?.toLowerCase().includes('registered')
-              ) {
+              if (invErr.message?.toLowerCase().includes('already') || invErr.message?.toLowerCase().includes('registered')) {
                 const authId = await resolveAuthUser(email)
                 if (authId) {
-                  await admin.from('users').upsert(
-                    { id: authId, email, name: name || email.split('@')[0] },
-                    { onConflict: 'id', ignoreDuplicates: true }
-                  )
-
-                  await admin.from('org_members').upsert(
-                    { org_id: orgId, user_id: authId, role, is_active: true },
-                    { onConflict: 'org_id,user_id', ignoreDuplicates: false }
-                  )
-
+                  await admin.from('users').upsert({ id: authId, email, name: name || email.split('@')[0] }, { onConflict: 'id', ignoreDuplicates: true })
+                  await admin.from('org_members').upsert({ org_id: orgId, user_id: authId, role, is_active: true }, { onConflict: 'org_id,user_id', ignoreDuplicates: false })
                   results.members.created++
                 } else {
                   results.members.errors.push(`${email}: user exists in auth but could not be resolved`)
@@ -559,6 +537,12 @@ export async function POST(request: NextRequest) {
               results.members.created++
             }
           }
+        }
+
+        // Process up to 5 members concurrently to avoid overwhelming Supabase auth
+        const MEMBER_BATCH = 5
+        for (let i = 0; i < validMemberRows.length; i += MEMBER_BATCH) {
+          await Promise.allSettled(validMemberRows.slice(i, i + MEMBER_BATCH).map(processMember))
         }
       }
     }
