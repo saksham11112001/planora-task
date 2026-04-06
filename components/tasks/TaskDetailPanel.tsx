@@ -61,6 +61,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
   const [attachMode,    setAttachMode]    = useState<'file'|'link'>('file')
   const [driveUrl,      setDriveUrl]      = useState('')
   const [driveTitle,    setDriveTitle]    = useState('')
+  const [caHeaders,     setCaHeaders]     = useState<string[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [aiLoading, setAiLoading] = useState(false)
   const [isSaving,  setIsSaving]  = useState(false)
@@ -70,7 +71,21 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
 
   useEffect(() => {
     if (tab === 'subtasks' && task) loadSubtasks(task.id)
-    if (tab === 'attachments' && task) loadAttachments(task.id)
+    if (tab === 'attachments' && task) {
+      loadAttachments(task.id)
+      const isCaCompliance =
+        (task as any).custom_fields?._ca_compliance === true ||
+        (task as any).custom_fields?._compliance_subtask === true
+      if (isCaCompliance && caHeaders.length === 0) {
+        fetch(`/api/ca/master?name=${encodeURIComponent(task.title)}`)
+          .then(r => r.json())
+          .then(d => {
+            const row = Array.isArray(d.data) ? d.data[0] : d.data
+            if (row?.attachment_headers?.length) setCaHeaders(row.attachment_headers)
+          })
+          .catch(() => {})
+      }
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, task?.id])
 
@@ -86,7 +101,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
   useEffect(() => {
     if (!task) return
     setSubtasksLoaded(false); setAttLoaded(false)
-    setSubtasks([]); setAttachments([])
+    setSubtasks([]); setAttachments([]); setCaHeaders([])
     setTitle(task.title)
     setDescription(task.description ?? '')
     setStatus(task.status)
@@ -823,6 +838,36 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
             {/* ── Attachments ── */}
             {tab === 'attachments' && (
               <div className="px-5 py-4">
+                {/* CA compliance required documents checklist */}
+                {caHeaders.length > 0 && (
+                  <div className="mb-4 rounded-xl p-3" style={{ background: '#fffbeb', border: '1px solid #fde68a' }}>
+                    <p className="text-xs font-semibold mb-2" style={{ color: '#92400e' }}>
+                      Required documents ({attachments.length}/{caHeaders.length} uploaded)
+                    </p>
+                    <div className="flex flex-col gap-1">
+                      {caHeaders.map((header, i) => {
+                        const uploaded = i < attachments.length
+                        return (
+                          <div key={header} className="flex items-center gap-2">
+                            <span style={{
+                              width: 16, height: 16, borderRadius: '50%', flexShrink: 0,
+                              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                              fontSize: 10, fontWeight: 700,
+                              background: uploaded ? '#d1fae5' : '#fef3c7',
+                              color: uploaded ? '#065f46' : '#92400e',
+                              border: `1px solid ${uploaded ? '#6ee7b7' : '#fde68a'}`,
+                            }}>
+                              {uploaded ? '✓' : i + 1}
+                            </span>
+                            <span className="text-xs" style={{ color: uploaded ? '#065f46' : '#78350f' }}>
+                              {header}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
                 {/* Mode toggle */}
                 <div className="flex gap-1 mb-3 p-1 rounded-lg" style={{ background: 'var(--surface-subtle)', border: '1px solid var(--border-light)', width: 'fit-content' }}>
                   <button

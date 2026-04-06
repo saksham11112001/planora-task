@@ -16,13 +16,22 @@ export async function GET(req: NextRequest) {
   const mb = await getOrgMember(supabase)
   if (!mb) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
-  const fy = req.nextUrl.searchParams.get('fy') ?? '2026-27'
-  const { data, error } = await supabase
+  const fy   = req.nextUrl.searchParams.get('fy') ?? '2026-27'
+  const name = req.nextUrl.searchParams.get('name')
+
+  let q = supabase
     .from('ca_master_tasks')
-    .select('*')
+    .select(name ? 'name,attachment_count,attachment_headers' : '*')
     .eq('org_id', mb.org_id)
-    .eq('financial_year', fy)
-    .order('sort_order', { ascending: true })
+    .eq('is_active', true)
+
+  if (name) {
+    q = q.eq('name', name).limit(1)
+  } else {
+    q = q.eq('financial_year', fy).order('sort_order', { ascending: true })
+  }
+
+  const { data, error } = await q
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ data: data ?? [] })
