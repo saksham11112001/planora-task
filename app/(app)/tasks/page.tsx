@@ -60,6 +60,14 @@ export default async function MyTasksPage() {
     }))
     const clientList = (allClients ?? []).map(c => ({ id: c.id, name: c.name, color: c.color }))
 
+    // Filter helper: hide CA compliance tasks that were not properly cron-triggered.
+    // Old import-created tasks have _ca_compliance: true but no _triggered: true.
+    const isVisible = (t: any) => {
+      const cf = t.custom_fields
+      if (cf?._ca_compliance === true) return cf?._triggered === true
+      return true
+    }
+
     const enrich = (t: any) => ({
       ...t,
       description: t.description ?? null, due_date: t.due_date ?? null,
@@ -88,15 +96,16 @@ export default async function MyTasksPage() {
           .order('due_date', { ascending: true, nullsFirst: false })
       : { data: [] }
 
-    const taskList     = (tasks ?? []).map(enrich)
+    const taskList     = (tasks ?? []).filter(isVisible).map(enrich)
     const approvalList = (approvalTasks ?? [])
       .filter(t => {
         const approverId = (t as any).approver_id
         if (approverId) return approverId === user.id
         return isManager
       })
+      .filter(isVisible)
       .map(enrich)
-    const assignedByMeList = (assignedByMeTasks ?? []).map(enrich)
+    const assignedByMeList = (assignedByMeTasks ?? []).filter(isVisible).map(enrich)
 
     return <MyTasksView
       tasks={taskList as any}

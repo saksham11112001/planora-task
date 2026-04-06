@@ -123,7 +123,7 @@ export const caComplianceSpawn = inngest.createFunction(
               due_date:          dueDateStr,
               is_recurring:      false,
               created_by:        null,
-              custom_fields:     { _ca_compliance: true },
+              custom_fields:     { _ca_compliance: true, _triggered: true },
             })
             .select('id')
             .single()

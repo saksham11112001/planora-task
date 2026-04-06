@@ -51,7 +51,16 @@ export default async function InboxPage() {
     const clientList = (allClientsResult.data ?? []).map(c => ({ id: c.id, name: c.name, color: c.color }))
     const canCreate  = ['owner','admin','manager','member'].includes(mb.role)
 
-    const enriched = (tasks ?? []).map(t => ({
+    const enriched = (tasks ?? [])
+      // Only show CA compliance tasks that were properly triggered by the cron
+      // (stamped with _triggered: true). Compliance tasks created via old import
+      // code have _ca_compliance: true but no _triggered flag — hide those.
+      .filter(t => {
+        const cf = (t as any).custom_fields
+        if (cf?._ca_compliance === true) return cf?._triggered === true
+        return true
+      })
+      .map(t => ({
       ...t, description: null, project_id: null, project: null, is_archived: false, created_at: '',
       approval_required: (t as any).approval_required ?? false, completed_at: null,
       is_recurring: t.is_recurring ?? false, estimated_hours: t.estimated_hours ?? null,
