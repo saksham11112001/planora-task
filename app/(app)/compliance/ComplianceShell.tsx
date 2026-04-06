@@ -92,11 +92,11 @@ function CAKanbanView({ userRole, currentUserId }: { userRole: string; currentUs
         }
       }
 
-      const tasks: KanbanTask[] = assignments.map((a: any) => {
+      const assignmentTasks: KanbanTask[] = assignments.map((a: any) => {
         const master      = a.master_task ?? {}
         const spawnedTask = spawnedByName.get(master.name ?? '')
         return {
-          id:                  a.id,        // assignment ID as stable key
+          id:                  a.id,
           name:                master.name  ?? 'Unnamed',
           group_name:          master.group_name ?? '',
           status:              spawnedTask?.status ?? 'upcoming',
@@ -110,6 +110,29 @@ function CAKanbanView({ userRole, currentUserId }: { userRole: string; currentUs
           _assignmentActive:   a.is_active ?? true,
         }
       })
+
+      // Also show imported compliance tasks that have no matching assignment
+      const assignedNames = new Set(
+        assignments.map((a: any) => (a.master_task?.name ?? '').toLowerCase().trim())
+      )
+      const unlinkedTasks: KanbanTask[] = spawnedTasks
+        .filter((t: any) => !assignedNames.has((t.title ?? '').toLowerCase().trim()))
+        .map((t: any) => ({
+          id:                  t.id,
+          name:                t.title ?? 'Unnamed',
+          group_name:          '',
+          status:              t.status ?? 'todo',
+          priority:            t.priority ?? 'medium',
+          due_date:            t.due_date ?? null,
+          is_recurring:        t.is_recurring ?? false,
+          next_occurrence_date: t.next_occurrence_date ?? null,
+          custom_fields:       t.custom_fields ?? null,
+          _raw:                t,
+          _taskId:             t.id,
+          _assignmentActive:   true,
+        }))
+
+      const tasks: KanbanTask[] = [...assignmentTasks, ...unlinkedTasks]
 
       setAllTasks(tasks)
 
