@@ -3,8 +3,10 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { FileCheck, ChevronRight, GripVertical } from 'lucide-react'
 import { CAMasterView } from './CAMasterView'
 import { CAClientSetupView } from './CAClientSetupView'
+import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
+import type { Task } from '@/types'
 
-interface Props { userRole: string }
+interface Props { userRole: string; currentUserId: string }
 
 /* ─── Step 3: Kanban Board ─────────────────────────────────────── */
 
@@ -18,15 +20,18 @@ interface KanbanTask {
   is_recurring?: boolean
   next_occurrence_date?: string | null
   custom_fields?: Record<string, any> | null
+  _raw?: any  // full API response for TaskDetailPanel
 }
 
 interface KanbanClient { id: string; name: string; color: string }
 
-function CAKanbanView({ userRole }: { userRole: string }) {
+function CAKanbanView({ userRole, currentUserId }: { userRole: string; currentUserId: string }) {
   const [clients, setClients]   = useState<KanbanClient[]>([])
   const [selectedClient, setSelectedClient] = useState<KanbanClient | null>(null)
   const [allTasks, setAllTasks] = useState<KanbanTask[]>([])
   const [loading, setLoading]   = useState(false)
+  const [selTask,  setSelTask]  = useState<Task | null>(null)
+  const [members,  setMembers]  = useState<{ id: string; name: string }[]>([])
 
   /* board state: task id → 'active' | 'paused' */
   const [board, setBoard] = useState<Record<string, 'active' | 'paused'>>({})
@@ -36,21 +41,29 @@ function CAKanbanView({ userRole }: { userRole: string }) {
   // (also persisted to DB via custom_fields._paused_next_date as fallback)
   const pausedDatesRef = useRef<Record<string, string | null>>({})
 
-  /* Load clients */
+  /* Load clients + members + current user once */
   useEffect(() => {
     fetch('/api/clients').then(r => r.json()).then(j => {
       setClients(Array.isArray(j) ? j : (j.data ?? []))
     }).catch(() => {})
+
+    fetch('/api/team').then(r => r.json()).then(d => {
+      const list = (d.data ?? []) as any[]
+      setMembers(list.map((m: any) => ({ id: m.user_id, name: (m.users as any)?.name ?? '' })))
+    }).catch(() => {})
+
   }, [])
 
-  /* Load tasks for selected client (from tasks table — covers both imported and manually created) */
+  /* Load tasks for selected client — only CA compliance tasks */
   const loadTasks = useCallback(async (clientId: string) => {
     setLoading(true)
     try {
       const res = await fetch(`/api/tasks?client_id=${clientId}&top_level=true&limit=200`)
       const json = await res.json()
       const data: any[] = Array.isArray(json) ? json : (json.data ?? [])
-      const tasks: KanbanTask[] = data.map((t: any) => ({
+      // Only show CA compliance tasks in this Kanban
+      const caOnly = data.filter((t: any) => t.custom_fields?._ca_compliance === true)
+      const tasks: KanbanTask[] = caOnly.map((t: any) => ({
         id: t.id,
         name: t.title,
         group_name: '',
@@ -60,6 +73,8 @@ function CAKanbanView({ userRole }: { userRole: string }) {
         is_recurring: t.is_recurring ?? false,
         next_occurrence_date: t.next_occurrence_date ?? null,
         custom_fields: t.custom_fields ?? null,
+        // preserve full task data for detail panel
+        _raw: t,
       }))
       setAllTasks(tasks)
       /* restore board state from localStorage */
@@ -141,12 +156,14 @@ function CAKanbanView({ userRole }: { userRole: string }) {
     return (
       <div
         draggable
-        onDragStart={() => setDragId(task.id)}
+        onDragStart={e => { e.stopPropagation(); setDragId(task.id) }}
         onDragEnd={() => { setDragId(null); setDragOver(null) }}
+        onClick={() => { if (!dragId) setSelTask(task._raw as Task) }}
         style={{
           background: 'var(--surface)', border: '1px solid var(--border)',
           borderRadius: 10, padding: '10px 12px', marginBottom: 8,
-          cursor: 'grab', boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+          cursor: dragId ? 'grabbing' : 'pointer',
+          boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
           opacity: dragId === task.id ? 0.5 : 1,
           transition: 'opacity 0.15s',
         }}
@@ -225,6 +242,15 @@ function CAKanbanView({ userRole }: { userRole: string }) {
 
   return (
     <div style={{ display: 'flex', flex: 1, height: '100%', overflow: 'hidden' }}>
+      <TaskDetailPanel
+        task={selTask}
+        members={members}
+        clients={clients.map(c => ({ ...c, color: c.color ?? '#94a3b8' }))}
+        currentUserId={currentUserId}
+        userRole={userRole}
+        onClose={() => setSelTask(null)}
+        onUpdated={() => { setSelTask(null); if (selectedClient) loadTasks(selectedClient.id) }}
+      />
       {/* Left: client list */}
       <div style={{ width: 220, flexShrink: 0, borderRight: '1px solid var(--border)', overflowY: 'auto', background: 'var(--surface)' }}>
         <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
@@ -284,7 +310,7 @@ function CAKanbanView({ userRole }: { userRole: string }) {
   )
 }
 
-export function ComplianceShell({ userRole }: Props) {
+export function ComplianceShell({ userRole, currentUserId }: Props) {
   const [step, setStep] = useState<1 | 2 | 3>(1)
   const isAdmin = ['owner', 'admin'].includes(userRole)
   const canSetupClients = ['owner', 'admin', 'manager'].includes(userRole)
@@ -409,7 +435,7 @@ export function ComplianceShell({ userRole }: Props) {
           </div>
         )}
         {step === 2 && <CAClientSetupView userRole={userRole} />}
-        {step === 3 && <CAKanbanView userRole={userRole} />}
+        {step === 3 && <CAKanbanView userRole={userRole} currentUserId={currentUserId} />}
       </div>
     </div>
   )

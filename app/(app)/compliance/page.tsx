@@ -11,5 +11,5 @@ export default async function CompliancePage() {
   const { data: mb } = await supabase.from('org_members')
     .select('org_id, role').eq('user_id', user.id).eq('is_active', true).maybeSingle()
   if (!mb) redirect('/onboarding')
-  return <ComplianceShell userRole={mb.role} />
+  return <ComplianceShell userRole={mb.role} currentUserId={user.id} />
 }
