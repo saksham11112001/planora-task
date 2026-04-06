@@ -28,6 +28,7 @@ export default async function NewProjectPage() {
           clients={clients ?? []}
           members={memberList}
           orgTemplates={orgTemplates}
+        />
       </Suspense>
     </div>
   )
