@@ -304,6 +304,27 @@ export async function POST(request: NextRequest) {
       return all.find(d => d >= today) ?? all[all.length - 1] ?? null
     }
 
+    // Fuzzy-match a name against caMasterMap keys (your org's actual master names).
+    // Priority: exact → alphanumeric exact → containment.
+    function findMasterEntry(name: string): MasterEntry | undefined {
+      const q = name.toLowerCase().trim()
+      if (!q) return undefined
+      // 1. Exact
+      const exact = caMasterMap.get(q)
+      if (exact) return exact
+      // 2. Alphanumeric exact (strips spaces, punctuation)
+      const qA = alphaNum(q)
+      for (const [key, entry] of caMasterMap) {
+        if (alphaNum(key) === qA) return entry
+      }
+      // 3. One contains the other (handles extra suffixes / missing words)
+      for (const [key, entry] of caMasterMap) {
+        const kA = alphaNum(key)
+        if (kA.includes(qA) || qA.includes(kA)) return entry
+      }
+      return undefined
+    }
+
     type CaLink = {
       masterTaskId: string
       clientId:     string
@@ -895,13 +916,19 @@ export async function POST(request: NextRequest) {
 
           const complianceType = cell(row, iCompliance)
           const compTask = complianceType ? findComplianceTask(complianceType) : null
-          const finalTitle = compTask ? compTask.title : title.trim()
-          const finalPriority = compTask ? compTask.priority : priority
+          // Match against CA Master names first (fuzzy), then fall back to static list
+          const oneTimeMasterEntry = complianceType
+            ? (findMasterEntry(complianceType) ?? (compTask ? findMasterEntry(compTask.title) : undefined))
+            : undefined
+          const isComplianceRow = !!(compTask || oneTimeMasterEntry)
+          // Use the exact master name so it maps back correctly in the Kanban
+          const masterName = oneTimeMasterEntry
+            ? ((_allCaMasterTasks ?? []).find((t: any) => t.id === oneTimeMasterEntry.id)?.name ?? complianceType)
+            : null
+          const finalTitle = masterName ?? (compTask ? compTask.title : title.trim())
+          const finalPriority = compTask?.priority ?? priority
 
           // For compliance tasks: derive due date from master data, not the sheet
-          const oneTimeMasterEntry = compTask
-            ? caMasterMap.get(compTask.title.toLowerCase().trim())
-            : undefined
           const dueDate = oneTimeMasterEntry
             ? nextDueDateFromMaster(oneTimeMasterEntry.dates)
             : cellDate(row, iDue)
@@ -913,7 +940,7 @@ export async function POST(request: NextRequest) {
           }
 
           const customFields: Record<string, any> = {
-            ...(compTask ? { _ca_compliance: true } : {}),
+            ...(isComplianceRow ? { _ca_compliance: true } : {}),
             ...(assigneeData.extra.length > 0 ? { _co_assignees: assigneeData.extra } : {}),
           }
           const customFieldsOrNull = Object.keys(customFields).length > 0 ? customFields : null
@@ -964,7 +991,7 @@ export async function POST(request: NextRequest) {
             }
 
             // Link to CA assignments so it shows in the CA Compliance view
-            if (compTask && oneTimeMasterEntry?.id && clientId && newTask?.id) {
+            if (isComplianceRow && oneTimeMasterEntry?.id && clientId && newTask?.id) {
               oneTimeCaLinks.push({
                 masterTaskId: oneTimeMasterEntry.id,
                 clientId,
@@ -1115,20 +1142,27 @@ export async function POST(request: NextRequest) {
             continue
           }
 
-          const compTask = findComplianceTask(typeName)
-          if (!compTask) {
-            results.compliance.errors.push(`"${typeName}": not a recognised compliance task — check spelling or leave blank`)
+          // Match against your CA Master names first (fuzzy), then fall back to static list
+          const masterEntry = findMasterEntry(typeName)
+          const compTask    = findComplianceTask(typeName)
+
+          if (!masterEntry && !compTask) {
+            results.compliance.errors.push(`"${typeName}": not found in your CA Master or recognised compliance tasks`)
             results.compliance.skipped++
             continue
           }
 
+          // Canonical title: prefer the exact master name so it maps back correctly
+          const canonicalTitle = masterEntry
+            ? (_allCaMasterTasks ?? []).find((t: any) => t.id === masterEntry.id)?.name ?? typeName
+            : compTask!.title
+
           const clientId = await resolveClient(cell(row, iClient))
           const assigneeData = await resolveAssignees(cell(row, iAssignee))
           const approverId = cell(row, iApprover) ? await resolveApprover(cell(row, iApprover)) : null
-          const priority = cell(row, iPriority) || compTask.priority
+          const priority = cell(row, iPriority) || compTask?.priority || 'medium'
 
           // Due date comes from master task dates, not the sheet
-          const masterEntry = caMasterMap.get(compTask.title.toLowerCase().trim())
           const dueDate = masterEntry ? nextDueDateFromMaster(masterEntry.dates) : null
 
           const freqRaw = cell(row, iFreq)
@@ -1146,7 +1180,7 @@ export async function POST(request: NextRequest) {
 
           if (cell(row, iApprover) && !approverId) {
             results.compliance.errors.push(
-              `"${compTask.title}": approver must be an active owner/admin/manager in this organisation`
+              `"${canonicalTitle}": approver must be an active owner/admin/manager in this organisation`
             )
           }
 
@@ -1157,7 +1191,7 @@ export async function POST(request: NextRequest) {
 
           const { data: newTask, error } = await admin.from('tasks').insert({
             org_id: orgId,
-            title: compTask.title,
+            title: canonicalTitle,
             status: 'todo',
             priority,
             client_id: clientId,
@@ -1173,12 +1207,12 @@ export async function POST(request: NextRequest) {
           }).select('id').single()
 
           if (error) {
-            results.compliance.errors.push(`"${compTask.title}": ${error.message}`)
+            results.compliance.errors.push(`"${canonicalTitle}": ${error.message}`)
             results.compliance.skipped++
           } else {
             results.compliance.created++
 
-            if (newTask?.id && compTask.subtasks.length > 0) {
+            if (newTask?.id && compTask && compTask.subtasks.length > 0) {
               await admin.from('tasks').insert(
                 compTask.subtasks.map(s => ({
                   org_id: orgId,
