@@ -910,6 +910,7 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
   const [tasks, setTasks] = useState<CAMasterTask[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingDefaults, setLoadingDefaults] = useState(false)
+  const [triggering,      setTriggering]      = useState(false)
   const [groupFilter, setGroupFilter] = useState<GroupFilter>(GROUP_FILTER_ALL)
   const [search, setSearch] = useState('')
   const [savedTab, setSavedTab] = useState<'unsaved' | 'saved'>('unsaved')
@@ -958,6 +959,21 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
   }, [])
 
   useEffect(() => { fetchTasks(fy) }, [fy, fetchTasks])
+
+  /* ── Manually trigger compliance task spawn ── */
+  async function handleTriggerSpawn() {
+    setTriggering(true)
+    try {
+      const res = await fetch('/api/ca/trigger', { method: 'POST' })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Trigger failed')
+      toast.success('Compliance tasks spawned for all assigned clients ✓')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Trigger failed')
+    } finally {
+      setTriggering(false)
+    }
+  }
 
   /* ── Load defaults ── */
   async function handleLoadDefaults() {
@@ -1102,6 +1118,23 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
           >
             <RefreshCw size={14} style={{ animation: loadingDefaults ? 'spin 1s linear infinite' : 'none' }} />
             {loadingDefaults ? 'Loading…' : 'Load defaults'}
+          </button>
+        )}
+
+        {canEdit && (
+          <button
+            onClick={handleTriggerSpawn}
+            disabled={triggering}
+            title="Create tasks now for all assigned clients whose trigger date has passed"
+            style={{
+              ...btnGhost,
+              display: 'flex', alignItems: 'center', gap: 6,
+              opacity: triggering ? 0.7 : 1,
+              borderColor: '#0d9488', color: '#0d9488',
+            }}
+          >
+            <AlertCircle size={14} />
+            {triggering ? 'Spawning…' : 'Spawn tasks now'}
           </button>
         )}
 

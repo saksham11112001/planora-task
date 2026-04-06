@@ -3,7 +3,6 @@
 import { CustomFieldsPanel } from '@/components/tasks/CustomFieldsPanel'
 import type { CustomFieldDef } from '@/components/tasks/CustomFieldsPanel'
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
 import { X, ThumbsUp, ThumbsDown, Flag, Calendar, User, Briefcase, Send, Clock, Sparkles, ShieldCheck, RefreshCw, FolderPlus, ArrowRightLeft, ExternalLink, Link2 } from 'lucide-react'
 import { cn }             from '@/lib/utils/cn'
 import { PRIORITY_CONFIG, STATUS_CONFIG } from '@/types'
@@ -24,7 +23,6 @@ interface Props {
 }
 
 export function TaskDetailPanel({ task, members, clients, currentUserId, userRole, onClose, onUpdated }: Props) {
-  const router     = useRouter()
   const isOpen     = !!task
   const canManage  = ['owner', 'admin', 'manager'].includes(userRole ?? '')
   // Designated approver: if task has approver_id, only that person can approve/reject
@@ -154,8 +152,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
       return
     }
     onUpdated?.()
-    router.refresh()
-  }, [task, onUpdated, router])
+  }, [task, onUpdated])
 
   /* debounced patch — for text fields that change frequently */
   const patchDebounced = useCallback((fields: Record<string, unknown>, delay = 600) => {
@@ -431,7 +428,6 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     setComment('')
     setSending(false)
     onUpdated?.()
-    router.refresh()
   }
 
   const isCompleted = status === 'completed'

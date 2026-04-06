@@ -17,6 +17,7 @@ interface KanbanTask {
   due_date?: string | null
   is_recurring?: boolean
   next_occurrence_date?: string | null
+  custom_fields?: Record<string, any> | null
 }
 
 interface KanbanClient { id: string; name: string; color: string }
@@ -31,7 +32,8 @@ function CAKanbanView({ userRole }: { userRole: string }) {
   const [board, setBoard] = useState<Record<string, 'active' | 'paused'>>({})
   const [dragId, setDragId] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState<'active' | 'paused' | null>(null)
-  // Stores original next_occurrence_date before pausing, so we can restore it on unpause
+  // In-memory cache of original next_occurrence_date before pausing
+  // (also persisted to DB via custom_fields._paused_next_date as fallback)
   const pausedDatesRef = useRef<Record<string, string | null>>({})
 
   /* Load clients */
@@ -57,6 +59,7 @@ function CAKanbanView({ userRole }: { userRole: string }) {
         due_date: t.due_date ?? null,
         is_recurring: t.is_recurring ?? false,
         next_occurrence_date: t.next_occurrence_date ?? null,
+        custom_fields: t.custom_fields ?? null,
       }))
       setAllTasks(tasks)
       /* restore board state from localStorage */
@@ -96,22 +99,32 @@ function CAKanbanView({ userRole }: { userRole: string }) {
     if (task?.is_recurring) {
       try {
         if (col === 'paused') {
-          // Remember the original date before clearing it
-          pausedDatesRef.current[task.id] = task.next_occurrence_date ?? task.due_date ?? null
+          // Remember original date in-memory AND persist to DB so it survives page reloads
+          const originalDate = task.next_occurrence_date ?? task.due_date ?? null
+          pausedDatesRef.current[task.id] = originalDate
           await fetch(`/api/tasks/${task.id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ next_occurrence_date: null }),
+            body: JSON.stringify({
+              next_occurrence_date: null,
+              custom_fields: { _paused_next_date: originalDate },
+            }),
           })
           setAllTasks(ts => ts.map(t => t.id === task.id ? { ...t, next_occurrence_date: null } : t))
         } else {
-          // Restore the saved date
-          const restoreDate = pausedDatesRef.current[task.id] ?? null
+          // Restore: prefer in-memory ref, fall back to DB-persisted value
+          const restoreDate =
+            pausedDatesRef.current[task.id] ??
+            (task as any).custom_fields?._paused_next_date ??
+            null
           delete pausedDatesRef.current[task.id]
           await fetch(`/api/tasks/${task.id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ next_occurrence_date: restoreDate }),
+            body: JSON.stringify({
+              next_occurrence_date: restoreDate,
+              custom_fields: { _paused_next_date: null },
+            }),
           })
           setAllTasks(ts => ts.map(t => t.id === task.id ? { ...t, next_occurrence_date: restoreDate } : t))
         }

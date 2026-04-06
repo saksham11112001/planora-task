@@ -9,7 +9,9 @@
       "Bash(wc -l /c/Users/saksh/Desktop/planora-task/app/\\\\\\(app\\\\\\)/compliance/CAMasterView.tsx)",
       "Bash(cat /c/Users/saksh/Desktop/planora-task/app/\\\\\\(app\\\\\\)/compliance/CAMasterView.tsx)",
       "Bash(npx tsc:*)",
-      "Bash(node -e \"const xlsx = require\\(''xlsx''\\); console.log\\(typeof xlsx.read\\)\")"
+      "Bash(node -e \"const xlsx = require\\(''xlsx''\\); console.log\\(typeof xlsx.read\\)\")",
+      "Bash(grep -B5 -A10 \"decision === ''reject''\" \"/c/Users/saksh/Desktop/planora-task/app/api/tasks/\\\\[id\\\\]/approve/route.ts\")",
+      "Bash(grep -B5 -A10 \"reject\" \"/c/Users/saksh/Desktop/planora-task/app/api/tasks\"*\"/approve\"*/route.ts)"
     ]
   }
 }

@@ -115,6 +115,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!Object.keys(updates).length)
     return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
 
+  // Merge custom_fields rather than overwrite — preserve existing flags (_ca_compliance, etc.)
+  if (updates.custom_fields && typeof updates.custom_fields === 'object') {
+    updates.custom_fields = {
+      ...((task as any).custom_fields ?? {}),
+      ...(updates.custom_fields as Record<string, unknown>),
+    }
+  }
+
   const { data, error } = await supabase
     .from('tasks').update(updates).eq('id', id).select('*').single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

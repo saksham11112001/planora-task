@@ -143,7 +143,7 @@ export async function POST(
     }).eq('id', id)
   } else if (decision === 'reject') {
     await supabase.from('tasks').update({
-      approval_status: 'rejected', status: 'in_progress', approved_by: user.id,
+      approval_status: 'rejected', status: 'todo', approved_by: user.id,
     }).eq('id', id)
   } else {
     return NextResponse.json({ error: 'Invalid decision' }, { status: 400 })
