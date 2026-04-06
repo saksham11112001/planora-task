@@ -33,13 +33,28 @@ export async function POST(
 
     // Block submit if subtasks are incomplete
     const { data: subtasks } = await supabase
-      .from('tasks').select('id, status, parent_task_id').eq('parent_task_id', id)
+      .from('tasks').select('id, status, parent_task_id, custom_fields').eq('parent_task_id', id)
     if (subtasks && subtasks.length > 0) {
       const incomplete = subtasks.filter((s: any) => s.status !== 'completed')
       if (incomplete.length > 0) {
         return NextResponse.json({
           error: `Complete all subtasks first — ${incomplete.length} remaining`,
           code: 'SUBTASKS_INCOMPLETE',
+        }, { status: 422 })
+      }
+    }
+
+    // CA compliance tasks require at least one attachment or drive link
+    const isCaCompliance =
+      (task as any).custom_fields?._ca_compliance === true ||
+      subtasks?.some((s: any) => s.custom_fields?._compliance_subtask === true)
+    if (isCaCompliance) {
+      const { data: attachments } = await supabase
+        .from('task_attachments').select('id').eq('task_id', id).limit(1)
+      if (!attachments || attachments.length === 0) {
+        return NextResponse.json({
+          error: 'CA compliance tasks require at least one document or drive link before submission',
+          code: 'ATTACHMENT_REQUIRED',
         }, { status: 422 })
       }
     }

@@ -844,10 +844,11 @@ export async function POST(request: NextRequest) {
             )
           }
 
-          const customFields =
-            assigneeData.extra.length > 0
-              ? { _co_assignees: assigneeData.extra }
-              : null
+          const customFields: Record<string, any> = {
+            ...(compTask ? { _ca_compliance: true } : {}),
+            ...(assigneeData.extra.length > 0 ? { _co_assignees: assigneeData.extra } : {}),
+          }
+          const customFieldsOrNull = Object.keys(customFields).length > 0 ? customFields : null
 
           const { data: newTask, error } = await admin.from('tasks').insert({
             org_id: orgId,
@@ -864,7 +865,7 @@ export async function POST(request: NextRequest) {
             estimated_hours: parseNumber(cell(row, iHours)),
             created_by: user.id,
             is_recurring: false,
-            custom_fields: customFields,
+            custom_fields: customFieldsOrNull,
           }).select('id').single()
 
           if (error) {
@@ -888,8 +889,8 @@ export async function POST(request: NextRequest) {
                 created_by: user.id,
                 is_recurring: false,
                 custom_fields: s.required
-                  ? { ...(customFields ?? {}), _compliance_subtask: true }
-                  : customFields,
+                  ? { ...(customFieldsOrNull ?? {}), _compliance_subtask: true }
+                  : customFieldsOrNull,
               }))
               await admin.from('tasks').insert(subtaskInserts)
             }
@@ -1062,10 +1063,10 @@ export async function POST(request: NextRequest) {
             )
           }
 
-          const customFields =
-            assigneeData.extra.length > 0
-              ? { _co_assignees: assigneeData.extra }
-              : null
+          const customFields: Record<string, any> = {
+            _ca_compliance: true,
+            ...(assigneeData.extra.length > 0 ? { _co_assignees: assigneeData.extra } : {}),
+          }
 
           const { data: newTask, error } = await admin.from('tasks').insert({
             org_id: orgId,
