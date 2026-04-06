@@ -44,16 +44,32 @@ export async function POST(
       }
     }
 
-    // CA compliance tasks require at least one attachment or drive link
+    // CA compliance tasks: check attachment count against CA master requirement
     const isCaCompliance =
       (task as any).custom_fields?._ca_compliance === true ||
       subtasks?.some((s: any) => s.custom_fields?._compliance_subtask === true)
     if (isCaCompliance) {
+      // Look up how many attachments the admin requires for this task in the CA master
+      const { data: masterTask } = await supabase
+        .from('ca_master_tasks')
+        .select('attachment_count, attachment_headers')
+        .eq('org_id', mb.org_id)
+        .eq('name', task.title)
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle()
+
+      const requiredCount = Math.max(1, masterTask?.attachment_count ?? 1)
       const { data: attachments } = await supabase
-        .from('task_attachments').select('id').eq('task_id', id).limit(1)
-      if (!attachments || attachments.length === 0) {
+        .from('task_attachments').select('id').eq('task_id', id)
+      const actualCount = attachments?.length ?? 0
+
+      if (actualCount < requiredCount) {
+        const headers: string[] = masterTask?.attachment_headers ?? []
+        const headerList = headers.length > 0 ? ` (${headers.join(', ')})` : ''
+        const missing = requiredCount - actualCount
         return NextResponse.json({
-          error: 'CA compliance tasks require at least one document or drive link before submission',
+          error: `${missing} more attachment${missing > 1 ? 's' : ''} required before submission${headerList} — ${actualCount} of ${requiredCount} uploaded`,
           code: 'ATTACHMENT_REQUIRED',
         }, { status: 422 })
       }
