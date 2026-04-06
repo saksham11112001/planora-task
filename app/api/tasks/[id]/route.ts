@@ -105,6 +105,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     'completed_at','assignee_id','client_id','approval_status',
     'approval_required','approved_by','approved_at',
     'estimated_hours','sort_order','custom_fields',
+    'next_occurrence_date','is_recurring',
   ] : [
     // Members: only status + completed_at (to submit/complete their own tasks)
     'status','completed_at','custom_fields',

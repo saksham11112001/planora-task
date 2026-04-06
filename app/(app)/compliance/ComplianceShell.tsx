@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { FileCheck, ChevronRight, GripVertical } from 'lucide-react'
 import { CAMasterView } from './CAMasterView'
 import { CAClientSetupView } from './CAClientSetupView'
@@ -15,6 +15,8 @@ interface KanbanTask {
   status: string
   priority: string
   due_date?: string | null
+  is_recurring?: boolean
+  next_occurrence_date?: string | null
 }
 
 interface KanbanClient { id: string; name: string; color: string }
@@ -29,6 +31,8 @@ function CAKanbanView({ userRole }: { userRole: string }) {
   const [board, setBoard] = useState<Record<string, 'active' | 'paused'>>({})
   const [dragId, setDragId] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState<'active' | 'paused' | null>(null)
+  // Stores original next_occurrence_date before pausing, so we can restore it on unpause
+  const pausedDatesRef = useRef<Record<string, string | null>>({})
 
   /* Load clients */
   useEffect(() => {
@@ -51,6 +55,8 @@ function CAKanbanView({ userRole }: { userRole: string }) {
         status: t.status ?? 'todo',
         priority: t.priority ?? 'medium',
         due_date: t.due_date ?? null,
+        is_recurring: t.is_recurring ?? false,
+        next_occurrence_date: t.next_occurrence_date ?? null,
       }))
       setAllTasks(tasks)
       /* restore board state from localStorage */
@@ -78,11 +84,41 @@ function CAKanbanView({ userRole }: { userRole: string }) {
     }
   }
 
-  function handleDrop(col: 'active' | 'paused') {
+  async function handleDrop(col: 'active' | 'paused') {
     if (!dragId) return
+    const task = allTasks.find(t => t.id === dragId)
     persistBoard({ ...board, [dragId]: col })
     setDragId(null)
     setDragOver(null)
+
+    // For recurring tasks: pause = clear next_occurrence_date (stops future triggers)
+    //                       unpause = restore original next_occurrence_date
+    if (task?.is_recurring) {
+      try {
+        if (col === 'paused') {
+          // Remember the original date before clearing it
+          pausedDatesRef.current[task.id] = task.next_occurrence_date ?? task.due_date ?? null
+          await fetch(`/api/tasks/${task.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ next_occurrence_date: null }),
+          })
+          setAllTasks(ts => ts.map(t => t.id === task.id ? { ...t, next_occurrence_date: null } : t))
+        } else {
+          // Restore the saved date
+          const restoreDate = pausedDatesRef.current[task.id] ?? null
+          delete pausedDatesRef.current[task.id]
+          await fetch(`/api/tasks/${task.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ next_occurrence_date: restoreDate }),
+          })
+          setAllTasks(ts => ts.map(t => t.id === task.id ? { ...t, next_occurrence_date: restoreDate } : t))
+        }
+      } catch {
+        // Non-critical — board state still persisted locally
+      }
+    }
   }
 
   const activeTasks = allTasks.filter(t => (board[t.id] ?? 'active') === 'active')
@@ -122,6 +158,15 @@ function CAKanbanView({ userRole }: { userRole: string }) {
                 <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
                   Due {task.due_date.slice(0, 10)}
                 </span>
+              )}
+              {task.is_recurring && board[task.id] === 'paused' && (
+                <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 99, fontWeight: 600,
+                  background: '#fffbeb', color: '#b45309', border: '1px solid #fde68a' }}>
+                  ⏸ Paused
+                </span>
+              )}
+              {task.is_recurring && board[task.id] !== 'paused' && (
+                <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>↻ Recurring</span>
               )}
             </div>
           </div>

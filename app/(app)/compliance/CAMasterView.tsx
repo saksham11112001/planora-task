@@ -912,11 +912,33 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
   const [loadingDefaults, setLoadingDefaults] = useState(false)
   const [groupFilter, setGroupFilter] = useState<GroupFilter>(GROUP_FILTER_ALL)
   const [search, setSearch] = useState('')
-  const [savedTab, setSavedTab] = useState<'all' | 'pending'>('all')
+  const [savedTab, setSavedTab] = useState<'unsaved' | 'saved'>('unsaved')
   const [showAddModal, setShowAddModal] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [pendingChanges, setPendingChanges] = useState<Record<string, Partial<CAMasterTask>>>({})
   const [savingAll, setSavingAll] = useState(false)
+  // Track which task IDs have been explicitly saved by the user (persisted per FY)
+  const [savedIds, setSavedIds] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem(`ca_saved_ids_${initFY}`)
+      return stored ? new Set(JSON.parse(stored)) : new Set()
+    } catch { return new Set() }
+  })
+
+  // Persist savedIds to localStorage whenever it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem(`ca_saved_ids_${fy}`, JSON.stringify([...savedIds]))
+    } catch {}
+  }, [savedIds, fy])
+
+  // Reload savedIds when FY changes
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(`ca_saved_ids_${fy}`)
+      setSavedIds(stored ? new Set(JSON.parse(stored)) : new Set())
+    } catch { setSavedIds(new Set()) }
+  }, [fy])
 
   const canEdit = isAdmin(userRole)
 
@@ -979,6 +1001,8 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
       const json = (await res.json()) as { data?: CAMasterTask; error?: string }
       if (!res.ok) throw new Error(json.error ?? 'Update failed')
       setPendingChanges(p => { const n = { ...p }; delete n[id]; return n })
+      // Mark this task as explicitly saved
+      setSavedIds(prev => new Set([...prev, id]))
       toast.success('Task saved')
     } catch (err) {
       if (prev) setTasks(ts => ts.map(t => t.id === id ? prev : t))
@@ -1015,12 +1039,21 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
   }
 
   /* ── Grouped + filtered tasks ── */
-  const grouped = useMemo(() => {
+  const { grouped, searchedUnsavedCount, searchedSavedCount } = useMemo(() => {
     const q = search.toLowerCase().trim()
-    const filtered = tasks.filter(t => {
+    // First apply only search (no tab filter) to get accurate tab counts
+    const searchFiltered = tasks.filter(t => {
       if (groupFilter !== GROUP_FILTER_ALL && t.group_name !== groupFilter) return false
-      if (savedTab === 'pending' && !pendingChanges[t.id]) return false
-      if (q && !t.name.toLowerCase().includes(q) && !t.group_name.toLowerCase().includes(q) && !t.code.toLowerCase().includes(q)) return false
+      if (!q) return true
+      return t.name.toLowerCase().includes(q) || t.group_name.toLowerCase().includes(q) || t.code.toLowerCase().includes(q)
+    })
+    const searchedSavedCount   = searchFiltered.filter(t => savedIds.has(t.id)).length
+    const searchedUnsavedCount = searchFiltered.filter(t => !savedIds.has(t.id)).length
+
+    // Then apply tab filter
+    const filtered = searchFiltered.filter(t => {
+      if (savedTab === 'saved'   && !savedIds.has(t.id)) return false
+      if (savedTab === 'unsaved' &&  savedIds.has(t.id)) return false
       return true
     })
     const map = new Map<string, CAMasterTask[]>()
@@ -1028,8 +1061,8 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
       if (!map.has(t.group_name)) map.set(t.group_name, [])
       map.get(t.group_name)!.push(t)
     }
-    return map
-  }, [tasks, groupFilter, search, savedTab, pendingChanges])
+    return { grouped: map, searchedUnsavedCount, searchedSavedCount }
+  }, [tasks, groupFilter, search, savedTab, savedIds])
 
   /* ─── Render ────────────────────────────────────────────────── */
 
@@ -1136,21 +1169,23 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
           )}
         </div>
 
-        {/* Saved / Pending tabs */}
+        {/* Unsaved / Saved tabs */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 0, borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border)', flexShrink: 0 }}>
           {([
-            { key: 'all',     label: 'All',     count: tasks.length },
-            { key: 'pending', label: 'Unsaved', count: Object.keys(pendingChanges).length },
+            { key: 'unsaved', label: 'Unsaved', count: searchedUnsavedCount, color: '#ca8a04' },
+            { key: 'saved',   label: 'Saved',   count: searchedSavedCount,   color: '#0d9488' },
           ] as const).map(tab => {
             const active = savedTab === tab.key
             return (
               <button key={tab.key} onClick={() => setSavedTab(tab.key)}
                 style={{
                   padding: '6px 14px', fontSize: 12, fontWeight: active ? 700 : 500,
-                  border: 'none', background: active ? 'var(--brand)' : 'var(--surface-alt)',
+                  border: 'none',
+                  background: active ? tab.color : 'var(--surface-alt)',
                   color: active ? '#fff' : 'var(--text-secondary)',
                   cursor: 'pointer', fontFamily: 'inherit',
                   display: 'flex', alignItems: 'center', gap: 5,
+                  transition: 'all 0.12s',
                 }}>
                 {tab.label}
                 <span style={{
