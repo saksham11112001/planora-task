@@ -1096,6 +1096,47 @@ export async function POST(request: NextRequest) {
                 }))
               )
             }
+
+            // Link to CA master assignment so the task appears in Step 3 Kanban
+            if (newTask?.id && clientId) {
+              const { data: masterTask } = await admin
+                .from('ca_master_tasks')
+                .select('id')
+                .eq('org_id', orgId)
+                .eq('name', compTask.title)
+                .eq('is_active', true)
+                .limit(1)
+                .maybeSingle()
+
+              if (masterTask?.id) {
+                // Upsert assignment so client shows up in Step 3
+                const { data: assignment } = await admin
+                  .from('ca_client_assignments')
+                  .upsert({
+                    org_id:         orgId,
+                    master_task_id: masterTask.id,
+                    client_id:      clientId,
+                    assignee_id:    assigneeData.primary ?? null,
+                    approver_id:    approverId ?? null,
+                    created_by:     user.id,
+                    is_active:      true,
+                  }, { onConflict: 'master_task_id,client_id', ignoreDuplicates: false })
+                  .select('id')
+                  .single()
+
+                // Record the task instance to prevent duplicate spawning later
+                if (assignment?.id && dueDate) {
+                  await admin.from('ca_task_instances').upsert({
+                    org_id:        orgId,
+                    assignment_id: assignment.id,
+                    task_id:       newTask.id,
+                    due_date:      dueDate,
+                    month_key:     'imported',
+                    status:        'created',
+                  }, { onConflict: 'assignment_id,due_date', ignoreDuplicates: true })
+                }
+              }
+            }
           }
         }
       }
