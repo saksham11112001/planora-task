@@ -280,6 +280,82 @@ export async function POST(request: NextRequest) {
     const admin = createAdminClient()
     const orgId = mb.org_id
 
+    // Pre-fetch all active CA master tasks once — shared across all sheet processors
+    const { data: _allCaMasterTasks } = await admin
+      .from('ca_master_tasks')
+      .select('id, name, dates')
+      .eq('org_id', orgId)
+      .eq('is_active', true)
+
+    type MasterEntry = { id: string; dates: Record<string, string> }
+    const caMasterMap = new Map<string, MasterEntry>(
+      (_allCaMasterTasks ?? []).map((t: any) => [
+        t.name.toLowerCase().trim(),
+        { id: t.id, dates: (t.dates ?? {}) as Record<string, string> },
+      ])
+    )
+
+    // Returns the next upcoming due date from master dates JSONB (IST-aware).
+    // Falls back to the latest past date if all dates have passed.
+    function nextDueDateFromMaster(dates: Record<string, string>): string | null {
+      const nowIST = new Date(Date.now() + 5.5 * 60 * 60 * 1000)
+      const today  = nowIST.toISOString().split('T')[0]
+      const all    = Object.values(dates).filter(Boolean).sort()
+      return all.find(d => d >= today) ?? all[all.length - 1] ?? null
+    }
+
+    type CaLink = {
+      masterTaskId: string
+      clientId:     string
+      assigneeId:   string | null
+      approverId:   string | null
+      taskId:       string
+      dueDate:      string
+    }
+
+    // Bulk-upserts ca_client_assignments then ca_task_instances for a batch of CA links
+    async function flushCaLinks(links: CaLink[], createdBy: string) {
+      if (links.length === 0) return
+      const { data: assignments } = await admin
+        .from('ca_client_assignments')
+        .upsert(
+          links.map(l => ({
+            org_id:         orgId,
+            master_task_id: l.masterTaskId,
+            client_id:      l.clientId,
+            assignee_id:    l.assigneeId,
+            approver_id:    l.approverId,
+            created_by:     createdBy,
+            is_active:      true,
+          })),
+          { onConflict: 'master_task_id,client_id', ignoreDuplicates: false }
+        )
+        .select('id, master_task_id, client_id')
+
+      if (!assignments) return
+      const instanceRows = links
+        .filter(l => l.dueDate)
+        .flatMap(l => {
+          const asgn = assignments.find(
+            a => a.master_task_id === l.masterTaskId && a.client_id === l.clientId
+          )
+          if (!asgn) return []
+          return [{
+            org_id:        orgId,
+            assignment_id: asgn.id,
+            task_id:       l.taskId,
+            due_date:      l.dueDate,
+            month_key:     'imported',
+            status:        'created',
+          }]
+        })
+      if (instanceRows.length > 0) {
+        await admin
+          .from('ca_task_instances')
+          .upsert(instanceRows, { onConflict: 'assignment_id,due_date', ignoreDuplicates: true })
+      }
+    }
+
     const results: ImportResults = {
       members: initBucket(),
       clients: initBucket(),
@@ -798,6 +874,7 @@ export async function POST(request: NextRequest) {
         const iHours      = findCol(headers, 'esthours', 'estimatedhours', 'hours')
         const iDesc       = findCol(headers, 'description', 'desc')
         const iCompliance = findCol(headers, 'compliancetasktype', 'compliance', 'compliancetask')
+        const oneTimeCaLinks: CaLink[] = []
 
         for (const row of dataRows(rows, hdrIdx)) {
           if (isSampleRow(row)) continue
@@ -814,13 +891,20 @@ export async function POST(request: NextRequest) {
 
           const assigneeData = await resolveAssignees(cell(row, iAssignee))
           const approverId = cell(row, iApprover) ? await resolveApprover(cell(row, iApprover)) : null
-          const dueDate = cellDate(row, iDue)
           const clientId = await resolveClient(cell(row, iClient))
 
           const complianceType = cell(row, iCompliance)
           const compTask = complianceType ? findComplianceTask(complianceType) : null
           const finalTitle = compTask ? compTask.title : title.trim()
           const finalPriority = compTask ? compTask.priority : priority
+
+          // For compliance tasks: derive due date from master data, not the sheet
+          const oneTimeMasterEntry = compTask
+            ? caMasterMap.get(compTask.title.toLowerCase().trim())
+            : undefined
+          const dueDate = oneTimeMasterEntry
+            ? nextDueDateFromMaster(oneTimeMasterEntry.dates)
+            : cellDate(row, iDue)
 
           if (cell(row, iApprover) && !approverId) {
             results.onetasks.errors.push(
@@ -878,8 +962,22 @@ export async function POST(request: NextRequest) {
               }))
               await admin.from('tasks').insert(subtaskInserts)
             }
+
+            // Link to CA assignments so it shows in the CA Compliance view
+            if (compTask && oneTimeMasterEntry?.id && clientId && newTask?.id) {
+              oneTimeCaLinks.push({
+                masterTaskId: oneTimeMasterEntry.id,
+                clientId,
+                assigneeId:   assigneeData.primary ?? null,
+                approverId:   approverId ?? null,
+                taskId:       newTask.id,
+                dueDate:      dueDate ?? '',
+              })
+            }
           }
         }
+
+        await flushCaLinks(oneTimeCaLinks, user.id)
       }
     }
 
@@ -998,39 +1096,6 @@ export async function POST(request: NextRequest) {
         const iPriority = findCol(headers, 'priority')
         const iFreq     = findCol(headers, 'frequency', 'freq')
 
-        // Pre-fetch all active CA master tasks once → O(1) map lookup per row
-        const { data: allCaMasterTasks } = await admin
-          .from('ca_master_tasks')
-          .select('id, name, dates')
-          .eq('org_id', orgId)
-          .eq('is_active', true)
-
-        type MasterEntry = { id: string; dates: Record<string, string> }
-        const caMasterMap = new Map<string, MasterEntry>(
-          (allCaMasterTasks ?? []).map((t: any) => [
-            t.name.toLowerCase().trim(),
-            { id: t.id, dates: (t.dates ?? {}) as Record<string, string> },
-          ])
-        )
-
-        // Returns the next upcoming due date from master dates JSONB,
-        // falling back to the latest past date if all have passed.
-        function nextDueDateFromMaster(dates: Record<string, string>): string | null {
-          const nowIST = new Date(Date.now() + 5.5 * 60 * 60 * 1000)
-          const today  = nowIST.toISOString().split('T')[0]
-          const all    = Object.values(dates).filter(Boolean).sort()
-          return all.find(d => d >= today) ?? all[all.length - 1] ?? null
-        }
-
-        // Collect CA links to bulk-upsert after the row loop
-        type CaLink = {
-          masterTaskId: string
-          clientId:     string
-          assigneeId:   string | null
-          approverId:   string | null
-          taskId:       string
-          dueDate:      string
-        }
         const caLinksToCreate: CaLink[] = []
 
         for (const row of dataRows(rows, hdrIdx)) {
@@ -1150,49 +1215,7 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // ── Bulk upsert CA client assignments + task instances (2 queries total) ──
-        if (caLinksToCreate.length > 0) {
-          const { data: upsertedAssignments } = await admin
-            .from('ca_client_assignments')
-            .upsert(
-              caLinksToCreate.map(l => ({
-                org_id:         orgId,
-                master_task_id: l.masterTaskId,
-                client_id:      l.clientId,
-                assignee_id:    l.assigneeId,
-                approver_id:    l.approverId,
-                created_by:     user.id,
-                is_active:      true,
-              })),
-              { onConflict: 'master_task_id,client_id', ignoreDuplicates: false }
-            )
-            .select('id, master_task_id, client_id')
-
-          if (upsertedAssignments) {
-            const instanceRows = caLinksToCreate
-              .filter(l => l.dueDate)
-              .flatMap(l => {
-                const asgn = upsertedAssignments.find(
-                  a => a.master_task_id === l.masterTaskId && a.client_id === l.clientId
-                )
-                if (!asgn) return []
-                return [{
-                  org_id:        orgId,
-                  assignment_id: asgn.id,
-                  task_id:       l.taskId,
-                  due_date:      l.dueDate,
-                  month_key:     'imported',
-                  status:        'created',
-                }]
-              })
-
-            if (instanceRows.length > 0) {
-              await admin
-                .from('ca_task_instances')
-                .upsert(instanceRows, { onConflict: 'assignment_id,due_date', ignoreDuplicates: true })
-            }
-          }
-        }
+        await flushCaLinks(caLinksToCreate, user.id)
       }
     }
 
