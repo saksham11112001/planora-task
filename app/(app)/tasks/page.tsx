@@ -34,7 +34,7 @@ export default async function MyTasksPage() {
 
       // Tasks needing my approval
       supabase.from('tasks')
-        .select('id, title, description, status, priority, due_date, assignee_id, approver_id, client_id, project_id, approval_status, approval_required, estimated_hours, is_recurring, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), projects(id, name, color)')
+        .select('id, title, description, status, priority, due_date, assignee_id, approver_id, client_id, project_id, approval_status, approval_required, estimated_hours, is_recurring, custom_fields, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), projects(id, name, color)')
         .eq('org_id', mb.org_id).eq('status', 'in_review').eq('approval_status', 'pending')
         .neq('is_archived', true).is('parent_task_id', null)
         .order('due_date', { ascending: true, nullsFirst: false }),
