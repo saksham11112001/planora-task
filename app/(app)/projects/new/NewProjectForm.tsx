@@ -152,9 +152,10 @@ const PROJECT_TEMPLATES: Record<string, ProjectTemplate> = {
 
 const COLORS = ['#0d9488','#7c3aed','#dc2626','#ca8a04','#16a34a','#0891b2','#db2777','#ea580c','#4f46e5','#374151']
 
-export function NewProjectForm({ clients, members }: {
+export function NewProjectForm({ clients: initialClients, members, orgTemplates = [] }: {
   clients: { id: string; name: string; color: string }[]
   members: { id: string; name: string }[]
+  orgTemplates?: { id: string; name: string; template_tasks: any[] }[]
 }) {
   const router = useRouter()
   const [saving,      setSaving]      = useState(false)
@@ -162,6 +163,7 @@ export function NewProjectForm({ clients, members }: {
   const [description, setDescription] = useState('')
   const [color,       setColor]       = useState('#0d9488')
   const searchParams  = useSearchParams()
+  const [clients,     setClients]     = useState(initialClients)
   const [clientId,    setClientId]    = useState(searchParams.get('client') ?? '')
   const [ownerId,     setOwnerId]     = useState('')
   const [dueDate,     setDueDate]     = useState('')
@@ -171,6 +173,31 @@ export function NewProjectForm({ clients, members }: {
   const [memberIds,    setMemberIds]    = useState<string[]>([])
   const [selectedTemplate,     setSelectedTemplate]     = useState<string | null>(null)
   const [templateTasksPreview, setTemplateTasksPreview] = useState<TemplateTask[]>([])
+  const [saveAsTemplate,       setSaveAsTemplate]       = useState(false)
+  const [addingClient,         setAddingClient]         = useState(false)
+  const [newClientName,        setNewClientName]        = useState('')
+  const [addingClientLoading,  setAddingClientLoading]  = useState(false)
+
+  async function handleAddClient() {
+    if (!newClientName.trim()) return
+    setAddingClientLoading(true)
+    try {
+      const res = await fetch('/api/clients', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newClientName.trim(), status: 'active' }),
+      })
+      const data = await res.json()
+      if (res.ok && data.data?.id) {
+        const newClient = { id: data.data.id, name: data.data.name, color: data.data.color ?? '#94a3b8' }
+        setClients(prev => [...prev, newClient])
+        setClientId(newClient.id)
+        setAddingClient(false)
+        setNewClientName('')
+        toast.success('Client added!')
+      }
+    } catch {} finally { setAddingClientLoading(false) }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -187,6 +214,7 @@ export function NewProjectForm({ clients, members }: {
           hours_budget: hoursBudget ? parseFloat(hoursBudget) : null,
           template_tasks: templateTasksPreview.length > 0 ? templateTasksPreview : undefined,
           member_ids: memberIds.length > 0 ? memberIds : null,
+          is_template: saveAsTemplate,
         }),
       })
       const data = await res.json()
@@ -230,6 +258,31 @@ export function NewProjectForm({ clients, members }: {
                 }
               </button>
             ))}
+            {orgTemplates.length > 0 && (
+              <>
+                <div style={{ width: 1, background: '#e5e7eb', flexShrink: 0, alignSelf: 'stretch', margin: '0 4px' }} />
+                {orgTemplates.map(tmpl => (
+                  <button key={tmpl.id} type="button"
+                    onClick={() => {
+                      const same = selectedTemplate === `org_${tmpl.id}`
+                      setSelectedTemplate(same ? null : `org_${tmpl.id}`)
+                      setTemplateTasksPreview(same ? [] : (tmpl.template_tasks ?? []))
+                      if (!name && !same) setName(tmpl.name)
+                    }}
+                    style={{
+                      width: 154, flexShrink: 0, padding: '12px 14px', borderRadius: 12, textAlign: 'left',
+                      border: selectedTemplate === `org_${tmpl.id}` ? '2px solid #0d9488' : '1.5px solid #e5e7eb',
+                      background: selectedTemplate === `org_${tmpl.id}` ? 'rgba(13,148,136,0.08)' : '#fafafa',
+                      cursor: 'pointer', transition: 'all 0.15s', fontFamily: 'inherit',
+                    }}>
+                    <div style={{ fontSize: 22, marginBottom: 6 }}>🏢</div>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: '#0d9488', marginBottom: 2 }}>ORG TEMPLATE</div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: selectedTemplate === `org_${tmpl.id}` ? '#0d9488' : '#374151', marginBottom: 3, lineHeight: 1.3 }}>{tmpl.name}</div>
+                    <div style={{ fontSize: 10, color: '#9ca3af' }}>{(tmpl.template_tasks ?? []).length} tasks</div>
+                  </button>
+                ))}
+              </>
+            )}
           </div>
         </div>
         {selectedTemplate && selectedTemplate !== 'Blank project' && templateTasksPreview.length > 0 && (
@@ -275,10 +328,32 @@ export function NewProjectForm({ clients, members }: {
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5">Client</label>
-          <select value={clientId} onChange={e => setClientId(e.target.value)} className="input">
-            <option value="">No client</option>
-            {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+          {!addingClient ? (
+            <div style={{ display: 'flex', gap: 6 }}>
+              <select value={clientId} onChange={e => setClientId(e.target.value)} className="input" style={{ flex: 1 }}>
+                <option value="">No client</option>
+                {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+              <button type="button" onClick={() => setAddingClient(true)}
+                style={{ padding: '0 12px', borderRadius: 8, border: '1.5px solid #e5e7eb', background: '#fafafa', cursor: 'pointer', fontSize: 13, color: '#0d9488', fontWeight: 600, whiteSpace: 'nowrap', fontFamily: 'inherit' }}>
+                + New
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input autoFocus value={newClientName} onChange={e => setNewClientName(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddClient() } if (e.key === 'Escape') { setAddingClient(false); setNewClientName('') } }}
+                className="input" style={{ flex: 1 }} placeholder="New client name" />
+              <button type="button" onClick={handleAddClient} disabled={addingClientLoading}
+                style={{ padding: '0 12px', borderRadius: 8, border: 'none', background: '#0d9488', cursor: 'pointer', fontSize: 13, color: '#fff', fontWeight: 600, fontFamily: 'inherit' }}>
+                {addingClientLoading ? '…' : 'Add'}
+              </button>
+              <button type="button" onClick={() => { setAddingClient(false); setNewClientName('') }}
+                style={{ padding: '0 10px', borderRadius: 8, border: '1.5px solid #e5e7eb', background: '#fafafa', cursor: 'pointer', fontSize: 13, color: '#6b7280', fontFamily: 'inherit' }}>
+                ✕
+              </button>
+            </div>
+          )}
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5">Project owner</label>
@@ -335,6 +410,12 @@ export function NewProjectForm({ clients, members }: {
           <input type="number" value={budget} onChange={e => setBudget(e.target.value)} className="input" placeholder="0"/>
         </div>
       </div>
+
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: 'var(--text-secondary)' }}>
+        <input type="checkbox" checked={saveAsTemplate} onChange={e => setSaveAsTemplate(e.target.checked)}
+          style={{ width: 15, height: 15, accentColor: '#0d9488' }} />
+        Save this project as a reusable template for your organisation
+      </label>
 
       <button type="submit" disabled={saving}
         className="w-full py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-60">

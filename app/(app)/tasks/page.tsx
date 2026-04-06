@@ -30,6 +30,7 @@ export default async function MyTasksPage() {
       supabase.from('tasks')
         .select('id, title, description, status, priority, due_date, assignee_id, approver_id, client_id, project_id, approval_status, approval_required, estimated_hours, is_recurring, custom_fields, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), approver:users!tasks_approver_id_fkey(id, name), projects(id, name, color)')
         .eq('org_id', mb.org_id).eq('assignee_id', user.id).neq('is_archived', true).is('parent_task_id', null)
+        .not('custom_fields', 'cs', '{"_ca_compliance":true}')
         .order('due_date', { ascending: true, nullsFirst: false }),
 
       // Tasks needing my approval
@@ -37,6 +38,7 @@ export default async function MyTasksPage() {
         .select('id, title, description, status, priority, due_date, assignee_id, approver_id, client_id, project_id, approval_status, approval_required, estimated_hours, is_recurring, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), projects(id, name, color)')
         .eq('org_id', mb.org_id).eq('status', 'in_review').eq('approval_status', 'pending')
         .neq('is_archived', true).is('parent_task_id', null)
+        .not('custom_fields', 'cs', '{"_ca_compliance":true}')
         .order('due_date', { ascending: true, nullsFirst: false }),
 
       // Team members
@@ -74,6 +76,20 @@ export default async function MyTasksPage() {
       project: (t.projects as any) ?? null,
     })
 
+    // Tasks assigned by me to others (for managers)
+    const { data: assignedByMeTasks } = isManager
+      ? await supabase.from('tasks')
+          .select('id, title, description, status, priority, due_date, assignee_id, approver_id, client_id, project_id, approval_status, approval_required, estimated_hours, is_recurring, custom_fields, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), approver:users!tasks_approver_id_fkey(id, name), projects(id, name, color)')
+          .eq('org_id', mb.org_id)
+          .eq('created_by', user.id)
+          .neq('assignee_id', user.id)
+          .not('assignee_id', 'is', null)
+          .neq('is_archived', true)
+          .is('parent_task_id', null)
+          .not('custom_fields', 'cs', '{"_ca_compliance":true}')
+          .order('due_date', { ascending: true, nullsFirst: false })
+      : { data: [] }
+
     const taskList     = (tasks ?? []).map(enrich)
     const approvalList = (approvalTasks ?? [])
       .filter(t => {
@@ -82,10 +98,13 @@ export default async function MyTasksPage() {
         return isManager
       })
       .map(enrich)
+    const assignedByMeList = (assignedByMeTasks ?? []).map(enrich)
 
     return <MyTasksView
       tasks={taskList as any}
       pendingApprovalTasks={approvalList as any}
+      assignedByMeTasks={assignedByMeList as any}
+      isManager={isManager}
       members={memberList}
       clients={clientList}
       currentUserId={user.id}

@@ -21,6 +21,11 @@ export async function GET(request: NextRequest) {
   if (!isOwner) {
     projectQuery = projectQuery.or(`member_ids.is.null,member_ids.cs.{${user.id}}`)
   }
+  if (sp.get('templates') === 'true') {
+    projectQuery = projectQuery.eq('status', 'template')
+  } else {
+    projectQuery = projectQuery.neq('status', 'template')
+  }
   const { data, error } = await projectQuery
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ data })
@@ -47,6 +52,7 @@ export async function POST(request: NextRequest) {
   }
   const body = await request.json()
   if (!body.name?.trim()) return NextResponse.json({ error: 'Name required' }, { status: 400 })
+  const isTemplate = body.is_template === true
   const { data, error } = await supabase.from('projects').insert({
     org_id:      mb.org_id,
     name:        body.name.trim(),
@@ -57,7 +63,7 @@ export async function POST(request: NextRequest) {
     due_date:    body.due_date    || null,
     budget:      body.budget      ?? null,
     hours_budget:body.hours_budget ?? null,
-    status:      'active',
+    status:      isTemplate ? 'template' : 'active',
     member_ids:  Array.isArray(body.member_ids) && body.member_ids.length > 0 ? body.member_ids : null,
   }).select('*').single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

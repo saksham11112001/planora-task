@@ -16,6 +16,8 @@ import { UniversalFilterBar } from '@/components/filters/UniversalFilterBar'
 interface Props {
   tasks:               Task[]
   pendingApprovalTasks?: Task[]
+  assignedByMeTasks?:  Task[]
+  isManager?:          boolean
   members:       { id: string; name: string }[]
   clients:       { id: string; name: string; color: string }[]
   currentUserId?: string
@@ -75,6 +77,8 @@ function groupByDue(tasks: Task[], today: string) {
 export function MyTasksView({
   tasks: initialTasks,
   pendingApprovalTasks = [],
+  assignedByMeTasks = [],
+  isManager: isManagerProp = false,
   members,
   clients,
   currentUserId,
@@ -103,6 +107,7 @@ export function MyTasksView({
   const [expandedTasks,  setExpandedTasks]  = useState<Set<string>>(new Set())
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
   const [groupPages,      setGroupPages]      = useState<Record<string, number>>({})
+  const [showAssignedByMe, setShowAssignedByMe] = useState(false)
 
   function toggleGroup(key: string) {
     setCollapsedGroups(prev => { const s = new Set(prev); s.has(key) ? s.delete(key) : s.add(key); return s })
@@ -123,6 +128,8 @@ export function MyTasksView({
     if (dueDateTo      && (!t.due_date || t.due_date > dueDateTo))   return false
     return true
   })
+
+  const displayTasks = showAssignedByMe ? assignedByMeTasks : filteredTasks
 
   // Subtasks load lazily on user click only
 
@@ -350,8 +357,8 @@ export function MyTasksView({
   }
 
   const Tabs = () => (
-    <div style={{ display:'flex', borderBottom:`1px solid var(--border)`, padding:'0 20px',
-      background:'var(--surface)', flexShrink:0 }}>
+    <div style={{ display:'flex', alignItems:'center', borderBottom:`1px solid var(--border)`, padding:'0 20px',
+      background:'var(--surface)', flexShrink:0, gap:8 }}>
       {(['List','Board'] as const).map(t => (
         <button key={t} onClick={() => setTab(t)}
           style={{ padding:'10px 15px', fontSize:14, fontWeight:500, border:'none',
@@ -361,6 +368,20 @@ export function MyTasksView({
           {t}
         </button>
       ))}
+      {canManage && (
+        <button
+          type="button"
+          onClick={() => setShowAssignedByMe(v => !v)}
+          style={{
+            padding: '5px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+            border: showAssignedByMe ? '1.5px solid #0d9488' : '1.5px solid #e5e7eb',
+            background: showAssignedByMe ? 'rgba(13,148,136,0.08)' : 'transparent',
+            color: showAssignedByMe ? '#0d9488' : 'var(--text-secondary)',
+            transition: 'all 0.15s',
+          }}>
+          Assigned by me
+        </button>
+      )}
     </div>
   )
 
@@ -527,8 +548,13 @@ export function MyTasksView({
         </div>
 
         <div style={{ flex:1, overflowY:'auto' }}>
+          {showAssignedByMe && (
+            <div style={{ padding:'10px 18px 4px', fontSize:12, fontWeight:600, color:'#0d9488' }}>
+              Tasks assigned by me to others
+            </div>
+          )}
           {LIST_SECS.map(sec => {
-            const secTasks = filteredTasks.filter(t => sec.filter(t, today))
+            const secTasks = displayTasks.filter(t => sec.filter(t, today))
             if (secTasks.length === 0) return null
             return (
               <div key={sec.key}>
@@ -709,7 +735,7 @@ export function MyTasksView({
 
           {/* Completed — paginated to LIST_DONE_PAGE */}
           {(() => {
-            const allDone = filteredTasks.filter(t => t.status === 'completed')
+            const allDone = displayTasks.filter(t => t.status === 'completed')
             if (!allDone.length) return null
             const visibleDone = listDoneExpanded ? allDone : allDone.slice(0, LIST_DONE_PAGE)
             const hiddenCount = allDone.length - LIST_DONE_PAGE

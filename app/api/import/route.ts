@@ -353,14 +353,11 @@ export async function POST(request: NextRequest) {
       clientId:     string
       assigneeId:   string | null
       approverId:   string | null
-      taskId:       string
-      dueDate:      string
     }
 
-    // Bulk-upserts ca_client_assignments then ca_task_instances for a batch of CA links
-    async function flushCaLinks(links: CaLink[], createdBy: string) {
+    async function flushCaLinks(links: { masterTaskId: string; clientId: string; assigneeId: string | null; approverId: string | null }[], createdBy: string) {
       if (links.length === 0) return
-      const { data: assignments } = await admin
+      await admin
         .from('ca_client_assignments')
         .upsert(
           links.map(l => ({
@@ -374,30 +371,6 @@ export async function POST(request: NextRequest) {
           })),
           { onConflict: 'master_task_id,client_id', ignoreDuplicates: false }
         )
-        .select('id, master_task_id, client_id')
-
-      if (!assignments) return
-      const instanceRows = links
-        .filter(l => l.dueDate)
-        .flatMap(l => {
-          const asgn = assignments.find(
-            a => a.master_task_id === l.masterTaskId && a.client_id === l.clientId
-          )
-          if (!asgn) return []
-          return [{
-            org_id:        orgId,
-            assignment_id: asgn.id,
-            task_id:       l.taskId,
-            due_date:      l.dueDate,
-            month_key:     'imported',
-            status:        'created',
-          }]
-        })
-      if (instanceRows.length > 0) {
-        await admin
-          .from('ca_task_instances')
-          .upsert(instanceRows, { onConflict: 'assignment_id,due_date', ignoreDuplicates: true })
-      }
     }
 
     const results: ImportResults = {
@@ -973,61 +946,41 @@ export async function POST(request: NextRequest) {
           }
           const customFieldsOrNull = Object.keys(customFields).length > 0 ? customFields : null
 
-          const { data: newTask, error } = await admin.from('tasks').insert({
-            org_id: orgId,
-            title: finalTitle,
-            description: cell(row, iDesc) || null,
-            status: 'todo',
-            priority: finalPriority,
-            project_id: null,
-            client_id: clientId,
-            assignee_id: assigneeData.primary,
-            approver_id: approverId,
-            approval_required: !!approverId,
-            due_date: dueDate,
-            estimated_hours: parseNumber(cell(row, iHours)),
-            created_by: user.id,
-            is_recurring: false,
-            custom_fields: customFieldsOrNull,
-          }).select('id').single()
-
-          if (error) {
-            results.onetasks.errors.push(`"${finalTitle}": ${error.message}`)
-            results.onetasks.skipped++
-          } else {
-            results.onetasks.created++
-
-            if (compTask && newTask?.id && compTask.subtasks.length > 0) {
-              const subtaskInserts = compTask.subtasks.map(s => ({
-                org_id: orgId,
-                title: s.title,
-                status: 'todo' as const,
-                priority: compTask.priority,
-                assignee_id: assigneeData.primary || null,
-                approver_id: approverId || null,
-                approval_required: !!approverId,
-                client_id: clientId || null,
-                due_date: dueDate,
-                parent_task_id: newTask.id,
-                created_by: user.id,
-                is_recurring: false,
-                custom_fields: s.required
-                  ? { ...(customFieldsOrNull ?? {}), _compliance_subtask: true }
-                  : customFieldsOrNull,
-              }))
-              await admin.from('tasks').insert(subtaskInserts)
-            }
-
-            // Link to CA assignments so it shows in the CA Compliance view
-            if (isComplianceRow && oneTimeMasterEntry?.id && clientId && newTask?.id) {
+          if (isComplianceRow) {
+            // Compliance rows: only create the assignment, let cron spawn the task N days before
+            if (oneTimeMasterEntry?.id && clientId) {
               oneTimeCaLinks.push({
                 masterTaskId: oneTimeMasterEntry.id,
                 clientId,
                 assigneeId:   assigneeData.primary ?? null,
                 approverId:   approverId ?? null,
-                taskId:       newTask.id,
-                dueDate:      dueDate ?? '',
               })
+              results.onetasks.created++
+            }
+          } else {
+            // Regular one-time tasks: create immediately
+            const { data: newTask, error } = await admin.from('tasks').insert({
+              org_id: orgId,
+              title: finalTitle,
+              description: cell(row, iDesc) || null,
+              status: 'todo',
+              priority: finalPriority,
+              project_id: null,
+              client_id: clientId,
+              assignee_id: assigneeData.primary,
+              approver_id: approverId,
+              approval_required: !!approverId,
+              due_date: dueDate,
+              estimated_hours: parseNumber(cell(row, iHours)),
+              created_by: user.id,
+              is_recurring: false,
+              custom_fields: customFieldsOrNull,
+            }).select('id').single()
+            if (error) {
+              results.onetasks.errors.push(`"${finalTitle}": ${error.message}`)
+              results.onetasks.skipped++
+            } else {
+              results.onetasks.created++
             }
           }
         }
@@ -1216,68 +1169,19 @@ export async function POST(request: NextRequest) {
             )
           }
 
-          const customFields: Record<string, any> = {
-            _ca_compliance: true,
-            ...(assigneeData.extra.length > 0 ? { _co_assignees: assigneeData.extra } : {}),
-          }
-
-          const { data: newTask, error } = await admin.from('tasks').insert({
-            org_id: orgId,
-            title: canonicalTitle,
-            status: 'todo',
-            priority,
-            client_id: clientId,
-            assignee_id: assigneeData.primary,
-            approver_id: approverId,
-            approval_required: !!approverId,
-            due_date: dueDate,
-            is_recurring: !!frequency,
-            frequency: frequency ?? undefined,
-            next_occurrence_date: frequency && dueDate ? dueDate : null,
-            created_by: user.id,
-            custom_fields: customFields,
-          }).select('id').single()
-
-          if (error) {
-            results.compliance.errors.push(`"${canonicalTitle}": ${error.message}`)
-            results.compliance.skipped++
-          } else {
+          // Don't create tasks here — cron will spawn them N days before due date
+          // Just create the assignment so client appears in Step 3 with "upcoming" status
+          if (masterEntry?.id && clientId) {
+            caLinksToCreate.push({
+              masterTaskId: masterEntry.id,
+              clientId,
+              assigneeId: assigneeData.primary ?? null,
+              approverId: approverId ?? null,
+            })
             results.compliance.created++
-
-            if (newTask?.id && compTask && compTask.subtasks.length > 0) {
-              await admin.from('tasks').insert(
-                compTask.subtasks.map(s => ({
-                  org_id: orgId,
-                  title: s.title,
-                  status: 'todo' as const,
-                  priority,
-                  assignee_id: assigneeData.primary || null,
-                  approver_id: approverId || null,
-                  approval_required: !!approverId,
-                  client_id: clientId || null,
-                  due_date: dueDate,
-                  parent_task_id: newTask.id,
-                  created_by: user.id,
-                  is_recurring: false,
-                  custom_fields: s.required
-                    ? { ...(customFields ?? {}), _compliance_subtask: true }
-                    : customFields,
-                }))
-              )
-            }
-
-            // Collect CA link — will be bulk-upserted after the row loop
-            if (masterEntry?.id && clientId && newTask?.id) {
-              const masterTaskId = masterEntry.id
-              caLinksToCreate.push({
-                masterTaskId,
-                clientId,
-                assigneeId: assigneeData.primary ?? null,
-                approverId: approverId ?? null,
-                taskId:     newTask.id,
-                dueDate:    dueDate ?? '',
-              })
-            }
+          } else {
+            results.compliance.errors.push(`"${canonicalTitle}": ${!clientId ? 'client not found' : 'not found in CA Master — add it in Step 1 first'}`)
+            results.compliance.skipped++
           }
         }
 
