@@ -868,12 +868,12 @@ export function MyTasksView({
           const today2 = todayStr()
           // Build base list for this column
           let colTasks = col.status === 'overdue'
-            ? tasks.filter(t => !!t.due_date && t.due_date < today2
+            ? displayTasks.filter(t => !!t.due_date && t.due_date < today2
                 && !['completed','cancelled','in_review'].includes(t.status)
                 && t.approval_status !== 'pending')
             : col.status === 'in_review'
-            ? tasks.filter(t => t.status === 'in_review' || t.approval_status === 'pending')
-            : tasks.filter(t => t.status === col.status && t.approval_status !== 'pending'
+            ? displayTasks.filter(t => t.status === 'in_review' || t.approval_status === 'pending')
+            : displayTasks.filter(t => t.status === col.status && t.approval_status !== 'pending'
                 && !(!!t.due_date && t.due_date < today2 && t.status !== 'completed'))
 
           // Apply global filters

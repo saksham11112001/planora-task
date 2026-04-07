@@ -24,11 +24,12 @@ interface Props {
 
 export function TaskDetailPanel({ task, members, clients, currentUserId, userRole, onClose, onUpdated }: Props) {
   const isOpen     = !!task
-  const canManage  = ['owner', 'admin', 'manager'].includes(userRole ?? '')
-  // Designated approver: if task has approver_id, only that person can approve/reject
+  const canManage      = ['owner', 'admin', 'manager'].includes(userRole ?? '')
+  const isOwnerOrAdmin = ['owner', 'admin'].includes(userRole ?? '')
+  // Designated approver: if task has approver_id, only that person (or any owner/admin) can approve/reject
   // If no approver set, any manager can
   const isDesignatedApprover = task?.approver_id
-    ? task.approver_id === currentUserId
+    ? task.approver_id === currentUserId || isOwnerOrAdmin
     : canManage
   const approverInfo = (task as any)?.approver as unknown as { id: string; name: string } | null
   const isAssignee = task?.assignee_id === currentUserId

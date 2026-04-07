@@ -35,7 +35,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     .eq('id', id).eq('org_id', mb.org_id).single()
   if (!task) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  const isManager  = ['owner','admin','manager'].includes(mb.role)
+  const isManager     = ['owner','admin','manager'].includes(mb.role)
+  const isOwnerOrAdmin = ['owner','admin'].includes(mb.role)
   const isAssignee = task.assignee_id === user.id
   const isApprover = task.approver_id
     ? task.approver_id === user.id
@@ -85,8 +86,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     task.approval_required &&
     task.approval_status !== 'approved'
   ) {
-    // Only the designated approver can bypass this and complete directly
-    if (!isApprover) {
+    // Owners/admins can bypass the approval gate entirely; so can the designated approver
+    if (!isApprover && !isOwnerOrAdmin) {
       return NextResponse.json({
         error: 'This task requires approval before it can be completed. Use "Submit for approval" instead.',
         code: 'APPROVAL_REQUIRED',
