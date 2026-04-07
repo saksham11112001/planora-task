@@ -25,6 +25,7 @@ export default async function InboxPage() {
         let q = supabase.from('tasks')
           .select('id, title, status, priority, due_date, approval_status, approval_required, client_id, assignee_id, is_recurring, estimated_hours, custom_fields, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url)')
           .eq('org_id', mb.org_id).is('project_id', null).is('parent_task_id', null).neq('is_archived', true)
+          .or('is_recurring.is.null,is_recurring.eq.false')
           .order('created_at', { ascending: false })
         if (!canViewAll) q = q.eq('assignee_id', user.id)
         return q

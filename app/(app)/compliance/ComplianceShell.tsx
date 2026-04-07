@@ -23,6 +23,8 @@ interface KanbanTask {
   _raw?: any              // full spawned task for TaskDetailPanel (null if not yet spawned)
   _taskId?: string        // spawned task ID, if any
   _assignmentActive: boolean
+  _nextDueDate?: string | null   // next upcoming due date from master task dates
+  _daysBeforeDue?: number        // trigger window from master task
 }
 
 interface KanbanClient { id: string; name: string; color: string }
@@ -33,6 +35,7 @@ function CAKanbanView({ userRole, currentUserId }: { userRole: string; currentUs
   const [allTasks, setAllTasks] = useState<KanbanTask[]>([])
   const [loading, setLoading]   = useState(false)
   const [selTask,  setSelTask]  = useState<Task | null>(null)
+  const [selUpcoming, setSelUpcoming] = useState<KanbanTask | null>(null)
   const [members,  setMembers]  = useState<{ id: string; name: string }[]>([])
 
   /* board state: task id → 'active' | 'paused' */
@@ -66,6 +69,13 @@ function CAKanbanView({ userRole, currentUserId }: { userRole: string; currentUs
     }).catch(() => {})
 
   }, [])
+
+  /** Returns the nearest future due date from a master task's dates JSONB */
+  function nextDueDateFromDates(dates: Record<string, string>): string | null {
+    const today = new Date().toISOString().split('T')[0]
+    const future = Object.values(dates ?? {}).filter(d => d >= today).sort()
+    return future[0] ?? null
+  }
 
   /* Load assignments for selected client + match to any already-spawned tasks */
   const loadTasks = useCallback(async (clientId: string) => {
@@ -108,6 +118,8 @@ function CAKanbanView({ userRole, currentUserId }: { userRole: string; currentUs
           _raw:                spawnedTask ?? null,
           _taskId:             spawnedTask?.id ?? null,
           _assignmentActive:   a.is_active ?? true,
+          _nextDueDate:        spawnedTask?.due_date ?? nextDueDateFromDates(master.dates ?? {}),
+          _daysBeforeDue:      master.days_before_due ?? 7,
         }
       })
 
@@ -241,11 +253,12 @@ function CAKanbanView({ userRole, currentUserId }: { userRole: string; currentUs
         onClick={() => {
           if (dragId) return
           if (hasTask) setSelTask(task._raw as Task)
+          else setSelUpcoming(task)
         }}
         style={{
           background: 'var(--surface)', border: '1px solid var(--border)',
           borderRadius: 10, padding: '10px 12px', marginBottom: 8,
-          cursor: dragId ? 'grabbing' : hasTask ? 'pointer' : 'default',
+          cursor: dragId ? 'grabbing' : 'pointer',
           boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
           opacity: dragId === task.id ? 0.5 : 1,
           transition: 'opacity 0.15s',
@@ -337,6 +350,60 @@ function CAKanbanView({ userRole, currentUserId }: { userRole: string; currentUs
         onClose={() => setSelTask(null)}
         onUpdated={() => { setSelTask(null); if (selectedClient) loadTasks(selectedClient.id) }}
       />
+
+      {/* Upcoming task info overlay */}
+      {selUpcoming && !selTask && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: 999,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }} onClick={() => setSelUpcoming(null)}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: 'var(--surface)', borderRadius: 14, padding: 28, minWidth: 340, maxWidth: 420,
+            boxShadow: '0 8px 40px rgba(0,0,0,0.18)', border: '1px solid var(--border)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+              <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>{selUpcoming.name}</span>
+              <button onClick={() => setSelUpcoming(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--text-muted)', lineHeight: 1 }}>×</button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)', width: 110 }}>Status</span>
+                <span style={{ fontSize: 12, fontWeight: 600, padding: '2px 10px', borderRadius: 99,
+                  background: '#fff7ed', color: '#ea580c' }}>⏰ Upcoming</span>
+              </div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)', width: 110 }}>Priority</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>{selUpcoming.priority}</span>
+              </div>
+              {selUpcoming._nextDueDate && (
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)', width: 110 }}>Next due date</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>
+                    {new Date(selUpcoming._nextDueDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  </span>
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)', width: 110 }}>Trigger window</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>
+                  {selUpcoming._daysBeforeDue ?? 7} days before due date
+                </span>
+              </div>
+              {selUpcoming._nextDueDate && selUpcoming._daysBeforeDue && (
+                <div style={{ marginTop: 6, padding: '10px 14px', borderRadius: 8, background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+                  <span style={{ fontSize: 12, color: '#15803d' }}>
+                    ✓ This task will appear in One-time tasks and My Tasks on{' '}
+                    <strong>
+                      {new Date(new Date(selUpcoming._nextDueDate).getTime() - (selUpcoming._daysBeforeDue ?? 7) * 86400000)
+                        .toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    </strong>
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       {/* Left: client list */}
       <div style={{ width: 220, flexShrink: 0, borderRight: '1px solid var(--border)', overflowY: 'auto', background: 'var(--surface)' }}>
         <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>

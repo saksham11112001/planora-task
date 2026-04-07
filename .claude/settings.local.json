@@ -13,7 +13,14 @@
       "Bash(grep -B5 -A10 \"decision === ''reject''\" \"/c/Users/saksh/Desktop/planora-task/app/api/tasks/\\\\[id\\\\]/approve/route.ts\")",
       "Bash(grep -B5 -A10 \"reject\" \"/c/Users/saksh/Desktop/planora-task/app/api/tasks\"*\"/approve\"*/route.ts)",
       "Bash(xargs grep:*)",
-      "Bash(ls -la /c/Users/saksh/Desktop/planora-task/app/\\\\\\(app\\\\\\)/compliance/)"
+      "Bash(ls -la /c/Users/saksh/Desktop/planora-task/app/\\\\\\(app\\\\\\)/compliance/)",
+      "Read(//c/Users/saksh/Downloads/**)",
+      "Bash(python3:*)",
+      "Bash(unzip -l planora_import_template.xlsx)",
+      "Bash(unzip -q -c planora_import_template.xlsx xl/workbook.xml)",
+      "Bash(chcp 65001)",
+      "Bash(python3 -c \":*)",
+      "Bash(iconv -f UTF-8 -t ASCII//TRANSLIT)"
     ]
   }
 }
