@@ -24,7 +24,12 @@
       "Bash(pip install:*)",
       "Bash(python -m pip install openpyxl --quiet)",
       "Bash(python -m ensurepip --default-pip)",
-      "Bash(python -m pip install openpyxl pandas --quiet)"
+      "Bash(python -m pip install openpyxl pandas --quiet)",
+      "Bash(find /c/Users/saksh/Desktop/planora-task -type f \\\\\\(-name *.sql -o -name *.ts -o -name *.tsx -o -name *.js -o -name *.jsx \\\\\\))",
+      "Bash(grep -h \"CREATE TABLE\\\\|org_id\" /c/Users/saksh/Desktop/planora-task/supabase/migrations/*.sql)",
+      "Bash(cat:*)",
+      "Read(//tmp/**)",
+      "Bash(grep -i \"org_settings\" /c/Users/saksh/Desktop/planora-task/supabase/MASTER_SCHEMA.sql /c/Users/saksh/Desktop/planora-task/supabase/migrations/*.sql)"
     ]
   }
 }

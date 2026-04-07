@@ -40,6 +40,7 @@ const LIST_SECS = [
 const BOARD_COLS = [
   { status:'overdue',     label:'Overdue',          color:'#dc2626' },
   { status:'todo',        label:'To do',             color:'var(--text-muted)' },
+  { status:'in_progress', label:'In progress',       color:'#0d9488' },
   { status:'in_review',   label:'Pending approval',  color:'#7c3aed' },
   { status:'completed',   label:'Done',              color:'#16a34a' },
 ]

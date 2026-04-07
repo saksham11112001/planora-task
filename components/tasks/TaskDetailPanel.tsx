@@ -495,20 +495,17 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
             )}
 
             {/* Designated approver info */}
-            {task.approval_required && approverInfo && (
+            {task.approval_required && (
               <div className="mb-3 flex items-center gap-2 px-3 py-2 rounded-lg text-xs"
                 style={{ background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.25)' }}>
                 <ShieldCheck className="h-3.5 w-3.5 text-violet-500 flex-shrink-0"/>
                 <span className="text-violet-700">
-                  Approver: <strong>{approverInfo.name}</strong>
+                  {approverInfo
+                    ? <>Approver: <strong>{approverInfo.name}</strong></>
+                    : task.approver_id
+                    ? 'Approver assigned (pending registration)'
+                    : 'Any manager can approve this task'}
                 </span>
-              </div>
-            )}
-            {task.approval_required && !approverInfo && (
-              <div className="mb-3 flex items-center gap-2 px-3 py-2 rounded-lg text-xs"
-                style={{ background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.25)' }}>
-                <ShieldCheck className="h-3.5 w-3.5 text-violet-500 flex-shrink-0"/>
-                <span className="text-violet-700">Any manager can approve this task</span>
               </div>
             )}
             {task.approval_status === 'rejected' && (
