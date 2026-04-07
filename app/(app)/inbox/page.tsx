@@ -52,24 +52,12 @@ export default async function InboxPage() {
     const clientList = (allClientsResult.data ?? []).map(c => ({ id: c.id, name: c.name, color: c.color }))
     const canCreate  = ['owner','admin','manager','member'].includes(mb.role)
 
-    // Cutoff: show compliance tasks that are due within the next 60 days.
-    // This hides far-future tasks (e.g. TAX Audit due Oct 31) while keeping
-    // near-term ones (Accounting Apr 6, GSTR 1 Apr 11, TDS May 31) visible.
-    // Cron-triggered tasks (_triggered: true) are always shown regardless of due date.
-    const nowIST   = new Date(Date.now() + 5.5 * 60 * 60 * 1000)
-    const cutoffDt = new Date(nowIST.getTime() + 60 * 24 * 60 * 60 * 1000)
-    const cutoff   = cutoffDt.toISOString().split('T')[0]   // YYYY-MM-DD, 60 days from now
-
     const enriched = (tasks ?? [])
       .filter(t => {
         const cf = (t as any).custom_fields
-        if (cf?._ca_compliance === true) {
-          // Always show if properly triggered by the cron
-          if (cf._triggered === true) return true
-          // For old import-created tasks: only show if due within 60 days
-          const due = (t as any).due_date ?? ''
-          return due !== '' && due <= cutoff
-        }
+        // Show compliance tasks only if properly cron/manually triggered (_triggered: true).
+        // Old direct-import tasks (no _triggered flag) are hidden from inbox.
+        if (cf?._ca_compliance === true) return cf?._triggered === true
         return true
       })
       .map(t => ({

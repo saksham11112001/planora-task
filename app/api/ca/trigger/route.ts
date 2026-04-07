@@ -66,6 +66,12 @@ export async function POST() {
   )
 
   // ── 3. Walk each assignment × each due date ───────────────────────
+  // Manual trigger backfills up to 3 months of overdue tasks so admins
+  // doing mid-year setup see all recent compliance tasks as overdue.
+  const threeMonthsAgo = new Date(nowIST)
+  threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
+  const threeMonthsAgoStr = threeMonthsAgo.toISOString().split('T')[0]
+
   let spawned = 0
   let skipped = 0
   const errors: string[] = []
@@ -76,7 +82,6 @@ export async function POST() {
 
     const dates: Record<string, string> = master.dates ?? {}
     const daysBeforeDue: number = master.days_before_due ?? 7
-    const assignmentStart = (asgn.created_at as string ?? '').split('T')[0]
 
     if (Object.keys(dates).length === 0) { skipped++; continue }
 
@@ -89,14 +94,11 @@ export async function POST() {
       triggerDate.setDate(triggerDate.getDate() - daysBeforeDue)
       const triggerStr  = triggerDate.toISOString().split('T')[0]
 
-      // Only spawn when trigger window has arrived
+      // Only spawn when trigger window has arrived (future tasks not yet due)
       if (triggerStr > today) continue
 
-      // Skip past-due dates (would appear as instant overdue)
-      if (dueDateStr < today) continue
-
-      // Skip months before this assignment was created (mid-year onboarding)
-      if (assignmentStart && dueDateStr < assignmentStart) continue
+      // Never backfill more than 3 months — tasks older than that are too stale
+      if (dueDateStr < threeMonthsAgoStr) continue
 
       // Skip if already spawned
       const instanceKey = `${asgn.id}__${dueDateStr}`
