@@ -967,7 +967,11 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
       const res = await fetch('/api/ca/trigger', { method: 'POST' })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? 'Trigger failed')
-      toast.success('Compliance tasks spawned for all assigned clients ✓')
+      if (json.errors?.length) {
+        toast.error(`${json.spawned} spawned, but errors: ${json.errors[0]}`)
+      } else {
+        toast.success(json.message ?? `Spawned ${json.spawned} compliance task(s) ✓`)
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Trigger failed')
     } finally {

@@ -20,7 +20,11 @@
       "Bash(unzip -q -c planora_import_template.xlsx xl/workbook.xml)",
       "Bash(chcp 65001)",
       "Bash(python3 -c \":*)",
-      "Bash(iconv -f UTF-8 -t ASCII//TRANSLIT)"
+      "Bash(iconv -f UTF-8 -t ASCII//TRANSLIT)",
+      "Bash(pip install:*)",
+      "Bash(python -m pip install openpyxl --quiet)",
+      "Bash(python -m ensurepip --default-pip)",
+      "Bash(python -m pip install openpyxl pandas --quiet)"
     ]
   }
 }
