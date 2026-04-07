@@ -548,6 +548,27 @@ export async function POST(request: NextRequest) {
       return data?.id ?? null
     }
 
+    // ── Pre-load all org lookup data (3 queries) to eliminate N+1 DB calls ──
+    const [clientsPre, projectsPre, membersPre] = await Promise.all([
+      admin.from('clients').select('id, name').eq('org_id', orgId),
+      admin.from('projects').select('id, name').eq('org_id', orgId),
+      admin.from('org_members')
+        .select('user_id, role, users!inner(id, name, email)')
+        .eq('org_id', orgId).eq('is_active', true),
+    ])
+    ;(clientsPre.data ?? []).forEach((c: any) => {
+      clientNameToId[c.name.toLowerCase()] = c.id
+    })
+    ;(projectsPre.data ?? []).forEach((p: any) => {
+      projectNameToId[p.name.toLowerCase()] = p.id
+    })
+    ;(membersPre.data ?? []).forEach((m: any) => {
+      const u = m.users as any
+      if (u?.email) emailCache[u.email.toLowerCase()] = m.user_id
+      if (u?.name)  emailCache[u.name.toLowerCase()]  = m.user_id
+      roleCache[m.user_id] = m.role
+    })
+
     // ─────────────────────────────────────────────────────────────
     // 1) MEMBERS
     // ─────────────────────────────────────────────────────────────
@@ -605,9 +626,11 @@ export async function POST(request: NextRequest) {
               await admin.from('org_members').insert({ org_id: orgId, user_id: uid, role, is_active: true })
             }
             if (name) await admin.from('users').update({ name }).eq('id', uid)
+            // Keep roleCache fresh so later sections (e.g. CA compliance) can resolve approver
+            roleCache[uid] = role
             results.members.created++
           } else {
-            const { error: invErr } = await admin.auth.admin.inviteUserByEmail(email, {
+            const { data: invData, error: invErr } = await admin.auth.admin.inviteUserByEmail(email, {
               data: { invited_to_org: orgId, invited_role: role, full_name: name || null },
               redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
             })
@@ -617,6 +640,9 @@ export async function POST(request: NextRequest) {
                 if (authId) {
                   await admin.from('users').upsert({ id: authId, email, name: name || email.split('@')[0] }, { onConflict: 'id', ignoreDuplicates: true })
                   await admin.from('org_members').upsert({ org_id: orgId, user_id: authId, role, is_active: true }, { onConflict: 'org_id,user_id', ignoreDuplicates: false })
+                  // Update caches so later sections can resolve this member as approver
+                  emailCache[email.toLowerCase()] = authId
+                  roleCache[authId] = role
                   results.members.created++
                 } else {
                   results.members.errors.push(`${email}: user exists in auth but could not be resolved`)
@@ -627,6 +653,12 @@ export async function POST(request: NextRequest) {
                 results.members.skipped++
               }
             } else {
+              // Capture the newly created auth user's ID so later sections (e.g. CA compliance)
+              // can resolve this invited member as approver without hitting the poisoned null cache
+              if (invData?.user?.id) {
+                emailCache[email.toLowerCase()] = invData.user.id
+                roleCache[invData.user.id] = role
+              }
               results.members.created++
             }
           }
@@ -664,29 +696,27 @@ export async function POST(request: NextRequest) {
         const iStatus   = findCol(headers, 'status')
         const iNotes    = findCol(headers, 'notes')
 
+        const toInsertClients: any[] = []
+        const seenClientNames = new Set<string>()
+
         for (const row of dataRows(rows, hdrIdx)) {
           if (isSampleRow(row)) continue
           const name = cell(row, iName)
           if (!name) continue
 
+          const lname = name.toLowerCase()
+          if (clientNameToId[lname] || seenClientNames.has(lname)) {
+            results.clients.skipped++
+            continue
+          }
+          seenClientNames.add(lname)
+
           const status = cell(row, iStatus) || 'active'
           const rawColor = cell(row, iColor) || '#0d9488'
           const color = rawColor.startsWith('#') ? rawColor : `#${rawColor}`
 
-          const { data: existing } = await admin
-            .from('clients')
-            .select('id')
-            .eq('org_id', orgId)
-            .ilike('name', name)
-            .maybeSingle()
-
-          if (existing?.id) {
-            clientNameToId[name.toLowerCase()] = existing.id
-            results.clients.skipped++
-            continue
-          }
-
-          const { data: created, error } = await admin.from('clients').insert({
+          toInsertClients.push({
+            _lname: lname,
             org_id: orgId,
             name: name.trim(),
             email: cell(row, iEmail) || null,
@@ -697,14 +727,21 @@ export async function POST(request: NextRequest) {
             status: ['active', 'inactive', 'lead'].includes(status) ? status : 'active',
             notes: cell(row, iNotes) || null,
             created_by: user.id,
-          }).select('id').single()
+          })
+        }
 
+        // Bulk insert in batches of 200
+        const CLIENT_BATCH = 200
+        for (let bi = 0; bi < toInsertClients.length; bi += CLIENT_BATCH) {
+          const batch = toInsertClients.slice(bi, bi + CLIENT_BATCH)
+          const rows2insert = batch.map(({ _lname: _, ...rest }: any) => rest)
+          const { data: created, error } = await admin.from('clients').insert(rows2insert).select('id, name')
           if (error) {
-            results.clients.errors.push(`"${name}": ${error.message}`)
-            results.clients.skipped++
+            results.clients.errors.push(`Batch error: ${error.message}`)
+            results.clients.skipped += batch.length
           } else {
-            clientNameToId[name.toLowerCase()] = created.id
-            results.clients.created++
+            ;(created ?? []).forEach((c: any) => { clientNameToId[c.name.toLowerCase()] = c.id })
+            results.clients.created += created?.length ?? 0
           }
         }
       }
@@ -804,64 +841,63 @@ export async function POST(request: NextRequest) {
         const iDesc     = findCol(headers, 'description', 'desc')
         const iClient   = findCol(headers, 'clientname', 'client')
 
-        for (const row of dataRows(rows, hdrIdx)) {
-          if (isSampleRow(row)) continue
+        const toInsertTasks: any[] = []
+        const allTaskRows = dataRows(rows, hdrIdx).filter(r => !isSampleRow(r))
+        const TASK_CHUNK = 20
+        for (let ci = 0; ci < allTaskRows.length; ci += TASK_CHUNK) {
+          await Promise.allSettled(allTaskRows.slice(ci, ci + TASK_CHUNK).map(async (row) => {
+            const title = cell(row, iTitle)
+            if (!title) return
 
-          const title = cell(row, iTitle)
-          if (!title) continue
+            const priority = cell(row, iPriority) || 'medium'
+            if (!['none', 'low', 'medium', 'high', 'urgent'].includes(priority)) {
+              results.tasks.errors.push(`"${title}": invalid priority "${priority}"`)
+              results.tasks.skipped++
+              return
+            }
 
-          const priority = cell(row, iPriority) || 'medium'
-          if (!['none', 'low', 'medium', 'high', 'urgent'].includes(priority)) {
-            results.tasks.errors.push(`"${title}": invalid priority "${priority}"`)
-            results.tasks.skipped++
-            continue
-          }
+            const status = cell(row, iStatus) || 'todo'
+            const validStatus = ['todo', 'in_progress', 'completed', 'blocked'].includes(status) ? status : 'todo'
 
-          const status = cell(row, iStatus) || 'todo'
-          const validStatus = ['todo', 'in_progress', 'completed', 'blocked'].includes(status)
-            ? status
-            : 'todo'
+            const [assigneeData, approverId, projectId, clientId] = await Promise.all([
+              resolveAssignees(cell(row, iAssignee)),
+              cell(row, iApprover) ? resolveApprover(cell(row, iApprover)) : Promise.resolve(null),
+              resolveProject(cell(row, iProject)),
+              resolveClient(cell(row, iClient)),
+            ])
 
-          const assigneeData = await resolveAssignees(cell(row, iAssignee))
-          const approverId = cell(row, iApprover) ? await resolveApprover(cell(row, iApprover)) : null
-          const dueDate = cellDate(row, iDue)
-          const projectId = await resolveProject(cell(row, iProject))
-          const clientId = await resolveClient(cell(row, iClient))
+            if (cell(row, iApprover) && !approverId) {
+              results.tasks.errors.push(`"${title}": approver must be an active owner/admin/manager in this organisation`)
+            }
 
-          if (cell(row, iApprover) && !approverId) {
-            results.tasks.errors.push(
-              `"${title}": approver must be an active owner/admin/manager in this organisation`
-            )
-          }
-
-          const customFields =
-            assigneeData.extra.length > 0
-              ? { _co_assignees: assigneeData.extra }
-              : null
-
-          const { error } = await admin.from('tasks').insert({
-            org_id: orgId,
-            title: title.trim(),
-            description: cell(row, iDesc) || null,
-            status: validStatus,
-            priority,
-            project_id: projectId,
-            client_id: clientId,
-            assignee_id: assigneeData.primary,
-            approver_id: approverId,
-            approval_required: !!approverId,
-            due_date: dueDate,
-            estimated_hours: parseNumber(cell(row, iHours)),
-            created_by: user.id,
-            is_recurring: false,
-            custom_fields: customFields,
-          })
-
+            toInsertTasks.push({
+              org_id: orgId,
+              title: title.trim(),
+              description: cell(row, iDesc) || null,
+              status: validStatus,
+              priority,
+              project_id: projectId,
+              client_id: clientId,
+              assignee_id: assigneeData.primary,
+              approver_id: approverId,
+              approval_required: !!approverId,
+              due_date: cellDate(row, iDue),
+              estimated_hours: parseNumber(cell(row, iHours)),
+              created_by: user.id,
+              is_recurring: false,
+              custom_fields: assigneeData.extra.length > 0 ? { _co_assignees: assigneeData.extra } : null,
+            })
+          }))
+        }
+        const TASK_INSERT_BATCH = 200
+        for (let bi = 0; bi < toInsertTasks.length; bi += TASK_INSERT_BATCH) {
+          const batch = toInsertTasks.slice(bi, bi + TASK_INSERT_BATCH)
+          const { error } = await admin.from('tasks').insert(batch)
           if (error) {
-            results.tasks.errors.push(`"${title}": ${error.message}`)
-            results.tasks.skipped++
+            results.tasks.errors.push(`Batch insert error: ${error.message}`)
+            results.tasks.skipped += batch.length
           } else {
-            results.tasks.created++
+            results.tasks.created += batch.length
           }
         }
       }
@@ -892,96 +928,101 @@ export async function POST(request: NextRequest) {
         const iDesc       = findCol(headers, 'description', 'desc')
         const iCompliance = findCol(headers, 'compliancetasktype', 'compliance', 'compliancetask')
         const oneTimeCaLinks: CaLink[] = []
+        const toInsertOneTasks: any[] = []
 
-        for (const row of dataRows(rows, hdrIdx)) {
-          if (isSampleRow(row)) continue
+        const allOneTimeRows = dataRows(rows, hdrIdx).filter(r => !isSampleRow(r))
+        const ONE_CHUNK = 20
+        for (let ci = 0; ci < allOneTimeRows.length; ci += ONE_CHUNK) {
+          await Promise.allSettled(allOneTimeRows.slice(ci, ci + ONE_CHUNK).map(async (row) => {
+            const title = cell(row, iTitle)
+            if (!title) return
 
-          const title = cell(row, iTitle)
-          if (!title) continue
-
-          const priority = cell(row, iPriority) || 'medium'
-          if (!['none', 'low', 'medium', 'high', 'urgent'].includes(priority)) {
-            results.onetasks.errors.push(`"${title}": invalid priority "${priority}"`)
-            results.onetasks.skipped++
-            continue
-          }
-
-          const assigneeData = await resolveAssignees(cell(row, iAssignee))
-          const approverId = cell(row, iApprover) ? await resolveApprover(cell(row, iApprover)) : null
-          const clientId = await resolveClient(cell(row, iClient))
-
-          const complianceType = cell(row, iCompliance)
-          const compTask = complianceType ? findComplianceTask(complianceType) : null
-          // Match against CA Master names first (fuzzy), then fall back to static list
-          const oneTimeMasterEntry = complianceType
-            ? (findMasterEntry(complianceType) ?? (compTask ? findMasterEntry(compTask.title) : undefined))
-            : undefined
-          const isComplianceRow = !!(compTask || oneTimeMasterEntry)
-          // Use the exact master name so it maps back correctly in the Kanban
-          const masterName = oneTimeMasterEntry
-            ? ((_allCaMasterTasks ?? []).find((t: any) => t.id === oneTimeMasterEntry.id)?.name ?? complianceType)
-            : null
-          const finalTitle = masterName ?? (compTask ? compTask.title : title.trim())
-          const finalPriority = compTask?.priority ?? priority
-
-          // For compliance tasks: DB master dates → static default dates → sheet column
-          const dueDate = (() => {
-            if (!isComplianceRow) return cellDate(row, iDue)
-            const dbDates = oneTimeMasterEntry?.dates ?? {}
-            const effective = Object.keys(dbDates).length > 0
-              ? dbDates
-              : findDefaultDates(complianceType || finalTitle)
-            return nextDueDateFromMaster(effective)
-          })()
-
-          if (cell(row, iApprover) && !approverId) {
-            results.onetasks.errors.push(
-              `"${finalTitle}": approver must be an active owner/admin/manager in this organisation`
-            )
-          }
-
-          const customFields: Record<string, any> = {
-            ...(isComplianceRow ? { _ca_compliance: true } : {}),
-            ...(assigneeData.extra.length > 0 ? { _co_assignees: assigneeData.extra } : {}),
-          }
-          const customFieldsOrNull = Object.keys(customFields).length > 0 ? customFields : null
-
-          if (isComplianceRow) {
-            // Compliance rows: only create the assignment, let cron spawn the task N days before
-            if (oneTimeMasterEntry?.id && clientId) {
-              oneTimeCaLinks.push({
-                masterTaskId: oneTimeMasterEntry.id,
-                clientId,
-                assigneeId:   assigneeData.primary ?? null,
-                approverId:   approverId ?? null,
-              })
-              results.onetasks.created++
-            }
-          } else {
-            // Regular one-time tasks: create immediately
-            const { data: newTask, error } = await admin.from('tasks').insert({
-              org_id: orgId,
-              title: finalTitle,
-              description: cell(row, iDesc) || null,
-              status: 'todo',
-              priority: finalPriority,
-              project_id: null,
-              client_id: clientId,
-              assignee_id: assigneeData.primary,
-              approver_id: approverId,
-              approval_required: !!approverId,
-              due_date: dueDate,
-              estimated_hours: parseNumber(cell(row, iHours)),
-              created_by: user.id,
-              is_recurring: false,
-              custom_fields: customFieldsOrNull,
-            }).select('id').single()
-            if (error) {
-              results.onetasks.errors.push(`"${finalTitle}": ${error.message}`)
+            const priority = cell(row, iPriority) || 'medium'
+            if (!['none', 'low', 'medium', 'high', 'urgent'].includes(priority)) {
+              results.onetasks.errors.push(`"${title}": invalid priority "${priority}"`)
               results.onetasks.skipped++
-            } else {
-              results.onetasks.created++
+              return
             }
+
+            const [assigneeData, approverId, clientId] = await Promise.all([
+              resolveAssignees(cell(row, iAssignee)),
+              cell(row, iApprover) ? resolveApprover(cell(row, iApprover)) : Promise.resolve(null),
+              resolveClient(cell(row, iClient)),
+            ])
+
+            const complianceType = cell(row, iCompliance)
+            const compTask = complianceType ? findComplianceTask(complianceType) : null
+            const oneTimeMasterEntry = complianceType
+              ? (findMasterEntry(complianceType) ?? (compTask ? findMasterEntry(compTask.title) : undefined))
+              : undefined
+            const isComplianceRow = !!(compTask || oneTimeMasterEntry)
+            const masterName = oneTimeMasterEntry
+              ? ((_allCaMasterTasks ?? []).find((t: any) => t.id === oneTimeMasterEntry.id)?.name ?? complianceType)
+              : null
+            const finalTitle = masterName ?? (compTask ? compTask.title : title.trim())
+            const finalPriority = compTask?.priority ?? priority
+
+            const dueDate = (() => {
+              if (!isComplianceRow) return cellDate(row, iDue)
+              const dbDates = oneTimeMasterEntry?.dates ?? {}
+              const effective = Object.keys(dbDates).length > 0
+                ? dbDates
+                : findDefaultDates(complianceType || finalTitle)
+              return nextDueDateFromMaster(effective)
+            })()
+
+            if (cell(row, iApprover) && !approverId) {
+              results.onetasks.errors.push(`"${finalTitle}": approver must be an active owner/admin/manager in this organisation`)
+            }
+
+            const customFields: Record<string, any> = {
+              ...(isComplianceRow ? { _ca_compliance: true } : {}),
+              ...(assigneeData.extra.length > 0 ? { _co_assignees: assigneeData.extra } : {}),
+            }
+            const customFieldsOrNull = Object.keys(customFields).length > 0 ? customFields : null
+
+            if (isComplianceRow) {
+              if (oneTimeMasterEntry?.id && clientId) {
+                oneTimeCaLinks.push({
+                  masterTaskId: oneTimeMasterEntry.id,
+                  clientId,
+                  assigneeId: assigneeData.primary ?? null,
+                  approverId: approverId ?? null,
+                })
+                results.onetasks.created++
+              }
+            } else {
+              toInsertOneTasks.push({
+                org_id: orgId,
+                title: finalTitle,
+                description: cell(row, iDesc) || null,
+                status: 'todo',
+                priority: finalPriority,
+                project_id: null,
+                client_id: clientId,
+                assignee_id: assigneeData.primary,
+                approver_id: approverId,
+                approval_required: !!approverId,
+                due_date: dueDate,
+                estimated_hours: parseNumber(cell(row, iHours)),
+                created_by: user.id,
+                is_recurring: false,
+                custom_fields: customFieldsOrNull,
+              })
+            }
+          }))
+        }
+
+        // Batch insert regular one-time tasks
+        const ONE_INSERT_BATCH = 200
+        for (let bi = 0; bi < toInsertOneTasks.length; bi += ONE_INSERT_BATCH) {
+          const batch = toInsertOneTasks.slice(bi, bi + ONE_INSERT_BATCH)
+          const { error } = await admin.from('tasks').insert(batch)
+          if (error) {
+            results.onetasks.errors.push(`Batch insert error: ${error.message}`)
+            results.onetasks.skipped += batch.length
+          } else {
+            results.onetasks.created += batch.length
           }
         }
 
@@ -1016,66 +1057,68 @@ export async function POST(request: NextRequest) {
 
         const VALID_FREQS = ['daily', 'weekly', 'bi_weekly', 'monthly', 'quarterly', 'annual']
 
-        for (const row of dataRows(rows, hdrIdx)) {
-          if (isSampleRow(row)) continue
+        const toInsertRecurring: any[] = []
+        const allRecurringRows = dataRows(rows, hdrIdx).filter(r => !isSampleRow(r))
+        const REC_CHUNK = 20
+        for (let ci = 0; ci < allRecurringRows.length; ci += REC_CHUNK) {
+          await Promise.allSettled(allRecurringRows.slice(ci, ci + REC_CHUNK).map(async (row) => {
+            const title = cell(row, iTitle)
+            if (!title) return
 
-          const title = cell(row, iTitle)
-          if (!title) continue
+            const freq = norm(cell(row, iFreq))
+            if (!VALID_FREQS.includes(freq)) {
+              results.recurring.errors.push(`"${title}": invalid frequency "${freq}"`)
+              results.recurring.skipped++
+              return
+            }
 
-          const freq = norm(cell(row, iFreq))
-          if (!VALID_FREQS.includes(freq)) {
-            results.recurring.errors.push(`"${title}": invalid frequency "${freq}"`)
-            results.recurring.skipped++
-            continue
-          }
+            const priority = cell(row, iPriority) || 'medium'
+            if (!['none', 'low', 'medium', 'high', 'urgent'].includes(priority)) {
+              results.recurring.errors.push(`"${title}": invalid priority "${priority}"`)
+              results.recurring.skipped++
+              return
+            }
 
-          const priority = cell(row, iPriority) || 'medium'
-          if (!['none', 'low', 'medium', 'high', 'urgent'].includes(priority)) {
-            results.recurring.errors.push(`"${title}": invalid priority "${priority}"`)
-            results.recurring.skipped++
-            continue
-          }
+            const startDate = cellDate(row, iStart) || new Date().toISOString().split('T')[0]
+            const [assigneeData, approverId, projectId, clientId] = await Promise.all([
+              resolveAssignees(cell(row, iAssignee)),
+              cell(row, iApprover) ? resolveApprover(cell(row, iApprover)) : Promise.resolve(null),
+              resolveProject(cell(row, iProject)),
+              resolveClient(cell(row, iClient)),
+            ])
 
-          const assigneeData = await resolveAssignees(cell(row, iAssignee))
-          const approverId = cell(row, iApprover) ? await resolveApprover(cell(row, iApprover)) : null
-          const startDate = cellDate(row, iStart) || new Date().toISOString().split('T')[0]
-          const projectId = await resolveProject(cell(row, iProject))
-          const clientId = await resolveClient(cell(row, iClient))
+            if (cell(row, iApprover) && !approverId) {
+              results.recurring.errors.push(`"${title}": approver must be an active owner/admin/manager in this organisation`)
+            }
 
-          if (cell(row, iApprover) && !approverId) {
-            results.recurring.errors.push(
-              `"${title}": approver must be an active owner/admin/manager in this organisation`
-            )
-          }
-
-          const customFields =
-            assigneeData.extra.length > 0
-              ? { _co_assignees: assigneeData.extra }
-              : null
-
-          const { error } = await admin.from('tasks').insert({
-            org_id: orgId,
-            title: title.trim(),
-            description: cell(row, iDesc) || null,
-            priority,
-            status: 'todo',
-            is_recurring: true,
-            frequency: freq,
-            next_occurrence_date: nextOccurrence(freq, startDate),
-            assignee_id: assigneeData.primary,
-            approver_id: approverId,
-            approval_required: !!approverId,
-            project_id: projectId,
-            client_id: clientId,
-            created_by: user.id,
-            custom_fields: customFields,
-          })
-
+            toInsertRecurring.push({
+              org_id: orgId,
+              title: title.trim(),
+              description: cell(row, iDesc) || null,
+              priority,
+              status: 'todo',
+              is_recurring: true,
+              frequency: freq,
+              next_occurrence_date: nextOccurrence(freq, startDate),
+              assignee_id: assigneeData.primary,
+              approver_id: approverId,
+              approval_required: !!approverId,
+              project_id: projectId,
+              client_id: clientId,
+              created_by: user.id,
+              custom_fields: assigneeData.extra.length > 0 ? { _co_assignees: assigneeData.extra } : null,
+            })
+          }))
+        }
+        const REC_INSERT_BATCH = 200
+        for (let bi = 0; bi < toInsertRecurring.length; bi += REC_INSERT_BATCH) {
+          const batch = toInsertRecurring.slice(bi, bi + REC_INSERT_BATCH)
+          const { error } = await admin.from('tasks').insert(batch)
           if (error) {
-            results.recurring.errors.push(`"${title}": ${error.message}`)
-            results.recurring.skipped++
+            results.recurring.errors.push(`Batch insert error: ${error.message}`)
+            results.recurring.skipped += batch.length
           } else {
-            results.recurring.created++
+            results.recurring.created += batch.length
           }
         }
       }
@@ -1106,83 +1149,59 @@ export async function POST(request: NextRequest) {
 
         const caLinksToCreate: CaLink[] = []
 
-        for (const row of dataRows(rows, hdrIdx)) {
-          if (isSampleRow(row)) continue
+        const allCaRows = dataRows(rows, hdrIdx).filter(r => !isSampleRow(r))
+        const CA_CHUNK = 20
+        for (let ci = 0; ci < allCaRows.length; ci += CA_CHUNK) {
+          await Promise.allSettled(allCaRows.slice(ci, ci + CA_CHUNK).map(async (row) => {
+            const typeName = cell(row, iType)
+            if (!typeName) return
 
-          const typeName = cell(row, iType)
-          if (!typeName) continue
+            const typeNorm = typeName.toLowerCase()
+            if (
+              typeNorm.includes('select') || typeNorm.includes('dropdown') ||
+              typeNorm.includes('enter') || typeNorm.includes('type here') ||
+              typeNorm.includes('e.g') || typeNorm.includes('example')
+            ) {
+              results.compliance.skipped++
+              return
+            }
 
-          // Skip obvious placeholder / instruction values silently
-          const typeNorm = typeName.toLowerCase()
-          if (
-            typeNorm.includes('select') || typeNorm.includes('dropdown') ||
-            typeNorm.includes('enter') || typeNorm.includes('type here') ||
-            typeNorm.includes('e.g') || typeNorm.includes('example')
-          ) {
-            results.compliance.skipped++
-            continue
-          }
+            const masterEntry = findMasterEntry(typeName)
+            const compTask    = findComplianceTask(typeName)
 
-          // Match against your CA Master names first (fuzzy), then fall back to static list
-          const masterEntry = findMasterEntry(typeName)
-          const compTask    = findComplianceTask(typeName)
+            if (!masterEntry && !compTask) {
+              results.compliance.errors.push(`"${typeName}": not found in your CA Master or recognised compliance tasks`)
+              results.compliance.skipped++
+              return
+            }
 
-          if (!masterEntry && !compTask) {
-            results.compliance.errors.push(`"${typeName}": not found in your CA Master or recognised compliance tasks`)
-            results.compliance.skipped++
-            continue
-          }
+            const canonicalTitle = masterEntry
+              ? (_allCaMasterTasks ?? []).find((t: any) => t.id === masterEntry.id)?.name ?? typeName
+              : compTask!.title
 
-          // Canonical title: prefer the exact master name so it maps back correctly
-          const canonicalTitle = masterEntry
-            ? (_allCaMasterTasks ?? []).find((t: any) => t.id === masterEntry.id)?.name ?? typeName
-            : compTask!.title
+            const [clientId, assigneeData, approverId] = await Promise.all([
+              resolveClient(cell(row, iClient)),
+              resolveAssignees(cell(row, iAssignee)),
+              cell(row, iApprover) ? resolveApprover(cell(row, iApprover)) : Promise.resolve(null),
+            ])
 
-          const clientId = await resolveClient(cell(row, iClient))
-          const assigneeData = await resolveAssignees(cell(row, iAssignee))
-          const approverId = cell(row, iApprover) ? await resolveApprover(cell(row, iApprover)) : null
-          const priority = cell(row, iPriority) || compTask?.priority || 'medium'
+            if (cell(row, iApprover) && !approverId) {
+              results.compliance.errors.push(`"${canonicalTitle}": approver must be an active owner/admin/manager in this organisation`)
+            }
 
-          // Due date: DB master dates → static default dates → null
-          const masterDates   = masterEntry?.dates ?? {}
-          const effectiveDates = Object.keys(masterDates).length > 0
-            ? masterDates
-            : findDefaultDates(typeName)
-          const dueDate = nextDueDateFromMaster(effectiveDates)
-
-          const freqRaw = cell(row, iFreq)
-          const freqMap: Record<string, string> = {
-            daily: 'daily',
-            weekly: 'weekly',
-            monthly: 'monthly',
-            quarterly: 'quarterly',
-            annual: 'annual',
-            yearly: 'annual',
-            biweekly: 'bi_weekly',
-            fortnightly: 'bi_weekly',
-          }
-          const frequency = freqRaw ? (freqMap[norm(freqRaw)] ?? 'monthly') : null
-
-          if (cell(row, iApprover) && !approverId) {
-            results.compliance.errors.push(
-              `"${canonicalTitle}": approver must be an active owner/admin/manager in this organisation`
-            )
-          }
-
-          // Don't create tasks here — cron will spawn them N days before due date
-          // Just create the assignment so client appears in Step 3 with "upcoming" status
-          if (masterEntry?.id && clientId) {
-            caLinksToCreate.push({
-              masterTaskId: masterEntry.id,
-              clientId,
-              assigneeId: assigneeData.primary ?? null,
-              approverId: approverId ?? null,
-            })
-            results.compliance.created++
-          } else {
-            results.compliance.errors.push(`"${canonicalTitle}": ${!clientId ? 'client not found' : 'not found in CA Master — add it in Step 1 first'}`)
-            results.compliance.skipped++
-          }
+            if (masterEntry?.id && clientId) {
+              caLinksToCreate.push({
+                masterTaskId: masterEntry.id,
+                clientId,
+                assigneeId: assigneeData.primary ?? null,
+                approverId: approverId ?? null,
+              })
+              results.compliance.created++
+            } else {
+              results.compliance.errors.push(`"${canonicalTitle}": ${!clientId ? 'client not found' : 'not found in CA Master — add it in Step 1 first'}`)
+              results.compliance.skipped++
+            }
+          }))
         }
 
         await flushCaLinks(caLinksToCreate, user.id)

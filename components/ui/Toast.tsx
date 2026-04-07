@@ -7,10 +7,10 @@ export function ToastContainer() {
   if (!toasts.length) return null
 
   const cfg = {
-    success: { bg: 'rgba(22,163,74,0.1)',    border: 'rgba(22,163,74,0.3)',    color: '#16a34a', icon: CheckCircle },
-    error:   { bg: 'rgba(220,38,38,0.1)',    border: 'rgba(220,38,38,0.3)',    color: '#dc2626', icon: XCircle     },
-    info:    { bg: 'rgba(59,130,246,0.1)',   border: 'rgba(59,130,246,0.3)',   color: '#2563eb', icon: Info         },
-    warning: { bg: 'rgba(202,138,4,0.1)',    border: 'rgba(202,138,4,0.3)',    color: '#ca8a04', icon: AlertTriangle},
+    success: { bg: '#f0fdf4', border: '#86efac', color: '#15803d', icon: CheckCircle },
+    error:   { bg: '#fef2f2', border: '#fca5a5', color: '#b91c1c', icon: XCircle     },
+    info:    { bg: '#eff6ff', border: '#93c5fd', color: '#1d4ed8', icon: Info         },
+    warning: { bg: '#fefce8', border: '#fde047', color: '#a16207', icon: AlertTriangle},
   }
 
   return (
@@ -24,7 +24,7 @@ export function ToastContainer() {
               display:'flex', alignItems:'center', gap:10,
               padding:'11px 14px', borderRadius:10,
               background:bg, border:`1px solid ${border}`,
-              boxShadow:'0 4px 20px rgba(0,0,0,0.1)',
+              boxShadow:'0 4px 20px rgba(0,0,0,0.15)',
               minWidth:240, maxWidth:360,
               pointerEvents:'all',
               animation:'toastIn 0.22s cubic-bezier(0.34,1.56,0.64,1) both',
