@@ -52,8 +52,9 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
 
   const [subtasks,      setSubtasks]      = useState<any[]>([])
   const [subtasksLoaded,setSubtasksLoaded]= useState(false)
-  const [newSubtitle,   setNewSubtitle]   = useState('')
-  const [addingSub,     setAddingSub]     = useState(false)
+  const [newSubtitle,      setNewSubtitle]      = useState('')
+  const [newSubAssigneeId, setNewSubAssigneeId] = useState('')
+  const [addingSub,        setAddingSub]        = useState(false)
   const [attachments,   setAttachments]   = useState<any[]>([])
   const [attLoaded,     setAttLoaded]     = useState(false)
   const [uploading,     setUploading]     = useState(false)
@@ -313,10 +314,11 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     const r = await fetch('/api/tasks', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title: newSubtitle.trim(), parent_task_id: task.id,
-        project_id: task.project_id ?? null, assignee_id: task.assignee_id ?? null }),
+        project_id: task.project_id ?? null,
+        assignee_id: newSubAssigneeId || task.assignee_id || null }),
     })
     const d = await r.json()
-    if (r.ok) { setSubtasks(p => [d.data, ...p]); setNewSubtitle('') }
+    if (r.ok) { setSubtasks(p => [d.data, ...p]); setNewSubtitle(''); setNewSubAssigneeId('') }
     setAddingSub(false)
   }
 
@@ -737,7 +739,9 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                   </div>
                 )}
                 <div>
-                  {subtasks.map(sub => (
+                  {subtasks.map(sub => {
+                    const subAssignee = sub.assignee_id ? members.find(m => m.id === sub.assignee_id) : null
+                    return (
                     <div key={sub.id}
                       style={{ display: 'flex', alignItems: 'center', gap: 10,
                         padding: '8px 20px', borderBottom: '1px solid var(--border-light)',
@@ -764,18 +768,29 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                       }}>
                         {sub.title}
                       </span>
+                      {subAssignee && (
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0,
+                          display:'flex', alignItems:'center', gap:4 }}>
+                          <span style={{ width:16, height:16, borderRadius:'50%', background:'var(--brand-light)',
+                            display:'flex', alignItems:'center', justifyContent:'center',
+                            fontSize:9, fontWeight:700, color:'var(--brand)', flexShrink:0 }}>
+                            {subAssignee.name[0]?.toUpperCase()}
+                          </span>
+                          <span>{subAssignee.name}</span>
+                        </span>
+                      )}
                       {sub.due_date && (
                         <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>
                           {sub.due_date}
                         </span>
                       )}
                     </div>
-                  ))}
+                  )})}
                 </div>
 
                 {/* Inline add subtask - always visible at bottom */}
                 <div style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
+                  display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
                   padding: '10px 20px', borderTop: subtasks.length > 0 ? '1px dashed var(--border)' : 'none',
                   marginTop: subtasks.length === 0 ? 0 : 4,
                 }}>
@@ -788,14 +803,32 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                     onChange={e => setNewSubtitle(e.target.value)}
                     onKeyDown={e => {
                       if (e.key === 'Enter' && newSubtitle.trim()) addSubtask()
-                      if (e.key === 'Escape') setNewSubtitle('')
+                      if (e.key === 'Escape') { setNewSubtitle(''); setNewSubAssigneeId('') }
                     }}
                     placeholder="Add subtask… (Enter to save)"
                     style={{
-                      flex: 1, fontSize: 13, border: 'none', outline: 'none',
+                      flex: 1, minWidth: 120, fontSize: 13, border: 'none', outline: 'none',
                       background: 'transparent', color: 'var(--text-primary)',
                     }}
                   />
+                  {/* Assignee selector for new subtask */}
+                  {members.length > 0 && (
+                    <select
+                      value={newSubAssigneeId}
+                      onChange={e => setNewSubAssigneeId(e.target.value)}
+                      style={{
+                        fontSize: 11, border: '1px solid var(--border)', borderRadius: 6,
+                        padding: '2px 6px', background: 'var(--surface)',
+                        color: newSubAssigneeId ? 'var(--text-primary)' : 'var(--text-muted)',
+                        cursor: 'pointer', flexShrink: 0,
+                      }}
+                    >
+                      <option value="">Assignee</option>
+                      {members.map(m => (
+                        <option key={m.id} value={m.id}>{m.name}</option>
+                      ))}
+                    </select>
+                  )}
                   {addingSub && (
                     <span style={{ fontSize: 11, color: 'var(--brand)' }}>Saving…</span>
                   )}

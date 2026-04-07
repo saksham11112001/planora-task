@@ -29,7 +29,18 @@
       "Bash(grep -h \"CREATE TABLE\\\\|org_id\" /c/Users/saksh/Desktop/planora-task/supabase/migrations/*.sql)",
       "Bash(cat:*)",
       "Read(//tmp/**)",
-      "Bash(grep -i \"org_settings\" /c/Users/saksh/Desktop/planora-task/supabase/MASTER_SCHEMA.sql /c/Users/saksh/Desktop/planora-task/supabase/migrations/*.sql)"
+      "Bash(grep -i \"org_settings\" /c/Users/saksh/Desktop/planora-task/supabase/MASTER_SCHEMA.sql /c/Users/saksh/Desktop/planora-task/supabase/migrations/*.sql)",
+      "Bash(npm install:*)",
+      "Bash(node \"C:\\\\Users\\\\saksh\\\\Desktop\\\\Planora_Session_Changelog.js\")",
+      "Bash(npm root:*)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); [print\\(k,v\\) for k,v in d.get\\(''''dependencies'''',{}\\).items\\(\\)]\")",
+      "Bash(head -120 \"app/\\(app\\)/tasks/MyTasksView.tsx\")",
+      "Bash(ls -la /c/Users/saksh/Desktop/planora-task/app/\\\\\\(app\\\\\\)/)",
+      "Bash(head -60 /c/Users/saksh/Desktop/planora-task/app/\\\\\\(app\\\\\\)/dashboard/DashboardClient.tsx)",
+      "Bash(find /c/Users/saksh/Desktop/planora-task/app -path *tasks/my* -o -path *approvals*)",
+      "Bash(grep -E \"\\\\.\\(tsx|ts\\)$\")",
+      "Bash(ls -la /c/Users/saksh/Desktop/planora-task/app/\\\\\\(app\\\\\\)/tasks/)",
+      "Bash(wc -l /c/Users/saksh/Desktop/planora-task/app/\\\\\\(app\\\\\\)/projects/new/NewProjectForm.tsx)"
     ]
   }
 }

@@ -2,7 +2,7 @@
 import React from 'react'
 import { useState, useTransition } from 'react'
 import { useRouter }    from 'next/navigation'
-import { RefreshCw, CheckCheck, Clock, FolderOpen, Trash2 } from 'lucide-react'
+import { RefreshCw, CheckCheck, Clock, FolderOpen, Trash2, User } from 'lucide-react'
 import { PriorityBadge, Avatar } from '@/components/ui/Badge'
 import { TaskDetailPanel }       from '@/components/tasks/TaskDetailPanel'
 import { InlineOneTimeTask }     from '@/components/tasks/InlineOneTimeTask'
@@ -287,6 +287,18 @@ export function MyTasksView({
     if (failed > 0) toast.error(`${failed} task(s) could not be submitted`)
   }
 
+  async function bulkDelete() {
+    const ids = [...checked]
+    if (!ids.length) return
+    if (!confirm(`Delete ${ids.length} task(s)? They will be moved to Trash.`)) return
+    setChecked(new Set())
+    setTasks(prev => prev.filter(t => !ids.includes(t.id)))
+    const results = await Promise.all(ids.map(id => fetch(`/api/tasks/${id}`, { method: 'DELETE' })))
+    const failed = results.filter(r => !r.ok).length
+    if (ids.length - failed > 0) toast.success(`${ids.length - failed} task(s) deleted`)
+    if (failed > 0) { toast.error(`${failed} task(s) could not be deleted`); refresh() }
+  }
+
   // Approve or reject a task (for managers/approvers)
   async function handleApproveDecision(taskId: string, decision: 'approve' | 'reject') {
     // Optimistic update
@@ -423,6 +435,13 @@ export function MyTasksView({
                 borderRadius:7, fontSize:13, fontWeight:500, cursor:'pointer', display:'flex', alignItems:'center', gap:6 }}>
               <CheckCheck style={{width:13,height:13}}/> Submit for approval
             </button>
+            {canManage && (
+              <button onClick={bulkDelete}
+                style={{ background:'#dc2626', color:'#fff', border:'none', padding:'6px 14px',
+                  borderRadius:7, fontSize:13, fontWeight:500, cursor:'pointer', display:'flex', alignItems:'center', gap:6 }}>
+                <Trash2 style={{width:13,height:13}}/> Delete
+              </button>
+            )}
             <button onClick={() => setChecked(new Set())}
               style={{ background:'none', border:'none', fontSize:12, color:'var(--text-muted)', cursor:'pointer' }}>
               Cancel
@@ -539,13 +558,16 @@ export function MyTasksView({
 
         {/* Universal filter bar */}
         <UniversalFilterBar clients={clients} showSearch showPriority showStatus showDueDate/>
-        <div style={{ display:'grid', gridTemplateColumns:'28px 22px 1fr 160px 100px 110px',
-          alignItems:'center', padding:'8px 18px', borderBottom:`1px solid var(--border)`,
-          background:'var(--surface-subtle)', flexShrink:0, fontSize:11, fontWeight:700,
+        <div style={{ display:'grid', gridTemplateColumns:'28px 22px 1fr 120px 130px 90px 100px 28px',
+          alignItems:'center', padding:'5px 18px', borderBottom:`1px solid var(--border)`,
+          background:'var(--surface-subtle)', flexShrink:0, fontSize:10, fontWeight:700,
           color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.06em' }}>
-          <div/><div/><div>Task name</div><div>Assignee</div>
+          <div/><div/><div>Task name</div>
+          <div>Client</div>
+          <div>Assigned by</div>
           <div style={{textAlign:'center'}}>Due date</div>
           <div style={{textAlign:'center'}}>Priority</div>
+          <div/>
         </div>
 
         <div style={{ flex:1, overflowY:'auto' }}>
@@ -559,24 +581,34 @@ export function MyTasksView({
             if (secTasks.length === 0) return null
             return (
               <div key={sec.key}>
-                <div style={{ display:'flex', alignItems:'center', gap:6, padding:'13px 18px 5px',
-                  fontSize:11, fontWeight:700, textTransform:'uppercase',
+                <div style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 18px 3px',
+                  fontSize:10, fontWeight:700, textTransform:'uppercase',
                   letterSpacing:'0.06em', color:sec.color }}>
                   ▾ {sec.label}
-                  <span style={{ opacity:0.4, fontWeight:400, textTransform:'none', fontSize:11 }}>({secTasks.length})</span>
+                  <span style={{ opacity:0.4, fontWeight:400, textTransform:'none', fontSize:10 }}>({secTasks.length})</span>
                 </div>
                 {secTasks.map(task => {
-                  const ov = isOverdue(task.due_date, task.status)
-                  const assignee = task.assignee as {id:string;name:string}|null
-                  const isPending = task.approval_status === 'pending' || task.status === 'in_review'
+                  const ov         = isOverdue(task.due_date, task.status)
+                  const isPending  = task.approval_status === 'pending' || task.status === 'in_review'
+                  const client     = (task as any).client as {id:string;name:string;color:string}|null
+                  const creator    = (task as any).creator as {id:string;name:string}|null
+                  const isCompliance = (task as any).custom_fields?._ca_compliance === true
+                  const isRecurring  = task.is_recurring === true
+                  const isProject    = !!task.project_id && !isRecurring && !isCompliance
+                  const typeBg = checked.has(task.id) ? 'var(--brand-light)'
+                    : isPending    ? 'var(--pending-surface, #faf5ff)'
+                    : ov           ? 'var(--overdue-surface, #fff9f9)'
+                    : isCompliance ? 'rgba(234,179,8,0.05)'
+                    : isRecurring  ? 'rgba(13,148,136,0.04)'
+                    : isProject    ? 'rgba(124,58,237,0.04)'
+                    : 'var(--surface)'
                   return (
                     <React.Fragment key={task.id}>
                     <div
-                      className="mytasks-row" style={{ display:'grid', gridTemplateColumns:'28px 22px 1fr 160px 100px 110px',
-                        alignItems:'center', padding:'0 18px', minHeight:48,
+                      className="mytasks-row" style={{ display:'grid', gridTemplateColumns:'28px 22px 1fr 120px 130px 90px 100px 28px',
+                        alignItems:'center', padding:'0 18px', minHeight:38,
                         borderBottom:`1px solid var(--border-light)`,
-                        background: checked.has(task.id) ? 'var(--brand-light)'
-                          : isPending ? 'var(--pending-surface, #faf5ff)' : ov ? 'var(--overdue-surface, #fff9f9)' : 'var(--surface)',
+                        background: typeBg,
                         cursor:'pointer' }}
                       onClick={() => setSelTask(selTask?.id === task.id ? null : task)}>
                       <input type="checkbox" checked={checked.has(task.id)}
@@ -591,35 +623,12 @@ export function MyTasksView({
                           display:'flex', alignItems:'center', gap:6 }}>
                           {task.is_recurring && <RefreshCw style={{ flexShrink:0, width:11, height:11, color:'var(--brand)', marginRight:2 }} title="Recurring task"/>}
                           {task.project_id && !task.is_recurring && <FolderOpen style={{ flexShrink:0, width:11, height:11, color:'#7c3aed', marginRight:2 }} title="Project task"/>}
+                          {isCompliance && <span style={{ flexShrink:0, fontSize:9, fontWeight:700, background:'rgba(234,179,8,0.15)', color:'#b45309', padding:'1px 4px', borderRadius:3 }}>CA</span>}
                           <span className="task-title" style={{ overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis', flex:1 }}>{task.title}</span>
                           {isPending && <span style={{ flexShrink:0, fontSize:11, background:'rgba(124,58,237,0.12)',
                             color:'#7c3aed', padding:'1px 5px', borderRadius:3, fontWeight:500 }}>
                             Pending
                           </span>}
-                        </div>
-                        {/* Assignor (approver) + Client inline */}
-                        <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:2, flexWrap:'wrap' }}>
-                          {(task as any).approver && (
-                            <div style={{ fontSize:11, color:'var(--text-muted)', display:'flex', alignItems:'center', gap:3, overflow:'hidden', whiteSpace:'nowrap' }}>
-                              <span style={{ color:'var(--text-muted)', opacity:0.6 }}>Assignor:</span>
-                              <span style={{ color:'var(--text-secondary)', fontWeight:500 }}>{(task as any).approver.name}</span>
-                            </div>
-                          )}
-                          {(task as any).client && (
-                            <div style={{ fontSize:11, color:'var(--text-muted)', display:'flex', alignItems:'center', gap:3, overflow:'hidden', whiteSpace:'nowrap' }}>
-                              <span style={{ width:5, height:5, borderRadius:'50%',
-                                background:(task as any).client?.color??'#ccc', display:'inline-block', flexShrink:0 }}/>
-                              <span style={{ overflow:'hidden', textOverflow:'ellipsis' }}>{(task as any).client?.name}</span>
-                            </div>
-                          )}
-                          {(task as any).project && !((task as any).client) && (
-                            <div style={{ fontSize:11, color:'var(--text-muted)',
-                              display:'flex', alignItems:'center', gap:3, overflow:'hidden', whiteSpace:'nowrap' }}>
-                              <span style={{ width:5, height:5, borderRadius:1,
-                                background:(task as any).project?.color??'#7c3aed', display:'inline-block', flexShrink:0 }}/>
-                              <span style={{ overflow:'hidden', textOverflow:'ellipsis' }}>{(task as any).project?.name}</span>
-                            </div>
-                          )}
                         </div>
                         {/* Mobile: show due date + priority inline */}
                         <div className="show-mobile-meta" style={{ display:'none', alignItems:'center', gap:6, marginTop:2 }}>
@@ -630,9 +639,23 @@ export function MyTasksView({
                           </span>}
                         </div>
                       </div>
-                      <div className="hide-mobile" style={{ display:'flex', alignItems:'center', gap:6 }}>
-                        {assignee && <><Avatar name={assignee.name} size="xs"/>
-                          <span style={{ fontSize:12, color:'var(--text-muted)', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{assignee.name}</span></>}
+                      {/* Client column */}
+                      <div className="hide-mobile" style={{ display:'flex', alignItems:'center', gap:4, overflow:'hidden', paddingRight:8 }}>
+                        {client ? (
+                          <>
+                            <span style={{ width:7, height:7, borderRadius:2, background:client.color, flexShrink:0, display:'inline-block' }}/>
+                            <span style={{ fontSize:12, color:'var(--text-muted)', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{client.name}</span>
+                          </>
+                        ) : <span style={{ fontSize:12, color:'var(--text-muted)' }}>—</span>}
+                      </div>
+                      {/* Assigned by column */}
+                      <div className="hide-mobile" style={{ display:'flex', alignItems:'center', gap:5, overflow:'hidden' }}>
+                        {creator ? (
+                          <>
+                            <User style={{ width:11, height:11, color:'var(--text-muted)', flexShrink:0 }}/>
+                            <span style={{ fontSize:12, color:'var(--text-muted)', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{creator.name}</span>
+                          </>
+                        ) : <span style={{ fontSize:12, color:'var(--text-muted)' }}>—</span>}
                       </div>
                       <div className="hide-mobile" style={{ textAlign:'center', fontSize:13,
                         color: task.due_date===today?'var(--brand)':ov?'#dc2626':'var(--text-muted)',
@@ -642,17 +665,31 @@ export function MyTasksView({
                       <div className="hide-mobile" style={{ display:'flex', justifyContent:'center' }}>
                         <PriorityBadge priority={task.priority}/>
                       </div>
+                      {/* Delete — last grid cell, always in layout but invisible until hover */}
+                      <div style={{ display:'flex', alignItems:'center', justifyContent:'center' }}
+                        onClick={e => e.stopPropagation()}>
+                        {canManage && (
+                          <button onClick={() => deleteTask(task.id)} title="Delete task"
+                            className="delete-task-btn"
+                            style={{ opacity:0, transition:'opacity 0.15s', display:'flex', alignItems:'center',
+                              justifyContent:'center', width:22, height:22, borderRadius:5, border:'none',
+                              background:'transparent', cursor:'pointer', color:'var(--text-muted)' }}
+                            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background='rgba(220,38,38,0.1)'; (e.currentTarget as HTMLElement).style.color='#dc2626' }}
+                            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background='transparent'; (e.currentTarget as HTMLElement).style.color='var(--text-muted)' }}>
+                            <Trash2 style={{ width:11, height:11 }}/>
+                          </button>
+                        )}
+                      </div>
                     </div>
                     {/* Inline subtasks */}
                     {expandedTasks.has(task.id) && (subtaskMap[task.id] ?? []).length > 0 && (
                       <div style={{ background:'var(--surface-subtle)', borderBottom:'1px solid var(--border-light)' }}>
                         {(subtaskMap[task.id] ?? []).map((sub: any) => (
                           <div key={sub.id} style={{ display:'flex', alignItems:'center', gap:8,
-                            padding:'5px 18px 5px 60px', borderBottom:'1px solid var(--border-light)' }}>
+                            padding:'4px 18px 4px 60px', borderBottom:'1px solid var(--border-light)' }}>
                             <button onClick={async e => {
                               e.stopPropagation()
                               const newStatus = sub.status === 'completed' ? 'todo' : 'completed'
-                              // Only CA compliance subtasks require attachment
                               if (newStatus === 'completed' && sub.custom_fields?._compliance_subtask) {
                                 const ar = await fetch(`/api/tasks/${sub.id}/attachments`)
                                 const ad = await ar.json().catch(() => ({ data: [] }))
@@ -667,7 +704,7 @@ export function MyTasksView({
                                 body: JSON.stringify({ status: newStatus, completed_at: newStatus==='completed'?new Date().toISOString():null })
                               })
                             }}
-                              style={{ width:14, height:14, borderRadius:'50%', border:'none', flexShrink:0, cursor:'pointer',
+                              style={{ width:13, height:13, borderRadius:'50%', border:'none', flexShrink:0, cursor:'pointer',
                                 background: sub.status==='completed'?'var(--brand)':'transparent',
                                 outline:`2px solid ${sub.status==='completed'?'var(--brand)':'var(--border)'}`,
                                 display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.15s' }}>
@@ -677,12 +714,12 @@ export function MyTasksView({
                                 </svg>
                               )}
                             </button>
-                            <span style={{ flex:1, fontSize:12,
+                            <span style={{ flex:1, fontSize:11,
                               color: sub.status==='completed'?'var(--text-muted)':'var(--text-primary)',
                               textDecoration: sub.status==='completed'?'line-through':'none' }}>{sub.title}</span>
                             {sub.status !== 'completed' && (
                               <label style={{ cursor:'pointer', flexShrink:0, display:'flex', alignItems:'center',
-                                gap:4, padding:'2px 8px', borderRadius:99, fontSize:10, fontWeight:600,
+                                gap:3, padding:'1px 6px', borderRadius:99, fontSize:10, fontWeight:600,
                                 background:'rgba(13,148,136,0.1)', color:'var(--brand)',
                                 border:'1px solid rgba(13,148,136,0.3)' }} onClick={e => e.stopPropagation()}>
                                 <input type="file" style={{ display:'none' }}
@@ -701,32 +738,6 @@ export function MyTasksView({
                         ))}
                       </div>
                     )}
-                    {/* Delete button — managers only, hover to reveal */}
-                    {canManage && (
-                      <div style={{ display:'flex', justifyContent:'flex-end', padding:'0 18px 4px' }}
-                        onClick={e => e.stopPropagation()}>
-                        <button onClick={() => deleteTask(task.id)}
-                          title="Delete task"
-                          style={{
-                            opacity: 0, transition: 'opacity 0.15s',
-                            display: 'flex', alignItems: 'center', gap: 4,
-                            padding: '3px 8px', borderRadius: 6, border: 'none',
-                            background: 'transparent', cursor: 'pointer',
-                            color: 'var(--text-muted)', fontSize: 11, fontFamily: 'inherit',
-                          }}
-                          className="delete-task-btn"
-                          onMouseEnter={e => {
-                            (e.currentTarget as HTMLElement).style.background = 'rgba(220,38,38,0.1)'
-                            ;(e.currentTarget as HTMLElement).style.color = '#dc2626'
-                          }}
-                          onMouseLeave={e => {
-                            (e.currentTarget as HTMLElement).style.background = 'transparent'
-                            ;(e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'
-                          }}>
-                          <Trash2 style={{ width: 11, height: 11 }}/> Delete
-                        </button>
-                      </div>
-                    )}
                     </React.Fragment>
                   )
                 })}
@@ -742,10 +753,10 @@ export function MyTasksView({
             const hiddenCount = allDone.length - LIST_DONE_PAGE
             return (
               <div>
-                <div style={{ display:'flex', alignItems:'center', gap:6, padding:'13px 18px 5px',
-                  fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'#16a34a' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 18px 3px',
+                  fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'#16a34a' }}>
                   <button onClick={() => setListDoneExpanded(v => !v)}
-                    style={{ background:'none', border:'none', cursor:'pointer', fontSize:11, color:'#16a34a',
+                    style={{ background:'none', border:'none', cursor:'pointer', fontSize:10, color:'#16a34a',
                       display:'flex', alignItems:'center', gap:4, padding:0, fontFamily:'inherit', fontWeight:700 }}>
                     {listDoneExpanded ? '▾' : '▸'} Completed
                     <span style={{ opacity:0.4, fontWeight:400, textTransform:'none' }}>({allDone.length})</span>
@@ -757,12 +768,13 @@ export function MyTasksView({
                   )}
                 </div>
                 {listDoneExpanded && visibleDone.map(task => {
-                  const assignee = task.assignee as {id:string;name:string}|null
+                  const client  = (task as any).client as {id:string;name:string;color:string}|null
+                  const creator = (task as any).creator as {id:string;name:string}|null
                   return (
                     <React.Fragment key={task.id}>
                     <div
-                      className="mytasks-row" style={{ display:'grid', gridTemplateColumns:'28px 22px 1fr 160px 100px 110px',
-                        alignItems:'center', padding:'0 18px', minHeight:48,
+                      className="mytasks-row" style={{ display:'grid', gridTemplateColumns:'28px 22px 1fr 120px 130px 90px 100px 28px',
+                        alignItems:'center', padding:'0 18px', minHeight:38,
                         borderBottom:`1px solid var(--border-light)`,
                         background:'var(--surface)', cursor:'pointer', opacity:0.7 }}
                       onClick={() => setSelTask(selTask?.id === task.id ? null : task)}>
@@ -774,15 +786,41 @@ export function MyTasksView({
                         overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis', paddingRight:8 }}>
                         {task.title}
                       </div>
-                      <div className="hide-mobile" style={{ display:'flex', alignItems:'center', gap:6 }}>
-                        {assignee && <><Avatar name={assignee.name} size="xs"/>
-                          <span style={{ fontSize:12, color:'var(--text-muted)', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{assignee.name}</span></>}
+                      <div className="hide-mobile" style={{ display:'flex', alignItems:'center', gap:4, overflow:'hidden' }}>
+                        {client ? (
+                          <>
+                            <span style={{ width:7, height:7, borderRadius:2, background:client.color, flexShrink:0, display:'inline-block' }}/>
+                            <span style={{ fontSize:12, color:'var(--text-muted)', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{client.name}</span>
+                          </>
+                        ) : <span style={{ fontSize:12, color:'var(--text-muted)' }}>—</span>}
+                      </div>
+                      <div className="hide-mobile" style={{ display:'flex', alignItems:'center', gap:5, overflow:'hidden' }}>
+                        {creator ? (
+                          <>
+                            <User style={{ width:11, height:11, color:'var(--text-muted)', flexShrink:0 }}/>
+                            <span style={{ fontSize:12, color:'var(--text-muted)', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{creator.name}</span>
+                          </>
+                        ) : <span style={{ fontSize:12, color:'var(--text-muted)' }}>—</span>}
                       </div>
                       <div style={{ textAlign:'center', fontSize:13, color:'var(--text-muted)' }}>
                         {task.due_date ? fmtDate(task.due_date) : '—'}
                       </div>
                       <div className="hide-mobile" style={{ display:'flex', justifyContent:'center' }}>
                         <PriorityBadge priority={task.priority}/>
+                      </div>
+                      <div style={{ display:'flex', alignItems:'center', justifyContent:'center' }}
+                        onClick={e => e.stopPropagation()}>
+                        {canManage && (
+                          <button onClick={() => deleteTask(task.id)} title="Delete task"
+                            className="delete-task-btn"
+                            style={{ opacity:0, transition:'opacity 0.15s', display:'flex', alignItems:'center',
+                              justifyContent:'center', width:22, height:22, borderRadius:5, border:'none',
+                              background:'transparent', cursor:'pointer', color:'var(--text-muted)' }}
+                            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background='rgba(220,38,38,0.1)'; (e.currentTarget as HTMLElement).style.color='#dc2626' }}
+                            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background='transparent'; (e.currentTarget as HTMLElement).style.color='var(--text-muted)' }}>
+                            <Trash2 style={{ width:11, height:11 }}/>
+                          </button>
+                        )}
                       </div>
                     </div>
                     </React.Fragment>
@@ -829,10 +867,11 @@ export function MyTasksView({
   return (
     <>
       <style>{`
+        .mytasks-row:hover .delete-task-btn { opacity: 1 !important; }
         @media (max-width: 640px) {
           .hide-mobile { display: none !important; }
           .mytasks-row, .mytasks-header {
-            grid-template-columns: 28px 22px 1fr 32px !important;
+            grid-template-columns: 28px 22px 1fr 28px !important;
           }
           .show-mobile-meta { display: flex !important; }
         }

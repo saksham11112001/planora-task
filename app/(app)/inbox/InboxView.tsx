@@ -1,7 +1,7 @@
 'use client'
 import React from 'react'
 import { useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { CheckCheck, Clock, Trash2 } from 'lucide-react'
 import { InlineOneTimeTask } from '@/components/tasks/InlineOneTimeTask'
 import { CompletionAttachModal } from '@/components/tasks/CompletionAttachModal'
@@ -23,9 +23,11 @@ interface Props {
 }
 
 export function InboxView({ tasks, members, clients, currentUserId, userRole, canCreate, canViewAllTasks }: Props) {
-  const canManage = ['owner','admin','manager'].includes(userRole ?? '')
-  const router    = useRouter()
-  const today     = todayStr()
+  const canManage    = ['owner','admin','manager'].includes(userRole ?? '')
+  const router       = useRouter()
+  const searchParams = useSearchParams()
+  const autoOpen     = searchParams.get('new') === '1'
+  const today        = todayStr()
 
   const [localTasks,      setLocalTasks]      = useState<Task[]>(tasks)
   const [selectedTask,    setSelectedTask]    = useState<Task | null>(null)
@@ -166,6 +168,18 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
     if (failed > 0) toast.error(`${failed} task(s) could not be submitted`)
   }
 
+  async function bulkDelete() {
+    const ids = [...checked]
+    if (!ids.length) return
+    if (!confirm(`Delete ${ids.length} task(s)? They will be moved to Trash.`)) return
+    setChecked(new Set())
+    setLocalTasks(prev => prev.filter(t => !ids.includes(t.id)))
+    const results = await Promise.all(ids.map(id => fetch(`/api/tasks/${id}`, { method: 'DELETE' })))
+    const failed = results.filter(r => !r.ok).length
+    if (ids.length - failed > 0) toast.success(`${ids.length - failed} task(s) deleted`)
+    if (failed > 0) { toast.error(`${failed} task(s) could not be deleted`); startT(() => router.refresh()) }
+  }
+
   async function handleBoardDrop(targetStatus: string) {
     if (!dragTaskId) return
     const task = localTasks.find(t => t.id===dragTaskId)
@@ -231,7 +245,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
 
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-      <style>{`@media(max-width:640px){.hide-mobile{display:none!important}.inbox-task-row{grid-template-columns:36px 22px 1fr 28px!important}}`}</style>
+      <style>{`@media(max-width:640px){.hide-mobile{display:none!important}.inbox-task-row{grid-template-columns:36px 22px 1fr 80px 32px 28px!important}}`}</style>
 
       <div style={{ display:'flex', borderBottom:'1px solid var(--border)', padding:'0 20px', background:'var(--surface)', flexShrink:0 }}>
         {(['List','Board'] as const).map(t => (
@@ -342,6 +356,11 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                 <button onClick={bulkComplete} style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 12px', background:'#0d9488', color:'#fff', border:'none', borderRadius:6, fontSize:12, fontWeight:600, cursor:'pointer' }}>
                   <CheckCheck style={{ width:14, height:14 }}/> Submit for approval
                 </button>
+                {canManage && (
+                  <button onClick={bulkDelete} style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 12px', background:'#dc2626', color:'#fff', border:'none', borderRadius:6, fontSize:12, fontWeight:600, cursor:'pointer' }}>
+                    <Trash2 style={{ width:14, height:14 }}/> Delete
+                  </button>
+                )}
                 <button onClick={() => setChecked(new Set())} style={{ padding:'4px 10px', background:'transparent', border:'none', fontSize:12, color:'var(--text-secondary)', cursor:'pointer' }}>Cancel</button>
               </div>
             )}
@@ -349,7 +368,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
             <div style={{ flex:1, overflowY:'auto', background:'var(--surface)' }}>
               {canCreate && (
                 <div style={{ borderBottom:'1px solid var(--border-light)' }}>
-                  <InlineOneTimeTask members={members} clients={clients} currentUserId={currentUserId}
+                  <InlineOneTimeTask members={members} clients={clients} currentUserId={currentUserId} defaultOpen={autoOpen}
                     onCreated={(newTask) => {
                       if (newTask?.id) setLocalTasks(prev => [{ ...newTask, assignee:members.find(m=>m.id===newTask.assignee_id)??null, client:clients.find(c=>c.id===newTask.client_id)??null } as any, ...prev])
                       startT(() => router.refresh())
@@ -361,7 +380,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                 <div key={section.key}>
                   <div
                     onClick={() => setCollapsedSections(p => { const n=new Set(p); n.has(section.key)?n.delete(section.key):n.add(section.key); return n })}
-                    style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 18px 8px', cursor:'pointer', userSelect:'none', borderBottom:'1px solid var(--border-light)' }}>
+                    style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 18px 5px', cursor:'pointer', userSelect:'none', borderBottom:'1px solid var(--border-light)' }}>
                     <span style={{ fontSize:10, color:'var(--text-muted)', transform:collapsedSections.has(section.key)?'rotate(-90deg)':'none', display:'inline-block', transition:'transform 0.15s' }}>▾</span>
                     <span style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', color:section.color }}>{section.label}</span>
                     <span style={{ fontSize:11, fontWeight:700, padding:'1px 7px', borderRadius:99, background:`${section.color}18`, color:section.color, marginLeft:2 }}>{section.tasks.length}</span>
@@ -372,10 +391,18 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                     const client   = (task as any).client as unknown as {id:string;name:string;color:string}|null
                     const pri      = PRIORITY_CONFIG[task.priority]
                     const isPending = task.status==='in_review' || task.approval_status==='pending'
+                    const isCompliance = (task as any).custom_fields?._ca_compliance === true
+                    const isRecurring  = (task as any).is_recurring === true
+                    const isProject    = !!(task as any).project_id && !isRecurring && !isCompliance
+                    const typeBg = checked.has(task.id) ? '#f0fdfa'
+                      : isCompliance ? 'rgba(234,179,8,0.05)'
+                      : isRecurring  ? 'rgba(13,148,136,0.04)'
+                      : isProject    ? 'rgba(124,58,237,0.04)'
+                      : section.bg
                     return (
                       <div key={task.id}>
                         <div className="inbox-task-row" onClick={() => setSelectedTask(task)}
-                          style={{ display:'grid', gridTemplateColumns:'36px 22px 1fr 110px 80px 32px 28px', alignItems:'center', padding:'0 16px', minHeight:48, borderBottom:'1px solid var(--border-light)', cursor:'pointer', background:checked.has(task.id)?'#f0fdfa':section.bg }}>
+                          style={{ display:'grid', gridTemplateColumns:'36px 22px 1fr 110px 110px 80px 32px 28px', alignItems:'center', padding:'0 16px', minHeight:40, borderBottom:'1px solid var(--border-light)', cursor:'pointer', background:typeBg }}>
                           <input type="checkbox" checked={checked.has(task.id)}
                             onChange={() => setChecked(p => { const s=new Set(p); s.has(task.id)?s.delete(task.id):s.add(task.id); return s })}
                             onClick={e => e.stopPropagation()} style={{ width:13, height:13, accentColor:'#0d9488', cursor:'pointer' }}/>
@@ -386,7 +413,15 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                           </button>
                           <div style={{ minWidth:0, paddingRight:8 }}>
                             <p style={{ fontSize:13, fontWeight:600, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis', color:isComp?'var(--text-muted)':ov?'#f87171':'var(--text-primary)', textDecoration:isComp?'line-through':'none', margin:0 }}>{task.title}</p>
-                            {client && <span style={{ display:'inline-flex', alignItems:'center', gap:3, fontSize:10, color:'var(--text-muted)' }}><span style={{ width:6, height:6, borderRadius:2, background:client.color, display:'inline-block' }}/>{client.name}</span>}
+                          </div>
+                          {/* Client column */}
+                          <div className="hide-mobile" style={{ display:'flex', alignItems:'center', gap:4, overflow:'hidden' }}>
+                            {client ? (
+                              <>
+                                <span style={{ width:7, height:7, borderRadius:2, background:client.color, flexShrink:0, display:'inline-block' }}/>
+                                <span style={{ fontSize:11, color:'var(--text-muted)', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{client.name}</span>
+                              </>
+                            ) : <span style={{ fontSize:11, color:'var(--text-muted)' }}>—</span>}
                           </div>
                           <div className="hide-mobile" style={{ textAlign:'center', fontSize:12, color:ov?'#f87171':task.due_date===today?'var(--brand)':'var(--text-muted)', fontWeight:ov||task.due_date===today?600:400 }}>
                             {task.due_date ? fmtDate(task.due_date) : '—'}

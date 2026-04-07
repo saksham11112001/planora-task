@@ -14,6 +14,7 @@ interface Props {
   clients:        { id: string; name: string; color: string }[]
   currentUserId?: string
   onCreated?:     (task?: any) => void
+  defaultOpen?:   boolean
 }
 
 const PRIORITY_OPTIONS = [
@@ -24,7 +25,7 @@ const PRIORITY_OPTIONS = [
   { value: 'urgent', label: 'Urgent',      color: '#dc2626' },
 ]
 
-export function InlineOneTimeTask({ members, clients, currentUserId, onCreated }: Props) {
+export function InlineOneTimeTask({ members, clients, currentUserId, onCreated, defaultOpen = false }: Props) {
   const router   = useRouter()
   const inputRef = useRef<HTMLInputElement>(null)
   const rowRef   = useRef<HTMLDivElement>(null)
@@ -33,7 +34,7 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated }
   const show     = (key: string) => taskFields[key]?.visible !== false
   const required = (key: string) => taskFields[key]?.mandatory === true
 
-  const [open,       setOpen]       = useState(false)
+  const [open,       setOpen]       = useState(defaultOpen)
   const [saving,     setSaving]     = useState(false)
   const [title,      setTitle]      = useState('')
   const [assignee,   setAssignee]   = useState(currentUserId ?? '')

@@ -435,10 +435,10 @@ export function RecurringView({
             style={{
               display: 'grid',
               gridTemplateColumns: '1fr 10rem 6rem 6rem 6rem 5rem 4.5rem',
-              padding: '10px 16px',
+              padding: '5px 16px',
               borderBottom: '1px solid var(--border)',
               background: 'var(--surface-subtle)',
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: 700,
               color: 'var(--text-muted)',
               textTransform: 'uppercase',
@@ -505,7 +505,7 @@ export function RecurringView({
                     display: 'grid',
                     gridTemplateColumns: '1fr 10rem 6rem 6rem 6rem 5rem 4.5rem',
                     alignItems: 'center',
-                    padding: '10px 16px',
+                    padding: '7px 16px',
                     cursor: 'pointer',
                   }}
                   onClick={() => setSelectedTask(selectedTask?.id === task.id ? null : task)}

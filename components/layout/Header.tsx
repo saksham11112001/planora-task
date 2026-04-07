@@ -107,7 +107,7 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void } = {}) {
   }
 
   const CREATE_ITEMS = [
-    { icon: CheckSquare, label: 'New task',      href: '/inbox' },
+    { icon: CheckSquare, label: 'New task',      href: '/inbox?new=1' },
     { icon: FolderOpen,  label: 'New project',   href: '/projects/new' },
     { icon: Users2,      label: 'New client',     href: '/clients/new' },
     { icon: Clock,       label: 'Log time',       href: '/time' },

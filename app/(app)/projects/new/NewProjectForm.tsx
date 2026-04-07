@@ -284,7 +284,7 @@ export function NewProjectForm({ clients: initialClients, members, orgTemplates 
                   cursor: 'pointer', transition: 'all 0.15s', fontFamily: 'inherit',
                   boxShadow: selectedTemplate === tName ? `0 4px 14px ${tData.color}25` : 'none',
                 }}>
-                <div style={{ fontSize: 22, marginBottom: 6 }}>{tData.icon}</div>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: tData.color, marginBottom: 6, flexShrink: 0 }}/>
                 <div style={{ fontSize: 11, fontWeight: 700, color: selectedTemplate === tName ? tData.color : '#374151', marginBottom: 3, lineHeight: 1.3 }}>{tName}</div>
                 {tData.tasks.length > 0
                   ? <div style={{ fontSize: 10, color: '#9ca3af' }}>{tData.tasks.length} tasks · {tData.tasks.reduce((n, t) => n + (t.subtasks?.length ?? 0), 0)} subtasks</div>
@@ -309,7 +309,9 @@ export function NewProjectForm({ clients: initialClients, members, orgTemplates 
                         cursor: isLoading ? 'wait' : 'pointer', transition: 'all 0.15s', fontFamily: 'inherit',
                         opacity: isLoading ? 0.7 : 1,
                       }}>
-                      <div style={{ fontSize: 22, marginBottom: 6 }}>{isLoading ? '⏳' : '🏢'}</div>
+                      <div style={{ width: 36, height: 36, borderRadius: 10, background: isSelected ? '#0d9488' : '#94a3b8', marginBottom: 6, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {isLoading && <span style={{ fontSize: 12, color: '#fff', fontWeight: 700 }}>…</span>}
+                      </div>
                       <div style={{ fontSize: 10, fontWeight: 700, color: '#0d9488', marginBottom: 2 }}>ORG TEMPLATE</div>
                       <div style={{ fontSize: 11, fontWeight: 700, color: isSelected ? '#0d9488' : '#374151', marginBottom: 3, lineHeight: 1.3 }}>{tmpl.name}</div>
                       <div style={{ fontSize: 10, color: '#9ca3af' }}>
