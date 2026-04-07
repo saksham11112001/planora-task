@@ -60,11 +60,20 @@ export default async function MyTasksPage() {
     }))
     const clientList = (allClients ?? []).map(c => ({ id: c.id, name: c.name, color: c.color }))
 
-    // Filter helper: hide CA compliance tasks that were not properly cron-triggered.
-    // Old import-created tasks have _ca_compliance: true but no _triggered: true.
+    // Filter helper for compliance tasks:
+    // - Cron-triggered tasks (_triggered: true) → always visible
+    // - Old import-created tasks (no _triggered) → visible only if due within 60 days
+    // - Regular tasks → always visible
+    const nowIST   = new Date(Date.now() + 5.5 * 60 * 60 * 1000)
+    const cutoffDt = new Date(nowIST.getTime() + 60 * 24 * 60 * 60 * 1000)
+    const cutoff   = cutoffDt.toISOString().split('T')[0]
     const isVisible = (t: any) => {
       const cf = t.custom_fields
-      if (cf?._ca_compliance === true) return cf?._triggered === true
+      if (cf?._ca_compliance === true) {
+        if (cf._triggered === true) return true
+        const due = t.due_date ?? ''
+        return due !== '' && due <= cutoff
+      }
       return true
     }
 

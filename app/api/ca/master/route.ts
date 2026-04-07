@@ -59,9 +59,9 @@ export async function POST(req: NextRequest) {
       attachment_headers: t.attachment_headers ?? [],
       priority: 'medium', is_active: true,
     }))
-    // Upsert so existing customizations aren't overwritten for existing codes
+    // Upsert — always refresh defaults (attachment_count, attachment_headers, dates, sort_order)
     const { error } = await admin.from('ca_master_tasks')
-      .upsert(rows, { onConflict: 'org_id,code,financial_year', ignoreDuplicates: true })
+      .upsert(rows, { onConflict: 'org_id,code,financial_year', ignoreDuplicates: false })
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ success: true, count: rows.length })
   }
