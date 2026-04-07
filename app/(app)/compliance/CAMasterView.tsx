@@ -265,16 +265,7 @@ function AttachHeadersCell({
 
   const preview = count === 0
     ? <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>—</span>
-    : (
-      <span style={{ fontSize: 12, color: 'var(--text-secondary)', cursor: editable ? 'pointer' : 'default' }}>
-        {headers.slice(0, 2).map((h, i) => (
-          <span key={i} style={{ marginRight: 4, maxWidth: 60, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block' }}>
-            {h || `#${i + 1}`}
-          </span>
-        ))}
-        {count > 2 && <span style={{ color: 'var(--text-muted)' }}>+{count - 2}</span>}
-      </span>
-    )
+    : <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>{count}</span>
 
   return (
     <td style={{ padding: '4px 6px', verticalAlign: 'middle', position: 'relative' }}>
