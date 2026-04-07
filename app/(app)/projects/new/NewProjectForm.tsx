@@ -174,9 +174,43 @@ export function NewProjectForm({ clients: initialClients, members, orgTemplates 
   const [selectedTemplate,     setSelectedTemplate]     = useState<string | null>(null)
   const [templateTasksPreview, setTemplateTasksPreview] = useState<TemplateTask[]>([])
   const [saveAsTemplate,       setSaveAsTemplate]       = useState(false)
+  const [loadingOrgTemplate,   setLoadingOrgTemplate]   = useState<string | null>(null)
   const [addingClient,         setAddingClient]         = useState(false)
   const [newClientName,        setNewClientName]        = useState('')
   const [addingClientLoading,  setAddingClientLoading]  = useState(false)
+
+  async function handleOrgTemplateClick(tmpl: { id: string; name: string; template_tasks: any[] }) {
+    const key = `org_${tmpl.id}`
+    if (selectedTemplate === key) {
+      setSelectedTemplate(null)
+      setTemplateTasksPreview([])
+      return
+    }
+    setSelectedTemplate(key)
+    setLoadingOrgTemplate(tmpl.id)
+    try {
+      const res = await fetch(`/api/tasks?project_id=${tmpl.id}&limit=500`)
+      if (res.ok) {
+        const json = await res.json()
+        const allTasks: any[] = json.data ?? json ?? []
+        const parents = allTasks.filter((t: any) => !t.parent_task_id)
+        const children = allTasks.filter((t: any) => !!t.parent_task_id)
+        const tasks: TemplateTask[] = parents.map((p: any) => ({
+          title: p.title,
+          priority: p.priority ?? 'medium',
+          subtasks: children.filter((c: any) => c.parent_task_id === p.id).map((c: any) => c.title),
+        }))
+        setTemplateTasksPreview(tasks)
+      } else {
+        setTemplateTasksPreview(tmpl.template_tasks ?? [])
+      }
+    } catch {
+      setTemplateTasksPreview(tmpl.template_tasks ?? [])
+    } finally {
+      setLoadingOrgTemplate(null)
+    }
+    if (!name) setName(tmpl.name)
+  }
 
   async function handleAddClient() {
     if (!newClientName.trim()) return
@@ -261,26 +295,29 @@ export function NewProjectForm({ clients: initialClients, members, orgTemplates 
             {orgTemplates.length > 0 && (
               <>
                 <div style={{ width: 1, background: '#e5e7eb', flexShrink: 0, alignSelf: 'stretch', margin: '0 4px' }} />
-                {orgTemplates.map(tmpl => (
-                  <button key={tmpl.id} type="button"
-                    onClick={() => {
-                      const same = selectedTemplate === `org_${tmpl.id}`
-                      setSelectedTemplate(same ? null : `org_${tmpl.id}`)
-                      setTemplateTasksPreview(same ? [] : (tmpl.template_tasks ?? []))
-                      if (!name && !same) setName(tmpl.name)
-                    }}
-                    style={{
-                      width: 154, flexShrink: 0, padding: '12px 14px', borderRadius: 12, textAlign: 'left',
-                      border: selectedTemplate === `org_${tmpl.id}` ? '2px solid #0d9488' : '1.5px solid #e5e7eb',
-                      background: selectedTemplate === `org_${tmpl.id}` ? 'rgba(13,148,136,0.08)' : '#fafafa',
-                      cursor: 'pointer', transition: 'all 0.15s', fontFamily: 'inherit',
-                    }}>
-                    <div style={{ fontSize: 22, marginBottom: 6 }}>🏢</div>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: '#0d9488', marginBottom: 2 }}>ORG TEMPLATE</div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: selectedTemplate === `org_${tmpl.id}` ? '#0d9488' : '#374151', marginBottom: 3, lineHeight: 1.3 }}>{tmpl.name}</div>
-                    <div style={{ fontSize: 10, color: '#9ca3af' }}>{(tmpl.template_tasks ?? []).length} tasks</div>
-                  </button>
-                ))}
+                {orgTemplates.map(tmpl => {
+                  const isSelected = selectedTemplate === `org_${tmpl.id}`
+                  const isLoading = loadingOrgTemplate === tmpl.id
+                  return (
+                    <button key={tmpl.id} type="button"
+                      onClick={() => handleOrgTemplateClick(tmpl)}
+                      disabled={isLoading}
+                      style={{
+                        width: 154, flexShrink: 0, padding: '12px 14px', borderRadius: 12, textAlign: 'left',
+                        border: isSelected ? '2px solid #0d9488' : '1.5px solid #e5e7eb',
+                        background: isSelected ? 'rgba(13,148,136,0.08)' : '#fafafa',
+                        cursor: isLoading ? 'wait' : 'pointer', transition: 'all 0.15s', fontFamily: 'inherit',
+                        opacity: isLoading ? 0.7 : 1,
+                      }}>
+                      <div style={{ fontSize: 22, marginBottom: 6 }}>{isLoading ? '⏳' : '🏢'}</div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: '#0d9488', marginBottom: 2 }}>ORG TEMPLATE</div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: isSelected ? '#0d9488' : '#374151', marginBottom: 3, lineHeight: 1.3 }}>{tmpl.name}</div>
+                      <div style={{ fontSize: 10, color: '#9ca3af' }}>
+                        {isLoading ? 'Loading…' : isSelected ? `${templateTasksPreview.length} tasks` : 'Click to load tasks'}
+                      </div>
+                    </button>
+                  )
+                })}
               </>
             )}
           </div>
