@@ -41,7 +41,7 @@ export async function POST() {
   const { data: assignments, error: asgErr } = await admin
     .from('ca_client_assignments')
     .select(`
-      id, org_id, client_id, assignee_id, approver_id, created_at,
+      id, org_id, client_id, assignee_id, approver_id, created_at, start_date,
       master_task:ca_master_tasks(id, name, priority, dates, days_before_due)
     `)
     .eq('org_id', mb.org_id)
@@ -66,12 +66,6 @@ export async function POST() {
   )
 
   // ── 3. Walk each assignment × each due date ───────────────────────
-  // Manual trigger backfills up to 3 months of overdue tasks so admins
-  // doing mid-year setup see all recent compliance tasks as overdue.
-  const threeMonthsAgo = new Date(nowIST)
-  threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
-  const threeMonthsAgoStr = threeMonthsAgo.toISOString().split('T')[0]
-
   let spawned = 0
   let skipped = 0
   const errors: string[] = []
@@ -85,8 +79,16 @@ export async function POST() {
 
     if (Object.keys(dates).length === 0) { skipped++; continue }
 
+    // Use the assignment's start_date as the lower bound for backfill.
+    // Falls back to created_at date so tasks before this client was set up are never spawned.
+    const startDateStr: string = (asgn as any).start_date
+      ?? asgn.created_at.split('T')[0]
+
     for (const [monthKey, dueDateStr] of Object.entries(dates)) {
       if (!dueDateStr) continue
+
+      // Skip dates before the client's start date
+      if (dueDateStr < startDateStr) continue
 
       // Compute trigger date
       const dueDate     = new Date(dueDateStr)
@@ -96,9 +98,6 @@ export async function POST() {
 
       // Only spawn when trigger window has arrived (future tasks not yet due)
       if (triggerStr > today) continue
-
-      // Never backfill more than 3 months — tasks older than that are too stale
-      if (dueDateStr < threeMonthsAgoStr) continue
 
       // Skip if already spawned
       const instanceKey = `${asgn.id}__${dueDateStr}`

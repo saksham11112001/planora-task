@@ -48,12 +48,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'assignments array required' }, { status: 400 })
 
   const admin = createAdminClient()
-  const rows = assignments.map((a: { master_task_id: string; client_id: string; assignee_id?: string; approver_id?: string }) => ({
+  const rows = assignments.map((a: { master_task_id: string; client_id: string; assignee_id?: string; approver_id?: string; start_date?: string }) => ({
     org_id: mb.org_id,
     master_task_id: a.master_task_id,
     client_id: a.client_id,
     assignee_id: a.assignee_id ?? null,
     approver_id: a.approver_id ?? null,
+    start_date: a.start_date ?? null,
     created_by: mb.user_id,
     is_active: true,
   }))

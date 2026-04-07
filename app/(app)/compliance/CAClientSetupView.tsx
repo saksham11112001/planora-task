@@ -480,7 +480,7 @@ export function CAClientSetupView({ userRole, financialYear = '2026-27' }: Props
     setSaving(true)
     try {
       /* Determine which tasks to add and which assignments to remove */
-      const toAdd: { master_task_id: string; client_id: string; assignee_id: string | null; approver_id: string | null }[] = []
+      const toAdd: { master_task_id: string; client_id: string; assignee_id: string | null; approver_id: string | null; start_date: string | null }[] = []
       const toRemove: string[] = []
 
       /* Existing assignment ids keyed by master_task_id */
@@ -499,12 +499,14 @@ export function CAClientSetupView({ userRole, financialYear = '2026-27' }: Props
               client_id: selectedClient.id,
               assignee_id: sel.assignee_id || null,
               approver_id: sel.approver_id || null,
+              start_date:  sel.start_date  || null,
             })
           } else {
             /* Update if changed — delete + re-add */
             const changed =
               (sel.assignee_id || null) !== existing.assignee_id ||
-              (sel.approver_id || null) !== existing.approver_id
+              (sel.approver_id || null) !== existing.approver_id ||
+              (sel.start_date  || null) !== ((existing as any).start_date ?? null)
             if (changed) {
               toRemove.push(existing.id)
               toAdd.push({
@@ -512,6 +514,7 @@ export function CAClientSetupView({ userRole, financialYear = '2026-27' }: Props
                 client_id: selectedClient.id,
                 assignee_id: sel.assignee_id || null,
                 approver_id: sel.approver_id || null,
+                start_date:  sel.start_date  || null,
               })
             }
           }
