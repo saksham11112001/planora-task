@@ -357,10 +357,15 @@ export async function POST(request: NextRequest) {
 
     async function flushCaLinks(links: { masterTaskId: string; clientId: string; assigneeId: string | null; approverId: string | null }[], createdBy: string): Promise<string | null> {
       if (links.length === 0) return null
+      // Deduplicate by (master_task_id, client_id) — PostgreSQL upsert rejects duplicate keys in the same batch
+      const seen = new Map<string, typeof links[0]>()
+      for (const l of links) seen.set(`${l.masterTaskId}__${l.clientId}`, l)
+      const unique = Array.from(seen.values())
+
       const { error } = await admin
         .from('ca_client_assignments')
         .upsert(
-          links.map(l => ({
+          unique.map(l => ({
             org_id:         orgId,
             master_task_id: l.masterTaskId,
             client_id:      l.clientId,
