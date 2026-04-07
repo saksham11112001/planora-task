@@ -136,6 +136,12 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
         {nav.ca_compliance_mode && <SI href="/compliance" active={isActive('/compliance')} icon={<FileCheck className="h-4 w-4"/>} label="CA Compliance"/>}
         <Div/>
 
+        {/* TASKS */}
+        <GL>Tasks</GL>
+        {nav.one_time_tasks && <SI href="/inbox"    active={isActive('/inbox')}    icon={<ListTodo className="h-4 w-4"/>} label="One-time tasks"/>}
+        {nav.recurring_tasks && <SI href="/recurring" active={isActive('/recurring')} icon={<RefreshCw className="h-4 w-4"/>} label="Recurring tasks"/>}
+        <Div/>
+
         {/* ORGANISATION */}
         <GL>Organisation</GL>
         {canManage && (
@@ -145,12 +151,6 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
         {nav.time_tracking && isPaid && <SI href="/time" active={isActive('/time')} icon={<Clock className="h-4 w-4"/>} label="Time tracking"/>}
         {nav.reports && isPaid && <SI href="/reports"  active={isActive('/reports')}  icon={<BarChart2 className="h-4 w-4"/>} label="Reports"/>}
         {nav.calendar && <SI href="/calendar" active={isActive('/calendar')} icon={<Calendar className="h-4 w-4"/>} label="Calendar"/>}
-        <Div/>
-
-        {/* TASKS */}
-        <GL>Tasks</GL>
-        {nav.one_time_tasks && <SI href="/inbox"    active={isActive('/inbox')}    icon={<ListTodo className="h-4 w-4"/>} label="One-time tasks"/>}
-        {nav.recurring_tasks && <SI href="/recurring" active={isActive('/recurring')} icon={<RefreshCw className="h-4 w-4"/>} label="Recurring tasks"/>}
         <Div/>
 
         {/* TOOLS */}
