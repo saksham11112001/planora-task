@@ -46,21 +46,11 @@ function CAKanbanView({ userRole, currentUserId }: { userRole: string; currentUs
   // (also persisted to DB via custom_fields._paused_next_date as fallback)
   const pausedDatesRef = useRef<Record<string, string | null>>({})
 
-  /* Load only clients that have assignments in Step 2 + members */
+  /* Load all clients + members */
   useEffect(() => {
-    // Derive client list from assignments — only clients with saved tasks appear
-    fetch('/api/ca/assignments').then(r => r.json()).then(d => {
-      const assignments: any[] = d.data ?? []
-      const seen = new Set<string>()
-      const clientsWithAssignments: KanbanClient[] = []
-      for (const a of assignments) {
-        const c = a.client
-        if (c && !seen.has(c.id)) {
-          seen.add(c.id)
-          clientsWithAssignments.push({ id: c.id, name: c.name, color: c.color ?? '#94a3b8' })
-        }
-      }
-      setClients(clientsWithAssignments)
+    fetch('/api/clients').then(r => r.json()).then(d => {
+      const list: any[] = Array.isArray(d) ? d : (d.data ?? [])
+      setClients(list.map((c: any) => ({ id: c.id, name: c.name, color: c.color ?? '#94a3b8' })))
     }).catch(() => {})
 
     fetch('/api/team').then(r => r.json()).then(d => {
