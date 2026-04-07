@@ -355,9 +355,9 @@ export async function POST(request: NextRequest) {
       approverId:   string | null
     }
 
-    async function flushCaLinks(links: { masterTaskId: string; clientId: string; assigneeId: string | null; approverId: string | null }[], createdBy: string) {
-      if (links.length === 0) return
-      await admin
+    async function flushCaLinks(links: { masterTaskId: string; clientId: string; assigneeId: string | null; approverId: string | null }[], createdBy: string): Promise<string | null> {
+      if (links.length === 0) return null
+      const { error } = await admin
         .from('ca_client_assignments')
         .upsert(
           links.map(l => ({
@@ -371,6 +371,11 @@ export async function POST(request: NextRequest) {
           })),
           { onConflict: 'master_task_id,client_id', ignoreDuplicates: false }
         )
+      if (error) {
+        console.error('[import] flushCaLinks upsert failed:', error.message)
+        return error.message
+      }
+      return null
     }
 
     const results: ImportResults = {
@@ -990,6 +995,12 @@ export async function POST(request: NextRequest) {
                   approverId: approverId ?? null,
                 })
                 results.onetasks.created++
+              } else if (!oneTimeMasterEntry?.id) {
+                results.onetasks.errors.push(`"${finalTitle}": not found in your CA Master tasks (Step 1). Add it in Compliance Master first.`)
+                results.onetasks.skipped++
+              } else if (!clientId) {
+                results.onetasks.errors.push(`"${finalTitle}": client not found — check the client name matches exactly.`)
+                results.onetasks.skipped++
               }
             } else {
               toInsertOneTasks.push({
@@ -1026,7 +1037,13 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        await flushCaLinks(oneTimeCaLinks, user.id)
+        const oneTimeFlushErr = await flushCaLinks(oneTimeCaLinks, user.id)
+        if (oneTimeFlushErr) {
+          results.onetasks.errors.push(`Failed to save compliance assignments to database: ${oneTimeFlushErr}`)
+          // Rollback the created count for the links that failed
+          results.onetasks.created -= oneTimeCaLinks.length
+          results.onetasks.skipped += oneTimeCaLinks.length
+        }
       }
     }
 
@@ -1204,7 +1221,12 @@ export async function POST(request: NextRequest) {
           }))
         }
 
-        await flushCaLinks(caLinksToCreate, user.id)
+        const caFlushErr = await flushCaLinks(caLinksToCreate, user.id)
+        if (caFlushErr) {
+          results.compliance.errors.push(`Failed to save compliance assignments to database: ${caFlushErr}`)
+          results.compliance.created = 0
+          results.compliance.skipped += caLinksToCreate.length
+        }
       }
     }
 
