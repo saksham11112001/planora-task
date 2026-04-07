@@ -80,9 +80,8 @@ export async function POST() {
     if (Object.keys(dates).length === 0) { skipped++; continue }
 
     // Use the assignment's start_date as the lower bound for backfill.
-    // Falls back to created_at date so tasks before this client was set up are never spawned.
-    const startDateStr: string = (asgn as any).start_date
-      ?? asgn.created_at.split('T')[0]
+    // If no start_date is set, apply no lower bound — spawn all triggered tasks.
+    const startDateStr: string = (asgn as any).start_date ?? '2000-01-01'
 
     for (const [monthKey, dueDateStr] of Object.entries(dates)) {
       if (!dueDateStr) continue

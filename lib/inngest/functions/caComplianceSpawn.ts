@@ -45,7 +45,7 @@ export const caComplianceSpawn = inngest.createFunction(
       const { data, error } = await admin
         .from('ca_client_assignments')
         .select(`
-          id, org_id, client_id, assignee_id, approver_id, created_at,
+          id, org_id, client_id, assignee_id, approver_id, created_at, start_date,
           master_task:ca_master_tasks(
             id, name, priority, dates, days_before_due
           )
@@ -74,12 +74,16 @@ export const caComplianceSpawn = inngest.createFunction(
       const dates: Record<string, string> = master.dates ?? {}
       const daysBeforeDue: number         = master.days_before_due ?? 7
 
-      // Use the assignment's creation date as the implicit start date.
-      // This prevents mid-year onboarding from spawning all prior months as overdue.
-      const assignmentStart = (asgn.created_at as string ?? '').split('T')[0]
+      // Use start_date if set (configured in Step 2), otherwise fall back to
+      // created_at so that mid-year onboarding doesn't spawn all prior months.
+      const startDateStr: string = (asgn as any).start_date
+        ?? (asgn.created_at as string ?? '').split('T')[0]
 
       for (const [monthKey, dueDateStr] of Object.entries(dates)) {
         if (!dueDateStr) continue
+
+        // Skip dates before the client's configured start date
+        if (dueDateStr < startDateStr) continue
 
         // Compute trigger date
         const dueDate     = new Date(dueDateStr)
@@ -90,14 +94,9 @@ export const caComplianceSpawn = inngest.createFunction(
         // Only spawn when trigger date has arrived
         if (triggerStr > today) continue
 
-        // Never spawn tasks whose due date has already passed — they would
-        // appear as instant overdue.
+        // Never spawn tasks whose due date has already passed in the daily cron
+        // (past tasks are handled by the manual Spawn Tasks trigger).
         if (dueDateStr < today) continue
-
-        // Skip months whose due date falls before this assignment was created.
-        // Handles mid-year client onboarding: a client assigned in April should
-        // not see Jan–Mar months spawned as overdue tasks.
-        if (assignmentStart && dueDateStr < assignmentStart) continue
 
         // Skip if already spawned for this assignment + due_date
         const instanceKey = `${asgn.id}__${dueDateStr}`
