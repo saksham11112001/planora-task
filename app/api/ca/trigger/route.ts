@@ -69,6 +69,7 @@ export async function POST() {
   let spawned = 0
   let skipped = 0
   const errors: string[] = []
+  const detail: { client_id: string; task: string; month: string; due: string; action: string; reason?: string }[] = []
 
   for (const asgn of assignments) {
     const master = asgn.master_task as any
@@ -86,8 +87,13 @@ export async function POST() {
     for (const [monthKey, dueDateStr] of Object.entries(dates)) {
       if (!dueDateStr) continue
 
+      const logBase = { client_id: asgn.client_id, task: master.name, month: monthKey, due: dueDateStr }
+
       // Skip dates before the client's start date
-      if (dueDateStr < startDateStr) continue
+      if (dueDateStr < startDateStr) {
+        detail.push({ ...logBase, action: 'skipped', reason: `before start_date (${startDateStr})` })
+        continue
+      }
 
       // Compute trigger date
       const dueDate     = new Date(dueDateStr)
@@ -96,11 +102,17 @@ export async function POST() {
       const triggerStr  = triggerDate.toISOString().split('T')[0]
 
       // Only spawn when trigger window has arrived (future tasks not yet due)
-      if (triggerStr > today) continue
+      if (triggerStr > today) {
+        detail.push({ ...logBase, action: 'skipped', reason: `trigger date ${triggerStr} not reached yet (today=${today})` })
+        continue
+      }
 
       // Skip if already spawned
       const instanceKey = `${asgn.id}__${dueDateStr}`
-      if (existingKeys.has(instanceKey)) continue
+      if (existingKeys.has(instanceKey)) {
+        detail.push({ ...logBase, action: 'skipped', reason: 'already spawned' })
+        continue
+      }
 
       // ── Create the parent compliance task ──
       const { data: newTask, error: taskErr } = await admin
@@ -162,6 +174,7 @@ export async function POST() {
       })
 
       existingKeys.add(instanceKey) // prevent duplicate within same request
+      detail.push({ client_id: asgn.client_id, task: master.name, month: monthKey, due: dueDateStr, action: 'spawned' })
       spawned++
     }
   }
@@ -177,6 +190,7 @@ export async function POST() {
     today,
     assignments_checked: assignments.length,
     errors: errors.length > 0 ? errors : undefined,
+    detail,
     message,
   })
 }
