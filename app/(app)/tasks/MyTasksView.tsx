@@ -583,7 +583,9 @@ export function MyTasksView({
           <div/><div/><div>Task name</div>
           <div>Client</div>
           <div>Assigned by</div>
-          <div style={{textAlign:'center'}}>Due date</div>
+          <div style={{textAlign:'center', display:'flex', alignItems:'center', justifyContent:'center', gap:3}}>
+            Due date <span style={{ fontSize:9, opacity:0.6 }}>↑</span>
+          </div>
           <div style={{textAlign:'center'}}>Priority</div>
           <div/>
         </div>
@@ -768,6 +770,19 @@ export function MyTasksView({
               </div>
             )
           })}
+
+          {/* Empty state — shown when all sections empty after filtering */}
+          {displayTasks.length === 0 && (filterCreator || filterClient || filterPriority || filterStatus || filterSearch || dueDateFrom || dueDateTo) && (
+            <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+              padding:'48px 24px', color:'var(--text-muted)', textAlign:'center' }}>
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"
+                style={{ marginBottom:12, opacity:0.3 }}>
+                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+              </svg>
+              <div style={{ fontSize:14, fontWeight:500, marginBottom:4 }}>No tasks match the active filters</div>
+              <div style={{ fontSize:12 }}>Try clearing one or more filters above</div>
+            </div>
+          )}
 
           {/* Completed — paginated to LIST_DONE_PAGE */}
           {(() => {

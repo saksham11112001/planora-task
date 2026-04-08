@@ -843,7 +843,12 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                       }}
                     />
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingLeft: 24 }}>
+                  {newSubtitle.trim() && (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 8, paddingLeft: 24,
+                    marginTop: 2,
+                    opacity: 1, transition: 'opacity 0.15s',
+                  }}>
                     <select
                       value={newSubAssigneeId}
                       onChange={e => setNewSubAssigneeId(e.target.value)}
@@ -868,10 +873,9 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                         outline: 'none', colorScheme: 'light dark', fontFamily: 'inherit',
                       }}
                     />
-                    {addingSub && (
+                    {addingSub ? (
                       <span style={{ fontSize: 11, color: 'var(--brand)' }}>Saving…</span>
-                    )}
-                    {newSubtitle.trim() && !addingSub && (
+                    ) : (
                       <button onClick={addSubtask}
                         style={{
                           fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 6,
@@ -882,6 +886,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                       </button>
                     )}
                   </div>
+                  )}
                 </div>}
 
                 {/* Progress */}

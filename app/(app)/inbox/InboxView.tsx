@@ -38,7 +38,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
   const [viewTab,         setViewTab]         = useState<'List'|'Board'>('List')
 
   // Global filters
-  const { search: searchQuery, clientId: clientFilter, priority: filterPriority, status: filterStatus, assigneeId: filterAssignee, dueDateFrom, dueDateTo } = useFilterStore()
+  const { search: searchQuery, clientId: clientFilter, priority: filterPriority, status: filterStatus, assigneeId: filterAssignee, dueDateFrom, dueDateTo, creatorId: filterCreator } = useFilterStore()
   const [doneBoardExp,    setDoneBoardExp]    = useState(false)
   const [dragTaskId,      setDragTaskId]      = useState<string|null>(null)
   const [dragOverCol,     setDragOverCol]     = useState<string|null>(null)
@@ -222,6 +222,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
     if (filterAssignee && (t.assignee_id ?? (t.assignee as any)?.id) !== filterAssignee) return false
     if (dueDateFrom    && (!t.due_date || t.due_date < dueDateFrom)) return false
     if (dueDateTo      && (!t.due_date || t.due_date > dueDateTo))   return false
+    if (filterCreator  && (t as any).creator?.id !== filterCreator) return false
     return true
   })
   const overdue  = visibleTasks.filter(t => t.status!=='completed' && isOverdue(t.due_date, t.status))
@@ -261,7 +262,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
       {viewTab === 'Board' && (
         <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
           {/* Universal filter bar for board */}
-          <UniversalFilterBar clients={clients} members={members} showSearch showPriority showAssignee showDueDate/>
+          <UniversalFilterBar clients={clients} members={members} showSearch showPriority showAssignee showAssignor showDueDate/>
           <div style={{ flex:1, overflowX:'auto', overflowY:'hidden', padding:'14px 20px', background:'var(--surface-subtle)', display:'flex', gap:12, alignItems:'flex-start' }}>
             {INBOX_BOARD_COLS.map(col => {
               const t2 = todayStr()
@@ -273,6 +274,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
               if (clientFilter)   colTasks = colTasks.filter(t => (t as any).client?.id===clientFilter)
               if (filterPriority) colTasks = colTasks.filter(t => t.priority===filterPriority)
               if (filterAssignee) colTasks = colTasks.filter(t => (t.assignee_id ?? (t.assignee as any)?.id)===filterAssignee)
+              if (filterCreator)  colTasks = colTasks.filter(t => (t as any).creator?.id===filterCreator)
               if (searchQuery)    colTasks = colTasks.filter(t => t.title.toLowerCase().includes(searchQuery.toLowerCase()))
               if (dueDateFrom)    colTasks = colTasks.filter(t => t.due_date && t.due_date>=dueDateFrom)
               if (dueDateTo)      colTasks = colTasks.filter(t => t.due_date && t.due_date<=dueDateTo)

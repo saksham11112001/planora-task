@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { RefreshCw, X, Pencil } from 'lucide-react'
+import { RefreshCw, X, Pencil, User } from 'lucide-react'
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
 import { InlineRecurringTask, FREQ_LABEL } from '@/components/tasks/InlineRecurringTask'
 import { fmtDate } from '@/lib/utils/format'
@@ -467,15 +467,18 @@ export function RecurringView({
 
           {visibleTasks.length === 0 && !canManage && (
             <div style={{ textAlign: 'center', padding: '48px 24px' }}>
-              <RefreshCw
-                style={{
-                  width: 36,
-                  height: 36,
-                  color: 'var(--border)',
-                  margin: '0 auto 12px',
-                }}
-              />
+              <RefreshCw style={{ width: 36, height: 36, color: 'var(--border)', margin: '0 auto 12px' }} />
               <p style={{ fontSize: 14, color: 'var(--text-muted)' }}>No recurring tasks yet</p>
+            </div>
+          )}
+          {visibleTasks.length === 0 && canManage && (clientFilter || filterPriority || filterSearch || filterAssignee || filterCreator) && (
+            <div style={{ display:'flex', flexDirection:'column', alignItems:'center', padding:'48px 24px', color:'var(--text-muted)', textAlign:'center' }}>
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"
+                style={{ marginBottom:12, opacity:0.3 }}>
+                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+              </svg>
+              <div style={{ fontSize:14, fontWeight:500, marginBottom:4 }}>No tasks match the active filters</div>
+              <div style={{ fontSize:12 }}>Try clearing one or more filters above</div>
             </div>
           )}
 
@@ -653,8 +656,13 @@ export function RecurringView({
                     )}
                   </div>
 
-                  <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-muted)', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
-                    {task.creator ? task.creator.name : '—'}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, overflow: 'hidden' }}>
+                    {task.creator ? (
+                      <>
+                        <User style={{ width: 10, height: 10, color: 'var(--text-muted)', flexShrink: 0 }} />
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{task.creator.name}</span>
+                      </>
+                    ) : <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>—</span>}
                   </div>
 
                   <div style={{ textAlign: 'center' }}>
@@ -832,7 +840,7 @@ export function RecurringView({
                       </div>
                     ))}
 
-                    <div style={{ padding: '4px 18px 4px 60px' }}>
+                    <div style={{ padding: '4px 18px 6px 60px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <div
                           style={{
@@ -855,6 +863,8 @@ export function RecurringView({
                             }
                             if (e.key === 'Escape') {
                               setNewSubInputs((prev) => ({ ...prev, [task.id]: '' }))
+                              setNewSubAssignees((prev) => ({ ...prev, [task.id]: '' }))
+                              setNewSubDueDates((prev) => ({ ...prev, [task.id]: '' }))
                             }
                           }}
                           placeholder="Add subtask… (Enter)"
@@ -868,30 +878,30 @@ export function RecurringView({
                           }}
                         />
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, paddingLeft: 21 }}>
+                      {(newSubInputs[task.id] ?? '').trim() && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 5, paddingLeft: 21 }}>
                         <select
                           value={newSubAssignees[task.id] ?? ''}
                           onChange={e => setNewSubAssignees(prev => ({ ...prev, [task.id]: e.target.value }))}
-                          style={{ fontSize: 11, border: '1px solid var(--border)', borderRadius: 6, padding: '2px 6px', background: 'var(--surface)', color: 'var(--text-secondary)', fontFamily: 'inherit' }}
+                          style={{ fontSize: 11, border: '1px solid var(--border)', borderRadius: 6, padding: '2px 6px', background: 'var(--surface)', color: 'var(--text-secondary)', fontFamily: 'inherit', cursor: 'pointer' }}
                         >
-                          <option value=''>Assignee</option>
+                          <option value=''>Assignee (optional)</option>
                           {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                         </select>
                         <input
                           type="date"
                           value={newSubDueDates[task.id] ?? ''}
                           onChange={e => setNewSubDueDates(prev => ({ ...prev, [task.id]: e.target.value }))}
-                          style={{ fontSize: 11, border: '1px solid var(--border)', borderRadius: 6, padding: '2px 6px', background: 'var(--surface)', color: 'var(--text-secondary)', fontFamily: 'inherit' }}
+                          style={{ fontSize: 11, border: '1px solid var(--border)', borderRadius: 6, padding: '2px 6px', background: 'var(--surface)', color: 'var(--text-secondary)', fontFamily: 'inherit', colorScheme: 'light dark' }}
                         />
                         <button
                           onClick={async () => {
-                            if ((newSubInputs[task.id] ?? '').trim()) {
-                              await addSubtask(task.id, newSubInputs[task.id], newSubAssignees[task.id], newSubDueDates[task.id])
-                            }
+                            await addSubtask(task.id, newSubInputs[task.id], newSubAssignees[task.id], newSubDueDates[task.id])
                           }}
-                          style={{ fontSize: 11, padding: '2px 10px', borderRadius: 6, border: 'none', background: 'var(--brand)', color: '#fff', cursor: 'pointer', fontFamily: 'inherit' }}
+                          style={{ fontSize: 11, fontWeight: 600, padding: '2px 10px', borderRadius: 6, border: 'none', background: 'var(--brand)', color: '#fff', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}
                         >Add</button>
                       </div>
+                      )}
                     </div>
                   </div>
                 )}

@@ -23,7 +23,7 @@ export default async function InboxPage() {
       // Tasks query (role-filtered)
       (() => {
         let q = supabase.from('tasks')
-          .select('id, title, status, priority, due_date, approval_status, approval_required, client_id, assignee_id, is_recurring, estimated_hours, custom_fields, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url)')
+          .select('id, title, status, priority, due_date, approval_status, approval_required, client_id, assignee_id, created_by, is_recurring, estimated_hours, custom_fields, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), creator:users!tasks_created_by_fkey(id, name)')
           .eq('org_id', mb.org_id).is('project_id', null).is('parent_task_id', null).neq('is_archived', true)
           .or('is_recurring.is.null,is_recurring.eq.false')
           .order('created_at', { ascending: false })
@@ -66,6 +66,7 @@ export default async function InboxPage() {
       is_recurring: t.is_recurring ?? false, estimated_hours: t.estimated_hours ?? null,
       due_date: t.due_date ?? null, assignee_id: t.assignee_id ?? null, client_id: t.client_id ?? null,
       approval_status: t.approval_status ?? null, assignee: (t.assignee as any) ?? null,
+      creator: (t as any).creator ?? null,
       client: t.client_id ? (clientMap[t.client_id] ? { id: t.client_id, ...clientMap[t.client_id] } : null) : null,
     }))
 
