@@ -581,7 +581,7 @@ export function MyTasksView({
             if (secTasks.length === 0) return null
             return (
               <div key={sec.key}>
-                <div style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 18px 3px',
+                <div style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 18px 5px',
                   fontSize:10, fontWeight:700, textTransform:'uppercase',
                   letterSpacing:'0.06em', color:sec.color }}>
                   ▾ {sec.label}
@@ -753,7 +753,7 @@ export function MyTasksView({
             const hiddenCount = allDone.length - LIST_DONE_PAGE
             return (
               <div>
-                <div style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 18px 3px',
+                <div style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 18px 5px',
                   fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'#16a34a' }}>
                   <button onClick={() => setListDoneExpanded(v => !v)}
                     style={{ background:'none', border:'none', cursor:'pointer', fontSize:10, color:'#16a34a',

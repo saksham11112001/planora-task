@@ -286,7 +286,7 @@ export function RecurringView({
                       display: 'flex',
                       alignItems: 'center',
                       gap: 7,
-                      padding: '10px 12px',
+                      padding: '11px 13px',
                       borderBottom: '1px solid var(--border)',
                     }}
                   >
@@ -299,7 +299,7 @@ export function RecurringView({
                         flexShrink: 0,
                       }}
                     />
-                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
                       {col.label}
                     </span>
                     <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-muted)' }}>
@@ -309,10 +309,10 @@ export function RecurringView({
 
                   <div
                     style={{
-                      padding: 7,
+                      padding: 8,
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: 6,
+                      gap: 7,
                       overflowY: 'auto',
                       flex: 1,
                     }}
@@ -324,7 +324,7 @@ export function RecurringView({
                         style={{
                           background: 'var(--surface)',
                           borderRadius: 8,
-                          padding: '9px 10px',
+                          padding: '10px 11px',
                           cursor: 'pointer',
                           border: `1px solid ${
                             selectedTask?.id === task.id ? 'var(--brand)' : 'var(--border)'
@@ -358,10 +358,10 @@ export function RecurringView({
 
                         <p
                           style={{
-                            fontSize: 12,
-                            fontWeight: 600,
+                            fontSize: 13,
+                            fontWeight: 500,
                             color: 'var(--text-primary)',
-                            lineHeight: 1.3,
+                            lineHeight: 1.4,
                           }}
                         >
                           {task.title}
@@ -435,14 +435,14 @@ export function RecurringView({
             style={{
               display: 'grid',
               gridTemplateColumns: '1fr 10rem 6rem 6rem 6rem 5rem 4.5rem',
-              padding: '5px 16px',
+              padding: '5px 18px',
               borderBottom: '1px solid var(--border)',
               background: 'var(--surface-subtle)',
               fontSize: 10,
               fontWeight: 700,
               color: 'var(--text-muted)',
               textTransform: 'uppercase',
-              letterSpacing: '0.05em',
+              letterSpacing: '0.06em',
               flexShrink: 0,
             }}
           >
@@ -505,7 +505,8 @@ export function RecurringView({
                     display: 'grid',
                     gridTemplateColumns: '1fr 10rem 6rem 6rem 6rem 5rem 4.5rem',
                     alignItems: 'center',
-                    padding: '7px 16px',
+                    padding: '0 18px',
+                    minHeight: 38,
                     cursor: 'pointer',
                   }}
                   onClick={() => setSelectedTask(selectedTask?.id === task.id ? null : task)}
@@ -741,7 +742,7 @@ export function RecurringView({
                           display: 'flex',
                           alignItems: 'center',
                           gap: 8,
-                          padding: '5px 16px 5px 46px',
+                          padding: '4px 18px 4px 60px',
                           borderBottom: '1px solid var(--border-light)',
                         }}
                       >
@@ -822,7 +823,7 @@ export function RecurringView({
                         display: 'flex',
                         alignItems: 'center',
                         gap: 8,
-                        padding: '5px 16px 6px 46px',
+                        padding: '4px 18px 4px 60px',
                       }}
                     >
                       <div
