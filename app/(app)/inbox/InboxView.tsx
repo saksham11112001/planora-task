@@ -45,6 +45,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
   const [subtaskMap,      setSubtaskMap]      = useState<Record<string,{id:string;title:string;status:string}[]>>({})
   const [loadingSubtasks, setLoadingSubtasks] = useState<Set<string>>(new Set())
   const [newSubInputs,    setNewSubInputs]    = useState<Record<string,string>>({})
+  const [newSubAssignees, setNewSubAssignees] = useState<Record<string,string>>({})
   const [completingTask,  setCompletingTask]  = useState<Task | null>(null)
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set(['done','overdue']))
   const BOARD_DONE_PAGE = 5
@@ -94,14 +95,16 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
     startT(() => router.refresh())
   }
 
-  async function addSubtaskInline(parentId: string, title: string) {
+  async function addSubtaskInline(parentId: string, title: string, assigneeId?: string) {
     if (!title.trim()) return
     const r = await fetch('/api/tasks', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: title.trim(), parent_task_id: parentId, status: 'todo' }),
+      body: JSON.stringify({ title: title.trim(), parent_task_id: parentId, status: 'todo', assignee_id: assigneeId || null }),
     })
     const d = await r.json()
     if (r.ok && d.data) setSubtaskMap(p => ({ ...p, [parentId]: [...(p[parentId]??[]), d.data] }))
+    setNewSubInputs(p => ({ ...p, [parentId]: '' }))
+    setNewSubAssignees(p => ({ ...p, [parentId]: '' }))
   }
 
   async function toggleDone(task: Task, e: React.MouseEvent) {
@@ -568,12 +571,44 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                                 <span style={{ fontSize:10, color:'var(--text-muted)', flexShrink:0, opacity:0.5 }}>Edit →</span>
                               </div>
                             )})}
-                            <div style={{ display:'flex', alignItems:'center', gap:8, padding:'5px 16px 6px 58px' }}>
-                              <div style={{ width:14, height:14, borderRadius:'50%', flexShrink:0, border:'1.5px dashed var(--brand)', opacity:0.5 }}/>
-                              <input value={newSubInputs[task.id]??''} onChange={e => setNewSubInputs(p => ({ ...p, [task.id]:e.target.value }))}
-                                onKeyDown={e => { if (e.key==='Enter' && (newSubInputs[task.id]??'').trim()) { addSubtaskInline(task.id, newSubInputs[task.id]); setNewSubInputs(p => ({ ...p, [task.id]:'' })) } }}
-                                placeholder="Add subtask… (Enter)" onClick={e => e.stopPropagation()}
-                                style={{ flex:1, fontSize:12, border:'none', outline:'none', background:'transparent', color:'var(--text-primary)' }}/>
+                            <div style={{ padding:'5px 16px 6px 58px' }}>
+                              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                                <div style={{ width:14, height:14, borderRadius:'50%', flexShrink:0, border:'1.5px dashed var(--brand)', opacity:0.5 }}/>
+                                <input value={newSubInputs[task.id]??''}
+                                  onChange={e => setNewSubInputs(p => ({ ...p, [task.id]:e.target.value }))}
+                                  onKeyDown={async e => {
+                                    if (e.key==='Enter' && (newSubInputs[task.id]??'').trim()) {
+                                      await addSubtaskInline(task.id, newSubInputs[task.id], newSubAssignees[task.id])
+                                    }
+                                    if (e.key==='Escape') {
+                                      setNewSubInputs(p => ({ ...p, [task.id]:'' }))
+                                      setNewSubAssignees(p => ({ ...p, [task.id]:'' }))
+                                    }
+                                  }}
+                                  placeholder="Add subtask… (Enter)" onClick={e => e.stopPropagation()}
+                                  style={{ flex:1, fontSize:12, border:'none', outline:'none', background:'transparent', color:'var(--text-primary)' }}/>
+                              </div>
+                              {/* Assignee + Add button — shown only when title is typed */}
+                              {(newSubInputs[task.id]??'').trim() && (
+                                <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:5, paddingLeft:22 }}>
+                                  <select
+                                    value={newSubAssignees[task.id]??''}
+                                    onChange={e => setNewSubAssignees(p => ({ ...p, [task.id]:e.target.value }))}
+                                    onClick={e => e.stopPropagation()}
+                                    style={{ fontSize:11, border:'1px solid var(--border)', borderRadius:6, padding:'2px 6px', background:'var(--surface)', color:'var(--text-secondary)', fontFamily:'inherit', cursor:'pointer' }}
+                                  >
+                                    <option value=''>Assignee (optional)</option>
+                                    {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                                  </select>
+                                  <button onClick={async e => {
+                                    e.stopPropagation()
+                                    await addSubtaskInline(task.id, newSubInputs[task.id], newSubAssignees[task.id])
+                                  }}
+                                    style={{ fontSize:11, fontWeight:600, padding:'2px 10px', borderRadius:6, border:'none', background:'var(--brand)', color:'#fff', cursor:'pointer', fontFamily:'inherit', flexShrink:0 }}>
+                                    Add
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           </div>
                         )}

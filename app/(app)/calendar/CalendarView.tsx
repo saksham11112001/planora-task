@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { ChevronLeft, ChevronRight, RefreshCw, FolderOpen, CheckSquare, Clock, AlertTriangle, LayoutGrid, AlignJustify } from 'lucide-react'
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
 import type { Task } from '@/types'
@@ -70,6 +70,22 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
   const [memberFilter,  setMemberFilter]  = useState('')
   const [panelTask, setPanelTask] = useState<Task | null>(null)
   const [panelLoading, setPanelLoading] = useState(false)
+  const timelineScrollRef = useRef<HTMLDivElement>(null)
+
+  // Auto-scroll timeline to today when entering timeline view or changing month
+  useEffect(() => {
+    if (viewMode !== 'timeline') return
+    const el = timelineScrollRef.current
+    if (!el) return
+    const CARD_W = 190, GAP = 10
+    const viewingCurrentMonth =
+      year === now.getFullYear() && month === now.getMonth()
+    if (!viewingCurrentMonth) { el.scrollLeft = 0; return }
+    const dayNum = now.getDate()
+    // Centre today in the viewport; fall back to left-aligned if near start
+    const scrollTo = Math.max(0, (dayNum - 1) * (CARD_W + GAP) - (el.clientWidth / 2 - CARD_W / 2))
+    el.scrollLeft = scrollTo
+  }, [viewMode, year, month])
 
   async function openTask(id: string) {
     setPanelLoading(true)
@@ -302,8 +318,8 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
       <div className="page-container">
         {Header}
         {StatsStrip}
-        {/* Horizontal scrollable day columns */}
-        <div style={{ overflowX:'auto', paddingBottom:16 }}>
+        {/* Horizontal scrollable day columns — today centred on load */}
+        <div ref={timelineScrollRef} style={{ overflowX:'auto', paddingBottom:16, scrollBehavior:'smooth' }}>
           <div style={{ display:'flex', gap:10, minWidth:'max-content', alignItems:'flex-start' }}>
             {days.map(dateStr => {
               const d = parseInt(dateStr.split('-')[2])
@@ -315,7 +331,7 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
 
               return (
                 <div key={dateStr}
-                  style={{ width:160, flexShrink:0, borderRadius:10,
+                  style={{ width:190, flexShrink:0, borderRadius:10,
                     border: isToday ? '2px solid var(--brand)' : '1px solid var(--border)',
                     background: isToday ? 'rgba(13,148,136,0.05)' : isWeekend ? 'var(--surface-subtle)' : 'var(--surface)',
                     opacity: isPast && !isToday ? 0.75 : 1,
@@ -407,29 +423,69 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
   }
 
   /* ────────────────────────────────────────────
-     MONTH GRID VIEW (default)
+     MONTH GRID VIEW — fits in one screen, no scroll
+     Available height inside .page-container:
+       100vh - 54px(header) - 64px(padding top+bottom) = 100vh - 118px
   ──────────────────────────────────────────── */
   return (<>
-    <div className="page-container" style={{ display:'flex', gap:20, minHeight:'calc(100vh - 120px)' }}>
+    {/* Override page-container scroll: fill exactly the available height */}
+    <div style={{ height:'calc(100vh - 118px)', display:'flex', flexDirection:'column', overflow:'hidden', gap:0 }}>
 
-      {/* ── Main calendar ── */}
-      <div style={{ flex:1, minWidth:0 }}>
+      {/* ── Controls (month nav + filters) ── */}
+      <div style={{ flexShrink:0 }}>
         {Header}
-        {StatsStrip}
+      </div>
 
-        {/* Day headers */}
-        <div style={{ display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:3,marginBottom:3 }}>
-          {DAY_NAMES.map((d,i) => (
-            <div key={d} style={{ textAlign:'center',padding:'6px 0',fontSize:11,fontWeight:700,
-              color: i===0||i===6 ? '#f87171' : 'var(--text-muted)',
-              textTransform:'uppercase',letterSpacing:'0.05em' }}>{d}</div>
-          ))}
+      {/* ── Stats + legend on same row ── */}
+      <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8, flexShrink:0, flexWrap:'wrap' }}>
+        {[
+          { label:'This month', value:monthTasks.length, color:'#0d9488', bg:'rgba(13,148,136,0.1)', border:'rgba(13,148,136,0.25)' },
+          { label:'Completed',  value:completedCount,   color:'#16a34a', bg:'rgba(22,163,74,0.1)',  border:'rgba(22,163,74,0.25)' },
+          { label:'Pending',    value:pendingCount,     color:'#0891b2', bg:'rgba(8,145,178,0.1)',  border:'rgba(8,145,178,0.25)' },
+          { label:'Overdue',    value:overdueCount,     color: overdueCount>0?'#dc2626':'#94a3b8',
+            bg: overdueCount>0?'rgba(220,38,38,0.1)':'var(--surface)', border: overdueCount>0?'rgba(220,38,38,0.25)':'var(--border)' },
+        ].map(s => (
+          <div key={s.label} style={{ padding:'5px 10px', borderRadius:8, background:s.bg, border:`1px solid ${s.border}`, display:'flex', alignItems:'baseline', gap:6 }}>
+            <span style={{ fontSize:16, fontWeight:800, color:s.color, lineHeight:1 }}>{s.value}</span>
+            <span style={{ fontSize:10, color:'var(--text-muted)' }}>{s.label}</span>
+          </div>
+        ))}
+        {/* Legend inline */}
+        <div style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:12, fontSize:10, color:'var(--text-muted)', flexWrap:'wrap' }}>
+          <span style={{ display:'flex', alignItems:'center', gap:3 }}>
+            <span style={{ width:8,height:8,borderRadius:2,background:'rgba(124,58,237,0.25)',border:'1px solid rgba(124,58,237,0.3)',display:'inline-block' }}/>Project
+          </span>
+          <span style={{ display:'flex', alignItems:'center', gap:3 }}>
+            <span style={{ width:8,height:8,borderRadius:2,background:'rgba(8,145,178,0.25)',border:'1px solid rgba(8,145,178,0.3)',display:'inline-block' }}/>One-time
+          </span>
+          <span style={{ display:'flex', alignItems:'center', gap:3 }}>
+            <span style={{ width:8,height:8,borderRadius:2,background:'rgba(234,179,8,0.25)',border:'1px solid rgba(234,179,8,0.3)',display:'inline-block' }}/>Compliance
+          </span>
+          <span style={{ display:'flex', alignItems:'center', gap:3 }}>
+            <RefreshCw style={{ width:9,height:9,color:'#ea580c' }}/> Recurring
+          </span>
         </div>
+      </div>
 
-        {/* Calendar grid */}
-        <div style={{ display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:3 }}>
-          {cells.map((day,i) => {
-            if (!day) return <div key={`e-${i}`} style={{ minHeight:100 }}/>
+      {/* ── Calendar + day panel side-by-side ── */}
+      <div style={{ flex:1, display:'flex', gap:20, overflow:'hidden' }}>
+
+        {/* Left: calendar grid */}
+        <div style={{ flex:1, minWidth:0, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+
+          {/* Day headers */}
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:3, marginBottom:3, flexShrink:0 }}>
+            {DAY_NAMES.map((d,i) => (
+              <div key={d} style={{ textAlign:'center', padding:'4px 0', fontSize:10, fontWeight:700,
+                color: i===0||i===6 ? '#f87171' : 'var(--text-muted)',
+                textTransform:'uppercase', letterSpacing:'0.05em' }}>{d}</div>
+            ))}
+          </div>
+
+          {/* Calendar grid — fills remaining height */}
+          <div style={{ flex:1, overflow:'hidden', display:'grid', gridTemplateColumns:'repeat(7,1fr)', gridAutoRows:'1fr', gap:3 }}>
+            {cells.map((day,i) => {
+            if (!day) return <div key={`e-${i}`}/>
             const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`
             const dayTasks  = byDate[dateStr] ?? []
             const isToday   = dateStr === todayStr
@@ -445,7 +501,7 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
                 onClick={() => setSelected(isSelected ? null : dateStr)}
                 onMouseEnter={() => setHovered(dateStr)}
                 onMouseLeave={() => setHovered(null)}
-                style={{ minHeight:100, padding:'6px 5px', borderRadius:10,
+                style={{ overflow:'hidden', padding:'5px 4px', borderRadius:8,
                   border: isSelected ? '2px solid var(--brand)'
                     : isToday ? '2px solid var(--brand-border)'
                     : isHovered && dayTasks.length>0 ? '1px solid var(--brand-border)'
@@ -510,13 +566,11 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
               </div>
             )
           })}
-        </div>
-        {Legend}
-      </div>
+          </div>{/* end calendar grid */}
+        </div>{/* end left flex col */}
 
-      {/* ── Day panel ── */}
-      <div style={{ width:300,flexShrink:0 }}>
-        <div style={{ position:'sticky',top:16 }}>
+        {/* ── Day panel (scrollable) ── */}
+        <div style={{ width:280, flexShrink:0, overflowY:'auto', paddingRight:2 }}>
           {selected ? (
             <>
               <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12 }}>
@@ -610,9 +664,10 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
               </p>
             </div>
           )}
-        </div>
-      </div>
-    </div>
+        </div>{/* end day panel */}
+
+      </div>{/* end calendar + panel row */}
+    </div>{/* end height wrapper */}
 
     {panelLoading && (
       <div style={{ position:'fixed',inset:0,zIndex:9998,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.15)' }}>

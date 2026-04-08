@@ -18,23 +18,24 @@ export default async function MyTasksPage() {
 
     const isManager = ['owner','admin','manager'].includes(mb.role)
 
-    // ── ALL data fetched in parallel ──────────────────────────────
+    // ── ALL data fetched in parallel (including assignedByMe) ─────
+    const TASK_COLS = 'id, title, description, status, priority, due_date, assignee_id, approver_id, client_id, project_id, approval_status, approval_required, estimated_hours, is_recurring, custom_fields, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), approver:users!tasks_approver_id_fkey(id, name), creator:users!tasks_created_by_fkey(id, name), projects(id, name, color)'
+
     const [
       { data: tasks },
       { data: approvalTasks },
       { data: members },
-      { data: allClients },
-      { data: clientsData },
+      { data: clientsData },   // single clients fetch — includes status for filter
+      { data: assignedByMeRaw },
     ] = await Promise.all([
-      // My tasks (all statuses for board view)
-      supabase.from('tasks')
-        .select('id, title, description, status, priority, due_date, assignee_id, approver_id, client_id, project_id, approval_status, approval_required, estimated_hours, is_recurring, custom_fields, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), approver:users!tasks_approver_id_fkey(id, name), creator:users!tasks_created_by_fkey(id, name), projects(id, name, color)')
-        .eq('org_id', mb.org_id).eq('assignee_id', user.id).neq('is_archived', true).is('parent_task_id', null)
+      // My tasks (assigned to me, all statuses)
+      supabase.from('tasks').select(TASK_COLS)
+        .eq('org_id', mb.org_id).eq('assignee_id', user.id).neq('is_archived', true)
+        .is('parent_task_id', null)
         .order('due_date', { ascending: true, nullsFirst: false }),
 
       // Tasks needing my approval
-      supabase.from('tasks')
-        .select('id, title, description, status, priority, due_date, assignee_id, approver_id, client_id, project_id, approval_status, approval_required, estimated_hours, is_recurring, custom_fields, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), approver:users!tasks_approver_id_fkey(id, name), creator:users!tasks_created_by_fkey(id, name), projects(id, name, color)')
+      supabase.from('tasks').select(TASK_COLS)
         .eq('org_id', mb.org_id).eq('status', 'in_review').eq('approval_status', 'pending')
         .neq('is_archived', true).is('parent_task_id', null)
         .order('due_date', { ascending: true, nullsFirst: false }),
@@ -43,22 +44,26 @@ export default async function MyTasksPage() {
       supabase.from('org_members')
         .select('user_id, users(id, name)').eq('org_id', mb.org_id).eq('is_active', true),
 
-      // All active clients
-      supabase.from('clients')
-        .select('id, name, color').eq('org_id', mb.org_id).eq('status', 'active').order('name'),
+      // Clients — single fetch, filter active client-side for filter bar
+      supabase.from('clients').select('id, name, color, status').eq('org_id', mb.org_id).order('name'),
 
-      // Client lookup map
-      supabase.from('clients').select('id, name, color').eq('org_id', mb.org_id),
+      // Tasks assigned by me to others — always run, used only when isManager
+      supabase.from('tasks').select(TASK_COLS)
+        .eq('org_id', mb.org_id).eq('created_by', user.id)
+        .neq('is_archived', true).is('parent_task_id', null)
+        .or('custom_fields.is.null,custom_fields.not.cs.{"_ca_compliance":true}')
+        .order('due_date', { ascending: true, nullsFirst: false }),
     ])
 
     const clientMap: Record<string, { id: string; name: string; color: string }> = {}
-    clientsData?.forEach(c => { clientMap[c.id] = c })
+    clientsData?.forEach(c => { clientMap[c.id] = { id: c.id, name: c.name, color: c.color } })
+    const clientList = (clientsData ?? []).filter(c => (c as any).status === 'active')
+      .map(c => ({ id: c.id, name: c.name, color: c.color }))
 
     const memberList = (members ?? []).map(m => ({
       id: (m.users as any)?.id ?? m.user_id,
       name: (m.users as any)?.name ?? 'Unknown',
     }))
-    const clientList = (allClients ?? []).map(c => ({ id: c.id, name: c.name, color: c.color }))
 
     // Only show compliance tasks that were properly triggered (_triggered: true).
     // Old direct-import tasks without this flag stay hidden from My Tasks.
@@ -83,17 +88,8 @@ export default async function MyTasksPage() {
       project: (t.projects as any) ?? null,
     })
 
-    // Tasks assigned by me to others (for managers)
-    const { data: assignedByMeTasks } = isManager
-      ? await supabase.from('tasks')
-          .select('id, title, description, status, priority, due_date, assignee_id, approver_id, client_id, project_id, approval_status, approval_required, estimated_hours, is_recurring, custom_fields, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), approver:users!tasks_approver_id_fkey(id, name), creator:users!tasks_created_by_fkey(id, name), projects(id, name, color)')
-          .eq('org_id', mb.org_id)
-          .eq('created_by', user.id)
-          .neq('is_archived', true)
-          .is('parent_task_id', null)
-          .or('custom_fields.is.null,custom_fields.not.cs.{"_ca_compliance":true}')
-          .order('due_date', { ascending: true, nullsFirst: false })
-      : { data: [] }
+    // Use assignedByMe results only if user is a manager
+    const assignedByMeTasks = isManager ? (assignedByMeRaw ?? []) : []
 
     const taskList     = (tasks ?? []).filter(isVisible).map(enrich)
     const approvalList = (approvalTasks ?? [])
