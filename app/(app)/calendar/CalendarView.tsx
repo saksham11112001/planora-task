@@ -63,7 +63,7 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
   const [year,     setYear]     = useState(now.getFullYear())
   const [month,    setMonth]    = useState(now.getMonth())
   const [filter,   setFilter]   = useState<Filter>('all')
-  const [viewMode, setViewMode] = useState<ViewMode>('month')
+  const [viewMode, setViewMode] = useState<ViewMode>('timeline')
   const [selected, setSelected] = useState<string|null>(null)
   const [hovered,       setHovered]       = useState<string|null>(null)
   const [clientFilter,  setClientFilter]  = useState('')
