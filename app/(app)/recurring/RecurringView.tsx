@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useMemo, useState, useEffect, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { RefreshCw, X, Pencil, User, Trash2 } from 'lucide-react'
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
@@ -97,6 +97,24 @@ export function RecurringView({
       return true
     })
   }, [localTasks, clientFilter, filterPriority, filterSearch, filterAssignee, filterCreator])
+
+  function handleTaskUpdated(fields?: Record<string, unknown>) {
+    if (fields && selectedTask) {
+      setLocalTasks(prev => prev.map(t => t.id === selectedTask.id ? { ...t, ...fields } as Task : t))
+      setSelectedTask(prev => prev ? { ...prev, ...fields } as Task : null)
+    }
+    startT(() => router.refresh())
+  }
+
+  // Pre-fetch subtasks when a task is selected so the expand arrow is instant
+  useEffect(() => {
+    if (!selectedTask?.id || subtaskMap[selectedTask.id]) return
+    fetch(`/api/tasks?parent_id=${selectedTask.id}&limit=50`)
+      .then(r => r.json())
+      .then(d => setSubtaskMap(prev => ({ ...prev, [selectedTask.id]: d.data ?? [] })))
+      .catch(() => {})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTask?.id])
 
   async function refreshSubs(taskId: string) {
     const r = await fetch(`/api/tasks?parent_id=${taskId}&limit=50`)
@@ -997,10 +1015,7 @@ export function RecurringView({
             currentUserId={currentUserId}
             userRole={userRole}
             onClose={() => setSelectedTask(null)}
-            onUpdated={() => {
-              setSelectedTask(null)
-              startT(() => router.refresh())
-            }}
+            onUpdated={handleTaskUpdated}
           />
         </div>
       )}

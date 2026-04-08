@@ -137,6 +137,18 @@ export function MyTasksView({
 
   function refresh() { startT(() => router.refresh()) }
 
+  function handleTaskUpdated(fields?: Record<string, unknown>) {
+    if (fields && selTask) {
+      setTasks(prev => prev.map(t => t.id === selTask.id ? { ...t, ...fields } as Task : t))
+      setSelTask(prev => prev ? { ...prev, ...fields } as Task : null)
+      // If task moved out of pending approval, remove it from that list too
+      if (fields.status && fields.status !== 'in_review') {
+        setPendingTasks(prev => prev.filter(t => t.id !== selTask.id))
+      }
+    }
+    refresh()
+  }
+
   // Universal toggle: ALL tasks go through approval (no direct completion by anyone)
   async function toggleDone(task: Task, e?: React.MouseEvent) {
     e?.stopPropagation()
@@ -926,7 +938,7 @@ export function MyTasksView({
       <TaskDetailPanel task={selTask} members={members} clients={clients}
         currentUserId={currentUserId} userRole={userRole}
         onClose={() => setSelTask(null)}
-        onUpdated={() => { refresh(); setSelTask(null) }}/>
+        onUpdated={handleTaskUpdated}/>
     </>
   )
 
@@ -1178,7 +1190,7 @@ export function MyTasksView({
       </div>
       <TaskDetailPanel task={selTask} members={members} clients={clients}
         currentUserId={currentUserId} userRole={userRole}
-        onClose={() => setSelTask(null)} onUpdated={refresh}/>
+        onClose={() => setSelTask(null)} onUpdated={handleTaskUpdated}/>
     </>
   )
 }

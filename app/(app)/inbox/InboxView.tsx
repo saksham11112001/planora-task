@@ -50,6 +50,24 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set(['done','overdue']))
   const BOARD_DONE_PAGE = 5
 
+  function handleTaskUpdated(fields?: Record<string, unknown>) {
+    if (fields) {
+      setLocalTasks(prev => prev.map(t => t.id === selectedTask?.id ? { ...t, ...fields } as Task : t))
+      setSelectedTask(prev => prev ? { ...prev, ...fields } as Task : null)
+    }
+    startT(() => router.refresh())
+  }
+
+  // Pre-fetch subtasks for a task as soon as it is selected so the expand is instant
+  React.useEffect(() => {
+    if (!selectedTask?.id || subtaskMap[selectedTask.id]) return
+    fetch(`/api/tasks?parent_id=${selectedTask.id}&limit=50`)
+      .then(r => r.json())
+      .then(d => setSubtaskMap(p => ({ ...p, [selectedTask.id]: d.data ?? [] })))
+      .catch(() => {})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTask?.id])
+
   async function toggleExpand(taskId: string) {
     setExpandedTasks(prev => {
       const next = new Set(prev)
@@ -333,7 +351,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
           <TaskDetailPanel task={selectedTask} members={members} clients={clients}
             currentUserId={currentUserId} userRole={userRole}
             onClose={() => setSelectedTask(null)}
-            onUpdated={() => { setSelectedTask(null); startT(() => router.refresh()) }}/>
+            onUpdated={handleTaskUpdated}/>
         </div>
       )}
 
@@ -641,7 +659,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
           <TaskDetailPanel task={selectedTask} members={members} clients={clients}
             currentUserId={currentUserId} userRole={userRole}
             onClose={() => setSelectedTask(null)}
-            onUpdated={() => { startT(() => router.refresh()) }}/>
+            onUpdated={handleTaskUpdated}/>
         </div>
       )}
     </div>

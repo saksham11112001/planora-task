@@ -19,7 +19,7 @@ interface Props {
   currentUserId?: string
   userRole?:      string
   onClose:        () => void
-  onUpdated?:     () => void
+  onUpdated?:     (fields?: Record<string, unknown>) => void
 }
 
 export function TaskDetailPanel({ task, members, clients, currentUserId, userRole, onClose, onUpdated }: Props) {
@@ -72,23 +72,11 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
   const [showConvert, setShowConvert] = useState(false)
   const titleRef = useRef<HTMLTextAreaElement>(null)
 
+  // Fallback: if pre-fetch didn't load yet, load on tab switch
   useEffect(() => {
-    if (tab === 'subtasks' && task) loadSubtasks(task.id)
-    if (tab === 'attachments' && task) {
-      loadAttachments(task.id)
-      const isCaCompliance =
-        (task as any).custom_fields?._ca_compliance === true ||
-        (task as any).custom_fields?._compliance_subtask === true
-      if (isCaCompliance && caHeaders.length === 0) {
-        fetch(`/api/ca/master?name=${encodeURIComponent(task.title)}`)
-          .then(r => r.json())
-          .then(d => {
-            const row = Array.isArray(d.data) ? d.data[0] : d.data
-            if (row?.attachment_headers?.length) setCaHeaders(row.attachment_headers)
-          })
-          .catch(() => {})
-      }
-    }
+    if (!task) return
+    if (tab === 'subtasks' && !subtasksLoaded) loadSubtasks(task.id)
+    if (tab === 'attachments' && !attLoaded)   loadAttachments(task.id)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, task?.id])
 
@@ -100,7 +88,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
       .catch(() => {})
   }, [])
 
-  /* sync from task */
+  /* sync from task + eagerly pre-fetch all tab data in parallel */
   useEffect(() => {
     if (!task) return
     setSubtasksLoaded(false); setAttLoaded(false)
@@ -114,6 +102,31 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     setDueDate(task.due_date ?? '')
     setEstHours(task.estimated_hours?.toString() ?? '')
     setTab('details')
+
+    // Pre-fetch subtasks + attachments in parallel so all tabs are instant
+    const taskId = task.id
+    Promise.all([
+      fetch(`/api/tasks?parent_id=${taskId}&limit=50`).then(r => r.json()).catch(() => ({ data: [] })),
+      fetch(`/api/tasks/${taskId}/attachments`).then(r => r.json()).catch(() => ({ data: [] })),
+    ]).then(([subData, attData]) => {
+      setSubtasks(subData.data ?? [])
+      setSubtasksLoaded(true)
+      setAttachments(attData.data ?? [])
+      setAttLoaded(true)
+    })
+
+    // CA compliance attachment headers
+    const isCaCompliance = (task as any).custom_fields?._ca_compliance === true ||
+      (task as any).custom_fields?._compliance_subtask === true
+    if (isCaCompliance) {
+      fetch(`/api/ca/master?name=${encodeURIComponent(task.title)}`)
+        .then(r => r.json())
+        .then(d => {
+          const row = Array.isArray(d.data) ? d.data[0] : d.data
+          if (row?.attachment_headers?.length) setCaHeaders(row.attachment_headers)
+        })
+        .catch(() => {})
+    }
   }, [task?.id])
 
   /* auto-grow textarea */
@@ -156,7 +169,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
       rollback?.()   // restore previous field value
       return
     }
-    onUpdated?.()
+    onUpdated?.(fields)
   }, [task, onUpdated])
 
   /* debounced patch — for text fields that change frequently */
@@ -264,7 +277,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     })
     if (res.ok) {
       toast.success('Submitted for approval ✓')
-      onUpdated?.()
+      onUpdated?.({ status: 'in_review', approval_status: 'pending' })
     } else {
       setStatus(prevStatus)   // rollback
       const d = await res.json().catch(() => ({}))
@@ -299,7 +312,9 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     if (decision === 'approve') toast.success('Task approved! ✅')
     if (decision === 'reject')  toast.info('Task rejected — sent back to assignee')
     if (decision === 'submit')  toast.success('Submitted for approval ✓')
-    onUpdated?.()
+    const newStatus = decision === 'approve' ? 'completed' : decision === 'reject' ? 'todo' : 'in_review'
+    const newApprovalStatus = decision === 'approve' ? 'approved' : decision === 'reject' ? 'rejected' : 'pending'
+    onUpdated?.({ status: newStatus, approval_status: newApprovalStatus })
   }
 
   /* comment */

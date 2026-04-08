@@ -46,6 +46,14 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
   const today = todayStr()
   const toolbarRef = useRef<HTMLDivElement>(null)
 
+  function handleTaskUpdated(fields?: Record<string, unknown>) {
+    if (fields && selectedTask) {
+      setTasks(prev => prev.map(t => t.id === selectedTask.id ? { ...t, ...fields } as Task : t))
+      setSelectedTask(prev => prev ? { ...prev, ...fields } as Task : null)
+    }
+    startT(() => router.refresh())
+  }
+
   const [filterAssignee, setFilterAssignee] = useState('')
   const [filterPriority, setFilterPriority] = useState('')
   const [filterStatus,   setFilterStatus]   = useState('')
@@ -832,7 +840,7 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
 
       <TaskDetailPanel task={selectedTask} members={members} clients={clients}
         currentUserId={currentUserId} userRole={userRole}
-        onClose={() => setSelectedTask(null)} onUpdated={() => startT(() => router.refresh())}/>
+        onClose={() => setSelectedTask(null)} onUpdated={handleTaskUpdated}/>
     </div>
   )
 }
