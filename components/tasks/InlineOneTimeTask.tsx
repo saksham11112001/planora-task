@@ -64,13 +64,15 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated, 
     setApproverId(''); setFiles([]); setErrors({})
     setCoAssignees([]); setMakeRecurring(false); setRecurringFreq('weekly'); setAddToProjectId('')
     setRequireAttachment(false); setCompSubtasks([])
+    setShowAddClient(false)
   }
 
   const handleClickOutside = useCallback((e: MouseEvent) => {
+    if (showAddClient) return  // don't close form while client modal is open
     if (rowRef.current && !rowRef.current.contains(e.target as Node)) {
       if (!title.trim()) reset()
     }
-  }, [title])
+  }, [title, showAddClient])
 
   useEffect(() => {
     if (!open) return  // only listen when form is actually open

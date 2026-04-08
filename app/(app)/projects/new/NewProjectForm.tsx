@@ -200,7 +200,8 @@ export function NewProjectForm({ clients: initialClients, members, orgTemplates 
           priority: p.priority ?? 'medium',
           subtasks: children.filter((c: any) => c.parent_task_id === p.id).map((c: any) => c.title),
         }))
-        setTemplateTasksPreview(tasks)
+        // Fall back to stored template_tasks if live fetch returns nothing
+        setTemplateTasksPreview(tasks.length > 0 ? tasks : (tmpl.template_tasks ?? []))
       } else {
         setTemplateTasksPreview(tmpl.template_tasks ?? [])
       }

@@ -45,6 +45,13 @@ export async function POST(request: NextRequest) {
           custom_fields } = body
   if (!title?.trim()) return NextResponse.json({ error: 'Title required' }, { status: 400 })
 
+  // If attaching to a parent task, verify it belongs to the same org
+  if (parent_task_id) {
+    const { data: parentTask } = await supabase
+      .from('tasks').select('id, org_id').eq('id', parent_task_id).eq('org_id', mb.org_id).single()
+    if (!parentTask) return NextResponse.json({ error: 'Parent task not found' }, { status: 404 })
+  }
+
   const { data: task, error } = await supabase.from('tasks').insert({
     org_id: mb.org_id, title: title.trim(), description: description || null,
     status, priority, assignee_id: assignee_id || null, client_id: client_id || null,

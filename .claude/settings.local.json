@@ -49,7 +49,11 @@
       "Bash(sed -n '32,52p' \"app/api/projects/route.ts\")",
       "Bash(sed -n '8,55p' \"app/api/projects/[id]/route.ts\")",
       "Bash(sed -n '18,35p' \"app/api/clients/route.ts\")",
-      "Bash(sed -n '8,35p' \"app/api/clients/[id]/route.ts\")"
+      "Bash(sed -n '8,35p' \"app/api/clients/[id]/route.ts\")",
+      "Bash(grep -A 5 -B 5 \"parent_task_id\" /c/Users/saksh/Desktop/planora-task/app/api/tasks/[id]/route.ts)",
+      "Bash(grep -n \"parent\\\\|subtask\" /c/Users/saksh/Desktop/planora-task/app/api/tasks/[id]/route.ts)",
+      "Bash(grep -n \"parent_task_id\" /c/Users/saksh/Desktop/planora-task/app/api/tasks/[id]/route.ts)",
+      "Bash(grep -l \"CREATE TABLE.*tasks\" /c/Users/saksh/Desktop/planora-task/supabase/migrations/*.sql)"
     ]
   }
 }

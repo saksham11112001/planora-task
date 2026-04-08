@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
     try {
       for (const t of templateTasks) {
         const validPriority = ['low','medium','high','urgent'].includes(t.priority) ? t.priority : 'medium'
-        const { data: newTask } = await supabase.from('tasks').insert({
+        const { data: newTask, error: taskErr } = await supabase.from('tasks').insert({
           org_id:      mb.org_id,
           project_id:  data.id,
           title:       t.title,
@@ -80,6 +80,8 @@ export async function POST(request: NextRequest) {
           is_recurring: false,
           approval_required: false,
         }).select('id').single()
+
+        if (taskErr) { console.error('[project template task insert]', taskErr.message, t.title); continue }
 
         // Create subtasks if any
         if (newTask?.id && t.subtasks && t.subtasks.length > 0) {
@@ -94,7 +96,8 @@ export async function POST(request: NextRequest) {
             is_recurring:   false,
             approval_required: false,
           }))
-          await supabase.from('tasks').insert(subtaskInserts)
+          const { error: subErr } = await supabase.from('tasks').insert(subtaskInserts)
+          if (subErr) console.error('[project template subtask insert]', subErr.message)
         }
       }
     } catch (e) {

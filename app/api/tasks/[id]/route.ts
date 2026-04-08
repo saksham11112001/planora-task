@@ -128,15 +128,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     .from('tasks').update(updates).eq('id', id).select('*').single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Auto-complete parent when all subtasks done
+  // Auto-complete parent when all subtasks done — only if parent doesn't require approval
   if (updates.status === 'completed' && data?.parent_task_id) {
     const { data: siblings } = await supabase
       .from('tasks').select('id, status')
       .eq('parent_task_id', data.parent_task_id)
     if (siblings?.length && siblings.every(s => s.status === 'completed')) {
-      await supabase.from('tasks')
-        .update({ status: 'completed', completed_at: new Date().toISOString() })
-        .eq('id', data.parent_task_id)
+      const { data: parentTask } = await supabase
+        .from('tasks').select('approval_required, approval_status')
+        .eq('id', data.parent_task_id).single()
+      // Skip auto-complete if parent requires approval and hasn't been approved yet
+      if (!parentTask?.approval_required || parentTask?.approval_status === 'approved') {
+        await supabase.from('tasks')
+          .update({ status: 'completed', completed_at: new Date().toISOString() })
+          .eq('id', data.parent_task_id)
+      }
     }
   }
 
