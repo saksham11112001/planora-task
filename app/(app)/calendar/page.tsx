@@ -22,7 +22,7 @@ export default async function CalendarPage() {
   const to   = new Date(); to.setMonth(to.getMonth() + 2)
 
   const taskQuery = supabase.from('tasks')
-    .select('id, title, status, priority, due_date, is_recurring, project_id, assignee_id, client_id, frequency, projects(id,name,color), assignee:users!tasks_assignee_id_fkey(id,name)')
+    .select('id, title, status, priority, due_date, is_recurring, project_id, assignee_id, client_id, frequency, custom_fields, projects(id,name,color), assignee:users!tasks_assignee_id_fkey(id,name)')
     .eq('org_id', orgId).not('due_date', 'is', null)
     .gte('due_date', from.toISOString().split('T')[0])
     .lte('due_date', to.toISOString().split('T')[0])
