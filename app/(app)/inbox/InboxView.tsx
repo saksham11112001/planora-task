@@ -245,7 +245,9 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
 
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-      <style>{`@media(max-width:640px){.hide-mobile{display:none!important}.inbox-task-row{grid-template-columns:36px 22px 1fr 80px 32px 28px!important}}`}</style>
+      <style>{`@media(max-width:640px){.hide-mobile{display:none!important}.inbox-task-row{grid-template-columns:36px 22px 1fr 80px 32px 28px!important}}`}
+        {`.inbox-col-header{display:grid;grid-template-columns:36px 22px 1fr 100px 110px 110px 80px 32px 28px;align-items:center;padding:0 16px;}`}
+      </style>
 
       <div style={{ display:'flex', borderBottom:'1px solid var(--border)', padding:'0 20px', background:'var(--surface)', flexShrink:0 }}>
         {(['List','Board'] as const).map(t => (
@@ -365,6 +367,17 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
               </div>
             )}
 
+            {/* Column headers */}
+            <div className="inbox-col-header hide-mobile" style={{ borderBottom:'1px solid var(--border)', background:'var(--surface-subtle)', flexShrink:0 }}>
+              <div/><div/>
+              <div style={{ fontSize:10, fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.07em', paddingLeft:2 }}>Task</div>
+              <div style={{ fontSize:10, fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.07em' }}>Assignee</div>
+              <div style={{ fontSize:10, fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.07em' }}>Client</div>
+              <div style={{ fontSize:10, fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.07em', textAlign:'center' }}>Due date</div>
+              <div style={{ fontSize:10, fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.07em', textAlign:'center' }}>Priority</div>
+              <div/><div/>
+            </div>
+
             <div style={{ flex:1, overflowY:'auto', background:'var(--surface)' }}>
               {canCreate && (
                 <div style={{ borderBottom:'1px solid var(--border-light)' }}>
@@ -402,7 +415,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                     return (
                       <div key={task.id}>
                         <div className="inbox-task-row" onClick={() => setSelectedTask(task)}
-                          style={{ display:'grid', gridTemplateColumns:'36px 22px 1fr 110px 110px 80px 32px 28px', alignItems:'center', padding:'0 16px', minHeight:40, borderBottom:'1px solid var(--border-light)', cursor:'pointer', background:typeBg }}>
+                          style={{ display:'grid', gridTemplateColumns:'36px 22px 1fr 100px 110px 110px 80px 32px 28px', alignItems:'center', padding:'0 16px', minHeight:40, borderBottom:'1px solid var(--border-light)', cursor:'pointer', background:typeBg }}>
                           <input type="checkbox" checked={checked.has(task.id)}
                             onChange={() => setChecked(p => { const s=new Set(p); s.has(task.id)?s.delete(task.id):s.add(task.id); return s })}
                             onClick={e => e.stopPropagation()} style={{ width:13, height:13, accentColor:'#0d9488', cursor:'pointer' }}/>
@@ -413,6 +426,21 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                           </button>
                           <div style={{ minWidth:0, paddingRight:8 }}>
                             <p style={{ fontSize:13, fontWeight:600, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis', color:isComp?'var(--text-muted)':ov?'#f87171':'var(--text-primary)', textDecoration:isComp?'line-through':'none', margin:0 }}>{task.title}</p>
+                          </div>
+                          {/* Assignee column */}
+                          <div className="hide-mobile" style={{ display:'flex', alignItems:'center', gap:4, overflow:'hidden' }}>
+                            {(() => {
+                              const assignee = (task as any).assignee as { id:string; name:string } | null
+                              if (!assignee) return <span style={{ fontSize:11, color:'var(--text-muted)' }}>—</span>
+                              return (
+                                <>
+                                  <span style={{ width:18, height:18, borderRadius:'50%', background:'var(--brand-light)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, fontWeight:700, color:'var(--brand)', flexShrink:0 }}>
+                                    {assignee.name[0]?.toUpperCase()}
+                                  </span>
+                                  <span style={{ fontSize:11, color:'var(--text-muted)', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{assignee.name.split(' ')[0]}</span>
+                                </>
+                              )
+                            })()}
                           </div>
                           {/* Client column */}
                           <div className="hide-mobile" style={{ display:'flex', alignItems:'center', gap:4, overflow:'hidden' }}>
