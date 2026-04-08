@@ -1,13 +1,16 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse }  from 'next/server'
 import type { NextRequest } from 'next/server'
+import { assertCan }     from '@/lib/utils/permissionGate'
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-  const { data: mb } = await supabase.from('org_members').select('org_id').eq('user_id', user.id).eq('is_active', true).single()
+  const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).single()
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
+  const timeLogDenied = await assertCan(supabase, mb.org_id, mb.role, 'time.log')
+  if (timeLogDenied) return NextResponse.json({ error: timeLogDenied.error }, { status: timeLogDenied.status })
 
   // Time tracking requires Starter+ plan
   const admin = createAdminClient()

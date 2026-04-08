@@ -2,6 +2,7 @@ import { createClient }  from '@/lib/supabase/server'
 import { NextResponse }   from 'next/server'
 import type { NextRequest } from 'next/server'
 import { inngest }        from '@/lib/inngest/client'
+import { assertCan }      from '@/lib/utils/permissionGate'
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
@@ -39,6 +40,12 @@ export async function POST(request: NextRequest) {
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
 
   const body = await request.json()
+
+  // Skip permission check for subtask creation (internal / compliance flow)
+  if (!body.parent_task_id) {
+    const denied = await assertCan(supabase, mb.org_id, mb.role, 'tasks.create')
+    if (denied) return NextResponse.json({ error: denied.error }, { status: denied.status })
+  }
   const { title, description, status = 'todo', priority = 'medium', assignee_id, approver_id,
           client_id, project_id, due_date, estimated_hours, approval_required = false,
           parent_task_id, is_recurring = false, frequency, next_occurrence_date,

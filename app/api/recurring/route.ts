@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse }  from 'next/server'
 import type { NextRequest } from 'next/server'
+import { assertCan }     from '@/lib/utils/permissionGate'
 
 // Map granular frequencies to DB-allowed values
 function normalizeFrequency(freq: string): string {
@@ -39,8 +40,8 @@ export async function POST(request: NextRequest) {
   const { data: mb } = await supabase.from('org_members')
     .select('org_id, role').eq('user_id', user.id).eq('is_active', true).single()
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
-  if (!['owner','admin','manager'].includes(mb.role))
-    return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
+  const recurringCreateDenied = await assertCan(supabase, mb.org_id, mb.role, 'recurring.create')
+  if (recurringCreateDenied) return NextResponse.json({ error: recurringCreateDenied.error }, { status: recurringCreateDenied.status })
 
   const body = await request.json()
   const { title, priority = 'medium', frequency, assignee_id, approver_id,

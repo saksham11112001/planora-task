@@ -11,6 +11,7 @@ const config: NextConfig = {
   // Experimental optimizations
   experimental: {
     optimizePackageImports: ['lucide-react', 'recharts', '@supabase/supabase-js'],
+    staleTimes: { dynamic: 0 },
   },
 
   // xlsx uses native Node.js modules — prevent webpack from bundling it

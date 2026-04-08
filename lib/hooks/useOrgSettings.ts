@@ -7,6 +7,7 @@ export interface CustomFieldDef {
 export interface TaskFields {
   [key: string]: { visible: boolean; mandatory: boolean }
 }
+export type RolePermissions = Record<string, Record<string, boolean>>
 export interface NavFeatures {
   one_time_tasks:     boolean
   recurring_tasks:    boolean
@@ -25,6 +26,7 @@ interface OrgSettings {
   taskFields:       TaskFields
   caComplianceMode: boolean
   navFeatures:      NavFeatures
+  rolePermissions:  RolePermissions | null
   loading:          boolean
 }
 
@@ -65,10 +67,11 @@ function notifyAll(s: OrgSettings) {
 
 async function fetchSettings(): Promise<OrgSettings> {
   try {
-    const [customRes, fieldsRes, featuresRes] = await Promise.all([
+    const [customRes, fieldsRes, featuresRes, permissionsRes] = await Promise.all([
       fetch('/api/settings/custom-fields').then(r => r.json()).catch(() => ({ data: [] })),
       fetch('/api/settings/fields').then(r => r.json()).catch(() => ({ data: null })),
       fetch('/api/settings/features').then(r => r.json()).catch(() => ({ data: {} })),
+      fetch('/api/settings/permissions').then(r => r.json()).catch(() => ({ data: null })),
     ])
     const raw = featuresRes.data ?? {}
     const nav: NavFeatures = {
@@ -89,16 +92,17 @@ async function fetchSettings(): Promise<OrgSettings> {
       taskFields:       fieldsRes.data ? { ...DEFAULT_TASK_FIELDS, ...fieldsRes.data } : DEFAULT_TASK_FIELDS,
       caComplianceMode: nav.ca_compliance_mode,
       navFeatures:      nav,
+      rolePermissions:  permissionsRes.data ?? null,
       loading:          false,
     }
   } catch {
-    return { customFields: [], taskFields: DEFAULT_TASK_FIELDS, caComplianceMode: false, navFeatures: DEFAULT_NAV, loading: false }
+    return { customFields: [], taskFields: DEFAULT_TASK_FIELDS, caComplianceMode: false, navFeatures: DEFAULT_NAV, rolePermissions: null, loading: false }
   }
 }
 
 export function useOrgSettings(): OrgSettings {
   const [state, setState] = useState<OrgSettings>(
-    _cache ?? { customFields: [], taskFields: DEFAULT_TASK_FIELDS, caComplianceMode: false, navFeatures: DEFAULT_NAV, loading: true }
+    _cache ?? { customFields: [], taskFields: DEFAULT_TASK_FIELDS, caComplianceMode: false, navFeatures: DEFAULT_NAV, rolePermissions: null, loading: true }
   )
 
   useEffect(() => {
@@ -124,6 +128,61 @@ export function useOrgSettings(): OrgSettings {
 export async function refreshOrgSettings() {
   const s = await fetchSettings()
   notifyAll(s)
+}
+
+// DEFAULT_PERMISSIONS for client-side fallback (mirrors permissionGate.ts)
+const DEFAULT_PERMISSIONS: RolePermissions = {
+  'tasks.create':       { admin: true, manager: true,  member: true,  viewer: false },
+  'tasks.edit':         { admin: true, manager: true,  member: false, viewer: false },
+  'tasks.edit_own':     { admin: true, manager: true,  member: true,  viewer: false },
+  'tasks.delete':       { admin: true, manager: true,  member: false, viewer: false },
+  'tasks.complete':     { admin: true, manager: true,  member: true,  viewer: false },
+  'tasks.view_all':     { admin: true, manager: true,  member: false, viewer: false },
+  'tasks.view_my':      { admin: true, manager: true,  member: true,  viewer: true  },
+  'tasks.bulk_actions': { admin: true, manager: true,  member: false, viewer: false },
+  'tasks.assign':       { admin: true, manager: true,  member: false, viewer: false },
+  'tasks.approve':      { admin: true, manager: true,  member: false, viewer: false },
+  'projects.create':    { admin: true, manager: true,  member: false, viewer: false },
+  'projects.edit':      { admin: true, manager: true,  member: false, viewer: false },
+  'projects.delete':    { admin: true, manager: false, member: false, viewer: false },
+  'projects.view_all':  { admin: true, manager: true,  member: true,  viewer: true  },
+  'clients.create':     { admin: true, manager: true,  member: false, viewer: false },
+  'clients.edit':       { admin: true, manager: true,  member: false, viewer: false },
+  'clients.delete':     { admin: true, manager: false, member: false, viewer: false },
+  'clients.view':       { admin: true, manager: true,  member: true,  viewer: true  },
+  'recurring.create':   { admin: true, manager: true,  member: false, viewer: false },
+  'recurring.edit':     { admin: true, manager: true,  member: false, viewer: false },
+  'recurring.delete':   { admin: true, manager: false, member: false, viewer: false },
+  'reports.view_own':   { admin: true, manager: true,  member: true,  viewer: true  },
+  'reports.view_all':   { admin: true, manager: true,  member: false, viewer: false },
+  'time.log':           { admin: true, manager: true,  member: true,  viewer: false },
+  'time.view_all':      { admin: true, manager: true,  member: false, viewer: false },
+  'team.invite':        { admin: true, manager: false, member: false, viewer: false },
+  'team.remove':        { admin: true, manager: false, member: false, viewer: false },
+  'team.change_role':   { admin: true, manager: false, member: false, viewer: false },
+  'settings.org':             { admin: true, manager: false, member: false, viewer: false },
+  'settings.tasks':           { admin: true, manager: false, member: false, viewer: false },
+  'compliance.view':          { admin: true, manager: true,  member: true,  viewer: false },
+  'compliance.edit':          { admin: true, manager: true,  member: false, viewer: false },
+  'compliance.assign':        { admin: true, manager: true,  member: false, viewer: false },
+  'compliance.manage_tasks':  { admin: true, manager: false, member: false, viewer: false },
+}
+
+/**
+ * Client-side permission check. Returns true if `role` can do `permission`.
+ * Owner always returns true; admin always returns true.
+ * Falls back to DEFAULT_PERMISSIONS if no custom permissions saved.
+ */
+export function checkPermission(
+  rolePermissions: RolePermissions | null,
+  role: string,
+  permission: string,
+): boolean {
+  if (role === 'owner' || role === 'admin') return true
+  const perms = rolePermissions ?? DEFAULT_PERMISSIONS
+  const row = perms[permission] ?? DEFAULT_PERMISSIONS[permission]
+  if (!row) return false
+  return row[role] === true
 }
 
 // Kept for backward compatibility

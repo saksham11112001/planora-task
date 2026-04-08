@@ -2,6 +2,7 @@ import { createClient }      from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse }      from 'next/server'
 import type { NextRequest }  from 'next/server'
+import { assertCan }         from '@/lib/utils/permissionGate'
 
 // ── Plan limits ───────────────────────────────────────────────────────────
 function memberLimit(plan: string) {
@@ -38,8 +39,9 @@ export async function POST(request: NextRequest) {
 
   const { data: mb } = await supabase.from('org_members')
     .select('org_id, role').eq('user_id', user.id).eq('is_active', true).single()
-  if (!mb || !['owner', 'admin', 'manager'].includes(mb.role))
-    return NextResponse.json({ error: 'Only owners/admins/managers can invite' }, { status: 403 })
+  if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
+  const inviteDenied = await assertCan(supabase, mb.org_id, mb.role, 'team.invite')
+  if (inviteDenied) return NextResponse.json({ error: inviteDenied.error }, { status: inviteDenied.status })
 
   const { email, role = 'member' } = await request.json()
   if (!email?.trim()) return NextResponse.json({ error: 'Email required' }, { status: 400 })
@@ -103,11 +105,19 @@ export async function PATCH(request: NextRequest) {
 
   const { data: mb } = await supabase.from('org_members')
     .select('org_id, role').eq('user_id', user.id).eq('is_active', true).single()
-  if (!mb || !['owner', 'admin'].includes(mb.role))
-    return NextResponse.json({ error: 'Only owners/admins can perform this action' }, { status: 403 })
+  if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
 
   const body = await request.json()
   const { member_id, user_id, role, is_active } = body
+
+  // Gate based on action type
+  if (is_active === false) {
+    const removeDenied = await assertCan(supabase, mb.org_id, mb.role, 'team.remove')
+    if (removeDenied) return NextResponse.json({ error: removeDenied.error }, { status: removeDenied.status })
+  } else {
+    const changeRoleDenied = await assertCan(supabase, mb.org_id, mb.role, 'team.change_role')
+    if (changeRoleDenied) return NextResponse.json({ error: changeRoleDenied.error }, { status: changeRoleDenied.status })
+  }
 
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
   const idToCheck = member_id || user_id

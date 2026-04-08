@@ -2,6 +2,7 @@ import { effectivePlan, isAtProjectLimit, projectLimit } from '@/lib/utils/planG
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse }  from 'next/server'
 import type { NextRequest } from 'next/server'
+import { assertCan }     from '@/lib/utils/permissionGate'
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
@@ -32,8 +33,9 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).single()
-  if (!mb || !['owner','admin','manager'].includes(mb.role))
-    return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
+  if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
+  const projectCreateDenied = await assertCan(supabase, mb.org_id, mb.role, 'projects.create')
+  if (projectCreateDenied) return NextResponse.json({ error: projectCreateDenied.error }, { status: projectCreateDenied.status })
 
   // Enforce project limit based on plan
   const { data: orgData } = await supabase.from('organisations')

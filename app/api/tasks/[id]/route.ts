@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { inngest }            from '@/lib/inngest/client'
 import { NextResponse }       from 'next/server'
 import type { NextRequest }   from 'next/server'
+import { assertCan }          from '@/lib/utils/permissionGate'
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -46,6 +47,24 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
 
   const body = await req.json()
+
+  // ── PERMISSION GATE ────────────────────────────────────────────────────────
+  // Complete task
+  if (body.status === 'completed' || body.status === 'in_review') {
+    const denied = await assertCan(supabase, mb.org_id, mb.role, 'tasks.complete')
+    if (denied) return NextResponse.json({ error: denied.error }, { status: denied.status })
+  }
+  // Re-assign task to someone else
+  if ('assignee_id' in body && body.assignee_id !== task.assignee_id) {
+    const denied = await assertCan(supabase, mb.org_id, mb.role, 'tasks.assign')
+    if (denied) return NextResponse.json({ error: denied.error }, { status: denied.status })
+  }
+  // General edit permission: assignees check edit_own, non-assignees check edit
+  {
+    const perm = isAssignee ? 'tasks.edit_own' : 'tasks.edit'
+    const denied = await assertCan(supabase, mb.org_id, mb.role, perm)
+    if (denied) return NextResponse.json({ error: denied.error }, { status: denied.status })
+  }
 
   // ── APPROVAL GATE ──────────────────────────────────────────────
   // Block completing a PARENT task if it has incomplete subtasks
@@ -196,8 +215,9 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const { data: mb } = await supabase
     .from('org_members').select('org_id, role')
     .eq('user_id', user.id).eq('is_active', true).single()
-  if (!mb || !['owner','admin','manager'].includes(mb.role))
-    return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
+  if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
+  const deleteDenied = await assertCan(supabase, mb.org_id, mb.role, 'tasks.delete')
+  if (deleteDenied) return NextResponse.json({ error: deleteDenied.error }, { status: deleteDenied.status })
   // Soft delete — move to trash with deleted_at timestamp
   // Tasks are permanently purged after 30 days via cron
   const { error } = await supabase
