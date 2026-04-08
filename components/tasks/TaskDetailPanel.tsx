@@ -825,7 +825,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                     onChange={e => setNewSubtitle(e.target.value)}
                     onKeyDown={e => {
                       if (e.key === 'Enter' && newSubtitle.trim()) addSubtask()
-                      if (e.key === 'Escape') { setNewSubtitle(''); setNewSubAssigneeId('') }
+                      if (e.key === 'Escape') { setNewSubtitle('') }
                     }}
                     placeholder="Add subtask… (Enter to save)"
                     style={{
@@ -833,24 +833,6 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                       background: 'transparent', color: 'var(--text-primary)',
                     }}
                   />
-                  {/* Assignee selector for new subtask */}
-                  {members.length > 0 && (
-                    <select
-                      value={newSubAssigneeId}
-                      onChange={e => setNewSubAssigneeId(e.target.value)}
-                      style={{
-                        fontSize: 11, border: '1px solid var(--border)', borderRadius: 6,
-                        padding: '2px 6px', background: 'var(--surface)',
-                        color: newSubAssigneeId ? 'var(--text-primary)' : 'var(--text-muted)',
-                        cursor: 'pointer', flexShrink: 0,
-                      }}
-                    >
-                      <option value="">Assignee</option>
-                      {members.map(m => (
-                        <option key={m.id} value={m.id}>{m.name}</option>
-                      ))}
-                    </select>
-                  )}
                   {addingSub && (
                     <span style={{ fontSize: 11, color: 'var(--brand)' }}>Saving…</span>
                   )}

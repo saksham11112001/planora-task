@@ -88,7 +88,7 @@ export default async function MyTasksPage() {
       ? await supabase.from('tasks')
           .select('id, title, description, status, priority, due_date, assignee_id, approver_id, client_id, project_id, approval_status, approval_required, estimated_hours, is_recurring, custom_fields, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), approver:users!tasks_approver_id_fkey(id, name), creator:users!tasks_created_by_fkey(id, name), projects(id, name, color)')
           .eq('org_id', mb.org_id)
-          .or(`created_by.eq.${user.id},approver_id.eq.${user.id}`)
+          .eq('created_by', user.id)
           .neq('assignee_id', user.id)
           .not('assignee_id', 'is', null)
           .neq('is_archived', true)
