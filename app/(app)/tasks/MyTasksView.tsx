@@ -39,7 +39,6 @@ const LIST_SECS = [
 ]
 const BOARD_COLS = [
   { status:'overdue',     label:'Overdue',          color:'#dc2626' },
-  { status:'todo',        label:'To do',             color:'var(--text-muted)' },
   { status:'in_progress', label:'In progress',       color:'#0d9488' },
   { status:'in_review',   label:'Pending approval',  color:'#7c3aed' },
   { status:'completed',   label:'Done',              color:'#16a34a' },
@@ -926,7 +925,9 @@ export function MyTasksView({
                 && t.approval_status !== 'pending')
             : col.status === 'in_review'
             ? displayTasks.filter(t => t.status === 'in_review' || t.approval_status === 'pending')
-            : displayTasks.filter(t => t.status === col.status && t.approval_status !== 'pending'
+            : displayTasks.filter(t =>
+                (t.status === col.status || (col.status === 'in_progress' && t.status === 'todo'))
+                && t.approval_status !== 'pending'
                 && !(!!t.due_date && t.due_date < today2 && t.status !== 'completed'))
 
           // Apply global filters

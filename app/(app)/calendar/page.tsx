@@ -22,7 +22,7 @@ export default async function CalendarPage() {
   const to   = new Date(); to.setMonth(to.getMonth() + 2)
 
   const taskQuery = supabase.from('tasks')
-    .select('id, title, status, priority, due_date, is_recurring, project_id, assignee_id, client_id, frequency, custom_fields, projects(id,name,color), assignee:users!tasks_assignee_id_fkey(id,name)')
+    .select('id, title, status, priority, due_date, is_recurring, project_id, assignee_id, approver_id, approval_status, approval_required, client_id, frequency, custom_fields, projects(id,name,color), assignee:users!tasks_assignee_id_fkey(id,name), approver:users!tasks_approver_id_fkey(id,name)')
     .eq('org_id', orgId).not('due_date', 'is', null)
     .gte('due_date', from.toISOString().split('T')[0])
     .lte('due_date', to.toISOString().split('T')[0])
@@ -38,7 +38,7 @@ export default async function CalendarPage() {
   // Build client map for task enrichment
   const clientMap: Record<string, { id: string; name: string; color: string }> = {}
   ;(clients ?? []).forEach((c: any) => { clientMap[c.id] = c })
-  const enrichedTasks = (tasks ?? []).map((t: any) => ({ ...t, client: t.client_id ? (clientMap[t.client_id] ?? null) : null }))
+  const enrichedTasks = (tasks ?? []).map((t: any) => ({ ...t, client: t.client_id ? (clientMap[t.client_id] ?? null) : null, approver: t.approver ?? null }))
 
   return <CalendarView tasks={enrichedTasks as any} clients={clients ?? []} members={memberList} canViewAll={canViewAll} currentUserId={user.id} userRole={mb.role}/>
 }

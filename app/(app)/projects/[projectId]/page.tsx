@@ -29,7 +29,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
       .select('*, owner_id, clients(id, name, color)')
       .eq('id', projectId).eq('org_id', mb.org_id).single(),
     supabase.from('tasks')
-      .select('id, title, description, status, priority, due_date, assignee_id, client_id, project_id, approval_status, approval_required, estimated_hours, is_recurring, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url)')
+      .select('id, title, description, status, priority, due_date, assignee_id, approver_id, client_id, project_id, approval_status, approval_required, estimated_hours, is_recurring, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), approver:users!tasks_approver_id_fkey(id, name)')
       .eq('project_id', projectId).neq('is_archived', true)
       .order('sort_order').order('created_at', { ascending: true }),
     supabase.from('time_logs').select('hours, is_billable').eq('project_id', projectId),
@@ -55,6 +55,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
     approval_required: t.approval_required ?? false, estimated_hours: t.estimated_hours ?? null,
     is_recurring: t.is_recurring ?? false, is_archived: false, completed_at: null, created_at: '',
     assignee: (t.assignee as any) ?? null,
+    approver: (t.approver as any) ?? null,
     client: t.client_id ? (clientMap[t.client_id] ?? null) : null,
     project: { id: project.id, name: project.name, color: project.color },
   }))
