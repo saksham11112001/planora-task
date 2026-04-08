@@ -68,9 +68,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (body.status === 'completed' && task.parent_task_id) {
     const isComplianceSubtask = (task as any).custom_fields?._compliance_subtask === true
     if (isComplianceSubtask) {
-      const { data: attachments } = await supabase
+      // Check attachments on the subtask itself first, then fall back to parent task
+      const { data: subtaskAttachments } = await supabase
         .from('task_attachments').select('id').eq('task_id', id).limit(1)
-      if (!attachments || attachments.length === 0) {
+      let hasAttachment = !!(subtaskAttachments && subtaskAttachments.length > 0)
+      if (!hasAttachment) {
+        const { data: parentAttachments } = await supabase
+          .from('task_attachments').select('id').eq('task_id', task.parent_task_id).limit(1)
+        hasAttachment = !!(parentAttachments && parentAttachments.length > 0)
+      }
+      if (!hasAttachment) {
         return NextResponse.json({
           error: `Upload the required document before marking this compliance subtask complete`,
           code: 'ATTACHMENT_REQUIRED',

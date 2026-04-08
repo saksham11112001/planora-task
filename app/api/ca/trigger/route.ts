@@ -1,15 +1,6 @@
 import { NextResponse }        from 'next/server'
 import { createClient }        from '@/lib/supabase/server'
 import { createAdminClient }   from '@/lib/supabase/admin'
-import { COMPLIANCE_TASKS }    from '@/lib/data/complianceTasks'
-
-// Build subtask lookup once at module level
-const SUBTASK_MAP = new Map(
-  COMPLIANCE_TASKS.map(t => [t.title.toLowerCase().trim(), t.subtasks])
-)
-function findSubtasks(name: string) {
-  return SUBTASK_MAP.get(name.toLowerCase().trim()) ?? []
-}
 
 /**
  * POST /api/ca/trigger
@@ -42,7 +33,7 @@ export async function POST() {
     .from('ca_client_assignments')
     .select(`
       id, org_id, client_id, assignee_id, approver_id, created_at, start_date,
-      master_task:ca_master_tasks(id, name, priority, dates, days_before_due)
+      master_task:ca_master_tasks(id, name, priority, dates, days_before_due, attachment_headers, attachment_count)
     `)
     .eq('org_id', mb.org_id)
     .eq('is_active', true)
@@ -141,12 +132,13 @@ export async function POST() {
         continue
       }
 
-      // ── Create subtasks ──
-      const subtasks = findSubtasks(master.name)
-      if (subtasks.length > 0) {
-        const subtaskRows = subtasks.map((s: any) => ({
+      // ── Create subtasks from master task's attachment_headers ──
+      // Each required attachment becomes a subtask so assignees know exactly what to upload.
+      const attachmentHeaders: string[] = master.attachment_headers ?? []
+      if (attachmentHeaders.length > 0) {
+        const subtaskRows = attachmentHeaders.map((header: string) => ({
           org_id:            asgn.org_id,
-          title:             s.title,
+          title:             header,
           status:            'todo' as const,
           priority:          master.priority ?? 'medium',
           assignee_id:       asgn.assignee_id  ?? null,
@@ -157,7 +149,7 @@ export async function POST() {
           parent_task_id:    newTask.id,
           is_recurring:      false,
           created_by:        user.id,
-          custom_fields:     s.required ? { _compliance_subtask: true } : null,
+          custom_fields:     { _compliance_subtask: true },
         }))
         const { error: subErr } = await admin.from('tasks').insert(subtaskRows)
         if (subErr) console.error('[ca/trigger] subtask insert failed:', subErr.message)
