@@ -473,15 +473,37 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                         {expandedTasks.has(task.id) && (
                           <div style={{ background:'var(--surface-subtle)', borderBottom:'1px solid var(--border)' }}>
                             {loadingSubtasks.has(task.id) && <div style={{ padding:'6px 58px', fontSize:11, color:'var(--text-muted)' }}>Loading…</div>}
-                            {(subtaskMap[task.id]??[]).map((sub:any) => (
-                              <div key={sub.id} style={{ display:'flex', alignItems:'center', gap:8, padding:'5px 16px 5px 58px', borderBottom:'1px solid var(--border-light)' }}>
-                                <button onClick={() => toggleSubRow(task.id, sub.id, sub.status)}
+                            {(subtaskMap[task.id]??[]).map((sub:any) => {
+                              const subAssigneeName = sub.assignee_id
+                                ? (members.find(m => m.id === sub.assignee_id)?.name ?? null)
+                                : null
+                              return (
+                              <div key={sub.id}
+                                onClick={async e => {
+                                  e.stopPropagation()
+                                  const r = await fetch(`/api/tasks/${sub.id}`)
+                                  const d = await r.json()
+                                  if (d?.data) setSelectedTask(d.data)
+                                }}
+                                style={{ display:'flex', alignItems:'center', gap:8, padding:'5px 16px 5px 58px', borderBottom:'1px solid var(--border-light)', cursor:'pointer' }}
+                                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--brand-light)'}
+                                onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}>
+                                <button onClick={e => { e.stopPropagation(); toggleSubRow(task.id, sub.id, sub.status) }}
                                   style={{ width:14, height:14, borderRadius:'50%', flexShrink:0, border:'none', background:sub.status==='completed'?'var(--brand)':'transparent', outline:`2px solid ${sub.status==='completed'?'var(--brand)':'var(--border)'}`, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
                                   {sub.status==='completed' && <svg viewBox="0 0 10 10" fill="none" style={{ width:8, height:8 }}><path d="M1.5 5L4 7.5L8.5 2.5" stroke="white" strokeWidth="1.8" strokeLinecap="round"/></svg>}
                                 </button>
                                 <span style={{ flex:1, fontSize:12, color:sub.status==='completed'?'var(--text-muted)':'var(--text-primary)', textDecoration:sub.status==='completed'?'line-through':'none' }}>{sub.title}</span>
+                                {subAssigneeName && (
+                                  <span style={{ fontSize:10, color:'var(--text-muted)', flexShrink:0, display:'flex', alignItems:'center', gap:4 }}>
+                                    <span style={{ width:14, height:14, borderRadius:'50%', background:'var(--brand-light)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:8, fontWeight:700, color:'var(--brand)', flexShrink:0 }}>
+                                      {subAssigneeName[0]?.toUpperCase()}
+                                    </span>
+                                    {subAssigneeName.split(' ')[0]}
+                                  </span>
+                                )}
+                                <span style={{ fontSize:10, color:'var(--text-muted)', flexShrink:0, opacity:0.5 }}>Edit →</span>
                               </div>
-                            ))}
+                            )})}
                             <div style={{ display:'flex', alignItems:'center', gap:8, padding:'5px 16px 6px 58px' }}>
                               <div style={{ width:14, height:14, borderRadius:'50%', flexShrink:0, border:'1.5px dashed var(--brand)', opacity:0.5 }}/>
                               <input value={newSubInputs[task.id]??''} onChange={e => setNewSubInputs(p => ({ ...p, [task.id]:e.target.value }))}

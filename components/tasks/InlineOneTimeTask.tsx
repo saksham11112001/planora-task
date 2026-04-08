@@ -276,36 +276,31 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated, 
           </label>
         )}
 
-        {/* Client */}
-        {show('client') && (
-          <label style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 20,
-            border: errors.client ? '1px solid #fca5a5' : clientId
-              ? `1px solid ${clientList.find(c => c.id === clientId)?.color ?? '#0d9488'}55`
-              : '1px solid var(--border)',
-            background: errors.client ? '#fef2f2' : clientId
-              ? `${clients.find(c => c.id === clientId)?.color ?? '#0d9488'}14`
-              : 'var(--surface-subtle)', cursor: 'pointer' }}>
-            {clientId
-              ? <span style={{ width: 8, height: 8, borderRadius: 2, flexShrink: 0,
-                  background: clientList.find(c => c.id === clientId)?.color ?? '#0d9488', display: 'inline-block' }}/>
-              : <Briefcase style={{ width: 11, height: 11, color: errors.client ? '#dc2626' : 'var(--text-muted)', flexShrink: 0 }} />
-            }
-            {clients.length === 0
-              ? <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>No clients</span>
-              : <select value={clientId} onChange={e => {
-                    if (e.target.value === '__add__') { setShowAddClient(true) }
-                    else { setClientId(e.target.value); setErrors(p => ({ ...p, client: '' })) }
-                  }}
-                  style={{ fontSize: 12, border: 'none', outline: 'none', background: 'transparent',
-                    color: clientId ? (clientList.find(c => c.id === clientId)?.color ?? '#0d9488') : 'var(--text-secondary)',
-                    cursor: 'pointer', appearance: 'none', fontWeight: clientId ? 600 : 400, fontFamily: 'inherit' }}>
-                  <option value="">Client{required('client') ? ' *' : '…'}</option>
-                  {clientList.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  <option value="__add__">+ Add new client…</option>
-                </select>
-            }
-          </label>
-        )}
+        {/* Client — always visible */}
+        <label style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 20,
+          border: errors.client ? '1px solid #fca5a5' : clientId
+            ? `1px solid ${clientList.find(c => c.id === clientId)?.color ?? '#0d9488'}55`
+            : '1px solid var(--border)',
+          background: errors.client ? '#fef2f2' : clientId
+            ? `${clientList.find(c => c.id === clientId)?.color ?? '#0d9488'}14`
+            : 'var(--surface-subtle)', cursor: 'pointer' }}>
+          {clientId
+            ? <span style={{ width: 8, height: 8, borderRadius: 2, flexShrink: 0,
+                background: clientList.find(c => c.id === clientId)?.color ?? '#0d9488', display: 'inline-block' }}/>
+            : <Briefcase style={{ width: 11, height: 11, color: errors.client ? '#dc2626' : 'var(--text-muted)', flexShrink: 0 }} />
+          }
+          <select value={clientId} onChange={e => {
+              if (e.target.value === '__add__') { setShowAddClient(true) }
+              else { setClientId(e.target.value); setErrors(p => ({ ...p, client: '' })) }
+            }}
+            style={{ fontSize: 12, border: 'none', outline: 'none', background: 'transparent',
+              color: clientId ? (clientList.find(c => c.id === clientId)?.color ?? '#0d9488') : 'var(--text-secondary)',
+              cursor: 'pointer', appearance: 'none', fontWeight: clientId ? 600 : 400, fontFamily: 'inherit' }}>
+            <option value="">Client{required('client') ? ' *' : '…'}</option>
+            {clientList.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            <option value="__add__">+ Add new client…</option>
+          </select>
+        </label>
 
         {/* Approver */}
         {show('approver') && approvers.length > 0 && (
