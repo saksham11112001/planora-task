@@ -1,5 +1,5 @@
 # Planora Task — Codebase Transfer Document
-> Use this at the start of a new chat to give the AI full context. Last updated: 2026-04-08
+> Use this at the start of a new chat to give the AI full context. Last updated: 2026-04-08 (Session 3)
 
 ---
 
@@ -83,6 +83,9 @@ tailwind.config.ts      — Tailwind CSS v4 config
 vercel.json             — Vercel deployment config
 types/index.ts          — TypeScript interfaces: User, Org, Task, Project, Client
 store/appStore.ts       — Zustand: session, toast notifications, filter state
+  — FilterState fields: clientId, priority, status, search, assigneeId,
+    dueDateFrom, dueDateTo, creatorId  ← "Assigned by" filter (added Session 3)
+  — setFilter(key, value) / resetFilters() — used by UniversalFilterBar
 ```
 
 ### app/ — Pages & API Routes
@@ -108,10 +111,20 @@ app/(app)/dashboard/page.tsx          — Dashboard stats (counts, recent tasks)
 app/(app)/dashboard/DashboardClient.tsx — Client widgets for dashboard
 
 app/(app)/tasks/page.tsx              — Server: fetches my tasks + approval tasks + assigned-by-me
-app/(app)/tasks/MyTasksView.tsx       — Client: list/board/kanban view with filters
-  — BOARD_COLS: overdue | in_progress (includes todo) | in_review | completed
+  — SELECT includes: creator:users!tasks_created_by_fkey(id, name)
+  — Enrichment: creator: (t.creator as any) ?? null
+app/(app)/tasks/MyTasksView.tsx       — Client: List / Board (Kanban) view
+  — BOARD_COLS: overdue | in_progress (includes todo) | in_review (Pending approval) | completed
+  — Grid: '28px 22px 1fr 120px 130px 90px 100px 28px'
+    (check | circle | Task | Client | Assigned by | Due date↑ | Priority | del)
+  — pendingApprovalTasks prop → converted to local state pendingTasks on mount
+  — handleApproveDecision: optimistically removes from pendingTasks + restores on failure
+  — Board in_review column: merges filteredTasks + pendingTasks (tasks from others)
+  — "Needs your approval" section renders from pendingTasks state (not prop) → live UI
+  — Inline upload button (amber arrow SVG) on compliance / approval_required task rows
+  — Filters: client, priority, status, search, dueDateFrom/To, creatorId (Assigned by)
+  — List sections sorted by due_date ascending; "Assigned by me" toggle for managers
   — onCreated: only adds to local state if assignedToMe; always calls router.refresh()
-  — isVisible: hides CA compliance tasks without _triggered:true flag
 
 app/(app)/projects/page.tsx           — Projects list
 app/(app)/projects/ProjectsView.tsx   — Projects grid/list
@@ -124,17 +137,37 @@ app/(app)/calendar/page.tsx           — Fetches tasks with due dates + approve
 app/(app)/calendar/CalendarView.tsx   — Monthly calendar component
 
 app/(app)/recurring/page.tsx          — Recurring tasks list
+  — SELECT includes: creator:users!tasks_created_by_fkey(id, name)
+  — Enrichment: creator: (t as any).creator ?? null
 app/(app)/recurring/RecurringView.tsx — Recurring task editor
+  — Grid: '1fr 10rem 6rem 6rem 6rem 7rem 5rem 4.5rem' (8 columns including Assigned by)
+  — "Assigned by" column between Approver and Client; uses User icon from lucide-react
+  — Subtask add: newSubAssignees / newSubDueDates per-task state maps
+    addSubtask(taskId, title, assigneeId, dueDate) sends both fields to API
+    Progressive disclosure: second row (select + date + Add) shown only when title typed
+  — Inline upload button on compliance / approval_required tasks
+  — Filters: creatorId (Assigned by); showAssignor on both UniversalFilterBars
   — onCreated: adds to local state + calls router.refresh() via startTransition
 
 app/(app)/approvals/page.tsx          — Approvals queue (pending + history, with approver join)
 app/(app)/approvals/ApprovalsView.tsx — Approval queue UI
 
+app/(app)/inbox/page.tsx              — One-time tasks inbox (all tasks for org)
+  — SELECT includes: creator:users!tasks_created_by_fkey(id, name)
+  — Enrichment: creator: (t as any).creator ?? null
+app/(app)/inbox/InboxView.tsx         — Client: List / Board view for one-time tasks
+  — Grid: '36px 22px 1fr 100px 110px 110px 100px 80px 32px 28px' (10 columns)
+    (check | circle | Task | Assignee | Client | Due date | Assigned by | Priority | expand | del)
+  — "Assigned by" column after Due date: creator avatar initial + first name
+  — Inline upload button (amber/grey arrow SVG) on compliance / approval_required tasks
+  — Compliance subtask rows also have inline upload button
+  — Filters: creatorId (Assigned by); showAssignor on both UniversalFilterBars
+  — Board + List both filter by creatorId
+
 app/(app)/time/page.tsx               — Time logs
 app/(app)/reports/page.tsx            — Reports + Excel export
 app/(app)/compliance/page.tsx         — CA compliance module
 app/(app)/import/page.tsx             — Data import wizard
-app/(app)/inbox/page.tsx              — Notifications inbox
 app/(app)/team/page.tsx               — Team members
 app/(app)/profile/page.tsx            — User profile
 app/(app)/settings/*/page.tsx         — Settings: org, members, permissions, billing, categories,
@@ -178,6 +211,8 @@ components/tasks/TaskDetailPanel.tsx  — Side panel for task details
   — isDesignatedApprover: includes isOwnerOrAdmin
   — canEdit = canManage || isAssignee
   — Shows "Any manager can approve" only when approverInfo is null AND no approver_id
+  — Subtask add row: progressive disclosure — assignee select + due date shown only
+    when title input has content; Escape clears all three fields
 
 components/tasks/InlineTaskRow.tsx    — Editable row in project/list views
 components/tasks/InlineOneTimeTask.tsx — Inline create one-time task
@@ -187,9 +222,17 @@ components/tasks/MentionTextarea.tsx  — @mention textarea for comments
 components/tasks/CompletionAttachModal.tsx — Attach files when completing task
 
 components/layout/Sidebar.tsx         — Left nav sidebar
+  — SI component calls router.refresh() on every link click (when not already active)
+    to force server-component re-fetch and show latest data
+
 components/layout/Header.tsx          — Top header with user menu
 components/search/SearchModal.tsx     — Global search (Cmd+K)
+
 components/filters/UniversalFilterBar.tsx — Shared filter UI
+  — Props: showSearch, showPriority, showStatus, showAssignee, showAssignor, showDueDate
+  — showAssignor?: boolean  — shows "Assigned by" pill using store.creatorId
+  — creatorId filter state stored in Zustand (see store/appStore.ts)
+
 components/ui/Toast.tsx               — Toast notification system
 components/ui/Badge.tsx               — Status/priority badges
 components/ui/DatePicker.tsx          — Date picker component
@@ -226,7 +269,11 @@ lib/data/caDefaultTasks.ts            — Default CA task templates
 
 ---
 
-## KEY BUGS FIXED IN THIS SESSION
+## KEY BUGS FIXED (ALL SESSIONS)
+
+---
+
+### SESSION 1 FIXES
 
 ### 1. Recurring task not showing in My Tasks immediately
 - **Root cause**: `RecurringView.tsx` `onCreated` had no `router.refresh()` call
@@ -251,6 +298,51 @@ lib/data/caDefaultTasks.ts            — Default CA task templates
 
 ### 5. My Tasks Kanban "To do" column removed
 - **Fix**: Removed `todo` from `BOARD_COLS` in `MyTasksView.tsx`; updated `in_progress` filter to also capture `status === 'todo'` tasks
+
+---
+
+### SESSION 2 FIXES
+
+### 6. Inline subtask add missing assignee + due date
+- **Root cause**: `TaskDetailPanel` subtask add form only had a title input
+- **Fix**: Added `newSubAssigneeId` / `newSubDueDate` states; second row (assignee select + date picker + Add button) shown only when title has content (progressive disclosure). Escape clears all fields.
+- **Also done in**: `RecurringView.tsx` with per-task state maps `newSubAssignees` / `newSubDueDates`
+
+### 7. "Assigned by" filter and column missing everywhere
+- **Root cause**: `creatorId` was not in the Zustand filter store; creator FK join was missing from most page queries; no UI for the filter
+- **Fix**:
+  - `store/appStore.ts`: added `creatorId: string` to `FilterState`, initial `''`, to `resetFilters`
+  - `UniversalFilterBar`: added `showAssignor?: boolean` prop + "Assigned by" PillSelect
+  - `tasks/page.tsx`: already had creator join; enriched `creator`
+  - `recurring/page.tsx` + `inbox/page.tsx`: added `creator:users!tasks_created_by_fkey(id, name)` to SELECT and enrichment
+  - `MyTasksView` / `RecurringView` / `InboxView`: filter on `creatorId`, show column in grid, pass `showAssignor` to both filter bars
+
+### 8. Sidebar navigation didn't refresh stale data
+- **Root cause**: Next.js `<Link>` uses client-side navigation which does NOT re-run server components by default; cached data was shown
+- **Fix**: `Sidebar.tsx` `SI` component now calls `router.refresh()` on every link click when not already on that page
+
+### 9. Inline upload button for compliance / approval_required tasks
+- **Added**: Small amber arrow-up SVG `<label>` wrapping `<input type="file">` in the title cell of compliance tasks and `approval_required` tasks, on all three views (MyTasksView, RecurringView, InboxView)
+- **Pattern**: `e.stopPropagation()` on both `<label onClick>` and `<input onClick>` to prevent TaskDetailPanel opening; POST to `/api/tasks/${id}/attachments` with `FormData`; compliance subtask rows in InboxView also get upload buttons
+
+---
+
+### SESSION 3 FIXES
+
+### 10. Pending approval tasks missing from Kanban board
+- **Root cause**: `displayTasks = showAssignedByMe ? assignedByMeTasks : filteredTasks` — `filteredTasks` is built from `tasks` state (tasks assigned TO current user). `pendingApprovalTasks` (others' tasks awaiting manager approval) is a separate prop that was never merged into `displayTasks`. The board's "Pending approval" column only looked at `displayTasks`.
+- **Fix**: Compute `extraPendingForBoard = pendingTasks.filter(pt => !filteredTasks.some(t => t.id === pt.id))` before the `BOARD_COLS.map`. Board's `in_review` column now uses `[...displayTasks filter..., ...extraPendingForBoard]`.
+
+### 11. Inline approval (Approve/Return) didn't update UI until page refresh
+- **Root cause**: `handleApproveDecision` updated `tasks` state (`setTasks`), but the "Needs your approval" section rendered from the raw `pendingApprovalTasks` **prop** which is immutable on the client.
+- **Fix**: `pendingApprovalTasks` prop converted to local state `const [pendingTasks, setPendingTasks] = useState<Task[]>(pendingApprovalTasks)`. `handleApproveDecision` now:
+  - Optimistically: `setPendingTasks(prev => prev.filter(t => t.id !== taskId))`
+  - On API failure: `setPendingTasks(prev => [pendingTaskSnapshot, ...prev])` (restores)
+  - "Needs your approval" section renders from `pendingTasks` state; badge count is live.
+
+### 12. "Assigned by" column missing from InboxView list
+- **Root cause**: Grid had 9 columns with no creator slot; no filter bar `showAssignor`.
+- **Fix**: Grid updated to 10 columns (`'36px 22px 1fr 100px 110px 110px 100px 80px 32px 28px'`); "Assigned by" header + creator cell added after Due date column; `showAssignor` added to List view filter bar.
 
 ---
 
@@ -295,6 +387,72 @@ const isVisible = (t: any) => {
   if (cf?._ca_compliance === true) return cf?._triggered === true
   return true
 }
+```
+
+### Creator join pattern (for "Assigned by" filter + column)
+```typescript
+// In page.tsx SELECT:
+creator:users!tasks_created_by_fkey(id, name)
+// In enrichment map:
+creator: (t as any).creator ?? null
+// In view filter:
+if (filterCreator && (t as any).creator?.id !== filterCreator) return false
+// In grid cell:
+const creator = (task as any).creator as { id:string; name:string } | null
+```
+
+### pendingApprovalTasks → local state pattern
+```typescript
+// In view component (MyTasksView):
+const [pendingTasks, setPendingTasks] = useState<Task[]>(pendingApprovalTasks)
+
+// In handleApproveDecision — optimistic removal:
+const pendingTaskSnapshot = pendingTasks.find(t => t.id === taskId)
+setPendingTasks(prev => prev.filter(t => t.id !== taskId))
+// ...on failure rollback:
+if (pendingTaskSnapshot) setPendingTasks(prev => [pendingTaskSnapshot, ...prev])
+
+// In board view — merge pendingTasks into in_review column:
+const extraPendingForBoard = !showAssignedByMe
+  ? pendingTasks.filter(pt => !filteredTasks.some(t => t.id === pt.id))
+  : []
+// ...then in BOARD_COLS.map for in_review:
+[...displayTasks.filter(t => t.status==='in_review'||t.approval_status==='pending'), ...extraPendingForBoard]
+```
+
+### Inline file upload button pattern (compliance / approval_required tasks)
+```tsx
+{(isCompliance || task.approval_required) && task.status !== 'completed' && (
+  <label
+    onClick={e => e.stopPropagation()}                       // prevent TaskDetailPanel
+    style={{ color: isCompliance ? '#b45309' : 'var(--text-muted)', ... }}
+    onMouseEnter/onMouseLeave for opacity transitions>
+    <input type="file" style={{ display:'none' }}
+      onClick={e => e.stopPropagation()}                     // belt+suspenders
+      onChange={async e => {
+        const fd = new FormData(); fd.append('file', file)
+        await fetch(`/api/tasks/${task.id}/attachments`, { method:'POST', body:fd })
+        toast.success / toast.error; e.target.value = ''
+      }}/>
+    <svg>...upload arrow...</svg>
+  </label>
+)}
+```
+
+### Sidebar navigation refresh pattern
+```typescript
+// In Sidebar.tsx SI component:
+function SI({ href, active, ... }) {
+  const router = useRouter()
+  return (
+    <Link href={href} prefetch={true}
+      onClick={() => { if (!active) router.refresh() }}>
+      ...
+    </Link>
+  )
+}
+// router.refresh() forces server components to re-render without full page reload.
+// Essential for force-dynamic pages to show latest DB data after navigation.
 ```
 
 ---
