@@ -875,6 +875,7 @@ export function RecurringView({
                 if (newTask) {
                   setLocalTasks((prev) => [...prev, newTask])
                 }
+                startT(() => router.refresh())
               }}
             />
           )}

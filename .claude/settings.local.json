@@ -42,7 +42,9 @@
       "Bash(ls -la /c/Users/saksh/Desktop/planora-task/app/\\\\\\(app\\\\\\)/tasks/)",
       "Bash(wc -l /c/Users/saksh/Desktop/planora-task/app/\\\\\\(app\\\\\\)/projects/new/NewProjectForm.tsx)",
       "Bash(find /c/Users/saksh/Desktop/planora-task -maxdepth 3 -type d -not -path */node_modules/* -not -path */.next/*)",
-      "Bash(grep -E \"^[^.]*$\")"
+      "Bash(grep -E \"^[^.]*$\")",
+      "Bash(cat \"app/\\(app\\)/recurring/RecurringView.tsx\")",
+      "Bash(head -5 \"app/\\(app\\)/recurring/RecurringView.tsx\")"
     ]
   }
 }

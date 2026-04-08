@@ -344,7 +344,9 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
         <div className="w-36 hidden md:flex items-center gap-2 pl-2" onClick={() => setSelectedTask(task)}>
           {assignee
             ? <><Avatar name={assignee.name} size="xs"/><span className="text-xs text-gray-500 truncate">{assignee.name}</span></>
-            : currentUserId
+            : task.assignee_id
+              ? <span className="text-xs text-gray-400 truncate">Assigned</span>
+              : currentUserId
               ? <button
                   onClick={async e => {
                     e.stopPropagation()

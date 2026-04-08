@@ -410,15 +410,28 @@ export function MyTasksView({
               members={members} clients={clients} currentUserId={currentUserId}
               onCreated={(newTask) => {
                 if (newTask?.id) {
-                  const enriched = {
-                    ...newTask, description: null, project_id: null, project: null,
-                    is_archived: false, created_at: '', approval_required: false,
-                    completed_at: null, is_recurring: false, estimated_hours: null,
-                    approval_status: null, approver: null, approver_id: null,
-                    assignee: members.find(m => m.id === newTask.assignee_id) ?? null,
-                    client: clients.find(cl => cl.id === newTask.client_id) ?? null,
+                  // Only add to "My Tasks" state if the task is assigned to current user
+                  const assignedToMe = !newTask.assignee_id || newTask.assignee_id === currentUserId
+                  if (assignedToMe) {
+                    const enriched = {
+                      ...newTask,
+                      description:       newTask.description       ?? null,
+                      project_id:        newTask.project_id        ?? null,
+                      project:           null,
+                      is_archived:       false,
+                      created_at:        '',
+                      approval_required: newTask.approval_required ?? false,
+                      completed_at:      null,
+                      is_recurring:      newTask.is_recurring      ?? false,
+                      estimated_hours:   newTask.estimated_hours   ?? null,
+                      approval_status:   null,
+                      approver:          null,
+                      approver_id:       newTask.approver_id       ?? null,
+                      assignee:          members.find(m => m.id === newTask.assignee_id) ?? null,
+                      client:            clients.find(cl => cl.id === newTask.client_id) ?? null,
+                    }
+                    setTasks(prev => [enriched as any, ...prev])
                   }
-                  setTasks(prev => [enriched as any, ...prev])
                 }
                 refresh()
               }}
