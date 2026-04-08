@@ -40,7 +40,9 @@
       "Bash(find /c/Users/saksh/Desktop/planora-task/app -path *tasks/my* -o -path *approvals*)",
       "Bash(grep -E \"\\\\.\\(tsx|ts\\)$\")",
       "Bash(ls -la /c/Users/saksh/Desktop/planora-task/app/\\\\\\(app\\\\\\)/tasks/)",
-      "Bash(wc -l /c/Users/saksh/Desktop/planora-task/app/\\\\\\(app\\\\\\)/projects/new/NewProjectForm.tsx)"
+      "Bash(wc -l /c/Users/saksh/Desktop/planora-task/app/\\\\\\(app\\\\\\)/projects/new/NewProjectForm.tsx)",
+      "Bash(find /c/Users/saksh/Desktop/planora-task -maxdepth 3 -type d -not -path */node_modules/* -not -path */.next/*)",
+      "Bash(grep -E \"^[^.]*$\")"
     ]
   }
 }

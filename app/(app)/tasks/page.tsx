@@ -91,7 +91,7 @@ export default async function MyTasksPage() {
           .eq('created_by', user.id)
           .neq('is_archived', true)
           .is('parent_task_id', null)
-          .not('custom_fields', 'cs', '{"_ca_compliance":true}')
+          .or('custom_fields.is.null,custom_fields.not.cs.{"_ca_compliance":true}')
           .order('due_date', { ascending: true, nullsFirst: false })
       : { data: [] }
 
