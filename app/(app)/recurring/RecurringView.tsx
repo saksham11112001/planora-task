@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { RefreshCw, X, Pencil, User } from 'lucide-react'
+import { RefreshCw, X, Pencil, User, Trash2 } from 'lucide-react'
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
 import { InlineRecurringTask, FREQ_LABEL } from '@/components/tasks/InlineRecurringTask'
 import { fmtDate } from '@/lib/utils/format'
@@ -77,6 +77,7 @@ export function RecurringView({
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
 
+  const [checked,     setChecked]     = useState<Set<string>>(new Set())
   const [subtaskMap, setSubtaskMap] = useState<Record<string, any[]>>({})
   const [expandedSubs, setExpandedSubs] = useState<Set<string>>(new Set())
   const [newSubInputs, setNewSubInputs] = useState<Record<string, string>>({})
@@ -214,6 +215,18 @@ export function RecurringView({
       const d = await res.json().catch(() => ({}))
       toast.error(d.error ?? 'Failed')
     }
+  }
+
+  async function bulkDelete() {
+    const ids = [...checked]
+    if (!ids.length) return
+    if (!confirm(`Delete ${ids.length} recurring task${ids.length !== 1 ? 's' : ''}? Future instances will stop being created.`)) return
+    setChecked(new Set())
+    setLocalTasks(prev => prev.filter(t => !ids.includes(t.id)))
+    const results = await Promise.all(ids.map(id => fetch(`/api/tasks/${id}`, { method: 'DELETE' })))
+    const failed = results.filter(r => !r.ok).length
+    if (ids.length - failed > 0) toast.success(`${ids.length - failed} task${ids.length - failed !== 1 ? 's' : ''} deleted`)
+    if (failed > 0) { toast.error(`${failed} could not be deleted`); startT(() => router.refresh()) }
   }
 
   return (
@@ -424,26 +437,36 @@ export function RecurringView({
         <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
           {/* Universal filter bar */}
           <UniversalFilterBar clients={clients} members={members} showSearch showPriority showAssignee showAssignor/>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              padding: '8px 16px',
-              borderBottom: '1px solid var(--border-light)',
-              background: 'var(--surface)',
-              flexShrink: 0,
-            }}
-          >
-            <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>
-              {visibleTasks.length} active · instances spawn automatically each morning at 7 AM IST
-            </span>
-          </div>
+          {/* ── Bulk action bar ── */}
+          {checked.size > 0 ? (
+            <div style={{ display:'flex', alignItems:'center', gap:12, padding:'8px 20px',
+              background:'#fef2f2', borderBottom:'1px solid #fecaca', flexShrink:0 }}>
+              <span style={{ fontSize:13, fontWeight:500, color:'#991b1b' }}>{checked.size} selected</span>
+              <button onClick={bulkDelete}
+                style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 14px',
+                  background:'#dc2626', color:'#fff', border:'none', borderRadius:6,
+                  fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+                <Trash2 style={{ width:13, height:13 }}/> Delete
+              </button>
+              <button onClick={() => setChecked(new Set())}
+                style={{ padding:'4px 10px', background:'transparent', border:'none',
+                  fontSize:12, color:'var(--text-secondary)', cursor:'pointer', fontFamily:'inherit' }}>
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 16px',
+              borderBottom:'1px solid var(--border-light)', background:'var(--surface)', flexShrink:0 }}>
+              <span style={{ fontSize:12, color:'var(--text-muted)', fontWeight:500 }}>
+                {visibleTasks.length} active · instances spawn automatically each morning at 7 AM IST
+              </span>
+            </div>
+          )}
 
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: '1fr 10rem 6rem 6rem 6rem 7rem 5rem 4.5rem',
+              gridTemplateColumns: '28px 1fr 10rem 6rem 6rem 6rem 7rem 5rem 4.5rem',
               padding: '5px 18px',
               borderBottom: '1px solid var(--border)',
               background: 'var(--surface-subtle)',
@@ -455,6 +478,10 @@ export function RecurringView({
               flexShrink: 0,
             }}
           >
+            <input type="checkbox"
+              checked={visibleTasks.length > 0 && visibleTasks.every(t => checked.has(t.id))}
+              onChange={e => setChecked(e.target.checked ? new Set(visibleTasks.map(t => t.id)) : new Set())}
+              style={{ width:13, height:13, accentColor:'var(--brand)', cursor:'pointer' }}/>
             <span>Task</span>
             <span style={{ textAlign: 'center' }}>Frequency</span>
             <span style={{ textAlign: 'center' }}>Next due</span>
@@ -512,11 +539,11 @@ export function RecurringView({
             }
 
             return (
-              <div key={task.id} className="group" style={{ borderBottom: '1px solid var(--border-light)' }}>
+              <div key={task.id} className="group" style={{ borderBottom: '1px solid var(--border-light)', background: checked.has(task.id) ? 'var(--brand-light)' : 'var(--surface)' }}>
                 <div
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: '1fr 10rem 6rem 6rem 6rem 7rem 5rem 4.5rem',
+                    gridTemplateColumns: '28px 1fr 10rem 6rem 6rem 6rem 7rem 5rem 4.5rem',
                     alignItems: 'center',
                     padding: '0 18px',
                     minHeight: 38,
@@ -524,6 +551,10 @@ export function RecurringView({
                   }}
                   onClick={() => setSelectedTask(selectedTask?.id === task.id ? null : task)}
                 >
+                  <input type="checkbox" checked={checked.has(task.id)}
+                    onChange={() => setChecked(p => { const s = new Set(p); s.has(task.id) ? s.delete(task.id) : s.add(task.id); return s })}
+                    onClick={e => e.stopPropagation()}
+                    style={{ width:13, height:13, accentColor:'var(--brand)', cursor:'pointer' }}/>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                     <button
                       onClick={async (e) => {
