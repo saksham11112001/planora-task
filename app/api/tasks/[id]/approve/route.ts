@@ -24,12 +24,13 @@ export async function POST(
   if (!task) return NextResponse.json({ error: 'Task not found' }, { status: 404 })
 
   const { decision } = await req.json()
-  const isAssignee   = task.assignee_id === user.id
+  const isAssignee    = task.assignee_id === user.id
+  const isOwnerOrAdmin = ['owner', 'admin'].includes(mb.role)
 
   // ── Who can do what ────────────────────────────────────────────────────────
-  // submit: only the assignee
+  // submit: the assignee OR any owner/admin
   if (decision === 'submit') {
-    if (!isAssignee) return NextResponse.json({ error: 'Only the assignee can submit for approval' }, { status: 403 })
+    if (!isAssignee && !isOwnerOrAdmin) return NextResponse.json({ error: 'Only the assignee can submit for approval' }, { status: 403 })
 
     // Block submit if subtasks are incomplete
     const { data: subtasks } = await supabase
@@ -115,11 +116,11 @@ export async function POST(
     return NextResponse.json({ ok: true, message: 'Submitted for approval' })
   }
 
-  // approve / reject: only the exact designated approver — no fallback to any manager
-  if (!task.approver_id) {
+  // approve / reject: designated approver OR any owner/admin
+  if (!task.approver_id && !isOwnerOrAdmin) {
     return NextResponse.json({ error: 'No approver assigned to this task' }, { status: 403 })
   }
-  if (task.approver_id !== user.id) {
+  if (task.approver_id && task.approver_id !== user.id && !isOwnerOrAdmin) {
     return NextResponse.json({ error: 'Only the designated approver can approve or reject this task' }, { status: 403 })
   }
 

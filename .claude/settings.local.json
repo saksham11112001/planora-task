@@ -44,7 +44,12 @@
       "Bash(find /c/Users/saksh/Desktop/planora-task -maxdepth 3 -type d -not -path */node_modules/* -not -path */.next/*)",
       "Bash(grep -E \"^[^.]*$\")",
       "Bash(cat \"app/\\(app\\)/recurring/RecurringView.tsx\")",
-      "Bash(head -5 \"app/\\(app\\)/recurring/RecurringView.tsx\")"
+      "Bash(head -5 \"app/\\(app\\)/recurring/RecurringView.tsx\")",
+      "Bash(grep -v \"//.*canManage\")",
+      "Bash(sed -n '32,52p' \"app/api/projects/route.ts\")",
+      "Bash(sed -n '8,55p' \"app/api/projects/[id]/route.ts\")",
+      "Bash(sed -n '18,35p' \"app/api/clients/route.ts\")",
+      "Bash(sed -n '8,35p' \"app/api/clients/[id]/route.ts\")"
     ]
   }
 }
