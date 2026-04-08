@@ -21,6 +21,7 @@ interface Task {
   approver_id?: string | null
   client_id: string | null
   assignee: { id: string; name: string } | null
+  creator?: { id: string; name: string } | null
   project: { id: string; name: string; color: string } | null
   client: { id: string; name: string; color: string } | null
 }
@@ -79,9 +80,11 @@ export function RecurringView({
   const [subtaskMap, setSubtaskMap] = useState<Record<string, any[]>>({})
   const [expandedSubs, setExpandedSubs] = useState<Set<string>>(new Set())
   const [newSubInputs, setNewSubInputs] = useState<Record<string, string>>({})
+  const [newSubAssignees, setNewSubAssignees] = useState<Record<string, string>>({})
+  const [newSubDueDates, setNewSubDueDates] = useState<Record<string, string>>({})
 
   // Global filters
-  const { clientId: clientFilter, priority: filterPriority, search: filterSearch, assigneeId: filterAssignee } = useFilterStore()
+  const { clientId: clientFilter, priority: filterPriority, search: filterSearch, assigneeId: filterAssignee, creatorId: filterCreator } = useFilterStore()
 
   const visibleTasks = useMemo(() => {
     return localTasks.filter(t => {
@@ -89,9 +92,10 @@ export function RecurringView({
       if (filterPriority && t.priority !== filterPriority) return false
       if (filterAssignee && (t.assignee_id ?? t.assignee?.id) !== filterAssignee) return false
       if (filterSearch   && !t.title.toLowerCase().includes(filterSearch.toLowerCase())) return false
+      if (filterCreator  && t.creator?.id !== filterCreator) return false
       return true
     })
-  }, [localTasks, clientFilter, filterPriority, filterSearch, filterAssignee])
+  }, [localTasks, clientFilter, filterPriority, filterSearch, filterAssignee, filterCreator])
 
   async function refreshSubs(taskId: string) {
     const r = await fetch(`/api/tasks?parent_id=${taskId}&limit=50`)
@@ -164,7 +168,7 @@ export function RecurringView({
     else toast.error('Upload failed')
   }
 
-  async function addSubtask(taskId: string, title: string) {
+  async function addSubtask(taskId: string, title: string, assigneeId?: string, dueDate?: string) {
     if (!title.trim()) return
 
     const r = await fetch('/api/tasks', {
@@ -175,6 +179,8 @@ export function RecurringView({
         parent_task_id: taskId,
         status: 'todo',
         priority: 'medium',
+        assignee_id: assigneeId || null,
+        due_date: dueDate || null,
       }),
     })
 
@@ -186,6 +192,8 @@ export function RecurringView({
 
     await refreshSubs(taskId)
     setNewSubInputs((prev) => ({ ...prev, [taskId]: '' }))
+    setNewSubAssignees((prev) => ({ ...prev, [taskId]: '' }))
+    setNewSubDueDates((prev) => ({ ...prev, [taskId]: '' }))
   }
 
   async function handleDelete(id: string) {
@@ -243,7 +251,7 @@ export function RecurringView({
       {viewTab === 'Board' && (
         <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
           {/* Universal filter bar */}
-          <UniversalFilterBar clients={clients} members={members} showSearch showPriority showAssignee/>
+          <UniversalFilterBar clients={clients} members={members} showSearch showPriority showAssignee showAssignor/>
 
           <div
             style={{
@@ -264,7 +272,8 @@ export function RecurringView({
                   (!clientFilter  || t.client_id === clientFilter  || t.client?.id === clientFilter) &&
                   (!filterPriority || t.priority === filterPriority) &&
                   (!filterAssignee || (t.assignee_id ?? t.assignee?.id) === filterAssignee) &&
-                  (!filterSearch   || t.title.toLowerCase().includes(filterSearch.toLowerCase())),
+                  (!filterSearch   || t.title.toLowerCase().includes(filterSearch.toLowerCase())) &&
+                  (!filterCreator  || t.creator?.id === filterCreator),
               )
 
               return (
@@ -414,7 +423,7 @@ export function RecurringView({
       {viewTab === 'List' && (
         <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
           {/* Universal filter bar */}
-          <UniversalFilterBar clients={clients} members={members} showSearch showPriority showAssignee/>
+          <UniversalFilterBar clients={clients} members={members} showSearch showPriority showAssignee showAssignor/>
           <div
             style={{
               display: 'flex',
@@ -434,7 +443,7 @@ export function RecurringView({
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: '1fr 10rem 6rem 6rem 6rem 5rem 4.5rem',
+              gridTemplateColumns: '1fr 10rem 6rem 6rem 6rem 7rem 5rem 4.5rem',
               padding: '5px 18px',
               borderBottom: '1px solid var(--border)',
               background: 'var(--surface-subtle)',
@@ -451,6 +460,7 @@ export function RecurringView({
             <span style={{ textAlign: 'center' }}>Next due</span>
             <span style={{ textAlign: 'center' }}>Assignee</span>
             <span style={{ textAlign: 'center' }}>Approver</span>
+            <span style={{ textAlign: 'center' }}>Assigned by</span>
             <span style={{ textAlign: 'center' }}>Client</span>
             <span />
           </div>
@@ -503,7 +513,7 @@ export function RecurringView({
                 <div
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: '1fr 10rem 6rem 6rem 6rem 5rem 4.5rem',
+                    gridTemplateColumns: '1fr 10rem 6rem 6rem 6rem 7rem 5rem 4.5rem',
                     alignItems: 'center',
                     padding: '0 18px',
                     minHeight: 38,
@@ -641,6 +651,10 @@ export function RecurringView({
                         }}
                       />
                     )}
+                  </div>
+
+                  <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-muted)', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+                    {task.creator ? task.creator.name : '—'}
                   </div>
 
                   <div style={{ textAlign: 'center' }}>
@@ -818,47 +832,66 @@ export function RecurringView({
                       </div>
                     ))}
 
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 8,
-                        padding: '4px 18px 4px 60px',
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: 13,
-                          height: 13,
-                          borderRadius: '50%',
-                          flexShrink: 0,
-                          border: '1.5px dashed var(--brand)',
-                          opacity: 0.5,
-                        }}
-                      />
-                      <input
-                        value={newSubInputs[task.id] ?? ''}
-                        onChange={(e) =>
-                          setNewSubInputs((prev) => ({ ...prev, [task.id]: e.target.value }))
-                        }
-                        onKeyDown={async (e) => {
-                          if (e.key === 'Enter' && (newSubInputs[task.id] ?? '').trim()) {
-                            await addSubtask(task.id, newSubInputs[task.id])
+                    <div style={{ padding: '4px 18px 4px 60px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div
+                          style={{
+                            width: 13,
+                            height: 13,
+                            borderRadius: '50%',
+                            flexShrink: 0,
+                            border: '1.5px dashed var(--brand)',
+                            opacity: 0.5,
+                          }}
+                        />
+                        <input
+                          value={newSubInputs[task.id] ?? ''}
+                          onChange={(e) =>
+                            setNewSubInputs((prev) => ({ ...prev, [task.id]: e.target.value }))
                           }
-                          if (e.key === 'Escape') {
-                            setNewSubInputs((prev) => ({ ...prev, [task.id]: '' }))
-                          }
-                        }}
-                        placeholder="Add subtask… (Enter)"
-                        style={{
-                          flex: 1,
-                          fontSize: 12,
-                          border: 'none',
-                          outline: 'none',
-                          background: 'transparent',
-                          color: 'var(--text-primary)',
-                        }}
-                      />
+                          onKeyDown={async (e) => {
+                            if (e.key === 'Enter' && (newSubInputs[task.id] ?? '').trim()) {
+                              await addSubtask(task.id, newSubInputs[task.id], newSubAssignees[task.id], newSubDueDates[task.id])
+                            }
+                            if (e.key === 'Escape') {
+                              setNewSubInputs((prev) => ({ ...prev, [task.id]: '' }))
+                            }
+                          }}
+                          placeholder="Add subtask… (Enter)"
+                          style={{
+                            flex: 1,
+                            fontSize: 12,
+                            border: 'none',
+                            outline: 'none',
+                            background: 'transparent',
+                            color: 'var(--text-primary)',
+                          }}
+                        />
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, paddingLeft: 21 }}>
+                        <select
+                          value={newSubAssignees[task.id] ?? ''}
+                          onChange={e => setNewSubAssignees(prev => ({ ...prev, [task.id]: e.target.value }))}
+                          style={{ fontSize: 11, border: '1px solid var(--border)', borderRadius: 6, padding: '2px 6px', background: 'var(--surface)', color: 'var(--text-secondary)', fontFamily: 'inherit' }}
+                        >
+                          <option value=''>Assignee</option>
+                          {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                        </select>
+                        <input
+                          type="date"
+                          value={newSubDueDates[task.id] ?? ''}
+                          onChange={e => setNewSubDueDates(prev => ({ ...prev, [task.id]: e.target.value }))}
+                          style={{ fontSize: 11, border: '1px solid var(--border)', borderRadius: 6, padding: '2px 6px', background: 'var(--surface)', color: 'var(--text-secondary)', fontFamily: 'inherit' }}
+                        />
+                        <button
+                          onClick={async () => {
+                            if ((newSubInputs[task.id] ?? '').trim()) {
+                              await addSubtask(task.id, newSubInputs[task.id], newSubAssignees[task.id], newSubDueDates[task.id])
+                            }
+                          }}
+                          style={{ fontSize: 11, padding: '2px 10px', borderRadius: 6, border: 'none', background: 'var(--brand)', color: '#fff', cursor: 'pointer', fontFamily: 'inherit' }}
+                        >Add</button>
+                      </div>
                     </div>
                   </div>
                 )}

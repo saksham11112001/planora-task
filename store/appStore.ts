@@ -54,6 +54,7 @@ export interface FilterState {
   priority:    string
   status:      string
   assigneeId:  string
+  creatorId:   string
   dueDateFrom: string
   dueDateTo:   string
   setFilter:   (key: keyof Omit<FilterState, 'setFilter' | 'resetFilters'>, value: string) => void
@@ -66,8 +67,9 @@ export const useFilterStore = create<FilterState>((set) => ({
   priority:     '',
   status:       '',
   assigneeId:   '',
+  creatorId:    '',
   dueDateFrom:  '',
   dueDateTo:    '',
   setFilter:    (key, value) => set({ [key]: value }),
-  resetFilters: () => set({ search: '', clientId: '', priority: '', status: '', assigneeId: '', dueDateFrom: '', dueDateTo: '' }),
+  resetFilters: () => set({ search: '', clientId: '', priority: '', status: '', assigneeId: '', creatorId: '', dueDateFrom: '', dueDateTo: '' }),
 }))

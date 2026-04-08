@@ -56,6 +56,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
   const [subtasksLoaded,setSubtasksLoaded]= useState(false)
   const [newSubtitle,      setNewSubtitle]      = useState('')
   const [newSubAssigneeId, setNewSubAssigneeId] = useState('')
+  const [newSubDueDate,    setNewSubDueDate]    = useState('')
   const [addingSub,        setAddingSub]        = useState(false)
   const [attachments,   setAttachments]   = useState<any[]>([])
   const [attLoaded,     setAttLoaded]     = useState(false)
@@ -315,12 +316,20 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     setAddingSub(true)
     const r = await fetch('/api/tasks', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: newSubtitle.trim(), parent_task_id: task.id,
+      body: JSON.stringify({
+        title: newSubtitle.trim(), parent_task_id: task.id,
         project_id: task.project_id ?? null,
-        assignee_id: newSubAssigneeId || task.assignee_id || null }),
+        assignee_id: newSubAssigneeId || task.assignee_id || null,
+        due_date: newSubDueDate || null,
+      }),
     })
     const d = await r.json()
-    if (r.ok) { setSubtasks(p => [d.data, ...p]); setNewSubtitle(''); setNewSubAssigneeId('') }
+    if (r.ok) {
+      setSubtasks(p => [...p, d.data])
+      setNewSubtitle('')
+      setNewSubAssigneeId('')
+      setNewSubDueDate('')
+    }
     setAddingSub(false)
   }
 
@@ -812,40 +821,67 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
 
                 {/* Inline add subtask - only for managers and main task assignee */}
                 {canEdit && <div style={{
-                  display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
-                  padding: '10px 20px', borderTop: subtasks.length > 0 ? '1px dashed var(--border)' : 'none',
+                  padding: '8px 20px', borderTop: subtasks.length > 0 ? '1px dashed var(--border)' : 'none',
                   marginTop: subtasks.length === 0 ? 0 : 4,
                 }}>
-                  <div style={{
-                    width: 16, height: 16, borderRadius: '50%', flexShrink: 0,
-                    border: '2px dashed var(--brand)', opacity: 0.5,
-                  }}/>
-                  <input
-                    value={newSubtitle}
-                    onChange={e => setNewSubtitle(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter' && newSubtitle.trim()) addSubtask()
-                      if (e.key === 'Escape') { setNewSubtitle('') }
-                    }}
-                    placeholder="Add subtask… (Enter to save)"
-                    style={{
-                      flex: 1, minWidth: 120, fontSize: 13, border: 'none', outline: 'none',
-                      background: 'transparent', color: 'var(--text-primary)',
-                    }}
-                  />
-                  {addingSub && (
-                    <span style={{ fontSize: 11, color: 'var(--brand)' }}>Saving…</span>
-                  )}
-                  {newSubtitle.trim() && !addingSub && (
-                    <button onClick={addSubtask}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                    <div style={{
+                      width: 16, height: 16, borderRadius: '50%', flexShrink: 0,
+                      border: '2px dashed var(--brand)', opacity: 0.5,
+                    }}/>
+                    <input
+                      value={newSubtitle}
+                      onChange={e => setNewSubtitle(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && newSubtitle.trim()) addSubtask()
+                        if (e.key === 'Escape') { setNewSubtitle(''); setNewSubAssigneeId(''); setNewSubDueDate('') }
+                      }}
+                      placeholder="Subtask title…"
                       style={{
-                        fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 6,
-                        background: 'var(--brand)', color: '#fff', border: 'none', cursor: 'pointer',
-                        flexShrink: 0,
-                      }}>
-                      Add
-                    </button>
-                  )}
+                        flex: 1, minWidth: 120, fontSize: 13, border: 'none', outline: 'none',
+                        background: 'transparent', color: 'var(--text-primary)',
+                      }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingLeft: 24 }}>
+                    <select
+                      value={newSubAssigneeId}
+                      onChange={e => setNewSubAssigneeId(e.target.value)}
+                      style={{
+                        fontSize: 11, padding: '3px 8px', borderRadius: 6,
+                        border: '1px solid var(--border)', background: 'var(--surface-subtle)',
+                        color: newSubAssigneeId ? 'var(--text-primary)' : 'var(--text-muted)',
+                        outline: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                      }}
+                    >
+                      <option value="">Assignee (same as task)</option>
+                      {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                    </select>
+                    <input
+                      type="date"
+                      value={newSubDueDate}
+                      onChange={e => setNewSubDueDate(e.target.value)}
+                      style={{
+                        fontSize: 11, padding: '3px 8px', borderRadius: 6,
+                        border: '1px solid var(--border)', background: 'var(--surface-subtle)',
+                        color: newSubDueDate ? 'var(--text-primary)' : 'var(--text-muted)',
+                        outline: 'none', colorScheme: 'light dark', fontFamily: 'inherit',
+                      }}
+                    />
+                    {addingSub && (
+                      <span style={{ fontSize: 11, color: 'var(--brand)' }}>Saving…</span>
+                    )}
+                    {newSubtitle.trim() && !addingSub && (
+                      <button onClick={addSubtask}
+                        style={{
+                          fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 6,
+                          background: 'var(--brand)', color: '#fff', border: 'none', cursor: 'pointer',
+                          flexShrink: 0, fontFamily: 'inherit',
+                        }}>
+                        Add
+                      </button>
+                    )}
+                  </div>
                 </div>}
 
                 {/* Progress */}

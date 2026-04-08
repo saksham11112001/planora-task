@@ -29,6 +29,7 @@ interface Props {
   showStatus?:   boolean
   showDueDate?:  boolean
   showAssignee?: boolean
+  showAssignor?: boolean
   className?:    string
 }
 
@@ -95,12 +96,13 @@ export function UniversalFilterBar({
   showStatus   = true,
   showDueDate  = false,
   showAssignee = false,
+  showAssignor = false,
 }: Props) {
-  const { search, clientId, priority, status, assigneeId, dueDateFrom, dueDateTo, setFilter, resetFilters } = useFilterStore()
+  const { search, clientId, priority, status, assigneeId, creatorId, dueDateFrom, dueDateTo, setFilter, resetFilters } = useFilterStore()
   const [duePreset, setDuePreset] = useState<string>('')
   const [showCustom, setShowCustom] = useState(false)
 
-  const activeCount = [clientId, priority, status, assigneeId, dueDateFrom, dueDateTo, duePreset, search]
+  const activeCount = [clientId, priority, status, assigneeId, creatorId, dueDateFrom, dueDateTo, duePreset, search]
     .filter(Boolean).length
 
   const priorityOpts = (Object.keys(PRIORITY_CONFIG) as string[])
@@ -181,6 +183,16 @@ export function UniversalFilterBar({
           value={assigneeId}
           onChange={v => setFilter('assigneeId', v)}
           placeholder="All assignees"
+          options={members.map(m => ({ value: m.id, label: m.name }))}
+        />
+      )}
+
+      {/* Assignor (creator / assigned by) */}
+      {showAssignor && members.length > 0 && (
+        <PillSelect
+          value={creatorId}
+          onChange={v => setFilter('creatorId', v)}
+          placeholder="Assigned by"
           options={members.map(m => ({ value: m.id, label: m.name }))}
         />
       )}

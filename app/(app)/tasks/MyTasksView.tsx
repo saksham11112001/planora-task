@@ -116,7 +116,7 @@ export function MyTasksView({
   function showMoreGroup(key: string) { setGroupPages(prev => ({ ...prev, [key]: (prev[key] ?? 1) + 1 })) }
 
   // Global filters (My Tasks never filters by assignee — already scoped to current user)
-  const { clientId: filterClient, priority: filterPriority, status: filterStatus, search: filterSearch, dueDateFrom, dueDateTo } = useFilterStore()
+  const { clientId: filterClient, priority: filterPriority, status: filterStatus, search: filterSearch, dueDateFrom, dueDateTo, creatorId: filterCreator } = useFilterStore()
 
   // Apply filters
   const filteredTasks = tasks.filter(t => {
@@ -126,6 +126,7 @@ export function MyTasksView({
     if (filterSearch   && !t.title.toLowerCase().includes(filterSearch.toLowerCase())) return false
     if (dueDateFrom    && (!t.due_date || t.due_date < dueDateFrom)) return false
     if (dueDateTo      && (!t.due_date || t.due_date > dueDateTo))   return false
+    if (filterCreator  && (t as any).creator?.id !== filterCreator) return false
     return true
   })
 
@@ -429,7 +430,12 @@ export function MyTasksView({
                       assignee:          members.find(m => m.id === newTask.assignee_id) ?? null,
                       client:            clients.find(cl => cl.id === newTask.client_id) ?? null,
                     }
-                    setTasks(prev => [enriched as any, ...prev])
+                    setTasks(prev => [...prev, enriched as any].sort((a, b) => {
+                      if (a.due_date && b.due_date) return a.due_date.localeCompare(b.due_date)
+                      if (a.due_date) return -1
+                      if (b.due_date) return 1
+                      return 0
+                    }))
                   }
                 }
                 refresh()
@@ -569,7 +575,7 @@ export function MyTasksView({
         )}
 
         {/* Universal filter bar */}
-        <UniversalFilterBar clients={clients} showSearch showPriority showStatus showDueDate/>
+        <UniversalFilterBar clients={clients} members={members} showSearch showPriority showStatus showDueDate showAssignor/>
         <div style={{ display:'grid', gridTemplateColumns:'28px 22px 1fr 120px 130px 90px 100px 28px',
           alignItems:'center', padding:'5px 18px', borderBottom:`1px solid var(--border)`,
           background:'var(--surface-subtle)', flexShrink:0, fontSize:10, fontWeight:700,
@@ -590,6 +596,12 @@ export function MyTasksView({
           )}
           {LIST_SECS.map(sec => {
             const secTasks = displayTasks.filter(t => sec.filter(t, today))
+              .sort((a, b) => {
+                if (a.due_date && b.due_date) return a.due_date.localeCompare(b.due_date)
+                if (a.due_date) return -1
+                if (b.due_date) return 1
+                return 0
+              })
             if (secTasks.length === 0) return null
             return (
               <div key={sec.key}>
@@ -913,7 +925,7 @@ export function MyTasksView({
       )}
       <Tabs/>
       {/* Universal filter bar (no assignee — My Tasks is already user-scoped) */}
-      <UniversalFilterBar clients={clients} showSearch showPriority showDueDate/>
+      <UniversalFilterBar clients={clients} members={members} showSearch showPriority showDueDate showAssignor/>
       <div style={{ flex:1, overflowX:'auto', overflowY:'hidden', padding:'14px 20px',
         background:'var(--surface-subtle)', display:'flex', gap:12, alignItems:'flex-start' }}>
         {BOARD_COLS.map(col => {
