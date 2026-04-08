@@ -33,6 +33,8 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     : canManage
   const approverInfo = (task as any)?.approver as unknown as { id: string; name: string } | null
   const isAssignee = task?.assignee_id === currentUserId
+  // canEdit: only managers or the main task assignee can edit the parent task
+  const canEdit = canManage || isAssignee
 
   /* local editable state */
   const [title,       setTitle]       = useState('')
@@ -454,19 +456,23 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
             {/* ── Panel header ── */}
             <div className="flex items-center gap-2 px-4 py-3 border-b sticky top-0 z-10"
               style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
-              <button
-                onClick={handleComplete}
-                className={cn('task-check flex-shrink-0', isCompleted && 'done', isInReview && 'popping', completing && 'popping')}
-                title={isCompleted ? 'Mark incomplete' : isInReview ? 'Pending approval — click to reopen' : 'Submit for approval'}
-              >
-                {(isCompleted || isInReview) && (
-                  <svg viewBox="0 0 16 16" fill="none" className="h-2.5 w-2.5">
-                    <path d="M13 4L6.5 11 3 7.5" stroke={isInReview ? '#7c3aed' : 'white'} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                )}
-              </button>
+              {canEdit ? (
+                <button
+                  onClick={handleComplete}
+                  className={cn('task-check flex-shrink-0', isCompleted && 'done', isInReview && 'popping', completing && 'popping')}
+                  title={isCompleted ? 'Mark incomplete' : isInReview ? 'Pending approval — click to reopen' : 'Submit for approval'}
+                >
+                  {(isCompleted || isInReview) && (
+                    <svg viewBox="0 0 16 16" fill="none" className="h-2.5 w-2.5">
+                      <path d="M13 4L6.5 11 3 7.5" stroke={isInReview ? '#7c3aed' : 'white'} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
+                </button>
+              ) : (
+                <div className="task-check flex-shrink-0" style={{ opacity: 0.3, cursor: 'not-allowed' }} title="Only the task assignee can submit this task" />
+              )}
               <span className="text-xs font-medium flex-1" style={{ color: isCompleted ? '#16a34a' : isInReview ? '#7c3aed' : 'var(--text-muted)' }}>
-                {isCompleted ? '✓ Completed' : isInReview ? '⏳ Pending approval' : 'Submit for approval'}
+                {isCompleted ? '✓ Completed' : isInReview ? '⏳ Pending approval' : canEdit ? 'Submit for approval' : 'View only'}
               </span>
               {isSaving && (
                 <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>Saving…</span>
@@ -539,23 +545,26 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
               <textarea
                 ref={titleRef}
                 value={title}
-                onChange={e => { setTitle(e.target.value); patchDebounced({ title: e.target.value }) }}
-                onBlur={() => { if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; if (task && title !== task.title) patch({ title }) } }}
+                onChange={e => { if (!canEdit) return; setTitle(e.target.value); patchDebounced({ title: e.target.value }) }}
+                onBlur={() => { if (!canEdit) return; if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; if (task && title !== task.title) patch({ title }) } }}
                 rows={1}
+                readOnly={!canEdit}
                 className={cn(
                   'w-full text-lg font-bold resize-none outline-none bg-transparent leading-snug',
-                  isCompleted ? 'line-through' : ''
+                  isCompleted ? 'line-through' : '',
+                  !canEdit ? 'cursor-default select-text' : ''
                 )}
                 style={{ color: isCompleted ? 'var(--text-muted)' : 'var(--text-primary)' }}
               />
               <textarea
                 value={description}
-                onChange={e => { setDescription(e.target.value); patchDebounced({ description: e.target.value || null }, 800) }}
-                onBlur={() => { if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; if (task && description !== (task.description ?? '')) patch({ description: description || null }) } }}
-                placeholder="Add a description..."
+                onChange={e => { if (!canEdit) return; setDescription(e.target.value); patchDebounced({ description: e.target.value || null }, 800) }}
+                onBlur={() => { if (!canEdit) return; if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; if (task && description !== (task.description ?? '')) patch({ description: description || null }) } }}
+                placeholder={canEdit ? 'Add a description...' : ''}
                 rows={3}
+                readOnly={!canEdit}
                 className="w-full mt-2 text-sm resize-none outline-none bg-transparent leading-relaxed"
-                style={{ color: 'var(--text-secondary)', caretColor: 'var(--brand)' }}
+                style={{ color: 'var(--text-secondary)', caretColor: 'var(--brand)', cursor: canEdit ? undefined : 'default' }}
               />
             </div>
 
@@ -573,27 +582,30 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
               <>
               <div className="px-5 py-3">
                 <FieldRow label="Status">
-                  <select value={status} onChange={e => { const prev = status; setStatus(e.target.value); patch({ status: e.target.value }, () => setStatus(prev)) }}
-                    className="text-sm bg-transparent outline-none cursor-pointer flex-1"
-                    style={{ color: 'var(--text-primary)' }}>
+                  <select value={status} onChange={e => { if (!canEdit) return; const prev = status; setStatus(e.target.value); patch({ status: e.target.value }, () => setStatus(prev)) }}
+                    disabled={!canEdit}
+                    className="text-sm bg-transparent outline-none flex-1"
+                    style={{ color: 'var(--text-primary)', cursor: canEdit ? 'pointer' : 'default' }}>
                     {Object.entries(STATUS_CONFIG).map(([v, c]) => <option key={v} value={v}>{c.label}</option>)}
                   </select>
                 </FieldRow>
 
                 <FieldRow label="Priority">
                   <Flag className="h-3.5 w-3.5" style={{ color: priConf.color }} />
-                  <select value={priority} onChange={e => { const prev = priority; setPriority(e.target.value); patch({ priority: e.target.value }, () => setPriority(prev)) }}
-                    className="text-sm bg-transparent outline-none cursor-pointer flex-1"
-                    style={{ color: 'var(--text-primary)' }}>
+                  <select value={priority} onChange={e => { if (!canEdit) return; const prev = priority; setPriority(e.target.value); patch({ priority: e.target.value }, () => setPriority(prev)) }}
+                    disabled={!canEdit}
+                    className="text-sm bg-transparent outline-none flex-1"
+                    style={{ color: 'var(--text-primary)', cursor: canEdit ? 'pointer' : 'default' }}>
                     {Object.entries(PRIORITY_CONFIG).map(([v, c]) => <option key={v} value={v}>{c.label}</option>)}
                   </select>
                 </FieldRow>
 
                 <FieldRow label="Assignee">
                   {assigneeId && <Avatar name={assignee?.name ?? '?'} size="xs" />}
-                  <select value={assigneeId} onChange={e => { const prev = assigneeId; setAssigneeId(e.target.value); patch({ assignee_id: e.target.value || null }, () => setAssigneeId(prev)) }}
-                    className="text-sm bg-transparent outline-none cursor-pointer flex-1"
-                    style={{ color: 'var(--text-primary)' }}>
+                  <select value={assigneeId} onChange={e => { if (!canEdit) return; const prev = assigneeId; setAssigneeId(e.target.value); patch({ assignee_id: e.target.value || null }, () => setAssigneeId(prev)) }}
+                    disabled={!canEdit}
+                    className="text-sm bg-transparent outline-none flex-1"
+                    style={{ color: 'var(--text-primary)', cursor: canEdit ? 'pointer' : 'default' }}>
                     <option value="">Unassigned</option>
                     {members.map(m => (
                       <option key={m.id} value={m.id}>{m.name}{m.id === currentUserId ? ' (me)' : ''}</option>
@@ -636,13 +648,16 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                 <FieldRow label="Due date">
                   <Calendar className="h-3.5 w-3.5" style={{ color: 'var(--text-muted)' }} />
                   <input type="date" value={dueDate}
-                    onChange={e => { const prev = dueDate; setDueDate(e.target.value); patch({ due_date: e.target.value || null }, () => setDueDate(prev)) }}
-                    className="text-sm outline-none cursor-pointer flex-1 rounded-md px-2 py-1"
+                    onChange={e => { if (!canEdit) return; const prev = dueDate; setDueDate(e.target.value); patch({ due_date: e.target.value || null }, () => setDueDate(prev)) }}
+                    readOnly={!canEdit}
+                    disabled={!canEdit}
+                    className="text-sm outline-none flex-1 rounded-md px-2 py-1"
                     style={{
                       color: overdue ? '#dc2626' : dueDate ? 'var(--text-primary)' : 'var(--text-muted)',
                       background: 'var(--surface-subtle)',
                       border: '1px solid var(--border)',
                       colorScheme: 'light dark',
+                      cursor: canEdit ? 'pointer' : 'default',
                     }}
                   />
                   {overdue && <span className="text-xs text-red-500 font-medium flex-shrink-0">Overdue</span>}
@@ -651,9 +666,10 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                 {clients.length > 0 && (
                   <FieldRow label="Client">
                     {clientId && <div className="h-3 w-3 rounded-sm flex-shrink-0" style={{ background: client?.color }} />}
-                    <select value={clientId} onChange={e => { setClientId(e.target.value); patch({ client_id: e.target.value || null }) }}
-                      className="text-sm bg-transparent outline-none cursor-pointer flex-1"
-                      style={{ color: 'var(--text-primary)' }}>
+                    <select value={clientId} onChange={e => { if (!canEdit) return; setClientId(e.target.value); patch({ client_id: e.target.value || null }) }}
+                      disabled={!canEdit}
+                      className="text-sm bg-transparent outline-none flex-1"
+                      style={{ color: 'var(--text-primary)', cursor: canEdit ? 'pointer' : 'default' }}>
                       <option value="">No client</option>
                       {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
@@ -663,11 +679,13 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                 <FieldRow label="Est. hours">
                   <Clock className="h-3.5 w-3.5" style={{ color: 'var(--text-muted)' }} />
                   <input type="number" step="0.5" min="0" value={estHours}
-                    onChange={e => setEstHours(e.target.value)}
-                    onBlur={() => patch({ estimated_hours: estHours ? parseFloat(estHours) : null })}
+                    onChange={e => { if (!canEdit) return; setEstHours(e.target.value) }}
+                    onBlur={() => { if (canEdit) patch({ estimated_hours: estHours ? parseFloat(estHours) : null }) }}
+                    readOnly={!canEdit}
+                    disabled={!canEdit}
                     placeholder="0"
                     className="text-sm bg-transparent outline-none w-16"
-                    style={{ color: 'var(--text-primary)' }}
+                    style={{ color: 'var(--text-primary)', cursor: canEdit ? undefined : 'default' }}
                   />
                   {estHours && <span className="text-xs" style={{ color: 'var(--text-muted)' }}>hrs</span>}
                 </FieldRow>
@@ -681,7 +699,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
               </div>
 
               {/* ── Convert task actions ── */}
-              {!task.is_recurring && (
+              {!task.is_recurring && canEdit && (
                 <div className="px-5 pb-4 pt-2">
                   <button
                     onClick={() => setShowConvert(p => !p)}
@@ -741,19 +759,23 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                 <div>
                   {subtasks.map(sub => {
                     const subAssignee = sub.assignee_id ? members.find(m => m.id === sub.assignee_id) : null
+                    // Can toggle: managers, main task assignee, or the specific subtask's own assignee
+                    const canToggleSub = canEdit || sub.assignee_id === currentUserId
                     return (
                     <div key={sub.id}
                       style={{ display: 'flex', alignItems: 'center', gap: 10,
                         padding: '8px 20px', borderBottom: '1px solid var(--border-light)',
                         background: 'var(--surface)' }}
                       className="group">
-                      <button onClick={() => toggleSubtask(sub)}
+                      <button onClick={() => canToggleSub && toggleSubtask(sub)}
                         style={{
                           width: 16, height: 16, borderRadius: '50%', flexShrink: 0,
                           border: `2px solid ${sub.status === 'completed' ? 'var(--brand)' : 'var(--border)'}`,
                           background: sub.status === 'completed' ? 'var(--brand)' : 'transparent',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          cursor: 'pointer', padding: 0, transition: 'all 0.15s',
+                          cursor: canToggleSub ? 'pointer' : 'not-allowed',
+                          opacity: canToggleSub ? 1 : 0.4,
+                          padding: 0, transition: 'all 0.15s',
                         }}>
                         {sub.status === 'completed' && (
                           <svg viewBox="0 0 10 10" fill="none" style={{ width: 8, height: 8 }}>
@@ -788,8 +810,8 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                   )})}
                 </div>
 
-                {/* Inline add subtask - always visible at bottom */}
-                <div style={{
+                {/* Inline add subtask - only for managers and main task assignee */}
+                {canEdit && <div style={{
                   display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
                   padding: '10px 20px', borderTop: subtasks.length > 0 ? '1px dashed var(--border)' : 'none',
                   marginTop: subtasks.length === 0 ? 0 : 4,
@@ -842,7 +864,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                       Add
                     </button>
                   )}
-                </div>
+                </div>}
 
                 {/* Progress */}
                 {subtasks.length > 0 && (
