@@ -53,7 +53,9 @@
       "Bash(grep -A 5 -B 5 \"parent_task_id\" /c/Users/saksh/Desktop/planora-task/app/api/tasks/[id]/route.ts)",
       "Bash(grep -n \"parent\\\\|subtask\" /c/Users/saksh/Desktop/planora-task/app/api/tasks/[id]/route.ts)",
       "Bash(grep -n \"parent_task_id\" /c/Users/saksh/Desktop/planora-task/app/api/tasks/[id]/route.ts)",
-      "Bash(grep -l \"CREATE TABLE.*tasks\" /c/Users/saksh/Desktop/planora-task/supabase/migrations/*.sql)"
+      "Bash(grep -l \"CREATE TABLE.*tasks\" /c/Users/saksh/Desktop/planora-task/supabase/migrations/*.sql)",
+      "Bash(find /c/Users/saksh/Desktop/planora-task/components -type f -name *.tsx)",
+      "Bash(find /c/Users/saksh/Desktop/planora-task -name AppShell* -type f)"
     ]
   }
 }

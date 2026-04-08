@@ -247,7 +247,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
       <style>{`@media(max-width:640px){.hide-mobile{display:none!important}.inbox-task-row{grid-template-columns:36px 22px 1fr 80px 32px 28px!important}}`}
-        {`.inbox-col-header{display:grid;grid-template-columns:36px 22px 1fr 100px 110px 110px 80px 32px 28px;align-items:center;padding:0 16px;}`}
+        {`.inbox-col-header{display:grid;grid-template-columns:36px 22px 1fr 100px 110px 110px 100px 80px 32px 28px;align-items:center;padding:0 16px;}`}
       </style>
 
       <div style={{ display:'flex', borderBottom:'1px solid var(--border)', padding:'0 20px', background:'var(--surface)', flexShrink:0 }}>
@@ -342,7 +342,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
             </div>
 
             {/* Universal filter bar */}
-            <UniversalFilterBar clients={clients} members={members} showSearch showPriority showStatus showAssignee showDueDate/>
+            <UniversalFilterBar clients={clients} members={members} showSearch showPriority showStatus showAssignee showAssignor showDueDate/>
 
             {localTasks.length > 0 && (
               <div style={{ padding:'6px 16px', borderBottom:'1px solid var(--border-light)', background:'var(--surface-subtle)', display:'flex', alignItems:'center', gap:12, flexWrap:'wrap', flexShrink:0 }}>
@@ -376,6 +376,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
               <div style={{ fontSize:10, fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.07em' }}>Assignee</div>
               <div style={{ fontSize:10, fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.07em' }}>Client</div>
               <div style={{ fontSize:10, fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.07em', textAlign:'center' }}>Due date</div>
+              <div style={{ fontSize:10, fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.07em' }}>Assigned by</div>
               <div style={{ fontSize:10, fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.07em', textAlign:'center' }}>Priority</div>
               <div/><div/>
             </div>
@@ -417,7 +418,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                     return (
                       <div key={task.id}>
                         <div className="inbox-task-row" onClick={() => setSelectedTask(task)}
-                          style={{ display:'grid', gridTemplateColumns:'36px 22px 1fr 100px 110px 110px 80px 32px 28px', alignItems:'center', padding:'0 16px', minHeight:40, borderBottom:'1px solid var(--border-light)', cursor:'pointer', background:typeBg }}>
+                          style={{ display:'grid', gridTemplateColumns:'36px 22px 1fr 100px 110px 110px 100px 80px 32px 28px', alignItems:'center', padding:'0 16px', minHeight:40, borderBottom:'1px solid var(--border-light)', cursor:'pointer', background:typeBg }}>
                           <input type="checkbox" checked={checked.has(task.id)}
                             onChange={() => setChecked(p => { const s=new Set(p); s.has(task.id)?s.delete(task.id):s.add(task.id); return s })}
                             onClick={e => e.stopPropagation()} style={{ width:13, height:13, accentColor:'#0d9488', cursor:'pointer' }}/>
@@ -426,8 +427,31 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                             {isComp && <svg viewBox="0 0 16 16" fill="none" style={{ width:9, height:9 }}><path d="M13 4L6.5 11 3 7.5" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                             {isPending && !isComp && <Clock style={{ width:8, height:8, color:'#7c3aed' }}/>}
                           </button>
-                          <div style={{ minWidth:0, paddingRight:8 }}>
-                            <p style={{ fontSize:13, fontWeight:600, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis', color:isComp?'var(--text-muted)':ov?'#f87171':'var(--text-primary)', textDecoration:isComp?'line-through':'none', margin:0 }}>{task.title}</p>
+                          <div style={{ minWidth:0, display:'flex', alignItems:'center', gap:5, overflow:'hidden' }}>
+                            <p style={{ fontSize:13, fontWeight:600, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis', color:isComp?'var(--text-muted)':ov?'#f87171':'var(--text-primary)', textDecoration:isComp?'line-through':'none', margin:0, flex:1 }}>{task.title}</p>
+                            {(isCompliance || (task as any).approval_required) && !isComp && (
+                              <label
+                                title={isCompliance ? 'Upload compliance document' : 'Upload attachment'}
+                                onClick={e => e.stopPropagation()}
+                                style={{ flexShrink:0, cursor:'pointer', display:'inline-flex', alignItems:'center', justifyContent:'center',
+                                  width:18, height:18, borderRadius:4, opacity:0.5, transition:'opacity 0.15s, background 0.15s',
+                                  color: isCompliance ? '#b45309' : 'var(--text-muted)' }}
+                                onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.opacity='1'; el.style.background=isCompliance?'rgba(234,179,8,0.15)':'var(--surface-subtle)' }}
+                                onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.opacity='0.5'; el.style.background='transparent' }}
+                              >
+                                <input type="file" style={{ display:'none' }} onClick={e => e.stopPropagation()} onChange={async e => {
+                                  const file = e.target.files?.[0]; if (!file) return
+                                  const fd = new FormData(); fd.append('file', file)
+                                  const res = await fetch(`/api/tasks/${task.id}/attachments`, { method:'POST', body:fd })
+                                  if (res.ok) toast.success(`Uploaded: ${file.name} ✓`)
+                                  else toast.error('Upload failed')
+                                  e.target.value = ''
+                                }}/>
+                                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" style={{ width:11, height:11 }}>
+                                  <path d="M8 10V3M5 6l3-3 3 3M3 13h10"/>
+                                </svg>
+                              </label>
+                            )}
                           </div>
                           {/* Assignee column */}
                           <div className="hide-mobile" style={{ display:'flex', alignItems:'center', gap:4, overflow:'hidden' }}>
@@ -455,6 +479,21 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                           </div>
                           <div className="hide-mobile" style={{ textAlign:'center', fontSize:12, color:ov?'#f87171':task.due_date===today?'var(--brand)':'var(--text-muted)', fontWeight:ov||task.due_date===today?600:400 }}>
                             {task.due_date ? fmtDate(task.due_date) : '—'}
+                          </div>
+                          {/* Assigned by column */}
+                          <div className="hide-mobile" style={{ display:'flex', alignItems:'center', gap:4, overflow:'hidden' }}>
+                            {(() => {
+                              const creator = (task as any).creator as { id:string; name:string } | null
+                              if (!creator) return <span style={{ fontSize:11, color:'var(--text-muted)' }}>—</span>
+                              return (
+                                <>
+                                  <span style={{ width:16, height:16, borderRadius:'50%', background:'var(--surface-subtle)', border:'1px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:8, fontWeight:700, color:'var(--text-secondary)', flexShrink:0 }}>
+                                    {creator.name[0]?.toUpperCase()}
+                                  </span>
+                                  <span style={{ fontSize:11, color:'var(--text-muted)', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{creator.name.split(' ')[0]}</span>
+                                </>
+                              )
+                            })()}
                           </div>
                           <div style={{ display:'flex', justifyContent:'center' }}>
                             <span style={{ display:'inline-flex', alignItems:'center', gap:3, padding:'2px 6px', borderRadius:4, fontSize:11, fontWeight:500, background:pri?.bg??'#f8fafc', color:pri?.color??'#94a3b8' }}>{pri?.label ?? task.priority}</span>
@@ -502,6 +541,29 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                                     </span>
                                     {subAssigneeName.split(' ')[0]}
                                   </span>
+                                )}
+                                {sub.custom_fields?._compliance_subtask && sub.status !== 'completed' && (
+                                  <label
+                                    title="Upload compliance document"
+                                    onClick={e => e.stopPropagation()}
+                                    style={{ flexShrink:0, cursor:'pointer', display:'inline-flex', alignItems:'center', justifyContent:'center',
+                                      width:18, height:18, borderRadius:4, opacity:0.55, transition:'opacity 0.15s, background 0.15s',
+                                      color:'#b45309' }}
+                                    onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.opacity='1'; el.style.background='rgba(234,179,8,0.15)' }}
+                                    onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.opacity='0.55'; el.style.background='transparent' }}
+                                  >
+                                    <input type="file" style={{ display:'none' }} onClick={e => e.stopPropagation()} onChange={async e => {
+                                      const file = e.target.files?.[0]; if (!file) return
+                                      const fd = new FormData(); fd.append('file', file)
+                                      const res = await fetch(`/api/tasks/${sub.id}/attachments`, { method:'POST', body:fd })
+                                      if (res.ok) toast.success(`Uploaded: ${file.name} ✓`)
+                                      else toast.error('Upload failed')
+                                      e.target.value = ''
+                                    }}/>
+                                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" style={{ width:11, height:11 }}>
+                                      <path d="M8 10V3M5 6l3-3 3 3M3 13h10"/>
+                                    </svg>
+                                  </label>
                                 )}
                                 <span style={{ fontSize:10, color:'var(--text-muted)', flexShrink:0, opacity:0.5 }}>Edit →</span>
                               </div>

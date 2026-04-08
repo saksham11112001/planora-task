@@ -291,8 +291,10 @@ function Div() {
 }
 
 function SI({ href, active, icon, label }: { href: string; active: boolean; icon: React.ReactNode; label: string }) {
+  const router = useRouter()
   return (
     <Link href={href} prefetch={true}
+      onClick={() => { if (!active) router.refresh() }}
       style={{
         display: 'flex', alignItems: 'center', gap: 9,
         padding: '7px 10px', borderRadius: 7, fontSize: 13,

@@ -558,11 +558,35 @@ export function RecurringView({
                             overflow: 'hidden',
                             whiteSpace: 'nowrap',
                             textOverflow: 'ellipsis',
+                            flex: 1,
                           }}
                         >
                           {task.title}
                         </span>
                         <PriorityBadge priority={task.priority as any} />
+                        {((task as any).custom_fields?._ca_compliance || (task as any).approval_required) && task.status !== 'completed' && (
+                          <label
+                            title={(task as any).custom_fields?._ca_compliance ? 'Upload compliance document' : 'Upload attachment'}
+                            onClick={e => e.stopPropagation()}
+                            style={{ flexShrink:0, cursor:'pointer', display:'inline-flex', alignItems:'center', justifyContent:'center',
+                              width:18, height:18, borderRadius:4, opacity:0.5, transition:'opacity 0.15s, background 0.15s',
+                              color:(task as any).custom_fields?._ca_compliance ? '#b45309' : 'var(--text-muted)' }}
+                            onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.opacity='1'; el.style.background=(task as any).custom_fields?._ca_compliance?'rgba(234,179,8,0.15)':'var(--surface-subtle)' }}
+                            onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.opacity='0.5'; el.style.background='transparent' }}
+                          >
+                            <input type="file" style={{ display:'none' }} onClick={e => e.stopPropagation()} onChange={async e => {
+                              const file = e.target.files?.[0]; if (!file) return
+                              const fd = new FormData(); fd.append('file', file)
+                              const res = await fetch(`/api/tasks/${task.id}/attachments`, { method:'POST', body:fd })
+                              if (res.ok) toast.success(`Uploaded: ${file.name} ✓`)
+                              else toast.error('Upload failed')
+                              e.target.value = ''
+                            }}/>
+                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" style={{ width:11, height:11 }}>
+                              <path d="M8 10V3M5 6l3-3 3 3M3 13h10"/>
+                            </svg>
+                          </label>
+                        )}
                       </div>
 
                       {task.project && (

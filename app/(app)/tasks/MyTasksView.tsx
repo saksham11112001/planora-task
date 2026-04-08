@@ -90,8 +90,9 @@ export function MyTasksView({
   const today      = todayStr()
   const canManage  = ['owner','admin','manager'].includes(userRole ?? '')
 
-  const [tasks,      setTasks]      = useState<Task[]>(initialTasks)
-  const [tab,        setTab]        = useState<'List'|'Board'>('Board')
+  const [tasks,        setTasks]        = useState<Task[]>(initialTasks)
+  const [pendingTasks, setPendingTasks] = useState<Task[]>(pendingApprovalTasks)
+  const [tab,          setTab]          = useState<'List'|'Board'>('Board')
   const [selTask,    setSelTask]    = useState<Task | null>(null)
   const [dragTaskId, setDragTaskId] = useState<string | null>(null)
   const [checked,    setChecked]    = useState<Set<string>>(new Set())
@@ -301,12 +302,15 @@ export function MyTasksView({
 
   // Approve or reject a task (for managers/approvers)
   async function handleApproveDecision(taskId: string, decision: 'approve' | 'reject') {
-    // Optimistic update
+    // Snapshot for rollback
     const task = tasks.find(t => t.id === taskId)
+    const pendingTaskSnapshot = pendingTasks.find(t => t.id === taskId)
     const newStatus = decision === 'approve' ? 'completed' : 'todo'
+    // Optimistic: update tasks state (for tasks in own list) and remove from pendingTasks
     setTasks(prev => prev.map(t => t.id === taskId
       ? { ...t, status: newStatus as any, approval_status: decision === 'approve' ? 'approved' : 'rejected',
           completed_at: decision === 'approve' ? new Date().toISOString() : null } : t))
+    setPendingTasks(prev => prev.filter(t => t.id !== taskId))
     setSelTask(prev => prev?.id === taskId
       ? { ...prev, status: newStatus as any, approval_status: decision === 'approve' ? 'approved' : 'rejected' } : prev)
 
@@ -322,6 +326,7 @@ export function MyTasksView({
         setTasks(prev => prev.map(t => t.id === taskId ? task : t))
         setSelTask(prev => prev?.id === taskId ? task : prev)
       }
+      if (pendingTaskSnapshot) setPendingTasks(prev => [pendingTaskSnapshot, ...prev])
       const d = await res.json().catch(() => ({}))
       toast.error(d.error ?? 'Action failed')
     }
@@ -467,7 +472,7 @@ export function MyTasksView({
           </div>
         )}
         {/* ── Needs your approval section ─────────────────────────── */}
-        {pendingApprovalTasks.length > 0 && (
+        {pendingTasks.length > 0 && (
           <div style={{ borderBottom:'2px solid #7c3aed', marginBottom:0 }}>
             {/* Section header */}
             <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 18px 8px',
@@ -478,11 +483,11 @@ export function MyTasksView({
               </span>
               <span style={{ fontSize:11, background:'#7c3aed', color:'#fff',
                 borderRadius:99, padding:'1px 8px', fontWeight:600 }}>
-                {pendingApprovalTasks.length}
+                {pendingTasks.length}
               </span>
             </div>
             {/* Approval task rows */}
-            {pendingApprovalTasks.map(task => {
+            {pendingTasks.map(task => {
               const assignee = task.assignee as {id:string;name:string}|null
               const ov = isOverdue(task.due_date, task.status)
               return (
@@ -655,6 +660,29 @@ export function MyTasksView({
                             color:'#7c3aed', padding:'1px 5px', borderRadius:3, fontWeight:500 }}>
                             Pending
                           </span>}
+                          {(isCompliance || task.approval_required) && task.status !== 'completed' && (
+                            <label
+                              title={isCompliance ? 'Upload compliance document' : 'Upload attachment'}
+                              onClick={e => e.stopPropagation()}
+                              style={{ flexShrink:0, cursor:'pointer', display:'inline-flex', alignItems:'center', justifyContent:'center',
+                                width:18, height:18, borderRadius:4, opacity:0.5, transition:'opacity 0.15s, background 0.15s',
+                                color: isCompliance ? '#b45309' : 'var(--text-muted)' }}
+                              onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.opacity='1'; el.style.background=isCompliance?'rgba(234,179,8,0.15)':'var(--surface-subtle)' }}
+                              onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.opacity='0.5'; el.style.background='transparent' }}
+                            >
+                              <input type="file" style={{ display:'none' }} onClick={e => e.stopPropagation()} onChange={async e => {
+                                const file = e.target.files?.[0]; if (!file) return
+                                const fd = new FormData(); fd.append('file', file)
+                                const res = await fetch(`/api/tasks/${task.id}/attachments`, { method:'POST', body:fd })
+                                if (res.ok) toast.success(`Uploaded: ${file.name} ✓`)
+                                else toast.error('Upload failed')
+                                e.target.value = ''
+                              }}/>
+                              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" style={{ width:11, height:11 }}>
+                                <path d="M8 10V3M5 6l3-3 3 3M3 13h10"/>
+                              </svg>
+                            </label>
+                          )}
                         </div>
                         {/* Mobile: show due date + priority inline */}
                         <div className="show-mobile-meta" style={{ display:'none', alignItems:'center', gap:6, marginTop:2 }}>
@@ -943,7 +971,12 @@ export function MyTasksView({
       <UniversalFilterBar clients={clients} members={members} showSearch showPriority showDueDate showAssignor/>
       <div style={{ flex:1, overflowX:'auto', overflowY:'hidden', padding:'14px 20px',
         background:'var(--surface-subtle)', display:'flex', gap:12, alignItems:'flex-start' }}>
-        {BOARD_COLS.map(col => {
+        {(() => {
+          // Tasks pending manager approval that aren't already in filteredTasks
+          const extraPendingForBoard = !showAssignedByMe
+            ? pendingTasks.filter(pt => !filteredTasks.some(t => t.id === pt.id))
+            : []
+          return BOARD_COLS.map(col => {
           const today2 = todayStr()
           // Build base list for this column
           let colTasks = col.status === 'overdue'
@@ -951,7 +984,7 @@ export function MyTasksView({
                 && !['completed','cancelled','in_review'].includes(t.status)
                 && t.approval_status !== 'pending')
             : col.status === 'in_review'
-            ? displayTasks.filter(t => t.status === 'in_review' || t.approval_status === 'pending')
+            ? [...displayTasks.filter(t => t.status === 'in_review' || t.approval_status === 'pending'), ...extraPendingForBoard]
             : displayTasks.filter(t =>
                 (t.status === col.status || (col.status === 'in_progress' && t.status === 'todo'))
                 && t.approval_status !== 'pending'
@@ -1140,7 +1173,8 @@ export function MyTasksView({
               </div>
             </div>
           )
-        })}
+          })
+        })()}
       </div>
       <TaskDetailPanel task={selTask} members={members} clients={clients}
         currentUserId={currentUserId} userRole={userRole}
