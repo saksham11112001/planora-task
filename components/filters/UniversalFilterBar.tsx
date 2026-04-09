@@ -3,13 +3,18 @@ import React, { useState } from 'react'
 import { useFilterStore } from '@/store/appStore'
 import { PRIORITY_CONFIG, STATUS_CONFIG } from '@/types'
 
-/* ── Due date preset helpers ── */
+/* ── Date helpers ── */
 function todayIso() {
   return new Date().toISOString().slice(0, 10)
 }
 function addDays(n: number) {
   const d = new Date()
   d.setDate(d.getDate() + n)
+  return d.toISOString().slice(0, 10)
+}
+function subDays(n: number) {
+  const d = new Date()
+  d.setDate(d.getDate() - n)
   return d.toISOString().slice(0, 10)
 }
 
@@ -21,16 +26,34 @@ const DUE_PRESETS = [
   { value: 'custom', label: 'Custom range…', from: () => '', to: () => '' },
 ] as const
 
+const CREATED_PRESETS = [
+  { value: 'today',  label: 'Today',         from: () => todayIso(),  to: () => todayIso()  },
+  { value: '7d',     label: 'Last 7 days',   from: () => subDays(7),  to: () => todayIso()  },
+  { value: '30d',    label: 'Last 30 days',  from: () => subDays(30), to: () => todayIso()  },
+  { value: '90d',    label: 'Last 90 days',  from: () => subDays(90), to: () => todayIso()  },
+  { value: 'custom', label: 'Custom range…', from: () => '',          to: () => ''          },
+] as const
+
+const UPDATED_PRESETS = [
+  { value: 'today',  label: 'Today',         from: () => todayIso(),  to: () => todayIso()  },
+  { value: '7d',     label: 'Last 7 days',   from: () => subDays(7),  to: () => todayIso()  },
+  { value: '30d',    label: 'Last 30 days',  from: () => subDays(30), to: () => todayIso()  },
+  { value: '90d',    label: 'Last 90 days',  from: () => subDays(90), to: () => todayIso()  },
+  { value: 'custom', label: 'Custom range…', from: () => '',          to: () => ''          },
+] as const
+
 interface Props {
-  clients?:      { id: string; name: string; color: string }[]
-  members?:      { id: string; name: string }[]
-  showSearch?:   boolean
-  showPriority?: boolean
-  showStatus?:   boolean
-  showDueDate?:  boolean
-  showAssignee?: boolean
-  showAssignor?: boolean
-  className?:    string
+  clients?:          { id: string; name: string; color: string }[]
+  members?:          { id: string; name: string }[]
+  showSearch?:       boolean
+  showPriority?:     boolean
+  showStatus?:       boolean
+  showDueDate?:      boolean
+  showAssignee?:     boolean
+  showAssignor?:     boolean
+  showCreatedDate?:  boolean
+  showUpdatedDate?:  boolean
+  className?:        string
 }
 
 /* ---------- tiny helpers ---------- */
@@ -91,19 +114,36 @@ function PillSelect({
 export function UniversalFilterBar({
   clients = [],
   members = [],
-  showSearch   = false,
-  showPriority = true,
-  showStatus   = true,
-  showDueDate  = false,
-  showAssignee = false,
-  showAssignor = false,
+  showSearch        = false,
+  showPriority      = true,
+  showStatus        = true,
+  showDueDate       = false,
+  showAssignee      = false,
+  showAssignor      = false,
+  showCreatedDate   = false,
+  showUpdatedDate   = false,
 }: Props) {
-  const { search, clientId, priority, status, assigneeId, creatorId, dueDateFrom, dueDateTo, setFilter, resetFilters } = useFilterStore()
-  const [duePreset, setDuePreset] = useState<string>('')
-  const [showCustom, setShowCustom] = useState(false)
+  const {
+    search, clientId, priority, status, assigneeId, creatorId,
+    dueDateFrom, dueDateTo,
+    createdFrom, createdTo,
+    updatedFrom, updatedTo,
+    setFilter, resetFilters,
+  } = useFilterStore()
+  const [duePreset,     setDuePreset]     = useState<string>('')
+  const [showCustomDue, setShowCustomDue] = useState(false)
+  const [createdPreset, setCreatedPreset] = useState<string>('')
+  const [showCustomCreated, setShowCustomCreated] = useState(false)
+  const [updatedPreset, setUpdatedPreset] = useState<string>('')
+  const [showCustomUpdated, setShowCustomUpdated] = useState(false)
 
-  const activeCount = [clientId, priority, status, assigneeId, creatorId, dueDateFrom, dueDateTo, duePreset, search]
-    .filter(Boolean).length
+  const activeCount = [
+    clientId, priority, status, assigneeId, creatorId,
+    dueDateFrom, dueDateTo, duePreset,
+    createdFrom, createdTo, createdPreset,
+    updatedFrom, updatedTo, updatedPreset,
+    search,
+  ].filter(Boolean).length
 
   const priorityOpts = (Object.keys(PRIORITY_CONFIG) as string[])
     .filter(k => k !== 'none')
@@ -209,16 +249,16 @@ export function UniversalFilterBar({
                 if (v === '') {
                   setFilter('dueDateFrom', '')
                   setFilter('dueDateTo', '')
-                  setShowCustom(false)
+                  setShowCustomDue(false)
                 } else if (v === 'custom') {
-                  setShowCustom(true)
+                  setShowCustomDue(true)
                 } else {
                   const preset = DUE_PRESETS.find(p => p.value === v)
                   if (preset) {
                     setFilter('dueDateFrom', preset.from())
                     setFilter('dueDateTo', preset.to())
                   }
-                  setShowCustom(false)
+                  setShowCustomDue(false)
                 }
               }}
               style={{ ...(duePreset ? PILL_ACTIVE : PILL), paddingRight: 24 }}
@@ -232,7 +272,7 @@ export function UniversalFilterBar({
               <button
                 onClick={() => {
                   setDuePreset('')
-                  setShowCustom(false)
+                  setShowCustomDue(false)
                   setFilter('dueDateFrom', '')
                   setFilter('dueDateTo', '')
                 }}
@@ -248,7 +288,7 @@ export function UniversalFilterBar({
               >×</button>
             )}
           </div>
-          {showCustom && (
+          {showCustomDue && (
             <>
               <input
                 type="date" value={dueDateFrom}
@@ -266,10 +306,153 @@ export function UniversalFilterBar({
         </div>
       )}
 
+      {/* Created date — preset dropdown */}
+      {showCreatedDate && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <select
+              value={createdPreset}
+              onChange={e => {
+                const v = e.target.value
+                setCreatedPreset(v)
+                if (v === '') {
+                  setFilter('createdFrom', '')
+                  setFilter('createdTo', '')
+                  setShowCustomCreated(false)
+                } else if (v === 'custom') {
+                  setShowCustomCreated(true)
+                } else {
+                  const preset = CREATED_PRESETS.find(p => p.value === v)
+                  if (preset) {
+                    setFilter('createdFrom', preset.from())
+                    setFilter('createdTo', preset.to())
+                  }
+                  setShowCustomCreated(false)
+                }
+              }}
+              style={{ ...(createdPreset ? PILL_ACTIVE : PILL), paddingRight: 24 }}
+            >
+              <option value=''>Created date</option>
+              {CREATED_PRESETS.map(p => (
+                <option key={p.value} value={p.value}>{p.label}</option>
+              ))}
+            </select>
+            {createdPreset && (
+              <button
+                onClick={() => {
+                  setCreatedPreset('')
+                  setShowCustomCreated(false)
+                  setFilter('createdFrom', '')
+                  setFilter('createdTo', '')
+                }}
+                style={{
+                  position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)',
+                  width: 14, height: 14, borderRadius: '50%', border: 'none',
+                  background: 'var(--brand)', color: '#fff',
+                  fontSize: 9, fontWeight: 700, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  lineHeight: 1, padding: 0,
+                }}
+                title="Clear"
+              >×</button>
+            )}
+          </div>
+          {showCustomCreated && (
+            <>
+              <input
+                type="date" value={createdFrom}
+                onChange={e => setFilter('createdFrom', e.target.value)}
+                style={{ ...(createdFrom ? PILL_ACTIVE : PILL), paddingRight: 8, fontSize: 11 }}
+              />
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>–</span>
+              <input
+                type="date" value={createdTo}
+                onChange={e => setFilter('createdTo', e.target.value)}
+                style={{ ...(createdTo ? PILL_ACTIVE : PILL), paddingRight: 8, fontSize: 11 }}
+              />
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Last modified date — preset dropdown */}
+      {showUpdatedDate && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <select
+              value={updatedPreset}
+              onChange={e => {
+                const v = e.target.value
+                setUpdatedPreset(v)
+                if (v === '') {
+                  setFilter('updatedFrom', '')
+                  setFilter('updatedTo', '')
+                  setShowCustomUpdated(false)
+                } else if (v === 'custom') {
+                  setShowCustomUpdated(true)
+                } else {
+                  const preset = UPDATED_PRESETS.find(p => p.value === v)
+                  if (preset) {
+                    setFilter('updatedFrom', preset.from())
+                    setFilter('updatedTo', preset.to())
+                  }
+                  setShowCustomUpdated(false)
+                }
+              }}
+              style={{ ...(updatedPreset ? PILL_ACTIVE : PILL), paddingRight: 24 }}
+            >
+              <option value=''>Modified date</option>
+              {UPDATED_PRESETS.map(p => (
+                <option key={p.value} value={p.value}>{p.label}</option>
+              ))}
+            </select>
+            {updatedPreset && (
+              <button
+                onClick={() => {
+                  setUpdatedPreset('')
+                  setShowCustomUpdated(false)
+                  setFilter('updatedFrom', '')
+                  setFilter('updatedTo', '')
+                }}
+                style={{
+                  position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)',
+                  width: 14, height: 14, borderRadius: '50%', border: 'none',
+                  background: 'var(--brand)', color: '#fff',
+                  fontSize: 9, fontWeight: 700, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  lineHeight: 1, padding: 0,
+                }}
+                title="Clear"
+              >×</button>
+            )}
+          </div>
+          {showCustomUpdated && (
+            <>
+              <input
+                type="date" value={updatedFrom}
+                onChange={e => setFilter('updatedFrom', e.target.value)}
+                style={{ ...(updatedFrom ? PILL_ACTIVE : PILL), paddingRight: 8, fontSize: 11 }}
+              />
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>–</span>
+              <input
+                type="date" value={updatedTo}
+                onChange={e => setFilter('updatedTo', e.target.value)}
+                style={{ ...(updatedTo ? PILL_ACTIVE : PILL), paddingRight: 8, fontSize: 11 }}
+              />
+            </>
+          )}
+        </div>
+      )}
+
       {/* Clear all */}
       {activeCount > 0 && (
         <button
-          onClick={() => { resetFilters(); setDuePreset(''); setShowCustom(false) }}
+          onClick={() => {
+            resetFilters()
+            setDuePreset(''); setShowCustomDue(false)
+            setCreatedPreset(''); setShowCustomCreated(false)
+            setUpdatedPreset(''); setShowCustomUpdated(false)
+          }}
           style={{
             marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5,
             padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600,

@@ -117,7 +117,7 @@ export function MyTasksView({
   function showMoreGroup(key: string) { setGroupPages(prev => ({ ...prev, [key]: (prev[key] ?? 1) + 1 })) }
 
   // Global filters (My Tasks never filters by assignee — already scoped to current user)
-  const { clientId: filterClient, priority: filterPriority, status: filterStatus, search: filterSearch, dueDateFrom, dueDateTo, creatorId: filterCreator } = useFilterStore()
+  const { clientId: filterClient, priority: filterPriority, status: filterStatus, search: filterSearch, dueDateFrom, dueDateTo, creatorId: filterCreator, createdFrom, createdTo, updatedFrom, updatedTo } = useFilterStore()
 
   // Apply filters
   const filteredTasks = tasks.filter(t => {
@@ -125,8 +125,12 @@ export function MyTasksView({
     if (filterPriority && t.priority !== filterPriority)          return false
     if (filterStatus   && t.status   !== filterStatus)            return false
     if (filterSearch   && !t.title.toLowerCase().includes(filterSearch.toLowerCase())) return false
-    if (dueDateFrom    && (!t.due_date || t.due_date < dueDateFrom)) return false
-    if (dueDateTo      && (!t.due_date || t.due_date > dueDateTo))   return false
+    if (dueDateFrom    && (!t.due_date   || t.due_date < dueDateFrom))     return false
+    if (dueDateTo      && (!t.due_date   || t.due_date > dueDateTo))       return false
+    if (createdFrom    && (!t.created_at || t.created_at.slice(0,10) < createdFrom)) return false
+    if (createdTo      && (!t.created_at || t.created_at.slice(0,10) > createdTo))   return false
+    if (updatedFrom    && (!(t as any).updated_at || (t as any).updated_at.slice(0,10) < updatedFrom)) return false
+    if (updatedTo      && (!(t as any).updated_at || (t as any).updated_at.slice(0,10) > updatedTo))   return false
     if (filterCreator  && (t as any).creator?.id !== filterCreator) return false
     return true
   })
@@ -592,7 +596,7 @@ export function MyTasksView({
         )}
 
         {/* Universal filter bar */}
-        <UniversalFilterBar clients={clients} members={members} showSearch showPriority showStatus showDueDate showAssignor/>
+        <UniversalFilterBar clients={clients} members={members} showSearch showPriority showStatus showDueDate showAssignor showCreatedDate showUpdatedDate/>
         <div style={{ display:'grid', gridTemplateColumns:'28px 22px 1fr 120px 130px 90px 100px 28px',
           alignItems:'center', padding:'5px 18px', borderBottom:`1px solid var(--border)`,
           background:'var(--surface-subtle)', flexShrink:0, fontSize:10, fontWeight:700,
@@ -980,7 +984,7 @@ export function MyTasksView({
       )}
       <Tabs/>
       {/* Universal filter bar (no assignee — My Tasks is already user-scoped) */}
-      <UniversalFilterBar clients={clients} members={members} showSearch showPriority showDueDate showAssignor/>
+      <UniversalFilterBar clients={clients} members={members} showSearch showPriority showDueDate showAssignor showCreatedDate showUpdatedDate/>
       <div style={{ flex:1, overflowX:'auto', overflowY:'hidden', padding:'14px 20px',
         background:'var(--surface-subtle)', display:'flex', gap:12, alignItems:'flex-start' }}>
         {(() => {
@@ -1008,6 +1012,10 @@ export function MyTasksView({
           if (filterSearch)   colTasks = colTasks.filter(t => t.title.toLowerCase().includes(filterSearch.toLowerCase()))
           if (dueDateFrom)    colTasks = colTasks.filter(t => t.due_date && t.due_date >= dueDateFrom)
           if (dueDateTo)      colTasks = colTasks.filter(t => t.due_date && t.due_date <= dueDateTo)
+          if (createdFrom)    colTasks = colTasks.filter(t => t.created_at && t.created_at.slice(0,10) >= createdFrom)
+          if (createdTo)      colTasks = colTasks.filter(t => t.created_at && t.created_at.slice(0,10) <= createdTo)
+          if (updatedFrom)    colTasks = colTasks.filter(t => (t as any).updated_at && (t as any).updated_at.slice(0,10) >= updatedFrom)
+          if (updatedTo)      colTasks = colTasks.filter(t => (t as any).updated_at && (t as any).updated_at.slice(0,10) <= updatedTo)
 
           // Determine whether to render groups (todo + pending) or flat (overdue + done)
           const useGroups = col.status === 'todo' || col.status === 'in_review'

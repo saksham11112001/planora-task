@@ -85,7 +85,7 @@ export function RecurringView({
   const [newSubDueDates, setNewSubDueDates] = useState<Record<string, string>>({})
 
   // Global filters
-  const { clientId: clientFilter, priority: filterPriority, search: filterSearch, assigneeId: filterAssignee, creatorId: filterCreator } = useFilterStore()
+  const { clientId: clientFilter, priority: filterPriority, search: filterSearch, assigneeId: filterAssignee, creatorId: filterCreator, createdFrom, createdTo, updatedFrom, updatedTo } = useFilterStore()
 
   const visibleTasks = useMemo(() => {
     return localTasks.filter(t => {
@@ -94,9 +94,13 @@ export function RecurringView({
       if (filterAssignee && (t.assignee_id ?? t.assignee?.id) !== filterAssignee) return false
       if (filterSearch   && !t.title.toLowerCase().includes(filterSearch.toLowerCase())) return false
       if (filterCreator  && t.creator?.id !== filterCreator) return false
+      if (createdFrom    && (!t.created_at || t.created_at.slice(0,10) < createdFrom)) return false
+      if (createdTo      && (!t.created_at || t.created_at.slice(0,10) > createdTo))   return false
+      if (updatedFrom    && (!(t as any).updated_at || (t as any).updated_at.slice(0,10) < updatedFrom)) return false
+      if (updatedTo      && (!(t as any).updated_at || (t as any).updated_at.slice(0,10) > updatedTo))   return false
       return true
     })
-  }, [localTasks, clientFilter, filterPriority, filterSearch, filterAssignee, filterCreator])
+  }, [localTasks, clientFilter, filterPriority, filterSearch, filterAssignee, filterCreator, createdFrom, createdTo, updatedFrom, updatedTo])
 
   function handleTaskUpdated(fields?: Record<string, unknown>) {
     if (fields && selectedTask) {
@@ -282,7 +286,7 @@ export function RecurringView({
       {viewTab === 'Board' && (
         <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
           {/* Universal filter bar */}
-          <UniversalFilterBar clients={clients} members={members} showSearch showPriority showAssignee showAssignor/>
+          <UniversalFilterBar clients={clients} members={members} showSearch showPriority showAssignee showAssignor showCreatedDate showUpdatedDate/>
 
           <div
             style={{
@@ -454,7 +458,7 @@ export function RecurringView({
       {viewTab === 'List' && (
         <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
           {/* Universal filter bar */}
-          <UniversalFilterBar clients={clients} members={members} showSearch showPriority showAssignee showAssignor/>
+          <UniversalFilterBar clients={clients} members={members} showSearch showPriority showAssignee showAssignor showCreatedDate showUpdatedDate/>
           {/* ── Bulk action bar ── */}
           {checked.size > 0 ? (
             <div style={{ display:'flex', alignItems:'center', gap:12, padding:'8px 20px',

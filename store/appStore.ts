@@ -49,27 +49,40 @@ export const toast = {
 
 /* Universal Filter store */
 export interface FilterState {
-  search:      string
-  clientId:    string
-  priority:    string
-  status:      string
-  assigneeId:  string
-  creatorId:   string
-  dueDateFrom: string
-  dueDateTo:   string
-  setFilter:   (key: keyof Omit<FilterState, 'setFilter' | 'resetFilters'>, value: string) => void
-  resetFilters: () => void
+  search:        string
+  clientId:      string
+  priority:      string
+  status:        string
+  assigneeId:    string
+  creatorId:     string
+  dueDateFrom:   string
+  dueDateTo:     string
+  createdFrom:   string
+  createdTo:     string
+  updatedFrom:   string
+  updatedTo:     string
+  setFilter:     (key: keyof Omit<FilterState, 'setFilter' | 'resetFilters'>, value: string) => void
+  resetFilters:  () => void
 }
 
 export const useFilterStore = create<FilterState>((set) => ({
-  search:       '',
-  clientId:     '',
-  priority:     '',
-  status:       '',
-  assigneeId:   '',
-  creatorId:    '',
-  dueDateFrom:  '',
-  dueDateTo:    '',
-  setFilter:    (key, value) => set({ [key]: value }),
-  resetFilters: () => set({ search: '', clientId: '', priority: '', status: '', assigneeId: '', creatorId: '', dueDateFrom: '', dueDateTo: '' }),
+  search:        '',
+  clientId:      '',
+  priority:      '',
+  status:        '',
+  assigneeId:    '',
+  creatorId:     '',
+  dueDateFrom:   '',
+  dueDateTo:     '',
+  createdFrom:   '',
+  createdTo:     '',
+  updatedFrom:   '',
+  updatedTo:     '',
+  setFilter:     (key, value) => set({ [key]: value }),
+  resetFilters:  () => set({
+    search: '', clientId: '', priority: '', status: '', assigneeId: '', creatorId: '',
+    dueDateFrom: '', dueDateTo: '',
+    createdFrom: '', createdTo: '',
+    updatedFrom: '', updatedTo: '',
+  }),
 }))

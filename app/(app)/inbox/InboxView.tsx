@@ -38,7 +38,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
   const [viewTab,         setViewTab]         = useState<'List'|'Board'>('List')
 
   // Global filters
-  const { search: searchQuery, clientId: clientFilter, priority: filterPriority, status: filterStatus, assigneeId: filterAssignee, dueDateFrom, dueDateTo, creatorId: filterCreator } = useFilterStore()
+  const { search: searchQuery, clientId: clientFilter, priority: filterPriority, status: filterStatus, assigneeId: filterAssignee, dueDateFrom, dueDateTo, creatorId: filterCreator, createdFrom, createdTo, updatedFrom, updatedTo } = useFilterStore()
   const [doneBoardExp,    setDoneBoardExp]    = useState(false)
   const [dragTaskId,      setDragTaskId]      = useState<string|null>(null)
   const [dragOverCol,     setDragOverCol]     = useState<string|null>(null)
@@ -241,8 +241,12 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
     if (filterPriority && t.priority !== filterPriority) return false
     if (filterStatus   && t.status   !== filterStatus)   return false
     if (filterAssignee && (t.assignee_id ?? (t.assignee as any)?.id) !== filterAssignee) return false
-    if (dueDateFrom    && (!t.due_date || t.due_date < dueDateFrom)) return false
-    if (dueDateTo      && (!t.due_date || t.due_date > dueDateTo))   return false
+    if (dueDateFrom    && (!t.due_date   || t.due_date < dueDateFrom))     return false
+    if (dueDateTo      && (!t.due_date   || t.due_date > dueDateTo))       return false
+    if (createdFrom    && (!t.created_at || t.created_at.slice(0,10) < createdFrom)) return false
+    if (createdTo      && (!t.created_at || t.created_at.slice(0,10) > createdTo))   return false
+    if (updatedFrom    && (!(t as any).updated_at || (t as any).updated_at.slice(0,10) < updatedFrom)) return false
+    if (updatedTo      && (!(t as any).updated_at || (t as any).updated_at.slice(0,10) > updatedTo))   return false
     if (filterCreator  && (t as any).creator?.id !== filterCreator) return false
     return true
   })
@@ -283,7 +287,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
       {viewTab === 'Board' && (
         <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
           {/* Universal filter bar for board */}
-          <UniversalFilterBar clients={clients} members={members} showSearch showPriority showAssignee showAssignor showDueDate/>
+          <UniversalFilterBar clients={clients} members={members} showSearch showPriority showAssignee showAssignor showDueDate showCreatedDate showUpdatedDate/>
           <div style={{ flex:1, overflowX:'auto', overflowY:'hidden', padding:'14px 20px', background:'var(--surface-subtle)', display:'flex', gap:12, alignItems:'flex-start' }}>
             {INBOX_BOARD_COLS.map(col => {
               const t2 = todayStr()
@@ -299,6 +303,10 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
               if (searchQuery)    colTasks = colTasks.filter(t => t.title.toLowerCase().includes(searchQuery.toLowerCase()))
               if (dueDateFrom)    colTasks = colTasks.filter(t => t.due_date && t.due_date>=dueDateFrom)
               if (dueDateTo)      colTasks = colTasks.filter(t => t.due_date && t.due_date<=dueDateTo)
+              if (createdFrom)    colTasks = colTasks.filter(t => t.created_at && t.created_at.slice(0,10)>=createdFrom)
+              if (createdTo)      colTasks = colTasks.filter(t => t.created_at && t.created_at.slice(0,10)<=createdTo)
+              if (updatedFrom)    colTasks = colTasks.filter(t => (t as any).updated_at && (t as any).updated_at.slice(0,10)>=updatedFrom)
+              if (updatedTo)      colTasks = colTasks.filter(t => (t as any).updated_at && (t as any).updated_at.slice(0,10)<=updatedTo)
               const allDone = colTasks
               if (col.status==='completed' && !doneBoardExp) colTasks = colTasks.slice(0, BOARD_DONE_PAGE)
               return (
@@ -363,7 +371,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
             </div>
 
             {/* Universal filter bar */}
-            <UniversalFilterBar clients={clients} members={members} showSearch showPriority showStatus showAssignee showAssignor showDueDate/>
+            <UniversalFilterBar clients={clients} members={members} showSearch showPriority showStatus showAssignee showAssignor showDueDate showCreatedDate showUpdatedDate/>
 
             {localTasks.length > 0 && (
               <div style={{ padding:'6px 16px', borderBottom:'1px solid var(--border-light)', background:'var(--surface-subtle)', display:'flex', alignItems:'center', gap:12, flexWrap:'wrap', flexShrink:0 }}>

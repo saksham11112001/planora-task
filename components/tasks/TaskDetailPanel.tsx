@@ -720,6 +720,26 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                     <span className="text-sm" style={{ color: 'var(--text-primary)' }}>{(task.project as any).name}</span>
                   </FieldRow>
                 )}
+
+                {/* Created date */}
+                {task.created_at && (
+                  <FieldRow label="Created">
+                    <Clock className="h-3.5 w-3.5" style={{ color: 'var(--text-muted)' }} />
+                    <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                      {new Date(task.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}
+                    </span>
+                  </FieldRow>
+                )}
+
+                {/* Last modified date */}
+                {(task as any).updated_at && (
+                  <FieldRow label="Last modified">
+                    <Clock className="h-3.5 w-3.5" style={{ color: 'var(--text-muted)' }} />
+                    <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                      {new Date((task as any).updated_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}
+                    </span>
+                  </FieldRow>
+                )}
               </div>
 
               {/* ── Convert task actions ── */}

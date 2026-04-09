@@ -39,7 +39,8 @@ export interface Task {
   estimated_hours?: number | null; is_recurring: boolean; frequency?: Frequency | null
   next_occurrence_date?: string | null; approval_required: boolean
   approval_status?: 'pending' | 'approved' | 'rejected' | null
-  is_archived: boolean; created_at: string
+  is_archived: boolean; created_at: string; updated_at?: string
+  approver_id?: string | null; approver?: { id: string; name: string } | null
   assignee?: { id: string; name: string } | null
   project?: { id: string; name: string; color: string } | null
   client?: { id: string; name: string; color: string } | null
