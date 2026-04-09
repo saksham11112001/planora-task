@@ -1,9 +1,10 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 
-type Mode = 'choose' | 'magic' | 'magic_sent'
+type Mode = 'choose' | 'magic' | 'magic_sent' | 'password' | 'password_sent'
 
 function GoogleIcon() {
   return (
@@ -16,11 +17,39 @@ function GoogleIcon() {
   )
 }
 
-export default function LoginPage() {
-  const [mode,    setMode]    = useState<Mode>('choose')
-  const [email,   setEmail]   = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error,   setError]   = useState('')
+function EyeIcon({ open }: { open: boolean }) {
+  return open ? (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+    </svg>
+  ) : (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/>
+      <line x1="1" y1="1" x2="23" y2="23"/>
+    </svg>
+  )
+}
+
+function LoginInner() {
+  const router  = useRouter()
+  const params  = useSearchParams()
+  const [mode,      setMode]      = useState<Mode>('choose')
+  const [isSignUp,  setIsSignUp]  = useState(false)
+  const [email,     setEmail]     = useState('')
+  const [password,  setPassword]  = useState('')
+  const [showPwd,   setShowPwd]   = useState(false)
+  const [loading,   setLoading]   = useState(false)
+  const [error,     setError]     = useState('')
+
+  // Show error from URL params (e.g. ?error=auth_failed after callback fails)
+  useEffect(() => {
+    const urlError = params.get('error')
+    if (urlError === 'auth_failed') {
+      setError('Sign-in failed — please try again. If the problem persists, try a different method.')
+    }
+  }, [params])
+
+  function reset() { setError(''); setPassword('') }
 
   async function handleGoogle() {
     if (loading) return
@@ -55,6 +84,82 @@ export default function LoginPage() {
     setMode('magic_sent')
   }
 
+  async function handlePasswordSignIn(e: React.FormEvent) {
+    e.preventDefault()
+    if (!email.trim())    { setError('Enter your email address'); return }
+    if (!password.trim()) { setError('Enter your password'); return }
+    setLoading(true); setError('')
+    const supabase = createClient()
+    const { data: { user }, error: err } = await supabase.auth.signInWithPassword({
+      email:    email.trim(),
+      password: password.trim(),
+    })
+    if (err || !user) {
+      setLoading(false)
+      // Friendlier messages for common errors
+      if (err?.message?.toLowerCase().includes('invalid login')) {
+        setError('Incorrect email or password. Please check and try again.')
+      } else {
+        setError(err?.message ?? 'Sign-in failed. Please try again.')
+      }
+      return
+    }
+    // Provision user row then redirect
+    try {
+      await fetch('/api/auth/provision', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id:         user.id,
+          email:      user.email,
+          name:       user.user_metadata?.full_name ?? user.user_metadata?.name ?? user.email?.split('@')[0],
+          avatar_url: user.user_metadata?.avatar_url ?? null,
+        }),
+      })
+    } catch (_) {}
+    router.replace('/dashboard')
+  }
+
+  async function handlePasswordSignUp(e: React.FormEvent) {
+    e.preventDefault()
+    if (!email.trim())    { setError('Enter your email address'); return }
+    if (!password.trim()) { setError('Enter a password'); return }
+    if (password.length < 8) { setError('Password must be at least 8 characters'); return }
+    setLoading(true); setError('')
+    const supabase = createClient()
+    const { data: { user }, error: err } = await supabase.auth.signUp({
+      email:    email.trim(),
+      password: password.trim(),
+      options:  { emailRedirectTo: `${window.location.origin}/auth/callback` },
+    })
+    setLoading(false)
+    if (err) { setError(err.message); return }
+    // If Supabase returns a user with an identities array (auto-confirm on),
+    // skip email step and go straight to dashboard
+    if (user && (user as any).identities?.length > 0 && user.email_confirmed_at) {
+      try {
+        await fetch('/api/auth/provision', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: user.id, email: user.email,
+            name: user.email?.split('@')[0],
+            avatar_url: null,
+          }),
+        })
+      } catch (_) {}
+      router.replace('/dashboard')
+      return
+    }
+    setMode('password_sent')
+  }
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%', padding: '12px 14px', border: '1.5px solid #e2e8f0',
+    borderRadius: 10, fontSize: 14, color: '#0f172a', outline: 'none',
+    boxSizing: 'border-box', transition: 'border-color 0.15s', fontFamily: 'inherit',
+  }
+
   return (
     <div style={{
       minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -77,7 +182,7 @@ export default function LoginPage() {
         {/* Card */}
         <div style={{ background: '#fff', borderRadius: 18, padding: '36px 32px', boxShadow: '0 25px 60px rgba(0,0,0,0.3)' }}>
 
-          {/* Magic link sent */}
+          {/* ── Magic link sent ── */}
           {mode === 'magic_sent' && (
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: 48, marginBottom: 16 }}>📬</div>
@@ -89,15 +194,31 @@ export default function LoginPage() {
               <p style={{ fontSize: 12, color: '#94a3b8' }}>
                 Didn't get it? Check spam or{' '}
                 <button onClick={() => { setMode('magic'); setError('') }}
-                  style={{ color: '#0d9488', background: 'none', border: 'none', cursor: 'pointer',
-                    fontSize: 12, fontWeight: 600, textDecoration: 'underline' }}>
+                  style={{ color: '#0d9488', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, textDecoration: 'underline' }}>
                   try again
                 </button>
               </p>
             </div>
           )}
 
-          {/* Choose method */}
+          {/* ── Sign-up confirmation sent ── */}
+          {mode === 'password_sent' && (
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 48, marginBottom: 16 }}>✉️</div>
+              <h2 style={{ fontSize: 20, fontWeight: 700, color: '#0f172a', marginBottom: 8 }}>Confirm your email</h2>
+              <p style={{ fontSize: 14, color: '#64748b', lineHeight: 1.6, marginBottom: 20 }}>
+                We sent a confirmation link to <strong style={{ color: '#0f172a' }}>{email}</strong>.<br/>
+                Click it to activate your account, then sign in.
+              </p>
+              <button onClick={() => { setMode('password'); setIsSignUp(false); reset() }}
+                style={{ width: '100%', padding: '13px 16px', background: '#0d9488', color: '#fff',
+                  border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                Go to sign in
+              </button>
+            </div>
+          )}
+
+          {/* ── Choose method ── */}
           {mode === 'choose' && (
             <>
               <h1 style={{ fontSize: 20, fontWeight: 700, color: '#0f172a', marginBottom: 4 }}>Welcome to Planora</h1>
@@ -119,25 +240,32 @@ export default function LoginPage() {
                   marginBottom: 12, transition: 'all 0.15s', opacity: loading ? 0.7 : 1,
                   fontFamily: 'inherit' }}>
                 {loading
-                  ? <div style={{ width: 18, height: 18, border: '2px solid #e2e8f0',
-                      borderTopColor: '#0d9488', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }}/>
-                  : <GoogleIcon />}
+                  ? <div style={{ width: 18, height: 18, border: '2px solid #e2e8f0', borderTopColor: '#0d9488', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }}/>
+                  : <GoogleIcon/>}
                 {loading ? 'Connecting...' : 'Continue with Google'}
               </button>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '16px 0' }}>
-                <div style={{ flex: 1, height: 1, background: '#e2e8f0' }}/>
-                <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 500 }}>or</span>
-                <div style={{ flex: 1, height: 1, background: '#e2e8f0' }}/>
-              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <button onClick={() => { setMode('password'); setIsSignUp(false); reset() }}
+                  style={{ width: '100%', padding: '13px 16px', border: '1.5px solid #e2e8f0',
+                    borderRadius: 10, fontSize: 14, fontWeight: 500, color: '#374151',
+                    background: '#fff', cursor: 'pointer', transition: 'all 0.15s', fontFamily: 'inherit' }}>
+                  🔑 Sign in with password
+                </button>
 
-              <button onClick={() => { setMode('magic'); setError('') }}
-                style={{ width: '100%', padding: '13px 16px', border: '1.5px solid #e2e8f0',
-                  borderRadius: 10, fontSize: 14, fontWeight: 500, color: '#374151',
-                  background: '#fff', cursor: 'pointer', transition: 'all 0.15s',
-                  fontFamily: 'inherit' }}>
-                ✉ Continue with email link
-              </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ flex: 1, height: 1, background: '#e2e8f0' }}/>
+                  <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 500 }}>or</span>
+                  <div style={{ flex: 1, height: 1, background: '#e2e8f0' }}/>
+                </div>
+
+                <button onClick={() => { setMode('magic'); reset() }}
+                  style={{ width: '100%', padding: '13px 16px', border: '1.5px solid #e2e8f0',
+                    borderRadius: 10, fontSize: 14, fontWeight: 500, color: '#374151',
+                    background: '#fff', cursor: 'pointer', transition: 'all 0.15s', fontFamily: 'inherit' }}>
+                  ✉ Continue with email link
+                </button>
+              </div>
 
               <p style={{ marginTop: 20, textAlign: 'center', fontSize: 12, color: '#94a3b8' }}>
                 By signing in you agree to our{' '}
@@ -147,10 +275,10 @@ export default function LoginPage() {
             </>
           )}
 
-          {/* Magic link form */}
+          {/* ── Magic link form ── */}
           {mode === 'magic' && (
             <>
-              <button onClick={() => { setMode('choose'); setError('') }}
+              <button onClick={() => { setMode('choose'); reset() }}
                 style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer',
                   fontSize: 13, padding: 0, marginBottom: 20, display: 'flex', alignItems: 'center',
                   gap: 4, fontFamily: 'inherit' }}>
@@ -171,9 +299,7 @@ export default function LoginPage() {
                 <input
                   type="email" value={email} onChange={e => setEmail(e.target.value)}
                   placeholder="you@company.com" required autoFocus
-                  style={{ width: '100%', padding: '12px 14px', border: '1.5px solid #e2e8f0',
-                    borderRadius: 10, fontSize: 14, color: '#0f172a', outline: 'none',
-                    marginBottom: 12, boxSizing: 'border-box', transition: 'border-color 0.15s' }}
+                  style={{ ...inputStyle, marginBottom: 12 }}
                   onFocus={e => e.target.style.borderColor = '#0d9488'}
                   onBlur={e => e.target.style.borderColor = '#e2e8f0'}
                 />
@@ -181,10 +307,102 @@ export default function LoginPage() {
                   style={{ width: '100%', padding: '13px 16px',
                     background: loading ? '#94a3b8' : '#0d9488',
                     color: '#fff', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 600,
-                    cursor: loading ? 'not-allowed' : 'pointer', transition: 'background 0.15s',
-                    fontFamily: 'inherit' }}>
+                    cursor: loading ? 'not-allowed' : 'pointer', transition: 'background 0.15s', fontFamily: 'inherit' }}>
                   {loading ? 'Sending...' : 'Send magic link →'}
                 </button>
+              </form>
+            </>
+          )}
+
+          {/* ── Email + password ── */}
+          {mode === 'password' && (
+            <>
+              <button onClick={() => { setMode('choose'); reset() }}
+                style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer',
+                  fontSize: 13, padding: 0, marginBottom: 20, display: 'flex', alignItems: 'center',
+                  gap: 4, fontFamily: 'inherit' }}>
+                ← Back
+              </button>
+
+              {/* Sign in / Sign up tabs */}
+              <div style={{ display: 'flex', borderRadius: 10, border: '1.5px solid #e2e8f0', marginBottom: 24, overflow: 'hidden' }}>
+                {[{ label: 'Sign in', signup: false }, { label: 'Create account', signup: true }].map(({ label, signup }) => (
+                  <button key={label} onClick={() => { setIsSignUp(signup); reset() }}
+                    style={{ flex: 1, padding: '10px 0', fontSize: 13, fontWeight: 600, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                      background: isSignUp === signup ? '#0d9488' : '#fff',
+                      color:      isSignUp === signup ? '#fff' : '#94a3b8',
+                      transition: 'all 0.15s' }}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              <h1 style={{ fontSize: 20, fontWeight: 700, color: '#0f172a', marginBottom: 4 }}>
+                {isSignUp ? 'Create your account' : 'Welcome back'}
+              </h1>
+              <p style={{ fontSize: 14, color: '#64748b', marginBottom: 24 }}>
+                {isSignUp ? 'Start your free workspace today' : 'Sign in with your email and password'}
+              </p>
+
+              {error && (
+                <div style={{ marginBottom: 16, padding: '10px 14px', background: '#fef2f2',
+                  border: '1px solid #fecaca', borderRadius: 8, fontSize: 13, color: '#dc2626' }}>
+                  {error}
+                </div>
+              )}
+
+              <form onSubmit={isSignUp ? handlePasswordSignUp : handlePasswordSignIn}>
+                <input
+                  type="email" value={email} onChange={e => setEmail(e.target.value)}
+                  placeholder="you@company.com" required autoFocus
+                  style={{ ...inputStyle, marginBottom: 10 }}
+                  onFocus={e => e.target.style.borderColor = '#0d9488'}
+                  onBlur={e => e.target.style.borderColor = '#e2e8f0'}
+                />
+                {/* Password field with show/hide */}
+                <div style={{ position: 'relative', marginBottom: isSignUp ? 6 : 14 }}>
+                  <input
+                    type={showPwd ? 'text' : 'password'}
+                    value={password} onChange={e => setPassword(e.target.value)}
+                    placeholder={isSignUp ? 'Choose a password (min 8 chars)' : 'Your password'}
+                    required
+                    style={{ ...inputStyle, paddingRight: 44 }}
+                    onFocus={e => e.target.style.borderColor = '#0d9488'}
+                    onBlur={e => e.target.style.borderColor = '#e2e8f0'}
+                  />
+                  <button type="button" onClick={() => setShowPwd(v => !v)}
+                    style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+                      background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: 2 }}>
+                    <EyeIcon open={showPwd}/>
+                  </button>
+                </div>
+
+                {!isSignUp && (
+                  <div style={{ textAlign: 'right', marginBottom: 14 }}>
+                    <button type="button" onClick={() => { setMode('magic'); reset() }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer',
+                        fontSize: 12, color: '#0d9488', fontWeight: 500, padding: 0 }}>
+                      Forgot password? Use email link →
+                    </button>
+                  </div>
+                )}
+
+                <button type="submit" disabled={loading}
+                  style={{ width: '100%', padding: '13px 16px',
+                    background: loading ? '#94a3b8' : '#0d9488',
+                    color: '#fff', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 600,
+                    cursor: loading ? 'not-allowed' : 'pointer', transition: 'background 0.15s', fontFamily: 'inherit',
+                    marginBottom: 16 }}>
+                  {loading ? (isSignUp ? 'Creating account...' : 'Signing in...') : (isSignUp ? 'Create account →' : 'Sign in →')}
+                </button>
+
+                <p style={{ textAlign: 'center', fontSize: 12, color: '#94a3b8' }}>
+                  {isSignUp ? 'Already have an account? ' : "Don't have an account? "}
+                  <button type="button" onClick={() => { setIsSignUp(v => !v); reset() }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0d9488', fontSize: 12, fontWeight: 600, padding: 0 }}>
+                    {isSignUp ? 'Sign in' : 'Create one'}
+                  </button>
+                </p>
               </form>
             </>
           )}
@@ -198,4 +416,12 @@ export default function LoginPage() {
       <style dangerouslySetInnerHTML={{ __html: '@keyframes spin{to{transform:rotate(360deg)}}' }}/>
     </div>
   )
+}
+
+export default function LoginPage() {
+  const fallback = (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'linear-gradient(135deg, #0f172a 0%, #134e4a 60%, #0d9488 100%)' }}/>
+  )
+  return <Suspense fallback={fallback}><LoginInner/></Suspense>
 }
