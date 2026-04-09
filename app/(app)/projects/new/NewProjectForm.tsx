@@ -265,7 +265,7 @@ export function NewProjectForm({ clients: initialClients, members, orgTemplates 
 
       {/* ── Template picker — single horizontal scrollable row ── */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Start from a template</label>
+        <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>Start from a template</label>
         <div style={{ overflowX: 'auto', paddingBottom: 8 }}>
           <div style={{ display: 'flex', gap: 10, minWidth: 'max-content' }}>
             {Object.entries(PROJECT_TEMPLATES).map(([tName, tData]) => (
@@ -280,22 +280,22 @@ export function NewProjectForm({ clients: initialClients, members, orgTemplates 
                 }}
                 style={{
                   width: 154, flexShrink: 0, padding: '12px 14px', borderRadius: 12, textAlign: 'left',
-                  border: selectedTemplate === tName ? `2px solid ${tData.color}` : '1.5px solid #e5e7eb',
-                  background: selectedTemplate === tName ? `${tData.color}12` : '#fafafa',
+                  border: selectedTemplate === tName ? `2px solid ${tData.color}` : '1.5px solid var(--border)',
+                  background: selectedTemplate === tName ? `${tData.color}18` : 'var(--surface-subtle)',
                   cursor: 'pointer', transition: 'all 0.15s', fontFamily: 'inherit',
                   boxShadow: selectedTemplate === tName ? `0 4px 14px ${tData.color}25` : 'none',
                 }}>
                 <div style={{ width: 36, height: 36, borderRadius: 10, background: tData.color, marginBottom: 6, flexShrink: 0 }}/>
-                <div style={{ fontSize: 11, fontWeight: 700, color: selectedTemplate === tName ? tData.color : '#374151', marginBottom: 3, lineHeight: 1.3 }}>{tName}</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: selectedTemplate === tName ? tData.color : 'var(--text-primary)', marginBottom: 3, lineHeight: 1.3 }}>{tName}</div>
                 {tData.tasks.length > 0
-                  ? <div style={{ fontSize: 10, color: '#9ca3af' }}>{tData.tasks.length} tasks · {tData.tasks.reduce((n, t) => n + (t.subtasks?.length ?? 0), 0)} subtasks</div>
-                  : <div style={{ fontSize: 10, color: '#9ca3af' }}>Start blank</div>
+                  ? <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{tData.tasks.length} tasks · {tData.tasks.reduce((n, t) => n + (t.subtasks?.length ?? 0), 0)} subtasks</div>
+                  : <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Start blank</div>
                 }
               </button>
             ))}
             {orgTemplates.length > 0 && (
               <>
-                <div style={{ width: 1, background: '#e5e7eb', flexShrink: 0, alignSelf: 'stretch', margin: '0 4px' }} />
+                <div style={{ width: 1, background: 'var(--border)', flexShrink: 0, alignSelf: 'stretch', margin: '0 4px' }} />
                 {orgTemplates.map(tmpl => {
                   const isSelected = selectedTemplate === `org_${tmpl.id}`
                   const isLoading = loadingOrgTemplate === tmpl.id
@@ -305,17 +305,17 @@ export function NewProjectForm({ clients: initialClients, members, orgTemplates 
                       disabled={isLoading}
                       style={{
                         width: 154, flexShrink: 0, padding: '12px 14px', borderRadius: 12, textAlign: 'left',
-                        border: isSelected ? '2px solid #0d9488' : '1.5px solid #e5e7eb',
-                        background: isSelected ? 'rgba(13,148,136,0.08)' : '#fafafa',
+                        border: isSelected ? '2px solid #0d9488' : '1.5px solid var(--border)',
+                        background: isSelected ? 'rgba(13,148,136,0.12)' : 'var(--surface-subtle)',
                         cursor: isLoading ? 'wait' : 'pointer', transition: 'all 0.15s', fontFamily: 'inherit',
                         opacity: isLoading ? 0.7 : 1,
                       }}>
-                      <div style={{ width: 36, height: 36, borderRadius: 10, background: isSelected ? '#0d9488' : '#94a3b8', marginBottom: 6, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 10, background: isSelected ? '#0d9488' : 'var(--text-muted)', marginBottom: 6, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         {isLoading && <span style={{ fontSize: 12, color: '#fff', fontWeight: 700 }}>…</span>}
                       </div>
                       <div style={{ fontSize: 10, fontWeight: 700, color: '#0d9488', marginBottom: 2 }}>ORG TEMPLATE</div>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: isSelected ? '#0d9488' : '#374151', marginBottom: 3, lineHeight: 1.3 }}>{tmpl.name}</div>
-                      <div style={{ fontSize: 10, color: '#9ca3af' }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: isSelected ? '#0d9488' : 'var(--text-primary)', marginBottom: 3, lineHeight: 1.3 }}>{tmpl.name}</div>
+                      <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
                         {isLoading ? 'Loading…' : isSelected ? `${templateTasksPreview.length} tasks` : 'Click to load tasks'}
                       </div>
                     </button>
@@ -326,13 +326,13 @@ export function NewProjectForm({ clients: initialClients, members, orgTemplates 
           </div>
         </div>
         {selectedTemplate && selectedTemplate !== 'Blank project' && templateTasksPreview.length > 0 && (
-          <div style={{ marginTop: 8, padding: '10px 14px', borderRadius: 10, background: '#f0fdfa', border: '1px solid #99f6e4' }}>
-            <p style={{ fontSize: 11, fontWeight: 700, color: '#0d9488', marginBottom: 6 }}>
+          <div style={{ marginTop: 8, padding: '10px 14px', borderRadius: 10, background: 'rgba(13,148,136,0.08)', border: '1px solid rgba(13,148,136,0.2)' }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--brand)', marginBottom: 6 }}>
               Will auto-create {templateTasksPreview.length} tasks · {templateTasksPreview.reduce((n, t) => n + (t.subtasks?.length ?? 0), 0)} subtasks
             </p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
               {templateTasksPreview.slice(0, 6).map((t, i) => (
-                <span key={i} style={{ fontSize: 10, background: 'var(--surface)', color: 'var(--text-primary)', padding: '2px 8px', borderRadius: 99, border: '1px solid #ccfbf1', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                <span key={i} style={{ fontSize: 10, background: 'var(--surface)', color: 'var(--text-primary)', padding: '2px 8px', borderRadius: 99, border: '1px solid rgba(13,148,136,0.2)', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
                   {t.title}{t.subtasks?.length ? <span style={{ color: '#0d9488', fontWeight: 700 }}>+{t.subtasks.length}</span> : null}
                 </span>
               ))}
