@@ -57,7 +57,7 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
   const [filterAssignee, setFilterAssignee] = useState('')
   const [filterPriority, setFilterPriority] = useState('')
   const [filterStatus,   setFilterStatus]   = useState('')
-  const [sortBy,         setSortBy]         = useState<'due_date'|'priority'|'title'|'created_at'>('due_date')
+  const [sortBy,         setSortBy]         = useState<'due_date'|'priority'|'title'|'created_at'|'updated_at'>('due_date')
   const [sortDir,        setSortDir]        = useState<'asc'|'desc'>('asc')
   const [addSectionOpen, setAddSectionOpen] = useState(false)
   const [newSectionName, setNewSectionName] = useState('')
@@ -108,6 +108,8 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
       cmp = (PRIORITY_ORDER[a.priority] ?? 4) - (PRIORITY_ORDER[b.priority] ?? 4)
     } else if (sortBy === 'title') {
       cmp = a.title.localeCompare(b.title)
+    } else if (sortBy === 'updated_at') {
+      cmp = ((a as any).updated_at ?? '').localeCompare((b as any).updated_at ?? '')
     }
     return sortDir === 'asc' ? cmp : -cmp
   })
@@ -369,7 +371,12 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
         </button>
         <div className="w-36 hidden md:flex items-center gap-2 pl-2" onClick={() => setSelectedTask(task)}>
           {assignee
-            ? <><Avatar name={assignee.name} size="xs"/><span className="text-xs text-gray-500 truncate">{assignee.name}</span></>
+            ? <span style={{ display:'inline-flex', alignItems:'center', padding:'2px 8px', borderRadius:99,
+                background:'var(--surface-subtle)', border:'1px solid var(--border)',
+                fontSize:11, fontWeight:500, color:'var(--text-secondary)',
+                maxWidth:120, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
+                {assignee.name.split(' ')[0]}
+              </span>
             : task.assignee_id
               ? <span className="text-xs text-gray-400 truncate">Assigned</span>
               : currentUserId
@@ -397,9 +404,6 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
         <div className="w-24 hidden md:block text-center" onClick={() => setSelectedTask(task)}>
           {task.due_date && <span className="text-xs" style={{ color: ov ? '#dc2626' : '#94a3b8' }}>{fmtDate(task.due_date)}</span>}
         </div>
-        <div className="w-24 hidden lg:flex justify-center" onClick={() => setSelectedTask(task)}>
-          <PriorityBadge priority={task.priority}/>
-        </div>
         <div className="w-28 hidden lg:flex justify-center" onClick={() => setSelectedTask(task)}>
           {task.status !== 'todo' && (
             <span className="status-badge" style={{ background: statConf.bg, color: statConf.color }}>
@@ -407,29 +411,35 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
             </span>
           )}
         </div>
-        {/* Delete button — managers only, hover to reveal */}
-        {canManage && (
-          <button
-            onClick={e => { e.stopPropagation(); deleteTask(task.id) }}
-            className="opacity-0 group-hover:opacity-100 flex-shrink-0"
-            title="Delete task"
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              width: 26, height: 26, borderRadius: 6, border: 'none',
-              background: 'transparent', cursor: 'pointer',
-              color: 'var(--text-muted)', transition: 'all 0.15s',
-            }}
-            onMouseEnter={e => {
-              (e.currentTarget as HTMLElement).style.background = '#fef2f2'
-              ;(e.currentTarget as HTMLElement).style.color = '#dc2626'
-            }}
-            onMouseLeave={e => {
-              (e.currentTarget as HTMLElement).style.background = 'transparent'
-              ;(e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'
-            }}>
-            <Trash2 className="h-3 w-3"/>
-          </button>
-        )}
+        {/* Priority dot + Delete button */}
+        <div style={{ display:'flex', alignItems:'center', gap:4, flexShrink:0 }}>
+          <div title={task.priority}
+            style={{ width:8, height:8, borderRadius:'50%',
+              background: {'none':'#94a3b8','low':'#16a34a','medium':'#ca8a04','high':'#ea580c','urgent':'#dc2626'}[task.priority] ?? '#94a3b8' }}/>
+          {canManage && (
+            <button
+              onClick={e => { e.stopPropagation(); deleteTask(task.id) }}
+              className="opacity-0 group-hover:opacity-100"
+              title="Delete task"
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: 26, height: 26, borderRadius: 6, border: 'none',
+                background: 'transparent', cursor: 'pointer',
+                color: 'var(--text-muted)', transition: 'all 0.15s',
+                flexShrink: 0,
+              }}
+              onMouseEnter={e => {
+                (e.currentTarget as HTMLElement).style.background = '#fef2f2'
+                ;(e.currentTarget as HTMLElement).style.color = '#dc2626'
+              }}
+              onMouseLeave={e => {
+                (e.currentTarget as HTMLElement).style.background = 'transparent'
+                ;(e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'
+              }}>
+              <Trash2 className="h-3 w-3"/>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Inline subtasks */}
@@ -534,6 +544,11 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
             {checked.size > 0 ? (
               <><span className="text-sm font-medium text-gray-700 mr-2">{checked.size} selected</span>
                 <button onClick={bulkComplete} className="btn btn-brand btn-sm flex items-center gap-1.5"><CheckCheck className="h-3.5 w-3.5"/> Complete</button>
+                <button onClick={() => setChecked(new Set(filteredTasks.map(t => t.id)))}
+                  style={{ background:'transparent', border:'1px solid var(--border)', padding:'5px 12px',
+                    borderRadius:7, fontSize:12, fontWeight:500, color:'var(--text-secondary)', cursor:'pointer', fontFamily:'inherit' }}>
+                  Select all
+                </button>
                 <button onClick={() => setChecked(new Set())} className="btn btn-ghost btn-sm">Cancel</button></>
             ) : (
               <>
@@ -621,7 +636,7 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
                       <p style={{fontSize:11,fontWeight:700,color:'var(--text-muted)',
                         textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:8}}>Sort by</p>
                       <div style={{display:'flex',flexDirection:'column',gap:2}}>
-                        {([['due_date','Due date'],['priority','Priority'],['title','Title']] as const).map(([val,label])=>(
+                        {([['due_date','Due date'],['priority','Priority'],['title','Title'],['created_at','Created date'],['updated_at','Modified date']] as const).map(([val,label])=>(
                           <button key={val} onClick={()=>{
                             if(sortBy===val) setSortDir(d=>d==='asc'?'desc':'asc')
                             else { setSortBy(val); setSortDir('asc') }
@@ -649,7 +664,6 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
             <div className="flex-1">Task name</div>
             <div className="w-36 pl-2 hidden md:block">Assignee</div>
             <div className="w-24 text-center hidden md:block">Due date</div>
-            <div className="w-24 text-center hidden lg:block">Priority</div>
             <div className="w-28 text-center hidden lg:block">Status</div>
           </div>
           <div className="flex-1 overflow-y-auto">

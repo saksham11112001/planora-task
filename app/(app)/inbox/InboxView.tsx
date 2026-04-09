@@ -2,7 +2,7 @@
 import React from 'react'
 import { useState, useTransition } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { CheckCheck, Clock, Trash2 } from 'lucide-react'
+import { CheckCheck, Clock, SortAsc, Trash2 } from 'lucide-react'
 import { InlineOneTimeTask } from '@/components/tasks/InlineOneTimeTask'
 import { CompletionAttachModal } from '@/components/tasks/CompletionAttachModal'
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
@@ -49,6 +49,9 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
   const [completingTask,  setCompletingTask]  = useState<Task | null>(null)
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set(['done','overdue']))
   const BOARD_DONE_PAGE = 5
+  const [sortBy, setSortBy] = useState<'due_date'|'created_at'|'updated_at'>('due_date')
+  const [sortDir, setSortDir] = useState<'asc'|'desc'>('asc')
+  const [sortOpen, setSortOpen] = useState(false)
 
   function handleTaskUpdated(fields?: Record<string, unknown>) {
     if (fields) {
@@ -255,11 +258,27 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
   const inReview = visibleTasks.filter(t => t.approval_status==='pending')
   const done     = visibleTasks.filter(t => t.status==='completed')
   const filterTasks = (list: Task[]) => !searchQuery.trim() ? list : list.filter(t => t.title.toLowerCase().includes(searchQuery.toLowerCase()))
+  const filterAndSort = (list: Task[]) => {
+    const filtered = !searchQuery.trim() ? list : list.filter(t => t.title.toLowerCase().includes(searchQuery.toLowerCase()))
+    return filtered.sort((a, b) => {
+      let cmp = 0
+      if (sortBy === 'due_date') {
+        if (a.due_date && b.due_date) cmp = a.due_date.localeCompare(b.due_date)
+        else if (a.due_date) cmp = -1
+        else if (b.due_date) cmp = 1
+      } else if (sortBy === 'created_at') {
+        cmp = (a.created_at ?? '').localeCompare(b.created_at ?? '')
+      } else if (sortBy === 'updated_at') {
+        cmp = ((a as any).updated_at ?? '').localeCompare((b as any).updated_at ?? '')
+      }
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+  }
   const sections = [
-    { key:'overdue', label:'Overdue',          color:'#dc2626', bg:'#fff9f9', tasks:filterTasks(overdue),  addRow:false },
-    { key:'inprog',  label:'In progress',      color:'#0d9488', bg:'#fff',   tasks:filterTasks(inProg),   addRow:true  },
-    { key:'review',  label:'Pending approval', color:'#7c3aed', bg:'#faf5ff',tasks:filterTasks(inReview), addRow:false },
-    { key:'done',    label:'Completed',         color:'#16a34a', bg:'#fff',   tasks:filterTasks(done),     addRow:false },
+    { key:'overdue', label:'Overdue',          color:'#dc2626', bg:'#fff9f9', tasks:filterAndSort(overdue),  addRow:false },
+    { key:'inprog',  label:'In progress',      color:'#0d9488', bg:'#fff',   tasks:filterAndSort(inProg),   addRow:true  },
+    { key:'review',  label:'Pending approval', color:'#7c3aed', bg:'#faf5ff',tasks:filterAndSort(inReview), addRow:false },
+    { key:'done',    label:'Completed',         color:'#16a34a', bg:'#fff',   tasks:filterAndSort(done),     addRow:false },
   ].filter(s => s.tasks.length > 0 || s.addRow)
 
   const INBOX_BOARD_COLS = [
@@ -271,8 +290,8 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
 
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-      <style>{`@media(max-width:640px){.hide-mobile{display:none!important}.inbox-task-row{grid-template-columns:36px 22px 1fr 80px 32px 28px!important}}`}
-        {`.inbox-col-header{display:grid;grid-template-columns:36px 22px 1fr 100px 110px 110px 100px 80px 32px 28px;align-items:center;padding:0 16px;}`}
+      <style>{`@media(max-width:640px){.hide-mobile{display:none!important}.inbox-task-row{grid-template-columns:36px 22px 1fr 80px 32px 40px!important}}`}
+        {`.inbox-col-header{display:grid;grid-template-columns:36px 22px 1fr 90px 90px 90px 90px 32px 40px;align-items:center;padding:0 16px;}`}
       </style>
 
       <div style={{ display:'flex', borderBottom:'1px solid var(--border)', padding:'0 20px', background:'var(--surface)', flexShrink:0 }}>
@@ -399,9 +418,47 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                     <Trash2 style={{ width:14, height:14 }}/> Delete
                   </button>
                 )}
+                <button onClick={() => setChecked(new Set(visibleTasks.map(t => t.id)))}
+                  style={{ background:'transparent', border:'1px solid var(--border)', padding:'4px 10px',
+                    borderRadius:6, fontSize:12, fontWeight:500, color:'var(--text-secondary)', cursor:'pointer' }}>
+                  Select all
+                </button>
                 <button onClick={() => setChecked(new Set())} style={{ padding:'4px 10px', background:'transparent', border:'none', fontSize:12, color:'var(--text-secondary)', cursor:'pointer' }}>Cancel</button>
               </div>
             )}
+
+            {/* Sort bar */}
+            <div style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 16px', borderBottom:'1px solid var(--border-light)', background:'var(--surface)', flexShrink:0 }}>
+              <span style={{ fontSize:11, color:'var(--text-muted)', marginLeft:'auto' }}>Sort:</span>
+              <div style={{ position:'relative' }}>
+                <button onClick={() => setSortOpen(v => !v)}
+                  style={{ display:'flex', alignItems:'center', gap:4, padding:'3px 10px', borderRadius:6,
+                    border:'1px solid var(--border)', cursor:'pointer', fontSize:11, fontWeight:500,
+                    color: sortBy !== 'due_date' ? 'var(--brand)' : 'var(--text-secondary)',
+                    background: sortBy !== 'due_date' ? 'var(--brand-light)' : 'var(--surface)' }}>
+                  <SortAsc style={{ width:12, height:12 }}/>
+                  {sortBy === 'due_date' ? 'Due date' : sortBy === 'created_at' ? 'Created' : 'Modified'}
+                  {' '}{sortDir === 'asc' ? '↑' : '↓'}
+                </button>
+                {sortOpen && (
+                  <div style={{ position:'absolute', top:'100%', right:0, marginTop:4, background:'var(--surface)',
+                    border:'1px solid var(--border)', borderRadius:10, boxShadow:'0 8px 24px rgba(0,0,0,0.12)',
+                    zIndex:9999, padding:8, minWidth:160 }} onClick={e => e.stopPropagation()}>
+                    {([['due_date','Due date'],['created_at','Created date'],['updated_at','Modified date']] as const).map(([val,label]) => (
+                      <button key={val} onClick={() => { if (sortBy===val) setSortDir(d => d==='asc'?'desc':'asc'); else { setSortBy(val); setSortDir('asc') } setSortOpen(false) }}
+                        style={{ display:'flex', alignItems:'center', justifyContent:'space-between', width:'100%',
+                          padding:'7px 10px', borderRadius:6, border:'none', cursor:'pointer', textAlign:'left',
+                          background: sortBy===val ? 'var(--brand-light)' : 'transparent',
+                          color: sortBy===val ? 'var(--brand)' : 'var(--text-primary)',
+                          fontSize:12, fontWeight: sortBy===val ? 600 : 400 }}>
+                        {label}
+                        {sortBy===val && <span style={{ fontSize:10 }}>{sortDir==='asc'?'↑':'↓'}</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
 
             {/* Column headers */}
             <div className="inbox-col-header hide-mobile" style={{ borderBottom:'1px solid var(--border)', background:'var(--surface-subtle)', flexShrink:0 }}>
@@ -411,7 +468,6 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
               <div style={{ fontSize:10, fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.07em' }}>Client</div>
               <div style={{ fontSize:10, fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.07em', textAlign:'center' }}>Due date</div>
               <div style={{ fontSize:10, fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.07em' }}>Assigned by</div>
-              <div style={{ fontSize:10, fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.07em', textAlign:'center' }}>Priority</div>
               <div/><div/>
             </div>
 
@@ -453,7 +509,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                     return (
                       <div key={task.id}>
                         <div className="inbox-task-row" onClick={() => setSelectedTask(task)}
-                          style={{ display:'grid', gridTemplateColumns:'36px 22px 1fr 100px 110px 110px 100px 80px 32px 28px', alignItems:'center', padding:'0 16px', minHeight:40, borderBottom:'1px solid var(--border-light)', cursor:'pointer', background:typeBg, borderLeft:`3px solid ${typeAccent}` }}>
+                          style={{ display:'grid', gridTemplateColumns:'36px 22px 1fr 90px 90px 90px 90px 32px 40px', alignItems:'center', padding:'0 16px', minHeight:40, borderBottom:'1px solid var(--border-light)', cursor:'pointer', background:typeBg, borderLeft:`3px solid ${typeAccent}` }}>
                           <input type="checkbox" checked={checked.has(task.id)}
                             onChange={() => setChecked(p => { const s=new Set(p); s.has(task.id)?s.delete(task.id):s.add(task.id); return s })}
                             onClick={e => e.stopPropagation()} style={{ width:13, height:13, accentColor:'#0d9488', cursor:'pointer' }}/>
@@ -489,17 +545,17 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                             )}
                           </div>
                           {/* Assignee column */}
-                          <div className="hide-mobile" style={{ display:'flex', alignItems:'center', gap:4, overflow:'hidden' }}>
+                          <div className="hide-mobile" style={{ display:'flex', alignItems:'center', overflow:'hidden' }}>
                             {(() => {
                               const assignee = (task as any).assignee as { id:string; name:string } | null
                               if (!assignee) return <span style={{ fontSize:11, color:'var(--text-muted)' }}>—</span>
                               return (
-                                <>
-                                  <span style={{ width:18, height:18, borderRadius:'50%', background:'var(--brand-light)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, fontWeight:700, color:'var(--brand)', flexShrink:0 }}>
-                                    {assignee.name[0]?.toUpperCase()}
-                                  </span>
-                                  <span style={{ fontSize:11, color:'var(--text-muted)', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{assignee.name.split(' ')[0]}</span>
-                                </>
+                                <span style={{ display:'inline-flex', alignItems:'center', padding:'2px 8px', borderRadius:99,
+                                  background:'var(--surface-subtle)', border:'1px solid var(--border)',
+                                  fontSize:11, fontWeight:500, color:'var(--text-secondary)',
+                                  maxWidth:82, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
+                                  {assignee.name.split(' ')[0]}
+                                </span>
                               )
                             })()}
                           </div>
@@ -516,35 +572,38 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                             {task.due_date ? fmtDate(task.due_date) : '—'}
                           </div>
                           {/* Assigned by column */}
-                          <div className="hide-mobile" style={{ display:'flex', alignItems:'center', gap:4, overflow:'hidden' }}>
+                          <div className="hide-mobile" style={{ display:'flex', alignItems:'center', overflow:'hidden' }}>
                             {(() => {
                               const creator = (task as any).creator as { id:string; name:string } | null
                               if (!creator) return <span style={{ fontSize:11, color:'var(--text-muted)' }}>—</span>
                               return (
-                                <>
-                                  <span style={{ width:16, height:16, borderRadius:'50%', background:'var(--surface-subtle)', border:'1px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:8, fontWeight:700, color:'var(--text-secondary)', flexShrink:0 }}>
-                                    {creator.name[0]?.toUpperCase()}
-                                  </span>
-                                  <span style={{ fontSize:11, color:'var(--text-muted)', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{creator.name.split(' ')[0]}</span>
-                                </>
+                                <span style={{ display:'inline-flex', alignItems:'center', padding:'2px 8px', borderRadius:99,
+                                  background:'var(--surface-subtle)', border:'1px solid var(--border)',
+                                  fontSize:11, fontWeight:500, color:'var(--text-secondary)',
+                                  maxWidth:82, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
+                                  {creator.name.split(' ')[0]}
+                                </span>
                               )
                             })()}
-                          </div>
-                          <div style={{ display:'flex', justifyContent:'center' }}>
-                            <span style={{ display:'inline-flex', alignItems:'center', gap:3, padding:'2px 6px', borderRadius:4, fontSize:11, fontWeight:500, background:pri?.bg??'#f8fafc', color:pri?.color??'#94a3b8' }}>{pri?.label ?? task.priority}</span>
                           </div>
                           <button onClick={e => { e.stopPropagation(); toggleExpand(task.id) }}
                             style={{ display:'flex', alignItems:'center', justifyContent:'center', padding:'2px 4px', borderRadius:4, border:'none', background:expandedTasks.has(task.id)?'var(--brand-light)':'transparent', color:expandedTasks.has(task.id)?'var(--brand)':'var(--text-muted)', fontSize:10, cursor:'pointer' }}>
                             {(subtaskMap[task.id]??[]).length>0 ? (subtaskMap[task.id]??[]).filter((s:any)=>s.status==='completed').length+'/'+(subtaskMap[task.id]??[]).length : '+'}
                           </button>
-                          {canManage ? (
-                            <button onClick={e => { e.stopPropagation(); deleteTask(task.id) }}
-                              style={{ display:'flex', alignItems:'center', justifyContent:'center', width:24, height:24, borderRadius:6, border:'none', background:'transparent', cursor:'pointer', color:'var(--text-muted)', flexShrink:0 }}
-                              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background='#fef2f2'; (e.currentTarget as HTMLElement).style.color='#dc2626' }}
-                              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background='transparent'; (e.currentTarget as HTMLElement).style.color='var(--text-muted)' }}>
-                              <Trash2 style={{ width:12, height:12 }}/>
-                            </button>
-                          ) : <div/>}
+                          <div style={{ display:'flex', alignItems:'center', justifyContent:'flex-end', gap:4 }}>
+                            <div title={task.priority}
+                              style={{ width:8, height:8, borderRadius:'50%', flexShrink:0,
+                                background: PRIORITY_CONFIG[task.priority]?.color ?? '#94a3b8' }}/>
+                            {canManage && (
+                              <button onClick={e => { e.stopPropagation(); deleteTask(task.id) }}
+                                style={{ display:'flex', alignItems:'center', justifyContent:'center', width:24, height:24, borderRadius:6, border:'none', background:'transparent', cursor:'pointer', color:'var(--text-muted)', flexShrink:0 }}
+                                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background='#fef2f2'; (e.currentTarget as HTMLElement).style.color='#dc2626' }}
+                                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background='transparent'; (e.currentTarget as HTMLElement).style.color='var(--text-muted)' }}>
+                                <Trash2 style={{ width:12, height:12 }}/>
+                              </button>
+                            )}
+                            {!canManage && <div/>}
+                          </div>
                         </div>
                         {expandedTasks.has(task.id) && (
                           <div style={{ background:'var(--surface-subtle)', borderBottom:'1px solid var(--border)' }}>

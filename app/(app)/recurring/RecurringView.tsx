@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useEffect, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { RefreshCw, X, Pencil, User, Trash2 } from 'lucide-react'
+import { RefreshCw, X, Pencil, User, Trash2, SortAsc } from 'lucide-react'
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
 import { InlineRecurringTask, FREQ_LABEL } from '@/components/tasks/InlineRecurringTask'
 import { fmtDate } from '@/lib/utils/format'
@@ -87,6 +87,10 @@ export function RecurringView({
   const [newSubAssignees, setNewSubAssignees] = useState<Record<string, string>>({})
   const [newSubDueDates, setNewSubDueDates] = useState<Record<string, string>>({})
 
+  const [sortBy, setSortBy] = useState<'due_date'|'created_at'|'updated_at'>('due_date')
+  const [sortDir, setSortDir] = useState<'asc'|'desc'>('asc')
+  const [sortOpen, setSortOpen] = useState(false)
+
   // Global filters
   const { clientId: clientFilter, priority: filterPriority, search: filterSearch, assigneeId: filterAssignee, creatorId: filterCreator, createdFrom, createdTo, updatedFrom, updatedTo } = useFilterStore()
 
@@ -104,6 +108,22 @@ export function RecurringView({
       return true
     })
   }, [localTasks, clientFilter, filterPriority, filterSearch, filterAssignee, filterCreator, createdFrom, createdTo, updatedFrom, updatedTo])
+
+  const sortedVisibleTasks = useMemo(() => {
+    return [...visibleTasks].sort((a, b) => {
+      let cmp = 0
+      if (sortBy === 'due_date') {
+        const ad = a.next_occurrence_date ?? ''
+        const bd = b.next_occurrence_date ?? ''
+        cmp = ad.localeCompare(bd)
+      } else if (sortBy === 'created_at') {
+        cmp = (a.created_at ?? '').localeCompare(b.created_at ?? '')
+      } else if (sortBy === 'updated_at') {
+        cmp = (a.updated_at ?? '').localeCompare(b.updated_at ?? '')
+      }
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+  }, [visibleTasks, sortBy, sortDir])
 
   function handleTaskUpdated(fields?: Record<string, unknown>) {
     if (fields && selectedTask) {
@@ -473,6 +493,11 @@ export function RecurringView({
                   fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
                 <Trash2 style={{ width:13, height:13 }}/> Delete
               </button>
+              <button onClick={() => setChecked(new Set(visibleTasks.map(t => t.id)))}
+                style={{ background:'transparent', border:'1px solid var(--border)', padding:'4px 10px',
+                  borderRadius:6, fontSize:12, fontWeight:500, color:'var(--text-secondary)', cursor:'pointer', fontFamily:'inherit' }}>
+                Select all
+              </button>
               <button onClick={() => setChecked(new Set())}
                 style={{ padding:'4px 10px', background:'transparent', border:'none',
                   fontSize:12, color:'var(--text-secondary)', cursor:'pointer', fontFamily:'inherit' }}>
@@ -488,10 +513,43 @@ export function RecurringView({
             </div>
           )}
 
+          {/* Sort bar */}
+          <div style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 18px', borderBottom:'1px solid var(--border-light)', background:'var(--surface)', flexShrink:0 }}>
+            <span style={{ fontSize:11, color:'var(--text-muted)', marginLeft:'auto' }}>Sort:</span>
+            <div style={{ position:'relative' }}>
+              <button onClick={() => setSortOpen(v => !v)}
+                style={{ display:'flex', alignItems:'center', gap:4, padding:'3px 10px', borderRadius:6,
+                  border:'1px solid var(--border)', cursor:'pointer', fontSize:11, fontWeight:500,
+                  color: sortBy !== 'due_date' ? 'var(--brand)' : 'var(--text-secondary)',
+                  background: sortBy !== 'due_date' ? 'var(--brand-light)' : 'var(--surface)' }}>
+                <SortAsc style={{ width:12, height:12 }}/>
+                {sortBy === 'due_date' ? 'Next due' : sortBy === 'created_at' ? 'Created' : 'Modified'}
+                {' '}{sortDir === 'asc' ? '↑' : '↓'}
+              </button>
+              {sortOpen && (
+                <div style={{ position:'absolute', top:'100%', right:0, marginTop:4, background:'var(--surface)',
+                  border:'1px solid var(--border)', borderRadius:10, boxShadow:'0 8px 24px rgba(0,0,0,0.12)',
+                  zIndex:9999, padding:8, minWidth:160 }} onClick={e => e.stopPropagation()}>
+                  {([['due_date','Next due date'],['created_at','Created date'],['updated_at','Modified date']] as const).map(([val,label]) => (
+                    <button key={val} onClick={() => { if (sortBy===val) setSortDir(d => d==='asc'?'desc':'asc'); else { setSortBy(val); setSortDir('asc') } setSortOpen(false) }}
+                      style={{ display:'flex', alignItems:'center', justifyContent:'space-between', width:'100%',
+                        padding:'7px 10px', borderRadius:6, border:'none', cursor:'pointer', textAlign:'left',
+                        background: sortBy===val ? 'var(--brand-light)' : 'transparent',
+                        color: sortBy===val ? 'var(--brand)' : 'var(--text-primary)',
+                        fontSize:12, fontWeight: sortBy===val ? 600 : 400 }}>
+                      {label}
+                      {sortBy===val && <span style={{ fontSize:10 }}>{sortDir==='asc'?'↑':'↓'}</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: '28px 1fr 10rem 6rem 6rem 6rem 7rem 5rem 4.5rem',
+              gridTemplateColumns: '28px 1fr 8rem 5rem 5rem 5rem 6rem 5rem 4.5rem',
               padding: '5px 18px',
               borderBottom: '1px solid var(--border)',
               background: 'var(--surface-subtle)',
@@ -534,7 +592,7 @@ export function RecurringView({
             </div>
           )}
 
-          {visibleTasks.map((task) => {
+          {sortedVisibleTasks.map((task) => {
             const isEditing = editingId === task.id
             const approver = members.find((m) => m.id === task.approver_id)
 
@@ -568,7 +626,7 @@ export function RecurringView({
                 <div
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: '28px 1fr 10rem 6rem 6rem 6rem 7rem 5rem 4.5rem',
+                    gridTemplateColumns: '28px 1fr 8rem 5rem 5rem 5rem 6rem 5rem 4.5rem',
                     alignItems: 'center',
                     padding: '0 18px',
                     minHeight: 38,
@@ -619,7 +677,6 @@ export function RecurringView({
                         >
                           {task.title}
                         </span>
-                        <PriorityBadge priority={task.priority as any} />
                         {((task as any).custom_fields?._ca_compliance || (task as any).approval_required) && task.status !== 'completed' && (
                           <label
                             title={(task as any).custom_fields?._ca_compliance ? 'Upload compliance document' : 'Upload attachment'}
@@ -690,58 +747,40 @@ export function RecurringView({
                     {task.next_occurrence_date ? fmtDate(task.next_occurrence_date) : '—'}
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'center' }}>
+                  <div style={{ display:'flex', justifyContent:'center' }}>
                     {task.assignee ? (
-                      <Avatar name={task.assignee.name} size="xs" />
+                      <span style={{ display:'inline-flex', alignItems:'center', padding:'2px 8px', borderRadius:99,
+                        background:'var(--surface-subtle)', border:'1px solid var(--border)',
+                        fontSize:11, fontWeight:500, color:'var(--text-secondary)',
+                        maxWidth:82, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
+                        {task.assignee.name.split(' ')[0]}
+                      </span>
                     ) : (
-                      <div
-                        style={{
-                          width: 20,
-                          height: 20,
-                          borderRadius: '50%',
-                          border: '1.5px dashed var(--border)',
-                        }}
-                      />
+                      <div style={{ width:20, height:20, borderRadius:'50%', border:'1.5px dashed var(--border)' }}/>
                     )}
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'center' }}>
+                  <div style={{ display:'flex', justifyContent:'center' }}>
                     {approver ? (
-                      <div
-                        style={{
-                          width: 20,
-                          height: 20,
-                          borderRadius: '50%',
-                          background: '#7c3aed',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#fff',
-                          fontSize: 8,
-                          fontWeight: 700,
-                        }}
-                        title={approver.name}
-                      >
-                        {approver.name?.[0]?.toUpperCase()}
-                      </div>
+                      <span style={{ display:'inline-flex', alignItems:'center', padding:'2px 8px', borderRadius:99,
+                        background:'rgba(124,58,237,0.08)', border:'1px solid rgba(124,58,237,0.2)',
+                        fontSize:11, fontWeight:500, color:'#7c3aed',
+                        maxWidth:82, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
+                        {approver.name.split(' ')[0]}
+                      </span>
                     ) : (
-                      <div
-                        style={{
-                          width: 20,
-                          height: 20,
-                          borderRadius: '50%',
-                          border: '1.5px dashed var(--border)',
-                        }}
-                      />
+                      <div style={{ width:20, height:20, borderRadius:'50%', border:'1.5px dashed var(--border)' }}/>
                     )}
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, overflow: 'hidden' }}>
+                  <div style={{ display:'flex', justifyContent:'center' }}>
                     {task.creator ? (
-                      <>
-                        <User style={{ width: 10, height: 10, color: 'var(--text-muted)', flexShrink: 0 }} />
-                        <span style={{ fontSize: 11, color: 'var(--text-muted)', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{task.creator.name}</span>
-                      </>
+                      <span style={{ display:'inline-flex', alignItems:'center', padding:'2px 8px', borderRadius:99,
+                        background:'var(--surface-subtle)', border:'1px solid var(--border)',
+                        fontSize:11, fontWeight:500, color:'var(--text-secondary)',
+                        maxWidth:82, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
+                        {task.creator.name.split(' ')[0]}
+                      </span>
                     ) : <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>—</span>}
                   </div>
 
@@ -781,7 +820,10 @@ export function RecurringView({
                     )}
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'center', gap: 2 }}>
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: 2, alignItems: 'center' }}>
+                    <div title={task.priority}
+                      style={{ width:8, height:8, borderRadius:'50%', flexShrink:0,
+                        background: ({'none':'#94a3b8','low':'#16a34a','medium':'#ca8a04','high':'#ea580c','urgent':'#dc2626'} as Record<string,string>)[task.priority] ?? '#94a3b8' }}/>
                     {canManage && (
                       <>
                         <button
