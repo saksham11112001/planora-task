@@ -1,5 +1,5 @@
 # Planora Task — Codebase Transfer Document
-> Use this at the start of a new chat to give the AI full context. Last updated: 2026-04-08 (Session 3)
+> Use this at the start of a new chat to give the AI full context. Last updated: 2026-04-09 (Session 5)
 
 ---
 
@@ -78,14 +78,25 @@ projects(id, name, color)
 ### Root Config
 ```
 next.config.ts          — Next.js config (optimization, headers, caching)
+  — experimental.staleTimes: { dynamic: 0 }  ← kills router cache (added Session 4)
+    forces every dynamic-route navigation to fetch fresh RSC payload from server
 middleware.ts           — Supabase JWT refresh + route protection
 tailwind.config.ts      — Tailwind CSS v4 config
 vercel.json             — Vercel deployment config
 types/index.ts          — TypeScript interfaces: User, Org, Task, Project, Client
+  — Task.updated_at?: string  ← added Session 4
+  — Task.approver_id?: string | null  ← added Session 4
+  — Task.approver?: { id: string; name: string } | null  ← added Session 4
 store/appStore.ts       — Zustand: session, toast notifications, filter state
   — FilterState fields: clientId, priority, status, search, assigneeId,
     dueDateFrom, dueDateTo, creatorId  ← "Assigned by" filter (added Session 3)
+    createdFrom, createdTo, updatedFrom, updatedTo  ← date range filters (added Session 4)
   — setFilter(key, value) / resetFilters() — used by UniversalFilterBar
+lib/utils/permissionGate.ts  — NEW (Session 4): server-side permission gate
+  — DEFAULT_PERMISSIONS: mirrors PermissionsView.tsx exactly (30 permissions)
+  — fetchOrgPermissions(supabase, orgId): React cache()-wrapped, reads org_settings.role_permissions
+  — canDo(supabase, orgId, role, permission): owner/admin always true; checks matrix
+  — assertCan(supabase, orgId, role, permission): returns {error, status:403} or null
 ```
 
 ### app/ — Pages & API Routes
@@ -111,8 +122,11 @@ app/(app)/dashboard/page.tsx          — Dashboard stats (counts, recent tasks)
 app/(app)/dashboard/DashboardClient.tsx — Client widgets for dashboard
 
 app/(app)/tasks/page.tsx              — Server: fetches my tasks + approval tasks + assigned-by-me
+  — export const dynamic = 'force-dynamic'  ← added Session 4
   — SELECT includes: creator:users!tasks_created_by_fkey(id, name)
+  — SELECT includes: created_at, updated_at  ← added Session 4
   — Enrichment: creator: (t.creator as any) ?? null
+  — Enrichment: created_at: t.created_at ?? '', updated_at: t.updated_at ?? null  ← Session 4
 app/(app)/tasks/MyTasksView.tsx       — Client: List / Board (Kanban) view
   — BOARD_COLS: overdue | in_progress (includes todo) | in_review (Pending approval) | completed
   — Grid: '28px 22px 1fr 120px 130px 90px 100px 28px'
@@ -123,22 +137,48 @@ app/(app)/tasks/MyTasksView.tsx       — Client: List / Board (Kanban) view
   — "Needs your approval" section renders from pendingTasks state (not prop) → live UI
   — Inline upload button (amber arrow SVG) on compliance / approval_required task rows
   — Filters: client, priority, status, search, dueDateFrom/To, creatorId (Assigned by)
+  — Filters: createdFrom/To, updatedFrom/To  ← added Session 4
   — List sections sorted by due_date ascending; "Assigned by me" toggle for managers
   — onCreated: only adds to local state if assignedToMe; always calls router.refresh()
+  — Row color coding: typeAccent per compliance/recurring/project/one-time (Session 4)
+    compliance=#d97706, recurring=#0d9488, project=#7c3aed, one-time=#0891b2
+    borderLeft: 3px solid typeAccent; bg: tinted rgba per type
+  — Board TaskCard color coding: typeAccent + typeBg + borderLeft per type (Session 4)
 
 app/(app)/projects/page.tsx           — Projects list
 app/(app)/projects/ProjectsView.tsx   — Projects grid/list
 app/(app)/projects/[projectId]/page.tsx  — Fetches project + tasks (with approver join) + members
+  — export const dynamic = 'force-dynamic' (already present pre-Session 4)
+  — SELECT includes: created_at, updated_at  ← added Session 4
+  — taskList map: created_at: (t as any).created_at ?? '', updated_at: (t as any).updated_at ?? null  ← Session 4
 app/(app)/projects/[projectId]/ProjectView.tsx  — Project board/list with inline task rows
   — "+ Assign to me" only shows when task.assignee_id is null (not just members.find() miss)
+  — TaskRow() color coding: _isCaComp ? #d97706 : #7c3aed; borderLeft 3px (Session 4)
 
+app/(app)/clients/page.tsx            — Server wrapper: fetches clients + canManage, renders ClientsView
+app/(app)/clients/ClientsView.tsx     — NEW Session 5: client component for the clients grid
+  — Inline edit button (Pencil icon) → navigates to /clients/[id]/edit
+  — Inline delete button (Trash2 icon) → calls DELETE /api/clients/[id] + optimistic removal
+  — Per-card checkbox (top-left): teal outline when selected
+  — "Select all" / "Deselect all" toggle button in header (canManage only)
+  — Bulk action bar: appears when ≥1 card selected — shows count + "Delete selected" + Cancel
+  — Bulk delete: parallel DELETE calls; partial success handled (success count + failure count toasts)
+  — All buttons use e.preventDefault() + e.stopPropagation() to block card link navigation
+  — router.refresh() called after every successful delete to sync server state
+  — Edit/Delete/Checkbox only rendered when canManage = true
 app/(app)/clients/[clientId]/page.tsx — Client detail with project stats
+  — export const dynamic = 'force-dynamic'  ← added Session 4
 app/(app)/calendar/page.tsx           — Fetches tasks with due dates + approver join
 app/(app)/calendar/CalendarView.tsx   — Monthly calendar component
+  — taskTypeBorder/Bg/Dot functions define type colors (compliance/recurring/project/one-time)
+  — isDone no longer overrides type colors; opacity: 0.72/0.68 used for done state instead (Session 4)
+  — Legend: recurring icon color fixed to #0d9488 (was #ea580c) (Session 4)
 
 app/(app)/recurring/page.tsx          — Recurring tasks list
   — SELECT includes: creator:users!tasks_created_by_fkey(id, name)
+  — SELECT includes: created_at, updated_at  ← added Session 4
   — Enrichment: creator: (t as any).creator ?? null
+  — Enrichment: created_at: t.created_at ?? '', updated_at: t.updated_at ?? null  ← Session 4
 app/(app)/recurring/RecurringView.tsx — Recurring task editor
   — Grid: '1fr 10rem 6rem 6rem 6rem 7rem 5rem 4.5rem' (8 columns including Assigned by)
   — "Assigned by" column between Approver and Client; uses User icon from lucide-react
@@ -147,14 +187,19 @@ app/(app)/recurring/RecurringView.tsx — Recurring task editor
     Progressive disclosure: second row (select + date + Add) shown only when title typed
   — Inline upload button on compliance / approval_required tasks
   — Filters: creatorId (Assigned by); showAssignor on both UniversalFilterBars
+  — Filters: createdFrom/To, updatedFrom/To  ← added Session 4
   — onCreated: adds to local state + calls router.refresh() via startTransition
+  — Row color coding: compliance=#d97706(amber), recurring=#0d9488(teal); borderLeft 3px (Session 4)
+  — Local Task interface now includes: created_at?, updated_at?, custom_fields?  ← Session 4
 
 app/(app)/approvals/page.tsx          — Approvals queue (pending + history, with approver join)
 app/(app)/approvals/ApprovalsView.tsx — Approval queue UI
 
 app/(app)/inbox/page.tsx              — One-time tasks inbox (all tasks for org)
   — SELECT includes: creator:users!tasks_created_by_fkey(id, name)
+  — SELECT includes: created_at, updated_at  ← added Session 4
   — Enrichment: creator: (t as any).creator ?? null
+  — Enrichment: created_at: (t as any).created_at ?? '', updated_at: (t as any).updated_at ?? null  ← Session 4
 app/(app)/inbox/InboxView.tsx         — Client: List / Board view for one-time tasks
   — Grid: '36px 22px 1fr 100px 110px 110px 100px 80px 32px 28px' (10 columns)
     (check | circle | Task | Assignee | Client | Due date | Assigned by | Priority | expand | del)
@@ -162,7 +207,12 @@ app/(app)/inbox/InboxView.tsx         — Client: List / Board view for one-time
   — Inline upload button (amber/grey arrow SVG) on compliance / approval_required tasks
   — Compliance subtask rows also have inline upload button
   — Filters: creatorId (Assigned by); showAssignor on both UniversalFilterBars
+  — Filters: createdFrom/To, updatedFrom/To applied in visibleTasks + board columns  ← Session 4
   — Board + List both filter by creatorId
+  — Row color coding: typeAccent based on compliance/recurring/project/one-time (Session 4)
+    compliance=#d97706, recurring=#0d9488, project=#7c3aed, one-time=#0891b2
+    borderLeft: 3px solid typeAccent; bg: tinted rgba per type
+  — Board card color coding: _cardBg + borderLeft per type (Session 4)
 
 app/(app)/time/page.tsx               — Time logs
 app/(app)/reports/page.tsx            — Reports + Excel export
@@ -177,8 +227,12 @@ app/(app)/settings/*/page.tsx         — Settings: org, members, permissions, b
 #### API Routes
 ```
 app/api/tasks/route.ts                — GET list / POST create task
+  — GET: SELECT now includes created_at, updated_at  ← Session 4
+  — POST: assertCan(tasks.create) after membership check  ← Session 4
 app/api/tasks/[id]/route.ts           — GET / PATCH / DELETE single task
   — PATCH: managers can update all fields incl. assignee_id, approver_id
+  — PATCH: assertCan(tasks.complete / tasks.assign / tasks.edit_own / tasks.edit)  ← Session 4
+  — DELETE: assertCan(tasks.delete)  ← Session 4
 app/api/tasks/[id]/approve/route.ts   — POST: submit / approve / reject
   — submit: assignee OR isOwnerOrAdmin
   — approve/reject: designated approver OR isOwnerOrAdmin
@@ -187,12 +241,24 @@ app/api/tasks/[id]/comments/route.ts  — Comments CRUD
 app/api/tasks/[id]/attachments/route.ts — Attachments upload/delete
 
 app/api/projects/route.ts             — Projects list/create
+  — POST: assertCan(projects.create)  ← Session 4
 app/api/projects/[id]/route.ts        — Project CRUD
+  — PATCH: assertCan(projects.edit)  ← Session 4
+  — DELETE: assertCan(projects.delete)  ← Session 4
 app/api/clients/route.ts              — Clients list/create
+  — POST: assertCan(clients.create)  ← Session 4
 app/api/clients/[id]/route.ts         — Client CRUD
+  — PATCH: assertCan(clients.edit)  ← Session 4
+  — DELETE: assertCan(clients.delete)  ← Session 4
 app/api/recurring/route.ts            — Recurring tasks CRUD
+  — POST: assertCan(recurring.create)  ← Session 4
+  — PATCH: assertCan(recurring.edit)  ← Session 4
 app/api/time-logs/route.ts            — Time logs CRUD
+  — POST: assertCan(time.log)  ← Session 4
 app/api/team/route.ts                 — Team members CRUD
+  — POST: assertCan(team.invite)  ← Session 4
+  — PATCH deactivate: assertCan(team.remove)  ← Session 4
+  — PATCH role change: assertCan(team.change_role)  ← Session 4
 app/api/search/route.ts               — Global search
 app/api/reports/export/route.ts       — Excel export
 app/api/import/route.ts               — File import
@@ -200,7 +266,9 @@ app/api/ca/master/route.ts            — CA master tasks CRUD
 app/api/ca/trigger/route.ts           — Trigger compliance task spawn
 app/api/inngest/route.ts              — Inngest event handler endpoint
 app/api/onboarding/route.ts           — Org creation
-app/api/settings/*/route.ts           — Settings endpoints
+app/api/settings/organisation/route.ts — PATCH: assertCan(settings.org)  ← Session 4
+app/api/settings/tasks/route.ts       — POST: assertCan(settings.tasks)  ← Session 4
+app/api/settings/*/route.ts           — Other settings endpoints
 app/api/ai/describe-task/route.ts     — AI task description
 ```
 
@@ -213,6 +281,9 @@ components/tasks/TaskDetailPanel.tsx  — Side panel for task details
   — Shows "Any manager can approve" only when approverInfo is null AND no approver_id
   — Subtask add row: progressive disclosure — assignee select + due date shown only
     when title input has content; Escape clears all three fields
+  — Created date row: shows task.created_at formatted with toLocaleString  ← Session 4
+  — Last modified row: shows (task as any).updated_at formatted with toLocaleString  ← Session 4
+    IMPORTANT: must use toLocaleString (not toLocaleDateString) to include hour/minute/hour12
 
 components/tasks/InlineTaskRow.tsx    — Editable row in project/list views
 components/tasks/InlineOneTimeTask.tsx — Inline create one-time task
@@ -230,8 +301,12 @@ components/search/SearchModal.tsx     — Global search (Cmd+K)
 
 components/filters/UniversalFilterBar.tsx — Shared filter UI
   — Props: showSearch, showPriority, showStatus, showAssignee, showAssignor, showDueDate
+  — showCreatedDate?: boolean  — shows Created date range filter  ← Session 4
+  — showUpdatedDate?: boolean  — shows Last modified date range filter  ← Session 4
   — showAssignor?: boolean  — shows "Assigned by" pill using store.creatorId
   — creatorId filter state stored in Zustand (see store/appStore.ts)
+  — CREATED_PRESETS / UPDATED_PRESETS: Today / Last 7d / Last 30d / Last 90d / Custom
+  — Preset + custom date range UI matches existing Due Date filter pattern
 
 components/ui/Toast.tsx               — Toast notification system
 components/ui/Badge.tsx               — Status/priority badges
@@ -261,7 +336,12 @@ lib/email/templates/taskAssigned.ts   — Assignment notification template
 lib/utils/format.ts                   — fmtDate, fmtHours, todayStr, etc.
 lib/utils/planGate.ts                 — Feature availability by plan tier
 lib/utils/cn.ts                       — Tailwind classname merge (clsx + twMerge)
+lib/utils/permissionGate.ts           — NEW Session 4: server-side permission gate (see Root Config above)
 lib/hooks/useOrgSettings.ts           — Org settings React hook
+  — OrgSettings interface now includes: rolePermissions: RolePermissions | null  ← Session 4
+  — fetchSettings() fetches /api/settings/permissions in parallel with other settings  ← Session 4
+  — Exports: checkPermission(rolePermissions, role, permission): boolean  ← Session 4
+    owner/admin always true; falls back to DEFAULT_PERMISSIONS if null
 lib/whatsapp/send.ts                  — WhatsApp notifications
 lib/compliance/index.ts               — CA compliance task logic
 lib/data/caDefaultTasks.ts            — Default CA task templates
@@ -343,6 +423,63 @@ lib/data/caDefaultTasks.ts            — Default CA task templates
 ### 12. "Assigned by" column missing from InboxView list
 - **Root cause**: Grid had 9 columns with no creator slot; no filter bar `showAssignor`.
 - **Fix**: Grid updated to 10 columns (`'36px 22px 1fr 100px 110px 110px 100px 80px 32px 28px'`); "Assigned by" header + creator cell added after Due date column; `showAssignor` added to List view filter bar.
+
+---
+
+---
+
+### SESSION 4 FIXES
+
+### 13. Cross-page stale data — navigating between pages showed cached data
+- **Root cause A**: Next.js router cache was serving stale RSC payloads on client-side navigation
+- **Fix A**: `next.config.ts` — added `experimental.staleTimes: { dynamic: 0 }` to disable router cache entirely for dynamic routes
+- **Root cause B**: Several pages were missing `export const dynamic = 'force-dynamic'`, so server components were statically cached at build time
+- **Fix B**: Added `force-dynamic` to `tasks/page.tsx`, `inbox/page.tsx`, `recurring/page.tsx`, `clients/[clientId]/page.tsx`, `settings/tasks/page.tsx`, `settings/notifications/page.tsx`, `settings/organisation/page.tsx`, `settings/billing/page.tsx`, `settings/members/page.tsx`
+
+### 14. Permission toggles in PermissionsView had no enforcement — settings were saved but never read
+- **Root cause**: Permission toggles stored data in `org_settings.role_permissions` (JSONB) but no API route ever read that data before mutating
+- **Fix**: Created `lib/utils/permissionGate.ts` with:
+  - `DEFAULT_PERMISSIONS` constant mirroring PermissionsView.tsx exactly (30 permissions)
+  - `fetchOrgPermissions()` — React `cache()`-wrapped Supabase read (deduplicates within request)
+  - `canDo()` — returns boolean; owner/admin always bypass
+  - `assertCan()` — returns `{error, status: 403}` or `null`
+- Applied `assertCan` to 20 API route mutation handlers across tasks, projects, clients, recurring, team, time-logs, settings
+
+### 15. Created/Last modified dates not showing in TaskDetailPanel
+- **Root cause 1**: All page-level Supabase SELECT strings did not include `created_at` or `updated_at`
+- **Fix 1**: Added both fields to SELECT in `tasks/page.tsx`, `inbox/page.tsx`, `recurring/page.tsx`, `projects/[projectId]/page.tsx`, `api/tasks/route.ts` GET
+- **Root cause 2**: Enrichment maps hardcoded `created_at: ''`, making the field always falsy
+- **Fix 2**: Changed to `created_at: t.created_at ?? ''` and added `updated_at: t.updated_at ?? null` to all enrichment maps
+- **Root cause 3**: `TaskDetailPanel` used `toLocaleDateString` for formatting, which silently ignores `hour`/`minute`/`hour12` options
+- **Fix 3**: Changed to `toLocaleString` (must use this API for combined date + time display)
+- **Root cause 4**: `types/index.ts` Task interface was missing `updated_at`
+- **Fix 4**: Added `updated_at?: string` to Task type
+- **Filter system**: Added `createdFrom`, `createdTo`, `updatedFrom`, `updatedTo` to Zustand `FilterState`; `UniversalFilterBar` gained `showCreatedDate`/`showUpdatedDate` props with preset + custom date range UI; all views (InboxView, MyTasksView, RecurringView) filter on these 4 fields
+
+### 16. All tasks in CalendarView appeared green (color coding broken)
+- **Root cause**: `taskTypeBorder/Bg/Dot` functions correctly returned type-based colors, but downstream in the render both timeline boxes and month-grid pills had `isDone ? '#16a34a' : borderClr` overrides — since all visible tasks were completed, everything rendered green
+- **Fix**: Removed `isDone` color overrides from both timeline and month-grid render paths. Type color now always shows. Done state expressed via `opacity: 0.72` (timeline) / `0.68` (month pills) instead
+- **Also fixed**: Legend recurring icon color was `#ea580c` (orange) instead of `#0d9488` (teal) to match `taskTypeBorder` function
+
+### 18. Clients page had no inline edit/delete — required navigating into the client to manage it
+- **Fix**: Extracted `ClientsView.tsx` (client component) from `clients/page.tsx` (now a thin server wrapper)
+- **Edit button**: Pencil icon (top-right of each card) → navigates to `/clients/[id]/edit`
+- **Delete button**: Trash2 icon (top-right of each card) → `DELETE /api/clients/[id]` with confirm dialog + optimistic UI removal + `router.refresh()`
+- **Checkbox**: Teal custom checkbox (top-left of each card, canManage only) — selected cards get teal outline
+- **Select all / Deselect all**: Button in header toggles all checkboxes
+- **Bulk action bar**: Appears when ≥1 selected — red tinted bar with count, "Delete selected" (parallel DELETE calls), and Cancel
+- **Partial failures**: Each DELETE is called independently; success/failure counts reported separately
+- No changes to existing routing, edit form, or API routes
+
+### 17. Task list rows in all views had no visual type distinction (all looked the same)
+- **Root cause**: Type color logic existed in some views at very low opacity; no `borderLeft` accent was applied
+- **Fix**: Applied consistent color coding across every list/board view:
+  - **Type accent colors**: Compliance=`#d97706`, Recurring=`#0d9488`, Project=`#7c3aed`, One-time=`#0891b2`
+  - **Every list row**: `borderLeft: 3px solid typeAccent` + subtle `rgba` background tint per type
+  - **Board cards** (InboxView, MyTasksView): `background: typeBg, borderLeft: 3px solid typeAccent`
+  - **ProjectView TaskRow**: compliance vs project accent (amber vs purple)
+  - **RecurringView rows**: compliance vs recurring accent (amber vs teal)
+  - No changes to existing task status logic, approval flow, or any other functionality
 
 ---
 
@@ -453,6 +590,78 @@ function SI({ href, active, ... }) {
 }
 // router.refresh() forces server components to re-render without full page reload.
 // Essential for force-dynamic pages to show latest DB data after navigation.
+```
+
+### Permission gate pattern (server-side, Session 4)
+```typescript
+// In any API route mutation handler:
+import { assertCan } from '@/lib/utils/permissionGate'
+
+// After membership check:
+const denied = await assertCan(supabase, mb.org_id, mb.role, 'tasks.create')
+if (denied) return NextResponse.json({ error: denied.error }, { status: denied.status })
+
+// Permission keys follow the format: '<resource>.<action>'
+// Resources: tasks, projects, clients, recurring, team, settings, time
+// Actions: create, edit, edit_own, delete, assign, complete, invite, remove, change_role, log, org, tasks
+// owner and admin ALWAYS bypass (no DB read needed)
+```
+
+### Task type color coding pattern (Session 4)
+```typescript
+// Determine task type from task fields:
+const isCompliance = (task as any).custom_fields?._ca_compliance === true
+const isRecurring  = task.is_recurring === true && !isCompliance
+const isProject    = !!task.project_id && !isRecurring && !isCompliance
+// else: one-time
+
+// Type accent colors:
+const typeAccent = isCompliance ? '#d97706'
+  : isRecurring ? '#0d9488'
+  : isProject   ? '#7c3aed'
+  : '#0891b2'  // one-time = cyan
+
+// Background tint (list rows):
+const typeBg = isCompliance ? 'rgba(234,179,8,0.09)'
+  : isRecurring ? 'rgba(13,148,136,0.07)'
+  : isProject   ? 'rgba(124,58,237,0.07)'
+  : 'rgba(8,145,178,0.05)'
+
+// Apply to row/card:
+style={{ borderLeft: `3px solid ${typeAccent}`, background: typeBg }}
+
+// For done/completed tasks in Calendar: use opacity instead of color override:
+style={{ opacity: isDone ? 0.72 : 1, borderLeft: `3px solid ${borderClr}` }}
+```
+
+### Created/Updated date display pattern (Session 4)
+```typescript
+// MUST use toLocaleString (NOT toLocaleDateString — it silently ignores hour/minute/hour12)
+new Date(task.created_at).toLocaleString('en-IN', {
+  day: '2-digit', month: 'short', year: 'numeric',
+  hour: '2-digit', minute: '2-digit', hour12: true
+})
+// updated_at is cast as any since it was added after the base Task type was stabilised:
+(task as any).updated_at && new Date((task as any).updated_at).toLocaleString(...)
+
+// Page-level SELECT must include both:
+.select('..., created_at, updated_at')
+// Enrichment map must pass through (not hardcode ''):
+created_at: t.created_at ?? '',
+updated_at: t.updated_at ?? null,
+```
+
+### Force-dynamic + staleTimes pattern (Session 4)
+```typescript
+// next.config.ts — kills router cache for all dynamic routes:
+experimental: {
+  staleTimes: { dynamic: 0 },
+}
+
+// Every server page that reads DB data should have:
+export const dynamic = 'force-dynamic'
+// This prevents static generation and ensures fresh server-component render on every request.
+// Combined with staleTimes:0, every navigation fetches latest data from DB.
 ```
 
 ---
