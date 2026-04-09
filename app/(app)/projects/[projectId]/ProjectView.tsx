@@ -2,7 +2,7 @@
 import Link from 'next/link'
 import { useState, useTransition, useEffect, useRef } from 'react'
 import { useRouter }    from 'next/navigation'
-import { Filter, SortAsc, Plus, CheckCheck, Clock, DollarSign, Trash2} from 'lucide-react'
+import { Filter, SortAsc, Plus, CheckCheck, Clock, DollarSign, Trash2, BookmarkPlus } from 'lucide-react'
 import { InlineTaskRow }   from '@/components/tasks/InlineTaskRow'
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
 import { PriorityBadge, Avatar }   from '@/components/ui/Badge'
@@ -63,8 +63,10 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
   const [newSectionName, setNewSectionName] = useState('')
   const [customSections, setCustomSections] = useState<{key:string;label:string}[]>([])
   const [newSubInputs,   setNewSubInputs]   = useState<Record<string,string>>({})
-  const [filterOpen,   setFilterOpen]   = useState(false)
-  const [sortOpen,     setSortOpen]     = useState(false)
+  const [filterOpen,        setFilterOpen]        = useState(false)
+  const [sortOpen,          setSortOpen]          = useState(false)
+  const [savingTemplate,    setSavingTemplate]    = useState(false)
+  const [templateSavedMsg,  setTemplateSavedMsg]  = useState('')
   // Close filter/sort dropdowns on outside click
   useEffect(() => {
     function close(e: MouseEvent) {
@@ -289,6 +291,19 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
     if (canComplete.length) toast.success(`${canComplete.length} tasks completed 🎉`)
     if (needsApproval.length) toast.info(`${needsApproval.length} task(s) need approval — skipped`)
     startT(() => router.refresh())
+  }
+
+  async function handleSaveAsTemplate() {
+    setSavingTemplate(true)
+    setTemplateSavedMsg('')
+    try {
+      const res = await fetch(`/api/projects/${project.id}/save-as-template`, { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) { toast.error(data.error ?? 'Could not save template'); return }
+      setTemplateSavedMsg(`Saved! ${data.task_count} tasks · ${data.subtask_count} subtasks`)
+      toast.success(`"${project.name}" saved as org template ✓`)
+      setTimeout(() => setTemplateSavedMsg(''), 4000)
+    } catch { toast.error('Network error') } finally { setSavingTemplate(false) }
   }
 
   function TaskRow({ task }: { task: Task }) {
@@ -577,6 +592,18 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
                     </div>
                   )}
                 </div>
+
+                {canManage && (
+                  <button
+                    onClick={handleSaveAsTemplate}
+                    disabled={savingTemplate}
+                    className="toolbar-btn"
+                    style={{ marginLeft: 'auto', color: templateSavedMsg ? '#16a34a' : 'var(--brand)', background: templateSavedMsg ? 'rgba(22,163,74,0.08)' : 'var(--brand-light)', borderColor: templateSavedMsg ? '#16a34a' : 'var(--brand-border)', opacity: savingTemplate ? 0.6 : 1 }}
+                    title="Save current tasks as a reusable org template">
+                    <BookmarkPlus className="h-3.5 w-3.5"/>
+                    {savingTemplate ? 'Saving…' : templateSavedMsg ? templateSavedMsg : 'Save as template'}
+                  </button>
+                )}
 
                 {/* Sort button */}
                 <div style={{position:'relative'}}>

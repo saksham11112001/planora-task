@@ -108,6 +108,7 @@ export async function POST(request: NextRequest) {
   }
 
   // If flagged as org template, save to org_feature_settings
+  // Use the tasks actually inserted rather than body.template_tasks (which is empty for blank projects)
   if (isTemplate && data?.id) {
     try {
       const { data: existing } = await supabase
@@ -117,11 +118,32 @@ export async function POST(request: NextRequest) {
         .eq('feature_key', 'project_templates')
         .maybeSingle()
       const currentTemplates: any[] = (existing?.config as any) ?? []
+
+      // Read back the tasks we just created so template_tasks is always accurate
+      const { data: insertedTasks } = await supabase
+        .from('tasks')
+        .select('id, title, priority, parent_task_id')
+        .eq('project_id', data.id)
+        .eq('org_id', mb.org_id)
+        .is('deleted_at', null)
+        .order('created_at', { ascending: true })
+
+      const allInserted = insertedTasks ?? []
+      const insertedParents  = allInserted.filter(t => !t.parent_task_id)
+      const insertedChildren = allInserted.filter(t =>  t.parent_task_id)
+      const savedTemplateTasks = insertedParents.map(p => ({
+        title:    p.title,
+        priority: p.priority ?? 'medium',
+        subtasks: insertedChildren
+          .filter(c => c.parent_task_id === p.id)
+          .map(c => c.title),
+      }))
+
       const newTemplate = {
         id:             data.id,
         name:           data.name,
         color:          data.color,
-        template_tasks: body.template_tasks ?? [],
+        template_tasks: savedTemplateTasks,
       }
       await supabase.from('org_feature_settings').upsert({
         org_id:      mb.org_id,
