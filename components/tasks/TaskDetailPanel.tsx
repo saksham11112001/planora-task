@@ -726,7 +726,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                   <FieldRow label="Created">
                     <Clock className="h-3.5 w-3.5" style={{ color: 'var(--text-muted)' }} />
                     <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                      {new Date(task.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}
+                      {new Date(task.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}
                     </span>
                   </FieldRow>
                 )}
@@ -736,7 +736,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                   <FieldRow label="Last modified">
                     <Clock className="h-3.5 w-3.5" style={{ color: 'var(--text-muted)' }} />
                     <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                      {new Date((task as any).updated_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}
+                      {new Date((task as any).updated_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}
                     </span>
                   </FieldRow>
                 )}

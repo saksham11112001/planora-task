@@ -58,7 +58,8 @@
       "Bash(find /c/Users/saksh/Desktop/planora-task -name AppShell* -type f)",
       "Bash(grep -rn \"checked\\\\|bulkDelete\\\\|bulkComplete\\\\|Select all\\\\|selectedIds\\\\|bulk\" app/\\\\\\(app\\\\\\)/projects/[projectId]/ProjectView.tsx)",
       "Bash(wc -l /c/Users/saksh/Desktop/planora-task/lib/supabase/*.ts)",
-      "Bash(xargs wc:*)"
+      "Bash(xargs wc:*)",
+      "Bash(grep -E \"\\\\.\\(tsx?|json\\)$\")"
     ]
   }
 }

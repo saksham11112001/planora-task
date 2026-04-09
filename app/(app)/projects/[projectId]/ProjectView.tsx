@@ -301,11 +301,14 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
     const hasUndone = subs.length > 0 && subsDone < subs.length
 
     const isPending = task.status === 'in_review' || task.approval_status === 'pending'
+    const _isCaComp = (task as any).custom_fields?._ca_compliance === true
+    const _typeAccent = _isCaComp ? '#d97706' : '#7c3aed'
+    const _typeBg = checked.has(task.id) ? undefined : isPending ? '#faf5ff' : _isCaComp ? 'rgba(234,179,8,0.07)' : 'rgba(124,58,237,0.05)'
 
     return (
       <>
       <div className={cn('task-row group', selectedTask?.id === task.id && 'selected', checked.has(task.id) && 'bg-teal-50/60')}
-        style={{ background: isPending ? '#faf5ff' : undefined }}>
+        style={{ background: _typeBg, borderLeft: `3px solid ${selectedTask?.id === task.id ? 'var(--brand)' : _typeAccent}` }}>
         <input type="checkbox" checked={checked.has(task.id)}
           onChange={() => setChecked(p => { const s = new Set(p); s.has(task.id) ? s.delete(task.id) : s.add(task.id); return s })}
           onClick={e => e.stopPropagation()} className="h-3.5 w-3.5 rounded border-gray-300 accent-teal-600 flex-shrink-0 cursor-pointer"/>

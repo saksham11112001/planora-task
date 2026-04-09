@@ -642,12 +642,13 @@ export function MyTasksView({
                   const isCompliance = (task as any).custom_fields?._ca_compliance === true
                   const isRecurring  = task.is_recurring === true
                   const isProject    = !!task.project_id && !isRecurring && !isCompliance
+                  const typeAccent   = isCompliance ? '#d97706' : isRecurring ? '#0d9488' : isProject ? '#7c3aed' : '#0891b2'
                   const typeBg = checked.has(task.id) ? 'var(--brand-light)'
                     : isPending    ? 'var(--pending-surface, #faf5ff)'
                     : ov           ? 'var(--overdue-surface, #fff9f9)'
-                    : isCompliance ? 'rgba(234,179,8,0.05)'
-                    : isRecurring  ? 'rgba(13,148,136,0.04)'
-                    : isProject    ? 'rgba(124,58,237,0.04)'
+                    : isCompliance ? 'rgba(234,179,8,0.09)'
+                    : isRecurring  ? 'rgba(13,148,136,0.07)'
+                    : isProject    ? 'rgba(124,58,237,0.07)'
                     : 'var(--surface)'
                   return (
                     <React.Fragment key={task.id}>
@@ -655,6 +656,7 @@ export function MyTasksView({
                       className="mytasks-row" style={{ display:'grid', gridTemplateColumns:'28px 22px 1fr 120px 130px 90px 100px 28px',
                         alignItems:'center', padding:'0 18px', minHeight:38,
                         borderBottom:`1px solid var(--border-light)`,
+                        borderLeft:`3px solid ${typeAccent}`,
                         background: typeBg,
                         cursor:'pointer' }}
                       onClick={() => setSelTask(selTask?.id === task.id ? null : task)}>
@@ -1037,15 +1039,22 @@ export function MyTasksView({
             const isDone = task.status === 'completed'
             const isPending = task.status === 'in_review' || task.approval_status === 'pending'
             const ov = isOverdue(task.due_date, task.status)
+            const _isComp = (task as any).custom_fields?._ca_compliance === true
+            const _isRec  = task.is_recurring === true
+            const _isPrj  = !!task.project_id && !_isRec && !_isComp
+            const _accent = _isComp ? '#d97706' : _isRec ? '#0d9488' : _isPrj ? '#7c3aed' : '#0891b2'
+            const _cardBg = _isComp ? 'rgba(234,179,8,0.07)' : _isRec ? 'rgba(13,148,136,0.06)' : _isPrj ? 'rgba(124,58,237,0.06)' : 'var(--surface)'
+            const isSelected = dragTaskId===task.id || selTask?.id===task.id
             return (
               <div
                 draggable
                 onDragStart={() => handleDragStart(task.id)}
                 onDragEnd={() => { setDragTaskId(null); setDragOverCol(null) }}
                 onClick={() => setSelTask(selTask?.id === task.id ? null : task)}
-                style={{ background:'var(--surface)', borderRadius:8, padding:'10px 11px',
+                style={{ background:_cardBg, borderRadius:8, padding:'10px 11px',
                   cursor:'grab',
-                  border:`1px solid ${dragTaskId===task.id?'var(--brand)':selTask?.id===task.id?'var(--brand)':isPending?'#ddd6fe':'var(--border)'}`,
+                  border:`1px solid ${isSelected?'var(--brand)':isPending?'#ddd6fe':'var(--border)'}`,
+                  borderLeft:`3px solid ${isSelected?'var(--brand)':_accent}`,
                   boxShadow: dragTaskId===task.id ? '0 4px 14px rgba(0,0,0,0.12)' : '0 1px 3px rgba(0,0,0,0.05)',
                   opacity: isDone ? 0.65 : dragTaskId===task.id ? 0.5 : 1,
                   transform: dragTaskId===task.id ? 'scale(1.02)' : 'none',

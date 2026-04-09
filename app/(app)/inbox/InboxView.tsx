@@ -325,12 +325,17 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                       const pri = PRIORITY_CONFIG[task.priority]
                       const isDone = task.status==='completed'
                       const ov = !!task.due_date && task.due_date<todayStr()
+                      const _isComp = (task as any).custom_fields?._ca_compliance === true
+                      const _isRec  = (task as any).is_recurring === true
+                      const _isPrj  = !!(task as any).project_id && !_isRec && !_isComp
+                      const _accent = _isComp ? '#d97706' : _isRec ? '#0d9488' : _isPrj ? '#7c3aed' : '#0891b2'
+                      const _cardBg = _isComp ? 'rgba(234,179,8,0.07)' : _isRec ? 'rgba(13,148,136,0.06)' : _isPrj ? 'rgba(124,58,237,0.06)' : 'var(--surface)'
                       return (
                         <div key={task.id} draggable
                           onDragStart={() => setDragTaskId(task.id)}
                           onDragEnd={() => { setDragTaskId(null); setDragOverCol(null) }}
                           onClick={() => setSelectedTask(selectedTask?.id===task.id ? null : task)}
-                          style={{ background:'var(--surface)', borderRadius:8, padding:'9px 10px', cursor:'grab', border:`1px solid ${selectedTask?.id===task.id?'var(--brand)':'var(--border)'}`, opacity:isDone?0.65:dragTaskId===task.id?0.5:1, boxShadow:'0 1px 3px rgba(0,0,0,0.05)', transition:'opacity 0.15s' }}>
+                          style={{ background:_cardBg, borderRadius:8, padding:'9px 10px', cursor:'grab', border:`1px solid ${selectedTask?.id===task.id?'var(--brand)':'var(--border)'}`, borderLeft:`3px solid ${selectedTask?.id===task.id?'var(--brand)':_accent}`, opacity:isDone?0.65:dragTaskId===task.id?0.5:1, boxShadow:'0 1px 3px rgba(0,0,0,0.05)', transition:'opacity 0.15s' }}>
                           <div style={{ fontSize:12, fontWeight:500, color:isDone?'var(--text-muted)':'var(--text-primary)', textDecoration:isDone?'line-through':'none', marginBottom:6, lineHeight:1.4 }}>{task.title}</div>
                           {(task as any).client && (
                             <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:5 }}>
@@ -439,15 +444,16 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                     const isCompliance = (task as any).custom_fields?._ca_compliance === true
                     const isRecurring  = (task as any).is_recurring === true
                     const isProject    = !!(task as any).project_id && !isRecurring && !isCompliance
+                    const typeAccent   = isCompliance ? '#d97706' : isRecurring ? '#0d9488' : isProject ? '#7c3aed' : '#0891b2'
                     const typeBg = checked.has(task.id) ? '#f0fdfa'
-                      : isCompliance ? 'rgba(234,179,8,0.05)'
-                      : isRecurring  ? 'rgba(13,148,136,0.04)'
-                      : isProject    ? 'rgba(124,58,237,0.04)'
+                      : isCompliance ? 'rgba(234,179,8,0.09)'
+                      : isRecurring  ? 'rgba(13,148,136,0.07)'
+                      : isProject    ? 'rgba(124,58,237,0.07)'
                       : section.bg
                     return (
                       <div key={task.id}>
                         <div className="inbox-task-row" onClick={() => setSelectedTask(task)}
-                          style={{ display:'grid', gridTemplateColumns:'36px 22px 1fr 100px 110px 110px 100px 80px 32px 28px', alignItems:'center', padding:'0 16px', minHeight:40, borderBottom:'1px solid var(--border-light)', cursor:'pointer', background:typeBg }}>
+                          style={{ display:'grid', gridTemplateColumns:'36px 22px 1fr 100px 110px 110px 100px 80px 32px 28px', alignItems:'center', padding:'0 16px', minHeight:40, borderBottom:'1px solid var(--border-light)', cursor:'pointer', background:typeBg, borderLeft:`3px solid ${typeAccent}` }}>
                           <input type="checkbox" checked={checked.has(task.id)}
                             onChange={() => setChecked(p => { const s=new Set(p); s.has(task.id)?s.delete(task.id):s.add(task.id); return s })}
                             onClick={e => e.stopPropagation()} style={{ width:13, height:13, accentColor:'#0d9488', cursor:'pointer' }}/>

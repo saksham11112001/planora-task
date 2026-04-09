@@ -20,6 +20,9 @@ interface Task {
   assignee_id: string | null
   approver_id?: string | null
   client_id: string | null
+  created_at?: string
+  updated_at?: string
+  custom_fields?: Record<string, any> | null
   assignee: { id: string; name: string } | null
   creator?: { id: string; name: string } | null
   project: { id: string; name: string; color: string } | null
@@ -561,7 +564,7 @@ export function RecurringView({
             }
 
             return (
-              <div key={task.id} className="group" style={{ borderBottom: '1px solid var(--border-light)', background: checked.has(task.id) ? 'var(--brand-light)' : 'var(--surface)' }}>
+              <div key={task.id} className="group" style={{ borderBottom: '1px solid var(--border-light)', background: checked.has(task.id) ? 'var(--brand-light)' : (task as any).custom_fields?._ca_compliance ? 'rgba(234,179,8,0.07)' : 'rgba(13,148,136,0.05)', borderLeft:`3px solid ${(task as any).custom_fields?._ca_compliance ? '#d97706' : '#0d9488'}` }}>
                 <div
                   style={{
                     display: 'grid',

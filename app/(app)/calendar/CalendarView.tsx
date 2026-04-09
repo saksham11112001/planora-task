@@ -364,9 +364,10 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
                         <button key={t.id} onClick={() => openTask(t.id)}
                           style={{ display:'block', textAlign:'left', width:'100%', padding:'6px 8px',
                             borderRadius:6, cursor:'pointer', fontFamily:'inherit',
-                            background: isDone ? 'rgba(22,163,74,0.07)' : bgClr,
-                            border:`1px solid ${isDone ? 'rgba(22,163,74,0.25)' : borderClr + '55'}`,
-                            borderLeft:`3px solid ${isDone ? '#16a34a' : borderClr}`,
+                            background: bgClr,
+                            border:`1px solid ${borderClr}55`,
+                            borderLeft:`3px solid ${borderClr}`,
+                            opacity: isDone ? 0.72 : 1,
                             transition:'all 0.1s' }}
                           onMouseEnter={e => { (e.currentTarget as any).style.boxShadow='0 2px 8px rgba(0,0,0,0.1)' }}
                           onMouseLeave={e => { (e.currentTarget as any).style.boxShadow='' }}>
@@ -462,7 +463,8 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
             <span style={{ width:8,height:8,borderRadius:2,background:'rgba(234,179,8,0.25)',border:'1px solid rgba(234,179,8,0.3)',display:'inline-block' }}/>Compliance
           </span>
           <span style={{ display:'flex', alignItems:'center', gap:3 }}>
-            <RefreshCw style={{ width:9,height:9,color:'#ea580c' }}/> Recurring
+            <span style={{ width:8,height:8,borderRadius:2,background:'rgba(13,148,136,0.25)',border:'1px solid rgba(13,148,136,0.3)',display:'inline-block' }}/>
+            <RefreshCw style={{ width:9,height:9,color:'#0d9488' }}/> Recurring
           </span>
         </div>
       </div>
@@ -543,8 +545,10 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
                   return (
                     <div key={t.id} style={{ display:'flex',alignItems:'center',gap:3,
                       padding:'2px 5px',borderRadius:5,marginBottom:2,
-                      background: isDone?'rgba(22,163,74,0.1)':bgClr,
-                      border:`1px solid ${dotClr}30`,
+                      background: bgClr,
+                      border:`1px solid ${dotClr}44`,
+                      borderLeft:`2px solid ${dotClr}`,
+                      opacity: isDone ? 0.68 : 1,
                       overflow:'hidden' }}>
                       <span style={{ width:5,height:5,borderRadius:'50%',background:dotClr,flexShrink:0 }}/>
                       <span style={{ fontSize:9,fontWeight:500,

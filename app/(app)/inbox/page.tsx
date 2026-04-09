@@ -23,7 +23,7 @@ export default async function InboxPage() {
       // Tasks query (role-filtered)
       (() => {
         let q = supabase.from('tasks')
-          .select('id, title, status, priority, due_date, approval_status, approval_required, approver_id, client_id, assignee_id, created_by, is_recurring, estimated_hours, custom_fields, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), approver:users!tasks_approver_id_fkey(id, name), creator:users!tasks_created_by_fkey(id, name)')
+          .select('id, title, status, priority, due_date, approval_status, approval_required, approver_id, client_id, assignee_id, created_by, is_recurring, estimated_hours, custom_fields, created_at, updated_at, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), approver:users!tasks_approver_id_fkey(id, name), creator:users!tasks_created_by_fkey(id, name)')
           .eq('org_id', mb.org_id).is('project_id', null).is('parent_task_id', null).neq('is_archived', true)
           .or('is_recurring.is.null,is_recurring.eq.false')
           .order('created_at', { ascending: false })
@@ -61,7 +61,9 @@ export default async function InboxPage() {
         return true
       })
       .map(t => ({
-      ...t, description: null, project_id: null, project: null, is_archived: false, created_at: '',
+      ...t, description: null, project_id: null, project: null, is_archived: false,
+      created_at: (t as any).created_at ?? '',
+      updated_at: (t as any).updated_at ?? null,
       approval_required: (t as any).approval_required ?? false, completed_at: null,
       is_recurring: t.is_recurring ?? false, estimated_hours: t.estimated_hours ?? null,
       due_date: t.due_date ?? null, assignee_id: t.assignee_id ?? null, client_id: t.client_id ?? null,

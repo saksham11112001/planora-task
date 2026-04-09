@@ -19,7 +19,7 @@ export default async function MyTasksPage() {
     const isManager = ['owner','admin','manager'].includes(mb.role)
 
     // ── ALL data fetched in parallel (including assignedByMe) ─────
-    const TASK_COLS = 'id, title, description, status, priority, due_date, assignee_id, approver_id, client_id, project_id, approval_status, approval_required, estimated_hours, is_recurring, custom_fields, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), approver:users!tasks_approver_id_fkey(id, name), creator:users!tasks_created_by_fkey(id, name), projects(id, name, color)'
+    const TASK_COLS = 'id, title, description, status, priority, due_date, assignee_id, approver_id, client_id, project_id, approval_status, approval_required, estimated_hours, is_recurring, custom_fields, created_at, updated_at, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), approver:users!tasks_approver_id_fkey(id, name), creator:users!tasks_created_by_fkey(id, name), projects(id, name, color)'
 
     const [
       { data: tasks },
@@ -80,7 +80,7 @@ export default async function MyTasksPage() {
       project_id: t.project_id ?? null, approval_status: t.approval_status ?? null,
       approval_required: t.approval_required ?? false, estimated_hours: t.estimated_hours ?? null,
       is_recurring: t.is_recurring ?? false, completed_at: null,
-      is_archived: false, created_at: '', approver_id: t.approver_id ?? null,
+      is_archived: false, created_at: t.created_at ?? '', updated_at: t.updated_at ?? null, approver_id: t.approver_id ?? null,
       approver: (t.approver as any) ?? null,
       assignee: (t.assignee as any) ?? null,
       creator: (t.creator as any) ?? null,
