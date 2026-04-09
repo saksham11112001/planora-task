@@ -914,33 +914,163 @@ html.dark [style*="background: var(--surface-subtle)"] {
   background: var(--surface-subtle) !important;
 }
 
-/* Priority/status chip backgrounds */
-html.dark [style*="background: '#fff7ed'"],
-html.dark [style*="background:'#fff7ed'"] { background: rgba(234,88,12,0.15) !important; }
-html.dark [style*="background: '#fef2f2'"],
-html.dark [style*="background:'#fef2f2'"] { background: rgba(220,38,38,0.12) !important; }
-html.dark [style*="background: '#f0fdf4'"],
-html.dark [style*="background:'#f0fdf4'"] { background: rgba(22,163,74,0.12) !important; }
-html.dark [style*="background: '#f5f3ff'"],
-html.dark [style*="background:'#f5f3ff'"] { background: rgba(124,58,237,0.12) !important; }
-html.dark [style*="background: '#fffbeb'"],
-html.dark [style*="background:'#fffbeb'"] { background: rgba(202,138,4,0.12) !important; }
-html.dark [style*="background: '#ecfeff'"],
-html.dark [style*="background:'#ecfeff'"] { background: rgba(8,145,178,0.12) !important; }
-html.dark [style*="background: '#fdf2f8'"],
-html.dark [style*="background:'#fdf2f8'"] { background: rgba(219,39,119,0.12) !important; }
-html.dark [style*="background: '#f0fdfa'"],
-html.dark [style*="background:'#f0fdfa'"] { background: var(--brand-light) !important; }
+/* ── Inline background overrides — covers BOTH React-rendered (no quotes)
+      and any string-interpolated (single-quoted) variants ───────── */
 
-/* Surface subtle for page backgrounds */
+/* Orange / amber-light (task settings note, billing banners, trash warning,
+   compliance priority-medium, project subtask expand button)  */
+html.dark [style*="background: #fff7ed"],
+html.dark [style*="background: '#fff7ed'"],
+html.dark [style*="background:'#fff7ed'"],
+html.dark [style*="background:#fff7ed"]   { background: rgba(234,88,12,0.15)   !important; }
+
+/* Amber-pale (billing trial banner bg, recurring/task status badge) */
+html.dark [style*="background: #fffbeb"],
+html.dark [style*="background: '#fffbeb'"],
+html.dark [style*="background:'#fffbeb'"],
+html.dark [style*="background:#fffbeb"]   { background: rgba(202,138,4,0.12)   !important; }
+
+/* Amber-medium (billing progress-bar track) */
+html.dark [style*="background: #fde68a"],
+html.dark [style*="background: '#fde68a'"],
+html.dark [style*="background:'#fde68a'"],
+html.dark [style*="background:#fde68a"]   { background: rgba(202,138,4,0.20)   !important; }
+
+/* Amber-light badge (billing trial days left chip) */
+html.dark [style*="background: #fef3c7"],
+html.dark [style*="background: '#fef3c7'"],
+html.dark [style*="background:'#fef3c7'"],
+html.dark [style*="background:#fef3c7"]   { background: rgba(202,138,4,0.15)   !important; }
+
+/* Red / rose light (approval/overdue banners, import error containers) */
+html.dark [style*="background: #fef2f2"],
+html.dark [style*="background: '#fef2f2'"],
+html.dark [style*="background:'#fef2f2'"],
+html.dark [style*="background:#fef2f2"]   { background: rgba(220,38,38,0.12)   !important; }
+
+html.dark [style*="background: #fff1f2"],
+html.dark [style*="background: '#fff1f2'"],
+html.dark [style*="background:'#fff1f2'"],
+html.dark [style*="background:#fff1f2"]   { background: rgba(220,38,38,0.10)   !important; }
+
+html.dark [style*="background: #fff5f5"],
+html.dark [style*="background: '#fff5f5'"],
+html.dark [style*="background:'#fff5f5'"],
+html.dark [style*="background:#fff5f5"]   { background: rgba(220,38,38,0.08)   !important; }
+
+/* Green light (billing active status, compliance completed badge, success banners) */
+html.dark [style*="background: #f0fdf4"],
+html.dark [style*="background: '#f0fdf4'"],
+html.dark [style*="background:'#f0fdf4'"],
+html.dark [style*="background:#f0fdf4"]   { background: rgba(22,163,74,0.12)   !important; }
+
+html.dark [style*="background: #f0fdfa"],
+html.dark [style*="background: '#f0fdfa'"],
+html.dark [style*="background:'#f0fdfa'"],
+html.dark [style*="background:#f0fdfa"]   { background: var(--brand-light)     !important; }
+
+/* Blue light (compliance in_progress status badge) */
+html.dark [style*="background: #eff6ff"],
+html.dark [style*="background: '#eff6ff'"],
+html.dark [style*="background:'#eff6ff'"],
+html.dark [style*="background:#eff6ff"]   { background: rgba(37,99,235,0.12)   !important; }
+
+html.dark [style*="background: #dbeafe"],
+html.dark [style*="background: '#dbeafe'"],
+html.dark [style*="background:'#dbeafe'"],
+html.dark [style*="background:#dbeafe"]   { background: rgba(37,99,235,0.10)   !important; }
+
+/* Purple / violet light (compliance in_review status badge) */
+html.dark [style*="background: #fdf4ff"],
+html.dark [style*="background: '#fdf4ff'"],
+html.dark [style*="background:'#fdf4ff'"],
+html.dark [style*="background:#fdf4ff"]   { background: rgba(147,51,234,0.12)  !important; }
+
+html.dark [style*="background: #f5f3ff"],
+html.dark [style*="background: '#f5f3ff'"],
+html.dark [style*="background:'#f5f3ff'"],
+html.dark [style*="background:#f5f3ff"]   { background: rgba(124,58,237,0.12)  !important; }
+
+html.dark [style*="background: #fae8ff"],
+html.dark [style*="background: '#fae8ff'"],
+html.dark [style*="background:'#fae8ff'"],
+html.dark [style*="background:#fae8ff"]   { background: rgba(147,51,234,0.10)  !important; }
+
+/* Cyan light (one-time task badges) */
+html.dark [style*="background: #ecfeff"],
+html.dark [style*="background: '#ecfeff'"],
+html.dark [style*="background:'#ecfeff'"],
+html.dark [style*="background:#ecfeff"]   { background: rgba(8,145,178,0.12)   !important; }
+
+/* Pink light */
+html.dark [style*="background: #fdf2f8"],
+html.dark [style*="background: '#fdf2f8'"],
+html.dark [style*="background:'#fdf2f8'"],
+html.dark [style*="background:#fdf2f8"]   { background: rgba(219,39,119,0.12)  !important; }
+
+/* Slate / cool-grey light (icon wrappers, empty-state placeholders, todo badges) */
+html.dark [style*="background: #f1f5f9"],
+html.dark [style*="background: '#f1f5f9'"],
+html.dark [style*="background:'#f1f5f9'"],
+html.dark [style*="background:#f1f5f9"]   { background: var(--surface-subtle)  !important; }
+
+html.dark [style*="background: #f8fafc"],
 html.dark [style*="background: '#f8fafc'"],
 html.dark [style*="background:'#f8fafc'"],
-html.dark [style*="background: '#f1f5f9'"] { background: var(--surface-subtle) !important; }
+html.dark [style*="background:#f8fafc"]   { background: var(--surface-subtle)  !important; }
 
-/* Pure white surfaces */
-html.dark [style*="background: 'white'"],
+html.dark [style*="background: #e2e8f0"],
+html.dark [style*="background: '#e2e8f0'"],
+html.dark [style*="background:'#e2e8f0'"],
+html.dark [style*="background:#e2e8f0"]   { background: var(--border)          !important; }
+
+/* Pure white — NOTE: do NOT add unquoted [style*="background: #fff"] here because
+   the substring "#fff" matches #fffbeb, #fff7ed etc. and would override the
+   specific amber/red rules above. The 6-digit #ffffff form is handled earlier. */
+html.dark [style*="background: '#fff'"],
+html.dark [style*="background:'#fff'"],
+html.dark [style*="background: white"],
 html.dark [style*="background:'white'"],
-html.dark [style*="background: white"] { background: var(--surface) !important; }
+html.dark [style*="background: 'white'"] { background: var(--surface) !important; }
+
+/* Pale purple gradient (upsell banners — trash, permissions pages) */
+html.dark [style*="#faf5ff"]              { background: var(--surface)          !important; }
+
+/* ── Border color overrides — unquoted (React) + quoted variants ── */
+
+/* Light amber borders (billing/settings/trash note boxes) */
+html.dark [style*="border: 1px solid #fde68a"],
+html.dark [style*="border: '1px solid #fde68a'"]  { border-color: rgba(202,138,4,0.35)   !important; }
+
+/* Light green borders (compliance completed info box) */
+html.dark [style*="border: 1px solid #bbf7d0"],
+html.dark [style*="border: '1px solid #bbf7d0'"]  { border-color: rgba(22,163,74,0.30)   !important; }
+
+/* Light purple borders (trash/permissions upsell banners) */
+html.dark [style*="border: 1px solid #ddd6fe"],
+html.dark [style*="border: '1px solid #ddd6fe'"]  { border-color: rgba(124,58,237,0.30)  !important; }
+
+/* Light red borders (import error, danger badges) */
+html.dark [style*="border: 1px solid #fecaca"],
+html.dark [style*="border: '1px solid #fecaca'"]  { border-color: rgba(220,38,38,0.30)   !important; }
+
+/* Light grey borders (inputs, form elements) */
+html.dark [style*="border: 1px solid #e2e8f0"],
+html.dark [style*="border: '1px solid #e2e8f0'"],
+html.dark [style*="border: 1.5px solid #e2e8f0"],
+html.dark [style*="border: '1.5px solid #e2e8f0'"] { border-color: var(--border) !important; }
+
+html.dark [style*="borderColor: #e2e8f0"],
+html.dark [style*="borderColor: '#e2e8f0'"],
+html.dark [style*="borderColor:'#e2e8f0'"]         { border-color: var(--border) !important; }
+
+/* Light grey bottom borders (column headers, dividers) */
+html.dark [style*="borderBottom: 1px solid #e2e8f0"],
+html.dark [style*="borderBottom: '1px solid #e2e8f0'"],
+html.dark [style*="borderBottom:'1px solid #e2e8f0'"] { border-bottom-color: var(--border) !important; }
+
+html.dark [style*="borderTop: 1px solid #e2e8f0"],
+html.dark [style*="borderTop: '1px solid #e2e8f0'"]   { border-top-color: var(--border) !important; }
 
 /* Text color overrides */
 html.dark [style*="color: 'white'"],

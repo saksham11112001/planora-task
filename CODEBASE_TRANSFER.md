@@ -1,5 +1,5 @@
 # Planora Task — Codebase Transfer Document
-> Use this at the start of a new chat to give the AI full context. Last updated: 2026-04-09 (Session 5)
+> Use this at the start of a new chat to give the AI full context. Last updated: 2026-04-09 (Session 6)
 
 ---
 
@@ -460,6 +460,22 @@ lib/data/caDefaultTasks.ts            — Default CA task templates
 - **Root cause**: `taskTypeBorder/Bg/Dot` functions correctly returned type-based colors, but downstream in the render both timeline boxes and month-grid pills had `isDone ? '#16a34a' : borderClr` overrides — since all visible tasks were completed, everything rendered green
 - **Fix**: Removed `isDone` color overrides from both timeline and month-grid render paths. Type color now always shows. Done state expressed via `opacity: 0.72` (timeline) / `0.68` (month pills) instead
 - **Also fixed**: Legend recurring icon color was `#ea580c` (orange) instead of `#0d9488` (teal) to match `taskTypeBorder` function
+
+### 19. White/light boxes appearing throughout the app in dark mode
+- **Root cause 1 (new colors missing)**: Several light hex values used across the codebase had no dark-mode override in `globals.css`:
+  - `#fffbeb`, `#fde68a`, `#fef3c7` — amber (billing banners, task settings notes, trash warnings)
+  - `#fff1f2`, `#fff5f5` — rose/red (billing inactive badge, import error containers)
+  - `#eff6ff` — blue (compliance in_progress status badge)
+  - `#fdf4ff` — purple (compliance in_review status badge)
+  - `#dbeafe`, `#fae8ff` — additional blue/purple light variants
+  - `linear-gradient(135deg,#faf5ff,#f0fdfa)` — upsell gradient (TrashView, PermissionsView)
+- **Root cause 2 (existing overrides didn't match React-rendered HTML)**: The existing override block in `globals.css` used ONLY the single-quoted selector form e.g. `[style*="background: '#fef2f2'"]`. React renders `style={{ background: '#fef2f2' }}` as `style="background: #fef2f2;"` in the DOM (no quotes). So ALL the "chip background" rules at lines 918-933 were silently failing.
+- **Fix**: Replaced the entire inline-background override section with a new block that:
+  - Covers 17 specific hex colors + their border counterparts
+  - Includes BOTH the unquoted form (catches React-rendered) AND the quoted form (catches edge cases)
+  - Adds explicit border-color overrides for amber, green, purple, red, and grey border patterns
+- **Critical anti-pattern avoided**: `[style*="background: #fff"]` (unquoted) would substring-match `#fffbeb`, `#fff7ed`, etc. and override their specific amber/red rules due to CSS cascade order. Only `[style*="background: '#fff'"]` (quoted, harmless) is used for 3-digit white.
+- **Only file changed**: `app/globals.css` — no component files were touched
 
 ### 18. Clients page had no inline edit/delete — required navigating into the client to manage it
 - **Fix**: Extracted `ClientsView.tsx` (client component) from `clients/page.tsx` (now a thin server wrapper)
