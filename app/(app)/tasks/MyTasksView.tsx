@@ -603,7 +603,7 @@ export function MyTasksView({
           color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.06em' }}>
           <div/><div/><div>Task name</div>
           <div>Client</div>
-          <div>Assigned by</div>
+          <div>{showAssignedByMe ? 'Assignee' : 'Assigned by'}</div>
           <div style={{textAlign:'center', display:'flex', alignItems:'center', justifyContent:'center', gap:3}}>
             Due date <span style={{ fontSize:9, opacity:0.6 }}>↑</span>
           </div>
@@ -720,14 +720,26 @@ export function MyTasksView({
                           </>
                         ) : <span style={{ fontSize:12, color:'var(--text-muted)' }}>—</span>}
                       </div>
-                      {/* Assigned by column */}
+                      {/* Assigned by / Assignee column */}
                       <div className="hide-mobile" style={{ display:'flex', alignItems:'center', gap:5, overflow:'hidden' }}>
-                        {creator ? (
-                          <>
-                            <User style={{ width:11, height:11, color:'var(--text-muted)', flexShrink:0 }}/>
-                            <span style={{ fontSize:12, color:'var(--text-muted)', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{creator.name}</span>
-                          </>
-                        ) : <span style={{ fontSize:12, color:'var(--text-muted)' }}>—</span>}
+                        {showAssignedByMe ? (
+                          (() => {
+                            const assignee = task.assignee as {id:string;name:string}|null
+                            return assignee ? (
+                              <>
+                                <Avatar name={assignee.name} size="xs"/>
+                                <span style={{ fontSize:12, color:'var(--text-muted)', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{assignee.name}</span>
+                              </>
+                            ) : <span style={{ fontSize:12, color:'var(--text-muted)' }}>—</span>
+                          })()
+                        ) : (
+                          creator ? (
+                            <>
+                              <User style={{ width:11, height:11, color:'var(--text-muted)', flexShrink:0 }}/>
+                              <span style={{ fontSize:12, color:'var(--text-muted)', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{creator.name}</span>
+                            </>
+                          ) : <span style={{ fontSize:12, color:'var(--text-muted)' }}>—</span>
+                        )}
                       </div>
                       <div className="hide-mobile" style={{ textAlign:'center', fontSize:13,
                         color: task.due_date===today?'var(--brand)':ov?'#dc2626':'var(--text-muted)',
