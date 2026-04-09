@@ -18,14 +18,15 @@ interface Props {
   fromDate:      string
   toDate:        string
   logs:          Log[]
-  projects:      { id: string; name: string; color: string }[]
+  projects:      { id: string; name: string; color: string; client_id: string | null }[]
   tasks:         { id: string; title: string; project_id: string | null }[]
+  clients:       { id: string; name: string; color: string }[]
   members:       { id: string; name: string }[]
   currentUserId: string
   canSeeAll:     boolean
 }
 
-export function TimeView({ logs, projects, tasks, members, currentUserId, canSeeAll, fromDate, toDate }: Props) {
+export function TimeView({ logs, projects, tasks, clients, members, currentUserId, canSeeAll, fromDate, toDate }: Props) {
   const router  = useRouter()
   const [, startT] = useTransition()
 
@@ -35,7 +36,7 @@ export function TimeView({ logs, projects, tasks, members, currentUserId, canSee
   const [form, setForm] = useState({
     hours: '', description: '',
     logged_date: new Date().toISOString().split('T')[0],
-    project_id: '', task_id: '', is_billable: true,
+    client_id: '', project_id: '', task_id: '', is_billable: true,
   })
 
   // Inline edit
@@ -47,7 +48,8 @@ export function TimeView({ logs, projects, tasks, members, currentUserId, canSee
 
   const totalHours    = logs.reduce((s, l) => s + l.hours, 0)
   const billableHours = logs.filter(l => l.is_billable).reduce((s, l) => s + l.hours, 0)
-  const filteredTasks = form.project_id ? tasks.filter(t => t.project_id === form.project_id) : tasks
+  const filteredProjects = form.client_id ? projects.filter(p => p.client_id === form.client_id) : projects
+  const filteredTasks    = form.project_id ? tasks.filter(t => t.project_id === form.project_id) : tasks
 
   // ── Date filter helpers ────────────────────────────────────────────
   function applyDateFilter() {
@@ -95,7 +97,7 @@ export function TimeView({ logs, projects, tasks, members, currentUserId, canSee
       if (!res.ok) { const d = await res.json(); toast.error(d.error ?? 'Failed'); return }
       toast.success('Time logged!')
       setShowForm(false)
-      setForm({ hours: '', description: '', logged_date: new Date().toISOString().split('T')[0], project_id: '', task_id: '', is_billable: true })
+      setForm({ hours: '', description: '', logged_date: new Date().toISOString().split('T')[0], client_id: '', project_id: '', task_id: '', is_billable: true })
       startT(() => router.refresh())
     } finally { setSaving(false) }
   }
@@ -200,14 +202,23 @@ export function TimeView({ logs, projects, tasks, members, currentUserId, canSee
               </label>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Client</label>
+              <select value={form.client_id}
+                onChange={e => setForm(f => ({ ...f, client_id: e.target.value, project_id: '', task_id: '' }))}
+                className="input">
+                <option value="">No client</option>
+                {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Project</label>
               <select value={form.project_id}
                 onChange={e => setForm(f => ({ ...f, project_id: e.target.value, task_id: '' }))}
                 className="input">
                 <option value="">No project</option>
-                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                {filteredProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
             <div>
