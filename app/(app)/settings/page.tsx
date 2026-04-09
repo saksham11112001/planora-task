@@ -18,7 +18,8 @@ const SECTIONS = [
   { href: '/settings/trash',              label: 'Trash & recovery',    desc: 'Restore deleted tasks (30-day window)',            adminOnly: false, color: '#94a3b8', bg: '#f8fafc', iconName: 'Trash2'    },
   { href: '/settings/billing',          label: 'Billing & plan',   desc: 'Subscription and upgrade options',       adminOnly: true,  color: '#16a34a', bg: '#f0fdf4', iconName: 'CreditCard'},
   { href: '/settings/coupons',        label: 'Coupons',           desc: 'Manage discount and promo codes',        adminOnly: true,  color: '#ea580c', bg: '#fff7ed', iconName: 'Tag'       },
-  { href: '/settings/notifications', label: 'Notifications',   desc: 'Email and WhatsApp preferences',        adminOnly: false, color: '#db2777', bg: '#fdf2f8', iconName: 'Bell'      },
+  { href: '/settings/notifications',         label: 'Notifications',          desc: 'Email and WhatsApp preferences per event',             adminOnly: false, color: '#db2777', bg: '#fdf2f8', iconName: 'Bell'      },
+  { href: '/settings/notification-frequency', label: 'Notification frequency', desc: 'Immediate emails vs twice-daily digest for the whole org', adminOnly: true,  color: '#7c3aed', bg: '#f5f3ff', iconName: 'Clock'     },
 ]
 
 export default async function SettingsPage() {

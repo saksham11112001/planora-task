@@ -3,6 +3,7 @@ import { createAdminClient }       from '@/lib/supabase/admin'
 import { sendDueSoonEmail, sendEscalationEmail } from '@/lib/email/send'
 import { acquireEmailSlot }                        from '@/lib/email/gate'
 import { waTaskDueSoon, waTaskOverdue } from '@/lib/whatsapp/send'
+import { getOrgNotifMode, queueNotification } from '@/lib/email/queue'
 
 /**
  * Runs every day at 8:00 AM IST (2:30 AM UTC)
@@ -34,7 +35,7 @@ export const dailyReminders = inngest.createFunction(
     const dueSoonTasks = await step.run('fetch-due-soon-tasks', async () => {
       const { data: tasks } = await admin.from('tasks')
         .select(`
-          id, title, due_date, project_id,
+          id, title, due_date, project_id, org_id,
           assignee:users!tasks_assignee_id_fkey(id, name, email, phone_number, whatsapp_opted_in),
           project:projects(name),
           org:organisations!inner(name)
@@ -65,20 +66,31 @@ export const dailyReminders = inngest.createFunction(
         const hoursLeft = Math.max(0, Math.round(msLeft / 3600000))
 
         if (sendEmail) {
-          const canSend = await acquireEmailSlot(assignee.id, 'daily_reminder')
-          if (canSend) {
-            await sendDueSoonEmail({
-              to:           assignee.email,
-              assigneeName: assignee.name,
-              taskId:       task.id,
-              taskTitle:    task.title,
-              orgName:      (task.org as any)?.name ?? '',
-              dueDate,
-              hoursLeft,
-              projectName:  (task.project as any)?.name ?? null,
-              projectId:    task.project_id,
+          const orgName = (task.org as any)?.name ?? ''
+          const orgMode = await getOrgNotifMode((task as any).org_id ?? '')
+          if (orgMode === 'digest' && (task as any).org_id) {
+            await queueNotification({
+              orgId: (task as any).org_id, userId: assignee.id, userEmail: assignee.email,
+              eventType: 'task_due_soon',
+              subject: `"${task.title}" is due in ${hoursLeft}h`,
             })
             dueSoonCount++
+          } else {
+            const canSend = await acquireEmailSlot(assignee.id, 'daily_reminder')
+            if (canSend) {
+              await sendDueSoonEmail({
+                to:           assignee.email,
+                assigneeName: assignee.name,
+                taskId:       task.id,
+                taskTitle:    task.title,
+                orgName,
+                dueDate,
+                hoursLeft,
+                projectName:  (task.project as any)?.name ?? null,
+                projectId:    task.project_id,
+              })
+              dueSoonCount++
+            }
           }
         }
 
@@ -132,6 +144,17 @@ export const dailyReminders = inngest.createFunction(
 
           // Don't escalate to themselves if manager is also the assignee
           if (mgrUser.id === assignee?.id) continue
+
+          const orgMode = await getOrgNotifMode((task as any).org_id)
+          if (orgMode === 'digest') {
+            await queueNotification({
+              orgId: (task as any).org_id, userId: mgrUser.id, userEmail: mgrUser.email,
+              eventType: 'escalation_alert',
+              subject: `Overdue: "${task.title}" (assigned to ${assignee?.name ?? 'team member'})`,
+            })
+            escalationCount++
+            continue
+          }
 
           if (!(await acquireEmailSlot(mgrUser.id, 'escalation_alert'))) continue
           await sendEscalationEmail({

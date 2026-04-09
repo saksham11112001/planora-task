@@ -9,6 +9,7 @@ import { dailyReminders }      from '@/lib/inngest/functions/dailyReminders'
 import { recurringSpawn }      from '@/lib/inngest/functions/recurringSpawn'
 import { caComplianceSpawn }   from '@/lib/inngest/functions/caComplianceSpawn'
 import { trialExpiry }         from '@/lib/inngest/functions/trialExpiry'
+import { digestMorning, digestEvening } from '@/lib/inngest/functions/digestNotifications'
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
@@ -23,5 +24,7 @@ export const { GET, POST, PUT } = serve({
     recurringSpawn,
     caComplianceSpawn,
     trialExpiry,
+    digestMorning,
+    digestEvening,
   ],
 })

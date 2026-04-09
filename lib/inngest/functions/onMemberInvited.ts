@@ -2,6 +2,7 @@ import { inngest }               from '../client'
 import { acquireEmailSlot }       from '@/lib/email/gate'
 import { createAdminClient }       from '@/lib/supabase/admin'
 import { sendMemberInvitedEmail }   from '@/lib/email/send'
+import { getOrgNotifMode, queueNotification } from '@/lib/email/queue'
 
 export const onMemberInvited = inngest.createFunction(
   { id: 'on-member-invited', name: 'Notify team on new member join' },
@@ -29,6 +30,18 @@ export const onMemberInvited = inngest.createFunction(
         .select('via_email').eq('user_id', user.id).eq('event_type', 'member_invited').maybeSingle()
 
       if (prefs?.via_email === false) continue
+
+      const orgMode = await getOrgNotifMode(d.org_id)
+      if (orgMode === 'digest') {
+        await queueNotification({
+          orgId: d.org_id, userId: user.id, userEmail: user.email,
+          eventType: 'member_invited',
+          subject: `${d.member_name} (${d.member_email}) joined ${d.org_name} as ${d.role}`,
+        })
+        count++
+        continue
+      }
+
       if (!(await acquireEmailSlot(user.id, 'member_invited'))) continue
       await sendMemberInvitedEmail({
         to:           user.email,

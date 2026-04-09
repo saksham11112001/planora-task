@@ -3,6 +3,7 @@ import { acquireEmailSlot }      from '@/lib/email/gate'
 import { createAdminClient }     from '@/lib/supabase/admin'
 import { sendTaskAssignedEmail } from '@/lib/email/send'
 import { waTaskAssigned }        from '@/lib/whatsapp/send'
+import { getOrgNotifModeForUser, queueNotification } from '@/lib/email/queue'
 
 export const onTaskAssigned = inngest.createFunction(
   { id: 'on-task-assigned', name: 'Notify on task assignment' },
@@ -19,12 +20,22 @@ export const onTaskAssigned = inngest.createFunction(
       .eq('event_type', 'task_assigned')
       .maybeSingle()
 
-    const sendEmail    = prefs?.via_email    ?? true   // default: email on
-    const sendWhatsApp = prefs?.via_whatsapp ?? false  // default: WA off
+    const sendEmail    = prefs?.via_email    ?? true
+    const sendWhatsApp = prefs?.via_whatsapp ?? false
 
     const results: string[] = []
 
     if (sendEmail) {
+      // Check org notification mode
+      const { mode, orgId } = await getOrgNotifModeForUser(d.assignee_id)
+      if (mode === 'digest' && orgId) {
+        await queueNotification({
+          orgId, userId: d.assignee_id, userEmail: d.assignee_email,
+          eventType: 'task_assigned',
+          subject: `New task assigned: ${d.task_title}${d.assigner_name ? ` (by ${d.assigner_name})` : ''}`,
+        })
+        results.push('queued_for_digest')
+      } else {
       const canSend = await acquireEmailSlot(d.assignee_id, 'task_assigned')
       if (canSend) {
         await sendTaskAssignedEmail({
@@ -39,6 +50,7 @@ export const onTaskAssigned = inngest.createFunction(
         })
         results.push('email_sent')
       }
+      } // end else (immediate mode)
     }
 
     if (sendWhatsApp && d.assignee_phone) {

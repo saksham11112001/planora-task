@@ -3,6 +3,7 @@ import { acquireEmailSlot }           from '@/lib/email/gate'
 import { createAdminClient }          from '@/lib/supabase/admin'
 import { sendApprovalRequestedEmail, sendApprovalResultEmail } from '@/lib/email/send'
 import { waApprovalNeeded, waApprovalResult }                  from '@/lib/whatsapp/send'
+import { getOrgNotifMode, getOrgNotifModeForUser, queueNotification } from '@/lib/email/queue'
 
 // ── When assignee submits for approval → notify manager ──────────────────
 export const onApprovalRequested = inngest.createFunction(
@@ -25,6 +26,19 @@ export const onApprovalRequested = inngest.createFunction(
         .select('via_email, via_whatsapp')
         .eq('user_id', managerUserId).eq('event_type', 'task_approved').maybeSingle()
       sendWA = prefs?.via_whatsapp ?? false
+    }
+
+    // Check org notification mode (use org_id from manager's membership)
+    if (managerUserId) {
+      const { data: mgMb } = await admin.from('org_members').select('org_id').eq('user_id', managerUserId).eq('is_active', true).maybeSingle()
+      if (mgMb?.org_id && await getOrgNotifMode(mgMb.org_id) === 'digest') {
+        await queueNotification({
+          orgId: mgMb.org_id, userId: managerUserId, userEmail: d.manager_email,
+          eventType: 'approval_requested',
+          subject: `Approval needed: "${d.task_title}" submitted by ${d.submitter_name}`,
+        })
+        return { queued: true }
+      }
     }
 
     // Email is always sent by default for approvals, but max 1 per day
@@ -68,6 +82,17 @@ export const onApprovalCompleted = inngest.createFunction(
     const sendWhatsApp = prefs?.via_whatsapp ?? false
 
     if (sendEmail) {
+      // Check org notification mode
+      const { mode, orgId } = await getOrgNotifModeForUser(d.assignee_id)
+      if (mode === 'digest' && orgId) {
+        const verb = d.decision === 'approved' ? 'approved ✓' : 'returned ✗'
+        await queueNotification({
+          orgId, userId: d.assignee_id, userEmail: d.assignee_email,
+          eventType: 'approval_completed',
+          subject: `"${d.task_title}" was ${verb} by ${d.reviewer_name}`,
+        })
+        return { queued: true }
+      }
       const canSend = await acquireEmailSlot(d.assignee_id, 'approval_completed')
       if (!canSend) return { skipped: 'daily_limit' }
       await sendApprovalResultEmail({

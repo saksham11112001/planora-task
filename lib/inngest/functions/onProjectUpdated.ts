@@ -2,6 +2,7 @@ import { inngest }                 from '../client'
 import { acquireEmailSlot }        from '@/lib/email/gate'
 import { createAdminClient }        from '@/lib/supabase/admin'
 import { sendProjectUpdatedEmail }   from '@/lib/email/send'
+import { getOrgNotifMode, queueNotification } from '@/lib/email/queue'
 
 export const onProjectUpdated = inngest.createFunction(
   { id: 'on-project-updated', name: 'Notify team on project status change' },
@@ -27,6 +28,18 @@ export const onProjectUpdated = inngest.createFunction(
         .select('via_email').eq('user_id', user.id).eq('event_type', 'project_updated').maybeSingle()
 
       if (prefs?.via_email === false) continue
+
+      const orgMode = await getOrgNotifMode(d.org_id)
+      if (orgMode === 'digest') {
+        await queueNotification({
+          orgId: d.org_id, userId: user.id, userEmail: user.email,
+          eventType: 'project_updated',
+          subject: `Project "${d.project_name}" status changed to ${d.new_status} by ${d.updated_by_name}`,
+        })
+        count++
+        continue
+      }
+
       if (!(await acquireEmailSlot(user.id, 'project_updated'))) continue
       await sendProjectUpdatedEmail({
         to:           user.email,
