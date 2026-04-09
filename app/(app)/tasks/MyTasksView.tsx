@@ -2,7 +2,7 @@
 import React from 'react'
 import { useState, useTransition } from 'react'
 import { useRouter }    from 'next/navigation'
-import { RefreshCw, CheckCheck, Clock, FolderOpen, Trash2, User } from 'lucide-react'
+import { RefreshCw, CheckCheck, Clock, FolderOpen, Trash2, User, SortAsc } from 'lucide-react'
 import { PriorityBadge, Avatar } from '@/components/ui/Badge'
 import { TaskDetailPanel }       from '@/components/tasks/TaskDetailPanel'
 import { InlineOneTimeTask }     from '@/components/tasks/InlineOneTimeTask'
@@ -109,6 +109,9 @@ export function MyTasksView({
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
   const [groupPages,      setGroupPages]      = useState<Record<string, number>>({})
   const [showAssignedByMe, setShowAssignedByMe] = useState(false)
+  const [sortBy, setSortBy] = useState<'due_date'|'created_at'|'updated_at'>('due_date')
+  const [sortDir, setSortDir] = useState<'asc'|'desc'>('asc')
+  const [sortOpen, setSortOpen] = useState(false)
 
   function toggleGroup(key: string) {
     setCollapsedGroups(prev => { const s = new Set(prev); s.has(key) ? s.delete(key) : s.add(key); return s })
@@ -481,6 +484,11 @@ export function MyTasksView({
                 <Trash2 style={{width:13,height:13}}/> Delete
               </button>
             )}
+            <button onClick={() => setChecked(new Set(displayTasks.map(t => t.id)))}
+              style={{ background:'transparent', border:'1px solid var(--border)', padding:'5px 12px',
+                borderRadius:7, fontSize:12, fontWeight:500, color:'var(--text-secondary)', cursor:'pointer' }}>
+              Select all
+            </button>
             <button onClick={() => setChecked(new Set())}
               style={{ background:'none', border:'none', fontSize:12, color:'var(--text-muted)', cursor:'pointer' }}>
               Cancel
@@ -597,17 +605,47 @@ export function MyTasksView({
 
         {/* Universal filter bar */}
         <UniversalFilterBar clients={clients} members={members} showSearch showPriority showStatus showDueDate showAssignor showCreatedDate showUpdatedDate/>
-        <div style={{ display:'grid', gridTemplateColumns:'28px 22px 1fr 120px 130px 90px 100px 28px',
+        {/* Sort bar */}
+        <div style={{ display:'flex', alignItems:'center', gap:6, padding:'5px 18px', borderBottom:'1px solid var(--border-light)', background:'var(--surface)', flexShrink:0 }}>
+          <span style={{ fontSize:11, color:'var(--text-muted)', marginLeft:'auto' }}>Sort:</span>
+          <div style={{ position:'relative' }}>
+            <button onClick={() => setSortOpen(v => !v)}
+              style={{ display:'flex', alignItems:'center', gap:4, padding:'3px 10px', borderRadius:6,
+                border:'1px solid var(--border)', background:'var(--surface)', cursor:'pointer',
+                fontSize:11, fontWeight:500, color: sortBy !== 'due_date' ? 'var(--brand)' : 'var(--text-secondary)',
+                background: sortBy !== 'due_date' ? 'var(--brand-light)' : 'var(--surface)' }}>
+              <SortAsc style={{ width:12, height:12 }}/>
+              {sortBy === 'due_date' ? 'Due date' : sortBy === 'created_at' ? 'Created' : 'Modified'}
+              {' '}{sortDir === 'asc' ? '↑' : '↓'}
+            </button>
+            {sortOpen && (
+              <div style={{ position:'absolute', top:'100%', right:0, marginTop:4, background:'var(--surface)',
+                border:'1px solid var(--border)', borderRadius:10, boxShadow:'0 8px 24px rgba(0,0,0,0.12)',
+                zIndex:9999, padding:8, minWidth:160 }} onClick={e => e.stopPropagation()}>
+                {([['due_date','Due date'],['created_at','Created date'],['updated_at','Modified date']] as const).map(([val,label]) => (
+                  <button key={val} onClick={() => { if (sortBy===val) setSortDir(d => d==='asc'?'desc':'asc'); else { setSortBy(val); setSortDir('asc') } setSortOpen(false) }}
+                    style={{ display:'flex', alignItems:'center', justifyContent:'space-between', width:'100%',
+                      padding:'7px 10px', borderRadius:6, border:'none', cursor:'pointer', textAlign:'left',
+                      background: sortBy===val ? 'var(--brand-light)' : 'transparent',
+                      color: sortBy===val ? 'var(--brand)' : 'var(--text-primary)',
+                      fontSize:12, fontWeight: sortBy===val ? 600 : 400 }}>
+                    {label}
+                    {sortBy===val && <span style={{ fontSize:10 }}>{sortDir==='asc'?'↑':'↓'}</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+        {/* Column headers — 7 cols (no priority) */}
+        <div style={{ display:'grid', gridTemplateColumns:'28px 22px 1fr 100px 100px 80px 40px',
           alignItems:'center', padding:'5px 18px', borderBottom:`1px solid var(--border)`,
           background:'var(--surface-subtle)', flexShrink:0, fontSize:10, fontWeight:700,
           color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.06em' }}>
           <div/><div/><div>Task name</div>
           <div>Client</div>
           <div>{showAssignedByMe ? 'Assignee' : 'Assigned by'}</div>
-          <div style={{textAlign:'center', display:'flex', alignItems:'center', justifyContent:'center', gap:3}}>
-            Due date <span style={{ fontSize:9, opacity:0.6 }}>↑</span>
-          </div>
-          <div style={{textAlign:'center'}}>Priority</div>
+          <div style={{textAlign:'center'}}>Due date</div>
           <div/>
         </div>
 
@@ -620,10 +658,17 @@ export function MyTasksView({
           {LIST_SECS.map(sec => {
             const secTasks = displayTasks.filter(t => sec.filter(t, today))
               .sort((a, b) => {
-                if (a.due_date && b.due_date) return a.due_date.localeCompare(b.due_date)
-                if (a.due_date) return -1
-                if (b.due_date) return 1
-                return 0
+                let cmp = 0
+                if (sortBy === 'due_date') {
+                  if (a.due_date && b.due_date) cmp = a.due_date.localeCompare(b.due_date)
+                  else if (a.due_date) cmp = -1
+                  else if (b.due_date) cmp = 1
+                } else if (sortBy === 'created_at') {
+                  cmp = (a.created_at ?? '').localeCompare(b.created_at ?? '')
+                } else if (sortBy === 'updated_at') {
+                  cmp = ((a as any).updated_at ?? '').localeCompare((b as any).updated_at ?? '')
+                }
+                return sortDir === 'asc' ? cmp : -cmp
               })
             if (secTasks.length === 0) return null
             return (
@@ -653,7 +698,7 @@ export function MyTasksView({
                   return (
                     <React.Fragment key={task.id}>
                     <div
-                      className="mytasks-row" style={{ display:'grid', gridTemplateColumns:'28px 22px 1fr 120px 130px 90px 100px 28px',
+                      className="mytasks-row" style={{ display:'grid', gridTemplateColumns:'28px 22px 1fr 100px 100px 80px 40px',
                         alignItems:'center', padding:'0 18px', minHeight:38,
                         borderBottom:`1px solid var(--border-light)`,
                         borderLeft:`3px solid ${typeAccent}`,
@@ -726,18 +771,22 @@ export function MyTasksView({
                           (() => {
                             const assignee = task.assignee as {id:string;name:string}|null
                             return assignee ? (
-                              <>
-                                <Avatar name={assignee.name} size="xs"/>
-                                <span style={{ fontSize:12, color:'var(--text-muted)', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{assignee.name}</span>
-                              </>
+                              <span style={{ display:'inline-flex', alignItems:'center', padding:'2px 8px', borderRadius:99,
+                                background:'var(--surface-subtle)', border:'1px solid var(--border)',
+                                fontSize:11, fontWeight:500, color:'var(--text-secondary)',
+                                maxWidth:88, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
+                                {assignee.name.split(' ')[0]}
+                              </span>
                             ) : <span style={{ fontSize:12, color:'var(--text-muted)' }}>—</span>
                           })()
                         ) : (
                           creator ? (
-                            <>
-                              <User style={{ width:11, height:11, color:'var(--text-muted)', flexShrink:0 }}/>
-                              <span style={{ fontSize:12, color:'var(--text-muted)', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{creator.name}</span>
-                            </>
+                            <span style={{ display:'inline-flex', alignItems:'center', padding:'2px 8px', borderRadius:99,
+                              background:'var(--surface-subtle)', border:'1px solid var(--border)',
+                              fontSize:11, fontWeight:500, color:'var(--text-secondary)',
+                              maxWidth:88, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
+                              {creator.name.split(' ')[0]}
+                            </span>
                           ) : <span style={{ fontSize:12, color:'var(--text-muted)' }}>—</span>
                         )}
                       </div>
@@ -746,12 +795,12 @@ export function MyTasksView({
                         fontWeight: (task.due_date===today||ov)?600:400 }}>
                         {task.due_date ? fmtDate(task.due_date) : '—'}
                       </div>
-                      <div className="hide-mobile" style={{ display:'flex', justifyContent:'center' }}>
-                        <PriorityBadge priority={task.priority}/>
-                      </div>
-                      {/* Delete — last grid cell, always in layout but invisible until hover */}
-                      <div style={{ display:'flex', alignItems:'center', justifyContent:'center' }}
+                      {/* Delete — last grid cell, priority dot + delete button */}
+                      <div style={{ display:'flex', alignItems:'center', justifyContent:'flex-end', gap:4 }}
                         onClick={e => e.stopPropagation()}>
+                        <div title={task.priority}
+                          style={{ width:8, height:8, borderRadius:'50%', flexShrink:0,
+                            background: PRIORITY_CONFIG[task.priority]?.color ?? '#94a3b8' }}/>
                         {canManage && (
                           <button onClick={() => deleteTask(task.id)} title="Delete task"
                             className="delete-task-btn"
@@ -870,7 +919,7 @@ export function MyTasksView({
                   return (
                     <React.Fragment key={task.id}>
                     <div
-                      className="mytasks-row" style={{ display:'grid', gridTemplateColumns:'28px 22px 1fr 120px 130px 90px 100px 28px',
+                      className="mytasks-row" style={{ display:'grid', gridTemplateColumns:'28px 22px 1fr 100px 100px 80px 40px',
                         alignItems:'center', padding:'0 18px', minHeight:38,
                         borderBottom:`1px solid var(--border-light)`,
                         background:'var(--surface)', cursor:'pointer', opacity:0.7 }}
@@ -893,20 +942,22 @@ export function MyTasksView({
                       </div>
                       <div className="hide-mobile" style={{ display:'flex', alignItems:'center', gap:5, overflow:'hidden' }}>
                         {creator ? (
-                          <>
-                            <User style={{ width:11, height:11, color:'var(--text-muted)', flexShrink:0 }}/>
-                            <span style={{ fontSize:12, color:'var(--text-muted)', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{creator.name}</span>
-                          </>
+                          <span style={{ display:'inline-flex', alignItems:'center', padding:'2px 8px', borderRadius:99,
+                            background:'var(--surface-subtle)', border:'1px solid var(--border)',
+                            fontSize:11, fontWeight:500, color:'var(--text-secondary)',
+                            maxWidth:88, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
+                            {creator.name.split(' ')[0]}
+                          </span>
                         ) : <span style={{ fontSize:12, color:'var(--text-muted)' }}>—</span>}
                       </div>
                       <div style={{ textAlign:'center', fontSize:13, color:'var(--text-muted)' }}>
                         {task.due_date ? fmtDate(task.due_date) : '—'}
                       </div>
-                      <div className="hide-mobile" style={{ display:'flex', justifyContent:'center' }}>
-                        <PriorityBadge priority={task.priority}/>
-                      </div>
-                      <div style={{ display:'flex', alignItems:'center', justifyContent:'center' }}
+                      <div style={{ display:'flex', alignItems:'center', justifyContent:'flex-end', gap:4 }}
                         onClick={e => e.stopPropagation()}>
+                        <div title={task.priority}
+                          style={{ width:8, height:8, borderRadius:'50%', flexShrink:0,
+                            background: PRIORITY_CONFIG[task.priority]?.color ?? '#94a3b8' }}/>
                         {canManage && (
                           <button onClick={() => deleteTask(task.id)} title="Delete task"
                             className="delete-task-btn"
