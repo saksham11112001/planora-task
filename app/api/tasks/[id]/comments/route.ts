@@ -3,6 +3,21 @@ import { NextResponse } from 'next/server'
 import { inngest }       from '@/lib/inngest/client'
 import type { NextRequest } from 'next/server'
 
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+  const { data: mb } = await supabase.from('org_members').select('org_id').eq('user_id', user.id).eq('is_active', true).single()
+  if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
+  const { data, error } = await supabase.from('task_comments')
+    .select('id, content, created_at, author:users!task_comments_author_id_fkey(id, name)')
+    .eq('task_id', id).eq('org_id', mb.org_id)
+    .order('created_at', { ascending: true })
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ data: data ?? [] })
+}
+
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createClient()

@@ -1,8 +1,8 @@
 'use client'
 import Link from 'next/link'
-import { useState, useTransition, useEffect, useRef } from 'react'
+import React, { useState, useTransition, useEffect, useRef } from 'react'
 import { useRouter }    from 'next/navigation'
-import { Filter, SortAsc, Plus, CheckCheck, Clock, DollarSign, Trash2, BookmarkPlus } from 'lucide-react'
+import { Filter, SortAsc, Plus, CheckCheck, Clock, DollarSign, Trash2, BookmarkPlus, Copy } from 'lucide-react'
 import { InlineTaskRow }   from '@/components/tasks/InlineTaskRow'
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
 import { PriorityBadge, Avatar }   from '@/components/ui/Badge'
@@ -67,6 +67,7 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
   const [sortOpen,          setSortOpen]          = useState(false)
   const [savingTemplate,    setSavingTemplate]    = useState(false)
   const [templateSavedMsg,  setTemplateSavedMsg]  = useState('')
+  const [cloning,           setCloning]           = useState(false)
   // Close filter/sort dropdowns on outside click
   useEffect(() => {
     function close(e: MouseEvent) {
@@ -187,6 +188,7 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
       body: JSON.stringify({ title: title.trim(), parent_task_id: parentId, status: 'todo', priority: 'medium' }),
     })
     if (res.ok) {
+      setNewSubInputs(p => ({ ...p, [parentId]: '' }))
       const r = await fetch(`/api/tasks?parent_id=${parentId}&limit=50`)
       const d = await r.json()
       setSubtaskData(p => ({ ...p, [parentId]: d.data ?? [] }))
@@ -306,6 +308,18 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
       toast.success(`"${project.name}" saved as org template ✓`)
       setTimeout(() => setTemplateSavedMsg(''), 4000)
     } catch { toast.error('Network error') } finally { setSavingTemplate(false) }
+  }
+
+  async function handleClone() {
+    if (!confirm(`Clone "${project.name}"? A copy with all tasks will be created.`)) return
+    setCloning(true)
+    try {
+      const res = await fetch(`/api/projects/${project.id}/clone`, { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) { toast.error(data.error ?? 'Could not clone project'); return }
+      toast.success(`Project cloned — ${data.task_count} tasks copied ✓`)
+      router.push(`/projects/${data.id}`)
+    } catch { toast.error('Network error') } finally { setCloning(false) }
   }
 
   function TaskRow({ task }: { task: Task }) {
@@ -499,7 +513,7 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
               onChange={e => setNewSubInputs(p => ({...p, [task.id]: e.target.value}))}
               onKeyDown={e => {
                 if (e.key === 'Enter' && (newSubInputs[task.id] ?? '').trim()) {
-                  addSubtaskInline(task.id, newSubInput)
+                  addSubtaskInline(task.id, newSubInputs[task.id])
                   setNewSubInputs(p => ({...p, [task.id]: ''}))
                 }
                 if (e.key === 'Escape') setNewSubInputs(p => ({...p, [task.id]: ''}))
@@ -609,15 +623,26 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
                 </div>
 
                 {canManage && (
-                  <button
-                    onClick={handleSaveAsTemplate}
-                    disabled={savingTemplate}
-                    className="toolbar-btn"
-                    style={{ marginLeft: 'auto', color: templateSavedMsg ? '#16a34a' : 'var(--brand)', background: templateSavedMsg ? 'rgba(22,163,74,0.08)' : 'var(--brand-light)', borderColor: templateSavedMsg ? '#16a34a' : 'var(--brand-border)', opacity: savingTemplate ? 0.6 : 1 }}
-                    title="Save current tasks as a reusable org template">
-                    <BookmarkPlus className="h-3.5 w-3.5"/>
-                    {savingTemplate ? 'Saving…' : templateSavedMsg ? templateSavedMsg : 'Save as template'}
-                  </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto' }}>
+                    <button
+                      onClick={handleClone}
+                      disabled={cloning}
+                      className="toolbar-btn"
+                      style={{ opacity: cloning ? 0.6 : 1 }}
+                      title="Clone this project with all its tasks">
+                      <Copy className="h-3.5 w-3.5"/>
+                      {cloning ? 'Cloning…' : 'Clone project'}
+                    </button>
+                    <button
+                      onClick={handleSaveAsTemplate}
+                      disabled={savingTemplate}
+                      className="toolbar-btn"
+                      style={{ color: templateSavedMsg ? '#16a34a' : 'var(--brand)', background: templateSavedMsg ? 'rgba(22,163,74,0.08)' : 'var(--brand-light)', borderColor: templateSavedMsg ? '#16a34a' : 'var(--brand-border)', opacity: savingTemplate ? 0.6 : 1 }}
+                      title="Save current tasks as a reusable org template">
+                      <BookmarkPlus className="h-3.5 w-3.5"/>
+                      {savingTemplate ? 'Saving…' : templateSavedMsg ? templateSavedMsg : 'Save as template'}
+                    </button>
+                  </div>
                 )}
 
                 {/* Sort button */}
@@ -679,7 +704,7 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
                   </button>
                   {!isCollapsed && (
                     <>
-                      {section.tasks.map(t => <TaskRow key={t.id} task={t}/>)}
+                      {section.tasks.map(t => <React.Fragment key={t.id}>{TaskRow({ task: t })}</React.Fragment>)}
                       {section.creator && canManage && (
                         <InlineTaskRow projectId={project.id} projectOwnerId={projectOwnerId} defaultClientId={defaultClientId} members={members} clients={clients}
                           currentUserId={currentUserId} defaultStatus="todo" onCreated={(newTask) => {

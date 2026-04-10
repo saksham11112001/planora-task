@@ -4,16 +4,17 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 interface Member { id: string; name: string }
 
 interface Props {
-  value:       string
-  onChange:    (val: string) => void
-  onKeyDown?:  (e: React.KeyboardEvent<HTMLTextAreaElement>) => void
-  members:     Member[]
+  value:        string
+  onChange:     (val: string) => void
+  onKeyDown?:   (e: React.KeyboardEvent<HTMLTextAreaElement>) => void
+  members:      Member[]
   placeholder?: string
-  rows?:       number
-  className?:  string
+  rows?:        number
+  className?:   string
+  style?:       React.CSSProperties
 }
 
-export function MentionTextarea({ value, onChange, onKeyDown, members, placeholder, rows = 2, className }: Props) {
+export function MentionTextarea({ value, onChange, onKeyDown, members, placeholder, rows = 2, className, style }: Props) {
   const ref          = useRef<HTMLTextAreaElement>(null)
   const [show,       setShow]       = useState(false)
   const [query,      setQuery]      = useState('')
@@ -93,7 +94,7 @@ export function MentionTextarea({ value, onChange, onKeyDown, members, placehold
         placeholder={placeholder}
         rows={rows}
         className={className}
-        style={{ resize: 'none' }}
+        style={{ resize: 'none', ...style }}
       />
       {show && filtered.length > 0 && (
         <div style={{

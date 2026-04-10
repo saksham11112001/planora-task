@@ -50,6 +50,9 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
   const [comment,     setComment]     = useState('')
   const [sending,     setSending]     = useState(false)
   const [tab,         setTab]         = useState<'details' | 'subtasks' | 'attachments' | 'comments' | 'time'>('details')
+  const [comments,        setComments]        = useState<any[]>([])
+  const [commentsLoaded,  setCommentsLoaded]  = useState(false)
+  const [loadingComments, setLoadingComments] = useState(false)
   const [customFieldDefs, setCustomFieldDefs] = useState<CustomFieldDef[]>([])
 
   const [subtasks,      setSubtasks]      = useState<any[]>([])
@@ -93,6 +96,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     if (!task) return
     setSubtasksLoaded(false); setAttLoaded(false)
     setSubtasks([]); setAttachments([]); setCaHeaders([])
+    setComments([]); setCommentsLoaded(false)
     setTitle(task.title)
     setDescription(task.description ?? '')
     setStatus(task.status)
@@ -446,17 +450,56 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     setUploading(false)
   }
 
+  async function fetchComments(taskId: string) {
+    setLoadingComments(true)
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/comments`)
+      if (res.ok) {
+        const d = await res.json()
+        setComments(d.data ?? [])
+        setCommentsLoaded(true)
+      }
+    } finally {
+      setLoadingComments(false)
+    }
+  }
+
+  // Load comments when comments tab is opened or task changes
+  useEffect(() => {
+    if (tab === 'comments' && task?.id) {
+      setCommentsLoaded(false)
+      fetchComments(task.id)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, task?.id])
+
   async function sendComment() {
     if (!comment.trim() || !task) return
     setSending(true)
-    await fetch(`/api/tasks/${task.id}/comments`, {
+    const myName = members.find(m => m.id === currentUserId)?.name ?? 'You'
+    // Optimistic: add immediately
+    const optimistic = {
+      id: `temp-${Date.now()}`,
+      content: comment.trim(),
+      created_at: new Date().toISOString(),
+      author: { id: currentUserId, name: myName },
+    }
+    setComments(prev => [...prev, optimistic])
+    setComment('')
+    const res = await fetch(`/api/tasks/${task.id}/comments`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: comment.trim() }),
+      body: JSON.stringify({ content: optimistic.content }),
     })
-    setComment('')
     setSending(false)
-    onUpdated?.()
+    if (res.ok) {
+      // Replace optimistic with real data
+      fetchComments(task.id)
+    } else {
+      // Roll back
+      setComments(prev => prev.filter(c => c.id !== optimistic.id))
+      toast.error('Could not post comment')
+    }
   }
 
   const isCompleted = status === 'completed'
@@ -1121,8 +1164,13 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                     <MentionTextarea
                       value={comment}
                       onChange={setComment}
-                      onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) sendComment() }}
-                      placeholder="Write a comment... (Cmd+Enter to send, @ to mention)"
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault()
+                          sendComment()
+                        }
+                      }}
+                      placeholder="Write a comment… (Enter to send, Shift+Enter for new line, @ to mention)"
                       rows={2}
                       members={members}
                       className="w-full text-sm rounded-lg px-3 py-2 outline-none transition-all"
@@ -1130,26 +1178,31 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                         border: '1px solid var(--border)',
                         background: 'var(--surface-subtle)',
                         color: 'var(--text-primary)',
-                      } as React.CSSProperties}
+                      }}
                     />
                     {comment.trim() && (
                       <button onClick={sendComment} disabled={sending}
                         className="mt-1.5 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white rounded-lg transition-colors disabled:opacity-50"
                         style={{ background: 'var(--brand)' }}>
-                        <Send className="h-3 w-3" />{sending ? 'Sending...' : 'Send'}
+                        <Send className="h-3 w-3" />{sending ? 'Sending…' : 'Send'}
                       </button>
                     )}
                   </div>
                 </div>
-                {task.comments && (task.comments as any[]).length > 0 ? (
+                {loadingComments && !comments.length && (
+                  <p className="text-xs text-center py-4" style={{ color: 'var(--text-muted)' }}>Loading…</p>
+                )}
+                {comments.length > 0 ? (
                   <div className="space-y-3 mb-4">
-                    {(task.comments as any[]).sort((a,b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()).map((cm: any) => (
+                    {comments.map((cm: any) => (
                       <div key={cm.id} className="flex gap-3">
                         <Avatar name={cm.author?.name ?? '?'} size="sm" />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-baseline gap-2 mb-1">
                             <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{cm.author?.name ?? 'Unknown'}</span>
-                            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{new Date(cm.created_at).toLocaleDateString('en-IN', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })}</span>
+                            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                              {new Date(cm.created_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true })}
+                            </span>
                           </div>
                           <div className="text-sm rounded-lg px-3 py-2 leading-relaxed whitespace-pre-wrap"
                             style={{ color: 'var(--text-primary)', background: 'var(--surface-subtle)', border: '1px solid var(--border-light)' }}>
@@ -1160,7 +1213,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-center py-6 mb-4" style={{ color: 'var(--text-muted)' }}>No comments yet — be the first to add one</p>
+                  !loadingComments && <p className="text-xs text-center py-6 mb-4" style={{ color: 'var(--text-muted)' }}>No comments yet — be the first to add one</p>
                 )}
               </div>
             )}

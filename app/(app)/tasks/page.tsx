@@ -28,10 +28,9 @@ export default async function MyTasksPage() {
       { data: clientsData },   // single clients fetch — includes status for filter
       { data: assignedByMeRaw },
     ] = await Promise.all([
-      // My tasks (assigned to me, all statuses)
+      // My tasks (assigned to me, all statuses — includes subtasks assigned to me)
       supabase.from('tasks').select(TASK_COLS)
         .eq('org_id', mb.org_id).eq('assignee_id', user.id).neq('is_archived', true)
-        .is('parent_task_id', null)
         .order('due_date', { ascending: true, nullsFirst: false }),
 
       // Tasks needing my approval

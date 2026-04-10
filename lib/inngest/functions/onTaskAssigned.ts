@@ -1,5 +1,4 @@
 import { inngest }               from '../client'
-import { acquireEmailSlot }      from '@/lib/email/gate'
 import { createAdminClient }     from '@/lib/supabase/admin'
 import { sendTaskAssignedEmail } from '@/lib/email/send'
 import { waTaskAssigned }        from '@/lib/whatsapp/send'
@@ -36,8 +35,7 @@ export const onTaskAssigned = inngest.createFunction(
         })
         results.push('queued_for_digest')
       } else {
-      const canSend = await acquireEmailSlot(d.assignee_id, 'task_assigned')
-      if (canSend) {
+        // Immediate mode — send every assignment email, no daily cap
         await sendTaskAssignedEmail({
           to:           d.assignee_email,
           assigneeName: d.assignee_email.split('@')[0],
@@ -50,7 +48,6 @@ export const onTaskAssigned = inngest.createFunction(
         })
         results.push('email_sent')
       }
-      } // end else (immediate mode)
     }
 
     if (sendWhatsApp && d.assignee_phone) {
