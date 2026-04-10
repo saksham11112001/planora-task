@@ -114,12 +114,15 @@ export function MyTasksView({
   const LIST_DONE_PAGE = 5
   const [subtaskMap,     setSubtaskMap]     = useState<Record<string, any[]>>({})
   const [expandedTasks,  setExpandedTasks]  = useState<Set<string>>(new Set())
+  const [subInputs,      setSubInputs]      = useState<Record<string,string>>({})
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
   const [groupPages,      setGroupPages]      = useState<Record<string, number>>({})
   const [showAssignedByMe, setShowAssignedByMe] = useState(false)
   const [sortBy, setSortBy] = useState<'due_date'|'created_at'|'updated_at'>('due_date')
   const [sortDir, setSortDir] = useState<'asc'|'desc'>('asc')
   const [sortOpen, setSortOpen] = useState(false)
+  // Inline editing: maps taskId → field name being edited
+  const [inlineEdit, setInlineEdit] = useState<{taskId:string;field:string}|null>(null)
 
   function toggleGroup(key: string) {
     setCollapsedGroups(prev => { const s = new Set(prev); s.has(key) ? s.delete(key) : s.add(key); return s })
@@ -418,6 +421,26 @@ export function MyTasksView({
       refresh()
     } else {
       toast.success('Moved to Trash')
+    }
+  }
+
+  async function patchTaskField(taskId: string, field: string, value: unknown) {
+    setInlineEdit(null)
+    const prev = tasks.find(t => t.id === taskId)
+    // Optimistic update in both task lists
+    const applyUpdate = (t: Task) => t.id === taskId ? { ...t, [field]: value } as Task : t
+    setTasks(p => p.map(applyUpdate))
+    setAssignedByMeList(p => p.map(applyUpdate))
+    const res = await fetch(`/api/tasks/${taskId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [field]: value }),
+    })
+    if (!res.ok && prev) {
+      // rollback
+      const rollback = (t: Task) => t.id === taskId ? prev : t
+      setTasks(p => p.map(rollback))
+      setAssignedByMeList(p => p.map(rollback))
+      toast.error('Could not update task')
     }
   }
 
@@ -724,12 +747,13 @@ export function MyTasksView({
             )}
           </div>
         </div>
-        {/* Column headers — 7 cols (no priority) */}
-        <div style={{ display:'grid', gridTemplateColumns:'28px 22px 1fr 90px 90px 72px 40px',
+        {/* Column headers — 8 cols: checkbox | circle | expand | title | assignee | client | due | actions */}
+        <div style={{ display:'grid', gridTemplateColumns:'28px 22px 18px 1fr 90px 90px 72px 40px',
           alignItems:'center', padding:'5px 18px', borderBottom:`1px solid var(--border)`,
           background:'var(--surface-subtle)', flexShrink:0, fontSize:10, fontWeight:700,
           color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.06em' }}>
-          <div/><div/><div>Task name</div>
+          <div/><div/><div/>
+          <div>Task name</div>
           <div>{showAssignedByMe ? 'Assignee' : 'Assigned by'}</div>
           <div>Client</div>
           <div style={{textAlign:'center'}}>Due date</div>
@@ -785,7 +809,7 @@ export function MyTasksView({
                   return (
                     <React.Fragment key={task.id}>
                     <div
-                      className="mytasks-row" style={{ display:'grid', gridTemplateColumns:'28px 22px 1fr 90px 90px 72px 40px',
+                      className="mytasks-row" style={{ display:'grid', gridTemplateColumns:'28px 22px 18px 1fr 90px 90px 72px 40px',
                         alignItems:'center', padding:'0 18px', minHeight:38,
                         borderBottom:`1px solid var(--border-light)`,
                         borderLeft:`3px solid ${typeAccent}`,
@@ -796,6 +820,31 @@ export function MyTasksView({
                         onChange={() => setChecked(p => { const s=new Set(p); s.has(task.id)?s.delete(task.id):s.add(task.id); return s })}
                         onClick={e => e.stopPropagation()} style={{ accentColor:'var(--brand)', width:13, height:13 }}/>
                       <CircleBtn task={task}/>
+                      {/* Expand button — toggle subtasks inline */}
+                      <button
+                        onClick={async e => {
+                          e.stopPropagation()
+                          setExpandedTasks(prev => { const s=new Set(prev); s.has(task.id)?s.delete(task.id):s.add(task.id); return s })
+                          if (!subtaskMap[task.id]) {
+                            const r = await fetch(`/api/tasks?parent_id=${task.id}&limit=50`)
+                            const d = await r.json()
+                            setSubtaskMap(p => ({ ...p, [task.id]: d.data ?? [] }))
+                          }
+                        }}
+                        title="Subtasks"
+                        style={{ width:16, height:16, display:'flex', alignItems:'center', justifyContent:'center',
+                          border:'none', background:'transparent', cursor:'pointer', padding:0, borderRadius:3,
+                          color: expandedTasks.has(task.id) ? 'var(--brand)' : 'var(--text-muted)',
+                          fontSize:9, fontWeight:700, transition:'color 0.1s', flexShrink:0 }}
+                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.color='var(--brand)'}
+                        onMouseLeave={e => (e.currentTarget as HTMLElement).style.color=expandedTasks.has(task.id)?'var(--brand)':'var(--text-muted)'}>
+                        {expandedTasks.has(task.id) ? '▼' : '▶'}
+                        {(subtaskMap[task.id]??[]).length > 0 && (
+                          <span style={{ fontSize:8, marginLeft:1, opacity:0.7 }}>
+                            {(subtaskMap[task.id]??[]).filter((s:any)=>s.status==='completed').length}/{(subtaskMap[task.id]??[]).length}
+                          </span>
+                        )}
+                      </button>
                       <div style={{ minWidth:0, overflow:'hidden' }}>
                         <div style={{ fontSize:13,
                           color: task.status==='completed'?'#94a3b8':isPending?'#7c3aed':ov?'#dc2626':'var(--text-primary)',
@@ -843,19 +892,33 @@ export function MyTasksView({
                           </span>}
                         </div>
                       </div>
-                      {/* Assigned by / Assignee column — now first */}
-                      <div className="hide-mobile" style={{ display:'flex', alignItems:'center', gap:5, overflow:'hidden' }}>
-                        {showAssignedByMe ? (
+                      {/* Assignee column — inline editable for managers */}
+                      <div className="hide-mobile" style={{ display:'flex', alignItems:'center', gap:5, overflow:'hidden' }}
+                        onClick={e => { e.stopPropagation(); if (canManage) setInlineEdit({taskId:task.id,field:'assignee_id'}) }}>
+                        {inlineEdit?.taskId===task.id && inlineEdit.field==='assignee_id' ? (
+                          <select autoFocus defaultValue={task.assignee_id ?? ''}
+                            onChange={e => patchTaskField(task.id,'assignee_id',e.target.value||null)}
+                            onBlur={() => setInlineEdit(null)}
+                            onClick={e => e.stopPropagation()}
+                            style={{ fontSize:11, padding:'2px 5px', borderRadius:6, border:'1px solid var(--brand)',
+                              background:'var(--surface)', color:'var(--text-primary)', outline:'none',
+                              fontFamily:'inherit', maxWidth:84, cursor:'pointer' }}>
+                            <option value="">Unassigned</option>
+                            {members.map(m => <option key={m.id} value={m.id}>{m.name.split(' ')[0]}</option>)}
+                          </select>
+                        ) : showAssignedByMe ? (
                           (() => {
                             const assignee = task.assignee as {id:string;name:string}|null
                             return assignee ? (
-                              <span style={{ display:'inline-flex', alignItems:'center', padding:'2px 7px', borderRadius:99,
+                              <span title={canManage ? 'Click to reassign' : undefined}
+                                style={{ display:'inline-flex', alignItems:'center', padding:'2px 7px', borderRadius:99,
                                 background:'var(--surface-subtle)', border:'1px solid var(--border)',
                                 fontSize:11, fontWeight:500, color:'var(--text-secondary)',
-                                maxWidth:84, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
+                                maxWidth:84, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis',
+                                cursor: canManage ? 'pointer' : 'default' }}>
                                 {assignee.name.split(' ')[0]}
                               </span>
-                            ) : <span style={{ fontSize:12, color:'var(--text-muted)' }}>—</span>
+                            ) : <span style={{ fontSize:12, color:'var(--text-muted)', cursor: canManage?'pointer':'default' }}>—</span>
                           })()
                         ) : (
                           creator ? (
@@ -868,19 +931,47 @@ export function MyTasksView({
                           ) : <span style={{ fontSize:12, color:'var(--text-muted)' }}>—</span>
                         )}
                       </div>
-                      {/* Client column — now second */}
-                      <div className="hide-mobile" style={{ display:'flex', alignItems:'center', gap:4, overflow:'hidden', paddingRight:4 }}>
-                        {client ? (
+                      {/* Client column — inline editable for managers */}
+                      <div className="hide-mobile" style={{ display:'flex', alignItems:'center', gap:4, overflow:'hidden', paddingRight:4 }}
+                        onClick={e => { e.stopPropagation(); if (canManage) setInlineEdit({taskId:task.id,field:'client_id'}) }}>
+                        {inlineEdit?.taskId===task.id && inlineEdit.field==='client_id' ? (
+                          <select autoFocus defaultValue={task.client_id ?? ''}
+                            onChange={e => patchTaskField(task.id,'client_id',e.target.value||null)}
+                            onBlur={() => setInlineEdit(null)}
+                            onClick={e => e.stopPropagation()}
+                            style={{ fontSize:11, padding:'2px 5px', borderRadius:6, border:'1px solid var(--brand)',
+                              background:'var(--surface)', color:'var(--text-primary)', outline:'none',
+                              fontFamily:'inherit', maxWidth:84, cursor:'pointer' }}>
+                            <option value="">No client</option>
+                            {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                          </select>
+                        ) : client ? (
                           <>
                             <span style={{ width:7, height:7, borderRadius:2, background:client.color, flexShrink:0, display:'inline-block' }}/>
-                            <span style={{ fontSize:12, color:'var(--text-muted)', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{client.name}</span>
+                            <span title={canManage ? 'Click to change client' : undefined}
+                              style={{ fontSize:12, color:'var(--text-muted)', overflow:'hidden', whiteSpace:'nowrap',
+                                textOverflow:'ellipsis', cursor: canManage?'pointer':'default' }}>{client.name}</span>
                           </>
-                        ) : <span style={{ fontSize:12, color:'var(--text-muted)' }}>—</span>}
+                        ) : <span style={{ fontSize:12, color:'var(--text-muted)', cursor: canManage?'pointer':'default' }}>—</span>}
                       </div>
+                      {/* Due date — inline editable for managers */}
                       <div className="hide-mobile" style={{ textAlign:'center', fontSize:12,
                         color: task.due_date===today?'var(--brand)':ov?'#dc2626':'var(--text-muted)',
-                        fontWeight: (task.due_date===today||ov)?600:400 }}>
-                        {task.due_date ? fmtDate(task.due_date) : '—'}
+                        fontWeight: (task.due_date===today||ov)?600:400,
+                        cursor: canManage ? 'pointer' : 'default' }}
+                        onClick={e => { e.stopPropagation(); if (canManage) setInlineEdit({taskId:task.id,field:'due_date'}) }}>
+                        {inlineEdit?.taskId===task.id && inlineEdit.field==='due_date' ? (
+                          <input autoFocus type="date" defaultValue={task.due_date ?? ''}
+                            onChange={e => patchTaskField(task.id,'due_date',e.target.value||null)}
+                            onBlur={() => setInlineEdit(null)}
+                            onClick={e => e.stopPropagation()}
+                            style={{ fontSize:11, padding:'1px 4px', borderRadius:5, border:'1px solid var(--brand)',
+                              background:'var(--surface)', outline:'none', colorScheme:'light dark', fontFamily:'inherit' }}/>
+                        ) : (
+                          <span title={canManage ? 'Click to change due date' : undefined}>
+                            {task.due_date ? fmtDate(task.due_date) : '—'}
+                          </span>
+                        )}
                       </div>
                       {/* Delete — last grid cell, priority dot + delete button */}
                       <div style={{ display:'flex', alignItems:'center', justifyContent:'flex-end', gap:4 }}
@@ -901,12 +992,12 @@ export function MyTasksView({
                         )}
                       </div>
                     </div>
-                    {/* Inline subtasks */}
-                    {expandedTasks.has(task.id) && (subtaskMap[task.id] ?? []).length > 0 && (
+                    {/* Inline subtasks — shown when expanded */}
+                    {expandedTasks.has(task.id) && (
                       <div style={{ background:'var(--surface-subtle)', borderBottom:'1px solid var(--border-light)' }}>
                         {(subtaskMap[task.id] ?? []).map((sub: any) => (
                           <div key={sub.id} style={{ display:'flex', alignItems:'center', gap:8,
-                            padding:'4px 18px 4px 60px', borderBottom:'1px solid var(--border-light)' }}>
+                            padding:'4px 18px 4px 68px', borderBottom:'1px solid var(--border-light)' }}>
                             <button onClick={async e => {
                               e.stopPropagation()
                               const newStatus = sub.status === 'completed' ? 'todo' : 'completed'
@@ -937,6 +1028,14 @@ export function MyTasksView({
                             <span style={{ flex:1, fontSize:11,
                               color: sub.status==='completed'?'var(--text-muted)':'var(--text-primary)',
                               textDecoration: sub.status==='completed'?'line-through':'none' }}>{sub.title}</span>
+                            {sub.assignee_id && (
+                              <span style={{ fontSize:10, color:'var(--text-muted)', flexShrink:0 }}>
+                                {members.find(m=>m.id===sub.assignee_id)?.name.split(' ')[0] ?? ''}
+                              </span>
+                            )}
+                            {sub.due_date && (
+                              <span style={{ fontSize:10, color:'var(--text-muted)', flexShrink:0 }}>{fmtDate(sub.due_date)}</span>
+                            )}
                             {sub.status !== 'completed' && (
                               <label style={{ cursor:'pointer', flexShrink:0, display:'flex', alignItems:'center',
                                 gap:3, padding:'1px 6px', borderRadius:99, fontSize:10, fontWeight:600,
@@ -956,6 +1055,34 @@ export function MyTasksView({
                             )}
                           </div>
                         ))}
+                        {/* Inline add subtask row */}
+                        {canManage && (
+                          <div style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 18px 5px 68px' }}
+                            onClick={e => e.stopPropagation()}>
+                            <div style={{ width:13, height:13, borderRadius:'50%', flexShrink:0,
+                              border:'1.5px dashed var(--brand)', opacity:0.4 }}/>
+                            <input
+                              value={subInputs[task.id] ?? ''}
+                              onChange={e => setSubInputs(p => ({ ...p, [task.id]: e.target.value }))}
+                              onKeyDown={async e => {
+                                const val = subInputs[task.id] ?? ''
+                                if (e.key==='Enter' && val.trim()) {
+                                  setSubInputs(p => ({ ...p, [task.id]: '' }))
+                                  const r = await fetch('/api/tasks', {
+                                    method:'POST', headers:{'Content-Type':'application/json'},
+                                    body: JSON.stringify({ title:val.trim(), parent_task_id:task.id,
+                                      assignee_id:task.assignee_id||null, project_id:task.project_id||null })
+                                  })
+                                  const d = await r.json()
+                                  if (r.ok && d.data) setSubtaskMap(p => ({ ...p, [task.id]: [...(p[task.id]??[]), d.data] }))
+                                }
+                                if (e.key==='Escape') setSubInputs(p => ({ ...p, [task.id]: '' }))
+                              }}
+                              placeholder="Add subtask… (Enter)"
+                              style={{ flex:1, fontSize:11, border:'none', outline:'none',
+                                background:'transparent', color:'var(--text-primary)', fontFamily:'inherit' }}/>
+                          </div>
+                        )}
                       </div>
                     )}
                     </React.Fragment>
@@ -1006,7 +1133,7 @@ export function MyTasksView({
                   return (
                     <React.Fragment key={task.id}>
                     <div
-                      className="mytasks-row" style={{ display:'grid', gridTemplateColumns:'28px 22px 1fr 90px 90px 72px 40px',
+                      className="mytasks-row" style={{ display:'grid', gridTemplateColumns:'28px 22px 18px 1fr 90px 90px 72px 40px',
                         alignItems:'center', padding:'0 18px', minHeight:38,
                         borderBottom:`1px solid var(--border-light)`,
                         background:'var(--surface)', cursor:'pointer', opacity:0.7 }}
@@ -1015,6 +1142,7 @@ export function MyTasksView({
                         onChange={() => setChecked(p => { const s=new Set(p); s.has(task.id)?s.delete(task.id):s.add(task.id); return s })}
                         onClick={e => e.stopPropagation()} style={{ accentColor:'var(--brand)', width:13, height:13 }}/>
                       <CircleBtn task={task}/>
+                      <div/>
                       <div style={{ fontSize:13, color:'var(--text-muted)', textDecoration:'line-through',
                         overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis', paddingRight:8 }}>
                         {task.title}

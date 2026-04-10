@@ -44,12 +44,15 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
   const [assigneeId,  setAssigneeId]  = useState('')
   const [clientId,    setClientId]    = useState('')
   const [dueDate,     setDueDate]     = useState('')
-  const [estHours,    setEstHours]    = useState('')
   const [completing,  setCompleting]  = useState(false)
   const [approving,   setApproving]   = useState(false)
   const [comment,     setComment]     = useState('')
   const [sending,     setSending]     = useState(false)
-  const [tab,         setTab]         = useState<'details' | 'subtasks' | 'attachments' | 'comments' | 'time'>('details')
+  const [tab,         setTab]         = useState<'details' | 'attachments' | 'comments' | 'time'>('details')
+  const [subtasksOpen,    setSubtasksOpen]    = useState(true)
+  const [blockingSearch,  setBlockingSearch]  = useState('')
+  const [blockingResults, setBlockingResults] = useState<{id:string;title:string}[]>([])
+  const [blockingTasks,   setBlockingTasks]   = useState<{id:string;title:string}[]>([])
   const [comments,        setComments]        = useState<any[]>([])
   const [commentsLoaded,  setCommentsLoaded]  = useState(false)
   const [loadingComments, setLoadingComments] = useState(false)
@@ -72,16 +75,15 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
   const [aiLoading, setAiLoading] = useState(false)
   const [isSaving,  setIsSaving]  = useState(false)
   const [converting, setConverting] = useState(false)
-  const [showConvert, setShowConvert] = useState(false)
   const titleRef = useRef<HTMLTextAreaElement>(null)
 
-  // Fallback: if pre-fetch didn't load yet, load on tab switch
+  // Fallback: if pre-fetch didn't load yet, load on tab switch or on open
   useEffect(() => {
     if (!task) return
-    if (tab === 'subtasks' && !subtasksLoaded) loadSubtasks(task.id)
-    if (tab === 'attachments' && !attLoaded)   loadAttachments(task.id)
+    if (!subtasksLoaded) loadSubtasks(task.id)
+    if (tab === 'attachments' && !attLoaded) loadAttachments(task.id)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, task?.id])
+  }, [tab, task?.id, subtasksLoaded])
 
   /* load org custom field definitions once on mount */
   useEffect(() => {
@@ -104,8 +106,19 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     setAssigneeId(task.assignee_id ?? '')
     setClientId(task.client_id ?? '')
     setDueDate(task.due_date ?? '')
-    setEstHours(task.estimated_hours?.toString() ?? '')
     setTab('details')
+    setBlockingTasks([])
+    setBlockingSearch('')
+    setBlockingResults([])
+
+    // Load blocking task titles when task changes
+    if ((task as any).custom_fields?._blocked_by?.length) {
+      const ids: string[] = (task as any).custom_fields._blocked_by
+      Promise.all(ids.map(id => fetch(`/api/tasks/${id}`).then(r => r.json()).catch(() => null)))
+        .then(results => {
+          setBlockingTasks(results.filter(Boolean).map((d: any) => ({ id: d.data?.id, title: d.data?.title })).filter((t: any) => t.id))
+        })
+    }
 
     // Pre-fetch subtasks + attachments in parallel so all tabs are instant
     const taskId = task.id
@@ -384,6 +397,47 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     }
   }
 
+  async function searchBlockingTasks(q: string) {
+    if (!q.trim()) { setBlockingResults([]); return }
+    try {
+      const r = await fetch(`/api/search?q=${encodeURIComponent(q.trim())}`)
+      const d = await r.json()
+      setBlockingResults((d.data ?? []).filter((x: any) => x.type === 'task' && x.id !== task?.id).slice(0, 8).map((x: any) => ({ id: x.id, title: x.title })))
+    } catch {}
+  }
+
+  async function addBlockedBy(blockingTaskId: string) {
+    if (!task) return
+    const current: string[] = (task as any).custom_fields?._blocked_by ?? []
+    if (current.includes(blockingTaskId)) { setBlockingSearch(''); setBlockingResults([]); return }
+    const newBlockedBy = [...current, blockingTaskId]
+    setBlockingSearch(''); setBlockingResults([])
+    const res = await fetch(`/api/tasks/${task.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ custom_fields: { _blocked_by: newBlockedBy } }),
+    })
+    if (res.ok) {
+      const tr = await fetch(`/api/tasks/${blockingTaskId}`)
+      const td = await tr.json()
+      if (td.data) setBlockingTasks(p => [...p.filter(t => t.id !== blockingTaskId), { id: blockingTaskId, title: td.data.title }])
+      onUpdated?.({ custom_fields: { ...(task as any).custom_fields, _blocked_by: newBlockedBy } })
+      toast.success('Blocking task added')
+    } else toast.error('Failed to add dependency')
+  }
+
+  async function removeBlockedBy(blockingTaskId: string) {
+    if (!task) return
+    const newBlockedBy = ((task as any).custom_fields?._blocked_by ?? []).filter((id: string) => id !== blockingTaskId)
+    const res = await fetch(`/api/tasks/${task.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ custom_fields: { _blocked_by: newBlockedBy } }),
+    })
+    if (res.ok) {
+      onUpdated?.({ custom_fields: { ...(task as any).custom_fields, _blocked_by: newBlockedBy } })
+      toast.success('Dependency removed')
+    } else toast.error('Failed to remove dependency')
+  }
+
   async function loadAttachments(taskId: string) {
     if (attLoaded) return
     const r = await fetch(`/api/tasks/${taskId}/attachments`)
@@ -635,11 +689,225 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
               />
             </div>
 
+            {/* ── Subtasks (always-visible inline section) ── */}
+            <div style={{ borderBottom: '1px solid var(--border)' }}>
+              {/* Collapsible header */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 20px 6px',
+                borderBottom: subtasksOpen ? '1px solid var(--border-light)' : 'none' }}>
+                <button
+                  onClick={() => setSubtasksOpen(o => !o)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                    display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-muted)',
+                    fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em',
+                    fontFamily: 'inherit' }}>
+                  <span style={{ fontSize: 10 }}>{subtasksOpen ? '▾' : '▸'}</span>
+                  SUBTASKS
+                </button>
+                {subtasks.length > 0 && (
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ flex: 1, height: 3, background: 'var(--border-light)', borderRadius: 99, overflow: 'hidden' }}>
+                      <div style={{
+                        height: '100%', background: 'var(--brand)', borderRadius: 99,
+                        width: `${Math.round(subtasks.filter(s => s.status === 'completed').length / subtasks.length * 100)}%`,
+                        transition: 'width 0.3s ease',
+                      }}/>
+                    </div>
+                    <span style={{ fontSize: 10, color: 'var(--text-muted)', flexShrink: 0 }}>
+                      {subtasks.filter(s => s.status === 'completed').length}/{subtasks.length}
+                    </span>
+                  </div>
+                )}
+                {canEdit && (
+                  <button
+                    onClick={() => { setSubtasksOpen(true); }}
+                    title="Add subtask"
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px',
+                      color: 'var(--text-muted)', fontSize: 16, lineHeight: 1, fontFamily: 'inherit',
+                      display: 'flex', alignItems: 'center' }}>
+                    +
+                  </button>
+                )}
+              </div>
+
+              {subtasksOpen && (
+                <div style={{ padding: '4px 0' }}>
+                  {subtasks.length === 0 && (
+                    <div style={{ padding: '8px 20px 4px', textAlign: 'center' }}>
+                      <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>No subtasks yet</p>
+                    </div>
+                  )}
+                  <div>
+                    {subtasks.map(sub => {
+                      const subAssignee = sub.assignee_id ? members.find(m => m.id === sub.assignee_id) : null
+                      const canToggleSub = canEdit || sub.assignee_id === currentUserId
+                      return (
+                        <div key={sub.id}
+                          style={{ display: 'flex', alignItems: 'center', gap: 10,
+                            padding: '8px 20px', borderBottom: '1px solid var(--border-light)',
+                            background: 'var(--surface)' }}
+                          className="group">
+                          <button onClick={() => canToggleSub && toggleSubtask(sub)}
+                            style={{
+                              width: 16, height: 16, borderRadius: '50%', flexShrink: 0,
+                              border: `2px solid ${sub.status === 'completed' ? 'var(--brand)' : 'var(--border)'}`,
+                              background: sub.status === 'completed' ? 'var(--brand)' : 'transparent',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              cursor: canToggleSub ? 'pointer' : 'not-allowed',
+                              opacity: canToggleSub ? 1 : 0.4,
+                              padding: 0, transition: 'all 0.15s',
+                            }}>
+                            {sub.status === 'completed' && (
+                              <svg viewBox="0 0 10 10" fill="none" style={{ width: 8, height: 8 }}>
+                                <path d="M1.5 5L4 7.5L8.5 2.5" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
+                              </svg>
+                            )}
+                          </button>
+                          <span style={{
+                            flex: 1, fontSize: 13, lineHeight: 1.4,
+                            color: sub.status === 'completed' ? 'var(--text-muted)' : 'var(--text-primary)',
+                            textDecoration: sub.status === 'completed' ? 'line-through' : 'none',
+                          }}>
+                            {sub.title}
+                          </span>
+                          {subAssignee && (
+                            <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0,
+                              display:'flex', alignItems:'center', gap:4 }}>
+                              <span style={{ width:16, height:16, borderRadius:'50%', background:'var(--brand-light)',
+                                display:'flex', alignItems:'center', justifyContent:'center',
+                                fontSize:9, fontWeight:700, color:'var(--brand)', flexShrink:0 }}>
+                                {subAssignee.name[0]?.toUpperCase()}
+                              </span>
+                              <span>{subAssignee.name}</span>
+                            </span>
+                          )}
+                          {sub.due_date && (
+                            <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>
+                              {sub.due_date}
+                            </span>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  {/* Inline add subtask - title + assignee + due date on ONE row */}
+                  {canEdit && (
+                    <div style={{
+                      padding: '6px 20px',
+                      borderTop: subtasks.length > 0 ? '1px dashed var(--border)' : 'none',
+                      marginTop: subtasks.length === 0 ? 0 : 2,
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <div style={{
+                          width: 14, height: 14, borderRadius: '50%', flexShrink: 0,
+                          border: '2px dashed var(--brand)', opacity: 0.4,
+                        }}/>
+                        <input
+                          value={newSubtitle}
+                          onChange={e => setNewSubtitle(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter' && newSubtitle.trim()) addSubtask()
+                            if (e.key === 'Escape') { setNewSubtitle(''); setNewSubAssigneeId(''); setNewSubDueDate('') }
+                          }}
+                          placeholder="Add subtask…"
+                          style={{
+                            flex: 1, minWidth: 80, fontSize: 12, border: 'none', outline: 'none',
+                            background: 'transparent', color: 'var(--text-primary)', fontFamily: 'inherit',
+                          }}
+                        />
+                        <select
+                          value={newSubAssigneeId}
+                          onChange={e => setNewSubAssigneeId(e.target.value)}
+                          style={{
+                            fontSize: 11, padding: '3px 6px', borderRadius: 6, flexShrink: 0,
+                            border: '1px solid var(--border)', background: 'var(--surface-subtle)',
+                            color: newSubAssigneeId ? 'var(--text-primary)' : 'var(--text-muted)',
+                            outline: 'none', cursor: 'pointer', fontFamily: 'inherit', maxWidth: 90,
+                          }}
+                        >
+                          <option value="">Assignee…</option>
+                          {members.map(m => <option key={m.id} value={m.id}>{m.name.split(' ')[0]}</option>)}
+                        </select>
+                        <input
+                          type="date"
+                          value={newSubDueDate}
+                          onChange={e => setNewSubDueDate(e.target.value)}
+                          style={{
+                            fontSize: 11, padding: '3px 6px', borderRadius: 6, flexShrink: 0,
+                            border: '1px solid var(--border)', background: 'var(--surface-subtle)',
+                            color: newSubDueDate ? 'var(--text-primary)' : 'var(--text-muted)',
+                            outline: 'none', colorScheme: 'light dark', fontFamily: 'inherit', width: 100,
+                          }}
+                        />
+                        {newSubtitle.trim() && (
+                          addingSub ? (
+                            <span style={{ fontSize: 11, color: 'var(--brand)', flexShrink: 0 }}>…</span>
+                          ) : (
+                            <button onClick={addSubtask}
+                              style={{
+                                fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 6,
+                                background: 'var(--brand)', color: '#fff', border: 'none', cursor: 'pointer',
+                                flexShrink: 0, fontFamily: 'inherit',
+                              }}>
+                              Add
+                            </button>
+                          )
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* ── Convert task actions (top of panel) ── */}
+            {!task.is_recurring && canEdit && (
+              <div style={{
+                padding: '6px 20px 10px',
+                borderBottom: '1px solid var(--border)',
+                display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+              }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)',
+                  textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <ArrowRightLeft style={{ width: 10, height: 10 }}/>
+                  Convert
+                </span>
+                <button
+                  onClick={convertToRecurring}
+                  disabled={converting}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5,
+                    padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600,
+                    background: 'rgba(13,148,136,0.1)', color: 'var(--brand)',
+                    border: '1px solid rgba(13,148,136,0.25)', cursor: 'pointer',
+                    opacity: converting ? 0.6 : 1, transition: 'all 0.12s' }}
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(13,148,136,0.18)'}
+                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'rgba(13,148,136,0.1)'}>
+                  <RefreshCw style={{ width: 10, height: 10 }}/>
+                  Make recurring
+                </button>
+                {!task.project_id && (
+                  <button
+                    onClick={addToProject}
+                    disabled={converting}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 5,
+                      padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600,
+                      background: 'rgba(124,58,237,0.1)', color: '#7c3aed',
+                      border: '1px solid rgba(124,58,237,0.25)', cursor: 'pointer',
+                      opacity: converting ? 0.6 : 1, transition: 'all 0.12s' }}
+                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(124,58,237,0.18)'}
+                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'rgba(124,58,237,0.1)'}>
+                    <FolderPlus style={{ width: 10, height: 10 }}/>
+                    Add to project
+                  </button>
+                )}
+              </div>
+            )}
+
             {/* ── Tabs ── */}
             <div className="tab-bar px-5">
-              {(['details', 'subtasks', 'attachments', 'comments', 'time'] as const).map(t => (
+              {(['details', 'attachments', 'comments', 'time'] as const).map(t => (
                 <button key={t} onClick={() => setTab(t)} className={cn('tab-item capitalize', tab === t && 'active')}>
-                  {t === 'subtasks' ? 'Subtasks' : t === 'attachments' ? '📎 Files' : t.charAt(0).toUpperCase() + t.slice(1)}
+                  {t === 'attachments' ? '📎 Files' : t.charAt(0).toUpperCase() + t.slice(1)}
                 </button>
               ))}
             </div>
@@ -743,26 +1011,61 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                   </FieldRow>
                 )}
 
-                <FieldRow label="Est. hours">
-                  <Clock className="h-3.5 w-3.5" style={{ color: 'var(--text-muted)' }} />
-                  <input type="number" step="0.5" min="0" value={estHours}
-                    onChange={e => { if (!canEdit) return; setEstHours(e.target.value) }}
-                    onBlur={() => { if (canEdit) patch({ estimated_hours: estHours ? parseFloat(estHours) : null }) }}
-                    readOnly={!canEdit}
-                    disabled={!canEdit}
-                    placeholder="0"
-                    className="text-sm bg-transparent outline-none w-16"
-                    style={{ color: 'var(--text-primary)', cursor: canEdit ? undefined : 'default' }}
-                  />
-                  {estHours && <span className="text-xs" style={{ color: 'var(--text-muted)' }}>hrs</span>}
-                </FieldRow>
-
                 {task.project && (
                   <FieldRow label="Project">
                     <div className="h-2.5 w-2.5 rounded-sm flex-shrink-0" style={{ background: (task.project as any).color }} />
                     <span className="text-sm" style={{ color: 'var(--text-primary)' }}>{(task.project as any).name}</span>
                   </FieldRow>
                 )}
+
+                {/* Dependencies: Blocked by */}
+                <FieldRow label="Blocked by">
+                  <Link2 className="h-3.5 w-3.5" style={{ color: 'var(--text-muted)' }}/>
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {((task as any).custom_fields?._blocked_by ?? []).map((bid: string) => {
+                      return (
+                        <div key={bid} style={{ display:'flex', alignItems:'center', gap:6, padding:'2px 8px', borderRadius:6,
+                          background:'rgba(220,38,38,0.08)', border:'1px solid rgba(220,38,38,0.2)', fontSize:11 }}>
+                          <span style={{ flex:1, color:'var(--text-secondary)', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
+                            {blockingTasks.find(t => t.id === bid)?.title ?? bid}
+                          </span>
+                          {canEdit && (
+                            <button onClick={() => removeBlockedBy(bid)}
+                              style={{ background:'none', border:'none', cursor:'pointer', color:'#dc2626', padding:0, display:'flex', flexShrink:0 }}>
+                              <X style={{ width:10, height:10 }}/>
+                            </button>
+                          )}
+                        </div>
+                      )
+                    })}
+                    {canEdit && (
+                      <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                        <input
+                          value={blockingSearch}
+                          onChange={e => { setBlockingSearch(e.target.value); searchBlockingTasks(e.target.value) }}
+                          placeholder="Search task to block by…"
+                          style={{ flex:1, fontSize:11, padding:'3px 8px', borderRadius:6, border:'1px solid var(--border)',
+                            background:'var(--surface-subtle)', color:'var(--text-primary)', outline:'none', fontFamily:'inherit' }}
+                        />
+                      </div>
+                    )}
+                    {blockingResults.length > 0 && (
+                      <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:8,
+                        boxShadow:'0 4px 16px rgba(0,0,0,0.1)', zIndex:50, maxHeight:140, overflowY:'auto' }}>
+                        {blockingResults.map(t => (
+                          <button key={t.id} onClick={() => addBlockedBy(t.id)}
+                            style={{ display:'flex', alignItems:'center', gap:6, width:'100%', padding:'6px 10px',
+                              border:'none', background:'transparent', cursor:'pointer', textAlign:'left', fontSize:11,
+                              color:'var(--text-primary)', fontFamily:'inherit' }}
+                            onMouseEnter={e => (e.currentTarget as HTMLElement).style.background='var(--surface-subtle)'}
+                            onMouseLeave={e => (e.currentTarget as HTMLElement).style.background='transparent'}>
+                            <span style={{ flex:1, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{t.title}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </FieldRow>
 
                 {/* Created date */}
                 {task.created_at && (
@@ -785,41 +1088,6 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                 )}
               </div>
 
-              {/* ── Convert task actions ── */}
-              {!task.is_recurring && canEdit && (
-                <div className="px-5 pb-4 pt-2">
-                  <button
-                    onClick={() => setShowConvert(p => !p)}
-                    className="flex items-center gap-1.5 text-xs font-medium"
-                    style={{ color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-                    <ArrowRightLeft className="h-3 w-3"/>
-                    Convert this task
-                    <span style={{ fontSize: 10, marginLeft: 2 }}>{showConvert ? '▲' : '▼'}</span>
-                  </button>
-                  {showConvert && (
-                    <div className="mt-2 flex gap-2 flex-wrap">
-                      <button
-                        onClick={convertToRecurring}
-                        disabled={converting}
-                        className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-colors"
-                        style={{ background: 'rgba(13,148,136,0.12)', color: 'var(--brand)', border: '1px solid rgba(13,148,136,0.3)', cursor: 'pointer', opacity: converting ? 0.6 : 1 }}>
-                        <RefreshCw className="h-3 w-3"/>
-                        Make recurring
-                      </button>
-                      {!task.project_id && (
-                        <button
-                          onClick={addToProject}
-                          disabled={converting}
-                          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-colors"
-                          style={{ background: 'rgba(124,58,237,0.12)', color: '#7c3aed', border: '1px solid rgba(124,58,237,0.3)', cursor: 'pointer', opacity: converting ? 0.6 : 1 }}>
-                          <FolderPlus className="h-3 w-3"/>
-                          Add to project
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
               {/* ── Custom fields ── */}
               {customFieldDefs.length > 0 && task && (
                 <div className="px-5 pb-3">
@@ -832,152 +1100,6 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                 </div>
               )}
               </>
-            )}
-
-            {/* ── Subtasks ── */}
-            {tab === 'subtasks' && (
-              <div style={{ padding: '8px 0' }}>
-                {/* Subtask list + inline add below each */}
-                {subtasks.length === 0 && (
-                  <div style={{ padding: '20px 20px 4px', textAlign: 'center' }}>
-                    <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>No subtasks yet</p>
-                  </div>
-                )}
-                <div>
-                  {subtasks.map(sub => {
-                    const subAssignee = sub.assignee_id ? members.find(m => m.id === sub.assignee_id) : null
-                    // Can toggle: managers, main task assignee, or the specific subtask's own assignee
-                    const canToggleSub = canEdit || sub.assignee_id === currentUserId
-                    return (
-                    <div key={sub.id}
-                      style={{ display: 'flex', alignItems: 'center', gap: 10,
-                        padding: '8px 20px', borderBottom: '1px solid var(--border-light)',
-                        background: 'var(--surface)' }}
-                      className="group">
-                      <button onClick={() => canToggleSub && toggleSubtask(sub)}
-                        style={{
-                          width: 16, height: 16, borderRadius: '50%', flexShrink: 0,
-                          border: `2px solid ${sub.status === 'completed' ? 'var(--brand)' : 'var(--border)'}`,
-                          background: sub.status === 'completed' ? 'var(--brand)' : 'transparent',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          cursor: canToggleSub ? 'pointer' : 'not-allowed',
-                          opacity: canToggleSub ? 1 : 0.4,
-                          padding: 0, transition: 'all 0.15s',
-                        }}>
-                        {sub.status === 'completed' && (
-                          <svg viewBox="0 0 10 10" fill="none" style={{ width: 8, height: 8 }}>
-                            <path d="M1.5 5L4 7.5L8.5 2.5" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
-                          </svg>
-                        )}
-                      </button>
-                      <span style={{
-                        flex: 1, fontSize: 13, lineHeight: 1.4,
-                        color: sub.status === 'completed' ? 'var(--text-muted)' : 'var(--text-primary)',
-                        textDecoration: sub.status === 'completed' ? 'line-through' : 'none',
-                      }}>
-                        {sub.title}
-                      </span>
-                      {subAssignee && (
-                        <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0,
-                          display:'flex', alignItems:'center', gap:4 }}>
-                          <span style={{ width:16, height:16, borderRadius:'50%', background:'var(--brand-light)',
-                            display:'flex', alignItems:'center', justifyContent:'center',
-                            fontSize:9, fontWeight:700, color:'var(--brand)', flexShrink:0 }}>
-                            {subAssignee.name[0]?.toUpperCase()}
-                          </span>
-                          <span>{subAssignee.name}</span>
-                        </span>
-                      )}
-                      {sub.due_date && (
-                        <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>
-                          {sub.due_date}
-                        </span>
-                      )}
-                    </div>
-                  )})}
-                </div>
-
-                {/* Inline add subtask - title + assignee + due date on ONE row */}
-                {canEdit && <div style={{
-                  padding: '6px 20px', borderTop: subtasks.length > 0 ? '1px dashed var(--border)' : 'none',
-                  marginTop: subtasks.length === 0 ? 0 : 2,
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <div style={{
-                      width: 14, height: 14, borderRadius: '50%', flexShrink: 0,
-                      border: '2px dashed var(--brand)', opacity: 0.4,
-                    }}/>
-                    <input
-                      value={newSubtitle}
-                      onChange={e => setNewSubtitle(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter' && newSubtitle.trim()) addSubtask()
-                        if (e.key === 'Escape') { setNewSubtitle(''); setNewSubAssigneeId(''); setNewSubDueDate('') }
-                      }}
-                      placeholder="Add subtask…"
-                      style={{
-                        flex: 1, minWidth: 80, fontSize: 12, border: 'none', outline: 'none',
-                        background: 'transparent', color: 'var(--text-primary)', fontFamily: 'inherit',
-                      }}
-                    />
-                    {/* Assignee + Due date inline — always visible */}
-                    <select
-                      value={newSubAssigneeId}
-                      onChange={e => setNewSubAssigneeId(e.target.value)}
-                      style={{
-                        fontSize: 11, padding: '3px 6px', borderRadius: 6, flexShrink: 0,
-                        border: '1px solid var(--border)', background: 'var(--surface-subtle)',
-                        color: newSubAssigneeId ? 'var(--text-primary)' : 'var(--text-muted)',
-                        outline: 'none', cursor: 'pointer', fontFamily: 'inherit', maxWidth: 110,
-                      }}
-                    >
-                      <option value="">Assignee…</option>
-                      {members.map(m => <option key={m.id} value={m.id}>{m.name.split(' ')[0]}</option>)}
-                    </select>
-                    <input
-                      type="date"
-                      value={newSubDueDate}
-                      onChange={e => setNewSubDueDate(e.target.value)}
-                      style={{
-                        fontSize: 11, padding: '3px 6px', borderRadius: 6, flexShrink: 0,
-                        border: '1px solid var(--border)', background: 'var(--surface-subtle)',
-                        color: newSubDueDate ? 'var(--text-primary)' : 'var(--text-muted)',
-                        outline: 'none', colorScheme: 'light dark', fontFamily: 'inherit', width: 110,
-                      }}
-                    />
-                    {newSubtitle.trim() && (
-                      addingSub ? (
-                        <span style={{ fontSize: 11, color: 'var(--brand)', flexShrink: 0 }}>…</span>
-                      ) : (
-                        <button onClick={addSubtask}
-                          style={{
-                            fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 6,
-                            background: 'var(--brand)', color: '#fff', border: 'none', cursor: 'pointer',
-                            flexShrink: 0, fontFamily: 'inherit',
-                          }}>
-                          Add
-                        </button>
-                      )
-                    )}
-                  </div>
-                </div>}
-
-                {/* Progress */}
-                {subtasks.length > 0 && (
-                  <div style={{ padding: '8px 20px 4px', display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div style={{ flex: 1, height: 4, background: 'var(--border-light)', borderRadius: 99, overflow: 'hidden' }}>
-                      <div style={{
-                        height: '100%', background: 'var(--brand)', borderRadius: 99,
-                        width: `${subtasks.length > 0 ? Math.round(subtasks.filter(s => s.status === 'completed').length / subtasks.length * 100) : 0}%`,
-                        transition: 'width 0.3s ease',
-                      }}/>
-                    </div>
-                    <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>
-                      {subtasks.filter(s => s.status === 'completed').length}/{subtasks.length}
-                    </span>
-                  </div>
-                )}
-              </div>
             )}
 
             {/* ── Attachments ── */}

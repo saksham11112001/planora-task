@@ -1,10 +1,21 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 type Mode = 'choose' | 'magic' | 'magic_sent' | 'email_password' | 'email_signup' | 'signup_confirm'
+
+function MicrosoftIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 21 21">
+      <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+      <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
+      <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
+      <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+    </svg>
+  )
+}
 
 function GoogleIcon() {
   return (
@@ -26,11 +37,39 @@ export default function LoginPage() {
   const [loading,  setLoading]  = useState(false)
   const [error,    setError]    = useState('')
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('error') === 'auth_failed') {
+      setError("Sign-in failed. Please try again — if the problem persists, try a different method.")
+      setMode('choose')
+    }
+  }, [])
+
   function resetForm(newMode: Mode) {
     setMode(newMode)
     setError('')
     setPassword('')
     setConfirm('')
+  }
+
+  // ── Microsoft OAuth ───────────────────────────────────────────────────────
+  async function handleMicrosoft() {
+    if (loading) return
+    setLoading(true); setError('')
+    try {
+      const supabase = createClient()
+      const { error: e } = await supabase.auth.signInWithOAuth({
+        provider: 'azure',
+        options: {
+          redirectTo: `${window.location.origin}/auth/confirm`,
+          scopes: 'email profile openid',
+        },
+      })
+      if (e) { setError('Microsoft sign-in failed: ' + e.message); setLoading(false) }
+    } catch {
+      setError('Something went wrong. Please try again.')
+      setLoading(false)
+    }
   }
 
   // ── Google OAuth ──────────────────────────────────────────────────────────
@@ -208,6 +247,11 @@ export default function LoginPage() {
                   ? <Spinner />
                   : <GoogleIcon />}
                 {loading ? 'Connecting...' : 'Continue with Google'}
+              </button>
+
+              <button onClick={handleMicrosoft} disabled={loading} style={{ ...primaryBtn, background: '#fff', color: '#374151', border: '1.5px solid #e2e8f0', marginBottom: 12 }}>
+                {loading ? <Spinner /> : <MicrosoftIcon />}
+                {loading ? 'Connecting...' : 'Continue with Microsoft (Outlook)'}
               </button>
 
               <Divider />

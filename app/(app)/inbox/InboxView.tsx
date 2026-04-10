@@ -46,6 +46,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
   const [loadingSubtasks, setLoadingSubtasks] = useState<Set<string>>(new Set())
   const [newSubInputs,    setNewSubInputs]    = useState<Record<string,string>>({})
   const [newSubAssignees, setNewSubAssignees] = useState<Record<string,string>>({})
+  const [newSubDueDates,  setNewSubDueDates]  = useState<Record<string,string>>({})
   const [completingTask,  setCompletingTask]  = useState<Task | null>(null)
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set(['done','overdue']))
   const BOARD_DONE_PAGE = 5
@@ -116,11 +117,11 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
     startT(() => router.refresh())
   }
 
-  async function addSubtaskInline(parentId: string, title: string, assigneeId?: string) {
+  async function addSubtaskInline(parentId: string, title: string, assigneeId?: string, dueDate?: string) {
     if (!title.trim()) return
     const r = await fetch('/api/tasks', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: title.trim(), parent_task_id: parentId, status: 'todo', assignee_id: assigneeId || null }),
+      body: JSON.stringify({ title: title.trim(), parent_task_id: parentId, status: 'todo', assignee_id: assigneeId || null, due_date: dueDate || null }),
     })
     const d = await r.json()
     if (r.ok && d.data) setSubtaskMap(p => ({ ...p, [parentId]: [...(p[parentId]??[]), d.data] }))
@@ -291,7 +292,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
       <style>{`@media(max-width:640px){.hide-mobile{display:none!important}.inbox-task-row{grid-template-columns:36px 22px 1fr 80px 32px 40px!important}}`}
-        {`.inbox-col-header{display:grid;grid-template-columns:36px 22px 1fr 90px 90px 90px 90px 32px 40px;align-items:center;padding:0 16px;}`}
+        {`.inbox-col-header{display:grid;grid-template-columns:36px 22px 1fr 90px 90px 90px 90px 40px;align-items:center;padding:0 16px;}`}
       </style>
 
       <div style={{ display:'flex', borderBottom:'1px solid var(--border)', padding:'0 20px', background:'var(--surface)', flexShrink:0 }}>
@@ -468,7 +469,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
               <div style={{ fontSize:10, fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.07em' }}>Client</div>
               <div style={{ fontSize:10, fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.07em', textAlign:'center' }}>Due date</div>
               <div style={{ fontSize:10, fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.07em' }}>Assigned by</div>
-              <div/><div/>
+              <div/>
             </div>
 
             <div style={{ flex:1, overflowY:'auto', background:'var(--surface)' }}>
@@ -509,7 +510,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                     return (
                       <div key={task.id}>
                         <div className="inbox-task-row" onClick={() => setSelectedTask(task)}
-                          style={{ display:'grid', gridTemplateColumns:'36px 22px 1fr 90px 90px 90px 90px 32px 40px', alignItems:'center', padding:'0 16px', minHeight:40, borderBottom:'1px solid var(--border-light)', cursor:'pointer', background:typeBg, borderLeft:`3px solid ${typeAccent}` }}>
+                          style={{ display:'grid', gridTemplateColumns:'36px 22px 1fr 90px 90px 90px 90px 40px', alignItems:'center', padding:'0 16px', minHeight:40, borderBottom:'1px solid var(--border-light)', cursor:'pointer', background:typeBg, borderLeft:`3px solid ${typeAccent}` }}>
                           <input type="checkbox" checked={checked.has(task.id)}
                             onChange={() => setChecked(p => { const s=new Set(p); s.has(task.id)?s.delete(task.id):s.add(task.id); return s })}
                             onClick={e => e.stopPropagation()} style={{ width:13, height:13, accentColor:'#0d9488', cursor:'pointer' }}/>
@@ -519,6 +520,21 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                             {isPending && !isComp && <Clock style={{ width:8, height:8, color:'#7c3aed' }}/>}
                           </button>
                           <div style={{ minWidth:0, display:'flex', alignItems:'center', gap:5, overflow:'hidden' }}>
+                            <button onClick={e => { e.stopPropagation(); toggleExpand(task.id) }}
+                              title={expandedTasks.has(task.id) ? 'Hide subtasks' : 'Show/add subtasks'}
+                              style={{ width:16, height:16, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center',
+                                borderRadius:3, border:'none', background:'transparent', cursor:'pointer', padding:0,
+                                color: expandedTasks.has(task.id) ? 'var(--brand)' : 'var(--text-muted)',
+                                fontSize:9, fontWeight:700, transition:'all 0.1s' }}
+                              onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--brand)'}
+                              onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = expandedTasks.has(task.id) ? 'var(--brand)' : 'var(--text-muted)'}>
+                              {expandedTasks.has(task.id) ? '▼' : '▶'}
+                              {(subtaskMap[task.id]??[]).length > 0 && (
+                                <span style={{ fontSize:8, marginLeft:1, opacity:0.7 }}>
+                                  {(subtaskMap[task.id]??[]).filter((s:any)=>s.status==='completed').length}/{(subtaskMap[task.id]??[]).length}
+                                </span>
+                              )}
+                            </button>
                             <p style={{ fontSize:13, fontWeight:600, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis', color:isComp?'var(--text-muted)':ov?'#f87171':'var(--text-primary)', textDecoration:isComp?'line-through':'none', margin:0, flex:1 }}>{task.title}</p>
                             {(isCompliance || (task as any).approval_required) && !isComp && (
                               <label
@@ -586,10 +602,6 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                               )
                             })()}
                           </div>
-                          <button onClick={e => { e.stopPropagation(); toggleExpand(task.id) }}
-                            style={{ display:'flex', alignItems:'center', justifyContent:'center', padding:'2px 4px', borderRadius:4, border:'none', background:expandedTasks.has(task.id)?'var(--brand-light)':'transparent', color:expandedTasks.has(task.id)?'var(--brand)':'var(--text-muted)', fontSize:10, cursor:'pointer' }}>
-                            {(subtaskMap[task.id]??[]).length>0 ? (subtaskMap[task.id]??[]).filter((s:any)=>s.status==='completed').length+'/'+(subtaskMap[task.id]??[]).length : '+'}
-                          </button>
                           <div style={{ display:'flex', alignItems:'center', justifyContent:'flex-end', gap:4 }}>
                             <div title={task.priority}
                               style={{ width:8, height:8, borderRadius:'50%', flexShrink:0,
@@ -663,43 +675,47 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                               </div>
                             )})}
                             <div style={{ padding:'5px 16px 6px 58px' }}>
-                              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                                <div style={{ width:14, height:14, borderRadius:'50%', flexShrink:0, border:'1.5px dashed var(--brand)', opacity:0.5 }}/>
+                              <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                                <div style={{ width:13, height:13, borderRadius:'50%', flexShrink:0, border:'1.5px dashed var(--brand)', opacity:0.4 }}/>
                                 <input value={newSubInputs[task.id]??''}
                                   onChange={e => setNewSubInputs(p => ({ ...p, [task.id]:e.target.value }))}
                                   onKeyDown={async e => {
                                     if (e.key==='Enter' && (newSubInputs[task.id]??'').trim()) {
-                                      await addSubtaskInline(task.id, newSubInputs[task.id], newSubAssignees[task.id])
+                                      await addSubtaskInline(task.id, newSubInputs[task.id], newSubAssignees[task.id], newSubDueDates[task.id])
                                     }
                                     if (e.key==='Escape') {
                                       setNewSubInputs(p => ({ ...p, [task.id]:'' }))
                                       setNewSubAssignees(p => ({ ...p, [task.id]:'' }))
+                                      setNewSubDueDates(p => ({ ...p, [task.id]:'' }))
                                     }
                                   }}
-                                  placeholder="Add subtask… (Enter)" onClick={e => e.stopPropagation()}
-                                  style={{ flex:1, fontSize:12, border:'none', outline:'none', background:'transparent', color:'var(--text-primary)' }}/>
-                              </div>
-                              {/* Assignee + Add button — shown only when title is typed */}
-                              {(newSubInputs[task.id]??'').trim() && (
-                                <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:5, paddingLeft:22 }}>
-                                  <select
-                                    value={newSubAssignees[task.id]??''}
-                                    onChange={e => setNewSubAssignees(p => ({ ...p, [task.id]:e.target.value }))}
-                                    onClick={e => e.stopPropagation()}
-                                    style={{ fontSize:11, border:'1px solid var(--border)', borderRadius:6, padding:'2px 6px', background:'var(--surface)', color:'var(--text-secondary)', fontFamily:'inherit', cursor:'pointer' }}
-                                  >
-                                    <option value=''>Assignee (optional)</option>
-                                    {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                                  </select>
+                                  placeholder="Add subtask…"
+                                  onClick={e => e.stopPropagation()}
+                                  style={{ flex:1, minWidth:60, fontSize:12, border:'none', outline:'none', background:'transparent', color:'var(--text-primary)', fontFamily:'inherit' }}/>
+                                <select
+                                  value={newSubAssignees[task.id]??''}
+                                  onChange={e => setNewSubAssignees(p => ({ ...p, [task.id]:e.target.value }))}
+                                  onClick={e => e.stopPropagation()}
+                                  style={{ fontSize:11, border:'1px solid var(--border)', borderRadius:6, padding:'2px 5px', background:'var(--surface-subtle)', color:'var(--text-secondary)', fontFamily:'inherit', cursor:'pointer', maxWidth:90, flexShrink:0 }}>
+                                  <option value=''>Assignee…</option>
+                                  {members.map(m => <option key={m.id} value={m.id}>{m.name.split(' ')[0]}</option>)}
+                                </select>
+                                <input type="date"
+                                  value={newSubDueDates[task.id]??''}
+                                  onChange={e => setNewSubDueDates(p => ({ ...p, [task.id]:e.target.value }))}
+                                  onClick={e => e.stopPropagation()}
+                                  style={{ fontSize:11, border:'1px solid var(--border)', borderRadius:6, padding:'2px 5px', background:'var(--surface-subtle)', color:'var(--text-secondary)', colorScheme:'light dark', fontFamily:'inherit', width:100, flexShrink:0 }}/>
+                                {(newSubInputs[task.id]??'').trim() && (
                                   <button onClick={async e => {
                                     e.stopPropagation()
-                                    await addSubtaskInline(task.id, newSubInputs[task.id], newSubAssignees[task.id])
+                                    await addSubtaskInline(task.id, newSubInputs[task.id], newSubAssignees[task.id], newSubDueDates[task.id])
+                                    setNewSubDueDates(p => ({ ...p, [task.id]:'' }))
                                   }}
-                                    style={{ fontSize:11, fontWeight:600, padding:'2px 10px', borderRadius:6, border:'none', background:'var(--brand)', color:'#fff', cursor:'pointer', fontFamily:'inherit', flexShrink:0 }}>
+                                    style={{ fontSize:11, fontWeight:600, padding:'3px 10px', borderRadius:6, border:'none', background:'var(--brand)', color:'#fff', cursor:'pointer', fontFamily:'inherit', flexShrink:0 }}>
                                     Add
                                   </button>
-                                </div>
-                              )}
+                                )}
+                              </div>
                             </div>
                           </div>
                         )}

@@ -5,7 +5,7 @@ import { todayStr }     from '@/lib/utils/format'
 import { DashboardClient } from './DashboardClient'
 import type { Metadata }   from 'next'
 export const metadata: Metadata = { title: 'Home' }
-export const revalidate = 30
+export const revalidate = 0
 
 export default async function DashboardPage() {
   const user = await getSessionUser()

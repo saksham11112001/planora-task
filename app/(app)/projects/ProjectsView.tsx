@@ -75,7 +75,21 @@ export function ProjectsView({ projects, counts, clients, canManage }: Props) {
     const isDone   = p.status === 'completed'
 
     return (
-      <div className="group/card" style={{ position: 'relative' }}>
+      <div className="group/card" style={{ position: 'relative' }}
+        onMouseEnter={e => {
+          const wrap = e.currentTarget
+          const link = wrap.querySelector('.project-card-link') as HTMLElement
+          if (link) { link.style.boxShadow = '0 4px 20px rgba(0,0,0,0.1)'; link.style.borderColor = p.color; link.style.transform = 'translateY(-1px)' }
+          const actions = wrap.querySelector('.card-actions') as HTMLElement
+          if (actions) actions.style.opacity = '1'
+        }}
+        onMouseLeave={e => {
+          const wrap = e.currentTarget
+          const link = wrap.querySelector('.project-card-link') as HTMLElement
+          if (link) { link.style.boxShadow = ''; link.style.borderColor = 'var(--border)'; link.style.transform = '' }
+          const actions = wrap.querySelector('.card-actions') as HTMLElement
+          if (actions) actions.style.opacity = '0'
+        }}>
         {/* Hover actions */}
         {canManage && (
           <div style={{
@@ -108,7 +122,7 @@ export function ProjectsView({ projects, counts, clients, canManage }: Props) {
             </button>
           </div>
         )}
-        <Link href={`/projects/${p.id}`} style={{
+        <Link href={`/projects/${p.id}`} className="project-card-link" style={{
           display: 'block', textDecoration: 'none',
           background: 'var(--surface)',
           border: '1px solid var(--border)',
@@ -116,22 +130,6 @@ export function ProjectsView({ projects, counts, clients, canManage }: Props) {
           borderRadius: 10, padding: '14px 16px',
           transition: 'all 0.15s',
           opacity: isDone ? 0.72 : isOnHold ? 0.88 : 1,
-        }}
-        onMouseEnter={e => {
-          const el = e.currentTarget as HTMLElement
-          el.style.boxShadow = `0 4px 20px rgba(0,0,0,0.1)`
-          el.style.borderColor = p.color
-          el.style.transform = 'translateY(-1px)'
-          const actions = el.closest('.group\\/card')?.querySelector('.card-actions') as HTMLElement
-          if (actions) actions.style.opacity = '1'
-        }}
-        onMouseLeave={e => {
-          const el = e.currentTarget as HTMLElement
-          el.style.boxShadow = ''
-          el.style.borderColor = 'var(--border)'
-          el.style.transform = ''
-          const actions = el.closest('.group\\/card')?.querySelector('.card-actions') as HTMLElement
-          if (actions) actions.style.opacity = '0'
         }}>
           {/* Title */}
           <div style={{ marginBottom: 10, paddingRight: 48 }}>

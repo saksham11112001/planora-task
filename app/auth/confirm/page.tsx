@@ -3,7 +3,7 @@ import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
-type State = 'loading' | 'otp_expired' | 'error'
+type State = 'loading' | 'otp_expired' | 'cancelled' | 'error'
 
 function AuthConfirmInner() {
   const router = useRouter()
@@ -19,7 +19,8 @@ function AuthConfirmInner() {
       // Check for errors first
       const errorCode = hashParams.get('error_code')
       const errorParam = hashParams.get('error')
-      if (errorCode === 'otp_expired' || errorParam === 'access_denied') { setState('otp_expired'); return }
+      if (errorCode === 'otp_expired') { setState('otp_expired'); return }
+      if (errorParam === 'access_denied') { setState('cancelled'); return }
       if (errorParam) { setState('error'); return }
 
       const accessToken  = hashParams.get('access_token')
@@ -95,6 +96,21 @@ function AuthConfirmInner() {
     )
   }
 
+  if (state === 'cancelled') {
+    return (
+      <div style={outer}>
+        <div style={card}>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>✋</div>
+          <h2 style={h2}>Sign-in cancelled</h2>
+          <p style={body}>
+            You cancelled the sign-in. No worries — click below to try again.
+          </p>
+          <button onClick={() => router.replace('/login')} style={btn}>Back to sign in</button>
+        </div>
+      </div>
+    )
+  }
+
   if (state === 'error') {
     return (
       <div style={outer}>
@@ -102,10 +118,12 @@ function AuthConfirmInner() {
           <div style={{ fontSize: 40, marginBottom: 16 }}>⚠️</div>
           <h2 style={h2}>Sign-in failed</h2>
           <p style={body}>
-            We couldn't complete your sign-in. Please try clicking the invite
-            link again, or ask your admin to resend the invitation.
+            We couldn't complete your sign-in. This can happen if the link expired or was already used.
           </p>
           <button onClick={() => router.replace('/login')} style={btn}>Back to sign in</button>
+          <p style={{ ...hint, marginTop: 12 }}>
+            Tip: Try signing in with Google directly — it's the fastest option.
+          </p>
         </div>
       </div>
     )

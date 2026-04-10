@@ -39,6 +39,7 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated, 
   const [title,      setTitle]      = useState('')
   const [assignee,   setAssignee]   = useState(currentUserId ?? '')
   const [coAssignees,   setCoAssignees]   = useState<string[]>([])
+  const [coAssigneesOpen, setCoAssigneesOpen] = useState(false)
   const [makeRecurring, setMakeRecurring] = useState(false)
   const [recurringFreq, setRecurringFreq] = useState('weekly')
   const [addToProjectId, setAddToProjectId] = useState('')
@@ -54,6 +55,7 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated, 
   const [requireAttachment, setRequireAttachment] = useState(false)
   const [compSubtasks, setCompSubtasks] = useState<{title:string;required:boolean;due_date?:string;assignee_id?:string}[]>([])
   const [projectsList, setProjectsList] = useState<{id: string; name: string; color: string}[]>([])
+  const [moreOpen, setMoreOpen] = useState(false)
 
   const approvers = members.filter(m => m.role && ['owner','admin','manager'].includes(m.role))
   const priConf   = PRIORITY_OPTIONS.find(p => p.value === priority) ?? PRIORITY_OPTIONS[2]
@@ -86,6 +88,11 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated, 
       .then(r => r.json())
       .then(j => setProjectsList(Array.isArray(j) ? j : (j.data ?? [])))
       .catch(() => {})
+  }, [open])
+
+  // Auto-focus input when opened (handles both defaultOpen=true and openRow())
+  useEffect(() => {
+    if (open) setTimeout(() => inputRef.current?.focus(), 80)
   }, [open])
 
   function openRow() { setOpen(true); setTimeout(() => inputRef.current?.focus(), 50) }
@@ -229,25 +236,36 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated, 
           </label>
         )}
 
-        {/* Co-assignees multi-select */}
+        {/* Co-assignees — compact dropdown */}
         {members.length > 1 && (
-          <div style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px',
-            borderRadius:20, border: coAssignees.length > 0 ? '1.5px solid var(--brand)' : '1px solid var(--border)',
-            background: coAssignees.length > 0 ? 'var(--brand-light)' : 'var(--surface-subtle)', flexWrap:'wrap', maxWidth:240 }}>
-            <User style={{ width:11, height:11, color: coAssignees.length>0?'var(--brand)':'var(--text-muted)', flexShrink:0 }}/>
-            <span style={{ fontSize:11, color: coAssignees.length>0?'var(--brand)':'var(--text-muted)', fontWeight:600, flexShrink:0 }}>
-              {coAssignees.length > 0 ? `+${coAssignees.length} co-assignee${coAssignees.length>1?'s':''}` : 'Add co-assignee'}
-            </span>
-            {members.filter(m => m.id !== assignee).map(m => (
-              <button key={m.id} type="button"
-                onClick={() => setCoAssignees(p => p.includes(m.id) ? p.filter(id=>id!==m.id) : [...p, m.id])}
-                style={{ fontSize:10, padding:'1px 7px', borderRadius:99, border:'none', cursor:'pointer',
-                  background: coAssignees.includes(m.id) ? 'var(--brand)' : '#e2e8f0',
-                  color: coAssignees.includes(m.id) ? '#fff' : '#374151',
-                  fontFamily:'inherit', fontWeight:600, flexShrink:0 }}>
-                {m.name.split(' ')[0]}
-              </button>
-            ))}
+          <div style={{ position:'relative' }}>
+            <button type="button"
+              onClick={() => setCoAssigneesOpen(p => !p)}
+              style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px', borderRadius:20,
+                border: coAssignees.length > 0 ? '1.5px solid var(--brand)' : '1px solid var(--border)',
+                background: coAssignees.length > 0 ? 'rgba(13,148,136,0.08)' : 'var(--surface-subtle)',
+                cursor:'pointer', fontSize:12, color: coAssignees.length>0 ? 'var(--brand)' : 'var(--text-secondary)',
+                fontFamily:'inherit' }}>
+              <User style={{ width:11, height:11 }}/>
+              {coAssignees.length > 0 ? `+${coAssignees.length} co-assignee${coAssignees.length>1?'s':''}` : '+ Co-assignee'}
+            </button>
+            {coAssigneesOpen && (
+              <div style={{ position:'absolute', top:'calc(100% + 4px)', left:0, zIndex:100,
+                background:'var(--surface)', border:'1px solid var(--border)', borderRadius:10,
+                boxShadow:'0 8px 24px rgba(0,0,0,0.12)', padding:'6px 8px', minWidth:170 }}>
+                {members.filter(m => m.id !== assignee).map(m => (
+                  <label key={m.id} style={{ display:'flex', alignItems:'center', gap:8, padding:'5px 6px',
+                    borderRadius:6, cursor:'pointer', fontSize:12, color:'var(--text-primary)' }}
+                    onMouseEnter={e => (e.currentTarget.style.background='var(--surface-subtle)')}
+                    onMouseLeave={e => (e.currentTarget.style.background='transparent')}>
+                    <input type="checkbox" checked={coAssignees.includes(m.id)}
+                      onChange={() => setCoAssignees(p => p.includes(m.id) ? p.filter(id=>id!==m.id) : [...p, m.id])}
+                      style={{ accentColor:'var(--brand)', width:13, height:13, cursor:'pointer' }}/>
+                    <span style={{ flex:1, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{m.name}</span>
+                  </label>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -335,26 +353,72 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated, 
         <input ref={fileRef} type="file" multiple style={{ display: 'none' }}
           onChange={e => { setFiles(Array.from(e.target.files ?? [])); setErrors(p => ({ ...p, attachment: '' })) }}/>
 
-        {/* Require attachment on complete toggle */}
-        <button type="button" onClick={() => setRequireAttachment(p => !p)}
+        {/* More options toggle */}
+        <button type="button"
+          onClick={() => setMoreOpen(p => !p)}
           style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px', borderRadius:20,
-            border: requireAttachment ? '1.5px solid #dc2626' : '1px solid var(--border)',
-            background: requireAttachment ? '#fef2f2' : 'var(--surface-subtle)',
-            color: requireAttachment ? '#dc2626' : 'var(--text-secondary)',
-            fontSize:12, cursor:'pointer', fontFamily:'inherit', fontWeight: requireAttachment ? 700 : 400 }}>
-          {requireAttachment
-            ? <ToggleRight style={{ width:13, height:13 }}/>
-            : <ToggleLeft  style={{ width:13, height:13 }}/>}
-          Require attachment on complete
+            border:'1px dashed var(--border)', background:'transparent',
+            color:'var(--text-muted)', fontSize:11, cursor:'pointer', fontFamily:'inherit' }}>
+          ⋯ {moreOpen ? 'Less' : 'More options'}
         </button>
 
-        {/* Custom fields */}
-        {customFields.length > 0 && (
-          <InlineCustomFields
-            defs={customFields}
-            values={customValues}
-            onChange={(k, v) => setCustomValues(p => ({ ...p, [k]: v }))}
-          />
+        {moreOpen && (
+          <>
+            {/* Require attachment */}
+            <button type="button" onClick={() => setRequireAttachment(p => !p)}
+              style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px', borderRadius:20,
+                border: requireAttachment ? '1.5px solid #dc2626' : '1px solid var(--border)',
+                background: requireAttachment ? '#fef2f2' : 'var(--surface-subtle)',
+                color: requireAttachment ? '#dc2626' : 'var(--text-secondary)',
+                fontSize:12, cursor:'pointer', fontFamily:'inherit', fontWeight: requireAttachment ? 700 : 400 }}>
+              {requireAttachment ? <ToggleRight style={{ width:13, height:13 }}/> : <ToggleLeft style={{ width:13, height:13 }}/>}
+              Require attachment on complete
+            </button>
+
+            {/* Custom fields */}
+            {customFields.length > 0 && (
+              <InlineCustomFields defs={customFields} values={customValues}
+                onChange={(k,v) => setCustomValues(p => ({ ...p, [k]:v }))}/>
+            )}
+
+            {/* Make recurring */}
+            <button type="button"
+              onClick={() => { setMakeRecurring(p => !p); if (addToProjectId) setAddToProjectId('') }}
+              style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px', borderRadius:20,
+                border: makeRecurring ? '1.5px solid #0d9488' : '1px solid var(--border)',
+                background: makeRecurring ? '#f0fdfa' : 'var(--surface-subtle)',
+                cursor:'pointer', fontSize:12, color: makeRecurring ? '#0d9488' : 'var(--text-secondary)',
+                fontWeight: makeRecurring ? 700 : 400, fontFamily:'inherit' }}>
+              🔁 {makeRecurring ? 'Recurring ✓' : 'Make recurring'}
+            </button>
+            {makeRecurring && (
+              <select value={recurringFreq} onChange={e => setRecurringFreq(e.target.value)}
+                style={{ fontSize:12, padding:'4px 8px', borderRadius:20, border:'1.5px solid #0d9488',
+                  background:'#f0fdfa', color:'#0d9488', fontWeight:600, outline:'none', cursor:'pointer', fontFamily:'inherit' }}>
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="bi_weekly">Every 2 weeks</option>
+                <option value="monthly">Monthly</option>
+                <option value="quarterly">Quarterly</option>
+                <option value="annual">Annual</option>
+              </select>
+            )}
+            {!makeRecurring && (
+              <label style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px',
+                borderRadius:20, border: addToProjectId ? '1.5px solid #7c3aed' : '1px solid var(--border)',
+                background: addToProjectId ? '#faf5ff' : 'var(--surface-subtle)', cursor:'pointer' }}>
+                <span style={{ fontSize:11 }}>📁</span>
+                <select value={addToProjectId} onChange={e => setAddToProjectId(e.target.value)}
+                  style={{ fontSize:12, border:'none', outline:'none', background:'transparent',
+                    color: addToProjectId ? '#7c3aed' : 'var(--text-secondary)',
+                    cursor:'pointer', appearance:'none', fontWeight: addToProjectId ? 600 : 400,
+                    fontFamily:'inherit', maxWidth:130 }}>
+                  <option value="">Project…</option>
+                  {projectsList.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </label>
+            )}
+          </>
         )}
 
         {/* Subtasks — per-subtask assignee + date */}
@@ -403,49 +467,6 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated, 
             <ListPlus style={{ width:12, height:12 }}/> Add subtask
           </button>
         </div>
-
-        {/* Make recurring / add to project pills */}
-        <button type="button"
-          onClick={() => { setMakeRecurring(p => !p); if (addToProjectId) setAddToProjectId('') }}
-          style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px',
-            borderRadius:20, border: makeRecurring ? '1.5px solid #0d9488' : '1px solid var(--border)',
-            background: makeRecurring ? '#f0fdfa' : 'var(--surface-subtle)',
-            cursor:'pointer', fontSize:12, color: makeRecurring ? '#0d9488' : 'var(--text-secondary)',
-            fontWeight: makeRecurring ? 700 : 400, fontFamily:'inherit' }}>
-          🔁 {makeRecurring ? 'Recurring ✓' : 'Make recurring'}
-        </button>
-        {makeRecurring && (
-          <select value={recurringFreq} onChange={e => setRecurringFreq(e.target.value)}
-            style={{ fontSize:12, padding:'4px 8px', borderRadius:20, border:'1.5px solid #0d9488',
-              background:'#f0fdfa', color:'#0d9488', fontWeight:600, outline:'none', cursor:'pointer',
-              fontFamily:'inherit' }}>
-            <option value="daily">Daily</option>
-            <option value="weekly">Weekly</option>
-            <option value="bi_weekly">Every 2 weeks</option>
-            <option value="monthly">Monthly</option>
-            <option value="quarterly">Quarterly</option>
-            <option value="annual">Annual</option>
-          </select>
-        )}
-        {!makeRecurring && (
-          <label style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px',
-            borderRadius:20, border: addToProjectId ? '1.5px solid #7c3aed' : '1px solid var(--border)',
-            background: addToProjectId ? '#faf5ff' : 'var(--surface-subtle)', cursor:'pointer' }}>
-            <span style={{ fontSize:11 }}>📁</span>
-            <select
-              value={addToProjectId}
-              onChange={e => setAddToProjectId(e.target.value)}
-              style={{ fontSize:12, border:'none', outline:'none', background:'transparent',
-                color: addToProjectId ? '#7c3aed' : 'var(--text-secondary)',
-                cursor:'pointer', appearance:'none', fontWeight: addToProjectId ? 600 : 400,
-                fontFamily:'inherit', maxWidth:130 }}>
-              <option value="">Project…</option>
-              {projectsList.map(p => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-          </label>
-        )}
 
         {/* Save */}
         <button onClick={save} disabled={saving || !title.trim()}

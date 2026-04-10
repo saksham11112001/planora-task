@@ -23,6 +23,7 @@ const CACHE_TTL   = 60_000
 
 export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
   const pathname    = usePathname()
+  const router      = useRouter()
   const { session } = useAppStore()
   const [projectsOpen, setProjectsOpen] = useState(false)
   const [projects, setProjects]         = useState<Project[]>(_projectCache)
@@ -122,8 +123,64 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
 
         {/* TASKS */}
         <GL>Tasks</GL>
-        {nav.one_time_tasks && <SI href="/inbox"     active={isActive('/inbox')}     icon={<ListTodo  className="h-4 w-4"/>} label="One-time tasks"/>}
-        {nav.recurring_tasks && <SI href="/recurring" active={isActive('/recurring')} icon={<RefreshCw className="h-4 w-4"/>} label="Recurring tasks"/>}
+        {nav.one_time_tasks && (
+          <div className="group/nav" style={{ position:'relative', display:'flex', alignItems:'center', margin:'1px 4px' }}>
+            <Link href="/inbox" prefetch={true}
+              onClick={() => { if (!isActive('/inbox')) router.refresh() }}
+              style={{
+                flex:1, display:'flex', alignItems:'center', gap:9,
+                padding:'7px 10px', borderRadius:7, fontSize:13,
+                textDecoration:'none', transition:'all 0.12s',
+                background: isActive('/inbox') ? 'rgba(255,255,255,0.14)' : 'transparent',
+                color: isActive('/inbox') ? '#fff' : 'rgba(255,255,255,0.6)',
+                fontWeight: isActive('/inbox') ? 500 : 400,
+                borderLeft: isActive('/inbox') ? '2px solid rgba(255,255,255,0.5)' : '2px solid transparent',
+              }}
+              onMouseEnter={e => { if (!isActive('/inbox')) { (e.currentTarget as HTMLElement).style.background='rgba(255,255,255,0.08)'; (e.currentTarget as HTMLElement).style.color='#fff' } }}
+              onMouseLeave={e => { if (!isActive('/inbox')) { (e.currentTarget as HTMLElement).style.background='transparent'; (e.currentTarget as HTMLElement).style.color='rgba(255,255,255,0.6)' } }}>
+              <ListTodo className="h-4 w-4"/><span style={{ flex:1 }}>One-time tasks</span>
+            </Link>
+            <Link href="/inbox?new=1"
+              className="opacity-0 group-hover/nav:opacity-100 transition-opacity"
+              style={{ position:'absolute', right:6, display:'flex', alignItems:'center', justifyContent:'center',
+                width:18, height:18, borderRadius:4, color:'rgba(255,255,255,0.4)', textDecoration:'none',
+                background:'rgba(255,255,255,0.08)' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color='#fff'; (e.currentTarget as HTMLElement).style.background='rgba(13,148,136,0.3)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color='rgba(255,255,255,0.4)'; (e.currentTarget as HTMLElement).style.background='rgba(255,255,255,0.08)' }}
+              title="Add one-time task">
+              <Plus className="h-3 w-3"/>
+            </Link>
+          </div>
+        )}
+        {nav.recurring_tasks && (
+          <div className="group/nav" style={{ position:'relative', display:'flex', alignItems:'center', margin:'1px 4px' }}>
+            <Link href="/recurring" prefetch={true}
+              onClick={() => { if (!isActive('/recurring')) router.refresh() }}
+              style={{
+                flex:1, display:'flex', alignItems:'center', gap:9,
+                padding:'7px 10px', borderRadius:7, fontSize:13,
+                textDecoration:'none', transition:'all 0.12s',
+                background: isActive('/recurring') ? 'rgba(255,255,255,0.14)' : 'transparent',
+                color: isActive('/recurring') ? '#fff' : 'rgba(255,255,255,0.6)',
+                fontWeight: isActive('/recurring') ? 500 : 400,
+                borderLeft: isActive('/recurring') ? '2px solid rgba(255,255,255,0.5)' : '2px solid transparent',
+              }}
+              onMouseEnter={e => { if (!isActive('/recurring')) { (e.currentTarget as HTMLElement).style.background='rgba(255,255,255,0.08)'; (e.currentTarget as HTMLElement).style.color='#fff' } }}
+              onMouseLeave={e => { if (!isActive('/recurring')) { (e.currentTarget as HTMLElement).style.background='transparent'; (e.currentTarget as HTMLElement).style.color='rgba(255,255,255,0.6)' } }}>
+              <RefreshCw className="h-4 w-4"/><span style={{ flex:1 }}>Recurring tasks</span>
+            </Link>
+            <Link href="/recurring?new=1"
+              className="opacity-0 group-hover/nav:opacity-100 transition-opacity"
+              style={{ position:'absolute', right:6, display:'flex', alignItems:'center', justifyContent:'center',
+                width:18, height:18, borderRadius:4, color:'rgba(255,255,255,0.4)', textDecoration:'none',
+                background:'rgba(255,255,255,0.08)' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color='#fff'; (e.currentTarget as HTMLElement).style.background='rgba(13,148,136,0.3)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color='rgba(255,255,255,0.4)'; (e.currentTarget as HTMLElement).style.background='rgba(255,255,255,0.08)' }}
+              title="Add recurring task">
+              <Plus className="h-3 w-3"/>
+            </Link>
+          </div>
+        )}
         <Div/>
 
         {/* WORK */}

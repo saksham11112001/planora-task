@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState, useEffect, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { RefreshCw, X, Pencil, User, Trash2, SortAsc } from 'lucide-react'
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
 import { InlineRecurringTask, FREQ_LABEL } from '@/components/tasks/InlineRecurringTask'
@@ -72,7 +72,9 @@ export function RecurringView({
   canManage,
   userRole,
 }: Props) {
-  const router = useRouter()
+  const router       = useRouter()
+  const searchParams = useSearchParams()
+  const autoOpen     = searchParams.get('new') === '1'
   const [, startT] = useTransition()
 
   const [localTasks, setLocalTasks] = useState<Task[]>(initialTasks)
@@ -447,6 +449,11 @@ export function RecurringView({
                           >
                             {FREQ_LABEL[task.frequency ?? ''] ?? task.frequency ?? '—'}
                           </span>
+                          {task.next_occurrence_date && (
+                            <span style={{ fontSize: 10, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 2 }}>
+                              📅 {fmtDate(task.next_occurrence_date)}
+                            </span>
+                          )}
                         </div>
 
                         {task.assignee && (
@@ -962,69 +969,45 @@ export function RecurringView({
                       </div>
                     ))}
 
-                    <div style={{ padding: '4px 18px 6px 60px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div
-                          style={{
-                            width: 13,
-                            height: 13,
-                            borderRadius: '50%',
-                            flexShrink: 0,
-                            border: '1.5px dashed var(--brand)',
-                            opacity: 0.5,
-                          }}
-                        />
-                        <input
-                          value={newSubInputs[task.id] ?? ''}
-                          onChange={(e) =>
-                            setNewSubInputs((prev) => ({ ...prev, [task.id]: e.target.value }))
-                          }
-                          onKeyDown={async (e) => {
-                            if (e.key === 'Enter' && (newSubInputs[task.id] ?? '').trim()) {
-                              await addSubtask(task.id, newSubInputs[task.id], newSubAssignees[task.id], newSubDueDates[task.id])
-                            }
-                            if (e.key === 'Escape') {
-                              setNewSubInputs((prev) => ({ ...prev, [task.id]: '' }))
-                              setNewSubAssignees((prev) => ({ ...prev, [task.id]: '' }))
-                              setNewSubDueDates((prev) => ({ ...prev, [task.id]: '' }))
-                            }
-                          }}
-                          placeholder="Add subtask… (Enter)"
-                          style={{
-                            flex: 1,
-                            fontSize: 12,
-                            border: 'none',
-                            outline: 'none',
-                            background: 'transparent',
-                            color: 'var(--text-primary)',
-                          }}
-                        />
-                      </div>
-                      {(newSubInputs[task.id] ?? '').trim() && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 5, paddingLeft: 21 }}>
-                        <select
-                          value={newSubAssignees[task.id] ?? ''}
-                          onChange={e => setNewSubAssignees(prev => ({ ...prev, [task.id]: e.target.value }))}
-                          style={{ fontSize: 11, border: '1px solid var(--border)', borderRadius: 6, padding: '2px 6px', background: 'var(--surface)', color: 'var(--text-secondary)', fontFamily: 'inherit', cursor: 'pointer' }}
-                        >
-                          <option value=''>Assignee (optional)</option>
-                          {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                        </select>
-                        <input
-                          type="date"
-                          value={newSubDueDates[task.id] ?? ''}
-                          onChange={e => setNewSubDueDates(prev => ({ ...prev, [task.id]: e.target.value }))}
-                          style={{ fontSize: 11, border: '1px solid var(--border)', borderRadius: 6, padding: '2px 6px', background: 'var(--surface)', color: 'var(--text-secondary)', fontFamily: 'inherit', colorScheme: 'light dark' }}
-                        />
-                        <button
-                          onClick={async () => {
+                    {canManage && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 18px 6px 60px' }}>
+                      <div style={{ width: 13, height: 13, borderRadius: '50%', flexShrink: 0, border: '1.5px dashed var(--brand)', opacity: 0.4 }}/>
+                      <input
+                        value={newSubInputs[task.id] ?? ''}
+                        onChange={(e) => setNewSubInputs((prev) => ({ ...prev, [task.id]: e.target.value }))}
+                        onKeyDown={async (e) => {
+                          if (e.key === 'Enter' && (newSubInputs[task.id] ?? '').trim()) {
                             await addSubtask(task.id, newSubInputs[task.id], newSubAssignees[task.id], newSubDueDates[task.id])
-                          }}
-                          style={{ fontSize: 11, fontWeight: 600, padding: '2px 10px', borderRadius: 6, border: 'none', background: 'var(--brand)', color: '#fff', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}
-                        >Add</button>
-                      </div>
-                      )}
+                          }
+                          if (e.key === 'Escape') {
+                            setNewSubInputs((prev) => ({ ...prev, [task.id]: '' }))
+                            setNewSubAssignees((prev) => ({ ...prev, [task.id]: '' }))
+                            setNewSubDueDates((prev) => ({ ...prev, [task.id]: '' }))
+                          }
+                        }}
+                        placeholder="Add subtask… (Enter)"
+                        style={{ flex: 1, fontSize: 12, border: 'none', outline: 'none', background: 'transparent', color: 'var(--text-primary)', fontFamily: 'inherit' }}
+                      />
+                      <select
+                        value={newSubAssignees[task.id] ?? ''}
+                        onChange={e => setNewSubAssignees(prev => ({ ...prev, [task.id]: e.target.value }))}
+                        style={{ fontSize: 11, border: '1px solid var(--border)', borderRadius: 6, padding: '2px 4px', background: 'var(--surface)', color: 'var(--text-secondary)', fontFamily: 'inherit', cursor: 'pointer', maxWidth: 90 }}
+                      >
+                        <option value=''>Assignee</option>
+                        {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                      </select>
+                      <input
+                        type="date"
+                        value={newSubDueDates[task.id] ?? ''}
+                        onChange={e => setNewSubDueDates(prev => ({ ...prev, [task.id]: e.target.value }))}
+                        style={{ fontSize: 11, border: '1px solid var(--border)', borderRadius: 6, padding: '2px 4px', background: 'var(--surface)', color: 'var(--text-secondary)', fontFamily: 'inherit', colorScheme: 'light dark', width: 100 }}
+                      />
+                      <button
+                        onClick={async () => { await addSubtask(task.id, newSubInputs[task.id], newSubAssignees[task.id], newSubDueDates[task.id]) }}
+                        style={{ fontSize: 11, fontWeight: 600, padding: '2px 10px', borderRadius: 6, border: 'none', background: 'var(--brand)', color: '#fff', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}
+                      >Add</button>
                     </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1036,6 +1019,7 @@ export function RecurringView({
               members={members}
               clients={clients}
               currentUserId={currentUserId}
+              defaultOpen={autoOpen}
               onCreated={(newTask?: any) => {
                 if (newTask) {
                   setLocalTasks((prev) => [...prev, newTask])

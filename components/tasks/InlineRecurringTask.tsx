@@ -52,6 +52,7 @@ interface Props {
   members:        { id: string; name: string }[]
   clients?:       { id: string; name: string; color: string }[]
   currentUserId?: string
+  defaultOpen?:   boolean
   editTask?: {
     id: string; title: string; frequency: string; priority: string
     assignee_id: string | null; client_id?: string | null; approver_id?: string | null
@@ -61,7 +62,7 @@ interface Props {
   onCancelEdit?: () => void
 }
 
-export function InlineRecurringTask({ members, clients = [], currentUserId, editTask, onCreated, onEdited, onCancelEdit }: Props) {
+export function InlineRecurringTask({ members, clients = [], currentUserId, defaultOpen = false, editTask, onCreated, onEdited, onCancelEdit }: Props) {
   const router   = useRouter()
   const inputRef = useRef<HTMLInputElement>(null)
   const rowRef   = useRef<HTMLDivElement>(null)
@@ -80,7 +81,7 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, edit
   const [clientList,      setClientList]      = useState(clients)
   const [compSubtasks,   setCompSubtasks]   = useState<{title:string;required:boolean;due_date?:string;assignee_id?:string}[]>([])
   const [requireAttachment, setRequireAttachment] = useState(false)
-  const [open,      setOpen]      = useState(isEdit)
+  const [open,      setOpen]      = useState(isEdit || defaultOpen)
   const [saving,    setSaving]    = useState(false)
   const [title,     setTitle]     = useState(editTask?.title ?? '')
   const [frequency, setFrequency] = useState(editTask?.frequency ?? 'weekly_mon')
@@ -90,8 +91,9 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, edit
   const [clientId,  setClientId]  = useState(editTask?.client_id ?? '')
   const [files,     setFiles]     = useState<File[]>([])
 
+  // Auto-focus input when opened (handles both defaultOpen=true and openRow())
   useEffect(() => {
-    if (open && !isEdit) setTimeout(() => inputRef.current?.focus(), 50)
+    if (open && !isEdit) setTimeout(() => inputRef.current?.focus(), 80)
   }, [open, isEdit])
 
   const handleClickOutside = useCallback((e: MouseEvent) => {

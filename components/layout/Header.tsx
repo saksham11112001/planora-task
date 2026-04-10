@@ -151,7 +151,7 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void } = {}) {
         <Search style={{ width: 14, height: 14, color: 'var(--text-muted)', flexShrink: 0 }}/>
         <span style={{ flex: 1, textAlign: 'left', fontSize: 13, color: 'var(--text-muted)' }}>Search tasks, projects…</span>
         <kbd style={{ fontSize: 10, background: 'var(--surface)', border: '1px solid var(--border)',
-          padding: '2px 5px', borderRadius: 4, color: 'var(--text-muted)', fontFamily: 'inherit' }}>⌘K</kbd>
+          padding: '2px 5px', borderRadius: 4, color: 'var(--text-muted)', fontFamily: 'inherit' }}>Ctrl+K</kbd>
       </button>
 
       <div className="flex-1"/>
