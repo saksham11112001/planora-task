@@ -99,8 +99,13 @@ export function MyTasksView({
   const [checked,    setChecked]    = useState<Set<string>>(new Set())
   const [completing, setCompleting] = useState<Set<string>>(new Set())
   const [completingTask,  setCompletingTask]  = useState<Task | null>(null)
-  // Undo-able completions: tasks visually marked done but not yet saved, with a 2.5s undo window
-  const [pendingUndo, setPendingUndo] = useState<{ taskId: string; task: Task; timer: ReturnType<typeof setTimeout> }[]>([])
+  // Undo-able actions: task marked done or submitted for approval, with a 2.5s undo window
+  const [pendingUndo, setPendingUndo] = useState<{
+    taskId:  string
+    task:    Task
+    action:  'completed' | 'submitted'
+    timer:   ReturnType<typeof setTimeout>
+  }[]>([])
 
   const [dragOverCol,    setDragOverCol]    = useState<string | null>(null)
   const [doneExpanded,   setDoneExpanded]   = useState(false)
@@ -202,22 +207,24 @@ export function MyTasksView({
     if (res.ok) {
       const d = await res.json().catch(() => ({}))
       if (d.auto_completed) {
-        // No approver + approval not required → auto-completed with 2.5s undo window
+        // No approver required → auto-completed; show 2.5s undo banner
         const completedAt = new Date().toISOString()
         setTasks(prev => prev.map(t => t.id === task.id
           ? { ...t, status: 'completed', approval_status: 'approved', completed_at: completedAt } : t))
         setSelTask(prev => prev?.id === task.id
           ? { ...prev, status: 'completed', approval_status: 'approved' } : prev)
-        // Show undo option via toast — actual state is already applied optimistically (API already saved)
-        // We just visually flag it; "undo" will reopen via PATCH
-        toast.success('Task completed ✓')
-        // Add to pending undo list — undo just fires a PATCH to reopen
         const timer = setTimeout(() => {
           setPendingUndo(prev => prev.filter(u => u.taskId !== task.id))
         }, 2600)
-        setPendingUndo(prev => [...prev.filter(u => u.taskId !== task.id), { taskId: task.id, task, timer }])
+        setPendingUndo(prev => [...prev.filter(u => u.taskId !== task.id),
+          { taskId: task.id, task, action: 'completed', timer }])
       } else {
-        toast.success('Submitted for approval ✓')
+        // Sent for approval → show 2.5s undo banner too
+        const timer = setTimeout(() => {
+          setPendingUndo(prev => prev.filter(u => u.taskId !== task.id))
+        }, 2600)
+        setPendingUndo(prev => [...prev.filter(u => u.taskId !== task.id),
+          { taskId: task.id, task, action: 'submitted', timer }])
       }
     } else {
       // Rollback optimistic update on failure
@@ -230,22 +237,33 @@ export function MyTasksView({
     }
   }
 
-  // Fire undo — reopen the task via API
+  // Fire undo — withdraw submission or reopen completed task via API
   async function fireUndo(taskId: string) {
     const entry = pendingUndo.find(u => u.taskId === taskId)
     if (!entry) return
     clearTimeout(entry.timer)
     setPendingUndo(prev => prev.filter(u => u.taskId !== taskId))
-    // Restore to original state
+    // Restore UI to the state before the action
     setTasks(prev => prev.map(t => t.id === taskId
       ? { ...t, status: entry.task.status, approval_status: entry.task.approval_status ?? null, completed_at: null } : t))
     setSelTask(prev => prev?.id === taskId
       ? { ...prev, status: entry.task.status, approval_status: entry.task.approval_status ?? null } : prev)
-    await fetch(`/api/tasks/${taskId}`, {
+    // PATCH back to todo — server auto-clears approval_status + completed_at when status='todo'
+    const res = await fetch(`/api/tasks/${taskId}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'todo', completed_at: null }),
+      body: JSON.stringify({ status: 'todo' }),
     })
-    toast.info('Task reopened')
+    if (res.ok) {
+      toast.info(entry.action === 'submitted' ? 'Submission withdrawn' : 'Task reopened')
+    } else {
+      // Rollback the rollback — re-apply the original action state
+      setTasks(prev => prev.map(t => t.id === taskId
+        ? { ...t,
+            status: entry.action === 'completed' ? 'completed' : 'in_review' as any,
+            approval_status: entry.action === 'completed' ? 'approved' : 'pending',
+          } : t))
+      toast.error('Could not undo — please try manually')
+    }
   }
 
   function handleDragStart(taskId: string) {
@@ -266,26 +284,35 @@ export function MyTasksView({
 
     // Dragging to completed or in_review → always submit for approval
     if (newStatus === 'completed' || newStatus === 'in_review') {
+      const droppedTaskId = dragTaskId   // capture before clearing
       setDragTaskId(null); setDragOverCol(null)
       // Optimistic: show as pending immediately
-      setTasks(prev => prev.map(t => t.id === dragTaskId
+      setTasks(prev => prev.map(t => t.id === droppedTaskId
         ? { ...t, status: 'in_review' as any, approval_status: 'pending' } : t))
-      const res = await fetch(`/api/tasks/${dragTaskId}/approve`, {
+      const res = await fetch(`/api/tasks/${droppedTaskId}/approve`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ decision: 'submit' }),
       })
       if (res.ok) {
         const d = await res.json().catch(() => ({}))
         if (d.auto_completed) {
-          setTasks(prev => prev.map(t => t.id === dragTaskId
+          setTasks(prev => prev.map(t => t.id === droppedTaskId
             ? { ...t, status: 'completed' as any, approval_status: 'approved', completed_at: new Date().toISOString() } : t))
-          toast.success('Task completed ✓')
+          const timer = setTimeout(() => {
+            setPendingUndo(prev => prev.filter(u => u.taskId !== droppedTaskId))
+          }, 2600)
+          setPendingUndo(prev => [...prev.filter(u => u.taskId !== droppedTaskId),
+            { taskId: droppedTaskId, task, action: 'completed', timer }])
         } else {
-          toast.success('Submitted for approval ✓')
+          const timer = setTimeout(() => {
+            setPendingUndo(prev => prev.filter(u => u.taskId !== droppedTaskId))
+          }, 2600)
+          setPendingUndo(prev => [...prev.filter(u => u.taskId !== droppedTaskId),
+            { taskId: droppedTaskId, task, action: 'submitted', timer }])
         }
       } else {
         // Rollback
-        setTasks(prev => prev.map(t => t.id === dragTaskId
+        setTasks(prev => prev.map(t => t.id === droppedTaskId
           ? { ...t, status: task.status as any, approval_status: task.approval_status ?? null } : t))
         const d = await res.json().catch(() => ({}))
         toast.error(d.error ?? 'Could not submit for approval')
@@ -468,7 +495,9 @@ export function MyTasksView({
               fontSize:13, fontWeight:500, minWidth:280,
             }}>
               <span style={{ flex:1, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
-                ✓ "{tasks.find(t => t.id === u.taskId)?.title ?? 'Task'}" completed
+                {u.action === 'completed' ? '✓' : '⏳'}{' '}
+                "{tasks.find(t => t.id === u.taskId)?.title ?? 'Task'}"{' '}
+                {u.action === 'completed' ? 'completed' : 'submitted for approval'}
               </span>
               <button onClick={() => fireUndo(u.taskId)}
                 style={{ padding:'4px 12px', borderRadius:6, border:'1px solid rgba(255,255,255,0.25)',

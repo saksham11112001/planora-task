@@ -139,6 +139,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   ]
   const updates: Record<string, unknown> = {}
   for (const k of ALLOWED) { if (k in body) updates[k] = body[k] }
+  // Always allow approval_status + completed_at clear when reopening to 'todo'
+  if (updates.status === 'todo') {
+    updates.approval_status = null
+    updates.completed_at    = null
+  }
   if (!Object.keys(updates).length)
     return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
 
