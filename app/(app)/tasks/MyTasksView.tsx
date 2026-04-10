@@ -90,8 +90,9 @@ export function MyTasksView({
   const today      = todayStr()
   const canManage  = ['owner','admin','manager'].includes(userRole ?? '')
 
-  const [tasks,        setTasks]        = useState<Task[]>(initialTasks)
-  const [pendingTasks, setPendingTasks] = useState<Task[]>(pendingApprovalTasks)
+  const [tasks,           setTasks]           = useState<Task[]>(initialTasks)
+  const [pendingTasks,    setPendingTasks]    = useState<Task[]>(pendingApprovalTasks)
+  const [assignedByMeList, setAssignedByMeList] = useState<Task[]>(assignedByMeTasks)
   const [tab,          setTab]          = useState<'List'|'Board'>('Board')
   const [selTask,    setSelTask]    = useState<Task | null>(null)
   const [dragTaskId, setDragTaskId] = useState<string | null>(null)
@@ -138,7 +139,7 @@ export function MyTasksView({
     return true
   })
 
-  const displayTasks = showAssignedByMe ? assignedByMeTasks : filteredTasks
+  const displayTasks = showAssignedByMe ? assignedByMeList : filteredTasks
 
   // Subtasks load lazily on user click only
 
@@ -313,6 +314,7 @@ export function MyTasksView({
     if (!confirm(`Delete ${ids.length} task(s)? They will be moved to Trash.`)) return
     setChecked(new Set())
     setTasks(prev => prev.filter(t => !ids.includes(t.id)))
+    setAssignedByMeList(prev => prev.filter(t => !ids.includes(t.id)))
     const results = await Promise.all(ids.map(id => fetch(`/api/tasks/${id}`, { method: 'DELETE' })))
     const failed = results.filter(r => !r.ok).length
     if (ids.length - failed > 0) toast.success(`${ids.length - failed} task(s) deleted`)
@@ -354,6 +356,7 @@ export function MyTasksView({
   async function deleteTask(taskId: string) {
     if (!confirm('Delete this task? It will move to Trash.')) return
     setTasks(prev => prev.filter(t => t.id !== taskId))
+    setAssignedByMeList(prev => prev.filter(t => t.id !== taskId))
     const res = await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' })
     if (!res.ok) {
       toast.error('Could not delete task')
