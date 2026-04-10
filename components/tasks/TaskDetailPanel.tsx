@@ -897,15 +897,15 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                   )})}
                 </div>
 
-                {/* Inline add subtask - only for managers and main task assignee */}
+                {/* Inline add subtask - title + assignee + due date on ONE row */}
                 {canEdit && <div style={{
-                  padding: '8px 20px', borderTop: subtasks.length > 0 ? '1px dashed var(--border)' : 'none',
-                  marginTop: subtasks.length === 0 ? 0 : 4,
+                  padding: '6px 20px', borderTop: subtasks.length > 0 ? '1px dashed var(--border)' : 'none',
+                  marginTop: subtasks.length === 0 ? 0 : 2,
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <div style={{
-                      width: 16, height: 16, borderRadius: '50%', flexShrink: 0,
-                      border: '2px dashed var(--brand)', opacity: 0.5,
+                      width: 14, height: 14, borderRadius: '50%', flexShrink: 0,
+                      border: '2px dashed var(--brand)', opacity: 0.4,
                     }}/>
                     <input
                       value={newSubtitle}
@@ -914,57 +914,52 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                         if (e.key === 'Enter' && newSubtitle.trim()) addSubtask()
                         if (e.key === 'Escape') { setNewSubtitle(''); setNewSubAssigneeId(''); setNewSubDueDate('') }
                       }}
-                      placeholder="Subtask title…"
+                      placeholder="Add subtask…"
                       style={{
-                        flex: 1, minWidth: 120, fontSize: 13, border: 'none', outline: 'none',
-                        background: 'transparent', color: 'var(--text-primary)',
+                        flex: 1, minWidth: 80, fontSize: 12, border: 'none', outline: 'none',
+                        background: 'transparent', color: 'var(--text-primary)', fontFamily: 'inherit',
                       }}
                     />
-                  </div>
-                  {newSubtitle.trim() && (
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: 8, paddingLeft: 24,
-                    marginTop: 2,
-                    opacity: 1, transition: 'opacity 0.15s',
-                  }}>
+                    {/* Assignee + Due date inline — always visible */}
                     <select
                       value={newSubAssigneeId}
                       onChange={e => setNewSubAssigneeId(e.target.value)}
                       style={{
-                        fontSize: 11, padding: '3px 8px', borderRadius: 6,
+                        fontSize: 11, padding: '3px 6px', borderRadius: 6, flexShrink: 0,
                         border: '1px solid var(--border)', background: 'var(--surface-subtle)',
                         color: newSubAssigneeId ? 'var(--text-primary)' : 'var(--text-muted)',
-                        outline: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                        outline: 'none', cursor: 'pointer', fontFamily: 'inherit', maxWidth: 110,
                       }}
                     >
-                      <option value="">Assignee (same as task)</option>
-                      {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                      <option value="">Assignee…</option>
+                      {members.map(m => <option key={m.id} value={m.id}>{m.name.split(' ')[0]}</option>)}
                     </select>
                     <input
                       type="date"
                       value={newSubDueDate}
                       onChange={e => setNewSubDueDate(e.target.value)}
                       style={{
-                        fontSize: 11, padding: '3px 8px', borderRadius: 6,
+                        fontSize: 11, padding: '3px 6px', borderRadius: 6, flexShrink: 0,
                         border: '1px solid var(--border)', background: 'var(--surface-subtle)',
                         color: newSubDueDate ? 'var(--text-primary)' : 'var(--text-muted)',
-                        outline: 'none', colorScheme: 'light dark', fontFamily: 'inherit',
+                        outline: 'none', colorScheme: 'light dark', fontFamily: 'inherit', width: 110,
                       }}
                     />
-                    {addingSub ? (
-                      <span style={{ fontSize: 11, color: 'var(--brand)' }}>Saving…</span>
-                    ) : (
-                      <button onClick={addSubtask}
-                        style={{
-                          fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 6,
-                          background: 'var(--brand)', color: '#fff', border: 'none', cursor: 'pointer',
-                          flexShrink: 0, fontFamily: 'inherit',
-                        }}>
-                        Add
-                      </button>
+                    {newSubtitle.trim() && (
+                      addingSub ? (
+                        <span style={{ fontSize: 11, color: 'var(--brand)', flexShrink: 0 }}>…</span>
+                      ) : (
+                        <button onClick={addSubtask}
+                          style={{
+                            fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 6,
+                            background: 'var(--brand)', color: '#fff', border: 'none', cursor: 'pointer',
+                            flexShrink: 0, fontFamily: 'inherit',
+                          }}>
+                          Add
+                        </button>
+                      )
                     )}
                   </div>
-                  )}
                 </div>}
 
                 {/* Progress */}

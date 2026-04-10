@@ -220,13 +220,13 @@ function MetricRow({ label, value, color, bar, barColor }: {
 }
 
 export function ReportsCharts({ dailyData, memberData, priorityData, projectData, timeByProject, employeeStats, currentUserId, userRole, clients = [] }: Props) {
-  const [activeTab,    setActiveTab]    = useState<'overview' | 'employees'>('overview')
+  const [activeTab,    setActiveTab]    = useState<'overview' | 'team'>('overview')
   const [clientFilter, setClientFilter] = useState('')
   const [timeline,     setTimeline]     = useState<'30' | '60' | '90' | '365'>('90')
   const [empFilter,    setEmpFilter]    = useState('')
   const canViewAll = !userRole || ['owner','admin','manager'].includes(userRole)
 
-  // Role-based employee list: members/viewers see only themselves
+  // Role-based member list: members/viewers see only themselves
   // Timeline filter: slice weeklyTrend to match selected days
   const timelineDays = parseInt(timeline)
   const timelineWeeks = Math.ceil(timelineDays / 7)
@@ -274,7 +274,7 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
       )}
       {/* Tab bar */}
       <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 20, background: 'var(--surface)', borderRadius: '8px 8px 0 0' }}>
-        {(['overview', 'employees'] as const).map(tab => (
+        {(['overview', 'team'] as const).map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)}
             style={{
               padding: '10px 20px', fontSize: 13, fontWeight: 500, border: 'none',
@@ -283,7 +283,7 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
               color: activeTab === tab ? 'var(--brand)' : 'var(--text-muted)',
               textTransform: 'capitalize',
             }}>
-            {tab === 'employees' ? '👤 Employee Performance' : '📊 Overview'}
+            {tab === 'team' ? '👤 Team Performance' : '📊 Overview'}
           </button>
         ))}
       </div>
@@ -383,8 +383,8 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
         </div>
       )}
 
-      {/* ── EMPLOYEE PERFORMANCE TAB ──────────────────────────── */}
-      {activeTab === 'employees' && (
+      {/* ── TEAM PERFORMANCE TAB ──────────────────────────── */}
+      {activeTab === 'team' && (
         <div>
           {/* Timeline + filter toolbar */}
           <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:16, flexWrap:'wrap' }}>
@@ -404,7 +404,7 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
               <select value={empFilter} onChange={e => setEmpFilter(e.target.value)}
                 style={{ padding:'6px 12px', borderRadius:8, border:'1px solid var(--border)',
                   background:'var(--surface)', fontSize:12, color:'var(--text-primary)', cursor:'pointer' }}>
-                <option value="">All employees</option>
+                <option value="">All members</option>
                 {employeeStats.map(e => <option key={e.uid} value={e.uid}>{e.name}</option>)}
               </select>
             )}

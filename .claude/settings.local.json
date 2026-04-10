@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -r \"Employees\" . --include=\"*.tsx\" --include=\"*.ts\" ! -path \"./.next/*\" ! -path \"./node_modules/*\")",
+      "Bash(grep -E \"\\\\.\\(tsx|ts\\)$\")",
+      "Bash(dir \"C:\\\\Users\\\\saksh\\\\Desktop\\\\planora-task\\\\app\\\\api\")"
+    ]
+  }
+}

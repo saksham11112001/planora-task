@@ -1,8 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { ArrowRight, CheckSquare, FolderOpen, Users2, BarChart2,
-         Calendar, Clock, AlertCircle, CheckCircle2, TrendingUp,
-         Star, Zap, RefreshCw, Plus } from 'lucide-react'
+         Calendar, CheckCircle2, TrendingUp, RefreshCw, Plus } from 'lucide-react'
 import { fmtDate } from '@/lib/utils/format'
 
 interface Props {
@@ -23,38 +22,6 @@ const QUICK_ACTIONS = [
   { icon: BarChart2,   label: 'Reports',         href: '/reports',      color: '#ca8a04' },
 ]
 
-function MiniAppCard({ title, color, tasks }: { title: string; color: string; tasks: string[] }) {
-  return (
-    <div style={{
-      background: 'rgba(255,255,255,0.07)',
-      backdropFilter: 'blur(12px)',
-      borderRadius: 12, padding: '12px 14px', minWidth: 160,
-      boxShadow: '0 4px 24px rgba(0,0,0,0.25)',
-      border: '1px solid rgba(255,255,255,0.12)',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-        <div style={{ width: 8, height: 8, borderRadius: '50%', background: color }}/>
-        <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.9)', overflow: 'hidden',
-          whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{title}</span>
-      </div>
-      {tasks.map((t, i) => (
-        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
-          <div style={{ width: 13, height: 13, borderRadius: '50%', flexShrink: 0,
-            background: i === 0 ? color : 'transparent',
-            border: i === 0 ? 'none' : '1.5px solid rgba(255,255,255,0.2)' }}/>
-          <span style={{ fontSize: 10,
-            color: i === 0 ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.75)',
-            textDecoration: i === 0 ? 'line-through' : 'none',
-            overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', flex: 1 }}>{t}</span>
-        </div>
-      ))}
-      <div style={{ marginTop: 8, height: 3, background: 'rgba(255,255,255,0.12)', borderRadius: 99 }}>
-        <div style={{ width: `${Math.round(100 / tasks.length)}%`, height: '100%',
-          background: color, borderRadius: 99 }}/>
-      </div>
-    </div>
-  )
-}
 
 export function DashboardClient({
   greeting, name, today,
@@ -139,16 +106,6 @@ export function DashboardClient({
             </div>
           </div>
 
-          {/* Right: mini app previews */}
-          <div style={{ display: 'flex', gap: 12, flexShrink: 0, position: 'relative', zIndex: 1 }}
-            className="hidden lg:flex">
-            <MiniAppCard title="Website Redesign" color="#0d9488"
-              tasks={['Homepage copy review','SEO audit','Brand refresh','Launch checklist']}/>
-            <div style={{ marginTop: 20 }}>
-              <MiniAppCard title="Client Onboarding" color="#7c3aed"
-                tasks={['Intro call complete','Send contract','Setup workspace','Handover call']}/>
-            </div>
-          </div>
         </div>
 
         {/* Bottom stats strip */}
