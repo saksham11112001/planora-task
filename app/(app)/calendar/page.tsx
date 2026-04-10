@@ -23,7 +23,7 @@ export default async function CalendarPage() {
 
   const taskQuery = supabase.from('tasks')
     .select('id, title, status, priority, due_date, is_recurring, project_id, assignee_id, approver_id, approval_status, approval_required, client_id, frequency, custom_fields, projects(id,name,color), assignee:users!tasks_assignee_id_fkey(id,name), approver:users!tasks_approver_id_fkey(id,name)')
-    .eq('org_id', orgId).not('due_date', 'is', null).neq('is_archived', true)
+    .eq('org_id', orgId).not('due_date', 'is', null).neq('is_archived', true).is('parent_task_id', null)
     .gte('due_date', from.toISOString().split('T')[0])
     .lte('due_date', to.toISOString().split('T')[0])
 

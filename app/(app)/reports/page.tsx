@@ -46,7 +46,7 @@ export default async function ReportsPage() {
   ] = await Promise.all([
     supabase.from('tasks')
       .select('id, title, status, priority, due_date, assignee_id, created_at, completed_at, project_id')
-      .eq('org_id', orgId).eq('is_recurring', false).gte('created_at', from90),
+      .eq('org_id', orgId).eq('is_recurring', false).neq('is_archived', true).is('parent_task_id', null).gte('created_at', from90),
     supabase.from('time_logs')
       .select('hours, is_billable, project_id, logged_date, user_id')
       .eq('org_id', orgId).gte('logged_date', from30.split('T')[0]),

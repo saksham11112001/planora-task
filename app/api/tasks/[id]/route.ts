@@ -220,10 +220,18 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   if (deleteDenied) return NextResponse.json({ error: deleteDenied.error }, { status: deleteDenied.status })
   // Soft delete — move to trash with deleted_at timestamp
   // Tasks are permanently purged after 30 days via cron
+  const deletedAt = new Date().toISOString()
   const { error } = await supabase
     .from('tasks')
-    .update({ is_archived: true, deleted_at: new Date().toISOString() })
+    .update({ is_archived: true, deleted_at: deletedAt })
     .eq('id', id).eq('org_id', mb.org_id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Also archive all subtasks so they don't linger in other views
+  await supabase
+    .from('tasks')
+    .update({ is_archived: true, deleted_at: deletedAt })
+    .eq('parent_task_id', id).eq('org_id', mb.org_id)
+
   return NextResponse.json({ success: true })
 }
