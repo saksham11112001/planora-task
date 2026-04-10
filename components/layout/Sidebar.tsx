@@ -1,13 +1,13 @@
 'use client'
 import Link                       from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import {
   CheckSquare,
   Home, ListTodo, Users2, FolderOpen,
   RefreshCw, Users, BarChart2, Settings, Plus,
   ChevronDown, ChevronRight, Clock, Zap, X, Upload,
-  Calendar, Shield, LogOut, FileCheck,
+  Calendar, Shield, LogOut, FileCheck, ArrowRight,
 } from 'lucide-react'
 import { cn }            from '@/lib/utils/cn'
 import { createClient }  from '@/lib/supabase/client'
@@ -15,7 +15,7 @@ import { useAppStore }   from '@/store/appStore'
 import { PlanBadge }     from '@/components/ui/Badge'
 import { useOrgSettings } from '@/lib/hooks/useOrgSettings'
 
-interface Project { id: string; name: string; color: string }
+interface Project { id: string; name: string; color: string; status?: string }
 
 let _projectCache: Project[] = []
 let _cacheTime    = 0
@@ -24,9 +24,13 @@ const CACHE_TTL   = 60_000
 export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
   const pathname    = usePathname()
   const { session } = useAppStore()
-  const [projectsOpen, setProjectsOpen] = useState(true)
+  const [projectsOpen, setProjectsOpen] = useState(false)
   const [projects, setProjects]         = useState<Project[]>(_projectCache)
-  const fetchRef = useRef(false)
+  const [flyoutOpen,    setFlyoutOpen]    = useState(false)
+  const [allProjects,   setAllProjects]   = useState<Project[]>([])
+  const [flyoutLoading, setFlyoutLoading] = useState(false)
+  const fetchRef  = useRef(false)
+  const flyoutRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const now = Date.now()
@@ -43,6 +47,29 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
 
   useEffect(() => { if (pathname === '/projects') _cacheTime = 0 }, [pathname])
 
+  // Close flyout on outside click
+  useEffect(() => {
+    if (!flyoutOpen) return
+    function handler(e: MouseEvent) {
+      if (flyoutRef.current && !flyoutRef.current.contains(e.target as Node)) {
+        setFlyoutOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [flyoutOpen])
+
+  const openFlyout = useCallback(async () => {
+    setFlyoutOpen(true)
+    if (allProjects.length > 0) return
+    setFlyoutLoading(true)
+    try {
+      const r = await fetch('/api/projects?limit=100')
+      const d = await r.json()
+      if (Array.isArray(d.data)) setAllProjects(d.data)
+    } catch {} finally { setFlyoutLoading(false) }
+  }, [allProjects.length])
+
   function isActive(href: string, exact = false) {
     if (exact) return pathname === href
     return pathname === href || pathname.startsWith(href + '/')
@@ -58,6 +85,7 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
   const nav = navFeatures
 
   return (
+    <>
     <aside style={{ width: 236, background: '#0f172a', display: 'flex', flexDirection: 'column', height: '100%' }}>
 
       {/* ── Brand ── */}
@@ -118,7 +146,6 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
         </div>
         {projectsOpen && (
           <>
-            <SI href="/projects" active={pathname === '/projects'} icon={<FolderOpen className="h-3.5 w-3.5"/>} label="All projects"/>
             {projects.slice(0, 4).map(p => (
               <Link key={p.id} href={`/projects/${p.id}`}
                 className={cn('flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm transition-colors',
@@ -129,14 +156,12 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
                 <span className="truncate text-xs">{p.name}</span>
               </Link>
             ))}
-            {projects.length > 4 && (
-              <Link href="/projects"
-                className="flex items-center gap-2 px-3 py-1.5 rounded-md transition-colors text-white/40 hover:text-white/70 hover:bg-white/5"
-                style={{ fontSize: 11 }}>
-                <span style={{ fontSize: 10 }}>•••</span>
-                <span>{projects.length - 4} more project{projects.length - 4 > 1 ? 's' : ''}</span>
-              </Link>
-            )}
+            <button onClick={openFlyout}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-md w-full transition-colors text-white/40 hover:text-white/70 hover:bg-white/5"
+              style={{ fontSize: 11, border: 'none', background: 'none', cursor: 'pointer', textAlign: 'left' }}>
+              <span style={{ fontSize: 10 }}>•••</span>
+              <span>Show more</span>
+            </button>
           </>
         )}
         {nav.clients && <SI href="/clients"    active={isActive('/clients')}    icon={<Users2    className="h-4 w-4"/>} label="Clients"/>}
@@ -274,6 +299,85 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
       </div>
 
     </aside>
+
+    {/* ── Projects Flyout Panel ── */}
+    {flyoutOpen && (
+      <div ref={flyoutRef} style={{
+        position: 'fixed', left: 236, top: 0, height: '100vh', width: 252,
+        background: '#0f172a', borderRight: '1px solid rgba(255,255,255,0.1)',
+        boxShadow: '6px 0 28px rgba(0,0,0,0.45)', zIndex: 300,
+        display: 'flex', flexDirection: 'column',
+      }}>
+        {/* Header */}
+        <div style={{ padding: '13px 14px', borderBottom: '1px solid rgba(255,255,255,0.08)',
+          display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <FolderOpen style={{ width: 15, height: 15, color: 'rgba(255,255,255,0.4)', flexShrink: 0 }}/>
+          <span style={{ color: '#fff', fontWeight: 600, fontSize: 13, flex: 1 }}>Projects</span>
+          <button onClick={() => setFlyoutOpen(false)}
+            style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.35)',
+              cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center' }}
+            className="hover:text-white transition-colors">
+            <X style={{ width: 15, height: 15 }}/>
+          </button>
+        </div>
+
+        {/* Scrollable project list */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 8px', scrollbarWidth: 'none' }}>
+          {flyoutLoading && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: '28px 0', gap: 8 }}>
+              <div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.15)',
+                borderTopColor: '#14b8a6', borderRadius: '50%',
+                animation: 'spin 0.7s linear infinite' }}/>
+              <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12 }}>Loading…</span>
+            </div>
+          )}
+          {!flyoutLoading && allProjects.length === 0 && (
+            <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12, textAlign: 'center', padding: '24px 0' }}>
+              No projects yet
+            </p>
+          )}
+          {allProjects.map(p => (
+            <Link key={p.id} href={`/projects/${p.id}`}
+              onClick={() => setFlyoutOpen(false)}
+              className={cn('flex items-center gap-2.5 px-3 py-2 rounded-md transition-colors',
+                pathname.startsWith(`/projects/${p.id}`)
+                  ? 'bg-white/15 text-white font-medium'
+                  : 'text-white/55 hover:bg-white/10 hover:text-white')}
+              style={{ textDecoration: 'none' }}>
+              <span style={{ width: 9, height: 9, borderRadius: 3, background: p.color, flexShrink: 0, display: 'inline-block' }}/>
+              <span style={{ fontSize: 12, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', flex: 1 }}>
+                {p.name}
+              </span>
+              {p.status && p.status !== 'active' && (
+                <span style={{ fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em',
+                  color: p.status === 'completed' ? '#2dd4bf' : p.status === 'on_hold' ? '#f59e0b' : 'rgba(255,255,255,0.3)',
+                  flexShrink: 0 }}>
+                  {p.status.replace('_', ' ')}
+                </span>
+              )}
+            </Link>
+          ))}
+        </div>
+
+        {/* Footer — show all link */}
+        <div style={{ padding: '8px', borderTop: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
+          <Link href="/projects" onClick={() => setFlyoutOpen(false)}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              padding: '9px 12px', borderRadius: 8,
+              background: 'rgba(13,148,136,0.14)',
+              border: '1px solid rgba(13,148,136,0.25)',
+              color: '#2dd4bf', textDecoration: 'none',
+              fontSize: 12, fontWeight: 600, transition: 'all 0.15s' }}
+            className="hover:bg-teal-500/20 transition-colors">
+            <FolderOpen style={{ width: 13, height: 13 }}/>
+            All projects
+            <ArrowRight style={{ width: 12, height: 12, marginLeft: 2 }}/>
+          </Link>
+        </div>
+      </div>
+    )}
+    </>
   )
 }
 
