@@ -21,7 +21,7 @@ interface Props {
   currentUserId: string
   userRole?: string
 }
-type Filter = 'all' | 'project' | 'one-time' | 'recurring'
+type Filter = 'all' | 'compliance' | 'project' | 'one-time' | 'recurring'
 type ViewMode = 'month' | 'timeline'
 
 const PRIORITY_COLORS: Record<string,string> = {
@@ -101,9 +101,10 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
   function goToday()   { setYear(now.getFullYear()); setMonth(now.getMonth()); setSelected(null) }
 
   const filtered = tasks.filter(t => {
-    if (filter==='project')   return !!t.project_id && !t.is_recurring
-    if (filter==='one-time')  return !t.project_id && !t.is_recurring
-    if (filter==='recurring') return t.is_recurring
+    if (filter==='compliance') return !!t.custom_fields?._ca_compliance
+    if (filter==='project')    return !!t.project_id && !t.is_recurring
+    if (filter==='one-time')   return !t.project_id && !t.is_recurring && !t.custom_fields?._ca_compliance
+    if (filter==='recurring')  return t.is_recurring
     return true
   }).filter(t => {
     if (clientFilter && (t as any).client?.id !== clientFilter) return false
@@ -129,10 +130,11 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
   const selectedTasks = selected ? (byDate[selected]??[]) : []
 
   const FILTERS = [
-    { v:'all'       as Filter, label:'All',        icon:CheckSquare, color:'#0d9488', bg:'rgba(13,148,136,0.12)' },
-    { v:'project'   as Filter, label:'Projects',   icon:FolderOpen,  color:'#7c3aed', bg:'rgba(124,58,237,0.12)' },
-    { v:'one-time'  as Filter, label:'One-time',   icon:CheckSquare, color:'#0891b2', bg:'rgba(8,145,178,0.12)' },
-    { v:'recurring' as Filter, label:'Recurring',  icon:RefreshCw,   color:'#ea580c', bg:'rgba(234,88,12,0.12)' },
+    { v:'all'        as Filter, label:'All',         icon:CheckSquare, color:'#0d9488', bg:'rgba(13,148,136,0.12)' },
+    { v:'compliance' as Filter, label:'Compliance',  icon:AlertTriangle, color:'#d97706', bg:'rgba(234,179,8,0.12)' },
+    { v:'project'    as Filter, label:'Projects',    icon:FolderOpen,  color:'#7c3aed', bg:'rgba(124,58,237,0.12)' },
+    { v:'one-time'   as Filter, label:'One-time',    icon:CheckSquare, color:'#0891b2', bg:'rgba(8,145,178,0.12)' },
+    { v:'recurring'  as Filter, label:'Recurring',   icon:RefreshCw,   color:'#ea580c', bg:'rgba(234,88,12,0.12)' },
   ]
 
   const monthStr = `${year}-${String(month+1).padStart(2,'0')}`

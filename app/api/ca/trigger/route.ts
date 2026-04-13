@@ -72,8 +72,10 @@ export async function POST() {
     if (Object.keys(dates).length === 0) { skipped++; continue }
 
     // Use the assignment's start_date as the lower bound for backfill.
-    // If no start_date is set, apply no lower bound — spawn all triggered tasks.
-    const startDateStr: string = (asgn as any).start_date ?? '2000-01-01'
+    // If no start_date is set, default to today so we never accidentally spawn
+    // past-due tasks for newly onboarded clients (same guard as the daily cron).
+    // Admins who need to backfill past months must set start_date on the assignment first.
+    const startDateStr: string = (asgn as any).start_date ?? today
 
     for (const [monthKey, dueDateStr] of Object.entries(dates)) {
       if (!dueDateStr) continue

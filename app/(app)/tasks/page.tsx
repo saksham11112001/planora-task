@@ -27,6 +27,7 @@ export default async function MyTasksPage() {
       { data: members },
       { data: clientsData },   // single clients fetch — includes status for filter
       { data: assignedByMeRaw },
+      { data: allComplianceRaw },
     ] = await Promise.all([
       // My tasks (assigned to me, all statuses — includes subtasks assigned to me)
       supabase.from('tasks').select(TASK_COLS)
@@ -51,6 +52,12 @@ export default async function MyTasksPage() {
         .eq('org_id', mb.org_id).eq('created_by', user.id)
         .neq('is_archived', true).is('parent_task_id', null)
         .or('custom_fields.is.null,custom_fields.not.cs.{"_ca_compliance":true}')
+        .order('due_date', { ascending: true, nullsFirst: false }),
+
+      // All org CA compliance tasks — shown to everyone (matching CA module page behaviour)
+      supabase.from('tasks').select(TASK_COLS)
+        .eq('org_id', mb.org_id).neq('is_archived', true).is('parent_task_id', null)
+        .contains('custom_fields', { _ca_compliance: true })
         .order('due_date', { ascending: true, nullsFirst: false }),
     ])
 
@@ -90,7 +97,13 @@ export default async function MyTasksPage() {
     // Use assignedByMe results only if user is a manager
     const assignedByMeTasks = isManager ? (assignedByMeRaw ?? []) : []
 
-    const taskList     = (tasks ?? []).filter(isVisible).map(enrich)
+    // Merge all-org compliance tasks into the task list (dedup by ID).
+    // This mirrors what the CA module page shows — compliance tasks are org-wide.
+    const assignedIds = new Set((tasks ?? []).map((t: any) => t.id))
+    const extraCompliance = (allComplianceRaw ?? []).filter((t: any) => !assignedIds.has(t.id))
+    const mergedTasks = [...(tasks ?? []), ...extraCompliance]
+
+    const taskList     = mergedTasks.filter(isVisible).map(enrich)
     const approvalList = (approvalTasks ?? [])
       .filter(t => {
         const approverId = (t as any).approver_id

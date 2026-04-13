@@ -21,18 +21,37 @@ export default async function CalendarPage() {
   const from = new Date(); from.setMonth(from.getMonth() - 6)
   const to   = new Date(); to.setMonth(to.getMonth() + 6)
 
-  const taskQuery = supabase.from('tasks')
-    .select('id, title, status, priority, due_date, is_recurring, project_id, assignee_id, approver_id, approval_status, approval_required, client_id, frequency, custom_fields, projects(id,name,color), assignee:users!tasks_assignee_id_fkey(id,name), approver:users!tasks_approver_id_fkey(id,name)')
-    .eq('org_id', orgId).not('due_date', 'is', null).neq('is_archived', true).is('parent_task_id', null)
-    .gte('due_date', from.toISOString().split('T')[0])
-    .lte('due_date', to.toISOString().split('T')[0])
+  const TASK_SELECT = 'id, title, status, priority, due_date, is_recurring, project_id, assignee_id, approver_id, approval_status, approval_required, client_id, frequency, custom_fields, projects(id,name,color), assignee:users!tasks_assignee_id_fkey(id,name), approver:users!tasks_approver_id_fkey(id,name)'
+  const dateFrom = from.toISOString().split('T')[0]
+  const dateTo   = to.toISOString().split('T')[0]
 
-  const [tasksResult, { data: clients }, { data: members }] = await Promise.all([
+  const taskQuery = supabase.from('tasks')
+    .select(TASK_SELECT)
+    .eq('org_id', orgId).not('due_date', 'is', null).neq('is_archived', true).is('parent_task_id', null)
+    .gte('due_date', dateFrom)
+    .lte('due_date', dateTo)
+
+  // Members see only their assigned tasks, but ALL CA compliance tasks should be
+  // visible org-wide (matching what the CA module page shows).
+  const complianceQuery = supabase.from('tasks')
+    .select(TASK_SELECT)
+    .eq('org_id', orgId).not('due_date', 'is', null).neq('is_archived', true).is('parent_task_id', null)
+    .gte('due_date', dateFrom)
+    .lte('due_date', dateTo)
+    .contains('custom_fields', { _ca_compliance: true })
+
+  const [tasksResult, complianceResult, { data: clients }, { data: members }] = await Promise.all([
     canViewAll ? taskQuery : taskQuery.eq('assignee_id', user.id),
+    canViewAll ? Promise.resolve({ data: [] as any[] }) : complianceQuery,
     supabase.from('clients').select('id, name, color').eq('org_id', mb.org_id).eq('status','active').order('name'),
     supabase.from('org_members').select('user_id, users(id, name)').eq('org_id', mb.org_id).eq('is_active', true),
   ])
-  const { data: tasks } = tasksResult
+
+  // Merge assigned tasks with compliance tasks (dedup by ID)
+  const assignedTasks = tasksResult.data ?? []
+  const complianceTasks = (complianceResult as any).data ?? []
+  const assignedIds = new Set(assignedTasks.map((t: any) => t.id))
+  const tasks = [...assignedTasks, ...complianceTasks.filter((t: any) => !assignedIds.has(t.id))]
   const memberList = (members ?? []).map((m: any) => ({ id: m.users?.id ?? m.user_id, name: m.users?.name ?? 'Unknown' }))
 
   // Build client map for task enrichment
