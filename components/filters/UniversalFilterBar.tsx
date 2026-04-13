@@ -133,7 +133,7 @@ export function UniversalFilterBar({
   return (
     <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 18px',
       borderBottom:'1px solid var(--border-light)', background:'var(--surface)',
-      flexShrink:0, flexWrap:'wrap', overflowX:'auto' }}>
+      flexShrink:0, flexWrap:'wrap', position:'relative', zIndex:10 }}>
 
       {showSearch && (
         <div style={{ display:'flex', alignItems:'center', gap:6, background:'var(--surface-subtle)',
@@ -206,7 +206,7 @@ export function UniversalFilterBar({
           )}
 
           {dateOpen && (
-            <div style={{ position:'absolute', top:'calc(100% + 6px)', left:0, zIndex:200,
+            <div style={{ position:'absolute', top:'calc(100% + 6px)', left:0, zIndex:1000,
               background:'var(--surface)', border:'1px solid var(--border)', borderRadius:12,
               boxShadow:'0 10px 40px rgba(0,0,0,0.15)', padding:'10px 12px', minWidth:260 }}>
 
