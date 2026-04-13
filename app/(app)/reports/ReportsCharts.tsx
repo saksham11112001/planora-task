@@ -237,19 +237,22 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
     ? baseStats.filter(e => e.uid === empFilter || e.name.toLowerCase().includes(empFilter.toLowerCase()))
     : baseStats
   ).map(e => {
-    const slicedTrend = e.weeklyTrend.slice(-Math.min(timelineWeeks, e.weeklyTrend.length))
-    // Recompute totals from weekly trend for the selected timeline
-    const filteredCompleted  = slicedTrend.reduce((s: number, w: any) => s + w.completed, 0)
-    const filteredAssigned   = slicedTrend.reduce((s: number, w: any) => s + w.assigned, 0)
+    // For the default '90' view, use server-computed values directly (most accurate).
+    // For other timelines, derive from weekly trend slices.
+    if (timeline === '90') return { ...e }
+
+    const slicedTrend      = e.weeklyTrend.slice(-Math.min(timelineWeeks, e.weeklyTrend.length))
+    const filteredCompleted = slicedTrend.reduce((s: number, w: any) => s + w.completed, 0)
+    const filteredAssigned  = slicedTrend.reduce((s: number, w: any) => s + w.assigned, 0)
     const filteredRate = filteredAssigned > 0
       ? Math.round((filteredCompleted / filteredAssigned) * 100)
-      : e.completionRate
+      : 0
     return {
       ...e,
       weeklyTrend:    slicedTrend,
-      completed:      timeline === '90' ? e.completed : filteredCompleted,
-      total:          timeline === '90' ? e.total : filteredAssigned,
-      completionRate: timeline === '90' ? e.completionRate : filteredRate,
+      completed:      filteredCompleted,
+      total:          filteredAssigned,
+      completionRate: filteredRate,
     }
   })
 

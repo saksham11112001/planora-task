@@ -44,9 +44,15 @@ export default async function ReportsPage() {
     { data: members },
     { data: clients },
   ] = await Promise.all([
+    // Fetch all active (non-completed) tasks with no date limit so in_progress /
+    // overdue / in_review counts are accurate regardless of when the task was created.
+    // Also fetch completed tasks from the last 90 days for trend + completion stats.
+    // .limit(5000) prevents Supabase's silent 1000-row default from truncating results.
     supabase.from('tasks')
       .select('id, title, status, priority, due_date, assignee_id, created_at, completed_at, project_id')
-      .eq('org_id', orgId).eq('is_recurring', false).neq('is_archived', true).is('parent_task_id', null),
+      .eq('org_id', orgId).eq('is_recurring', false).neq('is_archived', true).is('parent_task_id', null)
+      .or(`status.neq.completed,completed_at.gte.${from90}`)
+      .limit(5000),
     supabase.from('time_logs')
       .select('hours, is_billable, project_id, logged_date, user_id')
       .eq('org_id', orgId).gte('logged_date', from30.split('T')[0]),
