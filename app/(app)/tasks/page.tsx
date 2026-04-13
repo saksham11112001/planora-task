@@ -13,7 +13,7 @@ export default async function MyTasksPage() {
     if (!user) redirect('/login')
 
     const { data: mb } = await supabase.from('org_members')
-      .select('org_id, role').eq('user_id', user.id).eq('is_active', true).maybeSingle()
+      .select('org_id, role, can_view_all_tasks').eq('user_id', user.id).eq('is_active', true).maybeSingle()
     if (!mb) redirect('/onboarding')
 
     const isManager = ['owner','admin','manager'].includes(mb.role)

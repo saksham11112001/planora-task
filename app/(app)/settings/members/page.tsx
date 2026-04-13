@@ -15,7 +15,7 @@ export default async function MembersPage() {
   if (!mb) redirect('/onboarding')
 
   const { data: members } = await supabase.from('org_members')
-    .select('id, role, joined_at, user_id, users(id, name, email, avatar_url)')
+    .select('id, role, joined_at, user_id, can_view_all_tasks, users(id, name, email, avatar_url)')
     .eq('org_id', mb.org_id).eq('is_active', true).order('joined_at')
 
   const isAdmin = ['owner','admin'].includes(mb.role)

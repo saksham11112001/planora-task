@@ -13,10 +13,13 @@ export default async function InboxPage() {
     if (!user) redirect('/login')
 
     const { data: mb } = await supabase.from('org_members')
-      .select('org_id, role').eq('user_id', user.id).eq('is_active', true).maybeSingle()
+      .select('org_id, role, can_view_all_tasks').eq('user_id', user.id).eq('is_active', true).maybeSingle()
     if (!mb) redirect('/onboarding')
 
-    const canViewAll = ['owner', 'admin', 'manager'].includes(mb.role)
+    // Owners/admins always see everything. Other users see all tasks only if explicitly granted.
+    const canViewAll = ['owner', 'admin'].includes(mb.role) || (mb as any).can_view_all_tasks === true
+    // Managers see tasks assigned to them OR tasks where they're the approver.
+    const isManager  = mb.role === 'manager'
 
     // ── All fetches in parallel ───────────────────────────────────
     const [tasksResult, membersResult, clientsResult, allClientsResult] = await Promise.all([
@@ -27,8 +30,9 @@ export default async function InboxPage() {
           .eq('org_id', mb.org_id).is('project_id', null).is('parent_task_id', null).neq('is_archived', true)
           .or('is_recurring.is.null,is_recurring.eq.false')
           .order('created_at', { ascending: false })
-        if (!canViewAll) q = q.eq('assignee_id', user.id)
-        return q
+        if (canViewAll)  return q
+        if (isManager)   return q.or(`assignee_id.eq.${user.id},approver_id.eq.${user.id}`)
+        return q.eq('assignee_id', user.id)
       })(),
       // Members
       supabase.from('org_members').select('user_id, role, users(id, name)').eq('org_id', mb.org_id).eq('is_active', true),

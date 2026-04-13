@@ -26,7 +26,7 @@ export async function GET() {
   if (!mb) return NextResponse.json({ data: [] })
 
   const { data, error } = await supabase.from('org_members')
-    .select('id, role, joined_at, user_id, users(id, name, email, avatar_url)')
+    .select('id, role, joined_at, user_id, can_view_all_tasks, users(id, name, email, avatar_url)')
     .eq('org_id', mb.org_id).eq('is_active', true).order('joined_at')
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ data })
@@ -108,7 +108,7 @@ export async function PATCH(request: NextRequest) {
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
 
   const body = await request.json()
-  const { member_id, user_id, role, is_active } = body
+  const { member_id, user_id, role, is_active, can_view_all_tasks } = body
 
   // Gate based on action type
   if (is_active === false) {
@@ -139,6 +139,21 @@ export async function PATCH(request: NextRequest) {
     const { error: removeErr } = await removeQuery
     if (removeErr) return NextResponse.json({ error: removeErr.message }, { status: 500 })
     return NextResponse.json({ success: true, message: 'Member removed' })
+  }
+
+  // ── Toggle "View all tasks" permission ────────────────────────────────────
+  // Only owners/admins can grant this; cannot apply to owners/admins (they always see all).
+  if (typeof can_view_all_tasks === 'boolean') {
+    if (!['owner', 'admin'].includes(mb.role))
+      return NextResponse.json({ error: 'Only owners and admins can change this permission' }, { status: 403 })
+    const { data: target } = await admin.from('org_members')
+      .select('role').eq('org_id', mb.org_id).eq('id', member_id ?? '').maybeSingle()
+    if (target && ['owner', 'admin'].includes(target.role))
+      return NextResponse.json({ error: 'Cannot override permissions for owners or admins' }, { status: 400 })
+    const { error: flagErr } = await admin.from('org_members')
+      .update({ can_view_all_tasks }).eq('org_id', mb.org_id).eq('id', member_id)
+    if (flagErr) return NextResponse.json({ error: flagErr.message }, { status: 500 })
+    return NextResponse.json({ success: true })
   }
 
   // ── Change role ───────────────────────────────────────────────────────────

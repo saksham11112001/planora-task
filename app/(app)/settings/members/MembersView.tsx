@@ -5,7 +5,7 @@ import { UserPlus, X } from 'lucide-react'
 import { Avatar, RoleBadge } from '@/components/ui/Badge'
 import { toast }      from '@/store/appStore'
 
-interface Member { id: string; role: string; joined_at: string; user_id: string; users: { id: string; name: string; email: string; avatar_url: string | null } | null }
+interface Member { id: string; role: string; joined_at: string; user_id: string; can_view_all_tasks: boolean; users: { id: string; name: string; email: string; avatar_url: string | null } | null }
 interface Props { members: Member[]; currentUserId: string; isAdmin: boolean }
 
 const ROLES = ['admin','manager','member','viewer']
@@ -38,6 +38,15 @@ export function MembersView({ members, currentUserId, isAdmin }: Props) {
     })
     if (res.ok) { toast.success('Role updated'); startT(() => router.refresh()) }
     else toast.error('Failed to update role')
+  }
+
+  async function toggleViewAll(memberId: string, current: boolean) {
+    const res = await fetch('/api/team', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ member_id: memberId, can_view_all_tasks: !current }),
+    })
+    if (res.ok) { toast.success(!current ? 'View all tasks enabled' : 'View all tasks disabled'); startT(() => router.refresh()) }
+    else toast.error('Failed to update permission')
   }
 
   async function removeMember(memberId: string) {
@@ -91,6 +100,27 @@ export function MembersView({ members, currentUserId, isAdmin }: Props) {
                 </select>
               ) : (
                 <RoleBadge role={m.role}/>
+              )}
+              {/* View all tasks toggle — only for non-owner/admin members */}
+              {isAdmin && !isMe && !['owner','admin'].includes(m.role) && (
+                <button
+                  onClick={() => toggleViewAll(m.id, m.can_view_all_tasks)}
+                  title={m.can_view_all_tasks ? 'Click to revoke "View all tasks"' : 'Click to grant "View all tasks"'}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px',
+                    borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                    border: `1px solid ${m.can_view_all_tasks ? '#0d9488' : '#e2e8f0'}`,
+                    background: m.can_view_all_tasks ? 'rgba(13,148,136,0.08)' : 'var(--surface-subtle, #f8fafc)',
+                    color: m.can_view_all_tasks ? '#0d9488' : '#94a3b8',
+                    fontFamily: 'inherit', transition: 'all 0.12s', whiteSpace: 'nowrap',
+                  }}>
+                  <span style={{
+                    width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                    background: m.can_view_all_tasks ? '#0d9488' : '#cbd5e1',
+                    display: 'inline-block',
+                  }}/>
+                  View all tasks
+                </button>
               )}
               {isAdmin && !isMe && (
                 <button onClick={() => removeMember(m.id)} className="h-7 w-7 flex items-center justify-center rounded text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors">
