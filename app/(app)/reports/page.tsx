@@ -99,8 +99,7 @@ export default async function ReportsPage() {
       completed:  tasks30.filter(t => t.assignee_id === uid && t.status === 'completed').length,
       inProgress: tasks30.filter(t => t.assignee_id === uid && t.status === 'in_progress').length,
     }
-  }).filter(m => m.completed + m.inProgress > 0)
-    .sort((a, b) => b.completed - a.completed).slice(0, 8)
+  }).sort((a, b) => b.completed - a.completed).slice(0, 10)
 
   // ── Project completion ────────────────────────────────────────
   const projectData = (projects ?? []).map(p => {
@@ -184,8 +183,7 @@ export default async function ReportsPage() {
       weeklyTrend,
       completionRate: assigned.length > 0 ? Math.round((done.length / assigned.length) * 100) : 0,
     }
-  }).filter(m => m.total > 0 || m.hoursLogged > 0)
-    .sort((a, b) => b.completed - a.completed)
+  }).sort((a, b) => b.completed - a.completed)
 
   const kpis = [
     { label: 'Tasks created',    value: totalTasks,           sub: 'last 30 days',           color: '#0d9488', bg: '#f0fdfa' },
