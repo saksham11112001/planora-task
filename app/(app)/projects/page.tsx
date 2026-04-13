@@ -27,7 +27,7 @@ export default async function ProjectsPage() {
   }
   const [{ data: projects }, { data: taskCounts }, { data: clients }] = await Promise.all([
     projectsQuery,
-    supabase.from('tasks').select('project_id, status').eq('org_id', mb.org_id).not('project_id', 'is', null).neq('is_archived', true).is('parent_task_id', null),
+    supabase.from('tasks').select('project_id, status').eq('org_id', mb.org_id).not('project_id', 'is', null).neq('is_archived', true).is('parent_task_id', null).limit(5000),
     supabase.from('clients').select('id, name, color').eq('org_id', mb.org_id).eq('status', 'active').order('name'),
   ])
 

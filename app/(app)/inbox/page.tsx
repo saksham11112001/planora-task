@@ -32,9 +32,10 @@ export default async function InboxPage() {
           .eq('org_id', mb.org_id).is('project_id', null).is('parent_task_id', null)
           .neq('is_archived', true).or('is_recurring.is.null,is_recurring.eq.false')
           .order('created_at', { ascending: false })
-        return canViewAll
+        return (canViewAll
           ? q
           : q.or(`assignee_id.eq.${user.id},approver_id.eq.${user.id}`)
+        ).limit(2000)
       })(),
 
       // Members

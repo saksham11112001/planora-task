@@ -36,9 +36,10 @@ export default async function RecurringPage() {
       const q = supabase.from('tasks').select(TASK_SELECT)
         .eq('org_id', mb.org_id).eq('is_recurring', true).neq('is_archived', true)
         .order('next_occurrence_date', { ascending: true })
-      return canViewAll
+      return (canViewAll
         ? q
         : q.or(`assignee_id.eq.${user.id},approver_id.eq.${user.id}`)
+      ).limit(2000)
     })(),
     supabase.from('org_members').select('user_id, role, users(id, name)').eq('org_id', mb.org_id).eq('is_active', true),
     supabase.from('projects').select('id, name, color').eq('org_id', mb.org_id).neq('is_archived', true).order('name'),

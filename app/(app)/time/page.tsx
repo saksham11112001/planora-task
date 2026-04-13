@@ -52,7 +52,7 @@ export default async function TimePage({
       .match(canSeeAll ? {} : { user_id: user.id })
       .order('logged_date', { ascending: false }),
     supabase.from('projects').select('id, name, color, client_id').eq('org_id', mb.org_id).neq('is_archived', true).order('name'),
-    supabase.from('tasks').select('id, title, project_id').eq('org_id', mb.org_id).neq('is_archived', true).in('status', ['todo','in_progress','in_review']).limit(100),
+    supabase.from('tasks').select('id, title, project_id').eq('org_id', mb.org_id).neq('is_archived', true).in('status', ['todo','in_progress','in_review']).limit(500),
     canSeeAll
       ? supabase.from('org_members').select('user_id, users(id, name)').eq('org_id', mb.org_id).eq('is_active', true)
       : { data: null },

@@ -88,7 +88,7 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
     setLoading(true)
     try {
       // Fetch all top-level tasks and filter for CA compliance on client side
-      const res = await fetch('/api/tasks?top_level=true&limit=1000')
+      const res = await fetch('/api/tasks?top_level=true&limit=2000')
       const json = await res.json().catch(() => ({}))
       const all: any[] = json.data ?? json ?? []
       const caTasks = all.filter((t: any) => t.custom_fields?._ca_compliance === true)
