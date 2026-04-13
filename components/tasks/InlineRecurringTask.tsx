@@ -70,15 +70,14 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, defa
 
   const isEdit = !!editTask
   const { customFields, taskFields } = useOrgSettings()
-  // Keep clientList in sync with prop
-  const [_prevClients, setPrevClients] = useState(clients)
-  if (clients !== _prevClients) { setPrevClients(clients); setClientList(clients) }
   const show     = (key: string) => taskFields[key]?.visible !== false
   const required = (key: string) => taskFields[key]?.mandatory === true
   const [errors,       setErrors]       = useState<Record<string,string>>({})
   const [customValues,    setCustomValues]    = useState<Record<string,any>>({})
   const [showAddClient,   setShowAddClient]   = useState(false)
   const [clientList,      setClientList]      = useState(clients)
+  // Keep clientList in sync when the prop changes (e.g. after a new client is added upstream)
+  useEffect(() => { setClientList(clients) }, [clients])
   const [compSubtasks,   setCompSubtasks]   = useState<{title:string;required:boolean;due_date?:string;assignee_id?:string}[]>([])
   const [requireAttachment, setRequireAttachment] = useState(false)
   const [open,      setOpen]      = useState(isEdit || defaultOpen)
