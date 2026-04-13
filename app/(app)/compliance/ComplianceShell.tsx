@@ -1,8 +1,10 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { FileCheck, ChevronRight, Search } from 'lucide-react'
+import { useSearchParams } from 'next/navigation'
+import { FileCheck, ChevronRight, Search, ClipboardList } from 'lucide-react'
 import { CAMasterView } from './CAMasterView'
 import { CAClientSetupView } from './CAClientSetupView'
+import { CATasksView } from './CATasksView'
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
 import type { Task } from '@/types'
 
@@ -403,20 +405,68 @@ function CAKanbanView({ userRole, currentUserId }: { userRole: string; currentUs
 }
 
 export function ComplianceShell({ userRole, currentUserId }: Props) {
-  const [step, setStep] = useState<1 | 2 | 3>(1)
+  const searchParams = useSearchParams()
+  const initStep = searchParams.get('tab') === 'catasks' ? 4 : 1
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(initStep as 1 | 2 | 3 | 4)
   const isAdmin = ['owner', 'admin'].includes(userRole)
   const canSetupClients = ['owner', 'admin', 'manager'].includes(userRole)
 
+  /* ── Shared members + clients for CATasksView ── */
+  const [sharedMembers, setSharedMembers] = useState<{ id: string; name: string; role?: string }[]>([])
+  const [sharedClients, setSharedClients] = useState<{ id: string; name: string; color: string }[]>([])
+
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/team').then(r => r.json()),
+      fetch('/api/clients').then(r => r.json()),
+    ]).then(([td, cd]) => {
+      setSharedMembers(
+        ((td.data ?? []) as any[]).map((m: any) => ({
+          id: m.user_id,
+          name: (m.users as any)?.name ?? 'Unknown',
+          role: m.role ?? 'member',
+        }))
+      )
+      setSharedClients(
+        (Array.isArray(cd) ? cd : (cd.data ?? [])).map((c: any) => ({
+          id: c.id, name: c.name, color: c.color ?? '#94a3b8',
+        }))
+      )
+    }).catch(() => {})
+  }, [])
+
+  const tabBtn = (s: 1 | 2 | 3 | 4, label: string, num: number, enabled: boolean) => (
+    <button
+      onClick={() => enabled && setStep(s)}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        padding: s === 1 ? '14px 20px 14px 0' : '14px 20px',
+        background: 'none', border: 'none', cursor: enabled ? 'pointer' : 'default',
+        borderBottom: step === s ? '2px solid var(--brand)' : '2px solid transparent',
+        marginBottom: -1, flexShrink: 0,
+      }}>
+      <div style={{
+        width: 24, height: 24, borderRadius: '50%',
+        background: step === s ? 'var(--brand)' : 'var(--border)',
+        color: '#fff', fontSize: 12, fontWeight: 700,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+      }}>{num}</div>
+      <span style={{ fontSize: 13, fontWeight: step === s ? 700 : 500, color: step === s ? 'var(--brand)' : 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+        {label}
+      </span>
+    </button>
+  )
+
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
-      {/* Step header */}
+      {/* Tab header */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 0,
-        padding: '0 24px',
+        padding: '0 24px', overflowX: 'auto',
         background: 'var(--surface)', borderBottom: '1px solid var(--border)',
         flexShrink: 0,
       }}>
-        {/* Step 1 tab */}
+        {/* Step 1 */}
         <button
           onClick={() => isAdmin && setStep(1)}
           style={{
@@ -424,7 +474,7 @@ export function ComplianceShell({ userRole, currentUserId }: Props) {
             padding: '14px 20px 14px 0',
             background: 'none', border: 'none', cursor: isAdmin ? 'pointer' : 'default',
             borderBottom: step === 1 ? '2px solid var(--brand)' : '2px solid transparent',
-            marginBottom: -1,
+            marginBottom: -1, flexShrink: 0,
           }}>
           <div style={{
             width: 24, height: 24, borderRadius: '50%',
@@ -432,7 +482,7 @@ export function ComplianceShell({ userRole, currentUserId }: Props) {
             color: '#fff', fontSize: 12, fontWeight: 700,
             display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
           }}>1</div>
-          <span style={{ fontSize: 13, fontWeight: step === 1 ? 700 : 500, color: step === 1 ? 'var(--brand)' : 'var(--text-secondary)' }}>
+          <span style={{ fontSize: 13, fontWeight: step === 1 ? 700 : 500, color: step === 1 ? 'var(--brand)' : 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
             Compliance Master
           </span>
           {!isAdmin && (
@@ -444,50 +494,38 @@ export function ComplianceShell({ userRole, currentUserId }: Props) {
 
         <ChevronRight style={{ width: 16, height: 16, color: 'var(--text-muted)', flexShrink: 0, margin: '0 4px' }}/>
 
-        {/* Step 2 tab */}
-        <button
-          onClick={() => canSetupClients && setStep(2)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            padding: '14px 20px',
-            background: 'none', border: 'none', cursor: canSetupClients ? 'pointer' : 'default',
-            borderBottom: step === 2 ? '2px solid var(--brand)' : '2px solid transparent',
-            marginBottom: -1,
-          }}>
-          <div style={{
-            width: 24, height: 24, borderRadius: '50%',
-            background: step === 2 ? 'var(--brand)' : 'var(--border)',
-            color: '#fff', fontSize: 12, fontWeight: 700,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-          }}>2</div>
-          <span style={{ fontSize: 13, fontWeight: step === 2 ? 700 : 500, color: step === 2 ? 'var(--brand)' : 'var(--text-secondary)' }}>
-            Client Setup
-          </span>
-        </button>
+        {tabBtn(2, 'Client Setup', 2, canSetupClients)}
 
         <ChevronRight style={{ width: 16, height: 16, color: 'var(--text-muted)', flexShrink: 0, margin: '0 4px' }}/>
 
-        {/* Step 3 tab */}
+        {tabBtn(3, 'Kanban Board', 3, canSetupClients)}
+
+        <ChevronRight style={{ width: 16, height: 16, color: 'var(--text-muted)', flexShrink: 0, margin: '0 4px' }}/>
+
+        {/* Step 4 — CA Tasks */}
         <button
-          onClick={() => canSetupClients && setStep(3)}
+          onClick={() => setStep(4)}
           style={{
             display: 'flex', alignItems: 'center', gap: 8,
             padding: '14px 20px',
-            background: 'none', border: 'none', cursor: canSetupClients ? 'pointer' : 'default',
-            borderBottom: step === 3 ? '2px solid var(--brand)' : '2px solid transparent',
-            marginBottom: -1,
+            background: 'none', border: 'none', cursor: 'pointer',
+            borderBottom: step === 4 ? '2px solid var(--brand)' : '2px solid transparent',
+            marginBottom: -1, flexShrink: 0,
           }}>
           <div style={{
             width: 24, height: 24, borderRadius: '50%',
-            background: step === 3 ? 'var(--brand)' : 'var(--border)',
+            background: step === 4 ? 'var(--brand)' : 'var(--border)',
             color: '#fff', fontSize: 12, fontWeight: 700,
             display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-          }}>3</div>
-          <span style={{ fontSize: 13, fontWeight: step === 3 ? 700 : 500, color: step === 3 ? 'var(--brand)' : 'var(--text-secondary)' }}>
-            Kanban Board
+          }}>
+            <ClipboardList style={{ width: 13, height: 13 }} />
+          </div>
+          <span style={{ fontSize: 13, fontWeight: step === 4 ? 700 : 500, color: step === 4 ? 'var(--brand)' : 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+            CA Tasks
           </span>
         </button>
 
+        {/* Next buttons */}
         {step === 1 && canSetupClients && (
           <button
             onClick={() => setStep(2)}
@@ -495,7 +533,7 @@ export function ComplianceShell({ userRole, currentUserId }: Props) {
               marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6,
               padding: '7px 14px', borderRadius: 8, border: 'none',
               background: 'var(--brand)', color: '#fff',
-              fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0,
             }}>
             Next: Client Setup <ChevronRight style={{ width: 14, height: 14 }}/>
           </button>
@@ -507,9 +545,21 @@ export function ComplianceShell({ userRole, currentUserId }: Props) {
               marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6,
               padding: '7px 14px', borderRadius: 8, border: 'none',
               background: 'var(--brand)', color: '#fff',
-              fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0,
             }}>
             Next: Kanban Board <ChevronRight style={{ width: 14, height: 14 }}/>
+          </button>
+        )}
+        {step === 3 && (
+          <button
+            onClick={() => setStep(4)}
+            style={{
+              marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6,
+              padding: '7px 14px', borderRadius: 8, border: 'none',
+              background: 'var(--brand)', color: '#fff',
+              fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0,
+            }}>
+            View CA Tasks <ChevronRight style={{ width: 14, height: 14 }}/>
           </button>
         )}
       </div>
@@ -528,6 +578,14 @@ export function ComplianceShell({ userRole, currentUserId }: Props) {
         )}
         {step === 2 && <CAClientSetupView userRole={userRole} />}
         {step === 3 && <CAKanbanView userRole={userRole} currentUserId={currentUserId} />}
+        {step === 4 && (
+          <CATasksView
+            userRole={userRole}
+            currentUserId={currentUserId}
+            members={sharedMembers}
+            clients={sharedClients}
+          />
+        )}
       </div>
     </div>
   )

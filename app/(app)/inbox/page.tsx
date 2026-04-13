@@ -54,10 +54,9 @@ export default async function InboxPage() {
 
     const enriched = (tasks ?? [])
       .filter(t => {
-        const cf = (t as any).custom_fields
-        // Show compliance tasks only if properly cron/manually triggered (_triggered: true).
-        // Old direct-import tasks (no _triggered flag) are hidden from inbox.
-        if (cf?._ca_compliance === true) return cf?._triggered === true
+        // CA compliance tasks are managed exclusively in the CA Compliance module.
+        // Never show them in One-time tasks regardless of _triggered status.
+        if ((t as any).custom_fields?._ca_compliance === true) return false
         return true
       })
       .map(t => ({

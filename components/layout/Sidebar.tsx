@@ -7,7 +7,7 @@ import {
   Home, ListTodo, Users2, FolderOpen,
   RefreshCw, Users, BarChart2, Settings, Plus,
   ChevronDown, ChevronRight, Clock, Zap, X, Upload,
-  Calendar, Shield, LogOut, FileCheck, ArrowRight,
+  Calendar, Shield, LogOut, FileCheck, ArrowRight, ClipboardList,
 } from 'lucide-react'
 import { cn }            from '@/lib/utils/cn'
 import { createClient }  from '@/lib/supabase/client'
@@ -223,6 +223,22 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
         )}
         {nav.clients && <SI href="/clients"    active={isActive('/clients')}    icon={<Users2    className="h-4 w-4"/>} label="Clients"/>}
         {nav.ca_compliance_mode && <SI href="/compliance" active={isActive('/compliance')} icon={<FileCheck className="h-4 w-4"/>} label="CA Compliance"/>}
+        {nav.ca_compliance_mode && (
+          <Link href="/compliance?tab=catasks"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 9,
+              padding: '5px 10px 5px 30px', borderRadius: 7, fontSize: 12,
+              textDecoration: 'none', transition: 'all 0.12s', margin: '1px 4px',
+              background: 'transparent',
+              color: 'rgba(255,255,255,0.5)',
+              fontWeight: 400,
+            }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)'; (e.currentTarget as HTMLElement).style.color = '#fff' }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.5)' }}>
+            <ClipboardList style={{ width: 13, height: 13, flexShrink: 0 }}/>
+            <span>CA Tasks</span>
+          </Link>
+        )}
         <Div/>
 
         {/* ORGANISATION */}
