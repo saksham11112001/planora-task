@@ -70,7 +70,7 @@ export default async function ReportsPage() {
   // ── KPIs (last 30 days) ───────────────────────────────────────
   const totalTasks     = tasks30.length
   const completed      = tasks30.filter(t => t.status === 'completed').length
-  const overdue        = tasks30.filter(t => t.due_date && t.due_date < today && t.status !== 'completed').length
+  const overdue        = tasks.filter(t => t.due_date && t.due_date < today && t.status !== 'completed').length
   const completionRate = totalTasks > 0 ? Math.round((completed / totalTasks) * 100) : 0
   const totalHours     = logs.reduce((s, l) => s + (l.hours ?? 0), 0)
   const billableHours  = logs.filter(l => l.is_billable).reduce((s, l) => s + (l.hours ?? 0), 0)

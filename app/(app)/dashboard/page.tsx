@@ -27,9 +27,13 @@ export default async function DashboardPage() {
 
   const results = await Promise.allSettled([
     supabase.from('tasks').select('*', { count: 'exact', head: true })
-      .eq('org_id', orgId).eq('assignee_id', user.id).in('status', ['todo','in_progress']).lt('due_date', today),
+      .eq('org_id', orgId).neq('is_archived', true)
+      .in('status', ['todo','in_progress','in_review'])
+      .not('due_date', 'is', null).lt('due_date', today),
     supabase.from('tasks').select('*', { count: 'exact', head: true })
-      .eq('org_id', orgId).eq('assignee_id', user.id).in('status', ['todo','in_progress']).eq('due_date', today),
+      .eq('org_id', orgId).neq('is_archived', true)
+      .in('status', ['todo','in_progress','in_review'])
+      .eq('due_date', today),
     supabase.from('tasks').select('*', { count: 'exact', head: true })
       .eq('org_id', orgId).eq('assignee_id', user.id).eq('approval_status', 'pending'),
     supabase.from('tasks')
