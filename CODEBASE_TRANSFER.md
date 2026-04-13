@@ -53,16 +53,32 @@ projects(id, name, color)
 
 | Operation | Owner | Admin | Manager | Member | Viewer |
 |-----------|-------|-------|---------|--------|--------|
-| View all tasks | ✅ | ✅ | ✅ | Own only | ❌ |
+| View all tasks (My Tasks, Calendar, Inbox, Recurring) | ✅ | ✅ | Assignee/approver only | Assignee/approver only | Assignee/approver only |
+| "Assigned by me" section (My Tasks) | ✅ | ✅ | ❌ | ❌ | ❌ |
+| can_view_all_tasks flag override | N/A (always all) | N/A (always all) | Grants full view-all if set | Grants full view-all if set | Grants full view-all if set |
 | Create task | ✅ | ✅ | ✅ | ✅ | ❌ |
 | Edit any task | ✅ | ✅ | ✅ | Own assigned only | ❌ |
 | Delete / archive task | ✅ | ✅ | ✅ | ❌ | ❌ |
 | Change assignee | ✅ | ✅ | ✅ | ❌ | ❌ |
 | Submit for approval | ✅ bypass | ✅ bypass | If assignee | If assignee | ❌ |
 | Approve / Reject | ✅ bypass | ✅ bypass | If designated approver | If designated approver | ❌ |
+| Pending approval tasks (My Tasks) | ✅ all org | ✅ all org | Only where approver_id = self | Only where approver_id = self | Only where approver_id = self |
 | Set approver | ✅ | ✅ | ✅ | ❌ | ❌ |
 | Create recurring task | ✅ | ✅ | ✅ | ✅ | ❌ |
 | Manage CA compliance | ✅ | ✅ | ❌ | ❌ | ❌ |
+
+### Task Visibility Rules (enforced at DB query level in page.tsx files)
+
+**Rule:** `canViewAll = ['owner','admin'].includes(role) || can_view_all_tasks === true`
+
+| Page | canViewAll = true | canViewAll = false (any role) |
+|------|------------------|-------------------------------|
+| My Tasks (`/tasks`) | All non-archived top-level org tasks | `.or('assignee_id.eq.X,approver_id.eq.X')` |
+| Calendar (`/calendar`) | All tasks with due_date in ±6mo window | `.or('assignee_id.eq.X,approver_id.eq.X')` |
+| Inbox (`/inbox`) | All one-time non-compliance org tasks | `.or('assignee_id.eq.X,approver_id.eq.X')` |
+| Recurring (`/recurring`) | All recurring templates in org | `.or('assignee_id.eq.X,approver_id.eq.X')` |
+
+The `can_view_all_tasks` column lives on `org_members` (BOOLEAN DEFAULT FALSE). It is toggled per-user by owners/admins in **Settings › Members** and cannot be set on owner/admin members.
 
 **Approval flow:**
 1. Assignee (or owner/admin) submits → `status: in_review`, `approval_status: pending`

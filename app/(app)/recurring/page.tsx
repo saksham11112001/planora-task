@@ -12,26 +12,38 @@ export default async function RecurringPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
-  const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).maybeSingle()
+  const { data: mb } = await supabase.from('org_members')
+    .select('org_id, role, can_view_all_tasks').eq('user_id', user.id).eq('is_active', true).maybeSingle()
   if (!mb) redirect('/onboarding')
 
+  // canViewAll: owner/admin always; others only if explicitly granted via Members settings
+  const canViewAll = ['owner', 'admin'].includes(mb.role) || (mb as any).can_view_all_tasks === true
+  const canManage  = ['owner','admin','manager'].includes(mb.role)
 
-  // All 4 queries in parallel — was sequential before (~600ms saved)
+  const TASK_SELECT = 'id, title, status, priority, frequency, next_occurrence_date, assignee_id, approver_id, client_id, created_by, created_at, updated_at, assignee:users!tasks_assignee_id_fkey(id, name), approver:users!tasks_approver_id_fkey(id, name), creator:users!tasks_created_by_fkey(id, name), projects(id, name, color), clients(id, name, color)'
+
+  // All 4 queries in parallel
   const [
     { data: tasks },
     { data: members },
     { data: projects },
     { data: clients },
   ] = await Promise.all([
-    supabase.from('tasks')
-      .select('id, title, status, priority, frequency, next_occurrence_date, assignee_id, approver_id, client_id, created_by, created_at, updated_at, assignee:users!tasks_assignee_id_fkey(id, name), approver:users!tasks_approver_id_fkey(id, name), creator:users!tasks_created_by_fkey(id, name), projects(id, name, color), clients(id, name, color)')
-      .eq('org_id', mb.org_id).eq('is_recurring', true).neq('is_archived', true)
-      .order('next_occurrence_date', { ascending: true }),
+    // Recurring templates:
+    // canViewAll → all templates in the org
+    // others    → only templates they are assignee OR approver of
+    (() => {
+      const q = supabase.from('tasks').select(TASK_SELECT)
+        .eq('org_id', mb.org_id).eq('is_recurring', true).neq('is_archived', true)
+        .order('next_occurrence_date', { ascending: true })
+      return canViewAll
+        ? q
+        : q.or(`assignee_id.eq.${user.id},approver_id.eq.${user.id}`)
+    })(),
     supabase.from('org_members').select('user_id, role, users(id, name)').eq('org_id', mb.org_id).eq('is_active', true),
     supabase.from('projects').select('id, name, color').eq('org_id', mb.org_id).neq('is_archived', true).order('name'),
     supabase.from('clients').select('id, name, color').eq('org_id', mb.org_id).eq('status', 'active').order('name'),
   ])
-  const canManage = ['owner','admin','manager'].includes(mb.role)
 
 
 

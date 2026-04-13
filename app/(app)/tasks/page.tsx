@@ -16,49 +16,59 @@ export default async function MyTasksPage() {
       .select('org_id, role, can_view_all_tasks').eq('user_id', user.id).eq('is_active', true).maybeSingle()
     if (!mb) redirect('/onboarding')
 
-    const isManager = ['owner','admin','manager'].includes(mb.role)
+    // canViewAll: owner/admin always; others only if explicitly granted via Members settings
+    const isOwnerAdmin = ['owner', 'admin'].includes(mb.role)
+    const canViewAll   = isOwnerAdmin || (mb as any).can_view_all_tasks === true
 
-    // ── ALL data fetched in parallel (including assignedByMe) ─────
     const TASK_COLS = 'id, title, description, status, priority, due_date, assignee_id, approver_id, client_id, project_id, approval_status, approval_required, estimated_hours, is_recurring, custom_fields, created_at, updated_at, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), approver:users!tasks_approver_id_fkey(id, name), creator:users!tasks_created_by_fkey(id, name), projects(id, name, color)'
+
+    // ── Shared base (all non-archived top-level tasks for this org) ──────────
+    const base = supabase.from('tasks').select(TASK_COLS)
+      .eq('org_id', mb.org_id).neq('is_archived', true)
+      .order('due_date', { ascending: true, nullsFirst: false })
+
+    // ── Scope: all roles see only tasks they are assignee OR approver of.
+    //    Owner/admin (or flag-granted) see every task in the org.
+    const scopedBase = canViewAll
+      ? base
+      : base.or(`assignee_id.eq.${user.id},approver_id.eq.${user.id}`)
 
     const [
       { data: tasks },
       { data: approvalTasks },
       { data: members },
-      { data: clientsData },   // single clients fetch — includes status for filter
+      { data: clientsData },
       { data: assignedByMeRaw },
-      { data: allComplianceRaw },
     ] = await Promise.all([
-      // My tasks (assigned to me, all statuses — includes subtasks assigned to me)
-      supabase.from('tasks').select(TASK_COLS)
-        .eq('org_id', mb.org_id).eq('assignee_id', user.id).neq('is_archived', true)
-        .order('due_date', { ascending: true, nullsFirst: false }),
+      // Main task list — scoped by role
+      scopedBase.is('parent_task_id', null),
 
-      // Tasks needing my approval
-      supabase.from('tasks').select(TASK_COLS)
-        .eq('org_id', mb.org_id).eq('status', 'in_review').eq('approval_status', 'pending')
-        .neq('is_archived', true).is('parent_task_id', null)
-        .order('due_date', { ascending: true, nullsFirst: false }),
+      // Pending approval tasks — tasks in review waiting on this user's approval.
+      // Owner/admin: all pending-approval tasks in the org.
+      // Others: only tasks where they are explicitly the approver.
+      (() => {
+        const q = supabase.from('tasks').select(TASK_COLS)
+          .eq('org_id', mb.org_id).eq('status', 'in_review').eq('approval_status', 'pending')
+          .neq('is_archived', true).is('parent_task_id', null)
+          .order('due_date', { ascending: true, nullsFirst: false })
+        return canViewAll ? q : q.eq('approver_id', user.id)
+      })(),
 
-      // Team members
+      // Team members for filter/assignee dropdowns
       supabase.from('org_members')
         .select('user_id, users(id, name)').eq('org_id', mb.org_id).eq('is_active', true),
 
-      // Clients — single fetch, filter active client-side for filter bar
+      // Clients — full fetch; filter active client-side for filter bar
       supabase.from('clients').select('id, name, color, status').eq('org_id', mb.org_id).order('name'),
 
-      // Tasks assigned by me to others — always run, used only when isManager
-      supabase.from('tasks').select(TASK_COLS)
-        .eq('org_id', mb.org_id).eq('created_by', user.id)
-        .neq('is_archived', true).is('parent_task_id', null)
-        .or('custom_fields.is.null,custom_fields.not.cs.{"_ca_compliance":true}')
-        .order('due_date', { ascending: true, nullsFirst: false }),
-
-      // All org CA compliance tasks — shown to everyone (matching CA module page behaviour)
-      supabase.from('tasks').select(TASK_COLS)
-        .eq('org_id', mb.org_id).neq('is_archived', true).is('parent_task_id', null)
-        .contains('custom_fields', { _ca_compliance: true })
-        .order('due_date', { ascending: true, nullsFirst: false }),
+      // "Assigned by me" — only fetched for owner/admin; query is a no-op for others
+      isOwnerAdmin
+        ? supabase.from('tasks').select(TASK_COLS)
+            .eq('org_id', mb.org_id).eq('created_by', user.id)
+            .neq('is_archived', true).is('parent_task_id', null)
+            .or('custom_fields.is.null,custom_fields.not.cs.{"_ca_compliance":true}')
+            .order('due_date', { ascending: true, nullsFirst: false })
+        : Promise.resolve({ data: [] }),
     ])
 
     const clientMap: Record<string, { id: string; name: string; color: string }> = {}
@@ -72,7 +82,6 @@ export default async function MyTasksPage() {
     }))
 
     // Only show compliance tasks that were properly triggered (_triggered: true).
-    // Old direct-import tasks without this flag stay hidden from My Tasks.
     const isVisible = (t: any) => {
       const cf = t.custom_fields
       if (cf?._ca_compliance === true) return cf?._triggered === true
@@ -86,7 +95,8 @@ export default async function MyTasksPage() {
       project_id: t.project_id ?? null, approval_status: t.approval_status ?? null,
       approval_required: t.approval_required ?? false, estimated_hours: t.estimated_hours ?? null,
       is_recurring: t.is_recurring ?? false, completed_at: null,
-      is_archived: false, created_at: t.created_at ?? '', updated_at: t.updated_at ?? null, approver_id: t.approver_id ?? null,
+      is_archived: false, created_at: t.created_at ?? '', updated_at: t.updated_at ?? null,
+      approver_id: t.approver_id ?? null,
       approver: (t.approver as any) ?? null,
       assignee: (t.assignee as any) ?? null,
       creator: (t.creator as any) ?? null,
@@ -94,31 +104,16 @@ export default async function MyTasksPage() {
       project: (t.projects as any) ?? null,
     })
 
-    // Use assignedByMe results only if user is a manager
-    const assignedByMeTasks = isManager ? (assignedByMeRaw ?? []) : []
-
-    // Merge all-org compliance tasks into the task list (dedup by ID).
-    // This mirrors what the CA module page shows — compliance tasks are org-wide.
-    const assignedIds = new Set((tasks ?? []).map((t: any) => t.id))
-    const extraCompliance = (allComplianceRaw ?? []).filter((t: any) => !assignedIds.has(t.id))
-    const mergedTasks = [...(tasks ?? []), ...extraCompliance]
-
-    const taskList     = mergedTasks.filter(isVisible).map(enrich)
-    const approvalList = (approvalTasks ?? [])
-      .filter(t => {
-        const approverId = (t as any).approver_id
-        if (approverId) return approverId === user.id
-        return isManager
-      })
-      .filter(isVisible)
-      .map(enrich)
-    const assignedByMeList = (assignedByMeTasks ?? []).filter(isVisible).map(enrich)
+    const taskList        = (tasks ?? []).filter(isVisible).map(enrich)
+    const approvalList    = (approvalTasks ?? []).filter(isVisible).map(enrich)
+    const assignedByMeList = (assignedByMeRaw ?? []).filter(isVisible).map(enrich)
 
     return <MyTasksView
       tasks={taskList as any}
       pendingApprovalTasks={approvalList as any}
       assignedByMeTasks={assignedByMeList as any}
-      isManager={isManager}
+      // isManager controls "Assigned by me" tab — now limited to owner/admin only
+      isManager={isOwnerAdmin}
       members={memberList}
       clients={clientList}
       currentUserId={user.id}
