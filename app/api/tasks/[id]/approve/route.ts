@@ -32,6 +32,24 @@ export async function POST(
   if (decision === 'submit') {
     if (!isAssignee && !isOwnerOrAdmin) return NextResponse.json({ error: 'Only the assignee can submit for approval' }, { status: 403 })
 
+    // Block submit if this task is blocked by incomplete tasks
+    const blockedByIds: string[] = (task as any).custom_fields?._blocked_by ?? []
+    if (blockedByIds.length > 0) {
+      const blockerResults = await Promise.all(
+        blockedByIds.map(bid =>
+          supabase.from('tasks').select('id, title, status').eq('id', bid).eq('org_id', mb.org_id).maybeSingle()
+        )
+      )
+      const incomplete = blockerResults.filter(r => r.data && r.data.status !== 'completed').map(r => r.data!.title as string)
+      if (incomplete.length > 0) {
+        const names = incomplete.slice(0, 2).join(', ') + (incomplete.length > 2 ? ` +${incomplete.length - 2} more` : '')
+        return NextResponse.json({
+          error: `Blocked by: ${names}. Complete those tasks first.`,
+          code: 'BLOCKED_BY_INCOMPLETE',
+        }, { status: 422 })
+      }
+    }
+
     // Block submit if subtasks are incomplete
     const { data: subtasks } = await supabase
       .from('tasks').select('id, status, parent_task_id, custom_fields').eq('parent_task_id', id)

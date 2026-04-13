@@ -22,6 +22,11 @@ export async function GET(request: NextRequest) {
   if (sp.get('mine') === 'true') q = q.eq('assignee_id', user.id)
   if (sp.get('parent_id'))    q = q.eq('parent_task_id', sp.get('parent_id')!)
   if (sp.get('top_level') === 'true') q = q.is('parent_task_id', null)
+  // Find all tasks that are blocking a given task id (reverse lookup via JSONB @> contains)
+  if (sp.get('blocks_task_id')) {
+    const btid = sp.get('blocks_task_id')!
+    q = (q as any).contains('custom_fields', { _blocked_by: [btid] })
+  }
   q = q.order('due_date', { ascending: true, nullsFirst: false }).limit(parseInt(sp.get('limit') ?? '100'))
 
   const { data, error } = await q

@@ -67,6 +67,27 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   // ── APPROVAL GATE ──────────────────────────────────────────────
+  // ── BLOCKER GATE — check _blocked_by before allowing progress ─────────────
+  // Applies to any forward move: completed OR in_review (kanban drag to pending-approval col)
+  if (body.status === 'completed' || body.status === 'in_review') {
+    const blockedByIds: string[] = (task as any).custom_fields?._blocked_by ?? []
+    if (blockedByIds.length > 0) {
+      const results = await Promise.all(
+        blockedByIds.map(bid =>
+          supabase.from('tasks').select('id, title, status').eq('id', bid).eq('org_id', mb.org_id).maybeSingle()
+        )
+      )
+      const incomplete = results.filter(r => r.data && r.data.status !== 'completed').map(r => r.data!.title as string)
+      if (incomplete.length > 0) {
+        const names = incomplete.slice(0, 2).join(', ') + (incomplete.length > 2 ? ` +${incomplete.length - 2} more` : '')
+        return NextResponse.json({
+          error: `Blocked by: ${names}. Complete those tasks first.`,
+          code: 'BLOCKED_BY_INCOMPLETE',
+        }, { status: 422 })
+      }
+    }
+  }
+
   // Block completing a PARENT task if it has incomplete subtasks
   if (body.status === 'completed' && !task.parent_task_id) {
     const { data: subtasks } = await supabase

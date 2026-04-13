@@ -855,6 +855,11 @@ export function MyTasksView({
                           {task.project_id && !task.is_recurring && <FolderOpen style={{ flexShrink:0, width:11, height:11, color:'#7c3aed', marginRight:2 }} title="Project task"/>}
                           {isCompliance && <span style={{ flexShrink:0, fontSize:9, fontWeight:700, background:'rgba(234,179,8,0.15)', color:'#b45309', padding:'1px 4px', borderRadius:3 }}>CA</span>}
                           <span className="task-title" style={{ overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis', flex:1 }}>{task.title}</span>
+                          {((task as any).custom_fields?._blocked_by?.length > 0) && task.status !== 'completed' && (
+                            <span title="Blocked by incomplete tasks" style={{ flexShrink:0, display:'inline-flex', alignItems:'center', gap:2, padding:'1px 5px', borderRadius:4, fontSize:9, fontWeight:700, background:'rgba(220,38,38,0.1)', color:'#dc2626', letterSpacing:'0.02em', whiteSpace:'nowrap' }}>
+                              ⊘ Blocked
+                            </span>
+                          )}
                           {isPending && <span style={{ flexShrink:0, fontSize:11, background:'rgba(124,58,237,0.12)',
                             color:'#7c3aed', padding:'1px 5px', borderRadius:3, fontWeight:500 }}>
                             Pending
@@ -1420,13 +1425,20 @@ export function MyTasksView({
                     </span>
                   )}
                 </div>
-                {/* Footer: priority + due date + icons */}
+                {/* Footer: priority + blocked badge + due date + icons */}
                 <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:4 }}>
-                  <span style={{ display:'inline-flex', alignItems:'center', gap:3,
-                    padding:'2px 6px', borderRadius:4, fontSize:10, fontWeight:600,
-                    background: pri?.bg ?? '#f8fafc', color: pri?.color ?? '#94a3b8' }}>
-                    {task.priority === 'none' ? '—' : task.priority.charAt(0).toUpperCase()+task.priority.slice(1)}
-                  </span>
+                  <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                    <span style={{ display:'inline-flex', alignItems:'center', gap:3,
+                      padding:'2px 6px', borderRadius:4, fontSize:10, fontWeight:600,
+                      background: pri?.bg ?? '#f8fafc', color: pri?.color ?? '#94a3b8' }}>
+                      {task.priority === 'none' ? '—' : task.priority.charAt(0).toUpperCase()+task.priority.slice(1)}
+                    </span>
+                    {((task as any).custom_fields?._blocked_by?.length > 0) && !isDone && (
+                      <span title="Blocked by incomplete tasks" style={{ display:'inline-flex', alignItems:'center', gap:2, padding:'1px 5px', borderRadius:4, fontSize:9, fontWeight:700, background:'rgba(220,38,38,0.1)', color:'#dc2626', letterSpacing:'0.02em', whiteSpace:'nowrap' }}>
+                        ⊘ Blocked
+                      </span>
+                    )}
+                  </div>
                   <div style={{ display:'flex', alignItems:'center', gap:4 }}>
                     {task.due_date && (
                       <span style={{ fontSize:10, color: ov?'#dc2626':task.due_date===today2?'var(--brand)':'var(--text-muted)',

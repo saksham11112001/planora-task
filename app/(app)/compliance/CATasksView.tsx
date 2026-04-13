@@ -59,6 +59,11 @@ const BOARD_COLS = [
 /* ── Helper ────────────────────────────────────────────────────── */
 function todayStr() { return new Date().toISOString().slice(0, 10) }
 
+const SORT_OPTIONS: Array<['due_date' | 'created_at', string]> = [
+  ['due_date',   'Due date'],
+  ['created_at', 'Created date'],
+]
+
 export function CATasksView({ userRole, currentUserId, members, clients }: Props) {
   const router = useRouter()
   const [, startT] = useTransition()
@@ -255,15 +260,13 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
           {sortOpen && (
             <div style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 50, padding: 8, minWidth: 150 }}
               onClick={e => e.stopPropagation()}>
-              {[['due_date', 'Due date'], ['created_at', 'Created date']] as const}
-                .map(([val, label]) => (
-                  <button key={val}
-                    onClick={() => { if (sortBy === val) setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortBy(val); setSortDir('asc') } setSortOpen(false) }}
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '7px 10px', borderRadius: 6, border: 'none', cursor: 'pointer', textAlign: 'left', background: sortBy === val ? 'var(--brand-light)' : 'transparent', color: sortBy === val ? 'var(--brand)' : 'var(--text-primary)', fontSize: 12, fontWeight: sortBy === val ? 600 : 400, fontFamily: 'inherit' }}>
-                    {label}{sortBy === val && <span style={{ fontSize: 10 }}>{sortDir === 'asc' ? '↑' : '↓'}</span>}
-                  </button>
-                ))
-              }
+              {SORT_OPTIONS.map(([val, label]) => (
+                <button key={val}
+                  onClick={() => { if (sortBy === val) setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortBy(val); setSortDir('asc') } setSortOpen(false) }}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '7px 10px', borderRadius: 6, border: 'none', cursor: 'pointer', textAlign: 'left', background: sortBy === val ? 'var(--brand-light)' : 'transparent', color: sortBy === val ? 'var(--brand)' : 'var(--text-primary)', fontSize: 12, fontWeight: sortBy === val ? 600 : 400, fontFamily: 'inherit' }}>
+                  {label}{sortBy === val && <span style={{ fontSize: 10 }}>{sortDir === 'asc' ? '↑' : '↓'}</span>}
+                </button>
+              ))}
             </div>
           )}
         </div>

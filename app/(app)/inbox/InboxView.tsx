@@ -363,9 +363,14 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                               <span style={{ fontSize:10, color:'var(--text-muted)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{(task as any).client.name}</span>
                             </div>
                           )}
-                          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:4 }}>
                             <span style={{ display:'inline-flex', alignItems:'center', gap:3, padding:'2px 7px', borderRadius:5, fontSize:10, fontWeight:600, background:pri?.bg??'#f8fafc', color:pri?.color??'#94a3b8' }}>{pri?.icon} {task.priority}</span>
-                            {task.due_date && <span style={{ fontSize:10, color:ov?'#dc2626':'var(--text-muted)', fontWeight:ov?600:400 }}>{fmtDate(task.due_date)}</span>}
+                            {((task as any).custom_fields?._blocked_by?.length > 0) && (
+                              <span style={{ display:'inline-flex', alignItems:'center', gap:2, padding:'1px 5px', borderRadius:4, fontSize:9, fontWeight:700, background:'rgba(220,38,38,0.1)', color:'#dc2626', letterSpacing:'0.02em' }}>
+                                ⊘ Blocked
+                              </span>
+                            )}
+                            {task.due_date && <span style={{ fontSize:10, color:ov?'#dc2626':'var(--text-muted)', fontWeight:ov?600:400, marginLeft:'auto' }}>{fmtDate(task.due_date)}</span>}
                           </div>
                         </div>
                       )
@@ -536,6 +541,11 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                               )}
                             </button>
                             <p style={{ fontSize:13, fontWeight:600, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis', color:isComp?'var(--text-muted)':ov?'#f87171':'var(--text-primary)', textDecoration:isComp?'line-through':'none', margin:0, flex:1 }}>{task.title}</p>
+                            {((task as any).custom_fields?._blocked_by?.length > 0) && !isComp && (
+                              <span title="Blocked by incomplete tasks" style={{ flexShrink:0, display:'inline-flex', alignItems:'center', gap:2, padding:'1px 5px', borderRadius:4, fontSize:9, fontWeight:700, background:'rgba(220,38,38,0.1)', color:'#dc2626', letterSpacing:'0.02em', whiteSpace:'nowrap' }}>
+                                ⊘ Blocked
+                              </span>
+                            )}
                             {(isCompliance || (task as any).approval_required) && !isComp && (
                               <label
                                 title={isCompliance ? 'Upload compliance document' : 'Upload attachment'}

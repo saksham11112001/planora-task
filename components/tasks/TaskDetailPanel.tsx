@@ -53,6 +53,10 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
   const [blockingSearch,  setBlockingSearch]  = useState('')
   const [blockingResults, setBlockingResults] = useState<{id:string;title:string}[]>([])
   const [blockingTasks,   setBlockingTasks]   = useState<{id:string;title:string}[]>([])
+  // "Blocks" = tasks that THIS task is blocking (reverse of _blocked_by)
+  const [blocksTasks,     setBlocksTasks]     = useState<{id:string;title:string;status:string}[]>([])
+  const [blocksSearch,    setBlocksSearch]    = useState('')
+  const [blocksResults,   setBlocksResults]   = useState<{id:string;title:string}[]>([])
   const [comments,        setComments]        = useState<any[]>([])
   const [commentsLoaded,  setCommentsLoaded]  = useState(false)
   const [loadingComments, setLoadingComments] = useState(false)
@@ -110,8 +114,11 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     setBlockingTasks([])
     setBlockingSearch('')
     setBlockingResults([])
+    setBlocksTasks([])
+    setBlocksSearch('')
+    setBlocksResults([])
 
-    // Load blocking task titles when task changes
+    // Load "blocked by" task titles when task changes
     if ((task as any).custom_fields?._blocked_by?.length) {
       const ids: string[] = (task as any).custom_fields._blocked_by
       Promise.all(ids.map(id => fetch(`/api/tasks/${id}`).then(r => r.json()).catch(() => null)))
@@ -119,6 +126,12 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
           setBlockingTasks(results.filter(Boolean).map((d: any) => ({ id: d.data?.id, title: d.data?.title })).filter((t: any) => t.id))
         })
     }
+
+    // Load "blocks" tasks — tasks that this task is blocking (reverse lookup)
+    fetch(`/api/tasks?blocks_task_id=${task.id}&limit=50`)
+      .then(r => r.json())
+      .then(d => setBlocksTasks((d.data ?? []).map((t: any) => ({ id: t.id, title: t.title, status: t.status }))))
+      .catch(() => {})
 
     // Pre-fetch subtasks + attachments in parallel so all tabs are instant
     const taskId = task.id
@@ -436,6 +449,58 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
       onUpdated?.({ custom_fields: { ...(task as any).custom_fields, _blocked_by: newBlockedBy } })
       toast.success('Dependency removed')
     } else toast.error('Failed to remove dependency')
+  }
+
+  /* ── "Blocks" reverse side: this task blocks other tasks ──────── */
+  async function searchBlocksTasks(q: string) {
+    if (!q.trim()) { setBlocksResults([]); return }
+    try {
+      const r = await fetch(`/api/search?q=${encodeURIComponent(q.trim())}`)
+      const d = await r.json()
+      setBlocksResults((d.data ?? []).filter((x: any) => x.type === 'task' && x.id !== task?.id).slice(0, 8).map((x: any) => ({ id: x.id, title: x.title })))
+    } catch {}
+  }
+
+  // Adding "this task blocks task X" = writing task X's _blocked_by to include this task's id
+  async function addBlocksTask(targetTaskId: string) {
+    if (!task) return
+    if (blocksTasks.some(t => t.id === targetTaskId)) { setBlocksSearch(''); setBlocksResults([]); return }
+    setBlocksSearch(''); setBlocksResults([])
+    // Fetch target task's current custom_fields
+    const tr = await fetch(`/api/tasks/${targetTaskId}`)
+    const td = await tr.json()
+    if (!td.data) { toast.error('Task not found'); return }
+    const currentBlockedBy: string[] = td.data.custom_fields?._blocked_by ?? []
+    if (currentBlockedBy.includes(task.id)) {
+      // Already linked — just refresh local state
+      setBlocksTasks(p => [...p, { id: targetTaskId, title: td.data.title, status: td.data.status }])
+      return
+    }
+    const res = await fetch(`/api/tasks/${targetTaskId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ custom_fields: { _blocked_by: [...currentBlockedBy, task.id] } }),
+    })
+    if (res.ok) {
+      setBlocksTasks(p => [...p, { id: targetTaskId, title: td.data.title, status: td.data.status }])
+      toast.success(`"${td.data.title}" is now blocked by this task`)
+    } else toast.error('Failed to add block link')
+  }
+
+  // Remove "this task blocks task X" = remove this task's id from task X's _blocked_by
+  async function removeBlocksTask(targetTaskId: string) {
+    if (!task) return
+    const tr = await fetch(`/api/tasks/${targetTaskId}`)
+    const td = await tr.json()
+    if (!td.data) { toast.error('Task not found'); return }
+    const newBlockedBy = (td.data.custom_fields?._blocked_by ?? []).filter((id: string) => id !== task.id)
+    const res = await fetch(`/api/tasks/${targetTaskId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ custom_fields: { _blocked_by: newBlockedBy } }),
+    })
+    if (res.ok) {
+      setBlocksTasks(p => p.filter(t => t.id !== targetTaskId))
+      toast.success('Block link removed')
+    } else toast.error('Failed to remove block link')
   }
 
   async function loadAttachments(taskId: string) {
@@ -1066,6 +1131,62 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                     )}
                   </div>
                 </FieldRow>
+
+                {/* Dependencies: Blocks (tasks this task is blocking) */}
+                {(blocksTasks.length > 0 || canEdit) && (
+                  <FieldRow label="Blocks">
+                    <ArrowRightLeft className="h-3.5 w-3.5" style={{ color: 'var(--text-muted)' }}/>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {blocksTasks.map(t => (
+                        <div key={t.id} style={{ display:'flex', alignItems:'center', gap:6, padding:'2px 8px', borderRadius:6,
+                          background:'rgba(234,179,8,0.08)', border:'1px solid rgba(234,179,8,0.25)', fontSize:11 }}>
+                          <span style={{
+                            width:6, height:6, borderRadius:'50%', flexShrink:0,
+                            background: t.status === 'completed' ? '#16a34a' : t.status === 'in_progress' ? '#2563eb' : '#94a3b8',
+                          }}/>
+                          <span style={{ flex:1, color:'var(--text-secondary)', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
+                            {t.title}
+                          </span>
+                          <span style={{ fontSize:10, color: t.status === 'completed' ? '#16a34a' : 'var(--text-muted)', flexShrink:0 }}>
+                            {t.status === 'completed' ? '✓ done' : t.status.replace('_',' ')}
+                          </span>
+                          {canEdit && (
+                            <button onClick={() => removeBlocksTask(t.id)}
+                              style={{ background:'none', border:'none', cursor:'pointer', color:'#b45309', padding:0, display:'flex', flexShrink:0 }}>
+                              <X style={{ width:10, height:10 }}/>
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      {canEdit && (
+                        <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                          <input
+                            value={blocksSearch}
+                            onChange={e => { setBlocksSearch(e.target.value); searchBlocksTasks(e.target.value) }}
+                            placeholder="Search task this blocks…"
+                            style={{ flex:1, fontSize:11, padding:'3px 8px', borderRadius:6, border:'1px solid var(--border)',
+                              background:'var(--surface-subtle)', color:'var(--text-primary)', outline:'none', fontFamily:'inherit' }}
+                          />
+                        </div>
+                      )}
+                      {blocksResults.length > 0 && (
+                        <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:8,
+                          boxShadow:'0 4px 16px rgba(0,0,0,0.1)', zIndex:50, maxHeight:140, overflowY:'auto' }}>
+                          {blocksResults.map(t => (
+                            <button key={t.id} onClick={() => addBlocksTask(t.id)}
+                              style={{ display:'flex', alignItems:'center', gap:6, width:'100%', padding:'6px 10px',
+                                border:'none', background:'transparent', cursor:'pointer', textAlign:'left', fontSize:11,
+                                color:'var(--text-primary)', fontFamily:'inherit' }}
+                              onMouseEnter={e => (e.currentTarget as HTMLElement).style.background='var(--surface-subtle)'}
+                              onMouseLeave={e => (e.currentTarget as HTMLElement).style.background='transparent'}>
+                              <span style={{ flex:1, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{t.title}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </FieldRow>
+                )}
 
                 {/* Created date */}
                 {task.created_at && (
