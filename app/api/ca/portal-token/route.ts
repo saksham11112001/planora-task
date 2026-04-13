@@ -49,10 +49,13 @@ export async function POST(req: NextRequest) {
     .eq('org_id', mb.org_id)
     .eq('client_id', client_id)
 
+  const portalUrl = `${APP_URL}/portal/${rawToken}`
+
   const { error } = await admin.from('client_portal_tokens').insert({
     org_id:     mb.org_id,
     client_id,
     token_hash: tokenHash,
+    portal_url: portalUrl,
     expires_at: expiresAt,
     created_by: user.id,
   })

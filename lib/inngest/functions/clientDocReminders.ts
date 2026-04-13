@@ -192,25 +192,15 @@ export const clientDocReminders = inngest.createFunction(
       // Skip if no missing docs
       if (missingDocs.length === 0) continue
 
-      // Build portal URL — we don't store raw token so just point to /clients/:id
-      // In practice we look up the token hash but can't reverse it.
-      // Best we can do is link to the org's portal base — in future we could store a partial.
-      // For now send a generic "contact your CA firm" message with task info.
-      // (We'll use a dummy portal URL based on token lookup by client_id)
-      let portalUrl = APP_URL
+      // portal_url is stored at token generation time (hash is irreversible)
       const { data: tokenRow } = await admin
         .from('client_portal_tokens')
-        .select('token_hash, expires_at')
+        .select('portal_url, expires_at')
         .eq('client_id', clientId)
         .maybeSingle()
-      // We can't reconstruct raw token from hash, so the portal URL must be stored
-      // or embedded in a separate column. For now, link to dashboard as fallback.
-      // A proper solution would store the raw token encrypted or send via a one-time-url.
-      // Portal URL here will simply be the /portal route with note "ask CA for link".
-      // TODO: store raw token (encrypted) or use a separate short-link.
-      // For now, we just link to the app root which explains the limitation.
-      portalUrl = tokenRow && new Date(tokenRow.expires_at) > new Date()
-        ? `${APP_URL}/portal/[ask-your-CA-for-link]` // placeholder
+
+      const portalUrl = (tokenRow?.portal_url && new Date(tokenRow.expires_at) > new Date())
+        ? tokenRow.portal_url
         : APP_URL
 
       // Email client (days 7, 2, 0)

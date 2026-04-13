@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS client_portal_tokens (
   org_id      UUID        NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
   client_id   UUID        NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
   token_hash  TEXT        NOT NULL UNIQUE,
+  portal_url  TEXT,                                       -- full URL stored at generation time (hash is irreversible)
   expires_at  TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '90 days'),
   created_by  UUID        REFERENCES users(id) ON DELETE SET NULL,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
