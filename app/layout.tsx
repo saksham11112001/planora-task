@@ -31,7 +31,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             const isPublicPage = window.location.pathname === '/' ||
                                  window.location.pathname.startsWith('/login') ||
                                  window.location.pathname.startsWith('/privacy') ||
-                                 window.location.pathname.startsWith('/terms');
+                                 window.location.pathname.startsWith('/terms') ||
+                                 window.location.pathname.startsWith('/portal/');
             if (!isPublicPage) {
               const t = localStorage.getItem('planora-theme') || 'system';
               const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;

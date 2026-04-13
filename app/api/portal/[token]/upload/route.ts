@@ -38,27 +38,37 @@ export async function POST(
   const file           = formData.get('file') as File | null
   const documentTypeId = formData.get('document_type_id') as string | null
   const periodKey      = formData.get('period_key') as string | null
+  // Fallback fields used when no doc type is configured yet
+  const headerName     = formData.get('header_name') as string | null
+  const taskIdFallback = formData.get('task_id') as string | null
 
-  if (!file)           return NextResponse.json({ error: 'file is required' }, { status: 400 })
-  if (!documentTypeId) return NextResponse.json({ error: 'document_type_id is required' }, { status: 400 })
-  if (!periodKey)      return NextResponse.json({ error: 'period_key is required' }, { status: 400 })
+  if (!file)      return NextResponse.json({ error: 'file is required' }, { status: 400 })
+  if (!periodKey) return NextResponse.json({ error: 'period_key is required' }, { status: 400 })
   if (file.size > MAX_SIZE) return NextResponse.json({ error: 'File exceeds 20 MB limit' }, { status: 400 })
 
-  // 3. Verify document_type belongs to this org
-  const { data: docType } = await admin
-    .from('client_document_types')
-    .select('id, name, category, linked_task_types')
-    .eq('id', documentTypeId)
-    .eq('org_id', org_id)
-    .eq('is_active', true)
-    .maybeSingle()
+  // 3. Resolve document type — optional if task_id + header_name provided as fallback
+  let docType: { id: string; name: string; category: string; linked_task_types: string[] } | null = null
 
-  if (!docType) return NextResponse.json({ error: 'Document type not found' }, { status: 404 })
+  if (documentTypeId) {
+    const { data } = await admin
+      .from('client_document_types')
+      .select('id, name, category, linked_task_types')
+      .eq('id', documentTypeId)
+      .eq('org_id', org_id)
+      .eq('is_active', true)
+      .maybeSingle()
+    if (!data) return NextResponse.json({ error: 'Document type not found' }, { status: 404 })
+    docType = data
+  } else if (!taskIdFallback) {
+    // Neither doc type nor task fallback — can't proceed
+    return NextResponse.json({ error: 'document_type_id or task_id is required' }, { status: 400 })
+  }
 
   // 4. Upload file to Supabase Storage
   const fileBuffer  = Buffer.from(await file.arrayBuffer())
   const safeName    = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
-  const storagePath = `portal/${org_id}/${client_id}/${documentTypeId}/${periodKey}/${Date.now()}_${safeName}`
+  const typeSegment = documentTypeId ?? 'direct'
+  const storagePath = `portal/${org_id}/${client_id}/${typeSegment}/${periodKey}/${Date.now()}_${safeName}`
 
   const { data: storageData, error: storageError } = await admin.storage
     .from('task-attachments')
@@ -73,12 +83,48 @@ export async function POST(
     .from('task-attachments')
     .getPublicUrl(storageData.path)
 
-  // 5. Upsert client_document_uploads (replace if same period_key + doc_type)
+  // 5a. FALLBACK PATH: no doc type configured — attach directly to the specific task
+  if (!docType && taskIdFallback) {
+    const { data: attachment } = await admin
+      .from('task_attachments')
+      .insert({
+        task_id:         taskIdFallback,
+        org_id,
+        file_url:        publicUrl,
+        file_name:       file.name,
+        file_size:       file.size,
+        mime_type:       file.type || 'application/octet-stream',
+        uploaded_by:     null,
+        attachment_type: 'client_upload',
+        drive_url:       null,
+      })
+      .select('id')
+      .maybeSingle()
+
+    // Fire upload notification
+    try {
+      const { inngest } = await import('@/lib/inngest/client')
+      await inngest.send({
+        name: 'client/document-uploaded',
+        data: {
+          org_id, client_id,
+          upload_id:     attachment?.id ?? '',
+          doc_type_name: headerName ?? file.name,
+          period_key:    periodKey,
+          task_ids:      [taskIdFallback],
+        },
+      })
+    } catch (e) { console.error('[portal-upload] inngest send error:', e) }
+
+    return NextResponse.json({ success: true })
+  }
+
+  // 5b. DOC-TYPE PATH: upsert client_document_uploads (replace same period + type)
   await admin
     .from('client_document_uploads')
     .delete()
     .eq('client_id', client_id)
-    .eq('document_type_id', documentTypeId)
+    .eq('document_type_id', documentTypeId!)
     .eq('period_key', periodKey)
 
   const { data: upload, error: uploadError } = await admin
@@ -86,7 +132,7 @@ export async function POST(
     .insert({
       org_id,
       client_id,
-      document_type_id: documentTypeId,
+      document_type_id: documentTypeId!,
       period_key:        periodKey,
       file_url:          publicUrl,
       file_name:         file.name,
@@ -102,7 +148,7 @@ export async function POST(
   }
 
   // 6. Auto-link to matching tasks
-  await autoLinkToTasks({ admin, upload, docType, org_id, client_id, periodKey, publicUrl, fileName: file.name, fileSize: file.size, mimeType: file.type })
+  await autoLinkToTasks({ admin, upload, docType: docType!, org_id, client_id, periodKey, publicUrl, fileName: file.name, fileSize: file.size, mimeType: file.type })
 
   return NextResponse.json({ success: true, upload_id: upload.id })
 }

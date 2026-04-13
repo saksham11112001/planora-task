@@ -70,22 +70,32 @@ export function NotifView({
             <div className="flex-1 text-sm text-gray-700">{evt.label}</div>
 
             {/* Email toggle */}
-            <div className="w-20 flex justify-center">
+            <div className="w-20 flex justify-center items-center">
               <button
+                type="button"
                 onClick={() => toggle(evt.key, 'via_email')}
-                className={`h-5 w-9 rounded-full transition-colors relative ${prefs[evt.key]?.via_email ? 'bg-teal-500' : 'bg-gray-200'}`}
+                style={{ flexShrink: 0, width: 36, height: 20, borderRadius: 10, border: 'none', cursor: 'pointer', position: 'relative', transition: 'background 0.2s', background: prefs[evt.key]?.via_email ? '#0d9488' : '#d1d5db', padding: 0 }}
               >
-                <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${prefs[evt.key]?.via_email ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                <span style={{
+                  position: 'absolute', top: 2, left: prefs[evt.key]?.via_email ? 18 : 2,
+                  width: 16, height: 16, borderRadius: '50%', background: '#fff',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'left 0.2s',
+                }} />
               </button>
             </div>
 
             {/* WhatsApp toggle */}
-            <div className="w-20 flex justify-center">
+            <div className="w-20 flex justify-center items-center">
               <button
+                type="button"
                 onClick={() => toggle(evt.key, 'via_whatsapp')}
-                className={`h-5 w-9 rounded-full transition-colors relative ${prefs[evt.key]?.via_whatsapp ? 'bg-green-500' : 'bg-gray-200'}`}
+                style={{ flexShrink: 0, width: 36, height: 20, borderRadius: 10, border: 'none', cursor: 'pointer', position: 'relative', transition: 'background 0.2s', background: prefs[evt.key]?.via_whatsapp ? '#16a34a' : '#d1d5db', padding: 0 }}
               >
-                <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${prefs[evt.key]?.via_whatsapp ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                <span style={{
+                  position: 'absolute', top: 2, left: prefs[evt.key]?.via_whatsapp ? 18 : 2,
+                  width: 16, height: 16, borderRadius: '50%', background: '#fff',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'left 0.2s',
+                }} />
               </button>
             </div>
           </div>

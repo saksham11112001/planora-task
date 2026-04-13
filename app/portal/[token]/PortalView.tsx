@@ -195,6 +195,7 @@ function TaskCard({ task, rawToken, onUploaded, docTypes }: {
             <ChecklistRow
               key={i}
               item={item}
+              taskId={task.task_id}
               periodKey={task.period_key}
               rawToken={rawToken}
               onUploaded={onUploaded}
@@ -209,8 +210,9 @@ function TaskCard({ task, rawToken, onUploaded, docTypes }: {
 
 // ── Checklist row with upload ───────────────────────────────────────────────
 
-function ChecklistRow({ item, periodKey, rawToken, onUploaded, docTypes }: {
+function ChecklistRow({ item, taskId, periodKey, rawToken, onUploaded, docTypes }: {
   item: ChecklistItem
+  taskId: string
   periodKey: string
   rawToken: string
   onUploaded: () => void
@@ -220,21 +222,23 @@ function ChecklistRow({ item, periodKey, rawToken, onUploaded, docTypes }: {
   const [err, setErr]             = useState<string | null>(null)
   const fileRef                   = useRef<HTMLInputElement>(null)
 
-  // Find document_type_id by name if not already set
+  // Resolve doc type id — may be null if org hasn't set up doc types yet (fallback path used)
   const docTypeId = item.document_type_id
     ?? docTypes.find(d => d.name.toLowerCase() === item.header.toLowerCase())?.id
     ?? null
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
-    if (!file || !docTypeId) { setErr('Document type not configured'); return }
+    if (!file) return
     setUploading(true)
     setErr(null)
     try {
       const form = new FormData()
       form.append('file', file)
-      form.append('document_type_id', docTypeId)
       form.append('period_key', periodKey)
+      form.append('header_name', item.header)
+      form.append('task_id', taskId)
+      if (docTypeId) form.append('document_type_id', docTypeId)
       const res = await fetch(`/api/portal/${rawToken}/upload`, { method: 'POST', body: form })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Upload failed')
@@ -262,36 +266,32 @@ function ChecklistRow({ item, periodKey, rawToken, onUploaded, docTypes }: {
             {item.upload.file_name} · {fmtDate(item.upload.uploaded_at)}
           </a>
         )}
-        {err && <div style={{ fontSize: '11px', color: '#dc2626' }}>{err}</div>}
+        {err && <div style={{ fontSize: '11px', color: '#dc2626', marginTop: '2px' }}>{err}</div>}
       </div>
-      {!item.uploaded && (
-        <>
-          <input ref={fileRef} type="file" style={{ display: 'none' }} onChange={handleFile} />
-          <button
-            onClick={() => fileRef.current?.click()}
-            disabled={uploading || !docTypeId}
-            style={{
-              fontSize: '12px', fontWeight: 600, color: '#fff',
-              background: uploading ? '#94a3b8' : '#0d9488',
-              border: 'none', borderRadius: '6px', padding: '5px 12px', cursor: 'pointer', flexShrink: 0,
-            }}>
-            {uploading ? 'Uploading…' : '+ Upload'}
-          </button>
-        </>
-      )}
-      {item.uploaded && (
-        <>
-          <input ref={fileRef} type="file" style={{ display: 'none' }} onChange={handleFile} />
-          <button
-            onClick={() => fileRef.current?.click()}
-            disabled={uploading}
-            style={{
-              fontSize: '11px', color: '#64748b', background: 'none',
-              border: '1px solid #e2e8f0', borderRadius: '6px', padding: '4px 10px', cursor: 'pointer', flexShrink: 0,
-            }}>
-            Replace
-          </button>
-        </>
+      <input ref={fileRef} type="file" style={{ display: 'none' }} onChange={handleFile} />
+      {!item.uploaded ? (
+        <button
+          onClick={() => fileRef.current?.click()}
+          disabled={uploading}
+          style={{
+            fontSize: '12px', fontWeight: 600, color: '#fff',
+            background: uploading ? '#94a3b8' : '#0d9488',
+            border: 'none', borderRadius: '6px', padding: '6px 14px',
+            cursor: uploading ? 'not-allowed' : 'pointer', flexShrink: 0,
+          }}>
+          {uploading ? 'Uploading…' : '+ Upload'}
+        </button>
+      ) : (
+        <button
+          onClick={() => fileRef.current?.click()}
+          disabled={uploading}
+          style={{
+            fontSize: '11px', color: '#64748b', background: '#fff',
+            border: '1px solid #e2e8f0', borderRadius: '6px', padding: '4px 10px',
+            cursor: uploading ? 'not-allowed' : 'pointer', flexShrink: 0,
+          }}>
+          {uploading ? '…' : 'Replace'}
+        </button>
       )}
     </div>
   )
@@ -398,6 +398,7 @@ function PortalShell({ orgName, clientName, children }: { orgName: string; clien
     <div style={{
       minHeight: '100vh', background: '#f8fafc',
       fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      colorScheme: 'light',
     }}>
       {/* Header */}
       <div style={{ background: '#0f172a', padding: '16px 0' }}>
