@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { ArrowRight, Building2, Palette, Users, CreditCard, Bell,
-         LayoutGrid, Tag, Trash2, ShieldCheck, Search, Zap, Clock } from 'lucide-react'
+         LayoutGrid, Tag, Trash2, ShieldCheck, Search, Zap, Clock, FileText } from 'lucide-react'
 import { DeleteAccountButton } from './DeleteAccountButton'
 
 interface Section {
@@ -11,7 +11,7 @@ interface Section {
 }
 
 const ICON_MAP: Record<string, any> = {
-  Palette, Building2, Users, LayoutGrid, Tag, CreditCard, Bell, Trash2, ShieldCheck, Zap, Clock
+  Palette, Building2, Users, LayoutGrid, Tag, CreditCard, Bell, Trash2, ShieldCheck, Zap, Clock, FileText
 }
 
 interface Props {

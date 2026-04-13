@@ -6,6 +6,8 @@ import { taskCommentedHtml }  from './templates/taskCommented'
 import { projectUpdatedHtml }  from './templates/projectUpdated'
 import { memberInvitedHtml }   from './templates/memberInvited'
 import { escalationAlertHtml } from './templates/escalationAlert'
+import { clientDocReminderHtml, clientDocReminderSubject } from './templates/clientDocReminder'
+import { clientUploadNotifyHtml, clientUploadNotifySubject } from './templates/clientUploadNotify'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://planora.in'
 
@@ -109,6 +111,33 @@ export async function sendMemberInvitedEmail(p: {
     from: FROM, to: p.to,
     subject: `👋 ${p.memberName} joined ${p.orgName} on Planora`,
     html: memberInvitedHtml({ ...p, appUrl: APP_URL }),
+  })
+}
+
+// ── Client document reminder ─────────────────────────────────────────────────
+export async function sendClientDocReminderEmail(p: {
+  to: string; clientName: string; orgName: string
+  taskTitle: string; dueDate: string; collectionDeadline: string
+  daysLeft: number; portalUrl: string; missingDocs: string[]
+}) {
+  return resend.emails.send({
+    from: FROM, to: p.to,
+    subject: clientDocReminderSubject(p),
+    html:    clientDocReminderHtml(p),
+  })
+}
+
+// ── CA assignee upload notification ──────────────────────────────────────────
+export async function sendClientUploadNotifyEmail(p: {
+  to: string; assigneeName: string; clientName: string; orgName: string
+  taskTitle: string; docTypeName: string; periodKey: string
+  fileName: string; taskId: string; projectId?: string | null
+}) {
+  const url = taskUrl(p.taskId, p.projectId)
+  return resend.emails.send({
+    from: FROM, to: p.to,
+    subject: clientUploadNotifySubject({ ...p, taskUrl: url }),
+    html:    clientUploadNotifyHtml({ ...p, taskUrl: url }),
   })
 }
 

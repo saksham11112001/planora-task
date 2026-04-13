@@ -44,4 +44,14 @@ export type PlanoraEvents = {
   }
   'reminders/daily-check': { data: { triggered_at: string } }
   'recurring/daily-spawn':  { data: { triggered_at: string } }
+  'client/document-uploaded': {
+    data: {
+      org_id:        string
+      client_id:     string
+      upload_id:     string
+      doc_type_name: string
+      period_key:    string
+      task_ids:      string[]
+    }
+  }
 }

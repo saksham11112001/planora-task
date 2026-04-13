@@ -20,6 +20,7 @@ const SECTIONS = [
   { href: '/settings/coupons',        label: 'Coupons',           desc: 'Manage discount and promo codes',        adminOnly: true,  color: '#ea580c', bg: '#fff7ed', iconName: 'Tag'       },
   { href: '/settings/notifications',         label: 'Notifications',          desc: 'Email and WhatsApp preferences per event',             adminOnly: false, color: '#db2777', bg: '#fdf2f8', iconName: 'Bell'      },
   { href: '/settings/notification-frequency', label: 'Notification frequency', desc: 'Immediate emails vs twice-daily digest for the whole org', adminOnly: true,  color: '#7c3aed', bg: '#f5f3ff', iconName: 'Clock'     },
+  { href: '/settings/document-types',         label: 'Client document types', desc: 'Define documents clients must upload for compliance tasks',  adminOnly: true,  color: '#d97706', bg: '#fffbeb', iconName: 'FileText'  },
 ]
 
 export default async function SettingsPage() {

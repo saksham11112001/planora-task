@@ -3,9 +3,11 @@ import { createClient }       from '@/lib/supabase/server'
 import { redirect }           from 'next/navigation'
 import Link                   from 'next/link'
 import { ArrowLeft, FolderOpen, ExternalLink, Pencil, Clock, CheckSquare, AlertCircle } from 'lucide-react'
-import { ProjectStatusBadge } from '@/components/ui/Badge'
-import { fmtDate, fmtHours }  from '@/lib/utils/format'
-import type { Metadata }      from 'next'
+import { ProjectStatusBadge }   from '@/components/ui/Badge'
+import { fmtDate, fmtHours }    from '@/lib/utils/format'
+import { ClientPortalSection }  from './ClientPortalSection'
+import { createAdminClient }    from '@/lib/supabase/admin'
+import type { Metadata }        from 'next'
 export const metadata: Metadata = { title: 'Client' }
 export const revalidate = 30
 
@@ -47,6 +49,18 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
   const totalHours    = timeLogs?.reduce((s, l) => s + (l.hours ?? 0), 0) ?? 0
   const billableHours = timeLogs?.filter(l => l.is_billable).reduce((s, l) => s + (l.hours ?? 0), 0) ?? 0
   const canManage     = ['owner', 'admin', 'manager'].includes(mb.role)
+
+  // Fetch existing portal token metadata (never expose token_hash)
+  const adminDb = createAdminClient()
+  const { data: portalToken } = await adminDb
+    .from('client_portal_tokens')
+    .select('id, expires_at, created_at')
+    .eq('org_id', mb.org_id)
+    .eq('client_id', clientId)
+    .maybeSingle()
+  const portalTokenMeta = portalToken
+    ? { ...portalToken, is_expired: new Date(portalToken.expires_at) < new Date() }
+    : null
 
   return (
     <div className="page-container">
@@ -135,6 +149,13 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
             )}
           </div>
         </div>
+
+        {/* Client Portal — visible to owners/admins/managers only */}
+        {canManage && (
+          <div className="mb-6">
+            <ClientPortalSection clientId={client.id} initialToken={portalTokenMeta} />
+          </div>
+        )}
 
         {/* Projects */}
         <div className="flex items-center justify-between mb-3">
