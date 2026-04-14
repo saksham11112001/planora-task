@@ -89,7 +89,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   // Block completing a PARENT task if it has incomplete subtasks
-  if (body.status === 'completed' && !task.parent_task_id) {
+  // Owner/admin bypass: they can force-complete regardless of subtask state
+  if (body.status === 'completed' && !task.parent_task_id && !isOwnerOrAdmin) {
     const { data: subtasks } = await supabase
       .from('tasks').select('id, status').eq('parent_task_id', id)
     if (subtasks && subtasks.length > 0) {

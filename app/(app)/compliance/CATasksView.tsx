@@ -132,7 +132,12 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: newStatus, completed_at: newStatus === 'completed' ? new Date().toISOString() : null }),
     })
-    if (!res.ok) { setTasks(prev); toast.error('Update failed') }
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}))
+      setTasks(prev)
+      if (selTask?.id === taskId) setSelTask(prev ? { ...prev } : null)
+      toast.error(d.error ?? 'Update failed')
+    }
     else startT(() => router.refresh())
   }
 
