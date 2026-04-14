@@ -62,7 +62,10 @@ export const dailyReminders = inngest.createFunction(
         const sendWA    = prefs?.via_whatsapp ?? false
 
         const dueDate   = task.due_date as string
-        const msLeft    = new Date(dueDate).getTime() - now.getTime()
+        // Parse due_date as IST end-of-day (23:59 IST = 18:29 UTC) so hoursLeft
+        // reflects the true deadline in IST, not UTC midnight which is 5.5h earlier.
+        const dueDateISTMs = new Date(`${dueDate}T23:59:59+05:30`).getTime()
+        const msLeft    = dueDateISTMs - now.getTime()
         const hoursLeft = Math.max(0, Math.round(msLeft / 3600000))
 
         if (sendEmail) {

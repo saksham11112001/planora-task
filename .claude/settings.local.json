@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(grep -E \"\\\\.\\(md|txt|d\\\\.ts\\)$\")"
+      "Bash(grep -E \"\\\\.\\(md|txt|d\\\\.ts\\)$\")",
+      "Bash(xargs grep:*)"
     ]
   }
 }

@@ -64,6 +64,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
 
   const [subtasks,      setSubtasks]      = useState<any[]>([])
   const [subtasksLoaded,setSubtasksLoaded]= useState(false)
+  const [nilSubtaskId,  setNilSubtaskId]  = useState<string | null>(null)
   const [newSubtitle,      setNewSubtitle]      = useState('')
   const [newSubAssigneeId, setNewSubAssigneeId] = useState('')
   const [newSubDueDate,    setNewSubDueDate]    = useState('')
@@ -393,7 +394,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
       const parentAtt = parentAttRes ? await parentAttRes.json().catch(() => ({ data: [] })) : { data: [] }
       const total = (subAtt.data ?? []).length + (parentAtt.data ?? []).length
       if (total === 0) {
-        toast.error('📎 Attach a document or Drive/Dropbox link before completing this subtask')
+        setNilSubtaskId(sub.id)
         return
       }
     }
@@ -407,6 +408,28 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
       // Revert on failure
       setSubtasks(p => p.map(s => s.id === sub.id ? { ...s, status: sub.status } : s))
       toast.error('Could not update subtask')
+    }
+  }
+
+  async function markSubtaskNil(sub: any) {
+    // Store a nil attachment on the subtask then mark it complete
+    await fetch(`/api/tasks/${sub.id}/attachments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ drive_url: 'nil', file_name: 'Not available (nil)', attachment_type: 'link' }),
+    })
+    setNilSubtaskId(null)
+    setSubtasks(p => p.map(s => s.id === sub.id ? { ...s, status: 'completed' } : s))
+    const res = await fetch(`/api/tasks/${sub.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'completed', completed_at: new Date().toISOString() }),
+    })
+    if (!res.ok) {
+      setSubtasks(p => p.map(s => s.id === sub.id ? { ...s, status: sub.status } : s))
+      toast.error('Could not update subtask')
+    } else {
+      toast.success('Subtask marked as not available')
     }
   }
 
@@ -544,17 +567,21 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
 
   async function addDriveLink() {
     if (!task || !driveUrl.trim()) return
-    try { new URL(driveUrl.trim()) } catch {
-      toast.error('Please enter a valid URL (must start with https://)')
-      return
+    const trimmedUrl = driveUrl.trim()
+    const isNil = trimmedUrl.toLowerCase() === 'nil'
+    if (!isNil) {
+      try { new URL(trimmedUrl) } catch {
+        toast.error('Please enter a valid URL (must start with https://) or type nil if not available')
+        return
+      }
     }
     setUploading(true)
     const r = await fetch(`/api/tasks/${task.id}/attachments`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        drive_url: driveUrl.trim(),
-        file_name: driveTitle.trim() || driveUrl.trim(),
+        drive_url: isNil ? 'nil' : trimmedUrl,
+        file_name: isNil ? 'Not available (nil)' : (driveTitle.trim() || trimmedUrl),
         attachment_type: 'link',
       }),
     })
@@ -562,7 +589,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     if (r.ok) {
       setAttachments(p => [d.data, ...p])
       setDriveUrl(''); setDriveTitle('')
-      toast.success('Link added')
+      toast.success(isNil ? 'Marked as not available' : 'Link added')
     } else {
       toast.error(d.error ?? 'Failed to add link')
     }
@@ -806,9 +833,10 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                       const subAssignee = sub.assignee_id ? members.find(m => m.id === sub.assignee_id) : null
                       const canToggleSub = canEdit || sub.assignee_id === currentUserId
                       return (
-                        <div key={sub.id}
+                        <div key={sub.id}>
+                        <div
                           style={{ display: 'flex', alignItems: 'center', gap: 10,
-                            padding: '8px 20px', borderBottom: '1px solid var(--border-light)',
+                            padding: '8px 20px', borderBottom: nilSubtaskId === sub.id ? 'none' : '1px solid var(--border-light)',
                             background: 'var(--surface)' }}
                           className="group">
                           <button onClick={() => canToggleSub && toggleSubtask(sub)}
@@ -850,6 +878,32 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                               {sub.due_date}
                             </span>
                           )}
+                        </div>
+                        {/* Nil confirmation — shown when user tries to complete with no attachment */}
+                        {nilSubtaskId === sub.id && (
+                          <div style={{
+                            display: 'flex', alignItems: 'center', gap: 8,
+                            padding: '7px 20px 8px', borderBottom: '1px solid var(--border-light)',
+                            background: 'rgba(217,119,6,0.06)', borderLeft: '3px solid #d97706',
+                          }}>
+                            <span style={{ fontSize: 11, color: '#92400e', flex: 1 }}>
+                              No document found. Mark as <strong>not available (nil)</strong>?
+                            </span>
+                            <button
+                              onClick={() => markSubtaskNil(sub)}
+                              style={{ fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 6,
+                                background: '#d97706', color: '#fff', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
+                              Mark N/A
+                            </button>
+                            <button
+                              onClick={() => setNilSubtaskId(null)}
+                              style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6,
+                                background: 'none', color: 'var(--text-muted)', border: '1px solid var(--border)',
+                                cursor: 'pointer', fontFamily: 'inherit' }}>
+                              Cancel
+                            </button>
+                          </div>
+                        )}
                         </div>
                       )
                     })}
@@ -1346,7 +1400,8 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                   ? <p className="text-xs text-center py-4" style={{ color: 'var(--text-muted)' }}>No files attached yet</p>
                   : <div className="space-y-2">
                     {attachments.map(att => {
-                      const isLink = att.attachment_type === 'link' || att.drive_url
+                      const isNilAtt = att.drive_url === 'nil'
+                      const isLink = !isNilAtt && (att.attachment_type === 'link' || att.drive_url)
                       const isImg  = att.mime_type?.startsWith('image/')
                       const icon   = isLink ? null : att.mime_type?.includes('pdf') ? '📄' : isImg ? '🖼️' :
                                      att.mime_type?.includes('sheet') || att.mime_type?.includes('excel') ? '📊' :
@@ -1357,18 +1412,28 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                       return (
                         <div key={att.id}
                           className="flex items-center gap-3 p-3 rounded-xl group transition-colors"
-                          style={{ background: 'var(--surface-subtle)', border: '1px solid var(--border-light)' }}>
-                          {isLink
-                            ? <ExternalLink className="h-5 w-5 flex-shrink-0" style={{ color: 'var(--brand)' }} />
-                            : <span className="text-2xl flex-shrink-0">{icon}</span>
+                          style={{ background: isNilAtt ? 'rgba(217,119,6,0.06)' : 'var(--surface-subtle)',
+                            border: `1px solid ${isNilAtt ? 'rgba(217,119,6,0.25)' : 'var(--border-light)'}` }}>
+                          {isNilAtt
+                            ? <span className="text-2xl flex-shrink-0">🚫</span>
+                            : isLink
+                              ? <ExternalLink className="h-5 w-5 flex-shrink-0" style={{ color: 'var(--brand)' }} />
+                              : <span className="text-2xl flex-shrink-0">{icon}</span>
                           }
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{att.file_name}</p>
+                            <p className="text-sm font-medium truncate" style={{ color: isNilAtt ? '#92400e' : 'var(--text-primary)' }}>
+                              {isNilAtt ? 'Not available' : att.file_name}
+                            </p>
                             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                              {isLink ? 'Link' : kb}{att.uploader?.name ? ` · ${att.uploader.name}` : ''}
+                              {isNilAtt ? 'Marked N/A' : isLink ? 'Link' : kb}{att.uploader?.name ? ` · ${att.uploader.name}` : ''}
                             </p>
                           </div>
-                          {isLink
+                          {isNilAtt
+                            ? <span style={{ fontSize: 10, fontWeight: 700, color: '#d97706',
+                                background: 'rgba(217,119,6,0.15)', padding: '2px 7px', borderRadius: 4, flexShrink: 0 }}>
+                                N/A
+                              </span>
+                            : isLink
                             ? <a href={att.drive_url} target="_blank" rel="noopener noreferrer"
                                 className="text-xs font-medium px-2 py-1 rounded transition-colors flex-shrink-0"
                                 style={{ color: 'var(--brand)' }}>

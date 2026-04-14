@@ -14,6 +14,15 @@ function isValidUrl(str: string) {
   try { new URL(str); return true } catch { return false }
 }
 
+// "nil" means the user explicitly declares the document is not available
+function isNilEntry(str: string) {
+  return str.trim().toLowerCase() === 'nil'
+}
+
+function isAcceptableLink(str: string) {
+  return isValidUrl(str) || isNilEntry(str)
+}
+
 export function CompletionAttachModal({ taskId, taskTitle, onConfirm, onCancel }: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [files,     setFiles]     = useState<File[]>([])
@@ -38,17 +47,18 @@ export function CompletionAttachModal({ taskId, taskTitle, onConfirm, onCancel }
 
       if (hasLink) {
         const url = linkUrl.trim()
+        const nil = isNilEntry(url)
         const res = await fetch(`/api/tasks/${taskId}/attachments`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            drive_url: url,
-            file_name: linkName.trim() || url,
+            drive_url: nil ? 'nil' : url,
+            file_name: nil ? 'Not available (nil)' : (linkName.trim() || url),
             attachment_type: 'link',
           }),
         })
         if (!res.ok) toast.error('Link save failed — marking complete anyway')
-        else toast.success('Link attached ✓')
+        else toast.success(nil ? 'Marked as not available ✓' : 'Link attached ✓')
       }
     } catch {
       toast.error('Attachment failed — marking complete anyway')
@@ -92,7 +102,7 @@ export function CompletionAttachModal({ taskId, taskTitle, onConfirm, onCancel }
         <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 12 }}>
           Attach proof of completion <span style={{ fontWeight: 700, color: '#dc2626' }}>*</span>
           <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-muted)', marginLeft: 6 }}>
-            (file upload or a link)
+            (file upload or a link — type <code style={{ fontSize: 10, background: 'var(--border)', padding: '1px 4px', borderRadius: 3 }}>nil</code> if not available)
           </span>
         </p>
 
@@ -139,23 +149,29 @@ export function CompletionAttachModal({ taskId, taskTitle, onConfirm, onCancel }
         <div style={{ marginBottom: 20 }}>
           <div style={{
             display: 'flex', alignItems: 'center', gap: 8,
-            border: `1px solid ${hasLink && isValidUrl(linkUrl) ? 'var(--brand)' : hasLink ? '#f87171' : 'var(--border)'}`,
+            border: `1px solid ${hasLink && isAcceptableLink(linkUrl) ? 'var(--brand)' : hasLink ? '#f87171' : 'var(--border)'}`,
             borderRadius: 8, padding: '8px 12px',
             background: 'var(--surface-subtle)',
           }}>
             <LinkIcon style={{ width: 14, height: 14, color: 'var(--text-muted)', flexShrink: 0 }}/>
             <input
-              type="url"
+              type="text"
               value={linkUrl}
               onChange={e => setLinkUrl(e.target.value)}
-              placeholder="Paste Google Drive, Dropbox or any link…"
+              placeholder="Paste a link… or type nil if document not available"
               style={{
                 flex: 1, border: 'none', outline: 'none', background: 'transparent',
                 fontSize: 13, color: 'var(--text-primary)', fontFamily: 'inherit',
               }}
             />
+            {hasLink && isNilEntry(linkUrl) && (
+              <span style={{ fontSize: 10, fontWeight: 600, color: '#d97706',
+                background: 'rgba(217,119,6,0.1)', padding: '2px 6px', borderRadius: 4, flexShrink: 0 }}>
+                N/A
+              </span>
+            )}
           </div>
-          {hasLink && (
+          {hasLink && !isNilEntry(linkUrl) && (
             <input
               type="text"
               value={linkName}
@@ -169,8 +185,13 @@ export function CompletionAttachModal({ taskId, taskTitle, onConfirm, onCancel }
               }}
             />
           )}
-          {hasLink && !isValidUrl(linkUrl) && (
-            <p style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>Please enter a valid URL (starting with https://)</p>
+          {hasLink && isNilEntry(linkUrl) && (
+            <p style={{ fontSize: 11, color: '#d97706', marginTop: 4 }}>
+              Marked as not available — task will be completed without a document
+            </p>
+          )}
+          {hasLink && !isNilEntry(linkUrl) && !isValidUrl(linkUrl) && (
+            <p style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>Please enter a valid URL (starting with https://) or type <strong>nil</strong></p>
           )}
         </div>
 
@@ -178,13 +199,13 @@ export function CompletionAttachModal({ taskId, taskTitle, onConfirm, onCancel }
         <div style={{ display: 'flex', gap: 8 }}>
           <button
             onClick={handleConfirm}
-            disabled={uploading || (hasLink && !isValidUrl(linkUrl))}
+            disabled={uploading || (hasLink && !isAcceptableLink(linkUrl))}
             style={{
               flex: 1, padding: '10px', borderRadius: 8, border: 'none',
               background: canSubmit ? '#16a34a' : 'var(--border)',
               color: canSubmit ? '#fff' : 'var(--text-muted)',
               fontSize: 13, fontWeight: 600,
-              cursor: (uploading || (hasLink && !isValidUrl(linkUrl))) ? 'not-allowed' : 'pointer',
+              cursor: (uploading || (hasLink && !isAcceptableLink(linkUrl))) ? 'not-allowed' : 'pointer',
               fontFamily: 'inherit', opacity: uploading ? 0.7 : 1, transition: 'all 0.15s',
             }}>
             {uploading ? 'Saving…' : canSubmit ? 'Attach & mark complete' : 'Mark as complete'}

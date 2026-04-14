@@ -5,9 +5,10 @@ interface Props {
 
 export function taskDueSoonHtml(p: Props): string {
   const urgency = p.hoursLeft <= 2 ? '#dc2626' : p.hoursLeft <= 6 ? '#ea580c' : '#ca8a04'
-  const label   = p.hoursLeft <= 1 ? 'Due in under 1 hour!'
-    : p.hoursLeft <= 24 ? `Due in ${p.hoursLeft} hours`
-    : `Due today`
+  const label   = p.hoursLeft <= 1  ? 'Due in under 1 hour!'
+    : p.hoursLeft <= 24 ? `Due today — ${p.hoursLeft}h left`
+    : p.hoursLeft <= 48 ? 'Due tomorrow'
+    : `Due in ${Math.round(p.hoursLeft / 24)} days`
 
   return `<!DOCTYPE html><html>
 <body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
