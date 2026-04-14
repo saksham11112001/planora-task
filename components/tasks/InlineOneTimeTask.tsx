@@ -184,6 +184,14 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated, 
 
   return (
     <>
+    {/* Placeholder glorification for task name field */}
+    <style>{`
+      .iot-title-input::placeholder {
+        color: rgba(13,148,136,0.55);
+        font-weight: 500;
+        font-style: italic;
+      }
+    `}</style>
     {showAddClient && (
       <QuickAddClientModal
         onClose={() => setShowAddClient(false)}
@@ -200,12 +208,24 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated, 
       background: 'var(--surface)',
       boxShadow: '0 2px 12px rgba(13,148,136,0.08)', overflow: 'hidden',
     }}>
-      {/* Title */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px 8px' }}>
-        <div style={{ width: 15, height: 15, borderRadius: '50%', flexShrink: 0, border: '2px solid var(--brand)', opacity: 0.5 }} />
+      {/* Title — glorified: accent left-border + tinted bg fade away as user types */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        padding: '12px 14px 10px',
+        background: title ? 'transparent' : 'rgba(13,148,136,0.045)',
+        borderLeft: title ? '3px solid transparent' : '3px solid var(--brand)',
+        transition: 'background 0.25s ease, border-left-color 0.25s ease',
+      }}>
+        <div style={{
+          width: 16, height: 16, borderRadius: '50%', flexShrink: 0,
+          border: '2px solid var(--brand)',
+          opacity: title ? 0.4 : 1,
+          transition: 'opacity 0.25s ease',
+        }} />
         <input ref={inputRef} value={title} onChange={e => setTitle(e.target.value)} onKeyDown={onKeyDown}
-          placeholder="Task name…"
-          style={{ flex: 1, fontSize: 14, fontWeight: 500, border: 'none', outline: 'none',
+          placeholder="What needs to be done?"
+          className="iot-title-input"
+          style={{ flex: 1, fontSize: 15, fontWeight: 600, border: 'none', outline: 'none',
             background: 'transparent', color: 'var(--text-primary)', fontFamily: 'inherit' }}/>
         <button onClick={reset} style={{ background: 'none', border: 'none', cursor: 'pointer',
           color: 'var(--text-muted)', display: 'flex', padding: 2, borderRadius: 4 }}>
@@ -213,7 +233,7 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated, 
         </button>
       </div>
 
-      <div style={{ height: 1, background: 'var(--border-light)', margin: '0 14px' }} />
+      <div style={{ height: title ? 1 : 2, background: title ? 'var(--border-light)' : 'rgba(13,148,136,0.2)', margin: '0 14px', transition: 'height 0.25s, background 0.25s' }} />
 
       {/* Pills row */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px 4px', flexWrap: 'wrap' }}>
