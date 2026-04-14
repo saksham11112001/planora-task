@@ -199,6 +199,14 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, defa
 
   return (
     <>
+    {/* Placeholder glorification for recurring task name field */}
+    <style>{`
+      .irt-title-input::placeholder {
+        color: rgba(13,148,136,0.55);
+        font-weight: 500;
+        font-style: italic;
+      }
+    `}</style>
     {showAddClient && (
       <QuickAddClientModal
         onClose={() => setShowAddClient(false)}
@@ -216,21 +224,32 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, defa
       boxShadow:'0 2px 12px rgba(13,148,136,0.08)',
       overflow:'hidden',
     }}>
-      {/* Title row */}
-      <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px 8px' }}>
-        <RefreshCw style={{ width:13, height:13, color:'var(--brand)', flexShrink:0 }}/>
+      {/* Title row — glorified: accent left-border + tinted bg fade away as user types */}
+      <div style={{
+        display:'flex', alignItems:'center', gap:10,
+        padding:'12px 14px 10px',
+        background: title ? 'transparent' : 'rgba(13,148,136,0.045)',
+        borderLeft: title ? '3px solid transparent' : '3px solid var(--brand)',
+        transition:'background 0.25s ease, border-left-color 0.25s ease',
+      }}>
+        <RefreshCw style={{
+          width:15, height:15, color:'var(--brand)', flexShrink:0,
+          opacity: title ? 0.45 : 1,
+          transition:'opacity 0.25s ease',
+        }}/>
         <input ref={inputRef} value={title} onChange={e => setTitle(e.target.value)}
           onKeyDown={e => { if (e.key==='Enter') save(); if (e.key==='Escape') close() }}
-          placeholder="Recurring task name…"
-          style={{ flex:1, fontSize:14, fontWeight:500, border:'none', outline:'none',
-            background:'transparent', color:'var(--text-primary)' }}/>
+          placeholder="What repeats? Name this task…"
+          className="irt-title-input"
+          style={{ flex:1, fontSize:15, fontWeight:600, border:'none', outline:'none',
+            background:'transparent', color:'var(--text-primary)', fontFamily:'inherit' }}/>
         <button onClick={close} style={{ background:'none', border:'none', cursor:'pointer',
           color:'var(--text-muted)', display:'flex', padding:2, borderRadius:4 }}>
           <X style={{ width:13, height:13 }}/>
         </button>
       </div>
 
-      <div style={{ height:1, background:'var(--border-light)', margin:'0 14px' }}/>
+      <div style={{ height: title ? 1 : 2, background: title ? 'var(--border-light)' : 'rgba(13,148,136,0.2)', margin:'0 14px', transition:'height 0.25s, background 0.25s' }}/>
 
       {/* Options pills */}
       <div style={{ padding:'8px 14px 4px' }}>
