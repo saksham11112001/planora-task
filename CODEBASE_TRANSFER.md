@@ -1,5 +1,5 @@
 # Planora Task — Codebase Transfer Document
-> Use this at the start of a new chat to give the AI full context. Last updated: 2026-04-09 (Session 6)
+> Use this at the start of a new chat to give the AI full context. Last updated: 2026-04-14 (Session 7)
 
 ---
 
@@ -233,6 +233,12 @@ app/(app)/inbox/InboxView.tsx         — Client: List / Board view for one-time
 app/(app)/time/page.tsx               — Time logs
 app/(app)/reports/page.tsx            — Reports + Excel export
 app/(app)/compliance/page.tsx         — CA compliance module
+app/(app)/compliance/CATasksView.tsx  — CA Tasks tab (step 4 in ComplianceShell)
+  — patchStatus: now reads d.error from response body, surfaces real API error  ← Session 7
+  — filterAssignee state: '' | 'unassigned' | memberId  ← Session 7
+    Toolbar: "All assignees / ⊘ Unassigned / <member>" select — included in activeFilters
+  — masterUpdatePrompt state + updateMasterAssignment(): when assignee_id changes in
+    onUpdated, show popup asking to also PATCH ca_client_assignments.assignee_id  ← Session 7
 app/(app)/import/page.tsx             — Data import wizard
 app/(app)/team/page.tsx               — Team members
 app/(app)/profile/page.tsx            — User profile
@@ -249,10 +255,13 @@ app/api/tasks/[id]/route.ts           — GET / PATCH / DELETE single task
   — PATCH: managers can update all fields incl. assignee_id, approver_id
   — PATCH: assertCan(tasks.complete / tasks.assign / tasks.edit_own / tasks.edit)  ← Session 4
   — DELETE: assertCan(tasks.delete)  ← Session 4
+  — PATCH subtask-incomplete gate: `&& !isOwnerOrAdmin` — owner/admin can force-complete  ← Session 7
 app/api/tasks/[id]/approve/route.ts   — POST: submit / approve / reject
   — submit: assignee OR isOwnerOrAdmin
   — approve/reject: designated approver OR isOwnerOrAdmin
   — CA compliance: checks attachment_count vs ca_master_tasks before submit
+  — submit subtask gate: `!isOwnerOrAdmin &&` — owner/admin can force-submit  ← Session 7
+  — approve subtask gate: `!isOwnerOrAdmin &&` — owner/admin can force-approve  ← Session 7
 app/api/tasks/[id]/comments/route.ts  — Comments CRUD
 app/api/tasks/[id]/attachments/route.ts — Attachments upload/delete
 
@@ -303,7 +312,15 @@ components/tasks/TaskDetailPanel.tsx  — Side panel for task details
 
 components/tasks/InlineTaskRow.tsx    — Editable row in project/list views
 components/tasks/InlineOneTimeTask.tsx — Inline create one-time task
+  — Title row glorified when empty: teal left-border accent + tinted bg; circle full opacity  ← Session 7
+  — Input fontSize:15 / fontWeight:600 (from 14/500); placeholder "What needs to be done?"  ← Session 7
+  — .iot-title-input::placeholder CSS: teal 55% opacity, italic  ← Session 7
+  — Divider thickens (2px brand tint) when empty, hairline once typed  ← Session 7
+  — All transitions 0.25s ease so effects fade naturally as user types  ← Session 7
 components/tasks/InlineRecurringTask.tsx — Inline create recurring task
+  — Same glorification treatment as InlineOneTimeTask  ← Session 7
+  — .irt-title-input::placeholder; placeholder "What repeats? Name this task…"  ← Session 7
+  — RefreshCw icon at full opacity when empty → 45% once typed  ← Session 7
 components/tasks/CustomFieldsPanel.tsx — Custom fields editor in TaskDetailPanel
 components/tasks/MentionTextarea.tsx  — @mention textarea for comments
 components/tasks/CompletionAttachModal.tsx — Attach files when completing task
@@ -515,6 +532,49 @@ lib/data/caDefaultTasks.ts            — Default CA task templates
 
 ---
 
+### SESSION 7 FIXES & FEATURES
+
+### 20. Owner blocked from completing / submitting / approving tasks with incomplete subtasks
+- **Root cause**: Three subtask-incomplete gates had no owner/admin bypass. CA compliance tasks always carry subtasks (one per attachment header). Any owner action on a CA task triggered these gates and returned 422.
+- **Files fixed**:
+  - `app/api/tasks/[id]/route.ts` PATCH — `if (body.status === 'completed' && !task.parent_task_id && !isOwnerOrAdmin)`
+  - `app/api/tasks/[id]/approve/route.ts` submit branch — `if (!isOwnerOrAdmin && subtasks && subtasks.length > 0)`
+  - `app/api/tasks/[id]/approve/route.ts` approve branch — `if (!isOwnerOrAdmin && subtasksForApprove && ...)`
+- **Rule**: Owner/admin bypass ALL gates. Every new gate must include `&& !isOwnerOrAdmin` or `if (isOwnerOrAdmin) skip`.
+
+### 21. CATasksView patchStatus swallowed real API error — always showed "Update failed"
+- **Root cause**: `if (!res.ok) { setTasks(prev); toast.error('Update failed') }` — no attempt to read body
+- **Fix**: `const d = await res.json().catch(() => ({}))`; `toast.error(d.error ?? 'Update failed')`
+- **Pattern**: All patchStatus / inline-update handlers must read `d.error` from response body (see MyTasksView, InboxView which already do this correctly with `toast.error(d.error ?? '...')`).
+
+### 22. CA Tasks — no way to filter unassigned tasks
+- **Added**: `filterAssignee` state (`'' | 'unassigned' | memberId`) in `CATasksView`
+- **Toolbar**: "All assignees / ⊘ Unassigned / \<member>" `<select>` after the Status filter
+- **Filter logic**:
+  ```typescript
+  if (filterAssignee === 'unassigned' && t.assignee_id !== null) return false
+  if (filterAssignee && filterAssignee !== 'unassigned' && t.assignee_id !== filterAssignee) return false
+  ```
+- Included in `activeFilters` count and reset by Clear button.
+
+### 23. CA Tasks — no way to update recurring assignment when assigning a task
+- **Added**: When `onUpdated` is called with a changed `assignee_id` on a CA task that has a `client_id`, show a popup: *"Update recurring assignment for \<client> so future '\<task>' tasks go to \<assignee>?"*
+- **"Yes" flow**: `GET /api/ca/assignments?client_id=X` → find row where `master_task.name === task.title` → `PATCH /api/ca/assignments/{id} { assignee_id }` → future `caComplianceSpawn` runs use new assignee
+- **State**: `masterUpdatePrompt` object + `masterUpdating` boolean (spinner + disabled buttons during PATCH)
+- **Guard**: Only fires for `canManage` roles when task has a `client_id`. Tasks without client cannot have an assignment row.
+
+### 24. Inline task name field not noticed — users filled details before task name
+- **Fix**: Glorified the title row in both `InlineOneTimeTask` and `InlineRecurringTask`:
+  - Teal `3px` left-accent border when empty → transparent once typing starts
+  - Subtle `rgba(13,148,136,0.045)` background tint on title row → transparent once typing
+  - Divider below title: `2px` brand tint when empty → `1px` hairline once typing
+  - Circle / RefreshCw icon: full opacity when empty → 40–45% once typing
+  - Input: `fontSize:15 / fontWeight:600` (from 14/500)
+  - Placeholders: `"What needs to be done?"` / `"What repeats? Name this task…"` styled teal+italic
+  - All transitions `0.25s ease` — effects fade naturally, not jarring
+
+---
+
 ## PATTERNS TO KNOW
 
 ### Server component data fetching pattern
@@ -694,6 +754,56 @@ experimental: {
 export const dynamic = 'force-dynamic'
 // This prevents static generation and ensures fresh server-component render on every request.
 // Combined with staleTimes:0, every navigation fetches latest data from DB.
+```
+
+### Owner/admin gate bypass pattern — EVERY gate must include this (Session 7)
+```typescript
+// ❌ WRONG — blocks owner/admin
+if (subtasks.length > 0 && incomplete.length > 0) return 422
+
+// ✅ CORRECT — owner/admin can always force through
+if (!isOwnerOrAdmin && subtasks.length > 0 && incomplete.length > 0) return 422
+
+// Rule: owner and admin bypass ALL gates, not just permission gates.
+// This applies to: subtask checks, attachment checks, blocker checks, approval checks.
+```
+
+### CA task update-master popup pattern (Session 7)
+```typescript
+// In CATasksView.onUpdated: detect assignee change → show popup
+if (canManage && 'assignee_id' in fields && fields.assignee_id &&
+    fields.assignee_id !== selTask.assignee_id && selTask.client_id) {
+  const member = members.find(m => m.id === fields.assignee_id)
+  if (member) setMasterUpdatePrompt({ ... })
+}
+
+// updateMasterAssignment():
+// 1. GET /api/ca/assignments?client_id={clientId}   ← includes master_task.name join
+// 2. find(a => a.master_task?.name === masterTaskTitle)
+// 3. PATCH /api/ca/assignments/{id} { assignee_id }
+// Future caComplianceSpawn uses ca_client_assignments.assignee_id — so this
+// ensures all future spawned tasks for that client+master go to the new person.
+```
+
+### Inline form field glorification pattern (Session 7)
+```tsx
+// Title row: teal accent when empty, fades as user types
+<div style={{
+  background: title ? 'transparent' : 'rgba(13,148,136,0.045)',
+  borderLeft: title ? '3px solid transparent' : '3px solid var(--brand)',
+  transition: 'background 0.25s ease, border-left-color 0.25s ease',
+}}>
+  <YourIcon style={{ opacity: title ? 0.4 : 1, transition: 'opacity 0.25s ease' }}/>
+  <input className="my-title-input" style={{ fontSize: 15, fontWeight: 600 }}/>
+</div>
+<div style={{ height: title ? 1 : 2,
+  background: title ? 'var(--border-light)' : 'rgba(13,148,136,0.2)',
+  transition: 'height 0.25s, background 0.25s' }}/>
+
+// Placeholder styling — must use <style> tag (no inline ::placeholder support):
+<style>{`.my-title-input::placeholder {
+  color: rgba(13,148,136,0.55); font-weight: 500; font-style: italic;
+}`}</style>
 ```
 
 ---
