@@ -1,5 +1,5 @@
 # Planora Task — Codebase Transfer Document
-> Use this at the start of a new chat to give the AI full context. Last updated: 2026-04-14 (Session 7)
+> Use this at the start of a new chat to give the AI full context. Last updated: 2026-04-14 (Session 8)
 
 ---
 
@@ -33,8 +33,9 @@
 | `time_logs` | `id, org_id, task_id, project_id, user_id, hours, is_billable` |
 | `task_attachments` | `id, task_id, org_id, file_url, file_name` |
 | `task_comments` | `id, task_id, org_id, user_id, content` |
-| `ca_master_tasks` | `id, org_id, name, attachment_count, attachment_headers, is_active` |
-| `ca_assignments` | `id, org_id, client_id, master_task_id, assignee_id, due_date` |
+| `ca_master_tasks` | `id, org_id, name, attachment_count, attachment_headers, is_active, priority, dates (jsonb), days_before_due` |
+| `ca_client_assignments` | `id, org_id, client_id, master_task_id (→ ca_master_tasks), assignee_id` — FK join syntax: `master_task:ca_master_tasks(id, name, priority, dates, days_before_due)` |
+| `ca_task_instances` | `id, org_id, assignment_id (→ ca_client_assignments), due_date` — keyed as `${assignment_id}__${due_date}` to prevent re-spawn |
 | `notifications` | `id, org_id, user_id, type, read, data (jsonb)` |
 | `recurring_tasks` | `id, org_id, title, frequency, next_run, assignee_id, project_id, client_id` |
 
@@ -53,6 +54,7 @@ projects(id, name, color)
 
 | Operation | Owner | Admin | Manager | Member | Viewer |
 |-----------|-------|-------|---------|--------|--------|
+| View all tasks (Monitor page) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | View all tasks (My Tasks, Calendar, Inbox, Recurring) | ✅ | ✅ | Assignee/approver only | Assignee/approver only | Assignee/approver only |
 | "Assigned by me" section (My Tasks) | ✅ | ✅ | ❌ | ❌ | ❌ |
 | can_view_all_tasks flag override | N/A (always all) | N/A (always all) | Grants full view-all if set | Grants full view-all if set | Grants full view-all if set |
@@ -143,6 +145,9 @@ app/(app)/tasks/page.tsx              — Server: fetches my tasks + approval ta
   — SELECT includes: created_at, updated_at  ← added Session 4
   — Enrichment: creator: (t.creator as any) ?? null
   — Enrichment: created_at: t.created_at ?? '', updated_at: t.updated_at ?? null  ← Session 4
+  — Fetches caAssignments + caInstances for owner/admin; computes upcomingCATriggers  ← Session 8
+    (triggers firing in next 3 days that have not yet been spawned)
+  — Passes upcomingCATriggers to MyTasksView  ← Session 8
 app/(app)/tasks/MyTasksView.tsx       — Client: List / Board (Kanban) view
   — BOARD_COLS: overdue | in_progress (includes todo) | in_review (Pending approval) | completed
   — Grid: '28px 22px 1fr 120px 130px 90px 100px 28px'
@@ -160,6 +165,8 @@ app/(app)/tasks/MyTasksView.tsx       — Client: List / Board (Kanban) view
     compliance=#d97706, recurring=#0d9488, project=#7c3aed, one-time=#0891b2
     borderLeft: 3px solid typeAccent; bg: tinted rgba per type
   — Board TaskCard color coding: typeAccent + typeBg + borderLeft per type (Session 4)
+  — CATriggerSection component: collapsible amber-styled list of upcoming CA triggers  ← Session 8
+    Shown in List view above empty state when upcomingCATriggers.length > 0 && !showAssignedByMe
 
 app/(app)/projects/page.tsx           — Projects list
 app/(app)/projects/ProjectsView.tsx   — Projects grid/list
@@ -185,17 +192,25 @@ app/(app)/clients/ClientsView.tsx     — NEW Session 5: client component for th
 app/(app)/clients/[clientId]/page.tsx — Client detail with project stats
   — export const dynamic = 'force-dynamic'  ← added Session 4
 app/(app)/calendar/page.tsx           — Fetches tasks with due dates + approver join
+  — Fetches caAssignments + caInstances for owner/admin; computes upcomingCATriggers  ← Session 8
+  — Passes upcomingCATriggers to CalendarView  ← Session 8
 app/(app)/calendar/CalendarView.tsx   — Monthly calendar component
-  — taskTypeBorder/Bg/Dot functions define type colors (compliance/recurring/project/one-time)
+  — taskTypeBorder/Bg/Dot functions define type colors (compliance/recurring/project/quick)
   — isDone no longer overrides type colors; opacity: 0.72/0.68 used for done state instead (Session 4)
   — Legend: recurring icon color fixed to #0d9488 (was #ea580c) (Session 4)
+  — Filter pill "One-time" → "Quick"; legend "One-time" → "Quick"  ← Session 8
+  — upcomingCATriggers prop: ghost amber dashed cards in timeline + month grid + day panel  ← Session 8
+    byTriggerDate map groups triggers by triggerDate string
+    Timeline: amber dashed div with ⏰ badge after dayTasks.map()
+    Month: small amber dashed pill with ⏰ emoji (up to 2 per day cell)
+    Day panel: full "CA tasks triggering soon" section with title/client/dates
 
-app/(app)/recurring/page.tsx          — Recurring tasks list
+app/(app)/recurring/page.tsx          — Repeat tasks list (metadata title: "Repeat tasks")  ← Session 8
   — SELECT includes: creator:users!tasks_created_by_fkey(id, name)
   — SELECT includes: created_at, updated_at  ← added Session 4
   — Enrichment: creator: (t as any).creator ?? null
   — Enrichment: created_at: t.created_at ?? '', updated_at: t.updated_at ?? null  ← Session 4
-app/(app)/recurring/RecurringView.tsx — Recurring task editor
+app/(app)/recurring/RecurringView.tsx — Repeat task editor  ← Session 8 (renamed display text)
   — Grid: '1fr 10rem 6rem 6rem 6rem 7rem 5rem 4.5rem' (8 columns including Assigned by)
   — "Assigned by" column between Approver and Client; uses User icon from lucide-react
   — Subtask add: newSubAssignees / newSubDueDates per-task state maps
@@ -211,12 +226,12 @@ app/(app)/recurring/RecurringView.tsx — Recurring task editor
 app/(app)/approvals/page.tsx          — Approvals queue (pending + history, with approver join)
 app/(app)/approvals/ApprovalsView.tsx — Approval queue UI
 
-app/(app)/inbox/page.tsx              — One-time tasks inbox (all tasks for org)
+app/(app)/inbox/page.tsx              — Quick tasks inbox (metadata title: "Quick tasks")  ← Session 8
   — SELECT includes: creator:users!tasks_created_by_fkey(id, name)
   — SELECT includes: created_at, updated_at  ← added Session 4
   — Enrichment: creator: (t as any).creator ?? null
   — Enrichment: created_at: (t as any).created_at ?? '', updated_at: (t as any).updated_at ?? null  ← Session 4
-app/(app)/inbox/InboxView.tsx         — Client: List / Board view for one-time tasks
+app/(app)/inbox/InboxView.tsx         — Client: List / Board view for quick tasks  ← Session 8 (renamed)
   — Grid: '36px 22px 1fr 100px 110px 110px 100px 80px 32px 28px' (10 columns)
     (check | circle | Task | Assignee | Client | Due date | Assigned by | Priority | expand | del)
   — "Assigned by" column after Due date: creator avatar initial + first name
@@ -237,9 +252,38 @@ app/(app)/compliance/CATasksView.tsx  — CA Tasks tab (step 4 in ComplianceShel
   — patchStatus: now reads d.error from response body, surfaces real API error  ← Session 7
   — filterAssignee state: '' | 'unassigned' | memberId  ← Session 7
     Toolbar: "All assignees / ⊘ Unassigned / <member>" select — included in activeFilters
+  — doMasterUpdate(data) + updateMasterAssignment() refactored  ← Session 8
+    doMasterUpdate accepts params directly (no state dependency)
+    If task was UNASSIGNED (assignee_id===null): auto-calls doMasterUpdate immediately (no popup)
+    If task was ALREADY ASSIGNED: shows masterUpdatePrompt popup to confirm overwrite
   — masterUpdatePrompt state + updateMasterAssignment(): when assignee_id changes in
     onUpdated, show popup asking to also PATCH ca_client_assignments.assignee_id  ← Session 7
-app/(app)/import/page.tsx             — Data import wizard
+app/(app)/monitor/page.tsx            — NEW Session 8: Monitor server page (read-only, all roles)
+  — export const dynamic = 'force-dynamic'
+  — Fetches ALL org tasks (no role scoping — always full org view)
+  — TASK_COLS: id, title, status, priority, due_date, assignee, approver, creator, projects
+  — Fetches members + clients in parallel
+  — Passes tasks/members/clients/currentUserId/userRole to MonitorView
+app/(app)/monitor/MonitorView.tsx     — NEW Session 8: Monitor client component
+  — 'use client', fully read-only (no create/edit/delete buttons anywhere)
+  — Stats bar: total | todo | inProgress | inReview | completed | overdue | unassigned | CA count
+  — Filters: search, status (multi-select pill), priority, assignee, client, type, dueDateFrom/To, clear all
+  — GroupBy: status (default) | assignee | client | type | none — each group collapsible
+  — Task rows: 6-col grid — Task+client | Type badge | Priority | Status pill | Assignee avatar | Due date
+  — Type colors: CA=#d97706, Repeat=#0d9488, Project=#7c3aed, Quick=#0891b2
+  — Overdue: red text + ⚠ indicator on due date cell
+  — Unassigned: amber "⊘ Unassigned" label instead of avatar
+  — Opens TaskDetailPanel with userRole="viewer" to enforce fully read-only panel
+
+app/(app)/import/page.tsx             — Data import wizard  ← renamed display text in Session 8
+app/(app)/import/ImportView.tsx       — Import wizard UI
+  — "Importing one-time tasks…" → "Importing quick tasks…"  ← Session 8
+  — "Importing recurring tasks…" → "Importing repeat tasks…"  ← Session 8
+  — Result labels: "Quick tasks" / "Repeat tasks"  ← Session 8
+app/(app)/approvals/ApprovalsView.tsx — Approval queue UI
+  — StatTile "One-time" → "Quick tasks"; section labels renamed  ← Session 8
+app/(app)/settings/features/FeaturesView.tsx — Feature flags UI
+  — 'One-time tasks' feature → 'Quick tasks'; 'Recurring tasks' → 'Repeat tasks'  ← Session 8
 app/(app)/team/page.tsx               — Team members
 app/(app)/profile/page.tsx            — User profile
 app/(app)/settings/*/page.tsx         — Settings: org, members, permissions, billing, categories,
@@ -317,10 +361,11 @@ components/tasks/InlineOneTimeTask.tsx — Inline create one-time task
   — .iot-title-input::placeholder CSS: teal 55% opacity, italic  ← Session 7
   — Divider thickens (2px brand tint) when empty, hairline once typed  ← Session 7
   — All transitions 0.25s ease so effects fade naturally as user types  ← Session 7
-components/tasks/InlineRecurringTask.tsx — Inline create recurring task
+components/tasks/InlineRecurringTask.tsx — Inline create repeat task  ← Session 8 (renamed)
   — Same glorification treatment as InlineOneTimeTask  ← Session 7
   — .irt-title-input::placeholder; placeholder "What repeats? Name this task…"  ← Session 7
   — RefreshCw icon at full opacity when empty → 45% once typed  ← Session 7
+  — Toast: "Repeat task created ✓"; button label "Add repeat task"  ← Session 8
 components/tasks/CustomFieldsPanel.tsx — Custom fields editor in TaskDetailPanel
 components/tasks/MentionTextarea.tsx  — @mention textarea for comments
 components/tasks/CompletionAttachModal.tsx — Attach files when completing task
@@ -328,8 +373,11 @@ components/tasks/CompletionAttachModal.tsx — Attach files when completing task
 components/layout/Sidebar.tsx         — Left nav sidebar
   — SI component calls router.refresh() on every link click (when not already active)
     to force server-component re-fetch and show latest data
+  — Nav labels: "Quick tasks" (was "One-time tasks"), "Repeat tasks" (was "Recurring tasks")  ← Session 8
+  — Monitor nav item added to Organisation section: Eye icon → /monitor (all roles)  ← Session 8
 
 components/layout/Header.tsx          — Top header with user menu
+  — Quick-create label: "Repeat task" (was "Recurring task")  ← Session 8
 components/search/SearchModal.tsx     — Global search (Cmd+K)
 
 components/filters/UniversalFilterBar.tsx — Shared filter UI
@@ -575,6 +623,66 @@ lib/data/caDefaultTasks.ts            — Default CA task templates
 
 ---
 
+### SESSION 8 FEATURES
+
+### 25. CA Tasks — auto-update master when assigning a previously-unassigned task
+- **Problem**: Session 7 added a popup to ask "update master assignment?" whenever a task was reassigned. But for tasks that were *never* assigned, showing a confirmation popup is unnecessary friction.
+- **Fix**: Refactored `updateMasterAssignment()` into `doMasterUpdate(data)` (accepts explicit params, no state dependency) + `updateMasterAssignment()` (reads `masterUpdatePrompt` state for popup path).
+- **New logic in `onUpdated`**:
+  - `selTask.assignee_id === null` → call `doMasterUpdate(promptData)` immediately, no popup
+  - `selTask.assignee_id !== null` → set `masterUpdatePrompt`, show confirmation popup as before
+- **File**: `app/(app)/compliance/CATasksView.tsx`
+
+### 26. Upcoming CA compliance triggers shown in Calendar and Tasks (next 3 days, owner/admin only)
+- **Added**: Ghost amber "not-yet-spawned" CA tasks visible before they're created, so managers can prepare.
+- **Computation** (identical in both `calendar/page.tsx` and `tasks/page.tsx`):
+  1. Fetch `ca_client_assignments` joined with `ca_master_tasks` (priority, dates JSONB, days_before_due)
+  2. Fetch `ca_task_instances` (to know which have already been spawned: keyed `${assignment_id}__${due_date}`)
+  3. For each assignment × date entry: compute `triggerDate = dueDate − days_before_due`
+  4. If `triggerDate > today && triggerDate <= today+3 && not already spawned` → push to `upcomingCATriggers[]`
+  5. Only computed for `isOwnerAdmin`; others receive `[]`
+- **CalendarView**: `byTriggerDate` map. Renders ghost amber dashed cards in:
+  - Timeline day column (after real tasks)
+  - Month grid day cell (up to 2 pills, amber dashed border, ⏰ emoji)
+  - Day panel side section ("CA tasks triggering soon")
+- **MyTasksView**: `CATriggerSection` component — collapsible section with ⏰ header showing
+  title | client | due date | spawns-on date for each upcoming trigger
+- **Files**: `app/(app)/calendar/page.tsx`, `app/(app)/calendar/CalendarView.tsx`,
+  `app/(app)/tasks/page.tsx`, `app/(app)/tasks/MyTasksView.tsx`
+
+### 27. Renamed "One-time tasks" → "Quick tasks" and "Recurring tasks" → "Repeat tasks" everywhere in UI
+- **Scope**: ALL user-facing display text only. Routes (`/inbox`, `/recurring`), DB fields (`is_recurring`), API params, internal variable names, and CSS class names are unchanged.
+- **Files changed**:
+  - `components/layout/Sidebar.tsx` — nav labels + hover tooltips
+  - `components/layout/Header.tsx` — quick-create dropdown label
+  - `app/(app)/dashboard/DashboardClient.tsx` — quick-action label
+  - `app/(app)/inbox/page.tsx` — metadata title → "Quick tasks"
+  - `app/(app)/inbox/InboxView.tsx` — h1, empty state text
+  - `app/(app)/recurring/page.tsx` — metadata title → "Repeat tasks"
+  - `app/(app)/recurring/RecurringView.tsx` — empty state text
+  - `components/tasks/InlineRecurringTask.tsx` — toast text, button label
+  - `app/(app)/calendar/CalendarView.tsx` — filter pill label, legend label
+  - `app/(app)/approvals/ApprovalsView.tsx` — stat tile and section labels
+  - `app/(app)/settings/features/FeaturesView.tsx` — feature names and descriptions
+  - `app/(app)/import/ImportView.tsx` — progress step text and result labels
+
+### 28. New Monitor page — read-only all-tasks view for monitor/viewer role
+- **New files**: `app/(app)/monitor/page.tsx` + `app/(app)/monitor/MonitorView.tsx`
+- **Purpose**: A person who only monitors task status and follows up with team members — no create/edit/delete access.
+- **Server page**: Fetches ALL org tasks (no role scoping, no assignee filter) + members + clients. Passes `userRole` but MonitorView ignores it for permissions (always viewer mode).
+- **Client component features**:
+  - Stats bar: 8 tiles (total, todo, in_progress, in_review, completed, overdue, unassigned, CA tasks)
+  - Filters: text search, status (multi-select), priority, assignee, client, type (ca/repeat/project/quick), due date range from/to, Clear all button
+  - GroupBy selector: status (default) | assignee | client | type | none
+  - Each group is collapsible (chevron toggle), shows count badge
+  - Task rows: 6-column grid with type badge, priority badge, status pill, assignee avatar, due date
+  - Overdue: red `⚠ date` indicator
+  - Unassigned: amber "⊘ Unassigned" label
+  - Click → opens `TaskDetailPanel` with `userRole="viewer"` (fully read-only panel)
+- **Nav**: `Eye` icon in Organisation section of Sidebar, visible to all roles
+
+---
+
 ## PATTERNS TO KNOW
 
 ### Server component data fetching pattern
@@ -768,21 +876,87 @@ if (!isOwnerOrAdmin && subtasks.length > 0 && incomplete.length > 0) return 422
 // This applies to: subtask checks, attachment checks, blocker checks, approval checks.
 ```
 
-### CA task update-master popup pattern (Session 7)
+### CA task update-master pattern (Session 7 + Session 8)
 ```typescript
-// In CATasksView.onUpdated: detect assignee change → show popup
+// In CATasksView.onUpdated: detect assignee change
 if (canManage && 'assignee_id' in fields && fields.assignee_id &&
     fields.assignee_id !== selTask.assignee_id && selTask.client_id) {
   const member = members.find(m => m.id === fields.assignee_id)
-  if (member) setMasterUpdatePrompt({ ... })
+  if (member) {
+    const promptData = { assignmentClientId: selTask.client_id, masterTaskTitle: selTask.title,
+      newAssigneeId: fields.assignee_id, newAssigneeName: member.name }
+    if (selTask.assignee_id === null) {
+      // Was unassigned → auto-update master immediately, no confirmation popup
+      doMasterUpdate(promptData)
+    } else {
+      // Was already assigned → show popup to confirm overwrite
+      setMasterUpdatePrompt(promptData)
+    }
+  }
 }
 
-// updateMasterAssignment():
+// doMasterUpdate(data) — core logic, takes explicit params (no state dependency):
 // 1. GET /api/ca/assignments?client_id={clientId}   ← includes master_task.name join
 // 2. find(a => a.master_task?.name === masterTaskTitle)
 // 3. PATCH /api/ca/assignments/{id} { assignee_id }
 // Future caComplianceSpawn uses ca_client_assignments.assignee_id — so this
 // ensures all future spawned tasks for that client+master go to the new person.
+
+// updateMasterAssignment() — reads masterUpdatePrompt state, clears it, calls doMasterUpdate
+```
+
+### Upcoming CA triggers computation pattern (Session 8)
+```typescript
+// In page.tsx — owner/admin only:
+type UpcomingCATrigger = {
+  id: string; title: string; triggerDate: string; dueDate: string
+  clientId: string | null; clientName: string | null; clientColor: string | null
+  assigneeId: string | null; priority: string
+}
+const upcomingCATriggers: UpcomingCATrigger[] = []
+if (isOwnerAdmin && caAssignments) {
+  const todayS = new Date().toISOString().slice(0, 10)
+  const limitD = new Date(); limitD.setDate(limitD.getDate() + 3)
+  const limitS = limitD.toISOString().slice(0, 10)
+  const existingSet = new Set((caInstances ?? []).map(i => `${i.assignment_id}__${i.due_date}`))
+  for (const asgn of caAssignments) {
+    const mt = asgn.master_task
+    if (!mt?.dates) continue
+    for (const [, dueDateStr] of Object.entries(mt.dates)) {
+      const dueD = new Date(dueDateStr + 'T00:00:00')
+      const triggerD = new Date(dueD)
+      triggerD.setDate(dueD.getDate() - (mt.days_before_due ?? 7))
+      const triggerS = triggerD.toISOString().slice(0, 10)
+      if (triggerS > todayS && triggerS <= limitS && !existingSet.has(`${asgn.id}__${dueDateStr}`)) {
+        upcomingCATriggers.push({ id: `upcoming-${asgn.id}-${dueDateStr}`, title: mt.name, ... })
+      }
+    }
+  }
+}
+// Supabase queries:
+supabase.from('ca_client_assignments')
+  .select('id, client_id, assignee_id, master_task:ca_master_tasks(id, name, priority, dates, days_before_due)')
+  .eq('org_id', mb.org_id)
+supabase.from('ca_task_instances').select('assignment_id, due_date').eq('org_id', mb.org_id)
+```
+
+### Monitor / read-only viewer pattern (Session 8)
+```typescript
+// page.tsx — no role scoping on task query; always full org:
+supabase.from('tasks').select(TASK_COLS).eq('org_id', mb.org_id)
+  .neq('is_archived', true).is('parent_task_id', null)
+  .order('due_date', { ascending: true, nullsFirst: false }).limit(3000)
+
+// MonitorView — pass userRole="viewer" to TaskDetailPanel:
+<TaskDetailPanel task={selectedTask} userRole="viewer" ... />
+
+// Ghost amber CA trigger cards — use dashed borders with rgba colors only (no hex):
+style={{
+  background: 'rgba(234,179,8,0.05)',
+  border: '1px dashed rgba(217,119,6,0.4)',
+  borderLeft: '3px dashed #d97706',
+  opacity: 0.72,
+}}
 ```
 
 ### Inline form field glorification pattern (Session 7)
