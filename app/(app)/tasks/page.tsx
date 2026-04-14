@@ -39,6 +39,8 @@ export default async function MyTasksPage() {
       { data: members },
       { data: clientsData },
       { data: assignedByMeRaw },
+      { data: caAssignments },
+      { data: caInstances },
     ] = await Promise.all([
       // Main task list — scoped by role
       scopedBase.is('parent_task_id', null).limit(2000),
@@ -69,6 +71,15 @@ export default async function MyTasksPage() {
             .or('custom_fields.is.null,custom_fields.not.cs.{"_ca_compliance":true}')
             .order('due_date', { ascending: true, nullsFirst: false }).limit(2000)
         : Promise.resolve({ data: [] }),
+      // CA upcoming triggers — owner/admin only
+      isOwnerAdmin
+        ? supabase.from('ca_client_assignments')
+            .select('id, client_id, assignee_id, master_task:ca_master_tasks(id, name, priority, dates, days_before_due)')
+            .eq('org_id', mb.org_id)
+        : Promise.resolve({ data: [] as any[] }),
+      isOwnerAdmin
+        ? supabase.from('ca_task_instances').select('assignment_id, due_date').eq('org_id', mb.org_id)
+        : Promise.resolve({ data: [] as any[] }),
     ])
 
     const clientMap: Record<string, { id: string; name: string; color: string }> = {}
@@ -108,6 +119,46 @@ export default async function MyTasksPage() {
     const approvalList    = (approvalTasks ?? []).filter(isVisible).map(enrich)
     const assignedByMeList = (assignedByMeRaw ?? []).filter(isVisible).map(enrich)
 
+    // Compute CA triggers firing in the next 3 days (not yet spawned)
+    type UpcomingCATrigger = {
+      id: string; title: string; triggerDate: string; dueDate: string
+      clientId: string | null; clientName: string | null; clientColor: string | null
+      assigneeId: string | null; priority: string
+    }
+    const upcomingCATriggers: UpcomingCATrigger[] = []
+    if (isOwnerAdmin && caAssignments) {
+      const todayD = new Date()
+      const todayS = todayD.toISOString().slice(0, 10)
+      const limitD = new Date(todayD); limitD.setDate(todayD.getDate() + 3)
+      const limitS = limitD.toISOString().slice(0, 10)
+      const existingSet = new Set((caInstances ?? []).map((i: any) => `${i.assignment_id}__${i.due_date}`))
+      for (const asgn of (caAssignments as any[])) {
+        const mt = asgn.master_task
+        if (!mt?.dates) continue
+        for (const [, dueDateStr] of Object.entries(mt.dates as Record<string, string>)) {
+          if (typeof dueDateStr !== 'string') continue
+          const daysBeforeDue = (mt.days_before_due as number) ?? 7
+          const dueD = new Date(dueDateStr + 'T00:00:00')
+          const triggerD = new Date(dueD)
+          triggerD.setDate(dueD.getDate() - daysBeforeDue)
+          const triggerS = triggerD.toISOString().slice(0, 10)
+          if (triggerS > todayS && triggerS <= limitS && !existingSet.has(`${asgn.id}__${dueDateStr}`)) {
+            upcomingCATriggers.push({
+              id: `upcoming-${asgn.id}-${dueDateStr}`,
+              title: mt.name as string,
+              triggerDate: triggerS,
+              dueDate: dueDateStr,
+              clientId: asgn.client_id ?? null,
+              clientName: clientMap[asgn.client_id]?.name ?? null,
+              clientColor: clientMap[asgn.client_id]?.color ?? null,
+              assigneeId: asgn.assignee_id ?? null,
+              priority: (mt.priority as string) ?? 'medium',
+            })
+          }
+        }
+      }
+    }
+
     return <MyTasksView
       tasks={taskList as any}
       pendingApprovalTasks={approvalList as any}
@@ -119,6 +170,7 @@ export default async function MyTasksPage() {
       currentUserId={user.id}
       userRole={mb.role}
       canCreate={['owner','admin','manager','member'].includes(mb.role)}
+      upcomingCATriggers={upcomingCATriggers}
     />
   } catch (err: any) {
     console.error('[MyTasksPage]', err?.message ?? err)

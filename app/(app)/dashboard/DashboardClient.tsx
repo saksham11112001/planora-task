@@ -17,7 +17,7 @@ const QUICK_ACTIONS = [
   { icon: CheckSquare, label: 'Add task',       href: '/inbox',        color: '#0d9488' },
   { icon: FolderOpen,  label: 'New project',    href: '/projects/new', color: '#7c3aed' },
   { icon: Users2,      label: 'Add client',     href: '/clients/new',  color: '#0891b2' },
-  { icon: RefreshCw,   label: 'Recurring task', href: '/recurring',    color: '#ea580c' },
+  { icon: RefreshCw,   label: 'Repeat task', href: '/recurring',    color: '#ea580c' },
   { icon: Calendar,    label: 'Calendar',        href: '/calendar',     color: '#16a34a' },
   { icon: BarChart2,   label: 'Reports',         href: '/reports',      color: '#ca8a04' },
 ]

@@ -4,7 +4,7 @@ import { RecurringView } from './RecurringView'
 import type { Metadata } from 'next'
 
 export const dynamic = 'force-dynamic'
-export const metadata: Metadata = { title: 'Recurring tasks' }
+export const metadata: Metadata = { title: 'Repeat tasks' }
 
 
 export default async function RecurringPage() {

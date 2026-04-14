@@ -585,7 +585,7 @@ export function RecurringView({
           {visibleTasks.length === 0 && !canManage && (
             <div style={{ textAlign: 'center', padding: '48px 24px' }}>
               <RefreshCw style={{ width: 36, height: 36, color: 'var(--border)', margin: '0 auto 12px' }} />
-              <p style={{ fontSize: 14, color: 'var(--text-muted)' }}>No recurring tasks yet</p>
+              <p style={{ fontSize: 14, color: 'var(--text-muted)' }}>No repeat tasks yet</p>
             </div>
           )}
           {visibleTasks.length === 0 && canManage && (clientFilter || filterPriority || filterSearch || filterAssignee || filterCreator) && (

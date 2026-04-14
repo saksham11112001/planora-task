@@ -4,7 +4,7 @@ import { InboxView }       from './InboxView'
 import type { Metadata }   from 'next'
 
 export const dynamic = 'force-dynamic'
-export const metadata: Metadata = { title: 'One-time tasks' }
+export const metadata: Metadata = { title: 'Quick tasks' }
 
 export default async function InboxPage() {
   try {

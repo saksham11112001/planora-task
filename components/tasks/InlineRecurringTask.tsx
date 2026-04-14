@@ -161,7 +161,7 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, defa
         await fetch(`/api/tasks/${d.data.id}/attachments`, { method: 'POST', body: fd })
       }
 
-      toast.success(isEdit ? 'Updated ✓' : 'Recurring task created ✓')
+      toast.success(isEdit ? 'Updated ✓' : 'Repeat task created ✓')
       if (isEdit) { onEdited?.(); return }
       close()
       onCreated ? onCreated(d.data) : router.refresh()
@@ -191,7 +191,7 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, defa
       onMouseEnter={e=>{(e.currentTarget as any).style.color='var(--brand)';(e.currentTarget as any).style.background='var(--brand-light)'}}
       onMouseLeave={e=>{(e.currentTarget as any).style.color='var(--text-muted)';(e.currentTarget as any).style.background='transparent'}}>
         <Plus style={{ width:14, height:14, flexShrink:0 }}/>
-        <span style={{ fontSize:13 }}>Add recurring task</span>
+        <span style={{ fontSize:13 }}>Add repeat task</span>
       </div>
       </>
     )

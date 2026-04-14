@@ -13,6 +13,12 @@ import type { Task } from '@/types'
 import { toast, useFilterStore } from '@/store/appStore'
 import { UniversalFilterBar } from '@/components/filters/UniversalFilterBar'
 
+interface UpcomingCATrigger {
+  id: string; title: string; triggerDate: string; dueDate: string
+  clientId: string | null; clientName: string | null; clientColor: string | null
+  assigneeId: string | null; priority: string
+}
+
 interface Props {
   tasks:               Task[]
   pendingApprovalTasks?: Task[]
@@ -23,6 +29,7 @@ interface Props {
   currentUserId?: string
   userRole?:      string
   canCreate?:     boolean
+  upcomingCATriggers?: UpcomingCATrigger[]
 }
 
 const LIST_SECS = [
@@ -74,6 +81,56 @@ function groupByDue(tasks: Task[], today: string) {
   ].filter(g => g.tasks.length > 0)
 }
 
+function CATriggerSection({ triggers }: { triggers: UpcomingCATrigger[] }) {
+  const [expanded, setExpanded] = React.useState(true)
+  return (
+    <div style={{ borderBottom:'1px solid var(--border-light)' }}>
+      <div style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 18px 5px',
+        fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'#d97706' }}>
+        <button onClick={() => setExpanded(v => !v)}
+          style={{ background:'none', border:'none', cursor:'pointer', fontSize:10, color:'#d97706',
+            display:'flex', alignItems:'center', gap:4, padding:0, fontFamily:'inherit', fontWeight:700 }}>
+          {expanded ? '▾' : '▸'} ⏰ CA tasks triggering soon
+          <span style={{ opacity:0.5, fontWeight:400, textTransform:'none' }}>({triggers.length})</span>
+        </button>
+        <span style={{ fontSize:10, color:'#d97706', opacity:0.6, fontWeight:400, textTransform:'none', marginLeft:4 }}>
+          next 3 days
+        </span>
+      </div>
+      {expanded && triggers.map(ct => (
+        <div key={ct.id} style={{
+          display:'grid', gridTemplateColumns:'18px 1fr 90px 90px 80px',
+          gap:0, alignItems:'center', padding:'6px 18px',
+          borderLeft:'3px dashed #d97706',
+          background:'rgba(234,179,8,0.04)',
+          borderBottom:'1px solid rgba(234,179,8,0.1)',
+          opacity:0.85,
+        }}>
+          <span style={{ fontSize:9, fontWeight:700, color:'#d97706' }}>⏰</span>
+          <div style={{ overflow:'hidden' }}>
+            <span style={{ fontSize:12, fontWeight:500, color:'#d97706',
+              overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis', display:'block' }}>
+              {ct.title}
+            </span>
+          </div>
+          <div style={{ display:'flex', alignItems:'center', gap:4, paddingLeft:4 }}>
+            {ct.clientColor && <span style={{ width:6, height:6, borderRadius:2, background:ct.clientColor, flexShrink:0 }}/>}
+            <span style={{ fontSize:11, color:'#a16207', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
+              {ct.clientName ?? '—'}
+            </span>
+          </div>
+          <div style={{ fontSize:11, color:'#a16207', paddingLeft:4 }}>
+            Due {ct.dueDate}
+          </div>
+          <div style={{ fontSize:10, color:'#a16207', fontStyle:'italic', textAlign:'right' }}>
+            spawns {ct.triggerDate}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function MyTasksView({
   tasks: initialTasks,
   pendingApprovalTasks = [],
@@ -84,6 +141,7 @@ export function MyTasksView({
   currentUserId,
   userRole,
   canCreate = false,
+  upcomingCATriggers = [],
 }: Props) {
   const router     = useRouter()
   const [,startT]  = useTransition()
@@ -1096,6 +1154,11 @@ export function MyTasksView({
               </div>
             )
           })}
+
+          {/* ── CA tasks triggering in next 3 days (owner/admin only) ── */}
+          {upcomingCATriggers.length > 0 && !showAssignedByMe && (
+            <CATriggerSection triggers={upcomingCATriggers} />
+          )}
 
           {/* Empty state — shown when all sections empty after filtering */}
           {displayTasks.length === 0 && (filterCreator || filterClient || filterPriority || filterStatus || filterSearch || dueDateFrom || dueDateTo) && (

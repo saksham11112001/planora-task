@@ -111,7 +111,7 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void } = {}) {
     { icon: FolderOpen,  label: 'New project',   href: '/projects/new' },
     { icon: Users2,      label: 'New client',     href: '/clients/new' },
     { icon: Clock,       label: 'Log time',       href: '/time' },
-    { icon: RefreshCw,   label: 'Recurring task', href: '/recurring' },
+    { icon: RefreshCw,   label: 'Repeat task', href: '/recurring' },
   ]
 
   return (

@@ -16,9 +16,10 @@ export default async function CalendarPage() {
   if (!mb) redirect('/onboarding')
 
   const orgId = mb.org_id
+  const isOwnerAdmin = ['owner', 'admin'].includes(mb.role)
 
   // canViewAll: owner/admin always; others only if explicitly granted via Members settings
-  const canViewAll = ['owner', 'admin'].includes(mb.role) || (mb as any).can_view_all_tasks === true
+  const canViewAll = isOwnerAdmin || (mb as any).can_view_all_tasks === true
 
   // Fetch 12 months of tasks with due dates — wide enough that navigating months always has data
   const from = new Date(); from.setMonth(from.getMonth() - 6)
@@ -34,16 +35,23 @@ export default async function CalendarPage() {
     .gte('due_date', dateFrom)
     .lte('due_date', dateTo)
 
-  // All roles see only tasks they are assignee OR approver of.
-  // Owner/admin (or flag-granted) see every task in the org.
   const taskQuery = canViewAll
     ? base
     : base.or(`assignee_id.eq.${user.id},approver_id.eq.${user.id}`)
 
-  const [{ data: tasks }, { data: clients }, { data: members }] = await Promise.all([
+  const [{ data: tasks }, { data: clients }, { data: members }, { data: caAssignments }, { data: caInstances }] = await Promise.all([
     taskQuery.limit(2000),
     supabase.from('clients').select('id, name, color').eq('org_id', mb.org_id).eq('status', 'active').order('name'),
     supabase.from('org_members').select('user_id, users(id, name)').eq('org_id', mb.org_id).eq('is_active', true),
+    // CA upcoming triggers — owner/admin only
+    isOwnerAdmin
+      ? supabase.from('ca_client_assignments')
+          .select('id, client_id, assignee_id, master_task:ca_master_tasks(id, name, priority, dates, days_before_due)')
+          .eq('org_id', orgId)
+      : Promise.resolve({ data: [] as any[] }),
+    isOwnerAdmin
+      ? supabase.from('ca_task_instances').select('assignment_id, due_date').eq('org_id', orgId)
+      : Promise.resolve({ data: [] as any[] }),
   ])
 
   const memberList = (members ?? []).map((m: any) => ({ id: m.users?.id ?? m.user_id, name: m.users?.name ?? 'Unknown' }))
@@ -56,6 +64,47 @@ export default async function CalendarPage() {
     approver: t.approver ?? null,
   }))
 
+  // Compute CA triggers firing in the next 3 days (not yet spawned)
+  type UpcomingCATrigger = {
+    id: string; title: string; triggerDate: string; dueDate: string
+    clientId: string | null; clientName: string | null; clientColor: string | null
+    assigneeId: string | null; priority: string
+  }
+  const upcomingCATriggers: UpcomingCATrigger[] = []
+  if (isOwnerAdmin && caAssignments) {
+    const todayD = new Date()
+    const todayS = todayD.toISOString().slice(0, 10)
+    const limitD = new Date(todayD); limitD.setDate(todayD.getDate() + 3)
+    const limitS = limitD.toISOString().slice(0, 10)
+    const existingSet = new Set((caInstances ?? []).map((i: any) => `${i.assignment_id}__${i.due_date}`))
+    for (const asgn of (caAssignments as any[])) {
+      const mt = asgn.master_task
+      if (!mt?.dates) continue
+      for (const [, dueDateStr] of Object.entries(mt.dates as Record<string, string>)) {
+        if (typeof dueDateStr !== 'string') continue
+        const daysBeforeDue = (mt.days_before_due as number) ?? 7
+        const dueD = new Date(dueDateStr + 'T00:00:00')
+        const triggerD = new Date(dueD)
+        triggerD.setDate(dueD.getDate() - daysBeforeDue)
+        const triggerS = triggerD.toISOString().slice(0, 10)
+        if (triggerS > todayS && triggerS <= limitS && !existingSet.has(`${asgn.id}__${dueDateStr}`)) {
+          const cl = clientMap[asgn.client_id]
+          upcomingCATriggers.push({
+            id: `upcoming-${asgn.id}-${dueDateStr}`,
+            title: mt.name as string,
+            triggerDate: triggerS,
+            dueDate: dueDateStr,
+            clientId: asgn.client_id ?? null,
+            clientName: cl?.name ?? null,
+            clientColor: cl?.color ?? null,
+            assigneeId: asgn.assignee_id ?? null,
+            priority: (mt.priority as string) ?? 'medium',
+          })
+        }
+      }
+    }
+  }
+
   return <CalendarView
     tasks={enrichedTasks as any}
     clients={clients ?? []}
@@ -63,5 +112,6 @@ export default async function CalendarPage() {
     canViewAll={canViewAll}
     currentUserId={user.id}
     userRole={mb.role}
+    upcomingCATriggers={upcomingCATriggers}
   />
 }

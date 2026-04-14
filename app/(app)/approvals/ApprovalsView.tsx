@@ -731,7 +731,7 @@ export function ApprovalsView({ pending: initialPending, history, clients }: Pro
           <StatTile label="Pending review"   value={pending.length}     color="#7c3aed" icon={<Clock      style={{ width: 17, height: 17 }}/>}/>
           <StatTile label="CA Compliance"    value={compliance.length}  color="#d97706" icon={<FileCheck  style={{ width: 17, height: 17 }}/>}/>
           <StatTile label="Recurring"        value={recurring.length}   color="#0d9488" icon={<RefreshCw  style={{ width: 17, height: 17 }}/>}/>
-          <StatTile label="One-time"         value={oneTime.length}     color="#0891b2" icon={<ListTodo   style={{ width: 17, height: 17 }}/>}/>
+          <StatTile label="Quick tasks"       value={oneTime.length}     color="#0891b2" icon={<ListTodo   style={{ width: 17, height: 17 }}/>}/>
           <StatTile label="Approved today"   value={approvedToday}      color="#16a34a" icon={<CheckCheck style={{ width: 17, height: 17 }}/>}/>
         </div>
 
@@ -755,13 +755,13 @@ export function ApprovalsView({ pending: initialPending, history, clients }: Pro
             <Section label="CA Compliance" tasks={compliance} color="#d97706" accentColor="#d97706"
               icon={<FileCheck style={{ width: 13, height: 13 }}/>}
               {...sectionProps}/>
-            <Section label="Recurring tasks" tasks={recurring} color="#0d9488" accentColor="#0d9488"
+            <Section label="Repeat tasks" tasks={recurring} color="#0d9488" accentColor="#0d9488"
               icon={<RefreshCw style={{ width: 13, height: 13 }}/>}
               {...sectionProps}/>
             <Section label="Project tasks" tasks={projectTasks} color="#7c3aed" accentColor="#7c3aed"
               icon={<FolderOpen style={{ width: 13, height: 13 }}/>}
               {...sectionProps}/>
-            <Section label="One-time tasks" tasks={oneTime} color="#0891b2" accentColor="#0891b2"
+            <Section label="Quick tasks" tasks={oneTime} color="#0891b2" accentColor="#0891b2"
               icon={<ListTodo style={{ width: 13, height: 13 }}/>}
               {...sectionProps}/>
           </>

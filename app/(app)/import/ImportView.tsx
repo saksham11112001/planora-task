@@ -64,8 +64,8 @@ export function ImportView() {
       { step: 'Importing clients…', done: false },
       { step: 'Importing projects…', done: false },
       { step: 'Importing tasks…', done: false },
-      { step: 'Importing one-time tasks…', done: false },
-      { step: 'Importing recurring tasks…', done: false },
+      { step: 'Importing quick tasks…', done: false },
+      { step: 'Importing repeat tasks…', done: false },
       { step: 'Importing CA compliance tasks…', done: false },
     ]
     setProgress(steps.map(s => ({ ...s })))
@@ -107,8 +107,8 @@ export function ImportView() {
           { step: `Clients`, done: true, count: d.results?.clients?.created },
           { step: `Projects`, done: true, count: d.results?.projects?.created },
           { step: `Tasks`, done: true, count: d.results?.tasks?.created },
-          { step: `One-time tasks`, done: true, count: d.results?.onetasks?.created },
-          { step: `Recurring tasks`, done: true, count: d.results?.recurring?.created },
+          { step: `Quick tasks`, done: true, count: d.results?.onetasks?.created },
+          { step: `Repeat tasks`, done: true, count: d.results?.recurring?.created },
           { step: `CA compliance tasks`, done: true, count: d.results?.compliance?.created },
         ])
         setResults(d.results)
@@ -142,7 +142,7 @@ export function ImportView() {
             Bulk Import
           </h1>
           <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 6 }}>
-            Download the template, fill in your data across 6 sheets, then upload it here — members, clients, projects, tasks, one-time tasks and recurring tasks.
+            Download the template, fill in your data across 6 sheets, then upload it here — members, clients, projects, tasks, quick tasks and repeat tasks.
           </p>
         </div>
 

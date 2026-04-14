@@ -7,7 +7,7 @@ import {
   Home, ListTodo, Users2, FolderOpen,
   RefreshCw, Users, BarChart2, Settings, Plus,
   ChevronDown, ChevronRight, Clock, Zap, X, Upload,
-  Calendar, Shield, LogOut, FileCheck, ArrowRight, ClipboardList,
+  Calendar, Shield, LogOut, FileCheck, ArrowRight, ClipboardList, Eye,
 } from 'lucide-react'
 import { cn }            from '@/lib/utils/cn'
 import { createClient }  from '@/lib/supabase/client'
@@ -138,7 +138,7 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
               }}
               onMouseEnter={e => { if (!isActive('/inbox')) { (e.currentTarget as HTMLElement).style.background='rgba(255,255,255,0.08)'; (e.currentTarget as HTMLElement).style.color='#fff' } }}
               onMouseLeave={e => { if (!isActive('/inbox')) { (e.currentTarget as HTMLElement).style.background='transparent'; (e.currentTarget as HTMLElement).style.color='rgba(255,255,255,0.6)' } }}>
-              <ListTodo className="h-4 w-4"/><span style={{ flex:1 }}>One-time tasks</span>
+              <ListTodo className="h-4 w-4"/><span style={{ flex:1 }}>Quick tasks</span>
             </Link>
             <Link href="/inbox?new=1"
               className="opacity-0 group-hover/nav:opacity-100 transition-opacity"
@@ -147,7 +147,7 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
                 background:'rgba(255,255,255,0.08)' }}
               onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color='#fff'; (e.currentTarget as HTMLElement).style.background='rgba(13,148,136,0.3)' }}
               onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color='rgba(255,255,255,0.4)'; (e.currentTarget as HTMLElement).style.background='rgba(255,255,255,0.08)' }}
-              title="Add one-time task">
+              title="Add quick task">
               <Plus className="h-3 w-3"/>
             </Link>
           </div>
@@ -167,7 +167,7 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
               }}
               onMouseEnter={e => { if (!isActive('/recurring')) { (e.currentTarget as HTMLElement).style.background='rgba(255,255,255,0.08)'; (e.currentTarget as HTMLElement).style.color='#fff' } }}
               onMouseLeave={e => { if (!isActive('/recurring')) { (e.currentTarget as HTMLElement).style.background='transparent'; (e.currentTarget as HTMLElement).style.color='rgba(255,255,255,0.6)' } }}>
-              <RefreshCw className="h-4 w-4"/><span style={{ flex:1 }}>Recurring tasks</span>
+              <RefreshCw className="h-4 w-4"/><span style={{ flex:1 }}>Repeat tasks</span>
             </Link>
             <Link href="/recurring?new=1"
               className="opacity-0 group-hover/nav:opacity-100 transition-opacity"
@@ -176,7 +176,7 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
                 background:'rgba(255,255,255,0.08)' }}
               onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color='#fff'; (e.currentTarget as HTMLElement).style.background='rgba(13,148,136,0.3)' }}
               onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color='rgba(255,255,255,0.4)'; (e.currentTarget as HTMLElement).style.background='rgba(255,255,255,0.08)' }}
-              title="Add recurring task">
+              title="Add repeat task">
               <Plus className="h-3 w-3"/>
             </Link>
           </div>
@@ -247,6 +247,7 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
         {canManage && <SI href="/approvals" active={isActive('/approvals')} icon={<CheckSquare className="h-4 w-4"/>} label="Approvals"/>}
         {nav.time_tracking && isPaid && <SI href="/time" active={isActive('/time')} icon={<Clock className="h-4 w-4"/>} label="Time tracking"/>}
         {nav.reports && isPaid && <SI href="/reports" active={isActive('/reports')} icon={<BarChart2 className="h-4 w-4"/>} label="Reports"/>}
+        <SI href="/monitor" active={isActive('/monitor')} icon={<Eye className="h-4 w-4"/>} label="Monitor"/>
         <Div/>
 
         {/* TOOLS */}

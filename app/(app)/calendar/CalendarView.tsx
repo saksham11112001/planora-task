@@ -20,9 +20,15 @@ interface Props {
   canViewAll: boolean
   currentUserId: string
   userRole?: string
+  upcomingCATriggers?: UpcomingCATrigger[]
 }
 type Filter = 'all' | 'compliance' | 'project' | 'one-time' | 'recurring'
 type ViewMode = 'month' | 'timeline'
+interface UpcomingCATrigger {
+  id: string; title: string; triggerDate: string; dueDate: string
+  clientId: string | null; clientName: string | null; clientColor: string | null
+  assigneeId: string | null; priority: string
+}
 
 const PRIORITY_COLORS: Record<string,string> = {
   urgent:'#dc2626', high:'#ea580c', medium:'#ca8a04', low:'#16a34a', none:'#94a3b8',
@@ -58,7 +64,7 @@ function taskTypeDot(t: CalTask): string {
   return '#0891b2'
 }
 
-export function CalendarView({ tasks, clients = [], members = [], canViewAll, currentUserId, userRole }: Props) {
+export function CalendarView({ tasks, clients = [], members = [], canViewAll, currentUserId, userRole, upcomingCATriggers = [] }: Props) {
   const now = new Date()
   const [year,     setYear]     = useState(now.getFullYear())
   const [month,    setMonth]    = useState(now.getMonth())
@@ -119,6 +125,13 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
     byDate[t.due_date].push(t)
   })
 
+  // Upcoming CA triggers indexed by their triggerDate (the day they will be spawned)
+  const byTriggerDate: Record<string, UpcomingCATrigger[]> = {}
+  upcomingCATriggers.forEach(ct => {
+    if (!byTriggerDate[ct.triggerDate]) byTriggerDate[ct.triggerDate] = []
+    byTriggerDate[ct.triggerDate].push(ct)
+  })
+
   const firstDay    = new Date(year, month, 1).getDay()
   const daysInMonth = new Date(year, month+1, 0).getDate()
   const todayStr    = now.toISOString().split('T')[0]
@@ -133,7 +146,7 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
     { v:'all'        as Filter, label:'All',         icon:CheckSquare, color:'#0d9488', bg:'rgba(13,148,136,0.12)' },
     { v:'compliance' as Filter, label:'Compliance',  icon:AlertTriangle, color:'#d97706', bg:'rgba(234,179,8,0.12)' },
     { v:'project'    as Filter, label:'Projects',    icon:FolderOpen,  color:'#7c3aed', bg:'rgba(124,58,237,0.12)' },
-    { v:'one-time'   as Filter, label:'One-time',    icon:CheckSquare, color:'#0891b2', bg:'rgba(8,145,178,0.12)' },
+    { v:'one-time'   as Filter, label:'Quick',       icon:CheckSquare, color:'#0891b2', bg:'rgba(8,145,178,0.12)' },
     { v:'recurring'  as Filter, label:'Recurring',   icon:RefreshCw,   color:'#ea580c', bg:'rgba(234,88,12,0.12)' },
   ]
 
@@ -404,6 +417,27 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
                         </button>
                       )
                     })}
+                    {/* Upcoming CA trigger ghost cards */}
+                    {(byTriggerDate[dateStr] ?? []).map(ct => (
+                      <div key={ct.id} style={{ padding:'5px 7px', borderRadius:6,
+                        background:'rgba(234,179,8,0.05)',
+                        border:'1px dashed rgba(217,119,6,0.4)',
+                        borderLeft:'3px dashed #d97706',
+                        opacity:0.72 }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:2 }}>
+                          <span style={{ fontSize:8, fontWeight:700, color:'#d97706',
+                            background:'rgba(234,179,8,0.18)', padding:'1px 5px', borderRadius:3 }}>CA ⏰</span>
+                          {ct.clientName && <span style={{ fontSize:9, color:'#a16207',
+                            overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{ct.clientName}</span>}
+                        </div>
+                        <p style={{ fontSize:10, fontWeight:500, color:'#d97706', margin:'0 0 2px',
+                          lineHeight:1.3, overflow:'hidden', display:'-webkit-box',
+                          WebkitLineClamp:2, WebkitBoxOrient:'vertical' as const }}>
+                          {ct.title}
+                        </p>
+                        <span style={{ fontSize:9, color:'#a16207' }}>Due {ct.dueDate}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )
@@ -459,7 +493,7 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
             <span style={{ width:8,height:8,borderRadius:2,background:'rgba(124,58,237,0.25)',border:'1px solid rgba(124,58,237,0.3)',display:'inline-block' }}/>Project
           </span>
           <span style={{ display:'flex', alignItems:'center', gap:3 }}>
-            <span style={{ width:8,height:8,borderRadius:2,background:'rgba(8,145,178,0.25)',border:'1px solid rgba(8,145,178,0.3)',display:'inline-block' }}/>One-time
+            <span style={{ width:8,height:8,borderRadius:2,background:'rgba(8,145,178,0.25)',border:'1px solid rgba(8,145,178,0.3)',display:'inline-block' }}/>Quick
           </span>
           <span style={{ display:'flex', alignItems:'center', gap:3 }}>
             <span style={{ width:8,height:8,borderRadius:2,background:'rgba(234,179,8,0.25)',border:'1px solid rgba(234,179,8,0.3)',display:'inline-block' }}/>Compliance
@@ -569,6 +603,20 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
                     +{dayTasks.length-3} more
                   </div>
                 )}
+                {/* Upcoming CA trigger ghost pills */}
+                {(byTriggerDate[dateStr] ?? []).slice(0,2).map(ct => (
+                  <div key={ct.id} style={{ display:'flex', alignItems:'center', gap:3,
+                    padding:'2px 4px', borderRadius:4, marginBottom:1,
+                    background:'rgba(234,179,8,0.05)',
+                    border:'1px dashed rgba(217,119,6,0.45)',
+                    opacity:0.75 }}>
+                    <span style={{ fontSize:7, fontWeight:700, color:'#d97706', flexShrink:0 }}>⏰</span>
+                    <span style={{ fontSize:8, fontWeight:500, color:'#d97706',
+                      overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis', flex:1 }}>
+                      {ct.title}
+                    </span>
+                  </div>
+                ))}
               </div>
             )
           })}
@@ -656,6 +704,42 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
                       </button>
                     )
                   })}
+                </div>
+              )}
+              {/* Upcoming CA triggers for this day */}
+              {(byTriggerDate[selected] ?? []).length > 0 && (
+                <div style={{ marginTop:14 }}>
+                  <p style={{ fontSize:10, fontWeight:700, color:'#d97706', textTransform:'uppercase',
+                    letterSpacing:'0.06em', marginBottom:8, display:'flex', alignItems:'center', gap:5 }}>
+                    <span>⏰</span> CA tasks triggering soon
+                  </p>
+                  <div style={{ display:'flex', flexDirection:'column', gap:7 }}>
+                    {(byTriggerDate[selected] ?? []).map(ct => (
+                      <div key={ct.id} style={{ padding:'10px 12px', borderRadius:10,
+                        background:'rgba(234,179,8,0.06)',
+                        border:'1px dashed rgba(217,119,6,0.4)',
+                        borderLeft:'3px dashed #d97706',
+                        opacity:0.85 }}>
+                        <p style={{ fontSize:12, fontWeight:600, color:'#d97706', margin:'0 0 4px', lineHeight:1.4 }}>
+                          {ct.title}
+                        </p>
+                        <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+                          {ct.clientName && (
+                            <span style={{ fontSize:10, color:'#a16207', display:'flex', alignItems:'center', gap:3 }}>
+                              {ct.clientColor && <span style={{ width:6, height:6, borderRadius:2, background:ct.clientColor, display:'inline-block' }}/>}
+                              {ct.clientName}
+                            </span>
+                          )}
+                          <span style={{ fontSize:10, color:'#a16207', marginLeft:'auto' }}>
+                            Due {ct.dueDate}
+                          </span>
+                        </div>
+                        <p style={{ fontSize:10, color:'#a16207', margin:'4px 0 0', fontStyle:'italic' }}>
+                          Not yet spawned — triggers today
+                        </p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </>

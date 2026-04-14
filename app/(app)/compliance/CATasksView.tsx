@@ -171,39 +171,48 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
   }
 
   /* ── Update master (ca_client_assignments) after assignee change ── */
-  async function updateMasterAssignment() {
-    if (!masterUpdatePrompt) return
-    const { assignmentClientId, masterTaskTitle, newAssigneeId, newAssigneeName } = masterUpdatePrompt
+  async function doMasterUpdate(data: {
+    assignmentClientId: string
+    masterTaskTitle: string
+    newAssigneeId: string
+    newAssigneeName: string
+  }) {
     setMasterUpdating(true)
     try {
       // Fetch all assignments for this client — response includes master_task.name join
-      const res = await fetch(`/api/ca/assignments?client_id=${assignmentClientId}`)
+      const res = await fetch(`/api/ca/assignments?client_id=${data.assignmentClientId}`)
       const json = await res.json().catch(() => ({}))
       const assignment = (json.data ?? []).find(
-        (a: any) => a.master_task?.name?.toLowerCase() === masterTaskTitle.toLowerCase()
+        (a: any) => a.master_task?.name?.toLowerCase() === data.masterTaskTitle.toLowerCase()
       )
       if (!assignment) {
         toast.error('Could not find the recurring assignment — please update it manually in Client Setup')
-        setMasterUpdatePrompt(null)
         setMasterUpdating(false)
         return
       }
       const patch = await fetch(`/api/ca/assignments/${assignment.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ assignee_id: newAssigneeId }),
+        body: JSON.stringify({ assignee_id: data.newAssigneeId }),
       })
       if (!patch.ok) {
         const d = await patch.json().catch(() => ({}))
         toast.error(d.error ?? 'Failed to update recurring assignment')
       } else {
-        toast.success(`Recurring assignment updated — future "${masterTaskTitle}" tasks → ${newAssigneeName}`)
+        toast.success(`Recurring assignment updated — future "${data.masterTaskTitle}" tasks → ${data.newAssigneeName}`)
       }
     } catch {
       toast.error('Failed to update recurring assignment')
     }
-    setMasterUpdatePrompt(null)
     setMasterUpdating(false)
+  }
+
+  // Called from the confirmation popup (for reassignment of already-assigned tasks)
+  async function updateMasterAssignment() {
+    if (!masterUpdatePrompt) return
+    const data = { ...masterUpdatePrompt }
+    setMasterUpdatePrompt(null)
+    await doMasterUpdate(data)
   }
 
   /* ── Filtering + sorting ───────────────────────────────────── */
@@ -241,7 +250,7 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
         onClose={() => setSelTask(null)}
         onUpdated={fields => {
           if (fields && selTask) {
-            // Detect assignee change on a CA task with a client — prompt to update master
+            // Detect assignee change on a CA task with a client
             if (
               canManage &&
               'assignee_id' in fields &&
@@ -251,13 +260,20 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
             ) {
               const assigneeMember = members.find(m => m.id === (fields.assignee_id as string))
               if (assigneeMember) {
-                setMasterUpdatePrompt({
+                const promptData = {
                   assignmentClientId: selTask.client_id,
                   masterTaskTitle:    selTask.title,
                   clientName:         selTask.client?.name ?? 'this client',
                   newAssigneeId:      fields.assignee_id as string,
                   newAssigneeName:    assigneeMember.name,
-                })
+                }
+                if (selTask.assignee_id === null) {
+                  // Task was unassigned — auto-update master assignment immediately (no popup)
+                  doMasterUpdate(promptData)
+                } else {
+                  // Task was already assigned to someone — ask before overwriting master
+                  setMasterUpdatePrompt(promptData)
+                }
               }
             }
             setTasks(p => p.map(t => t.id === selTask.id ? { ...t, ...fields } as CATask : t))

@@ -397,7 +397,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
         <div style={{ flex:1, display:'flex', overflow:'hidden' }}>
           <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
             <div style={{ padding:'16px 20px 12px', background:'var(--surface)', borderBottom:'1px solid var(--border)', flexShrink:0 }}>
-              <h1 style={{ fontSize:20, fontWeight:700, color:'var(--text-primary)', margin:0 }}>One-time tasks</h1>
+              <h1 style={{ fontSize:20, fontWeight:700, color:'var(--text-primary)', margin:0 }}>Quick tasks</h1>
             </div>
 
             {/* Universal filter bar */}
@@ -738,7 +738,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
               {tasks.length === 0 && (
                 <div style={{ textAlign:'center', padding:'60px 24px', color:'var(--text-muted)' }}>
                   <p style={{ fontSize:14, fontWeight:500, marginBottom:6 }}>No tasks yet</p>
-                  <p style={{ fontSize:13 }}>Click &quot;+ Add task&quot; to create your first one-time task</p>
+                  <p style={{ fontSize:13 }}>Click &quot;+ Add task&quot; to create your first quick task</p>
                 </div>
               )}
             </div>
