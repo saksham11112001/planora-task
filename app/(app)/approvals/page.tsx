@@ -24,11 +24,12 @@ export default async function ApprovalsPage() {
   const { data: pendingRaw } = await supabase
     .from('tasks')
     .select(`
-      id, title, status, priority, due_date, created_at,
+      id, title, status, priority, due_date, created_at, created_by,
       assignee_id, approver_id, client_id, project_id,
       approval_status, approval_required, is_recurring, custom_fields,
       assignee:users!tasks_assignee_id_fkey(id, name),
       approver:users!tasks_approver_id_fkey(id, name),
+      creator:users!tasks_created_by_fkey(id, name),
       projects(id, name, color)
     `)
     .eq('org_id', mb.org_id)
@@ -44,11 +45,12 @@ export default async function ApprovalsPage() {
   const { data: historyRaw } = await supabase
     .from('tasks')
     .select(`
-      id, title, status, priority, due_date, completed_at,
+      id, title, status, priority, due_date, completed_at, created_by,
       assignee_id, approver_id, client_id, project_id,
-      approval_status, is_recurring,
+      approval_status, is_recurring, custom_fields,
       assignee:users!tasks_assignee_id_fkey(id, name),
       approver:users!tasks_approver_id_fkey(id, name),
+      creator:users!tasks_created_by_fkey(id, name),
       projects(id, name, color)
     `)
     .eq('org_id', mb.org_id)
@@ -74,6 +76,7 @@ export default async function ApprovalsPage() {
       ...t,
       assignee: t.assignee ?? null,
       approver: t.approver ?? null,
+      creator:  t.creator  ?? null,
       project:  t.projects ?? null,
       client:   t.client_id ? (clientMap[t.client_id] ?? null) : null,
     }

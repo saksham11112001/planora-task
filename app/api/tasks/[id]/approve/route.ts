@@ -23,7 +23,7 @@ export async function POST(
     .eq('id', id).eq('org_id', mb.org_id).single()
   if (!task) return NextResponse.json({ error: 'Task not found' }, { status: 404 })
 
-  const { decision } = await req.json()
+  const { decision, comment } = await req.json()
   const isAssignee    = task.assignee_id === user.id
   const isOwnerOrAdmin = ['owner', 'admin'].includes(mb.role)
 
@@ -161,8 +161,13 @@ export async function POST(
       approved_by: user.id, approved_at: new Date().toISOString(), completed_at: new Date().toISOString(),
     }).eq('id', id)
   } else if (decision === 'reject') {
+    const existingCf = (task as any).custom_fields ?? {}
+    const updatedCf  = comment?.trim()
+      ? { ...existingCf, _rejection_comment: comment.trim() }
+      : existingCf
     await supabase.from('tasks').update({
       approval_status: 'rejected', status: 'todo', approved_by: user.id,
+      custom_fields: updatedCf,
     }).eq('id', id)
   } else {
     return NextResponse.json({ error: 'Invalid decision' }, { status: 400 })
@@ -178,12 +183,13 @@ export async function POST(
           name: 'task/approval-completed',
           data: {
             task_id: id, task_title: task.title,
-            decision:       (decision === 'approve' ? 'approved' : 'rejected') as 'approved' | 'rejected',
-            assignee_id:    task.assignee_id,
-            assignee_email: assigneeProfile.email,
-            assignee_phone: assigneeProfile.phone_number ?? null,
-            reviewer_name:  (mb.users as any)?.name ?? 'Your manager',
-            org_name:       (mb.organisations as any)?.name ?? 'Your org',
+            decision:         (decision === 'approve' ? 'approved' : 'rejected') as 'approved' | 'rejected',
+            assignee_id:      task.assignee_id,
+            assignee_email:   assigneeProfile.email,
+            assignee_phone:   assigneeProfile.phone_number ?? null,
+            reviewer_name:    (mb.users as any)?.name ?? 'Your manager',
+            org_name:         (mb.organisations as any)?.name ?? 'Your org',
+            rejection_comment: comment?.trim() ?? null,
           },
         })
       }
