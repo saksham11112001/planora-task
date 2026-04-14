@@ -23,6 +23,7 @@ export function approvalRequestedHtml(p: {
 export function approvalResultHtml(p: {
   taskTitle: string; decision: 'approved' | 'rejected'
   reviewerName: string; orgName: string; taskUrl: string
+  rejectionComment?: string | null
 }): string {
   const approved = p.decision === 'approved'
   const color    = approved ? '#16a34a' : '#dc2626'
@@ -30,6 +31,13 @@ export function approvalResultHtml(p: {
   const border   = approved ? '#bbf7d0' : '#fecaca'
   const icon     = approved ? '✅' : '❌'
   const label    = approved ? 'Approved' : 'Rejected'
+
+  const commentBlock = (!approved && p.rejectionComment)
+    ? `<div style="margin-top:16px;padding:14px 16px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px">
+        <p style="margin:0 0 4px;font-size:11px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:0.05em">Reason from reviewer</p>
+        <p style="margin:0;font-size:13px;color:#7c2d12">${p.rejectionComment}</p>
+       </div>`
+    : ''
 
   return `<!DOCTYPE html><html>
 <body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
@@ -42,6 +50,7 @@ export function approvalResultHtml(p: {
       <p style="color:#64748b;font-size:14px;margin:0 0 24px"><strong>${p.reviewerName}</strong> reviewed your task in <strong>${p.orgName}</strong></p>
       <div style="background:${bg};border:1px solid ${border};border-radius:8px;padding:20px;margin-bottom:24px">
         <p style="color:#0f172a;font-size:16px;font-weight:600;margin:0">${p.taskTitle}</p>
+        ${commentBlock}
       </div>
       <a href="${p.taskUrl}" style="display:inline-block;background:#0d9488;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-size:14px;font-weight:600">View task →</a>
     </td></tr>

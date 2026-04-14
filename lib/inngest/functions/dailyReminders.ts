@@ -1,6 +1,6 @@
 import { inngest }               from '../client'
 import { createAdminClient }       from '@/lib/supabase/admin'
-import { sendDueSoonEmail, sendEscalationEmail } from '@/lib/email/send'
+import { sendDueSoonEmail, sendEscalationEmail, sendApprovalDigestEmail } from '@/lib/email/send'
 import { acquireEmailSlot }                        from '@/lib/email/gate'
 import { waTaskDueSoon, waTaskOverdue } from '@/lib/whatsapp/send'
 import { getOrgNotifMode, queueNotification } from '@/lib/email/queue'
@@ -79,7 +79,7 @@ export const dailyReminders = inngest.createFunction(
             })
             dueSoonCount++
           } else {
-            const canSend = await acquireEmailSlot(assignee.id, 'daily_reminder')
+            const canSend = await acquireEmailSlot(assignee.id, `daily_reminder_${task.id}`)
             if (canSend) {
               await sendDueSoonEmail({
                 to:           assignee.email,
@@ -174,6 +174,22 @@ export const dailyReminders = inngest.createFunction(
           })
           escalationCount++
         }
+
+        // Also notify the assignee directly that their task has been escalated
+        if (assignee?.email && (await acquireEmailSlot(assignee.id, `escalation_assignee_${task.id}`))) {
+          await sendEscalationEmail({
+            to:           assignee.email,
+            managerName:  'Your manager',
+            assigneeName: assignee.name ?? 'You',
+            taskId:       task.id,
+            taskTitle:    task.title,
+            dueDate:      task.due_date as string,
+            daysOverdue:  1,
+            orgName:      (task.org as any)?.name ?? '',
+            projectName:  (task.project as any)?.name ?? null,
+            projectId:    task.project_id,
+          })
+        }
       })
     }
 
@@ -218,6 +234,55 @@ export const dailyReminders = inngest.createFunction(
       })
     }
 
-    return { due_soon_count: dueSoonCount, escalation_count: escalationCount, overdue_wa_count: overdueCount }
+    // ── Step 4: Morning digest for approvers — pending approval tasks ────────
+    const approverDigestCount = await step.run('approver-morning-digest', async () => {
+      // Find all tasks pending approval, grouped by approver
+      const { data: pendingTasks } = await admin.from('tasks')
+        .select(`
+          id, title, due_date, project_id, org_id,
+          approver_id,
+          approver:users!tasks_approver_id_fkey(id, name, email),
+          assignee:users!tasks_assignee_id_fkey(id, name),
+          org:organisations!inner(name)
+        `)
+        .eq('status', 'in_review')
+        .eq('approval_status', 'pending')
+        .not('approver_id', 'is', null)
+        .eq('is_archived', false)
+        .limit(500)
+
+      if (!pendingTasks || pendingTasks.length === 0) return 0
+
+      // Group by approver
+      const byApprover = new Map<string, { approver: any; tasks: any[] }>()
+      for (const t of pendingTasks) {
+        const approver = (t as any).approver as any
+        if (!approver?.email) continue
+        const key = approver.id
+        if (!byApprover.has(key)) byApprover.set(key, { approver, tasks: [] })
+        byApprover.get(key)!.tasks.push(t)
+      }
+
+      let sent = 0
+      for (const { approver, tasks } of byApprover.values()) {
+        if (!(await acquireEmailSlot(approver.id, 'approver_digest'))) continue
+        await sendApprovalDigestEmail({
+          to:           approver.email,
+          approverName: approver.name,
+          orgName:      (tasks[0].org as any)?.name ?? '',
+          tasks: tasks.map(t => ({
+            taskId:       t.id,
+            taskTitle:    t.title,
+            assigneeName: (t.assignee as any)?.name ?? 'Team member',
+            dueDate:      t.due_date ?? null,
+            projectId:    t.project_id,
+          })),
+        })
+        sent++
+      }
+      return sent
+    })
+
+    return { due_soon_count: dueSoonCount, escalation_count: escalationCount, overdue_wa_count: overdueCount, approver_digest_count: approverDigestCount }
   }
 )

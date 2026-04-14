@@ -56,10 +56,10 @@ export default async function ApprovalsPage() {
     .eq('org_id', mb.org_id)
     .eq('approver_id', user.id)
     .in('approval_status', ['approved','rejected'])
-    .gte('completed_at', since)
+    .gte('approved_at', since)
     .neq('is_archived', true)
     .is('parent_task_id', null)
-    .order('completed_at', { ascending: false })
+    .order('approved_at', { ascending: false })
     .limit(30)
 
   // Fetch clients + members for display

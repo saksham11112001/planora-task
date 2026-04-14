@@ -6,7 +6,8 @@ import { Avatar } from '@/components/ui/Badge'
 import { toast } from '@/store/appStore'
 import {
   CheckCheck, X, Clock, RefreshCw, FolderOpen, ChevronDown, ChevronRight,
-  Paperclip, FileCheck, ListTodo, ExternalLink, AlertTriangle,
+  Paperclip, FileCheck, ListTodo, ExternalLink, AlertTriangle, Users,
+  LayoutGrid, LayoutList,
 } from 'lucide-react'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -37,7 +38,7 @@ interface Props {
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 const isCaTask      = (t: Task) => t.custom_fields?._ca_compliance === true
-const isRecurring   = (t: Task) => t.is_recurring
+const isRecurringT  = (t: Task) => t.is_recurring
 const isProjectTask = (t: Task) => !!t.project_id && !t.is_recurring && !isCaTask(t)
 const isOneTime     = (t: Task) => !t.is_recurring && !isCaTask(t) && !t.project_id
 
@@ -45,8 +46,13 @@ const PRIORITY_COLOR: Record<string, string> = {
   urgent: '#dc2626', high: '#ea580c', medium: '#ca8a04', low: '#16a34a',
 }
 
+function daysSince(dateStr: string): number {
+  return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000)
+}
+
 // Column grid — shared across header and every row
-const GRID = '22px 1fr 88px 106px 104px 104px 48px 174px'
+// checkbox | expand | task | due | client | assignee | creator | att | actions
+const GRID = '20px 20px 1fr 88px 104px 100px 100px 46px 180px'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Stat tile
@@ -56,7 +62,7 @@ function StatTile({ label, value, color, icon }: {
 }) {
   return (
     <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12,
-      padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 120 }}>
+      padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 110 }}>
       <div style={{ width: 36, height: 36, borderRadius: 9, background: `${color}18`,
         display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color }}>
         {icon}
@@ -70,9 +76,9 @@ function StatTile({ label, value, color, icon }: {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Column header row (rendered once per section, inside the table)
+// Column header row (rendered once per section)
 // ─────────────────────────────────────────────────────────────────────────────
-function ColHeader() {
+function ColHeader({ allChecked, onCheckAll }: { allChecked: boolean; onCheckAll: () => void }) {
   return (
     <div style={{
       display: 'grid', gridTemplateColumns: GRID, alignItems: 'center',
@@ -81,6 +87,8 @@ function ColHeader() {
       fontSize: 10, fontWeight: 700, color: 'var(--text-muted)',
       textTransform: 'uppercase', letterSpacing: '0.06em',
     }}>
+      <input type="checkbox" checked={allChecked} onChange={onCheckAll}
+        style={{ cursor: 'pointer', accentColor: 'var(--brand)', width: 13, height: 13 }}/>
       <div/>
       <div>Task</div>
       <div>Due date</div>
@@ -94,19 +102,18 @@ function ColHeader() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Subtask panel (expanded below a row)
+// Subtask panel
 // ─────────────────────────────────────────────────────────────────────────────
 function SubtaskPanel({ subtasks, loading }: { subtasks: any[] | null; loading: boolean }) {
   return (
     <div style={{ gridColumn: '1 / -1', background: 'rgba(0,0,0,0.02)',
-      borderBottom: '1px solid var(--border-light)', padding: '6px 14px 6px 44px' }}>
+      borderBottom: '1px solid var(--border-light)', padding: '6px 14px 6px 58px' }}>
       {loading && <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '6px 0' }}>Loading subtasks…</p>}
       {!loading && subtasks !== null && subtasks.length === 0 &&
         <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '6px 0' }}>No subtasks</p>}
       {!loading && subtasks !== null && subtasks.map((sub, i) => (
         <div key={sub.id} style={{ display: 'flex', alignItems: 'center', gap: 10,
           padding: '6px 0', borderBottom: i < subtasks.length - 1 ? '1px solid var(--border-light)' : 'none' }}>
-          {/* Status circle */}
           <div style={{ width: 13, height: 13, borderRadius: '50%', flexShrink: 0,
             border: `2px solid ${sub.status === 'completed' ? 'var(--brand)' : 'var(--border)'}`,
             background: sub.status === 'completed' ? 'var(--brand)' : 'transparent',
@@ -137,12 +144,12 @@ function SubtaskPanel({ subtasks, loading }: { subtasks: any[] | null; loading: 
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Attachment panel (expanded below a row)
+// Attachment panel
 // ─────────────────────────────────────────────────────────────────────────────
 function AttachPanel({ attachments, loading }: { attachments: any[] | null; loading: boolean }) {
   return (
     <div style={{ gridColumn: '1 / -1', background: 'rgba(0,0,0,0.02)',
-      borderBottom: '1px solid var(--border-light)', padding: '6px 14px 6px 44px' }}>
+      borderBottom: '1px solid var(--border-light)', padding: '6px 14px 6px 58px' }}>
       {loading && <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '6px 0' }}>Loading attachments…</p>}
       {!loading && attachments !== null && attachments.length === 0 &&
         <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '6px 0' }}>No attachments uploaded</p>}
@@ -181,7 +188,7 @@ function AttachPanel({ attachments, loading }: { attachments: any[] | null; load
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Reject comment panel (expanded below a row)
+// Reject comment panel
 // ─────────────────────────────────────────────────────────────────────────────
 function RejectPanel({ processing, onSend, onCancel }: {
   processing: boolean
@@ -192,7 +199,7 @@ function RejectPanel({ processing, onSend, onCancel }: {
   return (
     <div style={{ gridColumn: '1 / -1',
       background: 'rgba(220,38,38,0.03)', borderBottom: '1px solid rgba(220,38,38,0.15)',
-      padding: '10px 14px 12px 44px' }}>
+      padding: '10px 14px 12px 58px' }}>
       <p style={{ fontSize: 11, fontWeight: 700, color: '#dc2626', margin: '0 0 6px',
         textTransform: 'uppercase', letterSpacing: '0.05em' }}>
         Reason for returning (optional)
@@ -228,8 +235,9 @@ function RejectPanel({ processing, onSend, onCancel }: {
 // ─────────────────────────────────────────────────────────────────────────────
 // Single task row  (inline columns + expandable panels below)
 // ─────────────────────────────────────────────────────────────────────────────
-function TaskRow({ task, accentColor, processing, onApprove, onReject }: {
+function TaskRow({ task, accentColor, processing, checked, onCheck, onApprove, onReject }: {
   task: Task; accentColor: string; processing: boolean
+  checked: boolean; onCheck: () => void
   onApprove: () => void
   onReject: (comment: string) => void
 }) {
@@ -243,7 +251,8 @@ function TaskRow({ task, accentColor, processing, onApprove, onReject }: {
 
   const [rejectOpen, setRejectOpen] = useState(false)
 
-  const ov = isOverdue(task.due_date, task.status)
+  const ov      = isOverdue(task.due_date, task.status)
+  const waiting = daysSince(task.created_at)
 
   async function toggleSubtasks() {
     const next = !subtasksOpen
@@ -293,13 +302,14 @@ function TaskRow({ task, accentColor, processing, onApprove, onReject }: {
         padding: '0 14px', gap: 8, minHeight: 44,
         borderBottom: anyExpanded ? 'none' : '1px solid var(--border-light)',
         borderLeft: `3px solid ${accentColor}`,
-        background: 'var(--surface)',
+        background: checked ? `${accentColor}08` : 'var(--surface)',
         transition: 'background 0.1s',
-      }}
-        onMouseEnter={e => { if (!(e.currentTarget as HTMLElement).closest('[data-expanded]')) (e.currentTarget as HTMLElement).style.background = 'var(--surface-hover, var(--surface-subtle))' }}
-        onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'var(--surface)'}
-      >
-        {/* 1 — Expand toggle */}
+      }}>
+        {/* 1 — Checkbox */}
+        <input type="checkbox" checked={checked} onChange={onCheck}
+          style={{ cursor: 'pointer', accentColor: 'var(--brand)', width: 13, height: 13 }}/>
+
+        {/* 2 — Expand toggle */}
         <button onClick={toggleSubtasks}
           title="Toggle subtasks"
           style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2,
@@ -309,7 +319,7 @@ function TaskRow({ task, accentColor, processing, onApprove, onReject }: {
             : <ChevronRight style={{ width: 13, height: 13 }}/>}
         </button>
 
-        {/* 2 — Task name + priority */}
+        {/* 3 — Task name + priority + SLA badge */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0, padding: '10px 0' }}>
           <span style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
             background: PRIORITY_COLOR[task.priority] ?? '#94a3b8' }}/>
@@ -317,24 +327,32 @@ function TaskRow({ task, accentColor, processing, onApprove, onReject }: {
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {task.title}
           </span>
+          {waiting >= 2 && (
+            <span title={`Waiting ${waiting} days`} style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4,
+              flexShrink: 0, fontWeight: 600,
+              background: waiting >= 5 ? 'rgba(220,38,38,0.1)' : 'rgba(234,88,12,0.1)',
+              color: waiting >= 5 ? '#dc2626' : '#ea580c' }}>
+              {waiting}d
+            </span>
+          )}
           {task.project && (
             <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, flexShrink: 0,
               background: `${task.project.color}22`, color: task.project.color,
               border: `1px solid ${task.project.color}44`,
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 80 }}>
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 70 }}>
               {task.project.name}
             </span>
           )}
         </div>
 
-        {/* 3 — Due date */}
+        {/* 4 — Due date */}
         <div style={{ fontSize: 12, color: ov ? '#dc2626' : 'var(--text-muted)',
           fontWeight: ov ? 600 : 400, display: 'flex', alignItems: 'center', gap: 3 }}>
           {ov && <AlertTriangle style={{ width: 10, height: 10, flexShrink: 0 }}/>}
           {task.due_date ? fmtDate(task.due_date) : <span style={{ color: 'var(--text-muted)', opacity: 0.4 }}>—</span>}
         </div>
 
-        {/* 4 — Client */}
+        {/* 5 — Client */}
         <div style={{ fontSize: 12, color: 'var(--text-secondary)',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {task.client
@@ -348,7 +366,7 @@ function TaskRow({ task, accentColor, processing, onApprove, onReject }: {
             : <span style={{ opacity: 0.35 }}>—</span>}
         </div>
 
-        {/* 5 — Assigned to */}
+        {/* 6 — Assigned to */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
           {task.assignee
             ? <><Avatar name={task.assignee.name} size="xs"/>
@@ -359,7 +377,7 @@ function TaskRow({ task, accentColor, processing, onApprove, onReject }: {
             : <span style={{ fontSize: 12, opacity: 0.35, color: 'var(--text-muted)' }}>—</span>}
         </div>
 
-        {/* 6 — Assigned by */}
+        {/* 7 — Assigned by */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
           {task.creator
             ? <><Avatar name={task.creator.name} size="xs"/>
@@ -370,11 +388,11 @@ function TaskRow({ task, accentColor, processing, onApprove, onReject }: {
             : <span style={{ fontSize: 12, opacity: 0.35, color: 'var(--text-muted)' }}>—</span>}
         </div>
 
-        {/* 7 — Attachments */}
+        {/* 8 — Attachments */}
         <div style={{ display: 'flex', justifyContent: 'center' }}>
           <button onClick={toggleAttachments}
             title="View attachments"
-            style={{ display: 'flex', alignItems: 'center', gap: 3, background: 'none', border: 'none',
+            style={{ display: 'flex', alignItems: 'center', gap: 3, border: 'none',
               cursor: 'pointer', padding: '3px 5px', borderRadius: 5,
               color: attachOpen ? 'var(--brand)' : 'var(--text-muted)',
               background: attachOpen ? 'rgba(13,148,136,0.08)' : 'transparent' } as any}>
@@ -385,7 +403,7 @@ function TaskRow({ task, accentColor, processing, onApprove, onReject }: {
           </button>
         </div>
 
-        {/* 8 — Actions */}
+        {/* 9 — Actions */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
           <button onClick={openReject} disabled={processing}
             style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 6,
@@ -425,10 +443,14 @@ function TaskRow({ task, accentColor, processing, onApprove, onReject }: {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Section block (header + column header + rows, all in one bordered container)
+// Section block (header + column header + rows)
 // ─────────────────────────────────────────────────────────────────────────────
-function Section({ label, tasks, color, accentColor, icon, onApprove, onReject, processing }: {
+function Section({ label, tasks, color, accentColor, icon, selectedIds, onCheckAll, onCheckOne,
+  onApprove, onReject, processing }: {
   label: string; tasks: Task[]; color: string; accentColor: string; icon: React.ReactNode
+  selectedIds: Set<string>
+  onCheckAll: (ids: string[]) => void
+  onCheckOne: (id: string) => void
   onApprove: (id: string) => void
   onReject:  (id: string, comment: string) => void
   processing: Set<string>
@@ -436,11 +458,11 @@ function Section({ label, tasks, color, accentColor, icon, onApprove, onReject, 
   const [open, setOpen] = useState(true)
   if (tasks.length === 0) return null
 
+  const allChecked = tasks.every(t => selectedIds.has(t.id))
+
   return (
     <div style={{ marginBottom: 24, borderRadius: 12, overflow: 'hidden',
       border: '1px solid var(--border)', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-
-      {/* Section header bar */}
       <button onClick={() => setOpen(o => !o)}
         style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%',
           padding: '10px 14px', background: `${color}0d`, border: 'none',
@@ -462,20 +484,26 @@ function Section({ label, tasks, color, accentColor, icon, onApprove, onReject, 
           : <ChevronRight style={{ width: 14, height: 14, color: 'var(--text-muted)', flexShrink: 0 }}/>}
       </button>
 
-      {/* Column headers + rows */}
       {open && (
-        <div>
-          <ColHeader/>
-          {tasks.map(t => (
-            <TaskRow
-              key={t.id}
-              task={t}
-              accentColor={accentColor}
-              processing={processing.has(t.id)}
-              onApprove={() => onApprove(t.id)}
-              onReject={(comment) => onReject(t.id, comment)}
+        <div style={{ overflowX: 'auto' }}>
+          <div style={{ minWidth: 860 }}>
+            <ColHeader
+              allChecked={allChecked && tasks.length > 0}
+              onCheckAll={() => onCheckAll(tasks.map(t => t.id))}
             />
-          ))}
+            {tasks.map(t => (
+              <TaskRow
+                key={t.id}
+                task={t}
+                accentColor={accentColor}
+                processing={processing.has(t.id)}
+                checked={selectedIds.has(t.id)}
+                onCheck={() => onCheckOne(t.id)}
+                onApprove={() => onApprove(t.id)}
+                onReject={(comment) => onReject(t.id, comment)}
+              />
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -505,53 +533,56 @@ function HistoryTable({ history }: { history: Task[] }) {
       </button>
 
       {open && (
-        <div style={{ background: 'var(--surface)' }}>
-          {/* Header */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 130px 90px 90px',
-            padding: '7px 14px', background: 'var(--surface-subtle)', borderBottom: '1px solid var(--border)',
-            fontSize: 10, fontWeight: 700, color: 'var(--text-muted)',
-            textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            <div>Task</div><div>Assignee</div><div>Decision</div><div>Date</div>
-          </div>
-          {history.map(t => {
-            const approved = t.approval_status === 'approved'
-            return (
-              <div key={t.id} style={{ display: 'grid', gridTemplateColumns: '1fr 130px 90px 90px',
-                alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid var(--border-light)' }}>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)',
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</div>
-                  {t.client && (
-                    <span style={{ fontSize: 11, color: 'var(--text-muted)',
-                      display: 'flex', alignItems: 'center', gap: 3, marginTop: 2 }}>
-                      <span style={{ width: 6, height: 6, borderRadius: 1,
-                        background: t.client.color, display: 'inline-block' }}/>
-                      {t.client.name}
+        <div style={{ background: 'var(--surface)', overflowX: 'auto' }}>
+          <div style={{ minWidth: 500 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 130px 90px 90px',
+              padding: '7px 14px', background: 'var(--surface-subtle)', borderBottom: '1px solid var(--border)',
+              fontSize: 10, fontWeight: 700, color: 'var(--text-muted)',
+              textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              <div>Task</div><div>Assignee</div><div>Decision</div><div>Date</div>
+            </div>
+            {history.map(t => {
+              const approved = t.approval_status === 'approved'
+              return (
+                <div key={t.id} style={{ display: 'grid', gridTemplateColumns: '1fr 130px 90px 90px',
+                  alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid var(--border-light)' }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</div>
+                    {t.client && (
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)',
+                        display: 'flex', alignItems: 'center', gap: 3, marginTop: 2 }}>
+                        <span style={{ width: 6, height: 6, borderRadius: 1,
+                          background: t.client.color, display: 'inline-block' }}/>
+                        {t.client.name}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
+                    {t.assignee && <><Avatar name={t.assignee.name} size="xs"/>
+                      <span style={{ fontSize: 12, color: 'var(--text-muted)',
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {t.assignee.name}
+                      </span></>}
+                  </div>
+                  <div>
+                    <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 99, fontWeight: 600,
+                      background: approved ? 'rgba(22,163,74,0.12)' : 'rgba(220,38,38,0.12)',
+                      color: approved ? '#16a34a' : '#dc2626' }}>
+                      {approved ? '✓ Approved' : '✕ Returned'}
                     </span>
-                  )}
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                    {(t as any).approved_at
+                      ? new Date((t as any).approved_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+                      : t.completed_at
+                        ? new Date(t.completed_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+                        : '—'}
+                  </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
-                  {t.assignee && <><Avatar name={t.assignee.name} size="xs"/>
-                    <span style={{ fontSize: 12, color: 'var(--text-muted)',
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {t.assignee.name}
-                    </span></>}
-                </div>
-                <div>
-                  <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 99, fontWeight: 600,
-                    background: approved ? 'rgba(22,163,74,0.12)' : 'rgba(220,38,38,0.12)',
-                    color: approved ? '#16a34a' : '#dc2626' }}>
-                    {approved ? '✓ Approved' : '✕ Returned'}
-                  </span>
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                  {t.completed_at
-                    ? new Date(t.completed_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
-                    : '—'}
-                </div>
-              </div>
-            )
-          })}
+              )
+            })}
+          </div>
         </div>
       )}
     </div>
@@ -561,21 +592,44 @@ function HistoryTable({ history }: { history: Task[] }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Main view
 // ─────────────────────────────────────────────────────────────────────────────
-export function ApprovalsView({ pending: initialPending, history }: Props) {
+export function ApprovalsView({ pending: initialPending, history, clients }: Props) {
   const router = useRouter()
   const [, startT] = useTransition()
   const [pending,    setPending]    = useState<Task[]>(initialPending)
   const [processing, setProcessing] = useState<Set<string>>(new Set())
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [groupMode, setGroupMode] = useState<'type' | 'client'>('type')
+  const [bulkProcessing, setBulkProcessing] = useState(false)
 
-  const recurring    = pending.filter(isRecurring)
-  const compliance   = pending.filter(t => !isRecurring(t) && isCaTask(t))
+  const recurring    = pending.filter(isRecurringT)
+  const compliance   = pending.filter(t => !isRecurringT(t) && isCaTask(t))
   const projectTasks = pending.filter(isProjectTask)
   const oneTime      = pending.filter(isOneTime)
 
   const todayStr      = new Date().toISOString().split('T')[0]
   const approvedToday = history.filter(t =>
-    t.approval_status === 'approved' && t.completed_at?.startsWith(todayStr)
+    t.approval_status === 'approved' &&
+    ((t as any).approved_at?.startsWith(todayStr) || t.completed_at?.startsWith(todayStr))
   ).length
+
+  function toggleCheck(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleCheckAll(ids: string[]) {
+    setSelectedIds(prev => {
+      const allSelected = ids.every(id => prev.has(id))
+      const next = new Set(prev)
+      if (allSelected) ids.forEach(id => next.delete(id))
+      else ids.forEach(id => next.add(id))
+      return next
+    })
+  }
 
   async function decide(taskId: string, decision: 'approve' | 'reject', comment?: string) {
     setProcessing(p => new Set(p).add(taskId))
@@ -587,6 +641,7 @@ export function ApprovalsView({ pending: initialPending, history }: Props) {
     setProcessing(p => { const s = new Set(p); s.delete(taskId); return s })
     if (res.ok) {
       setPending(p => p.filter(t => t.id !== taskId))
+      setSelectedIds(p => { const s = new Set(p); s.delete(taskId); return s })
       toast.success(decision === 'approve' ? '✓ Task approved' : 'Returned to assignee')
       startT(() => router.refresh())
     } else {
@@ -595,30 +650,89 @@ export function ApprovalsView({ pending: initialPending, history }: Props) {
     }
   }
 
+  async function bulkApprove() {
+    if (selectedIds.size === 0 || bulkProcessing) return
+    setBulkProcessing(true)
+    const ids = Array.from(selectedIds)
+    await Promise.all(ids.map(id => decide(id, 'approve')))
+    setSelectedIds(new Set())
+    setBulkProcessing(false)
+  }
+
+  // Client grouping
+  const clientGroups: { client: { id: string; name: string; color: string } | null; tasks: Task[] }[] = []
+  if (groupMode === 'client') {
+    const byClient = new Map<string, Task[]>()
+    for (const t of pending) {
+      const key = t.client_id ?? '__none__'
+      if (!byClient.has(key)) byClient.set(key, [])
+      byClient.get(key)!.push(t)
+    }
+    for (const [key, tasks] of byClient.entries()) {
+      const client = key === '__none__' ? null : (clients.find(c => c.id === key) ?? null)
+      clientGroups.push({ client, tasks })
+    }
+    clientGroups.sort((a, b) => {
+      if (!a.client) return 1
+      if (!b.client) return -1
+      return a.client.name.localeCompare(b.client.name)
+    })
+  }
+
+  const sectionProps = {
+    selectedIds,
+    onCheckAll: toggleCheckAll,
+    onCheckOne: toggleCheck,
+    onApprove: (id: string) => decide(id, 'approve'),
+    onReject: (id: string, c: string) => decide(id, 'reject', c),
+    processing,
+  }
+
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden',
       background: 'var(--surface-subtle)' }}>
       <div style={{ flex: 1, overflowY: 'auto' }}>
-      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '28px 24px 80px' }}>
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '28px 24px 80px' }}>
 
         {/* Page header */}
-        <div style={{ marginBottom: 24 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 4px' }}>
-            Approvals
-          </h1>
-          <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>
-            {pending.length === 0
-              ? 'All caught up — no tasks waiting for your approval'
-              : `${pending.length} task${pending.length !== 1 ? 's' : ''} waiting for your review`}
-          </p>
+        <div style={{ marginBottom: 24, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <div>
+            <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 4px' }}>
+              Approvals
+            </h1>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>
+              {pending.length === 0
+                ? 'All caught up — no tasks waiting for your approval'
+                : `${pending.length} task${pending.length !== 1 ? 's' : ''} waiting for your review`}
+            </p>
+          </div>
+          {/* Group toggle */}
+          <div style={{ display: 'flex', gap: 4, background: 'var(--surface)', border: '1px solid var(--border)',
+            borderRadius: 8, padding: 3, flexShrink: 0 }}>
+            <button onClick={() => setGroupMode('type')}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 6,
+                border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 600,
+                background: groupMode === 'type' ? 'var(--brand)' : 'transparent',
+                color: groupMode === 'type' ? '#fff' : 'var(--text-muted)' }}>
+              <LayoutGrid style={{ width: 13, height: 13 }}/> By type
+            </button>
+            <button onClick={() => setGroupMode('client')}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 6,
+                border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 600,
+                background: groupMode === 'client' ? 'var(--brand)' : 'transparent',
+                color: groupMode === 'client' ? '#fff' : 'var(--text-muted)' }}>
+              <Users style={{ width: 13, height: 13 }}/> By client
+            </button>
+          </div>
         </div>
 
         {/* Stats bar */}
         <div style={{ display: 'flex', gap: 12, marginBottom: 28, flexWrap: 'wrap' }}>
-          <StatTile label="Pending review"  value={pending.length}    color="#7c3aed" icon={<Clock      style={{ width: 17, height: 17 }}/>}/>
-          <StatTile label="Recurring"       value={recurring.length}  color="#0d9488" icon={<RefreshCw  style={{ width: 17, height: 17 }}/>}/>
-          <StatTile label="One-time"        value={oneTime.length}    color="#0891b2" icon={<ListTodo   style={{ width: 17, height: 17 }}/>}/>
-          <StatTile label="Approved today"  value={approvedToday}     color="#16a34a" icon={<CheckCheck style={{ width: 17, height: 17 }}/>}/>
+          <StatTile label="Pending review"   value={pending.length}     color="#7c3aed" icon={<Clock      style={{ width: 17, height: 17 }}/>}/>
+          <StatTile label="CA Compliance"    value={compliance.length}  color="#d97706" icon={<FileCheck  style={{ width: 17, height: 17 }}/>}/>
+          <StatTile label="Recurring"        value={recurring.length}   color="#0d9488" icon={<RefreshCw  style={{ width: 17, height: 17 }}/>}/>
+          <StatTile label="One-time"         value={oneTime.length}     color="#0891b2" icon={<ListTodo   style={{ width: 17, height: 17 }}/>}/>
+          <StatTile label="Approved today"   value={approvedToday}      color="#16a34a" icon={<CheckCheck style={{ width: 17, height: 17 }}/>}/>
         </div>
 
         {/* Empty state */}
@@ -635,39 +749,67 @@ export function ApprovalsView({ pending: initialPending, history }: Props) {
           </div>
         )}
 
-        {/* CA Compliance section */}
-        <Section label="CA Compliance" tasks={compliance} color="#d97706" accentColor="#d97706"
-          icon={<FileCheck style={{ width: 13, height: 13 }}/>}
-          onApprove={id => decide(id, 'approve')}
-          onReject={(id, c) => decide(id, 'reject', c)}
-          processing={processing}/>
+        {/* ── By type grouping ── */}
+        {groupMode === 'type' && (
+          <>
+            <Section label="CA Compliance" tasks={compliance} color="#d97706" accentColor="#d97706"
+              icon={<FileCheck style={{ width: 13, height: 13 }}/>}
+              {...sectionProps}/>
+            <Section label="Recurring tasks" tasks={recurring} color="#0d9488" accentColor="#0d9488"
+              icon={<RefreshCw style={{ width: 13, height: 13 }}/>}
+              {...sectionProps}/>
+            <Section label="Project tasks" tasks={projectTasks} color="#7c3aed" accentColor="#7c3aed"
+              icon={<FolderOpen style={{ width: 13, height: 13 }}/>}
+              {...sectionProps}/>
+            <Section label="One-time tasks" tasks={oneTime} color="#0891b2" accentColor="#0891b2"
+              icon={<ListTodo style={{ width: 13, height: 13 }}/>}
+              {...sectionProps}/>
+          </>
+        )}
 
-        {/* Recurring section */}
-        <Section label="Recurring tasks" tasks={recurring} color="#0d9488" accentColor="#0d9488"
-          icon={<RefreshCw style={{ width: 13, height: 13 }}/>}
-          onApprove={id => decide(id, 'approve')}
-          onReject={(id, c) => decide(id, 'reject', c)}
-          processing={processing}/>
-
-        {/* Project section */}
-        <Section label="Project tasks" tasks={projectTasks} color="#7c3aed" accentColor="#7c3aed"
-          icon={<FolderOpen style={{ width: 13, height: 13 }}/>}
-          onApprove={id => decide(id, 'approve')}
-          onReject={(id, c) => decide(id, 'reject', c)}
-          processing={processing}/>
-
-        {/* One-time section */}
-        <Section label="One-time tasks" tasks={oneTime} color="#0891b2" accentColor="#0891b2"
-          icon={<ListTodo style={{ width: 13, height: 13 }}/>}
-          onApprove={id => decide(id, 'approve')}
-          onReject={(id, c) => decide(id, 'reject', c)}
-          processing={processing}/>
+        {/* ── By client grouping ── */}
+        {groupMode === 'client' && clientGroups.map(({ client, tasks }) => (
+          <Section
+            key={client?.id ?? '__none__'}
+            label={client ? client.name : 'No client'}
+            tasks={tasks}
+            color={client?.color ?? '#94a3b8'}
+            accentColor={client?.color ?? '#94a3b8'}
+            icon={<Users style={{ width: 13, height: 13 }}/>}
+            {...sectionProps}
+          />
+        ))}
 
         {/* History */}
         <HistoryTable history={history}/>
 
       </div>
       </div>
+
+      {/* ── Bulk approve floating bar ── */}
+      {selectedIds.size > 0 && (
+        <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
+          background: '#0f172a', borderRadius: 12, padding: '10px 18px',
+          display: 'flex', alignItems: 'center', gap: 14, zIndex: 50,
+          boxShadow: '0 8px 32px rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0' }}>
+            {selectedIds.size} selected
+          </span>
+          <button onClick={() => setSelectedIds(new Set())}
+            style={{ fontSize: 12, color: '#94a3b8', background: 'none', border: 'none',
+              cursor: 'pointer', fontFamily: 'inherit' }}>
+            Clear
+          </button>
+          <button onClick={bulkApprove} disabled={bulkProcessing}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 18px', borderRadius: 8,
+              border: 'none', background: '#0d9488', color: '#fff',
+              fontSize: 13, fontWeight: 700, cursor: bulkProcessing ? 'not-allowed' : 'pointer',
+              fontFamily: 'inherit', opacity: bulkProcessing ? 0.6 : 1 }}>
+            <CheckCheck style={{ width: 14, height: 14 }}/>
+            {bulkProcessing ? 'Approving…' : `Approve all ${selectedIds.size}`}
+          </button>
+        </div>
+      )}
     </div>
   )
 }

@@ -2,6 +2,7 @@ import { resend, FROM }           from './resend'
 import { taskAssignedHtml, taskAssignedText }     from './templates/taskAssigned'
 import { taskDueSoonHtml, taskDueSoonText }       from './templates/taskDueSoon'
 import { approvalRequestedHtml, approvalResultHtml } from './templates/approvalEmail'
+import { approvalDigestHtml } from './templates/approvalDigest'
 import { taskCommentedHtml }  from './templates/taskCommented'
 import { projectUpdatedHtml }  from './templates/projectUpdated'
 import { memberInvitedHtml }   from './templates/memberInvited'
@@ -62,7 +63,7 @@ export async function sendApprovalRequestedEmail(p: {
 export async function sendApprovalResultEmail(p: {
   to: string; taskId: string; taskTitle: string
   decision: 'approved' | 'rejected'; reviewerName: string
-  orgName: string; projectId?: string | null
+  orgName: string; projectId?: string | null; rejectionComment?: string | null
 }) {
   const url = taskUrl(p.taskId, p.projectId)
   const verb = p.decision === 'approved' ? 'Approved' : 'Rejected'
@@ -73,6 +74,18 @@ export async function sendApprovalResultEmail(p: {
   })
 }
 
+
+// ── Approver morning digest ───────────────────────────────────────────────
+export async function sendApprovalDigestEmail(p: {
+  to: string; approverName: string; orgName: string
+  tasks: { taskId: string; taskTitle: string; assigneeName: string; dueDate?: string | null; projectId?: string | null }[]
+}) {
+  return resend.emails.send({
+    from: FROM, to: p.to,
+    subject: `🔔 ${p.tasks.length} task${p.tasks.length !== 1 ? 's' : ''} waiting for your approval — ${p.orgName}`,
+    html: approvalDigestHtml(p),
+  })
+}
 
 // ── Comment notification ─────────────────────────────────────────────────
 export async function sendTaskCommentedEmail(p: {

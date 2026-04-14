@@ -96,12 +96,13 @@ export const onApprovalCompleted = inngest.createFunction(
       const canSend = await acquireEmailSlot(d.assignee_id, 'approval_completed')
       if (!canSend) return { skipped: 'daily_limit' }
       await sendApprovalResultEmail({
-        to:           d.assignee_email,
-        taskId:       d.task_id,
-        taskTitle:    d.task_title,
-        decision:     d.decision,
-        reviewerName: d.reviewer_name,
-        orgName:      d.org_name,
+        to:               d.assignee_email,
+        taskId:           d.task_id,
+        taskTitle:        d.task_title,
+        decision:         d.decision,
+        reviewerName:     d.reviewer_name,
+        orgName:          d.org_name,
+        rejectionComment: d.rejection_comment ?? null,
       })
     }
 

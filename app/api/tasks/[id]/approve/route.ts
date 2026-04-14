@@ -167,6 +167,7 @@ export async function POST(
       : existingCf
     await supabase.from('tasks').update({
       approval_status: 'rejected', status: 'todo', approved_by: user.id,
+      approved_at: new Date().toISOString(),
       custom_fields: updatedCf,
     }).eq('id', id)
   } else {

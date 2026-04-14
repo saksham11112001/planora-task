@@ -48,7 +48,10 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
   const [approving,   setApproving]   = useState(false)
   const [comment,     setComment]     = useState('')
   const [sending,     setSending]     = useState(false)
-  const [tab,         setTab]         = useState<'details' | 'attachments' | 'comments' | 'time'>('details')
+  const [tab,         setTab]         = useState<'details' | 'attachments' | 'comments' | 'time' | 'activity'>('details')
+  const [activityLog,      setActivityLog]      = useState<any[]>([])
+  const [activityLoaded,   setActivityLoaded]   = useState(false)
+  const [activityLoading,  setActivityLoading]  = useState(false)
   const [subtasksOpen,    setSubtasksOpen]    = useState(true)
   const [blockingSearch,  setBlockingSearch]  = useState('')
   const [blockingResults, setBlockingResults] = useState<{id:string;title:string}[]>([])
@@ -112,6 +115,8 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     setClientId(task.client_id ?? '')
     setDueDate(task.due_date ?? '')
     setTab('details')
+    setActivityLog([])
+    setActivityLoaded(false)
     setBlockingTasks([])
     setBlockingSearch('')
     setBlockingResults([])
@@ -380,6 +385,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
   }
 
   async function toggleSubtask(sub: any) {
+    setNilSubtaskId(null) // clear any open nil confirmation strip for another subtask
     const ns = sub.status === 'completed' ? 'todo' : 'completed'
 
     // CA compliance subtasks REQUIRE an attachment (file or link) before completing.
@@ -615,6 +621,19 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     if (tab === 'comments' && task?.id) {
       setCommentsLoaded(false)
       fetchComments(task.id)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, task?.id])
+
+  // Load activity log when activity tab is opened
+  useEffect(() => {
+    if (tab === 'activity' && task?.id && !activityLoaded) {
+      setActivityLoading(true)
+      fetch(`/api/tasks/${task.id}/activity`)
+        .then(r => r.json())
+        .then(d => { setActivityLog(d.data ?? []); setActivityLoaded(true) })
+        .catch(() => setActivityLog([]))
+        .finally(() => setActivityLoading(false))
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, task?.id])
@@ -1024,9 +1043,9 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
 
             {/* ── Tabs ── */}
             <div className="tab-bar px-5">
-              {(['details', 'attachments', 'comments', 'time'] as const).map(t => (
+              {(['details', 'attachments', 'comments', 'time', 'activity'] as const).map(t => (
                 <button key={t} onClick={() => setTab(t)} className={cn('tab-item capitalize', tab === t && 'active')}>
-                  {t === 'attachments' ? '📎 Files' : t.charAt(0).toUpperCase() + t.slice(1)}
+                  {t === 'attachments' ? '📎 Files' : t === 'activity' ? '🕐 History' : t.charAt(0).toUpperCase() + t.slice(1)}
                 </button>
               ))}
             </div>
@@ -1529,6 +1548,58 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                   <a href="/time" style={{ color: 'var(--brand)' }} className="underline">Time tracking</a>{' '}
                   page and link it to this task.
                 </p>
+              </div>
+            )}
+
+            {/* ── Activity / Audit trail ── */}
+            {tab === 'activity' && (
+              <div className="px-5 py-4">
+                {activityLoading && (
+                  <p className="text-sm text-center py-8" style={{ color: 'var(--text-muted)' }}>Loading history…</p>
+                )}
+                {!activityLoading && activityLog.length === 0 && (
+                  <p className="text-sm text-center py-8" style={{ color: 'var(--text-muted)' }}>No activity recorded yet.</p>
+                )}
+                {!activityLoading && activityLog.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                    {activityLog.map((entry: any, i: number) => {
+                      const actor = members.find(m => m.id === entry.actor_id)?.name ?? 'Someone'
+                      const date  = new Date(entry.created_at)
+                      const dateStr = date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                      const timeStr = date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+                      return (
+                        <div key={entry.id} style={{ display: 'flex', gap: 12, paddingBottom: 14,
+                          position: 'relative' }}>
+                          {/* Timeline spine */}
+                          {i < activityLog.length - 1 && (
+                            <div style={{ position: 'absolute', left: 7, top: 16, bottom: 0, width: 2,
+                              background: 'var(--border-light)' }}/>
+                          )}
+                          {/* Dot */}
+                          <div style={{ width: 16, height: 16, borderRadius: '50%', flexShrink: 0, marginTop: 2,
+                            background: 'var(--surface-subtle)', border: '2px solid var(--border)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1 }}>
+                            <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--brand)' }}/>
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={{ margin: '0 0 2px', fontSize: 13, color: 'var(--text-primary)' }}>
+                              <strong>{actor}</strong>{' '}
+                              <span style={{ color: 'var(--text-secondary)' }}>{entry.action.replace(/_/g, ' ')}</span>
+                              {entry.new_value && entry.new_value !== entry.old_value && (
+                                <span style={{ color: 'var(--text-muted)' }}>
+                                  {entry.old_value ? ` from "${entry.old_value}"` : ''}{' → '}<em>"{entry.new_value}"</em>
+                                </span>
+                              )}
+                            </p>
+                            <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)' }}>
+                              {dateStr} at {timeStr}
+                            </p>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             )}
           </>
