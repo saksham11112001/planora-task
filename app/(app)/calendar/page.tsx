@@ -1,5 +1,6 @@
-import { createClient } from '@/lib/supabase/server'
 import { redirect }     from 'next/navigation'
+import { getSessionUser, getOrgMembership } from '@/lib/supabase/cached'
+import { createClient } from '@/lib/supabase/server'
 import { CalendarView } from './CalendarView'
 import type { Metadata } from 'next'
 
@@ -7,14 +8,12 @@ export const dynamic = 'force-dynamic'
 export const metadata: Metadata = { title: 'Calendar' }
 
 export default async function CalendarPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getSessionUser()
   if (!user) redirect('/login')
-
-  const { data: mb } = await supabase.from('org_members')
-    .select('org_id, role, can_view_all_tasks').eq('user_id', user.id).eq('is_active', true).maybeSingle()
+  const mb = await getOrgMembership(user.id)
   if (!mb) redirect('/onboarding')
 
+  const supabase = await createClient()
   const orgId = mb.org_id
 
   // canViewAll: owner/admin always; others only if explicitly granted via Members settings
