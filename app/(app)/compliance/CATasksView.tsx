@@ -77,9 +77,19 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
   const [sortBy,      setSortBy]      = useState<'due_date' | 'created_at'>('due_date')
   const [sortDir,     setSortDir]     = useState<'asc' | 'desc'>('asc')
   const [sortOpen,    setSortOpen]    = useState(false)
-  const [filterPrio,  setFilterPrio]  = useState('')
-  const [filterClient,setFilterClient]= useState('')
-  const [filterStatus,setFilterStatus]= useState('')
+  const [filterPrio,     setFilterPrio]     = useState('')
+  const [filterClient,   setFilterClient]   = useState('')
+  const [filterStatus,   setFilterStatus]   = useState('')
+  const [filterAssignee, setFilterAssignee] = useState('')   // '' | 'unassigned' | memberId
+
+  const [masterUpdatePrompt, setMasterUpdatePrompt] = useState<{
+    assignmentClientId: string
+    masterTaskTitle: string
+    clientName: string
+    newAssigneeId: string
+    newAssigneeName: string
+  } | null>(null)
+  const [masterUpdating, setMasterUpdating] = useState(false)
 
   const canManage = ['owner', 'admin', 'manager'].includes(userRole)
 
@@ -160,6 +170,42 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
     startT(() => router.refresh())
   }
 
+  /* ── Update master (ca_client_assignments) after assignee change ── */
+  async function updateMasterAssignment() {
+    if (!masterUpdatePrompt) return
+    const { assignmentClientId, masterTaskTitle, newAssigneeId, newAssigneeName } = masterUpdatePrompt
+    setMasterUpdating(true)
+    try {
+      // Fetch all assignments for this client — response includes master_task.name join
+      const res = await fetch(`/api/ca/assignments?client_id=${assignmentClientId}`)
+      const json = await res.json().catch(() => ({}))
+      const assignment = (json.data ?? []).find(
+        (a: any) => a.master_task?.name?.toLowerCase() === masterTaskTitle.toLowerCase()
+      )
+      if (!assignment) {
+        toast.error('Could not find the recurring assignment — please update it manually in Client Setup')
+        setMasterUpdatePrompt(null)
+        setMasterUpdating(false)
+        return
+      }
+      const patch = await fetch(`/api/ca/assignments/${assignment.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assignee_id: newAssigneeId }),
+      })
+      if (!patch.ok) {
+        const d = await patch.json().catch(() => ({}))
+        toast.error(d.error ?? 'Failed to update recurring assignment')
+      } else {
+        toast.success(`Recurring assignment updated — future "${masterTaskTitle}" tasks → ${newAssigneeName}`)
+      }
+    } catch {
+      toast.error('Failed to update recurring assignment')
+    }
+    setMasterUpdatePrompt(null)
+    setMasterUpdating(false)
+  }
+
   /* ── Filtering + sorting ───────────────────────────────────── */
   const today = todayStr()
 
@@ -168,6 +214,8 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
       if (filterPrio   && t.priority  !== filterPrio)   return false
       if (filterClient && t.client_id !== filterClient) return false
       if (filterStatus && t.status    !== filterStatus) return false
+      if (filterAssignee === 'unassigned' && t.assignee_id !== null) return false
+      if (filterAssignee && filterAssignee !== 'unassigned' && t.assignee_id !== filterAssignee) return false
       if (search && !t.title.toLowerCase().includes(search.toLowerCase())) return false
       return true
     })
@@ -177,7 +225,7 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
       return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av)
     })
 
-  const activeFilters = [filterPrio, filterClient, filterStatus, search].filter(Boolean).length
+  const activeFilters = [filterPrio, filterClient, filterStatus, filterAssignee, search].filter(Boolean).length
 
   /* ── Render ────────────────────────────────────────────────── */
   return (
@@ -193,6 +241,25 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
         onClose={() => setSelTask(null)}
         onUpdated={fields => {
           if (fields && selTask) {
+            // Detect assignee change on a CA task with a client — prompt to update master
+            if (
+              canManage &&
+              'assignee_id' in fields &&
+              fields.assignee_id &&
+              fields.assignee_id !== selTask.assignee_id &&
+              selTask.client_id
+            ) {
+              const assigneeMember = members.find(m => m.id === (fields.assignee_id as string))
+              if (assigneeMember) {
+                setMasterUpdatePrompt({
+                  assignmentClientId: selTask.client_id,
+                  masterTaskTitle:    selTask.title,
+                  clientName:         selTask.client?.name ?? 'this client',
+                  newAssigneeId:      fields.assignee_id as string,
+                  newAssigneeName:    assigneeMember.name,
+                })
+              }
+            }
             setTasks(p => p.map(t => t.id === selTask.id ? { ...t, ...fields } as CATask : t))
             setSelTask(p => p ? { ...p, ...fields } as CATask : null)
           }
@@ -255,6 +322,14 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
           {Object.entries(STATUS_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
         </select>
 
+        {/* Assignee filter */}
+        <select value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)}
+          style={{ fontSize: 12, padding: '4px 10px', borderRadius: 20, border: filterAssignee ? '1px solid var(--brand)' : '1px solid var(--border)', background: filterAssignee ? 'rgba(13,148,136,0.08)' : 'var(--surface-subtle)', color: filterAssignee ? 'var(--brand)' : 'var(--text-secondary)', fontFamily: 'inherit', cursor: 'pointer', fontWeight: filterAssignee ? 600 : 400 }}>
+          <option value=''>All assignees</option>
+          <option value='unassigned'>⊘ Unassigned</option>
+          {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+        </select>
+
         {/* Sort */}
         <div style={{ position: 'relative' }}>
           <button onClick={() => setSortOpen(v => !v)}
@@ -278,7 +353,7 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
 
         {/* Clear filters */}
         {activeFilters > 0 && (
-          <button onClick={() => { setFilterPrio(''); setFilterClient(''); setFilterStatus(''); setSearch('') }}
+          <button onClick={() => { setFilterPrio(''); setFilterClient(''); setFilterStatus(''); setFilterAssignee(''); setSearch('') }}
             style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 20, border: '1px solid #dc2626', background: 'rgba(220,38,38,0.06)', color: '#dc2626', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
             ✕ Clear ({activeFilters})
           </button>
@@ -471,6 +546,85 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
                 </div>
               )
             })}
+          </div>
+        </div>
+      )}
+
+      {/* ─────────────── UPDATE MASTER POPUP ─────────────── */}
+      {masterUpdatePrompt && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 200,
+          background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}
+          onClick={() => !masterUpdating && setMasterUpdatePrompt(null)}>
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: 'var(--surface)', borderRadius: 14,
+              boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
+              padding: '28px 28px 22px', maxWidth: 420, width: '90%',
+              border: '1px solid var(--border)',
+            }}>
+            {/* Icon + heading */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 16 }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+                background: 'rgba(217,119,6,0.12)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                  <circle cx="9" cy="7" r="4"/>
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
+              </div>
+              <div>
+                <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 4px' }}>
+                  Update recurring assignment?
+                </p>
+                <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>
+                  You assigned <strong style={{ color: 'var(--text-primary)' }}>{masterUpdatePrompt.newAssigneeName}</strong> to this task.
+                  Would you also like to update the recurring CA assignment for{' '}
+                  <strong style={{ color: 'var(--text-primary)' }}>{masterUpdatePrompt.clientName}</strong> so all future{' '}
+                  <em>"{masterUpdatePrompt.masterTaskTitle}"</em> tasks are assigned to them too?
+                </p>
+              </div>
+            </div>
+
+            {/* Divider */}
+            <div style={{ height: 1, background: 'var(--border)', margin: '0 0 18px' }}/>
+
+            {/* Buttons */}
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setMasterUpdatePrompt(null)}
+                disabled={masterUpdating}
+                style={{
+                  padding: '8px 18px', borderRadius: 8, border: '1px solid var(--border)',
+                  background: 'transparent', color: 'var(--text-secondary)',
+                  fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit',
+                  opacity: masterUpdating ? 0.5 : 1,
+                }}>
+                No, just this task
+              </button>
+              <button
+                onClick={updateMasterAssignment}
+                disabled={masterUpdating}
+                style={{
+                  padding: '8px 18px', borderRadius: 8, border: 'none',
+                  background: '#d97706', color: '#fff',
+                  fontSize: 13, fontWeight: 600, cursor: masterUpdating ? 'not-allowed' : 'pointer',
+                  fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6,
+                  opacity: masterUpdating ? 0.7 : 1,
+                }}>
+                {masterUpdating && (
+                  <div style={{ width: 12, height: 12, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }}/>
+                )}
+                Yes, update assignment
+              </button>
+            </div>
           </div>
         </div>
       )}
