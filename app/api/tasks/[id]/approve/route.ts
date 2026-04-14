@@ -51,9 +51,10 @@ export async function POST(
     }
 
     // Block submit if subtasks are incomplete
+    // Owner/admin bypass: they can force-submit regardless of subtask state
     const { data: subtasks } = await supabase
       .from('tasks').select('id, status, parent_task_id, custom_fields').eq('parent_task_id', id)
-    if (subtasks && subtasks.length > 0) {
+    if (!isOwnerOrAdmin && subtasks && subtasks.length > 0) {
       const incomplete = subtasks.filter((s: any) => s.status !== 'completed')
       if (incomplete.length > 0) {
         return NextResponse.json({
@@ -144,9 +145,10 @@ export async function POST(
 
   if (decision === 'approve') {
     // Block approving a parent task if subtasks are still incomplete
+    // Owner/admin bypass: they can force-approve regardless of subtask state
     const { data: subtasksForApprove } = await supabase
       .from('tasks').select('id, status').eq('parent_task_id', id)
-    if (subtasksForApprove && subtasksForApprove.length > 0) {
+    if (!isOwnerOrAdmin && subtasksForApprove && subtasksForApprove.length > 0) {
       const incomplete = subtasksForApprove.filter((s: any) => s.status !== 'completed')
       if (incomplete.length > 0) {
         return NextResponse.json({

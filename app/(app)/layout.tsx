@@ -1,30 +1,29 @@
 import { redirect }  from 'next/navigation'
 import { AppShell }  from './AppShell'
 import { createClient } from '@/lib/supabase/server'
-import { getSessionUser } from '@/lib/supabase/cached'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   try {
-    // getSessionUser uses React cache() — deduplicated across layout + all child pages
-    const user = await getSessionUser()
-    if (!user) redirect('/login')
-
     const supabase = await createClient()
 
-    // Fetch membership and profile in parallel (saves 1 RTT vs sequential)
-    const [{ data: membership }, { data: profile }] = await Promise.all([
-      supabase
-        .from('org_members')
-        .select('id, org_id, role, is_active, organisations(id, name, slug, plan_tier, logo_color, status, trial_ends_at)')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .maybeSingle(),
-      supabase
-        .from('users')
-        .select('id, name, email, avatar_url')
-        .eq('id', user.id)
-        .maybeSingle(),
-    ])
+    // Get user — if no valid session, go to login
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) redirect('/login')
+
+    // Get membership with org details in one query
+    const { data: membership } = await supabase
+      .from('org_members')
+      .select('id, org_id, role, is_active, organisations(id, name, slug, plan_tier, logo_color, status, trial_ends_at)')
+      .eq('user_id', user!.id)
+      .eq('is_active', true)
+      .maybeSingle()
+
+    // Get user profile
+    const { data: profile } = await supabase
+      .from('users')
+      .select('id, name, email, avatar_url')
+      .eq('id', user!.id)
+      .maybeSingle()
 
     // No active membership — try to recover before giving up
     if (!membership) {
