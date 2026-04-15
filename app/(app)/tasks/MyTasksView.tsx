@@ -2,7 +2,7 @@
 import React from 'react'
 import { useState, useTransition } from 'react'
 import { useRouter }    from 'next/navigation'
-import { RefreshCw, CheckCheck, CheckCircle2, Clock, FolderOpen, Trash2, User, SortAsc } from 'lucide-react'
+import { RefreshCw, CheckCheck, CheckCircle2, Clock, FolderOpen, Trash2, User, SortAsc, Copy } from 'lucide-react'
 import { PriorityBadge, Avatar } from '@/components/ui/Badge'
 import { TaskDetailPanel }       from '@/components/tasks/TaskDetailPanel'
 import { InlineOneTimeTask }     from '@/components/tasks/InlineOneTimeTask'
@@ -480,6 +480,29 @@ export function MyTasksView({
     } else {
       toast.success('Moved to Trash')
     }
+  }
+
+  async function cloneTask(task: Task) {
+    const res = await fetch('/api/tasks', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title:             `${task.title} (copy)`,
+        status:            'todo',
+        priority:          task.priority,
+        assignee_id:       task.assignee_id ?? null,
+        client_id:         (task as any).client_id ?? null,
+        project_id:        (task as any).project_id ?? null,
+        approver_id:       (task as any).approver_id ?? null,
+        approval_required: (task as any).approval_required ?? false,
+        due_date:          task.due_date ?? null,
+        custom_fields:     (task as any).custom_fields ?? null,
+      }),
+    })
+    const d = await res.json()
+    if (!res.ok) { toast.error(d.error ?? 'Clone failed'); return }
+    const newTask = d.data ?? d
+    if (newTask?.id) setTasks(prev => [{ ...newTask, assignee: (task as any).assignee, client: (task as any).client } as Task, ...prev])
+    toast.success('Task cloned')
   }
 
   async function patchTaskField(taskId: string, field: string, value: unknown) {
@@ -1036,12 +1059,21 @@ export function MyTasksView({
                           </span>
                         )}
                       </div>
-                      {/* Delete — last grid cell, priority dot + delete button */}
+                      {/* Actions — last grid cell: priority dot + clone + delete */}
                       <div style={{ display:'flex', alignItems:'center', justifyContent:'flex-end', gap:4 }}
                         onClick={e => e.stopPropagation()}>
                         <div title={task.priority}
                           style={{ width:8, height:8, borderRadius:'50%', flexShrink:0,
                             background: PRIORITY_CONFIG[task.priority]?.color ?? '#94a3b8' }}/>
+                        <button onClick={e => { e.stopPropagation(); cloneTask(task) }} title="Clone task"
+                          className="delete-task-btn"
+                          style={{ opacity:0, transition:'opacity 0.15s', display:'flex', alignItems:'center',
+                            justifyContent:'center', width:22, height:22, borderRadius:5, border:'none',
+                            background:'transparent', cursor:'pointer', color:'var(--text-muted)' }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background='rgba(13,148,136,0.1)'; (e.currentTarget as HTMLElement).style.color='var(--brand)' }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background='transparent'; (e.currentTarget as HTMLElement).style.color='var(--text-muted)' }}>
+                          <Copy style={{ width:11, height:11 }}/>
+                        </button>
                         {canManage && (
                           <button onClick={() => deleteTask(task.id)} title="Delete task"
                             className="delete-task-btn"
@@ -1241,6 +1273,15 @@ export function MyTasksView({
                         <div title={task.priority}
                           style={{ width:8, height:8, borderRadius:'50%', flexShrink:0,
                             background: PRIORITY_CONFIG[task.priority]?.color ?? '#94a3b8' }}/>
+                        <button onClick={e => { e.stopPropagation(); cloneTask(task) }} title="Clone task"
+                          className="delete-task-btn"
+                          style={{ opacity:0, transition:'opacity 0.15s', display:'flex', alignItems:'center',
+                            justifyContent:'center', width:22, height:22, borderRadius:5, border:'none',
+                            background:'transparent', cursor:'pointer', color:'var(--text-muted)' }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background='rgba(13,148,136,0.1)'; (e.currentTarget as HTMLElement).style.color='var(--brand)' }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background='transparent'; (e.currentTarget as HTMLElement).style.color='var(--text-muted)' }}>
+                          <Copy style={{ width:11, height:11 }}/>
+                        </button>
                         {canManage && (
                           <button onClick={() => deleteTask(task.id)} title="Delete task"
                             className="delete-task-btn"

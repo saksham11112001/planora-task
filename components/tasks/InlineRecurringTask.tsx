@@ -10,6 +10,7 @@ import { InlineCustomFields } from '@/components/tasks/InlineCustomFields'
 // ── Granular frequency options ─────────────────────────────────
 const FREQUENCIES = [
   { group: 'Daily',     v: 'daily',            l: 'Every day' },
+  { group: 'Daily',     v: 'custom_daily',     l: 'Every N days…' },
   { group: 'Weekly',    v: 'weekly_mon',       l: 'Every Monday' },
   { group: 'Weekly',    v: 'weekly_tue',       l: 'Every Tuesday' },
   { group: 'Weekly',    v: 'weekly_wed',       l: 'Every Wednesday' },
@@ -26,19 +27,50 @@ const FREQUENCIES = [
   { group: 'Monthly',   v: 'monthly_25',       l: '25th of every month' },
   { group: 'Monthly',   v: 'monthly_last',     l: 'Last day of month' },
   { group: 'Monthly',   v: 'monthly',          l: 'Monthly (same date)' },
+  { group: 'Monthly',   v: 'monthly_custom',   l: 'Custom date…' },
   { group: 'Quarterly', v: 'quarterly_13',     l: '13th of quarter-end' },
   { group: 'Quarterly', v: 'quarterly_15',     l: '15th of quarter-end' },
   { group: 'Quarterly', v: 'quarterly_25',     l: '25th of quarter-end' },
   { group: 'Quarterly', v: 'quarterly_last',   l: 'Last day of quarter' },
   { group: 'Quarterly', v: 'quarterly',        l: 'Quarterly (same date)' },
+  { group: 'Quarterly', v: 'quarterly_custom', l: 'Custom date…' },
   { group: 'Annual',    v: 'annual_31jul',     l: '31st July (annual)' },
   { group: 'Annual',    v: 'annual_30sep',     l: '30th September (annual)' },
   { group: 'Annual',    v: 'annual_31dec',     l: '31st December (annual)' },
   { group: 'Annual',    v: 'annual_31mar',     l: '31st March (annual)' },
   { group: 'Annual',    v: 'annual',           l: 'Annually (same date)' },
+  { group: 'Annual',    v: 'annual_custom',    l: 'Custom date…' },
 ]
 
-const FREQ_LABEL: Record<string, string> = Object.fromEntries(FREQUENCIES.map(f => [f.v, f.l]))
+const MONTHS_SHORT = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec']
+const MONTHS_LABEL = ['January','February','March','April','May','June','July','August','September','October','November','December']
+
+const FREQ_LABEL_MAP: Record<string, string> = Object.fromEntries(FREQUENCIES.map(f => [f.v, f.l]))
+
+/** Returns a human-readable label for any frequency string, including dynamic ones */
+function getFreqLabel(freq: string): string {
+  if (FREQ_LABEL_MAP[freq]) return FREQ_LABEL_MAP[freq]
+  // every_N_days
+  const everyMatch = freq.match(/^every_(\d+)_days$/)
+  if (everyMatch) return `Every ${everyMatch[1]} day${everyMatch[1]==='1'?'':'s'}`
+  // monthly_N (custom day)
+  const monthMatch = freq.match(/^monthly_(\d+)$/)
+  if (monthMatch) return `${monthMatch[1]}th of every month`
+  // quarterly_N
+  const qMatch = freq.match(/^quarterly_(\d+)$/)
+  if (qMatch) return `${qMatch[1]}th of quarter-end`
+  // annual_Nmon
+  const annMatch = freq.match(/^annual_(\d+)([a-z]+)$/)
+  if (annMatch) {
+    const mIdx = MONTHS_SHORT.indexOf(annMatch[2])
+    return `${annMatch[1]}${mIdx >= 0 ? ' ' + MONTHS_LABEL[mIdx] : annMatch[2]} (annual)`
+  }
+  return freq
+}
+
+const FREQ_LABEL: Record<string, string> = new Proxy(FREQ_LABEL_MAP, {
+  get(target, key: string) { return target[key] ?? getFreqLabel(key) }
+})
 
 const PRIORITY_OPTIONS = [
   { value: 'none',   label: 'No priority', color: '#94a3b8' },
@@ -88,7 +120,20 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, defa
   const [assignee,  setAssignee]  = useState(editTask?.assignee_id ?? currentUserId ?? '')
   const [approverId,setApproverId] = useState(editTask?.approver_id ?? '')
   const [clientId,  setClientId]  = useState(editTask?.client_id ?? '')
-  const [files,     setFiles]     = useState<File[]>([])
+  const [files,            setFiles]           = useState<File[]>([])
+  const [customInterval,   setCustomInterval]   = useState(2)   // for "every N days"
+  const [customDay,        setCustomDay]        = useState(1)   // for monthly/quarterly custom day
+  const [customAnnualDay,  setCustomAnnualDay]  = useState(15)  // for annual custom day
+  const [customAnnualMonth,setCustomAnnualMonth]= useState('jan') // for annual custom month
+
+  // Derive the effective frequency string to save (resolves sentinel values)
+  const effectiveFrequency: string = (() => {
+    if (frequency === 'custom_daily')     return `every_${Math.max(1, customInterval)}_days`
+    if (frequency === 'monthly_custom')   return `monthly_${Math.max(1, Math.min(31, customDay))}`
+    if (frequency === 'quarterly_custom') return `quarterly_${Math.max(1, Math.min(31, customDay))}`
+    if (frequency === 'annual_custom')    return `annual_${Math.max(1, Math.min(31, customAnnualDay))}${customAnnualMonth}`
+    return frequency
+  })()
 
   // Auto-focus input when opened (handles both defaultOpen=true and openRow())
   useEffect(() => {
@@ -109,6 +154,7 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, defa
     setOpen(false); setTitle(''); setFrequency('weekly_mon'); setPriority('medium')
     setClientId(''); setAssignee(currentUserId ?? ''); setApproverId(''); setFiles([])
     setRequireAttachment(false); setCompSubtasks([])
+    setCustomInterval(2); setCustomDay(1); setCustomAnnualDay(15); setCustomAnnualMonth('jan')
   }
 
   function validate(): boolean {
@@ -130,7 +176,7 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, defa
       if (requireAttachment) cfBase._require_attachment = true
       const body = {
         title:         title.trim(),
-        frequency,
+        frequency:     effectiveFrequency,
         priority,
         assignee_id:   assignee     || null,
         approver_id:   approverId   || null,
@@ -273,6 +319,66 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, defa
             ))}
           </select>
         </label>
+
+        {/* Custom daily: every N days */}
+        {frequency === 'custom_daily' && (
+          <label style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px',
+            borderRadius:20, border:'1.5px solid var(--brand-border)',
+            background:'var(--brand-light)', cursor:'pointer' }}>
+            <span style={{ fontSize:12, color:'var(--brand)', fontWeight:500, whiteSpace:'nowrap' }}>Every</span>
+            <input type="number" min={1} max={365} value={customInterval}
+              onChange={e => setCustomInterval(Math.max(1, parseInt(e.target.value) || 1))}
+              style={{ width:44, fontSize:12, border:'none', outline:'none', background:'transparent',
+                color:'var(--brand)', fontWeight:600, textAlign:'center', cursor:'pointer' }}/>
+            <span style={{ fontSize:12, color:'var(--brand)', fontWeight:500, whiteSpace:'nowrap' }}>day{customInterval === 1 ? '' : 's'}</span>
+          </label>
+        )}
+
+        {/* Custom monthly: custom day of month */}
+        {frequency === 'monthly_custom' && (
+          <label style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px',
+            borderRadius:20, border:'1.5px solid var(--brand-border)',
+            background:'var(--brand-light)', cursor:'pointer' }}>
+            <span style={{ fontSize:12, color:'var(--brand)', fontWeight:500, whiteSpace:'nowrap' }}>Day</span>
+            <input type="number" min={1} max={31} value={customDay}
+              onChange={e => setCustomDay(Math.max(1, Math.min(31, parseInt(e.target.value) || 1)))}
+              style={{ width:44, fontSize:12, border:'none', outline:'none', background:'transparent',
+                color:'var(--brand)', fontWeight:600, textAlign:'center', cursor:'pointer' }}/>
+            <span style={{ fontSize:12, color:'var(--brand)', fontWeight:500, whiteSpace:'nowrap' }}>of month</span>
+          </label>
+        )}
+
+        {/* Custom quarterly: custom day of quarter-end month */}
+        {frequency === 'quarterly_custom' && (
+          <label style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px',
+            borderRadius:20, border:'1.5px solid var(--brand-border)',
+            background:'var(--brand-light)', cursor:'pointer' }}>
+            <span style={{ fontSize:12, color:'var(--brand)', fontWeight:500, whiteSpace:'nowrap' }}>Day</span>
+            <input type="number" min={1} max={31} value={customDay}
+              onChange={e => setCustomDay(Math.max(1, Math.min(31, parseInt(e.target.value) || 1)))}
+              style={{ width:44, fontSize:12, border:'none', outline:'none', background:'transparent',
+                color:'var(--brand)', fontWeight:600, textAlign:'center', cursor:'pointer' }}/>
+            <span style={{ fontSize:12, color:'var(--brand)', fontWeight:500, whiteSpace:'nowrap' }}>of quarter-end</span>
+          </label>
+        )}
+
+        {/* Custom annual: day + month */}
+        {frequency === 'annual_custom' && (
+          <label style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px',
+            borderRadius:20, border:'1.5px solid var(--brand-border)',
+            background:'var(--brand-light)', cursor:'pointer' }}>
+            <input type="number" min={1} max={31} value={customAnnualDay}
+              onChange={e => setCustomAnnualDay(Math.max(1, Math.min(31, parseInt(e.target.value) || 1)))}
+              style={{ width:36, fontSize:12, border:'none', outline:'none', background:'transparent',
+                color:'var(--brand)', fontWeight:600, textAlign:'center', cursor:'pointer' }}/>
+            <select value={customAnnualMonth} onChange={e => setCustomAnnualMonth(e.target.value)}
+              style={{ fontSize:12, border:'none', outline:'none', background:'transparent',
+                color:'var(--brand)', cursor:'pointer', appearance:'none', fontWeight:500 }}>
+              {MONTHS_SHORT.map((m, i) => <option key={m} value={m}>{MONTHS_LABEL[i]}</option>)}
+            </select>
+            <span style={{ fontSize:12, color:'var(--brand)', fontWeight:500, whiteSpace:'nowrap' }}>(annual)</span>
+          </label>
+        )}
 
         {/* Assignee */}
         <label style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px',
