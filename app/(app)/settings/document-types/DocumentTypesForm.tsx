@@ -142,7 +142,7 @@ export function DocumentTypesForm({ initialTypes, masterTaskNames }: Props) {
   const activeCat  = CATEGORIES.find(c => c.value === (form.category ?? 'monthly'))
 
   return (
-    <div style={{ maxWidth: '760px', paddingBottom: '40px' }}>
+    <div className="page-container" style={{ maxWidth: '760px', paddingBottom: '40px' }}>
 
       {/* Header */}
       <div style={{ marginBottom: '24px' }}>

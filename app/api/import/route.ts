@@ -699,12 +699,16 @@ export async function POST(request: NextRequest) {
         const headers = rows[hdrIdx]
         const iName     = findCol(headers, 'clientname', 'name')
         const iEmail    = findCol(headers, 'email', 'contactemail')
+        const iPhone    = findCol(headers, 'phone')
+        const iGstin    = findCol(headers, 'gstin')
         const iCompany  = findCol(headers, 'company')
         const iWebsite  = findCol(headers, 'website')
         const iIndustry = findCol(headers, 'industry')
         const iColor    = findCol(headers, 'color', 'colour')
         const iStatus   = findCol(headers, 'status')
         const iNotes    = findCol(headers, 'notes')
+
+        const GSTIN_RE = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/
 
         const toInsertClients: any[] = []
         const seenClientNames = new Set<string>()
@@ -725,17 +729,27 @@ export async function POST(request: NextRequest) {
           const rawColor = cell(row, iColor) || '#0d9488'
           const color = rawColor.startsWith('#') ? rawColor : `#${rawColor}`
 
+          // GSTIN — validate format and derive PAN from it
+          const rawGstin = cell(row, iGstin).toUpperCase().replace(/\s/g, '')
+          const gstin    = GSTIN_RE.test(rawGstin) ? rawGstin : null
+          const pan      = gstin ? gstin.slice(2, 12) : null
+          const clientCustomFields = (gstin || pan)
+            ? { ...(gstin ? { gstin } : {}), ...(pan ? { pan } : {}) }
+            : null
+
           toInsertClients.push({
             _lname: lname,
             org_id: orgId,
             name: name.trim(),
             email: cell(row, iEmail) || null,
+            phone: cell(row, iPhone) || null,
             company: cell(row, iCompany) || null,
             website: cell(row, iWebsite) || null,
             industry: cell(row, iIndustry) || null,
             color,
             status: ['active', 'inactive', 'lead'].includes(status) ? status : 'active',
             notes: cell(row, iNotes) || null,
+            ...(clientCustomFields ? { custom_fields: clientCustomFields } : {}),
             created_by: user.id,
           })
         }

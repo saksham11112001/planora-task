@@ -197,7 +197,7 @@ export function CouponsView({ initialCoupons }: Props) {
 
   /* ── RENDER ── */
   return (
-    <div style={{ padding: '24px', maxWidth: 1100, margin: '0 auto' }}>
+    <div className="page-container" style={{ maxWidth: 1100 }}>
 
       {/* ── Page header ── */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, gap: 16, flexWrap: 'wrap' }}>

@@ -153,13 +153,13 @@ wsRM.views = [
     // Sheet 3 — Clients
     // ══════════════════════════════════════════════════════════════════════════
     const wsClients = wb.addWorksheet('🏢 Clients')
-    setup(wsClients, [24, 28, 18, 22, 26, 18, 10, 16, 28])
-    wsClients.addRow(['Client Name *', 'Contact Email', 'Phone', 'Company', 'Website', 'Industry', 'Color', 'Status', 'Notes'])
-    wsClients.addRow(['Unique name', 'contact@client.com', '+91 9876543210', 'Company Ltd', 'https://company.com', 'Technology', '#6366f1', 'active | inactive | lead', 'Optional'])
-    wsClients.addRow(['[SAMPLE] Acme Corp', 'hello@acme.com', '', 'Acme Corp Ltd', '', 'Technology', '#6366f1', 'active', ''])
-    styleHeader(wsClients, 9)
-    styleHints(wsClients,  9)
-    dv(wsClients, 'H', [L_CLIENT_ST])
+    setup(wsClients, [24, 28, 18, 22, 22, 26, 18, 10, 16, 28])
+    wsClients.addRow(['Client Name *', 'Contact Email', 'Phone', 'GSTIN', 'Company', 'Website', 'Industry', 'Color', 'Status', 'Notes'])
+    wsClients.addRow(['Unique name', 'contact@client.com', '+91 9876543210', '15-char GST number', 'Company Ltd', 'https://company.com', 'Technology', '#6366f1', 'active | inactive | lead', 'Optional'])
+    wsClients.addRow(['[SAMPLE] Acme Corp', 'hello@acme.com', '', '', 'Acme Corp Ltd', '', 'Technology', '#6366f1', 'active', ''])
+    styleHeader(wsClients, 10)
+    styleHints(wsClients,  10)
+    dv(wsClients, 'I', [L_CLIENT_ST])
 
     // ══════════════════════════════════════════════════════════════════════════
     // _helpers (HIDDEN) — manager-only email list via IF formulas

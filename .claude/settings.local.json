@@ -8,7 +8,11 @@
       "WebFetch(domain:www.softwaresuggest.com)",
       "WebFetch(domain:indianbusinesstimes.com)",
       "Bash(npx tsc:*)",
-      "Bash(npx next:*)"
+      "Bash(npx next:*)",
+      "Bash(grep -n \"return \\(\" /c/Users/saksh/Desktop/planora-task/app/\\\\\\(app\\\\\\)/settings/*/\\\\*View.tsx /c/Users/saksh/Desktop/planora-task/app/\\\\\\(app\\\\\\)/settings/*/\\\\*Form.tsx)",
+      "Bash(grep -l \"custom_fields\" /c/Users/saksh/Desktop/planora-task/supabase/migrations/*.sql)",
+      "Bash(cat /c/Users/saksh/Desktop/planora-task/supabase/migrations/*.sql)",
+      "Bash(psql -U postgres -h localhost -d planora -c \"\\\\d tasks\")"
     ]
   }
 }

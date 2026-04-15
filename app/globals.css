@@ -1077,6 +1077,64 @@ html.dark [style*="color: 'white'"],
 html.dark [style*="color:'white'"],
 html.dark [style*="color: white"] { color: var(--text-primary) !important; }
 
+/* ── Dark mode interactive state fixes ──────────────────────────
+   Prevent white/light flashes on button click, hover, and focus
+   across components that use inline styles or unstyled buttons    */
+
+/* Danger / destructive button in dark mode */
+html.dark .btn-danger {
+  background: rgba(220,38,38,0.15) !important;
+  color: #f87171 !important;
+  border-color: rgba(220,38,38,0.30) !important;
+}
+html.dark .btn-danger:hover:not(:disabled) {
+  background: rgba(220,38,38,0.22) !important;
+  color: #fca5a5 !important;
+}
+
+/* Prevent webkit tap highlight white flash on mobile */
+html.dark button,
+html.dark a,
+html.dark [role="button"] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Prevent browser-default white active-state flash on unstyled buttons */
+html.dark button:active:not(:disabled) {
+  /* Use opacity dip instead of browser default white overlay */
+  opacity: 0.82;
+}
+
+/* Catch inline-style buttons that set background: 'transparent' or 'none'
+   and would otherwise show white on :focus in some browsers */
+html.dark button[style*="background: none"]:focus,
+html.dark button[style*="background: transparent"]:focus,
+html.dark button[style*="background:'none'"]:focus,
+html.dark button[style*="background:'transparent'"]:focus {
+  outline-color: var(--brand);
+  background: var(--border-light) !important;
+}
+
+/* ── RGB-form equivalents for common React inline style backgrounds ──
+   React/browsers may normalize hex → rgb() in the style attribute;
+   these selectors catch both forms.                                   */
+html.dark [style*="background: rgb(254, 242, 242)"]  { background: rgba(220,38,38,0.12) !important; }
+html.dark [style*="background: rgb(254, 243, 199)"]  { background: rgba(202,138,4,0.15) !important; }
+html.dark [style*="background: rgb(240, 253, 244)"]  { background: rgba(22,163,74,0.12) !important; }
+html.dark [style*="background: rgb(255, 255, 255)"]  { background: var(--surface) !important; }
+html.dark [style*="background: rgb(248, 250, 252)"]  { background: var(--surface-subtle) !important; }
+html.dark [style*="background: rgb(241, 245, 249)"]  { background: var(--surface-subtle) !important; }
+html.dark [style*="background: rgb(226, 232, 240)"]  { background: var(--border) !important; }
+html.dark [style*="background: rgb(255, 247, 237)"]  { background: rgba(234,88,12,0.15) !important; }
+html.dark [style*="background: rgb(253, 244, 255)"]  { background: rgba(147,51,234,0.12) !important; }
+html.dark [style*="background: rgb(239, 246, 255)"]  { background: rgba(37,99,235,0.12) !important; }
+html.dark [style*="background: rgb(236, 254, 255)"]  { background: rgba(8,145,178,0.12) !important; }
+html.dark [style*="background: rgb(250, 232, 255)"]  { background: rgba(147,51,234,0.10) !important; }
+
+/* Hover/focus states on inline-styled cards — prevent white card flash */
+html.dark .card-elevated:hover { background: var(--surface) !important; }
+html.dark .card:hover          { background: var(--surface) !important; }
+
 /* Border overrides */
 html.dark [style*="border: '1px solid #e2e8f0'"],
 html.dark [style*="borderBottom: '1px solid #f8fafc'"],
