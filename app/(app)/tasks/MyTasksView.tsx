@@ -2,7 +2,7 @@
 import React from 'react'
 import { useState, useTransition } from 'react'
 import { useRouter }    from 'next/navigation'
-import { RefreshCw, CheckCheck, Clock, FolderOpen, Trash2, User, SortAsc } from 'lucide-react'
+import { RefreshCw, CheckCheck, CheckCircle2, Clock, FolderOpen, Trash2, User, SortAsc } from 'lucide-react'
 import { PriorityBadge, Avatar } from '@/components/ui/Badge'
 import { TaskDetailPanel }       from '@/components/tasks/TaskDetailPanel'
 import { InlineOneTimeTask }     from '@/components/tasks/InlineOneTimeTask'
@@ -1452,7 +1452,7 @@ export function MyTasksView({
                         {isDone && <svg viewBox="0 0 10 10" fill="none" style={{width:7,height:7}}><path d="M1.5 5L4 7.5L8.5 2.5" stroke="white" strokeWidth="1.5" strokeLinecap="round"/></svg>}
                       </div>
                   }
-                  <span style={{ fontSize:12, fontWeight:500, lineHeight:1.4, flex:1, minWidth:0,
+                  <span style={{ fontSize:13, fontWeight:600, lineHeight:1.4, flex:1, minWidth:0,
                     color: isDone?'var(--text-muted)':isPending?'#7c3aed':ov?'#dc2626':'var(--text-primary)',
                     textDecoration: isDone?'line-through':'none',
                     overflow:'hidden', display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical' }}>
@@ -1460,7 +1460,7 @@ export function MyTasksView({
                   </span>
                 </div>
                 {/* Chips row: client + assignee (compact, with full-name tooltip) */}
-                <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:6, flexWrap:'wrap' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:6, flexWrap:'wrap', opacity: 0.85 }}>
                   {client && (
                     <span title={client.name}
                       style={{ display:'inline-flex', alignItems:'center', gap:3,
@@ -1549,7 +1549,24 @@ export function MyTasksView({
                 {useGroups ? (
                   /* ── Grouped columns: To do & Pending approval ── */
                   groups.length === 0
-                    ? <p style={{ fontSize:12, color:'var(--text-muted)', textAlign:'center', padding:'20px 0' }}>Nothing here</p>
+                    ? (
+                      <div style={{ display:'flex', flexDirection:'column', alignItems:'center',
+                        justifyContent:'center', padding:'32px 12px', gap:10, textAlign:'center' }}>
+                        <div style={{ width:36, height:36, borderRadius:'50%',
+                          background:'rgba(255,255,255,0.04)', border:'1px dashed var(--border)',
+                          display:'flex', alignItems:'center', justifyContent:'center' }}>
+                          {col.status === 'in_review'
+                            ? <Clock style={{ width:16, height:16, color:'var(--text-muted)' }}/>
+                            : <CheckCheck style={{ width:16, height:16, color:'var(--text-muted)' }}/>
+                          }
+                        </div>
+                        <p style={{ fontSize:12, color:'var(--text-muted)', lineHeight:1.5, margin:0 }}>
+                          {col.status === 'in_review'
+                            ? 'No tasks waiting for approval'
+                            : 'All clear — drag a task here or create one above'}
+                        </p>
+                      </div>
+                    )
                     : groups.map(grp => {
                         const gKey = `${col.status}-${grp.key}`
                         const isCollapsed = collapsedGroups.has(gKey)
@@ -1597,6 +1614,24 @@ export function MyTasksView({
                 ) : (
                   /* ── Flat columns: Overdue & Done ── */
                   <>
+                    {flatTasks.length === 0 && (
+                      <div style={{ display:'flex', flexDirection:'column', alignItems:'center',
+                        justifyContent:'center', padding:'32px 12px', gap:10, textAlign:'center' }}>
+                        <div style={{ width:36, height:36, borderRadius:'50%',
+                          background:'rgba(255,255,255,0.04)', border:'1px dashed var(--border)',
+                          display:'flex', alignItems:'center', justifyContent:'center' }}>
+                          {col.status === 'overdue'
+                            ? <CheckCircle2 style={{ width:16, height:16, color:'var(--text-muted)' }}/>
+                            : <CheckCheck style={{ width:16, height:16, color:'var(--text-muted)' }}/>
+                          }
+                        </div>
+                        <p style={{ fontSize:12, color:'var(--text-muted)', lineHeight:1.5, margin:0 }}>
+                          {col.status === 'overdue'
+                            ? 'No overdue tasks — great work!'
+                            : 'No completed tasks yet'}
+                        </p>
+                      </div>
+                    )}
                     {flatTasks.map(task => <TaskCard key={task.id} task={task}/>)}
                     {col.status === 'completed' && allDoneTasks.length > DONE_PAGE && (
                       <button onClick={() => setDoneExpanded(v => !v)}

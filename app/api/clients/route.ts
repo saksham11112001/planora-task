@@ -24,18 +24,20 @@ export async function POST(request: NextRequest) {
   if (clientCreateDenied) return NextResponse.json({ error: clientCreateDenied.error }, { status: clientCreateDenied.status })
   const body = await request.json()
   if (!body.name?.trim()) return NextResponse.json({ error: 'Name required' }, { status: 400 })
+  const cf = (body.custom_fields && typeof body.custom_fields === 'object') ? body.custom_fields : null
   const { data, error } = await supabase.from('clients').insert({
-    org_id:   mb.org_id,
-    name:     body.name.trim(),
-    email:    body.email    || null,
-    phone:    body.phone    || null,
-    company:  body.company  || null,
-    website:  body.website  || null,
-    industry: body.industry || null,
-    notes:    body.notes    || null,
-    status:   body.status   || 'active',
-    color:    body.color    || '#0d9488',
-    created_by: user.id,
+    org_id:        mb.org_id,
+    name:          body.name.trim(),
+    email:         body.email    || null,
+    phone:         body.phone    || null,
+    company:       body.company  || null,
+    website:       body.website  || null,
+    industry:      body.industry || null,
+    notes:         body.notes    || null,
+    status:        body.status   || 'active',
+    color:         body.color    || '#0d9488',
+    custom_fields: cf,
+    created_by:    user.id,
   }).select('*').single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ data }, { status: 201 })

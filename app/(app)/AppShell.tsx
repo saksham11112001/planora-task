@@ -22,6 +22,11 @@ export function AppShell({ user, org, role, workspaceId, children }: Props) {
   const pathname    = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
 
+  const isLocked =
+    org.status === 'expired' ||
+    org.status === 'payment_failed' ||
+    (org.status === 'trialing' && !!org.trial_ends_at && new Date(org.trial_ends_at) < new Date())
+
   useEffect(() => { setMobileOpen(false) }, [pathname])
 
   // Lock body scroll on iOS when sidebar is open
@@ -56,8 +61,6 @@ export function AppShell({ user, org, role, workspaceId, children }: Props) {
         <Header onMenuClick={() => setMobileOpen(o => !o)}/>
         {/* Trial expired / payment failed banner */}
         {(() => {
-          const isLocked = org.status === 'expired' || org.status === 'payment_failed' ||
-            (org.status === 'trialing' && org.trial_ends_at && new Date(org.trial_ends_at) < new Date())
           if (!isLocked) return null
           return (
             <div style={{ padding:'10px 20px', background:'#7c3aed',
@@ -76,12 +79,8 @@ export function AppShell({ user, org, role, workspaceId, children }: Props) {
           )
         })()}
         <main className="app-content" style={{
-          pointerEvents: (org.status === 'expired' || org.status === 'payment_failed' ||
-            (org.status === 'trialing' && org.trial_ends_at && new Date(org.trial_ends_at) < new Date()))
-            ? 'none' : undefined,
-          opacity: (org.status === 'expired' || org.status === 'payment_failed' ||
-            (org.status === 'trialing' && org.trial_ends_at && new Date(org.trial_ends_at) < new Date()))
-            ? 0.6 : undefined,
+          pointerEvents: isLocked ? 'none' : undefined,
+          opacity:       isLocked ? 0.6   : undefined,
         }}>
           <Suspense fallback={<PageFallback/>}>
             {children}

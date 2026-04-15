@@ -18,6 +18,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const updates: Record<string, unknown> = {}
   for (const k of ALLOWED) { if (k in body) updates[k] = body[k] }
 
+  // Merge custom_fields — do not overwrite unrelated keys
+  if ('custom_fields' in body && body.custom_fields && typeof body.custom_fields === 'object') {
+    const { data: existing } = await supabase
+      .from('clients').select('custom_fields').eq('id', id).eq('org_id', mb.org_id).maybeSingle()
+    updates.custom_fields = { ...(existing?.custom_fields ?? {}), ...(body.custom_fields as object) }
+  }
+
   const { data, error } = await supabase.from('clients').update(updates).eq('id', id).eq('org_id', mb.org_id).select('*').single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ data })

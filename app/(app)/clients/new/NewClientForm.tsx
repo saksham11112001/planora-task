@@ -1,10 +1,10 @@
 'use client'
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from '@/store/appStore'
 import {
   ChevronRight, ChevronDown, Search, X, Check,
-  FileCheck, Building2, Calendar, Paperclip, ShieldCheck, User, Shield, Bell,
+  FileCheck, Building2, Calendar, Paperclip, ShieldCheck, User, Shield, Bell, Loader2,
 } from 'lucide-react'
 import {
   COMPLIANCE_TASKS, COMPLIANCE_GROUPS,
@@ -86,6 +86,15 @@ export function NewClientForm({ members = [] }: { members?: Member[] }) {
       .catch(() => {})
   }, [caComplianceMode])
 
+  /* GST lookup */
+  const [gstin,        setGstin]        = useState('')
+  const [gstLooking,   setGstLooking]   = useState(false)
+  const [gstInfo,      setGstInfo]      = useState<null | {
+    pan?: string; state?: string; gst_status?: string | null; constitution?: string | null;
+    registration_date?: string | null; partial?: boolean; message?: string
+  }>(null)
+  const gstInputRef = useRef<HTMLInputElement>(null)
+
   /* Step 1 */
   const [form, setForm] = useState({
     name:'', email:'', phone:'', company:'', website:'',
@@ -103,6 +112,46 @@ export function NewClientForm({ members = [] }: { members?: Member[] }) {
   const approvers = members.filter(m => m.role && ['owner','admin','manager'].includes(m.role))
 
   function setField(k: string, v: string) { setForm(f => ({ ...f, [k]: v })) }
+
+  async function lookupGSTIN(raw: string) {
+    const g = raw.trim().toUpperCase()
+    if (g.length !== 15) return
+    setGstLooking(true)
+    setGstInfo(null)
+    try {
+      const res  = await fetch(`/api/gst/lookup?gstin=${encodeURIComponent(g)}`)
+      const json = await res.json()
+      if (!res.ok) { toast.error(json.error ?? 'GST lookup failed'); return }
+      const d = json.data
+      // Auto-fill form fields
+      setForm(f => ({
+        ...f,
+        name:    d.name    ?? f.name,
+        company: d.name    ?? f.company,
+        industry:d.nature_of_business ?? d.constitution ?? f.industry,
+        notes:   f.notes ? f.notes : [
+          d.gst_status      ? `GST Status: ${d.gst_status}`       : null,
+          d.state           ? `State: ${d.state}`                  : null,
+          d.constitution    ? `Entity: ${d.constitution}`          : null,
+          d.registration_date ? `GST Reg: ${d.registration_date}` : null,
+        ].filter(Boolean).join('\n'),
+      }))
+      setGstInfo({
+        pan:               d.pan,
+        state:             d.state,
+        gst_status:        d.gst_status,
+        constitution:      d.constitution,
+        registration_date: d.registration_date,
+        partial:           json.partial,
+        message:           json.message,
+      })
+      if (!json.partial) toast.success('GST data fetched — form auto-filled!')
+    } catch {
+      toast.error('GST lookup failed — check your connection')
+    } finally {
+      setGstLooking(false)
+    }
+  }
 
   function toggleTask(title: string) {
     setSelection(s => {
@@ -146,9 +195,19 @@ export function NewClientForm({ members = [] }: { members?: Member[] }) {
     if (!form.name.trim()) { setError('Client name is required'); return }
     setSaving(true); setError('')
     try {
+      const gstCustomFields = gstin.trim().length === 15 ? {
+        gstin:       gstin.trim().toUpperCase(),
+        pan:         gstInfo?.pan         ?? null,
+        gst_status:  gstInfo?.gst_status  ?? null,
+        gst_state:   gstInfo?.state       ?? null,
+        gst_reg_date:gstInfo?.registration_date ?? null,
+      } : undefined
       const clientRes = await fetch('/api/clients', {
         method:'POST', headers:{ 'Content-Type':'application/json' },
-        body: JSON.stringify({ ...form, name: form.name.trim() }),
+        body: JSON.stringify({
+          ...form, name: form.name.trim(),
+          ...(gstCustomFields ? { custom_fields: gstCustomFields } : {}),
+        }),
       })
       const clientData = await clientRes.json()
       if (!clientRes.ok) { setError(clientData.error ?? 'Failed to create client'); return }
@@ -199,6 +258,104 @@ export function NewClientForm({ members = [] }: { members?: Member[] }) {
     return (
       <div className="card p-6 space-y-5">
         {error && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>}
+
+        {/* ── GSTIN Auto-fill ── */}
+        <div style={{ background: 'linear-gradient(135deg, #f0fdf4, #ecfdf5)', border: '1px solid #bbf7d0', borderRadius: 12, padding: '14px 16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <div style={{ width: 28, height: 28, borderRadius: 7, background: '#0d9488', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <ShieldCheck style={{ width: 14, height: 14, color: '#fff' }}/>
+            </div>
+            <div>
+              <p style={{ fontSize: 13, fontWeight: 700, color: '#065f46', margin: 0 }}>Auto-fill via GSTIN</p>
+              <p style={{ fontSize: 11, color: '#6b7280', margin: 0 }}>Enter GST number to fetch business name, state &amp; more</p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              ref={gstInputRef}
+              value={gstin}
+              onChange={e => {
+                const v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 15)
+                setGstin(v)
+                setGstInfo(null)
+                if (v.length === 15) lookupGSTIN(v)
+              }}
+              placeholder="e.g. 27AAGCM1234A1Z5"
+              maxLength={15}
+              style={{
+                flex: 1, padding: '8px 12px', borderRadius: 8,
+                border: gstin.length === 15 ? '1.5px solid #0d9488' : '1px solid #d1fae5',
+                fontSize: 13, fontFamily: 'monospace', letterSpacing: '0.08em',
+                outline: 'none', background: '#fff', color: '#065f46', fontWeight: 600,
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => lookupGSTIN(gstin)}
+              disabled={gstin.length !== 15 || gstLooking}
+              style={{
+                padding: '8px 14px', borderRadius: 8, border: 'none',
+                background: gstin.length === 15 ? '#0d9488' : '#d1fae5',
+                color: gstin.length === 15 ? '#fff' : '#9ca3af',
+                fontSize: 12, fontWeight: 600, cursor: gstin.length === 15 ? 'pointer' : 'default',
+                display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0, fontFamily: 'inherit',
+                transition: 'all 0.15s',
+              }}>
+              {gstLooking
+                ? <><Loader2 style={{ width: 13, height: 13, animation: 'spin 0.7s linear infinite' }}/> Fetching…</>
+                : 'Fetch'}
+            </button>
+          </div>
+
+          {/* Progress indicator */}
+          {gstin.length > 0 && gstin.length < 15 && (
+            <p style={{ fontSize: 11, color: '#6b7280', margin: '6px 0 0' }}>
+              {15 - gstin.length} more character{15 - gstin.length !== 1 ? 's' : ''} needed
+            </p>
+          )}
+
+          {/* GST info card */}
+          {gstInfo && (
+            <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {gstInfo.pan && (
+                <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, background: '#fff', border: '1px solid #d1fae5', color: '#065f46', fontWeight: 600 }}>
+                  PAN: <span style={{ fontFamily: 'monospace' }}>{gstInfo.pan}</span>
+                </span>
+              )}
+              {gstInfo.state && (
+                <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, background: '#fff', border: '1px solid #d1fae5', color: '#065f46', fontWeight: 600 }}>
+                  📍 {gstInfo.state}
+                </span>
+              )}
+              {gstInfo.gst_status && (
+                <span style={{
+                  fontSize: 11, padding: '3px 8px', borderRadius: 6, fontWeight: 700,
+                  background: gstInfo.gst_status.toLowerCase() === 'active' ? '#f0fdf4' : '#fef2f2',
+                  color: gstInfo.gst_status.toLowerCase() === 'active' ? '#16a34a' : '#dc2626',
+                  border: `1px solid ${gstInfo.gst_status.toLowerCase() === 'active' ? '#bbf7d0' : '#fecaca'}`,
+                }}>
+                  {gstInfo.gst_status}
+                </span>
+              )}
+              {gstInfo.constitution && (
+                <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, background: '#fff', border: '1px solid #d1fae5', color: '#6b7280' }}>
+                  {gstInfo.constitution}
+                </span>
+              )}
+              {gstInfo.registration_date && (
+                <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, background: '#fff', border: '1px solid #d1fae5', color: '#6b7280' }}>
+                  Reg: {gstInfo.registration_date}
+                </span>
+              )}
+              {gstInfo.partial && gstInfo.message && (
+                <p style={{ width: '100%', fontSize: 11, color: '#6b7280', margin: '2px 0 0', fontStyle: 'italic' }}>
+                  ℹ️ {gstInfo.message}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5">Client name *</label>

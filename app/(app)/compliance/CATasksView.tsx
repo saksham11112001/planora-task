@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useTransition, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, RefreshCw, Trash2, SortAsc } from 'lucide-react'
+import { Search, RefreshCw, Trash2, SortAsc, MessageCircle } from 'lucide-react'
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
 import { fmtDate, isOverdue } from '@/lib/utils/format'
 import { toast } from '@/store/appStore'
@@ -135,7 +135,8 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
 
   /* ── Optimistic status patch ───────────────────────────────── */
   async function patchStatus(taskId: string, newStatus: string) {
-    const prev = tasks
+    const prevTasks   = tasks
+    const prevSelTask = selTask
     setTasks(p => p.map(t => t.id === taskId ? { ...t, status: newStatus } : t))
     if (selTask?.id === taskId) setSelTask(p => p ? { ...p, status: newStatus } : null)
     const res = await fetch(`/api/tasks/${taskId}`, {
@@ -144,8 +145,8 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
     })
     if (!res.ok) {
       const d = await res.json().catch(() => ({}))
-      setTasks(prev)
-      if (selTask?.id === taskId) setSelTask(prev ? { ...prev } : null)
+      setTasks(prevTasks)
+      if (prevSelTask?.id === taskId) setSelTask(prevSelTask)
       toast.error(d.error ?? 'Update failed')
     }
     else startT(() => router.refresh())
@@ -215,8 +216,29 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
     await doMasterUpdate(data)
   }
 
+  /* ── Urgency chip helper ──────────────────────────────────── */
+  function urgencyChip(due_date: string | null, status: string): { label: string; bg: string; color: string } | null {
+    if (!due_date || status === 'completed' || status === 'cancelled') return null
+    const now = new Date(); now.setHours(0, 0, 0, 0)
+    const due = new Date(due_date); due.setHours(0, 0, 0, 0)
+    const diff = Math.round((due.getTime() - now.getTime()) / 86400000)
+    if (diff < 0)  return { label: `Overdue ${Math.abs(diff)}d`, bg: '#fef2f2', color: '#dc2626' }
+    if (diff === 0) return { label: 'Due today',                  bg: '#f0fdf4', color: '#0d9488' }
+    if (diff <= 7)  return { label: `${diff}d left`,              bg: '#fefce8', color: '#b45309' }
+    return null
+  }
+
   /* ── Filtering + sorting ───────────────────────────────────── */
   const today = todayStr()
+
+  /* ── Health stats (across all tasks, ignoring current filters) ── */
+  const weekFromNow = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)
+  const healthStats = {
+    total:           tasks.length,
+    overdue:         tasks.filter(t => t.due_date && t.due_date < today && !['completed', 'cancelled'].includes(t.status)).length,
+    dueThisWeek:     tasks.filter(t => t.due_date && t.due_date >= today && t.due_date <= weekFromNow && t.status !== 'completed').length,
+    pendingApproval: tasks.filter(t => t.status === 'in_review').length,
+  }
 
   const visible = tasks
     .filter(t => {
@@ -282,6 +304,36 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
           startT(() => router.refresh())
         }}
       />
+
+      {/* ── Health stats bar ── */}
+      {!loading && tasks.length > 0 && (
+        <div style={{
+          display: 'flex', gap: 10, padding: '10px 18px',
+          background: 'var(--surface)', borderBottom: '1px solid var(--border)',
+          flexShrink: 0, flexWrap: 'wrap',
+        }}>
+          {[
+            { label: 'Total tasks',       value: healthStats.total,           bg: 'var(--surface-subtle)', color: 'var(--text-primary)',  border: 'var(--border)',   dot: '' },
+            { label: 'Overdue',           value: healthStats.overdue,         bg: healthStats.overdue > 0 ? '#fef2f2' : 'var(--surface-subtle)', color: healthStats.overdue > 0 ? '#dc2626' : 'var(--text-muted)', border: healthStats.overdue > 0 ? '#fecaca' : 'var(--border)', dot: '🔴' },
+            { label: 'Due this week',     value: healthStats.dueThisWeek,     bg: healthStats.dueThisWeek > 0 ? '#fefce8' : 'var(--surface-subtle)', color: healthStats.dueThisWeek > 0 ? '#b45309' : 'var(--text-muted)', border: healthStats.dueThisWeek > 0 ? '#fde68a' : 'var(--border)', dot: '⚠️' },
+            { label: 'Pending approval',  value: healthStats.pendingApproval, bg: healthStats.pendingApproval > 0 ? '#fdf4ff' : 'var(--surface-subtle)', color: healthStats.pendingApproval > 0 ? '#7c3aed' : 'var(--text-muted)', border: healthStats.pendingApproval > 0 ? '#e9d5ff' : 'var(--border)', dot: '🔵' },
+          ].map(stat => (
+            <div key={stat.label} style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center',
+              padding: '6px 14px', borderRadius: 10,
+              background: stat.bg, border: `1px solid ${stat.border}`,
+              minWidth: 90, gap: 2,
+            }}>
+              <span style={{ fontSize: 20, fontWeight: 800, color: stat.color, lineHeight: 1 }}>
+                {stat.value}
+              </span>
+              <span style={{ fontSize: 10, color: stat.color, fontWeight: 500, opacity: 0.85, whiteSpace: 'nowrap' }}>
+                {stat.label}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* ── View toggle + toolbar ── */}
       <div style={{
@@ -394,6 +446,20 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
             style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 14px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
             <Trash2 style={{ width: 13, height: 13 }}/> Delete
           </button>
+          <button
+            onClick={() => {
+              const selectedTasks = tasks.filter(t => checked.has(t.id))
+              const lines = selectedTasks.map(t => {
+                const client = t.client?.name ?? 'Client'
+                const due = t.due_date ? new Date(t.due_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'TBD'
+                return `• ${t.title} (${client}) — due ${due}`
+              })
+              const msg = `Dear Client,\n\nThis is a reminder for the following pending compliance tasks:\n\n${lines.join('\n')}\n\nKindly arrange the required documents at the earliest.\n\nRegards`
+              window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
+            }}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 14px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+            <MessageCircle style={{ width: 13, height: 13 }}/> WhatsApp Reminder
+          </button>
           <button onClick={() => setChecked(new Set(visible.map(t => t.id)))}
             style={{ background: 'transparent', border: '1px solid var(--border)', padding: '4px 10px', borderRadius: 6, fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)', cursor: 'pointer', fontFamily: 'inherit' }}>
             Select all
@@ -500,12 +566,19 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
                         textDecoration: task.status === 'completed' ? 'line-through' : 'none',
                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                       }}>{task.title}</p>
-                      {task.client && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 1 }}>
-                          <span style={{ width: 6, height: 6, borderRadius: 1, background: task.client.color, display: 'inline-block', flexShrink: 0 }}/>
-                          <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{task.client.name}</span>
-                        </div>
-                      )}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2, flexWrap: 'wrap' }}>
+                        {task.client && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                            <span style={{ width: 6, height: 6, borderRadius: 1, background: task.client.color, display: 'inline-block', flexShrink: 0 }}/>
+                            <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{task.client.name}</span>
+                          </div>
+                        )}
+                        {(() => { const chip = urgencyChip(task.due_date, task.status); return chip && (
+                          <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4, background: chip.bg, color: chip.color, flexShrink: 0 }}>
+                            {chip.label}
+                          </span>
+                        )})()}
+                      </div>
                     </div>
                   </div>
 

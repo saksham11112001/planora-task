@@ -1,10 +1,11 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { FileCheck, ChevronRight, Search, ClipboardList } from 'lucide-react'
+import { FileCheck, ChevronRight, Search, ClipboardList, ShieldCheck } from 'lucide-react'
 import { CAMasterView } from './CAMasterView'
 import { CAClientSetupView } from './CAClientSetupView'
 import { CATasksView } from './CATasksView'
+import { CADSCTrackerView } from './CADSCTrackerView'
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
 import type { Task } from '@/types'
 
@@ -335,18 +336,37 @@ function CAKanbanView({ userRole, currentUserId }: { userRole: string; currentUs
               boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
 
               {/* Column header */}
-              <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)',
-                display: 'flex', alignItems: 'center', gap: 8,
-                background: 'var(--surface)' }}>
-                <div style={{ width: 10, height: 10, borderRadius: '50%', background: client.color, flexShrink: 0 }} />
-                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', flex: 1,
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {client.name}
-                </span>
-                <span style={{ fontSize: 10, color: 'var(--text-muted)', flexShrink: 0 }}>
-                  {allTasks.length}
-                </span>
-              </div>
+              {(() => {
+                const todayStr = new Date().toISOString().slice(0, 10)
+                const overdueN = allTasks.filter(t => t._nextDueDate && t._nextDueDate < todayStr && t.status !== 'completed').length
+                const dueTodayN = allTasks.filter(t => t._nextDueDate === todayStr && t.status !== 'completed').length
+                return (
+                  <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)',
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    background: 'var(--surface)' }}>
+                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: client.color, flexShrink: 0 }} />
+                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', flex: 1,
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {client.name}
+                    </span>
+                    {overdueN > 0 && (
+                      <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4,
+                        background: '#fef2f2', color: '#dc2626', flexShrink: 0 }} title="Overdue tasks">
+                        {overdueN} overdue
+                      </span>
+                    )}
+                    {overdueN === 0 && dueTodayN > 0 && (
+                      <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4,
+                        background: '#f0fdf4', color: '#0d9488', flexShrink: 0 }} title="Due today">
+                        {dueTodayN} today
+                      </span>
+                    )}
+                    <span style={{ fontSize: 10, color: 'var(--text-muted)', flexShrink: 0 }}>
+                      {allTasks.length}
+                    </span>
+                  </div>
+                )
+              })()}
 
               {loading ? (
                 <div style={{ padding: '24px', textAlign: 'center', fontSize: 12, color: 'var(--text-muted)' }}>
@@ -406,8 +426,9 @@ function CAKanbanView({ userRole, currentUserId }: { userRole: string; currentUs
 
 export function ComplianceShell({ userRole, currentUserId }: Props) {
   const searchParams = useSearchParams()
-  const initStep = searchParams.get('tab') === 'catasks' ? 4 : 1
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(initStep as 1 | 2 | 3 | 4)
+  const tabParam = searchParams.get('tab')
+  const initStep = tabParam === 'catasks' ? 4 : tabParam === 'dsctracker' ? 5 : 1
+  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(initStep as 1 | 2 | 3 | 4 | 5)
   const isAdmin = ['owner', 'admin'].includes(userRole)
   const canSetupClients = ['owner', 'admin', 'manager'].includes(userRole)
 
@@ -435,7 +456,7 @@ export function ComplianceShell({ userRole, currentUserId }: Props) {
     }).catch(() => {})
   }, [])
 
-  const tabBtn = (s: 1 | 2 | 3 | 4, label: string, num: number, enabled: boolean) => (
+  const tabBtn = (s: 1 | 2 | 3 | 4 | 5, label: string, num: number, enabled: boolean) => (
     <button
       onClick={() => enabled && setStep(s)}
       style={{
@@ -525,6 +546,31 @@ export function ComplianceShell({ userRole, currentUserId }: Props) {
           </span>
         </button>
 
+        <ChevronRight style={{ width: 16, height: 16, color: 'var(--text-muted)', flexShrink: 0, margin: '0 4px' }}/>
+
+        {/* Step 5 — DSC Tracker */}
+        <button
+          onClick={() => setStep(5)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '14px 20px',
+            background: 'none', border: 'none', cursor: 'pointer',
+            borderBottom: step === 5 ? '2px solid var(--brand)' : '2px solid transparent',
+            marginBottom: -1, flexShrink: 0,
+          }}>
+          <div style={{
+            width: 24, height: 24, borderRadius: '50%',
+            background: step === 5 ? 'var(--brand)' : 'var(--border)',
+            color: '#fff', fontSize: 12, fontWeight: 700,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          }}>
+            <ShieldCheck style={{ width: 13, height: 13 }} />
+          </div>
+          <span style={{ fontSize: 13, fontWeight: step === 5 ? 700 : 500, color: step === 5 ? 'var(--brand)' : 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+            DSC Tracker
+          </span>
+        </button>
+
         {/* Next buttons */}
         {step === 1 && canSetupClients && (
           <button
@@ -586,6 +632,7 @@ export function ComplianceShell({ userRole, currentUserId }: Props) {
             clients={sharedClients}
           />
         )}
+        {step === 5 && <CADSCTrackerView userRole={userRole} />}
       </div>
     </div>
   )

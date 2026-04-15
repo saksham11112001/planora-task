@@ -52,7 +52,9 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void } = {}) {
     return () => document.removeEventListener('keydown', handle)
   }, [setSearchOpen])
 
-  // Fetch notifications
+  const NOTIF_READ_KEY = 'planora_notif_read_ts'
+
+  // Fetch notifications and compute real unread count using localStorage timestamp
   async function fetchNotifs() {
     if (nLoading || !session) return
     setNLoading(true)
@@ -74,15 +76,31 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void } = {}) {
         created_at: d.created_at,
       }))
       setNotifs(formatted)
-      setUnread(formatted.length > 0 ? Math.min(formatted.length, 5) : 0)
+
+      // Count items newer than last-read timestamp
+      const lastRead = typeof window !== 'undefined'
+        ? localStorage.getItem(NOTIF_READ_KEY)
+        : null
+      const newCount = formatted.filter(n =>
+        !lastRead || new Date(n.created_at) > new Date(lastRead)
+      ).length
+      setUnread(newCount)
     } catch {}
     setNLoading(false)
   }
 
   function openBell() {
+    const wasOpen = bellOpen
     setBellOpen(b => !b)
     setCreateOpen(false); setProfileOpen(false)
-    if (!bellOpen) { setUnread(0); fetchNotifs() }
+    if (!wasOpen) {
+      // Mark all as read by saving current timestamp
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(NOTIF_READ_KEY, new Date().toISOString())
+      }
+      setUnread(0)
+      fetchNotifs()
+    }
   }
 
   function actionLabel(action: string, actor?: string, taskTitle?: string) {
@@ -107,11 +125,11 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void } = {}) {
   }
 
   const CREATE_ITEMS = [
-    { icon: CheckSquare, label: 'New task',      href: '/inbox?new=1' },
-    { icon: FolderOpen,  label: 'New project',   href: '/projects/new' },
-    { icon: Users2,      label: 'New client',     href: '/clients/new' },
-    { icon: Clock,       label: 'Log time',       href: '/time' },
-    { icon: RefreshCw,   label: 'Repeat task', href: '/recurring' },
+    { icon: CheckSquare, label: 'New task',    href: '/inbox?new=1' },
+    { icon: FolderOpen,  label: 'New project', href: '/projects/new' },
+    { icon: Users2,      label: 'New client',  href: '/clients/new' },
+    { icon: Clock,       label: 'Log time',    href: '/time' },
+    { icon: RefreshCw,   label: 'Repeat task', href: '/recurring?new=1' },
   ]
 
   return (
@@ -210,21 +228,21 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void } = {}) {
         </button>
 
         {bellOpen && (
-          <div className="absolute right-0 top-full mt-1.5 rounded-xl shadow-xl z-50 w-80" style={{background:'var(--surface)',border:'1px solid var(--border)'}}
-            style={{ borderColor: 'var(--border)' }}>
+          <div className="absolute right-0 top-full mt-1.5 rounded-xl shadow-xl z-50 w-80" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
             <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--border)' }}>
               <span style={{ fontSize:14, fontWeight:600, color:'var(--text-primary)' }}>Activity</span>
-              <button onClick={() => setBellOpen(false)} className="text-gray-400 hover:text-gray-600">
+              <button onClick={() => setBellOpen(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center' }}>
                 <X className="h-4 w-4"/>
               </button>
             </div>
 
             {nLoading ? (
-              <div className="py-8 text-center text-sm text-gray-400">Loading…</div>
+              <div style={{ padding: '32px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>Loading…</div>
             ) : notifs.length === 0 ? (
-              <div className="py-8 text-center">
-                <CheckCheck className="h-8 w-8 text-gray-200 mx-auto mb-2"/>
-                <p className="text-sm text-gray-400">All caught up!</p>
+              <div style={{ padding: '32px 0', textAlign: 'center' }}>
+                <CheckCheck style={{ width: 32, height: 32, color: 'var(--border)', margin: '0 auto 8px' }}/>
+                <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>All caught up!</p>
               </div>
             ) : (
               <div className="max-h-80 overflow-y-auto">
@@ -283,13 +301,15 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void } = {}) {
               style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',fontSize:13,color:'var(--text-primary)',textDecoration:'none',transition:'background 0.1s'}} onMouseEnter={e=>(e.currentTarget.style.background='var(--border-light)')} onMouseLeave={e=>(e.currentTarget.style.background='transparent')}>
               <User style={{width:14,height:14,color:'var(--text-muted)',flexShrink:0}}/> My profile
             </Link>
-            <div className="mx-2 my-1 border-t border-gray-100"/>
+            <div style={{ margin: '4px 8px', borderTop: '1px solid var(--border)' }}/>
             <Link href="/settings" onClick={() => setProfileOpen(false)}
               style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',fontSize:13,color:'var(--text-primary)',textDecoration:'none',transition:'background 0.1s'}} onMouseEnter={e=>(e.currentTarget.style.background='var(--border-light)')} onMouseLeave={e=>(e.currentTarget.style.background='transparent')}>
               <Settings style={{width:14,height:14,color:'var(--text-muted)',flexShrink:0}}/>Settings
             </Link>
             <button onClick={handleLogout}
-              className="w-full" style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',fontSize:13,color:'#dc2626',background:'transparent',border:'none',cursor:'pointer',width:'100%',textAlign:'left',transition:'background 0.1s'}} onMouseEnter={e=>(e.currentTarget.style.background='#fef2f2')} onMouseLeave={e=>(e.currentTarget.style.background='transparent')}>
+              style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',fontSize:13,color:'#dc2626',background:'transparent',border:'none',cursor:'pointer',width:'100%',textAlign:'left',transition:'background 0.1s'}}
+              onMouseEnter={e=>(e.currentTarget.style.background='rgba(220,38,38,0.08)')}
+              onMouseLeave={e=>(e.currentTarget.style.background='transparent')}>
               <LogOut className="h-4 w-4"/>Sign out
             </button>
           </div>

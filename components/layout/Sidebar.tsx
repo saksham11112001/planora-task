@@ -21,6 +21,11 @@ let _projectCache: Project[] = []
 let _cacheTime    = 0
 const CACHE_TTL   = 60_000
 
+// Lightweight task-count cache shared across nav renders
+let _countCache = { overdue: 0, pending: 0 }
+let _countCacheTime = 0
+const COUNT_CACHE_TTL = 45_000
+
 export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
   const pathname    = usePathname()
   const router      = useRouter()
@@ -30,8 +35,11 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
   const [flyoutOpen,    setFlyoutOpen]    = useState(false)
   const [allProjects,   setAllProjects]   = useState<Project[]>([])
   const [flyoutLoading, setFlyoutLoading] = useState(false)
-  const fetchRef  = useRef(false)
-  const flyoutRef = useRef<HTMLDivElement>(null)
+  const [overdueCount,  setOverdueCount]  = useState(_countCache.overdue)
+  const [pendingCount,  setPendingCount]  = useState(_countCache.pending)
+  const fetchRef     = useRef(false)
+  const countFetchRef = useRef(false)
+  const flyoutRef    = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const now = Date.now()
@@ -47,6 +55,41 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
   }, [])
 
   useEffect(() => { if (pathname === '/projects') _cacheTime = 0 }, [pathname])
+
+  // Fetch overdue + pending-approval counts for nav badges
+  useEffect(() => {
+    if (countFetchRef.current) return
+    const now = Date.now()
+    if (now - _countCacheTime < COUNT_CACHE_TTL) return // still fresh
+
+    countFetchRef.current = true
+    const today = new Date().toISOString().slice(0, 10)
+
+    Promise.all([
+      // My tasks — used to compute overdue count
+      fetch('/api/tasks?mine=true&limit=500').then(r => r.json()).catch(() => ({ data: [] })),
+      // Pending approval tasks — all in_review across the org (managers see these)
+      canManage
+        ? fetch('/api/tasks?status=in_review&limit=200').then(r => r.json()).catch(() => ({ data: [] }))
+        : Promise.resolve({ data: [] }),
+    ]).then(([myData, pendData]) => {
+      const ov = Array.isArray(myData.data)
+        ? myData.data.filter((t: any) =>
+            t.due_date && t.due_date < today &&
+            !['completed', 'cancelled', 'in_review'].includes(t.status) &&
+            t.approval_status !== 'pending'
+          ).length
+        : 0
+      const pend = Array.isArray(pendData.data) ? pendData.data.length : 0
+
+      _countCache = { overdue: ov, pending: pend }
+      _countCacheTime = Date.now()
+      setOverdueCount(ov)
+      setPendingCount(pend)
+    }).catch(() => {}).finally(() => { countFetchRef.current = false })
+  // Re-fetch whenever the user navigates (pathname change) but rate-limited by cache TTL
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, canManage])
 
   // Close flyout on outside click
   useEffect(() => {
@@ -117,7 +160,7 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
         {/* PERSONAL */}
         <GL>Personal</GL>
         <SI href="/dashboard" active={isActive('/dashboard', true)} icon={<Home        className="h-4 w-4"/>} label="Home"/>
-        <SI href="/tasks"     active={isActive('/tasks',    true)}  icon={<CheckSquare className="h-4 w-4"/>} label="My tasks"/>
+        <SI href="/tasks"     active={isActive('/tasks',    true)}  icon={<CheckSquare className="h-4 w-4"/>} label="My tasks" badge={overdueCount > 0 ? overdueCount : undefined}/>
         {nav.calendar && <SI href="/calendar" active={isActive('/calendar')} icon={<Calendar className="h-4 w-4"/>} label="Calendar"/>}
         <Div/>
 
@@ -131,10 +174,10 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
                 flex:1, display:'flex', alignItems:'center', gap:9,
                 padding:'7px 10px', borderRadius:7, fontSize:13,
                 textDecoration:'none', transition:'all 0.12s',
-                background: isActive('/inbox') ? 'rgba(255,255,255,0.14)' : 'transparent',
+                background: isActive('/inbox') ? 'rgba(20,184,166,0.18)' : 'transparent',
                 color: isActive('/inbox') ? '#fff' : 'rgba(255,255,255,0.6)',
-                fontWeight: isActive('/inbox') ? 500 : 400,
-                borderLeft: isActive('/inbox') ? '2px solid rgba(255,255,255,0.5)' : '2px solid transparent',
+                fontWeight: isActive('/inbox') ? 600 : 400,
+                borderLeft: isActive('/inbox') ? '3px solid #14b8a6' : '3px solid transparent',
               }}
               onMouseEnter={e => { if (!isActive('/inbox')) { (e.currentTarget as HTMLElement).style.background='rgba(255,255,255,0.08)'; (e.currentTarget as HTMLElement).style.color='#fff' } }}
               onMouseLeave={e => { if (!isActive('/inbox')) { (e.currentTarget as HTMLElement).style.background='transparent'; (e.currentTarget as HTMLElement).style.color='rgba(255,255,255,0.6)' } }}>
@@ -160,10 +203,10 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
                 flex:1, display:'flex', alignItems:'center', gap:9,
                 padding:'7px 10px', borderRadius:7, fontSize:13,
                 textDecoration:'none', transition:'all 0.12s',
-                background: isActive('/recurring') ? 'rgba(255,255,255,0.14)' : 'transparent',
+                background: isActive('/recurring') ? 'rgba(20,184,166,0.18)' : 'transparent',
                 color: isActive('/recurring') ? '#fff' : 'rgba(255,255,255,0.6)',
-                fontWeight: isActive('/recurring') ? 500 : 400,
-                borderLeft: isActive('/recurring') ? '2px solid rgba(255,255,255,0.5)' : '2px solid transparent',
+                fontWeight: isActive('/recurring') ? 600 : 400,
+                borderLeft: isActive('/recurring') ? '3px solid #14b8a6' : '3px solid transparent',
               }}
               onMouseEnter={e => { if (!isActive('/recurring')) { (e.currentTarget as HTMLElement).style.background='rgba(255,255,255,0.08)'; (e.currentTarget as HTMLElement).style.color='#fff' } }}
               onMouseLeave={e => { if (!isActive('/recurring')) { (e.currentTarget as HTMLElement).style.background='transparent'; (e.currentTarget as HTMLElement).style.color='rgba(255,255,255,0.6)' } }}>
@@ -244,7 +287,7 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
         {/* ORGANISATION */}
         <GL>Organisation</GL>
         {nav.team && <SI href="/team"    active={isActive('/team')}    icon={<Users    className="h-4 w-4"/>} label="Team"/>}
-        {canManage && <SI href="/approvals" active={isActive('/approvals')} icon={<CheckSquare className="h-4 w-4"/>} label="Approvals"/>}
+        {canManage && <SI href="/approvals" active={isActive('/approvals')} icon={<CheckSquare className="h-4 w-4"/>} label="Approvals" badge={pendingCount > 0 ? pendingCount : undefined}/>}
         {nav.time_tracking && isPaid && <SI href="/time" active={isActive('/time')} icon={<Clock className="h-4 w-4"/>} label="Time tracking"/>}
         {nav.reports && isPaid && <SI href="/reports" active={isActive('/reports')} icon={<BarChart2 className="h-4 w-4"/>} label="Reports"/>}
         <SI href="/monitor" active={isActive('/monitor')} icon={<Eye className="h-4 w-4"/>} label="Monitor"/>
@@ -469,7 +512,9 @@ function Div() {
   return <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', margin: '6px 0' }}/>
 }
 
-function SI({ href, active, icon, label }: { href: string; active: boolean; icon: React.ReactNode; label: string }) {
+function SI({ href, active, icon, label, badge }: {
+  href: string; active: boolean; icon: React.ReactNode; label: string; badge?: number
+}) {
   const router = useRouter()
   return (
     <Link href={href} prefetch={true}
@@ -478,14 +523,26 @@ function SI({ href, active, icon, label }: { href: string; active: boolean; icon
         display: 'flex', alignItems: 'center', gap: 9,
         padding: '7px 10px', borderRadius: 7, fontSize: 13,
         textDecoration: 'none', transition: 'all 0.12s', margin: '1px 4px',
-        background: active ? 'rgba(255,255,255,0.14)' : 'transparent',
+        background: active ? 'rgba(20,184,166,0.18)' : 'transparent',
         color: active ? '#fff' : 'rgba(255,255,255,0.6)',
-        fontWeight: active ? 500 : 400,
-        borderLeft: active ? '2px solid rgba(255,255,255,0.5)' : '2px solid transparent',
+        fontWeight: active ? 600 : 400,
+        borderLeft: active ? '3px solid #14b8a6' : '3px solid transparent',
       }}
       onMouseEnter={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)'; (e.currentTarget as HTMLElement).style.color = '#fff' } }}
       onMouseLeave={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.6)' } }}>
-      {icon}{label}
+      {icon}
+      <span style={{ flex: 1 }}>{label}</span>
+      {badge != null && badge > 0 && (
+        <span style={{
+          minWidth: 18, height: 18, borderRadius: 99,
+          background: '#dc2626', color: '#fff',
+          fontSize: 10, fontWeight: 700, lineHeight: 1,
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          padding: '0 4px', flexShrink: 0,
+        }}>
+          {badge > 99 ? '99+' : badge}
+        </span>
+      )}
     </Link>
   )
 }

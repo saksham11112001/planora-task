@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:finexo.in)",
+      "WebFetch(domain:youtu.be)",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "WebSearch",
+      "WebFetch(domain:www.softwaresuggest.com)",
+      "WebFetch(domain:indianbusinesstimes.com)",
+      "Bash(npx tsc:*)"
+    ]
+  }
+}
