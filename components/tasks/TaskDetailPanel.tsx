@@ -1375,11 +1375,11 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                       : <>
                         <div className="text-3xl mb-2">📎</div>
                         <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Click to upload a file</p>
-                        <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>PDF, Word, Excel, images · Max 20 MB</p>
+                        <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>PDF, Word, Excel, images, ZIP · Max 20 MB</p>
                       </>
                     }
                     <input ref={fileInputRef} type="file" className="hidden" onChange={uploadFile}
-                      accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.gif,.webp,.txt,.csv"/>
+                      accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.gif,.webp,.txt,.csv,.zip"/>
                   </div>
                 ) : (
                   <div className="rounded-xl p-4 mb-4 space-y-2" style={{ border: '1px solid var(--border)', background: 'var(--surface-subtle)' }}>
@@ -1516,7 +1516,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                 )}
                 {comments.length > 0 ? (
                   <div className="space-y-3 mb-4">
-                    {comments.map((cm: any) => (
+                    {[...comments].reverse().map((cm: any) => (
                       <div key={cm.id} className="flex gap-3">
                         <Avatar name={cm.author?.name ?? '?'} size="sm" />
                         <div className="flex-1 min-w-0">

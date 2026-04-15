@@ -3,13 +3,60 @@ import { createAdminClient } from '@/lib/supabase/admin'
 
 function nextOccurrence(freq: string, from: string): string {
   const d = new Date(from)
+
+  // every_N_days (custom daily interval)
+  const everyMatch = freq.match(/^every_(\d+)_days$/)
+  if (everyMatch) {
+    d.setDate(d.getDate() + parseInt(everyMatch[1], 10))
+    return d.toISOString().split('T')[0]
+  }
+
+  // monthly_N — advance one month, set day to N
+  const monthlyMatch = freq.match(/^monthly_(\d+)$/)
+  if (monthlyMatch) {
+    const day = parseInt(monthlyMatch[1], 10)
+    d.setMonth(d.getMonth() + 1)
+    d.setDate(Math.min(day, new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()))
+    return d.toISOString().split('T')[0]
+  }
+
+  // quarterly_N — advance one quarter, set day to N
+  const quarterlyMatch = freq.match(/^quarterly_(\d+)$/)
+  if (quarterlyMatch) {
+    const day = parseInt(quarterlyMatch[1], 10)
+    d.setMonth(d.getMonth() + 3)
+    d.setDate(Math.min(day, new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()))
+    return d.toISOString().split('T')[0]
+  }
+
+  // annual_Nmon — advance one year, set day+month (e.g. annual_15jan)
+  const MONTHS_SHORT = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec']
+  const annualMatch = freq.match(/^annual_(\d+)([a-z]+)$/)
+  if (annualMatch) {
+    const day   = parseInt(annualMatch[1], 10)
+    const mIdx  = MONTHS_SHORT.indexOf(annualMatch[2])
+    if (mIdx >= 0) {
+      d.setFullYear(d.getFullYear() + 1)
+      d.setMonth(mIdx)
+      d.setDate(Math.min(day, new Date(d.getFullYear(), mIdx + 1, 0).getDate()))
+      return d.toISOString().split('T')[0]
+    }
+  }
+
   switch (freq) {
-    case 'daily':     d.setDate(d.getDate() + 1);        break
-    case 'weekly':    d.setDate(d.getDate() + 7);        break
-    case 'bi_weekly': d.setDate(d.getDate() + 14);       break
-    case 'monthly':   d.setMonth(d.getMonth() + 1);      break
-    case 'quarterly': d.setMonth(d.getMonth() + 3);      break
-    case 'annual':    d.setFullYear(d.getFullYear() + 1); break
+    case 'daily':         d.setDate(d.getDate() + 1);        break
+    case 'weekly':
+    case 'weekly_mon':
+    case 'weekly_tue':
+    case 'weekly_wed':
+    case 'weekly_thu':
+    case 'weekly_fri':    d.setDate(d.getDate() + 7);        break
+    case 'bi_weekly':     d.setDate(d.getDate() + 14);       break
+    case 'monthly':
+    case 'monthly_last':  d.setMonth(d.getMonth() + 1);      break
+    case 'quarterly':
+    case 'quarterly_last':d.setMonth(d.getMonth() + 3);      break
+    case 'annual':        d.setFullYear(d.getFullYear() + 1); break
   }
   return d.toISOString().split('T')[0]
 }

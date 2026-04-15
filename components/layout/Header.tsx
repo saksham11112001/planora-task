@@ -3,7 +3,7 @@ import { useState, useRef, useEffect, useTransition } from 'react'
 import { useRouter }     from 'next/navigation'
 import { Search, Plus, Bell, ChevronDown, CheckSquare, FolderOpen,
          Users2, LogOut, Settings, Clock, RefreshCw, Zap, X,
-         CheckCheck, AlertCircle, Menu, User } from 'lucide-react'
+         CheckCheck, AlertCircle, Menu, User, MessageSquarePlus, Paperclip, Send } from 'lucide-react'
 import Link              from 'next/link'
 import { ThemeToggle }   from '@/components/theme/ThemeToggle'
 import { createClient }  from '@/lib/supabase/client'
@@ -20,15 +20,20 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void } = {}) {
   const router       = useRouter()
   const [,startT]    = useTransition()
   const { session, searchOpen, setSearchOpen } = useAppStore()
-  const [createOpen,  setCreateOpen]  = useState(false)
-  const [profileOpen, setProfileOpen] = useState(false)
-  const [bellOpen,    setBellOpen]    = useState(false)
-  const [notifs,      setNotifs]      = useState<Notif[]>([])
-  const [unread,      setUnread]      = useState(0)
-  const [nLoading,    setNLoading]    = useState(false)
-  const createRef  = useRef<HTMLDivElement>(null)
-  const profileRef = useRef<HTMLDivElement>(null)
-  const bellRef    = useRef<HTMLDivElement>(null)
+  const [createOpen,    setCreateOpen]    = useState(false)
+  const [profileOpen,   setProfileOpen]   = useState(false)
+  const [bellOpen,      setBellOpen]      = useState(false)
+  const [reportOpen,    setReportOpen]    = useState(false)
+  const [reportText,    setReportText]    = useState('')
+  const [reportFiles,   setReportFiles]   = useState<File[]>([])
+  const [reportSending, setReportSending] = useState(false)
+  const [notifs,        setNotifs]        = useState<Notif[]>([])
+  const [unread,        setUnread]        = useState(0)
+  const [nLoading,      setNLoading]      = useState(false)
+  const createRef   = useRef<HTMLDivElement>(null)
+  const profileRef  = useRef<HTMLDivElement>(null)
+  const bellRef     = useRef<HTMLDivElement>(null)
+  const reportFileRef = useRef<HTMLInputElement>(null)
 
   const name = session?.user.name ?? session?.user.email?.split('@')[0] ?? 'U'
 
@@ -124,6 +129,21 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void } = {}) {
     router.push('/login')
   }
 
+  async function submitReport() {
+    if (!reportText.trim() && reportFiles.length === 0) return
+    setReportSending(true)
+    try {
+      const fd = new FormData()
+      fd.append('message', reportText.trim())
+      fd.append('url', typeof window !== 'undefined' ? window.location.href : '')
+      reportFiles.forEach(f => fd.append('files', f))
+      await fetch('/api/report-issue', { method: 'POST', body: fd })
+      setReportOpen(false); setReportText(''); setReportFiles([])
+      // show a simple inline success (no external toast import needed)
+    } catch {}
+    setReportSending(false)
+  }
+
   const CREATE_ITEMS = [
     { icon: CheckSquare, label: 'New task',    href: '/inbox?new=1' },
     { icon: FolderOpen,  label: 'New project', href: '/projects/new' },
@@ -211,6 +231,17 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void } = {}) {
       </div>
 
       <ThemeToggle/>
+
+      {/* Report issue */}
+      <button onClick={() => { setReportOpen(true); setCreateOpen(false); setBellOpen(false); setProfileOpen(false) }}
+        title="Report an issue"
+        style={{ width:34, height:34, borderRadius:8, border:'none',
+          background:'transparent', cursor:'pointer', display:'flex', alignItems:'center',
+          justifyContent:'center', color:'var(--text-muted)', transition:'all 0.15s', flexShrink:0 }}
+        onMouseEnter={e=>{e.currentTarget.style.background='rgba(234,179,8,0.1)';e.currentTarget.style.color='#d97706'}}
+        onMouseLeave={e=>{e.currentTarget.style.background='transparent';e.currentTarget.style.color='var(--text-muted)'}}>
+        <MessageSquarePlus style={{ width:16, height:16 }}/>
+      </button>
 
       {/* Bell */}
       <div className="relative" ref={bellRef}>
@@ -315,6 +346,99 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void } = {}) {
           </div>
         )}
       </div>
+      {/* ── Report issue modal ── */}
+      {reportOpen && (
+        <div style={{ position:'fixed', inset:0, zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center',
+          background:'rgba(0,0,0,0.45)', backdropFilter:'blur(4px)' }}
+          onClick={e => { if (e.target === e.currentTarget) { setReportOpen(false); setReportText(''); setReportFiles([]) } }}>
+          <div style={{ background:'var(--surface)', borderRadius:16, boxShadow:'0 20px 60px rgba(0,0,0,0.25)',
+            padding:24, width:'100%', maxWidth:500, display:'flex', flexDirection:'column', gap:16 }}
+            onClick={e => e.stopPropagation()}>
+
+            {/* Header */}
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                <div style={{ width:36, height:36, borderRadius:10, background:'rgba(234,179,8,0.1)',
+                  border:'1px solid rgba(234,179,8,0.3)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                  <AlertCircle style={{ width:18, height:18, color:'#d97706' }}/>
+                </div>
+                <div>
+                  <p style={{ fontSize:15, fontWeight:700, color:'var(--text-primary)', margin:0 }}>Report an issue</p>
+                  <p style={{ fontSize:11, color:'var(--text-muted)', margin:0 }}>Describe the problem and attach a screenshot if needed</p>
+                </div>
+              </div>
+              <button onClick={() => { setReportOpen(false); setReportText(''); setReportFiles([]) }}
+                style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text-muted)',
+                  display:'flex', alignItems:'center', padding:4, borderRadius:6 }}>
+                <X style={{ width:16, height:16 }}/>
+              </button>
+            </div>
+
+            {/* Textarea */}
+            <textarea
+              value={reportText}
+              onChange={e => setReportText(e.target.value)}
+              placeholder="Describe the issue… (what happened, steps to reproduce, what you expected)"
+              rows={5}
+              style={{ width:'100%', resize:'vertical', fontSize:13,
+                border:'1.5px solid var(--border)', borderRadius:10,
+                padding:'10px 12px', outline:'none', fontFamily:'inherit',
+                background:'var(--surface-subtle)', color:'var(--text-primary)',
+                boxSizing:'border-box', lineHeight:1.5 }}
+              onFocus={e => { e.currentTarget.style.borderColor = '#d97706' }}
+              onBlur={e => { e.currentTarget.style.borderColor = 'var(--border)' }}
+            />
+
+            {/* File upload */}
+            <div>
+              <input ref={reportFileRef} type="file" multiple accept="image/*,.pdf,.zip,.txt"
+                style={{ display:'none' }} onChange={e => setReportFiles(Array.from(e.target.files ?? []))}/>
+              <button onClick={() => reportFileRef.current?.click()}
+                style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 14px', borderRadius:8,
+                  border:'1.5px dashed var(--border)', background:'var(--surface-subtle)',
+                  color:'var(--text-muted)', fontSize:12, cursor:'pointer', fontFamily:'inherit',
+                  width:'100%', justifyContent:'center', transition:'all 0.15s' }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor='#d97706'; e.currentTarget.style.color='#d97706' }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor='var(--border)'; e.currentTarget.style.color='var(--text-muted)' }}>
+                <Paperclip style={{ width:13, height:13 }}/>
+                {reportFiles.length > 0
+                  ? `${reportFiles.length} file${reportFiles.length > 1 ? 's' : ''} attached — click to change`
+                  : 'Attach screenshot or file (optional)'}
+              </button>
+              {reportFiles.length > 0 && (
+                <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:6 }}>
+                  {reportFiles.map((f, i) => (
+                    <span key={i} style={{ fontSize:11, padding:'2px 8px', borderRadius:99,
+                      background:'rgba(234,179,8,0.1)', color:'#d97706', border:'1px solid rgba(234,179,8,0.25)' }}>
+                      {f.name}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Actions */}
+            <div style={{ display:'flex', justifyContent:'flex-end', gap:8, paddingTop:4 }}>
+              <button onClick={() => { setReportOpen(false); setReportText(''); setReportFiles([]) }}
+                style={{ padding:'7px 16px', borderRadius:8, border:'1px solid var(--border)',
+                  background:'transparent', color:'var(--text-secondary)',
+                  fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>
+                Cancel
+              </button>
+              <button onClick={submitReport}
+                disabled={reportSending || (!reportText.trim() && reportFiles.length === 0)}
+                style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 18px', borderRadius:8,
+                  border:'none', background: reportText.trim() || reportFiles.length > 0 ? '#d97706' : 'var(--border)',
+                  color: reportText.trim() || reportFiles.length > 0 ? '#fff' : 'var(--text-muted)',
+                  fontSize:13, fontWeight:600, cursor: reportText.trim() || reportFiles.length > 0 ? 'pointer' : 'default',
+                  fontFamily:'inherit', opacity: reportSending ? 0.7 : 1, transition:'all 0.15s' }}>
+                <Send style={{ width:13, height:13 }}/>
+                {reportSending ? 'Sending…' : 'Submit report'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   )
 }

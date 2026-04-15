@@ -282,6 +282,29 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
     }
   }
 
+  async function cloneTask(task: Task) {
+    const res = await fetch('/api/tasks', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title:             `${task.title} (copy)`,
+        status:            'todo',
+        priority:          task.priority,
+        assignee_id:       task.assignee_id ?? null,
+        client_id:         (task as any).client_id ?? null,
+        project_id:        (task as any).project_id ?? null,
+        approver_id:       (task as any).approver_id ?? null,
+        approval_required: (task as any).approval_required ?? false,
+        due_date:          task.due_date ?? null,
+        custom_fields:     (task as any).custom_fields ?? null,
+      }),
+    })
+    const d = await res.json()
+    if (!res.ok) { toast.error(d.error ?? 'Clone failed'); return }
+    const newTask = d.data ?? d
+    if (newTask?.id) setTasks(prev => [{ ...newTask, assignee: (task as any).assignee, client: (task as any).client } as Task, ...prev])
+    toast.success('Task cloned')
+  }
+
   async function bulkComplete() {
     const ids = [...checked]
     const allTasks = tasks.filter(t => ids.includes(t.id))
@@ -425,11 +448,32 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
             </span>
           )}
         </div>
-        {/* Priority dot + Delete button */}
+        {/* Priority dot + Clone + Delete buttons */}
         <div style={{ display:'flex', alignItems:'center', gap:4, flexShrink:0 }}>
           <div title={task.priority}
             style={{ width:8, height:8, borderRadius:'50%',
               background: {'none':'#94a3b8','low':'#16a34a','medium':'#ca8a04','high':'#ea580c','urgent':'#dc2626'}[task.priority] ?? '#94a3b8' }}/>
+          <button
+            onClick={e => { e.stopPropagation(); cloneTask(task) }}
+            className="opacity-0 group-hover:opacity-100"
+            title="Clone task"
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: 26, height: 26, borderRadius: 6, border: 'none',
+              background: 'transparent', cursor: 'pointer',
+              color: 'var(--text-muted)', transition: 'all 0.15s',
+              flexShrink: 0,
+            }}
+            onMouseEnter={e => {
+              (e.currentTarget as HTMLElement).style.background = 'rgba(13,148,136,0.1)'
+              ;(e.currentTarget as HTMLElement).style.color = 'var(--brand)'
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLElement).style.background = 'transparent'
+              ;(e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'
+            }}>
+            <Copy className="h-3 w-3"/>
+          </button>
           {canManage && (
             <button
               onClick={e => { e.stopPropagation(); deleteTask(task.id) }}
