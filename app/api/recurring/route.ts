@@ -1,36 +1,8 @@
-import { createClient } from '@/lib/supabase/server'
-import { NextResponse }  from 'next/server'
-import type { NextRequest } from 'next/server'
-import { assertCan }     from '@/lib/utils/permissionGate'
-
-// Map granular frequencies to DB-allowed values
-function normalizeFrequency(freq: string): string {
-  if (freq.startsWith('weekly_'))    return 'weekly'
-  if (freq.startsWith('monthly_'))   return 'monthly'
-  if (freq.startsWith('quarterly_')) return 'quarterly'
-  if (freq.startsWith('annual_'))    return 'annual'
-  return freq  // daily, bi_weekly, quarterly, annual — already valid
-}
-
-function nextOccurrence(freq: string, from: string): string {
-  const d = new Date(from)
-  // Normalise granular variants to their base interval
-  const base = freq.startsWith('weekly_')    ? 'weekly'
-             : freq.startsWith('monthly_')   ? 'monthly'
-             : freq.startsWith('quarterly_') ? 'quarterly'
-             : freq.startsWith('annual_')    ? 'annual'
-             : freq
-  switch (base) {
-    case 'daily':     d.setDate(d.getDate() + 1);          break
-    case 'weekly':    d.setDate(d.getDate() + 7);          break
-    case 'bi_weekly': d.setDate(d.getDate() + 14);         break
-    case 'monthly':   d.setMonth(d.getMonth() + 1);        break
-    case 'quarterly': d.setMonth(d.getMonth() + 3);        break
-    case 'annual':    d.setFullYear(d.getFullYear() + 1);  break
-    default:          d.setDate(d.getDate() + 7);          break
-  }
-  return d.toISOString().split('T')[0]
-}
+import { createClient }       from '@/lib/supabase/server'
+import { NextResponse }        from 'next/server'
+import type { NextRequest }    from 'next/server'
+import { assertCan }           from '@/lib/utils/permissionGate'
+import { normalizeFrequency, nextOccurrence } from '@/lib/utils/recurringSchedule'
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
@@ -50,7 +22,7 @@ export async function POST(request: NextRequest) {
   if (!frequency)     return NextResponse.json({ error: 'Frequency required' }, { status: 400 })
 
   const today       = start_date || new Date().toISOString().split('T')[0]
-  const dbFrequency = normalizeFrequency(frequency)  // map weekly_mon → weekly etc
+  const dbFrequency = normalizeFrequency(frequency)
   const nextDate    = nextOccurrence(frequency, today)
 
   const { data: task, error } = await supabase.from('tasks').insert({
@@ -59,7 +31,6 @@ export async function POST(request: NextRequest) {
     priority,
     status:               'todo',
     is_recurring:         true,
-    // Recurring tasks with a client assigned require manager approval before going live
     approval_required:    !!(client_id),
     frequency:            dbFrequency,
     next_occurrence_date: nextDate,
@@ -112,16 +83,19 @@ export async function PATCH(request: NextRequest) {
   if (!id) return NextResponse.json({ error: 'ID required' }, { status: 400 })
 
   const { title, frequency, priority, assignee_id, project_id, client_id } = await request.json()
+  const today       = new Date().toISOString().split('T')[0]
   const dbFrequency = frequency ? normalizeFrequency(frequency) : undefined
+  const nextDate    = frequency ? nextOccurrence(frequency, today) : undefined
 
   const { data, error } = await supabase.from('tasks')
     .update({
       title,
-      frequency:       dbFrequency,
+      frequency:            dbFrequency,
+      next_occurrence_date: nextDate,
       priority,
-      assignee_id:     assignee_id || null,
-      project_id:      project_id  || null,
-      client_id:       client_id   || null,
+      assignee_id:          assignee_id || null,
+      project_id:           project_id  || null,
+      client_id:            client_id   || null,
     })
     .eq('id', id).eq('org_id', mb.org_id).select('*').single()
 
