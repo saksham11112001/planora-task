@@ -54,7 +54,7 @@ export function digestEmailHtml(p: {
 
     <!-- Header -->
     <div style="background:#0d9488;padding:24px 32px;">
-      <div style="font-size:20px;font-weight:700;color:#fff;">Planora</div>
+      <div style="font-size:20px;font-weight:700;color:#fff;">Taska</div>
       <div style="font-size:13px;color:rgba(255,255,255,0.8);margin-top:2px;">Notification Digest · ${slotLabel}</div>
     </div>
 
@@ -71,7 +71,7 @@ export function digestEmailHtml(p: {
       <div style="margin-top:24px;text-align:center;">
         <a href="${p.appUrl}/dashboard"
           style="display:inline-block;background:#0d9488;color:#fff;text-decoration:none;font-size:13px;font-weight:600;padding:10px 24px;border-radius:8px;">
-          Open Planora →
+          Open Taska →
         </a>
       </div>
     </div>

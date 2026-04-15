@@ -144,7 +144,7 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
         </div>
         <span style={{ color: '#fff', fontWeight: 600, fontSize: 13, flex: 1, overflow: 'hidden',
           whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
-          {session?.org.name ?? 'Planora'}
+          {session?.org.name ?? 'Taska'}
         </span>
         <PlanBadge plan={plan}/>
         {onClose && (

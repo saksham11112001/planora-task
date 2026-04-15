@@ -10,7 +10,7 @@ import { escalationAlertHtml } from './templates/escalationAlert'
 import { clientDocReminderHtml, clientDocReminderSubject } from './templates/clientDocReminder'
 import { clientUploadNotifyHtml, clientUploadNotifySubject } from './templates/clientUploadNotify'
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://planora.in'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://taska.in'
 
 function taskUrl(taskId: string, projectId?: string | null) {
   return projectId ? `${APP_URL}/projects/${projectId}` : `${APP_URL}/inbox`
@@ -122,7 +122,7 @@ export async function sendMemberInvitedEmail(p: {
 }) {
   return resend.emails.send({
     from: FROM, to: p.to,
-    subject: `👋 ${p.memberName} joined ${p.orgName} on Planora`,
+    subject: `👋 ${p.memberName} joined ${p.orgName} on Taska`,
     html: memberInvitedHtml({ ...p, appUrl: APP_URL }),
   })
 }

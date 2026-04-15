@@ -5,14 +5,14 @@ import { NavigationProgress }  from '@/components/ui/NavigationProgress'
 import { KeyboardShortcuts }    from '@/components/ui/KeyboardShortcuts'
 
 export const metadata: Metadata = {
-  title:       { default: 'Planora', template: '%s | Planora' },
+  title:       { default: 'Taska', template: '%s | Taska' },
   description: 'Project management for modern teams',
   icons: {
     icon:  [{ url: '/favicon.svg', type: 'image/svg+xml' }],
     apple: [{ url: '/favicon.svg' }],
   },
   manifest: '/manifest',
-  appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: 'Planora' },
+  appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: 'Taska' },
 }
 
 export const viewport: Viewport = {
@@ -34,7 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                                  window.location.pathname.startsWith('/terms') ||
                                  window.location.pathname.startsWith('/portal/');
             if (!isPublicPage) {
-              const t = localStorage.getItem('planora-theme') || 'system';
+              const t = localStorage.getItem('taska-theme') || 'system';
               const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
               const dark = t === 'dark' || (t === 'system' && prefersDark);
               if (dark) {

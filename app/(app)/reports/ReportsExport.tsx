@@ -15,7 +15,7 @@ export function ReportsExport() {
       const a       = document.createElement('a')
       const date    = new Date().toISOString().split('T')[0]
       a.href        = url
-      a.download    = type === 'tasks' ? 'planora-tasks-' + date + '.csv' : 'planora-time-' + date + '.csv'
+      a.download    = type === 'tasks' ? 'taska-tasks-' + date + '.csv' : 'taska-time-' + date + '.csv'
       a.click()
       URL.revokeObjectURL(url)
     } finally { setDownloading(null) }

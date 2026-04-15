@@ -4,7 +4,7 @@ import { PortalView }         from './PortalView'
 import crypto                 from 'crypto'
 import type { Metadata }      from 'next'
 
-export const metadata: Metadata = { title: 'Client Portal — Planora' }
+export const metadata: Metadata = { title: 'Client Portal — Taska' }
 
 export default async function PortalPage({ params }: { params: Promise<{ token: string }> }) {
   const { token: rawToken } = await params
@@ -40,7 +40,7 @@ function ExpiredPage() {
         <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 24px', lineHeight: 1.6 }}>
           This portal link is no longer active. Please contact your CA firm to get a fresh link.
         </p>
-        <div style={{ fontSize: '12px', color: '#94a3b8' }}>Powered by Planora</div>
+        <div style={{ fontSize: '12px', color: '#94a3b8' }}>Powered by Taska</div>
       </div>
     </div>
   )

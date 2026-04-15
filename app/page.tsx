@@ -65,7 +65,7 @@ export default async function LandingPage() {
             color: '#fff', fontWeight: 800, fontSize: 16,
             boxShadow: '0 4px 12px rgba(13,148,136,0.4)',
           }}>P</div>
-          <span style={{ fontWeight: 800, fontSize: 18, letterSpacing: '-0.5px', color: '#0f172a' }}>Planora</span>
+          <span style={{ fontWeight: 800, fontSize: 18, letterSpacing: '-0.5px', color: '#0f172a' }}>Taska</span>
         </Link>
 
         <div style={{ flex: 1, display: 'flex', justifyContent: 'center', gap: 32 }} className="hide-mobile">
@@ -183,7 +183,7 @@ export default async function LandingPage() {
                   ))}
                 </div>
                 <div style={{ flex: 1, background: 'rgba(255,255,255,0.06)', borderRadius: 5, height: 18, display: 'flex', alignItems: 'center', padding: '0 8px' }}>
-                  <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)' }}>app.planora.in/dashboard</span>
+                  <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)' }}>app.taska.in/dashboard</span>
                 </div>
               </div>
               {/* App content */}
@@ -347,7 +347,7 @@ export default async function LandingPage() {
             <span style={{ color: '#0d9488' }}>wired together</span>
           </h2>
           <p style={{ fontSize: 16, color: '#64748b', maxWidth: 520, margin: '0 auto', lineHeight: 1.75 }}>
-            Planora connects every part of your workflow — from task creation to approval to reporting — in a single platform your whole team will actually use.
+            Taska connects every part of your workflow — from task creation to approval to reporting — in a single platform your whole team will actually use.
           </p>
         </div>
 
@@ -459,7 +459,7 @@ export default async function LandingPage() {
               desc:'Tasks due, approvals stuck, deadlines missed — alerts go straight to WhatsApp where your team already is. No app install needed.' },
             { icon:'🔁', color:'#0d9488', bg:'#f0fdfa', border:'#5eead4', badge:'Saves hours every week',
               title:'Recurring tasks, automated',
-              desc:'Set any task to repeat daily, weekly, monthly, or quarterly. Planora creates each instance, assigns it, and starts the clock automatically.' },
+              desc:'Set any task to repeat daily, weekly, monthly, or quarterly. Taska creates each instance, assigns it, and starts the clock automatically.' },
             { icon:'🧩', color:'#7c3aed', bg:'#faf5ff', border:'#c4b5fd', badge:'No-code workflow builder',
               title:'Custom workflows for any team',
               desc:'Build templates, approval chains, and custom fields for your exact process — no code required. Legal, ops, creative, finance, compliance.' },
@@ -500,7 +500,7 @@ export default async function LandingPage() {
               Tailored to your unique workflow
             </h2>
             <p style={{ fontSize: 16, color: 'rgba(255,255,255,0.65)', lineHeight: 1.78, marginBottom: 28, maxWidth: 420 }}>
-              Every team works differently. Build custom task templates, define your own approval chains, create fields specific to your process, and connect Planora to your tools via API — no developers needed.
+              Every team works differently. Build custom task templates, define your own approval chains, create fields specific to your process, and connect Taska to your tools via API — no developers needed.
             </p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 32 }}>
               {['Custom fields','Approval chains','Task templates','API access','Role permissions'].map(tag => (
@@ -548,7 +548,7 @@ export default async function LandingPage() {
               One platform, every team
             </h2>
             <p style={{ fontSize: 15, color: '#64748b', maxWidth: 400, margin: '0 auto', lineHeight: 1.7 }}>
-              Planora adapts to your workflow — not the other way around.
+              Taska adapts to your workflow — not the other way around.
             </p>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 16 }}>
@@ -641,14 +641,14 @@ export default async function LandingPage() {
               {'★★★★★'.split('').map((s,i) => <span key={i} style={{ color: '#fbbf24', fontSize: 22 }}>{s}</span>)}
             </div>
             <h2 style={{ fontSize: 'clamp(24px,3.5vw,36px)', fontWeight: 900, letterSpacing: '-1px', marginBottom: 12 }}>
-              Teams love Planora
+              Teams love Taska
             </h2>
             <p style={{ fontSize: 15, color: '#64748b', maxWidth: 400, margin: '0 auto' }}>Here&apos;s what they say.</p>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 20 }}>
             {[
               { name:'Priya Sharma', title:'Managing Partner', company:'Sharma & Associates', init:'PS', color:'#f97316',
-                quote:'We replaced three separate tools with Planora. The recurring task automation alone saves us 4+ hours every single month-end.',
+                quote:'We replaced three separate tools with Taska. The recurring task automation alone saves us 4+ hours every single month-end.',
                 metric:'4 hrs saved/month', mc:'#f97316' },
               { name:'Rahul Mehta', title:'Founder & CEO', company:'NexusDigital', init:'RM', color:'#0d9488',
                 quote:'WhatsApp reminders changed how our team operates. Task completion went from 67% to 94% within six weeks.',
@@ -711,7 +711,7 @@ export default async function LandingPage() {
             Ready to stop missing deadlines?
           </h2>
           <p style={{ fontSize: 17, color: 'rgba(255,255,255,0.58)', marginBottom: 32, lineHeight: 1.75 }}>
-            Join 200+ teams who run their work on Planora. Start free — no credit card needed.
+            Join 200+ teams who run their work on Taska. Start free — no credit card needed.
           </p>
           <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap' }}>
             <Link href="/login" className="cta-primary"
@@ -733,14 +733,14 @@ export default async function LandingPage() {
         <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
             <div style={{ width: 28, height: 28, borderRadius: 8, background: '#0d9488', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: 13 }}>P</div>
-            <span style={{ fontWeight: 700, fontSize: 15, color: '#fff' }}>Planora</span>
+            <span style={{ fontWeight: 700, fontSize: 15, color: '#fff' }}>Taska</span>
           </div>
           <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
             {['Privacy','Terms','Contact','Status'].map(l => (
               <a key={l} href="#" style={{ color: 'rgba(255,255,255,0.32)', fontSize: 13, textDecoration: 'none' }}>{l}</a>
             ))}
           </div>
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.2)' }}>© 2025 Planora. Made in India 🇮🇳</div>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.2)' }}>© 2025 Taska. Made in India 🇮🇳</div>
         </div>
       </footer>
     </div>

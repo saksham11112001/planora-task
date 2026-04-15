@@ -33,7 +33,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [resolved, setResolved]   = useState<'light' | 'dark'>('light')
 
   useEffect(() => {
-    const saved = (localStorage.getItem('planora-theme') as Theme) ?? 'system'
+    const saved = (localStorage.getItem('taska-theme') as Theme) ?? 'system'
     setThemeState(saved)
 
     const r = saved === 'system' ? getSystemTheme() : saved
@@ -43,7 +43,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     // Watch system preference changes (for system mode)
     const mq = window.matchMedia('(prefers-color-scheme: dark)')
     const handler = (e: MediaQueryListEvent) => {
-      const current = (localStorage.getItem('planora-theme') as Theme) ?? 'system'
+      const current = (localStorage.getItem('taska-theme') as Theme) ?? 'system'
       if (current === 'system') {
         const r2 = e.matches ? 'dark' : 'light'
         setResolved(r2)
@@ -56,13 +56,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   // Re-apply theme on client-side navigation (catches landing → app transitions)
   useEffect(() => {
-    const saved = (localStorage.getItem('planora-theme') as Theme) ?? 'system'
+    const saved = (localStorage.getItem('taska-theme') as Theme) ?? 'system'
     const r = saved === 'system' ? getSystemTheme() : saved
     applyResolved(r)
   })  // runs after every render = catches route changes
 
   function setTheme(t: Theme) {
-    localStorage.setItem('planora-theme', t)
+    localStorage.setItem('taska-theme', t)
     setThemeState(t)
     const r = t === 'system' ? getSystemTheme() : t
     setResolved(r)

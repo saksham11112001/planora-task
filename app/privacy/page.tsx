@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 
-export const metadata: Metadata = { title: 'Privacy Policy — Planora' }
+export const metadata: Metadata = { title: 'Privacy Policy — Taska' }
 
 export default function PrivacyPage() {
   const updated = '27 March 2026'
@@ -12,7 +12,7 @@ export default function PrivacyPage() {
           <div style={{ width:30, height:30, borderRadius:8, background:'#0d9488', display:'flex', alignItems:'center', justifyContent:'center' }}>
             <svg viewBox="0 0 20 20" fill="none" style={{ width:16, height:16 }}><path d="M3 5h14M3 10h10M3 15h7" stroke="#fff" strokeWidth="2" strokeLinecap="round"/></svg>
           </div>
-          <span style={{ fontWeight:700, fontSize:17, color:'#111827' }}>Planora</span>
+          <span style={{ fontWeight:700, fontSize:17, color:'#111827' }}>Taska</span>
         </Link>
         <div style={{ display:'flex', gap:20, fontSize:13 }}>
           <Link href="/privacy" style={{ color:'#0d9488', fontWeight:600, textDecoration:'none' }}>Privacy</Link>
@@ -29,13 +29,13 @@ export default function PrivacyPage() {
         </div>
 
         <div style={{ background:'#fffbeb', border:'1px solid #fde68a', borderRadius:10, padding:'16px 20px', marginBottom:40, fontSize:14, color:'#92400e', lineHeight:1.7 }}>
-          <strong>Plain-language summary:</strong> Planora collects only what it needs to run the service, never sells your data, stores everything encrypted on enterprise-grade infrastructure in India, and you can export or delete your data at any time.
+          <strong>Plain-language summary:</strong> Taska collects only what it needs to run the service, never sells your data, stores everything encrypted on enterprise-grade infrastructure in India, and you can export or delete your data at any time.
         </div>
 
         {([
           {
             n:'1', title:'Who We Are',
-            body:'Planora is a project and task management platform operated by SNG Advisers. Our data controller contact is: <strong>legal@sngadvisers.com</strong>.',
+            body:'Taska is a project and task management platform operated by SNG Advisers. Our data controller contact is: <strong>legal@sngadvisers.com</strong>.',
           },
           {
             n:'2', title:'What Data We Collect',
@@ -43,7 +43,7 @@ export default function PrivacyPage() {
           },
           {
             n:'3', title:'How We Use Your Data',
-            body:`We use your data solely to provide, maintain, and improve Planora — including sending transactional notifications, processing payments, and preventing abuse.<br/><br/>We do <strong>not</strong> use your data to train AI models, serve advertisements, or sell to third parties under any circumstances.`,
+            body:`We use your data solely to provide, maintain, and improve Taska — including sending transactional notifications, processing payments, and preventing abuse.<br/><br/>We do <strong>not</strong> use your data to train AI models, serve advertisements, or sell to third parties under any circumstances.`,
           },
           {
             n:'4', title:'Data Storage & Security',
@@ -63,7 +63,7 @@ export default function PrivacyPage() {
           },
           {
             n:'8', title:'Cookies',
-            body:'Planora uses only a technically-necessary authentication session cookie. No advertising, tracking, or analytics cookies are set. No cookie banner is shown.',
+            body:'Taska uses only a technically-necessary authentication session cookie. No advertising, tracking, or analytics cookies are set. No cookie banner is shown.',
           },
           {
             n:'9', title:'Changes to This Policy',

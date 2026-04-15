@@ -21,7 +21,7 @@ export function memberInvitedHtml(p: MemberProps): string {
             <td style="background:#0d9488;border-radius:8px;width:32px;height:32px;text-align:center;vertical-align:middle">
               <span style="color:#fff;font-size:16px;font-weight:700">P</span>
             </td>
-            <td style="padding-left:10px;color:#ffffff;font-size:18px;font-weight:700">Planora</td>
+            <td style="padding-left:10px;color:#ffffff;font-size:18px;font-weight:700">Taska</td>
           </tr></table>
         </td></tr>
         <tr><td style="padding:32px">
@@ -40,7 +40,7 @@ export function memberInvitedHtml(p: MemberProps): string {
           <a href="${p.appUrl}/team" style="display:inline-block;background:#0d9488;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:8px;font-size:14px;font-weight:600">View team →</a>
         </td></tr>
         <tr><td style="padding:16px 32px;border-top:1px solid #f1f5f9">
-          <p style="color:#94a3b8;font-size:12px;margin:0">Planora · Manage notification preferences in Settings</p>
+          <p style="color:#94a3b8;font-size:12px;margin:0">Taska · Manage notification preferences in Settings</p>
         </td></tr>
       </table>
     </td></tr>

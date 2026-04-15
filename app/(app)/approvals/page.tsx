@@ -4,7 +4,7 @@ import { ApprovalsView }   from './ApprovalsView'
 import type { Metadata }   from 'next'
 
 export const dynamic   = 'force-dynamic'
-export const metadata: Metadata = { title: 'Approvals | Planora' }
+export const metadata: Metadata = { title: 'Approvals | Taska' }
 
 export default async function ApprovalsPage() {
   try {

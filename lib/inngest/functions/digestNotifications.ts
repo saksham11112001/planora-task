@@ -4,7 +4,7 @@ import { getOrgNotifMode, getPendingForOrg, markQueueSent } from '@/lib/email/qu
 import { digestEmailHtml }      from '@/lib/email/templates/digestEmail'
 import { resend, FROM }         from '@/lib/email/resend'
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://planora.in'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://taska.in'
 
 async function runDigest(slot: 'morning' | 'evening') {
   const admin = createAdminClient()
@@ -73,7 +73,7 @@ async function runDigest(slot: 'morning' | 'evening') {
         await resend.emails.send({
           from:    FROM,
           to:      userEmail,
-          subject: `📬 Planora digest (${slotLabel} IST) — ${items.length} update${items.length === 1 ? '' : 's'}`,
+          subject: `📬 Taska digest (${slotLabel} IST) — ${items.length} update${items.length === 1 ? '' : 's'}`,
           html,
         })
         sentIds.push(...items.map(i => i.id))

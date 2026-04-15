@@ -30,7 +30,7 @@ export async function GET() {
     const exceljs = await import('exceljs')
     const ExcelJS  = (exceljs as any).default ?? exceljs
     const wb       = new ExcelJS.Workbook()
-    wb.creator     = 'Planora'
+    wb.creator     = 'Taska'
     wb.created     = new Date()
 
     // ── Palette ────────────────────────────────────────────────────────────
@@ -109,7 +109,7 @@ wsRM.views = [
 ]
 
     const instructions: [string, any][] = [
-      ['Planora Bulk Import Template',
+      ['Taska Bulk Import Template',
         { bold: true, size: 15, color: { argb: C.teal }, name: 'Arial' }],
       ['', {}],
       ['📋 How to use this template',
@@ -267,7 +267,7 @@ wsRM.views = [
     return new NextResponse(buf as Buffer, {
       headers: {
         'Content-Type'        : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Disposition' : 'attachment; filename="planora_import_template.xlsx"',
+        'Content-Disposition' : 'attachment; filename="taska_import_template.xlsx"',
         'Cache-Control'       : 'no-store',
       },
     })

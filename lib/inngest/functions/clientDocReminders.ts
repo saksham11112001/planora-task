@@ -3,7 +3,7 @@ import { createAdminClient }              from '@/lib/supabase/admin'
 import { sendClientDocReminderEmail }     from '@/lib/email/send'
 import { sendClientUploadNotifyEmail }    from '@/lib/email/send'
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://planora.in'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://taska.in'
 
 /**
  * Fires daily at 7:00 AM IST (1:30 AM UTC).
@@ -168,7 +168,7 @@ export const clientDocReminders = inngest.createFunction(
       if (![7, 2, 0, -1].includes(daysLeft)) continue
 
       const client  = clients[clientId]
-      const orgName = orgs[inst.org_id] ?? 'Planora'
+      const orgName = orgs[inst.org_id] ?? 'Taska'
       if (!client) continue
 
       // Determine missing docs

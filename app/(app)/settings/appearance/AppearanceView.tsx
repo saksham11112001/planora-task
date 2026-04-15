@@ -38,7 +38,7 @@ export function AppearanceView() {
       </Link>
       <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>Appearance</h1>
       <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 28 }}>
-        Choose how Planora looks. Saved on this device.
+        Choose how Taska looks. Saved on this device.
       </p>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>

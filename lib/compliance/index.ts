@@ -48,7 +48,7 @@ export interface TaskOverride {
 
 export type OrgOverrides = Record<string, TaskOverride>
 
-const LS_KEY = 'planora_compliance_overrides'
+const LS_KEY = 'taska_compliance_overrides'
 
 export function loadOverrides(): OrgOverrides {
   if (typeof window === 'undefined') return {}
@@ -73,7 +73,7 @@ export interface CustomTask {
   attachments: AttachmentConfig[]
 }
 
-const CUSTOM_KEY = 'planora_compliance_custom'
+const CUSTOM_KEY = 'taska_compliance_custom'
 
 export function loadCustomTasks(): CustomTask[] {
   if (typeof window === 'undefined') return []

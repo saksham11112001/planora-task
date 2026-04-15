@@ -90,7 +90,7 @@ export function BillingView({ orgName, currentPlan, status, subscriptionId, tria
       script.onload = () => {
         const options = {
           key: key_id, subscription_id,
-          name: 'Planora', description: `${plan.charAt(0).toUpperCase() + plan.slice(1)} Plan — ${annual ? 'Annual' : 'Monthly'}`,
+          name: 'Taska', description: `${plan.charAt(0).toUpperCase() + plan.slice(1)} Plan — ${annual ? 'Annual' : 'Monthly'}`,
           image: '/favicon.svg', prefill: { name: orgName },
           theme: { color: '#0d9488' },
           handler: () => { toast.success('Payment successful! Plan upgraded.'); setTimeout(() => window.location.reload(), 1500) },

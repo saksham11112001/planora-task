@@ -117,7 +117,7 @@ export default function OnboardingPage() {
             <div className="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center">
               <Zap className="h-6 w-6 text-white"/>
             </div>
-            <span className="text-2xl font-bold text-white">Planora</span>
+            <span className="text-2xl font-bold text-white">Taska</span>
           </div>
           <p className="text-teal-200 text-sm">Set up your workspace in 3 quick steps</p>
         </div>
@@ -239,7 +239,7 @@ export default function OnboardingPage() {
               <div className="flex gap-3 mt-6">
                 <button onClick={() => setStep(2)} className="btn btn-outline flex-1">Back</button>
                 <button onClick={handleSubmit} disabled={saving} className="btn btn-brand flex-1">
-                  {saving ? 'Setting up…' : 'Launch Planora 🚀'}
+                  {saving ? 'Setting up…' : 'Launch Taska 🚀'}
                 </button>
               </div>
               {!form.phone && (

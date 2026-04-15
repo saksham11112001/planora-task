@@ -75,8 +75,7 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
   const [filterClient,  setFilterClient]  = useState('')
   const [filterMember,  setFilterMember]  = useState('')
   const [filterType,    setFilterType]    = useState('')
-  const [dueDateFrom,   setDueDateFrom]   = useState('')
-  const [dueDateTo,     setDueDateTo]     = useState('')
+  const [filterDate,    setFilterDate]    = useState<'overdue' | 'today' | 'week' | ''>('')
   const [panelTask,     setPanelTask]     = useState<Task | null>(null)
   const [panelLoading,  setPanelLoading]  = useState(false)
   const [groupBy,       setGroupBy]       = useState<'status' | 'assignee' | 'client' | 'type' | 'none'>('status')
@@ -106,10 +105,11 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
     if (filterType === 'recurring' && !t.is_recurring)                         return false
     if (filterType === 'project'   && !t.project_id)                           return false
     if (filterType === 'quick'     && (t.project_id || t.is_recurring || t.custom_fields?._ca_compliance)) return false
-    if (dueDateFrom  && (!t.due_date || t.due_date < dueDateFrom))             return false
-    if (dueDateTo    && (!t.due_date || t.due_date > dueDateTo))               return false
+    if (filterDate === 'overdue' && !(t.due_date && t.due_date < today && !['completed','cancelled'].includes(t.status))) return false
+    if (filterDate === 'today'   && t.due_date !== today) return false
+    if (filterDate === 'week'    && !(t.due_date && t.due_date >= today && t.due_date <= new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10))) return false
     return true
-  }), [tasks, search, filterStatus, filterPrio, filterClient, filterMember, filterType, dueDateFrom, dueDateTo])
+  }), [tasks, search, filterStatus, filterPrio, filterClient, filterMember, filterType, filterDate, today])
 
   // ── Stats ──
   const stats = useMemo(() => {
@@ -171,11 +171,11 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
     return [{ key: 'all', label: 'All tasks', color: 'var(--brand)', tasks: visible }]
   }, [visible, groupBy])
 
-  const activeFilters = [search, filterStatus, filterPrio, filterClient, filterMember, filterType, dueDateFrom, dueDateTo].filter(Boolean).length
+  const activeFilters = [search, filterStatus, filterPrio, filterClient, filterMember, filterType, filterDate].filter(Boolean).length
 
   function clearFilters() {
     setSearch(''); setFilterStatus(''); setFilterPrio(''); setFilterClient('')
-    setFilterMember(''); setFilterType(''); setDueDateFrom(''); setDueDateTo('')
+    setFilterMember(''); setFilterType(''); setFilterDate('')
   }
 
   return (
@@ -285,17 +285,17 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
           <option value='quick'>Quick tasks</option>
         </select>
 
-        {/* Due date range */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>Due</span>
-          <input type='date' value={dueDateFrom} onChange={e => setDueDateFrom(e.target.value)}
-            style={{ fontSize: 11, padding: '4px 6px', borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit',
-              border: '1px solid var(--border)', background: 'var(--surface-subtle)', color: 'var(--text-secondary)' }}/>
-          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>–</span>
-          <input type='date' value={dueDateTo} onChange={e => setDueDateTo(e.target.value)}
-            style={{ fontSize: 11, padding: '4px 6px', borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit',
-              border: '1px solid var(--border)', background: 'var(--surface-subtle)', color: 'var(--text-secondary)' }}/>
-        </div>
+        {/* Due date preset */}
+        <select value={filterDate} onChange={e => setFilterDate(e.target.value as typeof filterDate)}
+          style={{ fontSize: 12, padding: '4px 10px', borderRadius: 20, cursor: 'pointer', fontFamily: 'inherit',
+            border: filterDate ? '1px solid var(--brand)' : '1px solid var(--border)',
+            background: filterDate ? 'rgba(13,148,136,0.08)' : 'var(--surface-subtle)',
+            color: filterDate ? 'var(--brand)' : 'var(--text-secondary)', fontWeight: filterDate ? 600 : 400 }}>
+          <option value=''>All dates</option>
+          <option value='overdue'>Overdue</option>
+          <option value='today'>Due today</option>
+          <option value='week'>Due this week</option>
+        </select>
 
         {/* Clear */}
         {activeFilters > 0 && (

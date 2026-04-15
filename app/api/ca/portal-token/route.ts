@@ -3,7 +3,7 @@ import { createClient }              from '@/lib/supabase/server'
 import { createAdminClient }         from '@/lib/supabase/admin'
 import crypto                        from 'crypto'
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://planora.in'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://taska.in'
 
 // POST /api/ca/portal-token
 // Body: { client_id: string }

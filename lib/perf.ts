@@ -1,5 +1,5 @@
 /**
- * Performance constants for Planora
+ * Performance constants for Taska
  * 
  * DEBOUNCE_MS: how long to wait after last keystroke before saving
  * MAX_PAGE_SIZE: max tasks per page fetch

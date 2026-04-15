@@ -4,7 +4,7 @@ import { ImportView }    from './ImportView'
 
 export const dynamic = 'force-dynamic'
 
-export const metadata = { title: 'Bulk Import — Planora' }
+export const metadata = { title: 'Bulk Import — Taska' }
 
 export default async function ImportPage() {
   const supabase = await createClient()

@@ -52,7 +52,7 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void } = {}) {
     return () => document.removeEventListener('keydown', handle)
   }, [setSearchOpen])
 
-  const NOTIF_READ_KEY = 'planora_notif_read_ts'
+  const NOTIF_READ_KEY = 'taska_notif_read_ts'
 
   // Fetch notifications and compute real unread count using localStorage timestamp
   async function fetchNotifs() {
