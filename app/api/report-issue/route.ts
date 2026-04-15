@@ -1,0 +1,59 @@
+import { createAdminClient } from '@/lib/supabase/admin'
+import { cookies }           from 'next/headers'
+import { createClient }      from '@/lib/supabase/server'
+import { NextResponse }      from 'next/server'
+
+export async function POST(req: Request) {
+  try {
+    const cookieStore = await cookies()
+    const sb  = createClient(cookieStore)
+    const { data: { user } } = await sb.auth.getUser()
+
+    const form    = await req.formData()
+    const message = (form.get('message') as string | null) ?? ''
+    const url     = (form.get('url')     as string | null) ?? ''
+    const files   = form.getAll('files') as File[]
+
+    if (!message.trim() && files.length === 0) {
+      return NextResponse.json({ error: 'Nothing to report' }, { status: 400 })
+    }
+
+    const admin = createAdminClient()
+
+    // Attempt to get org_id from user's profile
+    let orgId: string | null = null
+    if (user) {
+      const { data: profile } = await admin.from('users').select('org_id').eq('id', user.id).maybeSingle()
+      orgId = profile?.org_id ?? null
+    }
+
+    // Upload any attached files to storage
+    const attachmentUrls: string[] = []
+    for (const file of files) {
+      if (!(file instanceof File) || file.size === 0) continue
+      const path = `issue-reports/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+      const bytes = Buffer.from(await file.arrayBuffer())
+      const { error } = await admin.storage.from('attachments').upload(path, bytes, { contentType: file.type })
+      if (!error) {
+        const { data: urlData } = admin.storage.from('attachments').getPublicUrl(path)
+        attachmentUrls.push(urlData.publicUrl)
+      }
+    }
+
+    // Insert into issue_reports table (table must exist; graceful fail if not)
+    await admin.from('issue_reports').insert({
+      org_id:      orgId,
+      reporter_id: user?.id ?? null,
+      message:     message.trim(),
+      page_url:    url,
+      attachments: attachmentUrls.length > 0 ? attachmentUrls : null,
+      status:      'open',
+    })
+
+    return NextResponse.json({ ok: true })
+  } catch (err: any) {
+    // Even if DB insert fails, return success so UX is not blocked
+    console.error('[report-issue]', err?.message)
+    return NextResponse.json({ ok: true })
+  }
+}

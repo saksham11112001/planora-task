@@ -1,6 +1,7 @@
 'use client'
 import { useState, useMemo } from 'react'
-import { Search, RefreshCw, Filter, AlertTriangle, CheckCircle2, Clock, FolderOpen, ListTodo, BarChart2, Users } from 'lucide-react'
+import { Search, RefreshCw, Filter, AlertTriangle, CheckCircle2, Clock, FolderOpen, ListTodo, BarChart2, Users, Download } from 'lucide-react'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
 import { fmtDate, isOverdue } from '@/lib/utils/format'
 import type { Task } from '@/types'
@@ -75,9 +76,14 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
   const [filterClient,  setFilterClient]  = useState('')
   const [filterMember,  setFilterMember]  = useState('')
   const [filterType,    setFilterType]    = useState('')
-  const [dueDateFrom,   setDueDateFrom]   = useState('')
-  const [dueDateTo,     setDueDateTo]     = useState('')
-  const [panelTask,     setPanelTask]     = useState<Task | null>(null)
+  const [dueDateFrom,    setDueDateFrom]    = useState('')
+  const [dueDateTo,      setDueDateTo]      = useState('')
+  const [createdFrom,    setCreatedFrom]    = useState('')
+  const [createdTo,      setCreatedTo]      = useState('')
+  const [updatedFrom,    setUpdatedFrom]    = useState('')
+  const [updatedTo,      setUpdatedTo]      = useState('')
+  const [showChart,      setShowChart]      = useState(false)
+  const [panelTask,      setPanelTask]      = useState<Task | null>(null)
   const [panelLoading,  setPanelLoading]  = useState(false)
   const [groupBy,       setGroupBy]       = useState<'status' | 'assignee' | 'client' | 'type' | 'none'>('status')
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
@@ -108,8 +114,14 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
     if (filterType === 'quick'     && (t.project_id || t.is_recurring || t.custom_fields?._ca_compliance)) return false
     if (dueDateFrom  && (!t.due_date || t.due_date < dueDateFrom))             return false
     if (dueDateTo    && (!t.due_date || t.due_date > dueDateTo))               return false
+    const createdDate = t.created_at?.slice(0, 10) ?? ''
+    if (createdFrom  && createdDate < createdFrom)                             return false
+    if (createdTo    && createdDate > createdTo)                               return false
+    const updatedDate = (t.updated_at ?? t.created_at)?.slice(0, 10) ?? ''
+    if (updatedFrom  && updatedDate < updatedFrom)                             return false
+    if (updatedTo    && updatedDate > updatedTo)                               return false
     return true
-  }), [tasks, search, filterStatus, filterPrio, filterClient, filterMember, filterType, dueDateFrom, dueDateTo])
+  }), [tasks, search, filterStatus, filterPrio, filterClient, filterMember, filterType, dueDateFrom, dueDateTo, createdFrom, createdTo, updatedFrom, updatedTo])
 
   // ── Stats ──
   const stats = useMemo(() => {
@@ -171,11 +183,35 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
     return [{ key: 'all', label: 'All tasks', color: 'var(--brand)', tasks: visible }]
   }, [visible, groupBy])
 
-  const activeFilters = [search, filterStatus, filterPrio, filterClient, filterMember, filterType, dueDateFrom, dueDateTo].filter(Boolean).length
+  const activeFilters = [search, filterStatus, filterPrio, filterClient, filterMember, filterType, dueDateFrom, dueDateTo, createdFrom, createdTo, updatedFrom, updatedTo].filter(Boolean).length
 
   function clearFilters() {
     setSearch(''); setFilterStatus(''); setFilterPrio(''); setFilterClient('')
     setFilterMember(''); setFilterType(''); setDueDateFrom(''); setDueDateTo('')
+    setCreatedFrom(''); setCreatedTo(''); setUpdatedFrom(''); setUpdatedTo('')
+  }
+
+  function exportToExcel() {
+    const headers = ['Title','Status','Priority','Type','Assignee','Client','Due Date','Created','Updated']
+    const rows = visible.map(t => [
+      `"${(t.title ?? '').replace(/"/g,'""')}"`,
+      STATUS_CONFIG[t.status]?.label ?? t.status,
+      t.priority,
+      typeLabel(t),
+      t.assignee?.name ?? '',
+      t.client?.name ?? '',
+      t.due_date ?? '',
+      t.created_at?.slice(0,10) ?? '',
+      (t.updated_at ?? t.created_at)?.slice(0,10) ?? '',
+    ].join(','))
+    const csv = [headers.join(','), ...rows].join('\n')
+    const blob = new Blob([csv], { type: 'application/vnd.ms-excel' })
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href     = url
+    a.download = `monitor_export_${today}.xls`
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   return (
@@ -188,10 +224,28 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
             border: '1px solid rgba(13,148,136,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <BarChart2 style={{ width: 18, height: 18, color: '#0d9488' }}/>
           </div>
-          <div>
+          <div style={{ flex: 1 }}>
             <h1 style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>Monitor</h1>
             <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>Read-only view of all tasks across the organisation</p>
           </div>
+          {/* Chart toggle */}
+          <button onClick={() => setShowChart(v => !v)}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 20,
+              border: showChart ? '1px solid var(--brand)' : '1px solid var(--border)',
+              background: showChart ? 'rgba(13,148,136,0.1)' : 'var(--surface-subtle)',
+              color: showChart ? 'var(--brand)' : 'var(--text-secondary)',
+              fontSize: 12, fontWeight: showChart ? 600 : 400, cursor: 'pointer', fontFamily: 'inherit' }}>
+            <BarChart2 style={{ width: 13, height: 13 }}/>
+            {showChart ? 'Hide chart' : 'Show chart'}
+          </button>
+          {/* Export button */}
+          <button onClick={exportToExcel}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 20,
+              border: '1px solid var(--brand)', background: 'rgba(13,148,136,0.1)',
+              color: 'var(--brand)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+            <Download style={{ width: 13, height: 13 }}/>
+            Export Excel
+          </button>
         </div>
 
         {/* ── Stats bar ── */}
@@ -212,6 +266,63 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
             </div>
           ))}
         </div>
+
+        {/* ── Stats chart (collapsible) ── */}
+        {showChart && (
+          <div style={{ marginTop: 16, padding: '12px 0 4px', borderTop: '1px solid var(--border-light)' }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8,
+              textTransform: 'uppercase', letterSpacing: '0.05em' }}>Task distribution</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              {/* Status chart */}
+              <div>
+                <p style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>By status</p>
+                <ResponsiveContainer width="100%" height={140}>
+                  <BarChart data={[
+                    { name: 'To do',      value: stats.todo,       fill: '#64748b' },
+                    { name: 'In progress',value: stats.inProgress, fill: '#2563eb' },
+                    { name: 'In review',  value: stats.inReview,   fill: '#7c3aed' },
+                    { name: 'Completed',  value: stats.completed,  fill: '#16a34a' },
+                  ]} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                    <XAxis dataKey="name" tick={{ fontSize: 9 }} interval={0} angle={-20} textAnchor="end" height={32}/>
+                    <YAxis tick={{ fontSize: 9 }} allowDecimals={false}/>
+                    <Tooltip contentStyle={{ fontSize: 11 }}/>
+                    <Bar dataKey="value" radius={[3,3,0,0]}>
+                      {[
+                        { name: 'To do',      fill: '#64748b' },
+                        { name: 'In progress',fill: '#2563eb' },
+                        { name: 'In review',  fill: '#7c3aed' },
+                        { name: 'Completed',  fill: '#16a34a' },
+                      ].map((entry, i) => <Cell key={i} fill={entry.fill}/>)}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              {/* Type chart */}
+              <div>
+                <p style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>By type</p>
+                <ResponsiveContainer width="100%" height={140}>
+                  <BarChart data={[
+                    { name: 'CA',      value: stats.ca,                                                  fill: '#d97706' },
+                    { name: 'Repeat',  value: stats.recurring,                                           fill: '#0d9488' },
+                    { name: 'Project', value: tasks.filter(t => !!t.project_id && !t.is_recurring && !t.custom_fields?._ca_compliance).length, fill: '#7c3aed' },
+                    { name: 'Quick',   value: tasks.filter(t => !t.project_id && !t.is_recurring && !t.custom_fields?._ca_compliance).length,  fill: '#0891b2' },
+                    { name: 'Overdue', value: stats.overdue,                                             fill: '#dc2626' },
+                  ]} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                    <XAxis dataKey="name" tick={{ fontSize: 9 }}/>
+                    <YAxis tick={{ fontSize: 9 }} allowDecimals={false}/>
+                    <Tooltip contentStyle={{ fontSize: 11 }}/>
+                    <Bar dataKey="value" radius={[3,3,0,0]}>
+                      {[
+                        { fill: '#d97706' }, { fill: '#0d9488' }, { fill: '#7c3aed' },
+                        { fill: '#0891b2' }, { fill: '#dc2626' },
+                      ].map((entry, i) => <Cell key={i} fill={entry.fill}/>)}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Filters & group-by bar ── */}
@@ -290,11 +401,41 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
           <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>Due</span>
           <input type='date' value={dueDateFrom} onChange={e => setDueDateFrom(e.target.value)}
             style={{ fontSize: 11, padding: '4px 6px', borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit',
-              border: '1px solid var(--border)', background: 'var(--surface-subtle)', color: 'var(--text-secondary)' }}/>
+              border: dueDateFrom ? '1px solid var(--brand)' : '1px solid var(--border)',
+              background: 'var(--surface-subtle)', color: 'var(--text-secondary)' }}/>
           <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>–</span>
           <input type='date' value={dueDateTo} onChange={e => setDueDateTo(e.target.value)}
             style={{ fontSize: 11, padding: '4px 6px', borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit',
-              border: '1px solid var(--border)', background: 'var(--surface-subtle)', color: 'var(--text-secondary)' }}/>
+              border: dueDateTo ? '1px solid var(--brand)' : '1px solid var(--border)',
+              background: 'var(--surface-subtle)', color: 'var(--text-secondary)' }}/>
+        </div>
+
+        {/* Created date range */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>Created</span>
+          <input type='date' value={createdFrom} onChange={e => setCreatedFrom(e.target.value)}
+            style={{ fontSize: 11, padding: '4px 6px', borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit',
+              border: createdFrom ? '1px solid var(--brand)' : '1px solid var(--border)',
+              background: 'var(--surface-subtle)', color: 'var(--text-secondary)' }}/>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>–</span>
+          <input type='date' value={createdTo} onChange={e => setCreatedTo(e.target.value)}
+            style={{ fontSize: 11, padding: '4px 6px', borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit',
+              border: createdTo ? '1px solid var(--brand)' : '1px solid var(--border)',
+              background: 'var(--surface-subtle)', color: 'var(--text-secondary)' }}/>
+        </div>
+
+        {/* Modified date range */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>Modified</span>
+          <input type='date' value={updatedFrom} onChange={e => setUpdatedFrom(e.target.value)}
+            style={{ fontSize: 11, padding: '4px 6px', borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit',
+              border: updatedFrom ? '1px solid var(--brand)' : '1px solid var(--border)',
+              background: 'var(--surface-subtle)', color: 'var(--text-secondary)' }}/>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>–</span>
+          <input type='date' value={updatedTo} onChange={e => setUpdatedTo(e.target.value)}
+            style={{ fontSize: 11, padding: '4px 6px', borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit',
+              border: updatedTo ? '1px solid var(--brand)' : '1px solid var(--border)',
+              background: 'var(--surface-subtle)', color: 'var(--text-secondary)' }}/>
         </div>
 
         {/* Clear */}

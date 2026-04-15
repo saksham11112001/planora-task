@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useEffect, useTransition } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { RefreshCw, X, Pencil, User, Trash2, SortAsc } from 'lucide-react'
+import { RefreshCw, X, Pencil, User, Trash2, SortAsc, Copy } from 'lucide-react'
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
 import { InlineRecurringTask, FREQ_LABEL } from '@/components/tasks/InlineRecurringTask'
 import { fmtDate } from '@/lib/utils/format'
@@ -55,11 +55,11 @@ const BOARD_COLUMNS = [
 
 function normalizeFrequency(freq: string | null | undefined): string {
   if (!freq) return 'other'
-  if (freq === 'daily') return 'daily'
+  if (freq === 'daily' || /^every_\d+_days$/.test(freq)) return 'daily'
   if (freq.startsWith('weekly_') || freq === 'bi_weekly' || freq === 'weekly') return 'weekly'
   if (freq.startsWith('monthly_') || freq === 'monthly') return 'monthly'
-  if (freq === 'quarterly') return 'quarterly'
-  if (freq === 'annual' || freq === 'yearly') return 'annual'
+  if (freq.startsWith('quarterly_') || freq === 'quarterly') return 'quarterly'
+  if (freq.startsWith('annual_') || freq === 'annual' || freq === 'yearly') return 'annual'
   return 'other'
 }
 
@@ -262,6 +262,29 @@ export function RecurringView({
       const d = await res.json().catch(() => ({}))
       toast.error(d.error ?? 'Failed')
     }
+  }
+
+  async function cloneRecurring(task: any) {
+    const res = await fetch('/api/recurring', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title:                `${task.title} (copy)`,
+        priority:             task.priority,
+        frequency:            task.frequency,
+        next_occurrence_date: task.next_occurrence_date ?? null,
+        assignee_id:          task.assignee_id ?? null,
+        client_id:            task.client_id ?? null,
+        project_id:           task.project_id ?? null,
+        approver_id:          task.approver_id ?? null,
+        approval_required:    task.approval_required ?? false,
+        custom_fields:        task.custom_fields ?? null,
+      }),
+    })
+    const d = await res.json()
+    if (!res.ok) { toast.error(d.error ?? 'Clone failed'); return }
+    const newTask = d.data ?? d
+    if (newTask?.id) setLocalTasks(prev => [{ ...newTask, assignee: task.assignee, client: task.client }, ...prev])
+    toast.success('Recurring task cloned')
   }
 
   async function bulkDelete() {
@@ -831,6 +854,19 @@ export function RecurringView({
                     <div title={task.priority}
                       style={{ width:8, height:8, borderRadius:'50%', flexShrink:0,
                         background: ({'none':'#94a3b8','low':'#16a34a','medium':'#ca8a04','high':'#ea580c','urgent':'#dc2626'} as Record<string,string>)[task.priority] ?? '#94a3b8' }}/>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); cloneRecurring(task) }}
+                      title="Clone recurring task"
+                      style={{
+                        width: 26, height: 26, display: 'flex', alignItems: 'center',
+                        justifyContent: 'center', borderRadius: 6, border: 'none',
+                        background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)',
+                      }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background='rgba(13,148,136,0.1)'; (e.currentTarget as HTMLElement).style.color='var(--brand)' }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background='transparent'; (e.currentTarget as HTMLElement).style.color='var(--text-muted)' }}
+                    >
+                      <Copy style={{ width: 12, height: 12 }} />
+                    </button>
                     {canManage && (
                       <>
                         <button
