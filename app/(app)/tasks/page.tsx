@@ -43,7 +43,7 @@ export default async function MyTasksPage() {
       { data: caInstances },
     ] = await Promise.all([
       // Main task list — scoped by role
-      scopedBase.is('parent_task_id', null).limit(2000),
+      scopedBase.is('parent_task_id', null).limit(500),
 
       // Pending approval tasks — tasks in review waiting on this user's approval.
       // Owner/admin: all pending-approval tasks in the org.
@@ -53,7 +53,7 @@ export default async function MyTasksPage() {
           .eq('org_id', mb.org_id).eq('status', 'in_review').eq('approval_status', 'pending')
           .neq('is_archived', true).is('parent_task_id', null)
           .order('due_date', { ascending: true, nullsFirst: false })
-        return (canViewAll ? q : q.eq('approver_id', user.id)).limit(2000)
+        return (canViewAll ? q : q.eq('approver_id', user.id)).limit(500)
       })(),
 
       // Team members for filter/assignee dropdowns
@@ -69,7 +69,7 @@ export default async function MyTasksPage() {
             .eq('org_id', mb.org_id).eq('created_by', user.id)
             .neq('is_archived', true).is('parent_task_id', null)
             .or('custom_fields.is.null,custom_fields.not.cs.{"_ca_compliance":true}')
-            .order('due_date', { ascending: true, nullsFirst: false }).limit(2000)
+            .order('due_date', { ascending: true, nullsFirst: false }).limit(500)
         : Promise.resolve({ data: [] }),
       // CA upcoming triggers — owner/admin only
       isOwnerAdmin

@@ -51,6 +51,8 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
   const [newSubDueDates,  setNewSubDueDates]  = useState<Record<string,string>>({})
   const [completingTask,  setCompletingTask]  = useState<Task | null>(null)
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set(['done','overdue']))
+  const INBOX_SECTION_SIZE = 100
+  const [sectionPages, setSectionPages] = useState<Record<string, number>>({})
   const BOARD_DONE_PAGE = 5
   const [sortBy, setSortBy] = useState<'due_date'|'created_at'|'updated_at'>('due_date')
   const [sortDir, setSortDir] = useState<'asc'|'desc'>('asc')
@@ -529,7 +531,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                     <span style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', color:section.color }}>{section.label}</span>
                     <span style={{ fontSize:11, fontWeight:700, padding:'1px 7px', borderRadius:99, background:`${section.color}18`, color:section.color, marginLeft:2 }}>{section.tasks.length}</span>
                   </div>
-                  {!collapsedSections.has(section.key) && section.tasks.map(task => {
+                  {!collapsedSections.has(section.key) && section.tasks.slice(0, sectionPages[section.key] ?? INBOX_SECTION_SIZE).map(task => {
                     const ov       = isOverdue(task.due_date, task.status)
                     const isComp   = task.status==='completed'
                     const client   = (task as any).client as unknown as {id:string;name:string;color:string}|null
@@ -771,6 +773,15 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                       </div>
                     )
                   })}
+                  {!collapsedSections.has(section.key) && section.tasks.length > (sectionPages[section.key] ?? INBOX_SECTION_SIZE) && (
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', padding:'10px 16px', borderBottom:'1px solid var(--border-light)' }}>
+                      <button
+                        onClick={() => setSectionPages(p => ({ ...p, [section.key]: (p[section.key] ?? INBOX_SECTION_SIZE) + INBOX_SECTION_SIZE }))}
+                        style={{ fontSize:12, fontWeight:600, color:'var(--brand)', background:'rgba(13,148,136,0.06)', border:'1.5px solid rgba(13,148,136,0.2)', borderRadius:20, padding:'5px 18px', cursor:'pointer' }}>
+                        Show {Math.min(INBOX_SECTION_SIZE, section.tasks.length - (sectionPages[section.key] ?? INBOX_SECTION_SIZE))} more in {section.label}
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
 

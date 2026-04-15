@@ -9,7 +9,12 @@ export async function GET(request: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   const { data: mb } = await supabase.from('org_members').select('org_id').eq('user_id', user.id).eq('is_active', true).single()
   if (!mb) return NextResponse.json({ data: [] })
-  const { data, error } = await supabase.from('clients').select('id, name, color, status, email, company').eq('org_id', mb.org_id).order('name')
+  const sp     = request.nextUrl.searchParams
+  const limit  = Math.min(parseInt(sp.get('limit')  ?? '500'), 500)
+  const offset = Math.max(parseInt(sp.get('offset') ?? '0'),   0)
+  const { data, error } = await supabase.from('clients')
+    .select('id, name, color, status, email, company').eq('org_id', mb.org_id)
+    .order('name').range(offset, offset + limit - 1)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ data })
 }

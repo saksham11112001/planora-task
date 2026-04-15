@@ -1,5 +1,5 @@
 'use client'
-import { useState }          from 'react'
+import { useState } from 'react'
 import { useRouter }         from 'next/navigation'
 import Link                  from 'next/link'
 import { Plus, Users2, Pencil, Trash2, CheckSquare } from 'lucide-react'
@@ -20,11 +20,14 @@ interface Props {
   canManage: boolean
 }
 
+const CLIENTS_PER_PAGE = 50
+
 export function ClientsView({ initialClients, canManage }: Props) {
   const router          = useRouter()
   const [clients, setClients]   = useState<Client[]>(initialClients)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [deleting, setDeleting] = useState<Set<string>>(new Set())
+  const [clientPage, setClientPage] = useState(0)
 
   /* ── single delete ── */
   async function handleDelete(id: string, name: string, e: React.MouseEvent) {
@@ -157,8 +160,9 @@ export function ClientsView({ initialClients, canManage }: Props) {
         </div>
       ) : (
         /* ── grid ── */
+        <>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {clients.map(c => {
+          {clients.slice(clientPage * CLIENTS_PER_PAGE, (clientPage + 1) * CLIENTS_PER_PAGE).map(c => {
             const isSelected  = selected.has(c.id)
             const isDeleting  = deleting.has(c.id)
             return (
@@ -277,6 +281,41 @@ export function ClientsView({ initialClients, canManage }: Props) {
             )
           })}
         </div>
+        {/* ── Pagination controls ── */}
+        {clients.length > CLIENTS_PER_PAGE && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: 24 }}>
+            <button
+              onClick={() => setClientPage(p => Math.max(0, p - 1))}
+              disabled={clientPage === 0}
+              style={{
+                padding: '6px 16px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+                border: '1.5px solid var(--border)', background: 'var(--surface)',
+                color: clientPage === 0 ? 'var(--text-muted)' : 'var(--text-primary)',
+                cursor: clientPage === 0 ? 'not-allowed' : 'pointer',
+                opacity: clientPage === 0 ? 0.5 : 1,
+              }}>
+              ← Previous
+            </button>
+            <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+              Page {clientPage + 1} of {Math.ceil(clients.length / CLIENTS_PER_PAGE)}
+              {' '}·{' '}
+              {Math.min((clientPage + 1) * CLIENTS_PER_PAGE, clients.length)} of {clients.length} clients
+            </span>
+            <button
+              onClick={() => setClientPage(p => Math.min(Math.ceil(clients.length / CLIENTS_PER_PAGE) - 1, p + 1))}
+              disabled={(clientPage + 1) * CLIENTS_PER_PAGE >= clients.length}
+              style={{
+                padding: '6px 16px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+                border: '1.5px solid var(--border)', background: 'var(--surface)',
+                color: (clientPage + 1) * CLIENTS_PER_PAGE >= clients.length ? 'var(--text-muted)' : 'var(--text-primary)',
+                cursor: (clientPage + 1) * CLIENTS_PER_PAGE >= clients.length ? 'not-allowed' : 'pointer',
+                opacity: (clientPage + 1) * CLIENTS_PER_PAGE >= clients.length ? 0.5 : 1,
+              }}>
+              Next →
+            </button>
+          </div>
+        )}
+        </>
       )}
     </div>
   )
