@@ -66,6 +66,13 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
   const [newSectionName, setNewSectionName] = useState('')
   const [customSections, setCustomSections] = useState<{key:string;label:string}[]>([])
   const [newSubInputs,   setNewSubInputs]   = useState<Record<string,string>>({})
+  const [subAssigneeOpen, setSubAssigneeOpen] = useState<Record<string, boolean>>({})
+
+  const memberMap = React.useMemo(() => {
+    const m: Record<string, string> = {}
+    members.forEach(mb => { m[mb.id] = mb.name })
+    return m
+  }, [members])
   const [filterOpen,        setFilterOpen]        = useState(false)
   const [sortOpen,          setSortOpen]          = useState(false)
   const [savingTemplate,    setSavingTemplate]    = useState(false)
@@ -196,6 +203,20 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
       const d = await r.json()
       setSubtaskData(p => ({ ...p, [parentId]: d.data ?? [] }))
     }
+  }
+
+  async function assignSubtask(subId: string, assigneeId: string | null, parentId: string) {
+    setSubAssigneeOpen(p => ({ ...p, [subId]: false }))
+    setSubtaskData(p => ({
+      ...p,
+      [parentId]: (p[parentId] ?? []).map(s =>
+        s.id === subId ? { ...s, assignee_id: assigneeId } : s
+      ),
+    }))
+    await fetch(`/api/tasks/${subId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ assignee_id: assigneeId }),
+    })
   }
 
   async function toggleDone(task: Task, e: React.MouseEvent) {
@@ -550,6 +571,55 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
                 color: sub.status === 'completed' ? 'var(--text-muted)' : 'var(--text-primary)',
                 textDecoration: sub.status === 'completed' ? 'line-through' : 'none',
               }}>{sub.title}</span>
+              {/* Inline assignee selector */}
+              <div style={{ position: 'relative', flexShrink: 0 }}>
+                <button
+                  onClick={e => { e.stopPropagation(); setSubAssigneeOpen(p => ({ ...p, [sub.id]: !p[sub.id] })) }}
+                  style={{
+                    fontSize: 11, padding: '2px 8px', borderRadius: 20, cursor: 'pointer',
+                    border: '1px solid var(--border)', background: sub.assignee_id ? 'rgba(13,148,136,0.07)' : 'var(--surface)',
+                    color: sub.assignee_id ? 'var(--brand)' : 'var(--text-muted)', whiteSpace: 'nowrap',
+                    fontWeight: sub.assignee_id ? 600 : 400, fontFamily: 'inherit',
+                  }}
+                >
+                  {sub.assignee_id ? (memberMap[sub.assignee_id]?.split(' ')[0] ?? 'Assigned') : '+ Assign'}
+                </button>
+                {subAssigneeOpen[sub.id] && (
+                  <>
+                    <div
+                      style={{ position: 'fixed', inset: 0, zIndex: 49 }}
+                      onClick={() => setSubAssigneeOpen(p => ({ ...p, [sub.id]: false }))}
+                    />
+                    <div style={{
+                      position: 'absolute', right: 0, top: 'calc(100% + 4px)', zIndex: 50,
+                      background: 'var(--surface)', border: '1px solid var(--border)',
+                      borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+                      minWidth: 148, overflow: 'hidden',
+                    }}>
+                      <button
+                        onClick={() => assignSubtask(sub.id, null, task.id)}
+                        style={{
+                          width: '100%', textAlign: 'left', padding: '7px 12px', fontSize: 12,
+                          background: !sub.assignee_id ? 'var(--surface-subtle)' : 'transparent',
+                          border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontFamily: 'inherit',
+                        }}
+                      >Unassigned</button>
+                      {members.map(m => (
+                        <button
+                          key={m.id}
+                          onClick={() => assignSubtask(sub.id, m.id, task.id)}
+                          style={{
+                            width: '100%', textAlign: 'left', padding: '7px 12px', fontSize: 12,
+                            background: sub.assignee_id === m.id ? 'var(--surface-subtle)' : 'transparent',
+                            border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                            color: 'var(--text-primary)', fontWeight: sub.assignee_id === m.id ? 600 : 400,
+                          }}
+                        >{m.name}</button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           ))}
           {/* Inline add subtask */}
