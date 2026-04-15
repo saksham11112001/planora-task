@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useEffect, useTransition } from 'react'
+import { useMemo, useState, useEffect, useTransition, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { RefreshCw, X, Pencil, User, Trash2, SortAsc, Copy } from 'lucide-react'
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
@@ -80,6 +80,8 @@ export function RecurringView({
   const [localTasks, setLocalTasks] = useState<Task[]>(initialTasks)
   const [viewTab, setViewTab] = useState<'List' | 'Board'>('List')
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+  const panelHasUpdates = useRef(false)
+  useEffect(() => { panelHasUpdates.current = false }, [selectedTask?.id])
   const [editingId, setEditingId] = useState<string | null>(null)
 
   const [checked,     setChecked]     = useState<Set<string>>(new Set())
@@ -131,6 +133,7 @@ export function RecurringView({
     if (fields && selectedTask) {
       setLocalTasks(prev => prev.map(t => t.id === selectedTask.id ? { ...t, ...fields } as Task : t))
       setSelectedTask(prev => prev ? { ...prev, ...fields } as Task : null)
+      panelHasUpdates.current = true
     }
     startT(() => router.refresh())
   }
@@ -1083,7 +1086,13 @@ export function RecurringView({
             clients={clients}
             currentUserId={currentUserId}
             userRole={userRole}
-            onClose={() => setSelectedTask(null)}
+            onClose={() => {
+              if (panelHasUpdates.current) {
+                toast.success('Task updated')
+                panelHasUpdates.current = false
+              }
+              setSelectedTask(null)
+            }}
             onUpdated={handleTaskUpdated}
           />
         </div>
