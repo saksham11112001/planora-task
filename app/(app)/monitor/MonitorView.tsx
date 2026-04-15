@@ -1,6 +1,6 @@
 'use client'
-import { useState, useMemo } from 'react'
-import { Search, Filter, BarChart2, Download } from 'lucide-react'
+import { useState, useMemo, useRef, useEffect } from 'react'
+import { Search, Filter, BarChart2, Download, Calendar } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
 import { isOverdue } from '@/lib/utils/format'
@@ -66,14 +66,22 @@ function typeLabel(t: MonTask): string {
   return 'Quick'
 }
 
-function todayStr() { return new Date().toISOString().slice(0, 10) }
-function weeksFromNow(n: number) {
-  return new Date(Date.now() + n * 7 * 86400000).toISOString().slice(0, 10)
-}
-function monthsAgo(n: number) {
-  const d = new Date(); d.setMonth(d.getMonth() - n)
-  return d.toISOString().slice(0, 10)
-}
+function todayStr()       { return new Date().toISOString().slice(0, 10) }
+function addDays(n: number) { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10) }
+function subDays(n: number) { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10) }
+
+const DUE_PRESETS = [
+  { value: '1d',  label: 'Due today',  from: () => todayStr(),   to: () => addDays(1)  },
+  { value: '3d',  label: 'Due in 3d', from: () => todayStr(),   to: () => addDays(3)  },
+  { value: '1w',  label: 'Due in 1w', from: () => todayStr(),   to: () => addDays(7)  },
+  { value: '15d', label: 'Due in 15d',from: () => todayStr(),   to: () => addDays(15) },
+]
+const PAST_PRESETS = [
+  { value: 'today', label: 'Today',    from: () => todayStr(),   to: () => todayStr()  },
+  { value: '7d',    label: 'Last 7d',  from: () => subDays(7),   to: () => todayStr()  },
+  { value: '30d',   label: 'Last 30d', from: () => subDays(30),  to: () => todayStr()  },
+  { value: '90d',   label: 'Last 90d', from: () => subDays(90),  to: () => todayStr()  },
+]
 
 // Shared dropdown style helper
 function selectStyle(active: boolean) {
@@ -96,9 +104,46 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
   const [filterClient,   setFilterClient]   = useState('')
   const [filterMember,   setFilterMember]   = useState('')
   const [filterType,     setFilterType]     = useState('')
-  const [filterDue,      setFilterDue]      = useState('')   // due date preset
-  const [filterCreated,  setFilterCreated]  = useState('')   // created date preset
-  const [filterModified, setFilterModified] = useState('')   // modified date preset
+  // ── Date filter state ──
+  const [dateOpen,          setDateOpen]          = useState(false)
+  const [duePreset,         setDuePreset]          = useState('')
+  const [dueDateFrom,       setDueDateFrom]        = useState('')
+  const [dueDateTo,         setDueDateTo]          = useState('')
+  const [createdPreset,     setCreatedPreset]      = useState('')
+  const [createdFrom,       setCreatedFrom]        = useState('')
+  const [createdTo,         setCreatedTo]          = useState('')
+  const [updatedPreset,     setUpdatedPreset]      = useState('')
+  const [updatedFrom,       setUpdatedFrom]        = useState('')
+  const [updatedTo,         setUpdatedTo]          = useState('')
+  const [showCustomDue,     setShowCustomDue]      = useState(false)
+  const [showCustomCreated, setShowCustomCreated]  = useState(false)
+  const [showCustomUpdated, setShowCustomUpdated]  = useState(false)
+  const dateRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!dateOpen) return
+    function h(e: MouseEvent) {
+      if (dateRef.current && !dateRef.current.contains(e.target as Node)) setDateOpen(false)
+    }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [dateOpen])
+
+  const hasDateFilter = !!(duePreset || dueDateFrom || createdPreset || createdFrom || updatedPreset || updatedFrom)
+  const activeDateLabel = duePreset
+    ? DUE_PRESETS.find(p => p.value === duePreset)?.label ?? 'Date'
+    : dueDateFrom    ? 'Due: custom'
+    : createdPreset  ? `Created: ${PAST_PRESETS.find(p => p.value === createdPreset)?.label ?? ''}`
+    : createdFrom    ? 'Created: custom'
+    : updatedPreset  ? `Modified: ${PAST_PRESETS.find(p => p.value === updatedPreset)?.label ?? ''}`
+    : updatedFrom    ? 'Modified: custom'
+    : 'Date'
+
+  function clearDateFilters() {
+    setDuePreset(''); setDueDateFrom(''); setDueDateTo(''); setShowCustomDue(false)
+    setCreatedPreset(''); setCreatedFrom(''); setCreatedTo(''); setShowCustomCreated(false)
+    setUpdatedPreset(''); setUpdatedFrom(''); setUpdatedTo(''); setShowCustomUpdated(false)
+  }
 
   // ── UI state ──
   const [showChart,       setShowChart]       = useState(false)
@@ -144,7 +189,6 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
 
   // ── Filtering ──
   const visible = useMemo(() => {
-    const week = weeksFromNow(1)
     return tasks.filter(t => {
       if (search        && !t.title.toLowerCase().includes(search.toLowerCase()))         return false
       if (filterStatus  && t.status    !== filterStatus)                                  return false
@@ -155,23 +199,21 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
       if (filterType === 'recurring' && !t.is_recurring)                                  return false
       if (filterType === 'project'   && !t.project_id)                                   return false
       if (filterType === 'quick'     && (t.project_id || t.is_recurring || t.custom_fields?._ca_compliance)) return false
-      // Due date presets
-      if (filterDue === 'overdue'   && !(t.due_date && t.due_date < today && !['completed','cancelled'].includes(t.status))) return false
-      if (filterDue === 'today'     && t.due_date !== today)                              return false
-      if (filterDue === 'week'      && !(t.due_date && t.due_date >= today && t.due_date <= week)) return false
-      // Created date presets
+      // Due date range
+      if (dueDateFrom && (!t.due_date || t.due_date < dueDateFrom)) return false
+      if (dueDateTo   && (!t.due_date || t.due_date > dueDateTo))   return false
+      // Created date range
       const createdDate = t.created_at?.slice(0, 10) ?? ''
-      if (filterCreated === 'today'  && createdDate !== today)                            return false
-      if (filterCreated === 'week'   && !(createdDate >= weeksFromNow(-1) && createdDate <= today)) return false
-      if (filterCreated === 'month'  && !(createdDate >= monthsAgo(1)    && createdDate <= today)) return false
-      // Modified date presets
+      if (createdFrom && createdDate < createdFrom) return false
+      if (createdTo   && createdDate > createdTo)   return false
+      // Modified date range
       const updatedDate = (t.updated_at ?? t.created_at)?.slice(0, 10) ?? ''
-      if (filterModified === 'today' && updatedDate !== today)                            return false
-      if (filterModified === 'week'  && !(updatedDate >= weeksFromNow(-1) && updatedDate <= today)) return false
-      if (filterModified === 'month' && !(updatedDate >= monthsAgo(1)    && updatedDate <= today)) return false
+      if (updatedFrom && updatedDate < updatedFrom) return false
+      if (updatedTo   && updatedDate > updatedTo)   return false
       return true
     })
-  }, [tasks, search, filterStatus, filterPrio, filterClient, filterMember, filterType, filterDue, filterCreated, filterModified, today])
+  }, [tasks, search, filterStatus, filterPrio, filterClient, filterMember, filterType,
+      dueDateFrom, dueDateTo, createdFrom, createdTo, updatedFrom, updatedTo])
 
   // ── Stats ──
   const stats = useMemo(() => {
@@ -220,11 +262,15 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
     return [{ key: 'all', label: 'All tasks', color: 'var(--brand)', tasks: visible }]
   }, [visible, groupBy])
 
-  const activeFilters = [search, filterStatus, filterPrio, filterClient, filterMember, filterType, filterDue, filterCreated, filterModified].filter(Boolean).length
+  const activeFilters = [
+    search, filterStatus, filterPrio, filterClient, filterMember, filterType,
+    duePreset || dueDateFrom, createdPreset || createdFrom, updatedPreset || updatedFrom,
+  ].filter(Boolean).length
 
   function clearFilters() {
     setSearch(''); setFilterStatus(''); setFilterPrio(''); setFilterClient('')
-    setFilterMember(''); setFilterType(''); setFilterDue(''); setFilterCreated(''); setFilterModified('')
+    setFilterMember(''); setFilterType('')
+    clearDateFilters()
   }
 
   return (
@@ -379,29 +425,144 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
           <option value='quick'>Quick tasks</option>
         </select>
 
-        {/* Due date */}
-        <select value={filterDue} onChange={e => setFilterDue(e.target.value)} style={selectStyle(!!filterDue)}>
-          <option value=''>All due dates</option>
-          <option value='overdue'>Overdue</option>
-          <option value='today'>Due today</option>
-          <option value='week'>Due this week</option>
-        </select>
+        {/* Date filter — single button with dropdown panel */}
+        <div ref={dateRef} style={{ position: 'relative' }}>
+          <button onClick={() => setDateOpen(o => !o)}
+            style={{ ...selectStyle(hasDateFilter), display: 'flex', alignItems: 'center', gap: 5, paddingRight: hasDateFilter ? 28 : 10 }}>
+            <Calendar style={{ width: 11, height: 11, flexShrink: 0 }}/>
+            {activeDateLabel}
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0, opacity: 0.6 }}>
+              <path d="m6 9 6 6 6-6"/>
+            </svg>
+          </button>
+          {hasDateFilter && (
+            <button onClick={e => { e.stopPropagation(); clearDateFilters() }}
+              style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)',
+                width: 14, height: 14, borderRadius: '50%', border: 'none', background: 'var(--brand)',
+                color: '#fff', fontSize: 9, fontWeight: 700, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1, padding: 0 }}
+              title="Clear date filter">×</button>
+          )}
 
-        {/* Created */}
-        <select value={filterCreated} onChange={e => setFilterCreated(e.target.value)} style={selectStyle(!!filterCreated)}>
-          <option value=''>Any created</option>
-          <option value='today'>Created today</option>
-          <option value='week'>Created this week</option>
-          <option value='month'>Created this month</option>
-        </select>
+          {dateOpen && (
+            <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 1000,
+              background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12,
+              boxShadow: '0 10px 40px rgba(0,0,0,0.15)', padding: '10px 12px', minWidth: 260 }}>
 
-        {/* Modified */}
-        <select value={filterModified} onChange={e => setFilterModified(e.target.value)} style={selectStyle(!!filterModified)}>
-          <option value=''>Any modified</option>
-          <option value='today'>Modified today</option>
-          <option value='week'>Modified this week</option>
-          <option value='month'>Modified this month</option>
-        </select>
+              {/* Due date */}
+              <div style={{ marginBottom: 12 }}>
+                <p style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase',
+                  letterSpacing: '0.07em', marginBottom: 6 }}>Due date</p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {DUE_PRESETS.map(p => (
+                    <button key={p.value}
+                      onClick={() => {
+                        if (duePreset === p.value) { setDuePreset(''); setDueDateFrom(''); setDueDateTo('') }
+                        else { setDuePreset(p.value); setDueDateFrom(p.from()); setDueDateTo(p.to()); setShowCustomDue(false) }
+                      }}
+                      style={{ fontSize: 11, padding: '3px 10px', borderRadius: 99, border: 'none', cursor: 'pointer',
+                        fontFamily: 'inherit', fontWeight: duePreset === p.value ? 700 : 400,
+                        background: duePreset === p.value ? 'var(--brand)' : 'var(--surface-subtle)',
+                        color: duePreset === p.value ? '#fff' : 'var(--text-secondary)' }}>
+                      {p.label}
+                    </button>
+                  ))}
+                  <button onClick={() => { setShowCustomDue(o => !o); setDuePreset('') }}
+                    style={{ fontSize: 11, padding: '3px 10px', borderRadius: 99, border: 'none', cursor: 'pointer',
+                      fontFamily: 'inherit', fontWeight: showCustomDue ? 700 : 400,
+                      background: showCustomDue ? 'rgba(13,148,136,0.15)' : 'var(--surface-subtle)',
+                      color: showCustomDue ? 'var(--brand)' : 'var(--text-secondary)' }}>Custom…</button>
+                </div>
+                {showCustomDue && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                    <input type="date" value={dueDateFrom} onChange={e => setDueDateFrom(e.target.value)}
+                      style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--border)',
+                        background: 'var(--surface-subtle)', color: 'var(--text-primary)', fontFamily: 'inherit', colorScheme: 'light dark' as any }}/>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>–</span>
+                    <input type="date" value={dueDateTo} onChange={e => setDueDateTo(e.target.value)}
+                      style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--border)',
+                        background: 'var(--surface-subtle)', color: 'var(--text-primary)', fontFamily: 'inherit', colorScheme: 'light dark' as any }}/>
+                  </div>
+                )}
+              </div>
+
+              {/* Created date */}
+              <div style={{ marginBottom: 12, borderTop: '1px solid var(--border-light)', paddingTop: 12 }}>
+                <p style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase',
+                  letterSpacing: '0.07em', marginBottom: 6 }}>Created date</p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {PAST_PRESETS.map(p => (
+                    <button key={p.value}
+                      onClick={() => {
+                        if (createdPreset === p.value) { setCreatedPreset(''); setCreatedFrom(''); setCreatedTo('') }
+                        else { setCreatedPreset(p.value); setCreatedFrom(p.from()); setCreatedTo(p.to()); setShowCustomCreated(false) }
+                      }}
+                      style={{ fontSize: 11, padding: '3px 10px', borderRadius: 99, border: 'none', cursor: 'pointer',
+                        fontFamily: 'inherit', fontWeight: createdPreset === p.value ? 700 : 400,
+                        background: createdPreset === p.value ? 'var(--brand)' : 'var(--surface-subtle)',
+                        color: createdPreset === p.value ? '#fff' : 'var(--text-secondary)' }}>
+                      {p.label}
+                    </button>
+                  ))}
+                  <button onClick={() => { setShowCustomCreated(o => !o); setCreatedPreset('') }}
+                    style={{ fontSize: 11, padding: '3px 10px', borderRadius: 99, border: 'none', cursor: 'pointer',
+                      fontFamily: 'inherit', fontWeight: showCustomCreated ? 700 : 400,
+                      background: showCustomCreated ? 'rgba(13,148,136,0.15)' : 'var(--surface-subtle)',
+                      color: showCustomCreated ? 'var(--brand)' : 'var(--text-secondary)' }}>Custom…</button>
+                </div>
+                {showCustomCreated && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                    <input type="date" value={createdFrom} onChange={e => setCreatedFrom(e.target.value)}
+                      style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--border)',
+                        background: 'var(--surface-subtle)', color: 'var(--text-primary)', fontFamily: 'inherit', colorScheme: 'light dark' as any }}/>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>–</span>
+                    <input type="date" value={createdTo} onChange={e => setCreatedTo(e.target.value)}
+                      style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--border)',
+                        background: 'var(--surface-subtle)', color: 'var(--text-primary)', fontFamily: 'inherit', colorScheme: 'light dark' as any }}/>
+                  </div>
+                )}
+              </div>
+
+              {/* Modified date */}
+              <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: 12 }}>
+                <p style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase',
+                  letterSpacing: '0.07em', marginBottom: 6 }}>Modified date</p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {PAST_PRESETS.map(p => (
+                    <button key={p.value}
+                      onClick={() => {
+                        if (updatedPreset === p.value) { setUpdatedPreset(''); setUpdatedFrom(''); setUpdatedTo('') }
+                        else { setUpdatedPreset(p.value); setUpdatedFrom(p.from()); setUpdatedTo(p.to()); setShowCustomUpdated(false) }
+                      }}
+                      style={{ fontSize: 11, padding: '3px 10px', borderRadius: 99, border: 'none', cursor: 'pointer',
+                        fontFamily: 'inherit', fontWeight: updatedPreset === p.value ? 700 : 400,
+                        background: updatedPreset === p.value ? 'var(--brand)' : 'var(--surface-subtle)',
+                        color: updatedPreset === p.value ? '#fff' : 'var(--text-secondary)' }}>
+                      {p.label}
+                    </button>
+                  ))}
+                  <button onClick={() => { setShowCustomUpdated(o => !o); setUpdatedPreset('') }}
+                    style={{ fontSize: 11, padding: '3px 10px', borderRadius: 99, border: 'none', cursor: 'pointer',
+                      fontFamily: 'inherit', fontWeight: showCustomUpdated ? 700 : 400,
+                      background: showCustomUpdated ? 'rgba(13,148,136,0.15)' : 'var(--surface-subtle)',
+                      color: showCustomUpdated ? 'var(--brand)' : 'var(--text-secondary)' }}>Custom…</button>
+                </div>
+                {showCustomUpdated && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                    <input type="date" value={updatedFrom} onChange={e => setUpdatedFrom(e.target.value)}
+                      style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--border)',
+                        background: 'var(--surface-subtle)', color: 'var(--text-primary)', fontFamily: 'inherit', colorScheme: 'light dark' as any }}/>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>–</span>
+                    <input type="date" value={updatedTo} onChange={e => setUpdatedTo(e.target.value)}
+                      style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--border)',
+                        background: 'var(--surface-subtle)', color: 'var(--text-primary)', fontFamily: 'inherit', colorScheme: 'light dark' as any }}/>
+                  </div>
+                )}
+              </div>
+
+            </div>
+          )}
+        </div>
 
         {/* Clear */}
         {activeFilters > 0 && (
