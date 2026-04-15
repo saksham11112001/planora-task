@@ -1,8 +1,9 @@
 'use client'
 import { useState, useMemo } from 'react'
-import { Search, RefreshCw, Filter, AlertTriangle, CheckCircle2, Clock, FolderOpen, ListTodo, BarChart2, Users } from 'lucide-react'
+import { Search, Filter, BarChart2, Download } from 'lucide-react'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
-import { fmtDate, isOverdue } from '@/lib/utils/format'
+import { isOverdue } from '@/lib/utils/format'
 import type { Task } from '@/types'
 
 interface MonTask {
@@ -36,14 +37,14 @@ interface Props {
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  todo:        { label: 'To do',           color: '#64748b', bg: '#f1f5f9' },
-  in_progress: { label: 'In progress',     color: '#2563eb', bg: '#eff6ff' },
-  in_review:   { label: 'Pending approval',color: '#7c3aed', bg: '#fdf4ff' },
-  completed:   { label: 'Completed',       color: '#16a34a', bg: '#f0fdf4' },
-  cancelled:   { label: 'Cancelled',       color: '#94a3b8', bg: '#f8fafc' },
+  todo:        { label: 'To do',            color: '#64748b', bg: '#f1f5f9' },
+  in_progress: { label: 'In progress',      color: '#2563eb', bg: '#eff6ff' },
+  in_review:   { label: 'Pending approval', color: '#7c3aed', bg: '#fdf4ff' },
+  completed:   { label: 'Completed',        color: '#16a34a', bg: '#f0fdf4' },
+  cancelled:   { label: 'Cancelled',        color: '#94a3b8', bg: '#f8fafc' },
 }
 const PRIORITY_DOT: Record<string, string> = {
-  urgent:'#dc2626', high:'#ea580c', medium:'#ca8a04', low:'#16a34a', none:'#94a3b8',
+  urgent: '#dc2626', high: '#ea580c', medium: '#ca8a04', low: '#16a34a', none: '#94a3b8',
 }
 
 function typeAccent(t: MonTask): string {
@@ -66,19 +67,44 @@ function typeLabel(t: MonTask): string {
 }
 
 function todayStr() { return new Date().toISOString().slice(0, 10) }
+function weeksFromNow(n: number) {
+  return new Date(Date.now() + n * 7 * 86400000).toISOString().slice(0, 10)
+}
+function monthsAgo(n: number) {
+  const d = new Date(); d.setMonth(d.getMonth() - n)
+  return d.toISOString().slice(0, 10)
+}
+
+// Shared dropdown style helper
+function selectStyle(active: boolean) {
+  return {
+    fontSize: 12, padding: '4px 10px', borderRadius: 20, cursor: 'pointer', fontFamily: 'inherit',
+    border: active ? '1px solid var(--brand)' : '1px solid var(--border)',
+    background: active ? 'rgba(13,148,136,0.08)' : 'var(--surface-subtle)',
+    color: active ? 'var(--brand)' : 'var(--text-secondary)',
+    fontWeight: active ? 600 : 400,
+  } as React.CSSProperties
+}
 
 export function MonitorView({ tasks, members, clients, currentUserId, userRole }: Props) {
   const today = todayStr()
-  const [search,        setSearch]        = useState('')
-  const [filterStatus,  setFilterStatus]  = useState('')
-  const [filterPrio,    setFilterPrio]    = useState('')
-  const [filterClient,  setFilterClient]  = useState('')
-  const [filterMember,  setFilterMember]  = useState('')
-  const [filterType,    setFilterType]    = useState('')
-  const [filterDate,    setFilterDate]    = useState<'overdue' | 'today' | 'week' | ''>('')
-  const [panelTask,     setPanelTask]     = useState<Task | null>(null)
-  const [panelLoading,  setPanelLoading]  = useState(false)
-  const [groupBy,       setGroupBy]       = useState<'status' | 'assignee' | 'client' | 'type' | 'none'>('status')
+
+  // ── Filter state ──
+  const [search,         setSearch]         = useState('')
+  const [filterStatus,   setFilterStatus]   = useState('')
+  const [filterPrio,     setFilterPrio]     = useState('')
+  const [filterClient,   setFilterClient]   = useState('')
+  const [filterMember,   setFilterMember]   = useState('')
+  const [filterType,     setFilterType]     = useState('')
+  const [filterDue,      setFilterDue]      = useState('')   // due date preset
+  const [filterCreated,  setFilterCreated]  = useState('')   // created date preset
+  const [filterModified, setFilterModified] = useState('')   // modified date preset
+
+  // ── UI state ──
+  const [showChart,       setShowChart]       = useState(false)
+  const [panelTask,       setPanelTask]       = useState<Task | null>(null)
+  const [panelLoading,    setPanelLoading]    = useState(false)
+  const [groupBy,         setGroupBy]         = useState<'status' | 'assignee' | 'client' | 'type' | 'none'>('status')
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
 
   function toggleGroup(k: string) {
@@ -88,42 +114,78 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
   async function openTask(id: string) {
     setPanelLoading(true)
     try {
-      const res = await fetch(`/api/tasks/${id}`)
+      const res  = await fetch(`/api/tasks/${id}`)
       const data = await res.json()
       if (data?.data) setPanelTask(data.data as Task)
     } finally { setPanelLoading(false) }
   }
 
+  // ── Export ──
+  function exportToExcel() {
+    const headers = ['Title', 'Status', 'Priority', 'Type', 'Assignee', 'Client', 'Due Date', 'Created', 'Updated']
+    const rows = visible.map(t => [
+      `"${(t.title ?? '').replace(/"/g, '""')}"`,
+      STATUS_CONFIG[t.status]?.label ?? t.status,
+      t.priority,
+      typeLabel(t),
+      t.assignee?.name ?? '',
+      t.client?.name ?? '',
+      t.due_date ?? '',
+      t.created_at?.slice(0, 10) ?? '',
+      (t.updated_at ?? t.created_at)?.slice(0, 10) ?? '',
+    ].join(','))
+    const csv  = [headers.join(','), ...rows].join('\n')
+    const blob = new Blob([csv], { type: 'application/vnd.ms-excel' })
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href = url; a.download = `monitor_export_${today}.xls`; a.click()
+    URL.revokeObjectURL(url)
+  }
+
   // ── Filtering ──
-  const visible = useMemo(() => tasks.filter(t => {
-    if (search       && !t.title.toLowerCase().includes(search.toLowerCase())) return false
-    if (filterStatus && t.status !== filterStatus)                             return false
-    if (filterPrio   && t.priority !== filterPrio)                             return false
-    if (filterClient && t.client_id !== filterClient)                          return false
-    if (filterMember && t.assignee_id !== filterMember)                        return false
-    if (filterType === 'ca'        && !t.custom_fields?._ca_compliance)       return false
-    if (filterType === 'recurring' && !t.is_recurring)                         return false
-    if (filterType === 'project'   && !t.project_id)                           return false
-    if (filterType === 'quick'     && (t.project_id || t.is_recurring || t.custom_fields?._ca_compliance)) return false
-    if (filterDate === 'overdue' && !(t.due_date && t.due_date < today && !['completed','cancelled'].includes(t.status))) return false
-    if (filterDate === 'today'   && t.due_date !== today) return false
-    if (filterDate === 'week'    && !(t.due_date && t.due_date >= today && t.due_date <= new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10))) return false
-    return true
-  }), [tasks, search, filterStatus, filterPrio, filterClient, filterMember, filterType, filterDate, today])
+  const visible = useMemo(() => {
+    const week = weeksFromNow(1)
+    return tasks.filter(t => {
+      if (search        && !t.title.toLowerCase().includes(search.toLowerCase()))         return false
+      if (filterStatus  && t.status    !== filterStatus)                                  return false
+      if (filterPrio    && t.priority  !== filterPrio)                                    return false
+      if (filterClient  && t.client_id !== filterClient)                                  return false
+      if (filterMember  && t.assignee_id !== filterMember)                                return false
+      if (filterType === 'ca'        && !t.custom_fields?._ca_compliance)                return false
+      if (filterType === 'recurring' && !t.is_recurring)                                  return false
+      if (filterType === 'project'   && !t.project_id)                                   return false
+      if (filterType === 'quick'     && (t.project_id || t.is_recurring || t.custom_fields?._ca_compliance)) return false
+      // Due date presets
+      if (filterDue === 'overdue'   && !(t.due_date && t.due_date < today && !['completed','cancelled'].includes(t.status))) return false
+      if (filterDue === 'today'     && t.due_date !== today)                              return false
+      if (filterDue === 'week'      && !(t.due_date && t.due_date >= today && t.due_date <= week)) return false
+      // Created date presets
+      const createdDate = t.created_at?.slice(0, 10) ?? ''
+      if (filterCreated === 'today'  && createdDate !== today)                            return false
+      if (filterCreated === 'week'   && !(createdDate >= weeksFromNow(-1) && createdDate <= today)) return false
+      if (filterCreated === 'month'  && !(createdDate >= monthsAgo(1)    && createdDate <= today)) return false
+      // Modified date presets
+      const updatedDate = (t.updated_at ?? t.created_at)?.slice(0, 10) ?? ''
+      if (filterModified === 'today' && updatedDate !== today)                            return false
+      if (filterModified === 'week'  && !(updatedDate >= weeksFromNow(-1) && updatedDate <= today)) return false
+      if (filterModified === 'month' && !(updatedDate >= monthsAgo(1)    && updatedDate <= today)) return false
+      return true
+    })
+  }, [tasks, search, filterStatus, filterPrio, filterClient, filterMember, filterType, filterDue, filterCreated, filterModified, today])
 
   // ── Stats ──
   const stats = useMemo(() => {
     const all = tasks
     return {
-      total:       all.length,
-      todo:        all.filter(t => t.status === 'todo').length,
-      inProgress:  all.filter(t => t.status === 'in_progress').length,
-      inReview:    all.filter(t => t.status === 'in_review').length,
-      completed:   all.filter(t => t.status === 'completed').length,
-      overdue:     all.filter(t => !!t.due_date && t.due_date < today && !['completed','cancelled'].includes(t.status)).length,
-      ca:          all.filter(t => t.custom_fields?._ca_compliance).length,
-      recurring:   all.filter(t => t.is_recurring).length,
-      unassigned:  all.filter(t => !t.assignee_id).length,
+      total:      all.length,
+      todo:       all.filter(t => t.status === 'todo').length,
+      inProgress: all.filter(t => t.status === 'in_progress').length,
+      inReview:   all.filter(t => t.status === 'in_review').length,
+      completed:  all.filter(t => t.status === 'completed').length,
+      overdue:    all.filter(t => !!t.due_date && t.due_date < today && !['completed', 'cancelled'].includes(t.status)).length,
+      ca:         all.filter(t => t.custom_fields?._ca_compliance).length,
+      recurring:  all.filter(t => t.is_recurring).length,
+      unassigned: all.filter(t => !t.assignee_id).length,
     }
   }, [tasks, today])
 
@@ -131,34 +193,21 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
   const groups = useMemo<{ key: string; label: string; color: string; tasks: MonTask[] }[]>(() => {
     if (groupBy === 'none') return [{ key: 'all', label: 'All tasks', color: 'var(--brand)', tasks: visible }]
     if (groupBy === 'status') {
-      return ['todo','in_progress','in_review','completed','cancelled']
+      return ['todo', 'in_progress', 'in_review', 'completed', 'cancelled']
         .map(s => ({ key: s, label: STATUS_CONFIG[s]?.label ?? s, color: STATUS_CONFIG[s]?.color ?? '#94a3b8', tasks: visible.filter(t => t.status === s) }))
         .filter(g => g.tasks.length > 0)
     }
     if (groupBy === 'assignee') {
-      const byAssignee: Record<string, MonTask[]> = {}
-      visible.forEach(t => {
-        const k = t.assignee?.name ?? '⊘ Unassigned'
-        if (!byAssignee[k]) byAssignee[k] = []
-        byAssignee[k].push(t)
-      })
-      return Object.entries(byAssignee)
-        .sort(([a], [b]) => a.localeCompare(b))
+      const map: Record<string, MonTask[]> = {}
+      visible.forEach(t => { const k = t.assignee?.name ?? '⊘ Unassigned'; (map[k] ??= []).push(t) })
+      return Object.entries(map).sort(([a], [b]) => a.localeCompare(b))
         .map(([k, ts]) => ({ key: k, label: k, color: '#0d9488', tasks: ts }))
     }
     if (groupBy === 'client') {
-      const byClient: Record<string, MonTask[]> = {}
-      visible.forEach(t => {
-        const k = t.client?.name ?? '⊘ No client'
-        if (!byClient[k]) byClient[k] = []
-        byClient[k].push(t)
-      })
-      return Object.entries(byClient)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([k, ts]) => {
-          const cl = ts[0]?.client
-          return { key: k, label: k, color: cl?.color ?? '#94a3b8', tasks: ts }
-        })
+      const map: Record<string, MonTask[]> = {}
+      visible.forEach(t => { const k = t.client?.name ?? '⊘ No client'; (map[k] ??= []).push(t) })
+      return Object.entries(map).sort(([a], [b]) => a.localeCompare(b))
+        .map(([k, ts]) => ({ key: k, label: k, color: ts[0]?.client?.color ?? '#94a3b8', tasks: ts }))
     }
     if (groupBy === 'type') {
       return [
@@ -171,11 +220,11 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
     return [{ key: 'all', label: 'All tasks', color: 'var(--brand)', tasks: visible }]
   }, [visible, groupBy])
 
-  const activeFilters = [search, filterStatus, filterPrio, filterClient, filterMember, filterType, filterDate].filter(Boolean).length
+  const activeFilters = [search, filterStatus, filterPrio, filterClient, filterMember, filterType, filterDue, filterCreated, filterModified].filter(Boolean).length
 
   function clearFilters() {
     setSearch(''); setFilterStatus(''); setFilterPrio(''); setFilterClient('')
-    setFilterMember(''); setFilterType(''); setFilterDate('')
+    setFilterMember(''); setFilterType(''); setFilterDue(''); setFilterCreated(''); setFilterModified('')
   }
 
   return (
@@ -188,23 +237,40 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
             border: '1px solid rgba(13,148,136,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <BarChart2 style={{ width: 18, height: 18, color: '#0d9488' }}/>
           </div>
-          <div>
+          <div style={{ flex: 1 }}>
             <h1 style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>Monitor</h1>
             <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>Read-only view of all tasks across the organisation</p>
           </div>
+          {/* Chart toggle */}
+          <button onClick={() => setShowChart(v => !v)}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 20,
+              border: showChart ? '1px solid var(--brand)' : '1px solid var(--border)',
+              background: showChart ? 'rgba(13,148,136,0.1)' : 'var(--surface-subtle)',
+              color: showChart ? 'var(--brand)' : 'var(--text-secondary)',
+              fontSize: 12, fontWeight: showChart ? 600 : 400, cursor: 'pointer', fontFamily: 'inherit' }}>
+            <BarChart2 style={{ width: 13, height: 13 }}/>
+            {showChart ? 'Hide chart' : 'Show chart'}
+          </button>
+          {/* Export */}
+          <button onClick={exportToExcel}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 20,
+              border: '1px solid var(--brand)', background: 'rgba(13,148,136,0.1)',
+              color: 'var(--brand)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+            <Download style={{ width: 13, height: 13 }}/> Export Excel
+          </button>
         </div>
 
         {/* ── Stats bar ── */}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {[
-            { label: 'Total',      value: stats.total,      color: '#0d9488', bg: 'rgba(13,148,136,0.1)',    border: 'rgba(13,148,136,0.25)'  },
-            { label: 'To do',      value: stats.todo,       color: '#64748b', bg: 'var(--surface-subtle)',   border: 'var(--border)'           },
-            { label: 'In progress',value: stats.inProgress, color: '#2563eb', bg: 'rgba(37,99,235,0.08)',    border: 'rgba(37,99,235,0.25)'   },
-            { label: 'In review',  value: stats.inReview,   color: '#7c3aed', bg: 'rgba(124,58,237,0.08)',   border: 'rgba(124,58,237,0.25)'  },
-            { label: 'Completed',  value: stats.completed,  color: '#16a34a', bg: 'rgba(22,163,74,0.08)',    border: 'rgba(22,163,74,0.25)'   },
-            { label: 'Overdue',    value: stats.overdue,    color: stats.overdue > 0 ? '#dc2626' : '#94a3b8', bg: stats.overdue > 0 ? 'rgba(220,38,38,0.08)' : 'var(--surface-subtle)', border: stats.overdue > 0 ? 'rgba(220,38,38,0.25)' : 'var(--border)' },
-            { label: 'Unassigned', value: stats.unassigned, color: stats.unassigned > 0 ? '#d97706' : '#94a3b8', bg: stats.unassigned > 0 ? 'rgba(234,179,8,0.08)' : 'var(--surface-subtle)', border: stats.unassigned > 0 ? 'rgba(234,179,8,0.25)' : 'var(--border)' },
-            { label: 'CA',         value: stats.ca,         color: '#d97706', bg: 'rgba(234,179,8,0.08)',    border: 'rgba(234,179,8,0.25)'   },
+            { label: 'Total',       value: stats.total,      color: '#0d9488', bg: 'rgba(13,148,136,0.1)',  border: 'rgba(13,148,136,0.25)' },
+            { label: 'To do',       value: stats.todo,       color: '#64748b', bg: 'var(--surface-subtle)', border: 'var(--border)'         },
+            { label: 'In progress', value: stats.inProgress, color: '#2563eb', bg: 'rgba(37,99,235,0.08)',  border: 'rgba(37,99,235,0.25)'  },
+            { label: 'In review',   value: stats.inReview,   color: '#7c3aed', bg: 'rgba(124,58,237,0.08)', border: 'rgba(124,58,237,0.25)' },
+            { label: 'Completed',   value: stats.completed,  color: '#16a34a', bg: 'rgba(22,163,74,0.08)',  border: 'rgba(22,163,74,0.25)'  },
+            { label: 'Overdue',     value: stats.overdue,    color: stats.overdue > 0 ? '#dc2626' : '#94a3b8', bg: stats.overdue > 0 ? 'rgba(220,38,38,0.08)' : 'var(--surface-subtle)', border: stats.overdue > 0 ? 'rgba(220,38,38,0.25)' : 'var(--border)' },
+            { label: 'Unassigned',  value: stats.unassigned, color: stats.unassigned > 0 ? '#d97706' : '#94a3b8', bg: stats.unassigned > 0 ? 'rgba(234,179,8,0.08)' : 'var(--surface-subtle)', border: stats.unassigned > 0 ? 'rgba(234,179,8,0.25)' : 'var(--border)' },
+            { label: 'CA',          value: stats.ca,         color: '#d97706', bg: 'rgba(234,179,8,0.08)',  border: 'rgba(234,179,8,0.25)'  },
           ].map(s => (
             <div key={s.label} style={{ padding: '6px 12px', borderRadius: 8, background: s.bg, border: `1px solid ${s.border}` }}>
               <span style={{ fontSize: 16, fontWeight: 800, color: s.color, display: 'block', lineHeight: 1 }}>{s.value}</span>
@@ -212,6 +278,54 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
             </div>
           ))}
         </div>
+
+        {/* ── Chart (collapsible) ── */}
+        {showChart && (
+          <div style={{ marginTop: 16, padding: '12px 0 4px', borderTop: '1px solid var(--border-light)' }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Task distribution</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div>
+                <p style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>By status</p>
+                <ResponsiveContainer width="100%" height={140}>
+                  <BarChart data={[
+                    { name: 'To do',       value: stats.todo,       fill: '#64748b' },
+                    { name: 'In progress', value: stats.inProgress, fill: '#2563eb' },
+                    { name: 'In review',   value: stats.inReview,   fill: '#7c3aed' },
+                    { name: 'Completed',   value: stats.completed,  fill: '#16a34a' },
+                  ]} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                    <XAxis dataKey="name" tick={{ fontSize: 9 }} interval={0} angle={-20} textAnchor="end" height={32}/>
+                    <YAxis tick={{ fontSize: 9 }} allowDecimals={false}/>
+                    <Tooltip contentStyle={{ fontSize: 11 }}/>
+                    <Bar dataKey="value" radius={[3, 3, 0, 0]}>
+                      {[{ fill: '#64748b' }, { fill: '#2563eb' }, { fill: '#7c3aed' }, { fill: '#16a34a' }]
+                        .map((e, i) => <Cell key={i} fill={e.fill}/>)}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div>
+                <p style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>By type</p>
+                <ResponsiveContainer width="100%" height={140}>
+                  <BarChart data={[
+                    { name: 'CA',      value: stats.ca,        fill: '#d97706' },
+                    { name: 'Repeat',  value: stats.recurring, fill: '#0d9488' },
+                    { name: 'Project', value: tasks.filter(t => !!t.project_id && !t.is_recurring && !t.custom_fields?._ca_compliance).length, fill: '#7c3aed' },
+                    { name: 'Quick',   value: tasks.filter(t => !t.project_id && !t.is_recurring && !t.custom_fields?._ca_compliance).length,  fill: '#0891b2' },
+                    { name: 'Overdue', value: stats.overdue,   fill: '#dc2626' },
+                  ]} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                    <XAxis dataKey="name" tick={{ fontSize: 9 }}/>
+                    <YAxis tick={{ fontSize: 9 }} allowDecimals={false}/>
+                    <Tooltip contentStyle={{ fontSize: 11 }}/>
+                    <Bar dataKey="value" radius={[3, 3, 0, 0]}>
+                      {[{ fill: '#d97706' }, { fill: '#0d9488' }, { fill: '#7c3aed' }, { fill: '#0891b2' }, { fill: '#dc2626' }]
+                        .map((e, i) => <Cell key={i} fill={e.fill}/>)}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Filters & group-by bar ── */}
@@ -229,32 +343,20 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
         </div>
 
         {/* Status */}
-        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-          style={{ fontSize: 12, padding: '4px 10px', borderRadius: 20, cursor: 'pointer', fontFamily: 'inherit',
-            border: filterStatus ? '1px solid var(--brand)' : '1px solid var(--border)',
-            background: filterStatus ? 'rgba(13,148,136,0.08)' : 'var(--surface-subtle)',
-            color: filterStatus ? 'var(--brand)' : 'var(--text-secondary)', fontWeight: filterStatus ? 600 : 400 }}>
+        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={selectStyle(!!filterStatus)}>
           <option value=''>All statuses</option>
           {Object.entries(STATUS_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
         </select>
 
         {/* Priority */}
-        <select value={filterPrio} onChange={e => setFilterPrio(e.target.value)}
-          style={{ fontSize: 12, padding: '4px 10px', borderRadius: 20, cursor: 'pointer', fontFamily: 'inherit',
-            border: filterPrio ? '1px solid var(--brand)' : '1px solid var(--border)',
-            background: filterPrio ? 'rgba(13,148,136,0.08)' : 'var(--surface-subtle)',
-            color: filterPrio ? 'var(--brand)' : 'var(--text-secondary)', fontWeight: filterPrio ? 600 : 400 }}>
+        <select value={filterPrio} onChange={e => setFilterPrio(e.target.value)} style={selectStyle(!!filterPrio)}>
           <option value=''>All priorities</option>
-          {['urgent','high','medium','low','none'].map(p => <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>)}
+          {['urgent', 'high', 'medium', 'low', 'none'].map(p => <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>)}
         </select>
 
         {/* Assignee */}
         {members.length > 0 && (
-          <select value={filterMember} onChange={e => setFilterMember(e.target.value)}
-            style={{ fontSize: 12, padding: '4px 10px', borderRadius: 20, cursor: 'pointer', fontFamily: 'inherit',
-              border: filterMember ? '1px solid var(--brand)' : '1px solid var(--border)',
-              background: filterMember ? 'rgba(13,148,136,0.08)' : 'var(--surface-subtle)',
-              color: filterMember ? 'var(--brand)' : 'var(--text-secondary)', fontWeight: filterMember ? 600 : 400 }}>
+          <select value={filterMember} onChange={e => setFilterMember(e.target.value)} style={selectStyle(!!filterMember)}>
             <option value=''>All members</option>
             {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
           </select>
@@ -262,22 +364,14 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
 
         {/* Client */}
         {clients.length > 0 && (
-          <select value={filterClient} onChange={e => setFilterClient(e.target.value)}
-            style={{ fontSize: 12, padding: '4px 10px', borderRadius: 20, cursor: 'pointer', fontFamily: 'inherit',
-              border: filterClient ? '1px solid var(--brand)' : '1px solid var(--border)',
-              background: filterClient ? 'rgba(13,148,136,0.08)' : 'var(--surface-subtle)',
-              color: filterClient ? 'var(--brand)' : 'var(--text-secondary)', fontWeight: filterClient ? 600 : 400 }}>
+          <select value={filterClient} onChange={e => setFilterClient(e.target.value)} style={selectStyle(!!filterClient)}>
             <option value=''>All clients</option>
             {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         )}
 
         {/* Type */}
-        <select value={filterType} onChange={e => setFilterType(e.target.value)}
-          style={{ fontSize: 12, padding: '4px 10px', borderRadius: 20, cursor: 'pointer', fontFamily: 'inherit',
-            border: filterType ? '1px solid var(--brand)' : '1px solid var(--border)',
-            background: filterType ? 'rgba(13,148,136,0.08)' : 'var(--surface-subtle)',
-            color: filterType ? 'var(--brand)' : 'var(--text-secondary)', fontWeight: filterType ? 600 : 400 }}>
+        <select value={filterType} onChange={e => setFilterType(e.target.value)} style={selectStyle(!!filterType)}>
           <option value=''>All types</option>
           <option value='ca'>CA Compliance</option>
           <option value='recurring'>Repeat tasks</option>
@@ -285,16 +379,28 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
           <option value='quick'>Quick tasks</option>
         </select>
 
-        {/* Due date preset */}
-        <select value={filterDate} onChange={e => setFilterDate(e.target.value as typeof filterDate)}
-          style={{ fontSize: 12, padding: '4px 10px', borderRadius: 20, cursor: 'pointer', fontFamily: 'inherit',
-            border: filterDate ? '1px solid var(--brand)' : '1px solid var(--border)',
-            background: filterDate ? 'rgba(13,148,136,0.08)' : 'var(--surface-subtle)',
-            color: filterDate ? 'var(--brand)' : 'var(--text-secondary)', fontWeight: filterDate ? 600 : 400 }}>
-          <option value=''>All dates</option>
+        {/* Due date */}
+        <select value={filterDue} onChange={e => setFilterDue(e.target.value)} style={selectStyle(!!filterDue)}>
+          <option value=''>All due dates</option>
           <option value='overdue'>Overdue</option>
           <option value='today'>Due today</option>
           <option value='week'>Due this week</option>
+        </select>
+
+        {/* Created */}
+        <select value={filterCreated} onChange={e => setFilterCreated(e.target.value)} style={selectStyle(!!filterCreated)}>
+          <option value=''>Any created</option>
+          <option value='today'>Created today</option>
+          <option value='week'>Created this week</option>
+          <option value='month'>Created this month</option>
+        </select>
+
+        {/* Modified */}
+        <select value={filterModified} onChange={e => setFilterModified(e.target.value)} style={selectStyle(!!filterModified)}>
+          <option value=''>Any modified</option>
+          <option value='today'>Modified today</option>
+          <option value='week'>Modified this week</option>
+          <option value='month'>Modified this month</option>
         </select>
 
         {/* Clear */}
@@ -366,103 +472,70 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
 
             {/* Group rows */}
             {!collapsedGroups.has(grp.key) && grp.tasks.map(task => {
-              const accent   = typeAccent(task)
-              const bg       = typeBg(task)
-              const sc       = STATUS_CONFIG[task.status]
-              const ov       = !!task.due_date && task.due_date < today && !['completed','cancelled'].includes(task.status)
-              const isDone   = task.status === 'completed'
+              const accent = typeAccent(task)
+              const bg     = typeBg(task)
+              const sc     = STATUS_CONFIG[task.status] ?? STATUS_CONFIG.todo
+              const ov     = isOverdue(task.due_date, task.status)
               return (
-                <button key={task.id} onClick={() => openTask(task.id)}
+                <div key={task.id}
+                  onClick={() => openTask(task.id)}
                   style={{ display: 'grid', gridTemplateColumns: '1fr 70px 80px 100px 90px 80px',
-                    gap: 0, alignItems: 'center', width: '100%', padding: '9px 24px',
-                    borderBottom: '1px solid var(--border-light)',
-                    borderLeft: `3px solid ${accent}`,
-                    background: bg,
-                    cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
-                    opacity: isDone ? 0.72 : 1, transition: 'background 0.1s' }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = `${bg.replace('0.05','0.11').replace('0.06','0.12')}` }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = bg }}>
+                    alignItems: 'center', padding: '0 24px', minHeight: 38, cursor: 'pointer',
+                    borderBottom: '1px solid var(--border-light)', borderLeft: `3px solid ${accent}`,
+                    background: bg, transition: 'filter 0.1s' }}
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.filter = 'brightness(0.97)'}
+                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.filter = 'none'}>
 
                   {/* Title */}
-                  <div style={{ overflow: 'hidden', paddingRight: 8 }}>
-                    <span style={{ fontSize: 13, fontWeight: 500, color: isDone ? 'var(--text-muted)' : 'var(--text-primary)',
-                      textDecoration: isDone ? 'line-through' : undefined,
-                      overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', display: 'block' }}>
-                      {task.title}
-                    </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, padding: '7px 0' }}>
+                    <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</span>
                     {task.client && (
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 1 }}>
-                        <span style={{ width: 5, height: 5, borderRadius: 1, background: task.client.color, flexShrink: 0 }}/>
-                        <span style={{ fontSize: 10, color: 'var(--text-muted)', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
-                          {task.client.name}
-                        </span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 10,
+                        color: 'var(--text-muted)', flexShrink: 0 }}>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: task.client.color }}/>
+                        {task.client.name}
                       </span>
                     )}
                   </div>
 
                   {/* Type */}
-                  <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
-                    background: `${accent}18`, color: accent, display: 'inline-block' }}>
-                    {typeLabel(task)}
-                  </span>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: accent }}>{typeLabel(task)}</span>
 
                   {/* Priority */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     <span style={{ width: 7, height: 7, borderRadius: '50%', background: PRIORITY_DOT[task.priority] ?? '#94a3b8', flexShrink: 0 }}/>
-                    <span style={{ fontSize: 11, color: 'var(--text-secondary)', textTransform: 'capitalize' }}>{task.priority}</span>
+                    <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                      {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                    </span>
                   </div>
 
                   {/* Status */}
-                  <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 99,
-                    background: sc?.bg ?? 'var(--surface-subtle)', color: sc?.color ?? '#94a3b8',
-                    display: 'inline-block', whiteSpace: 'nowrap' }}>
-                    {sc?.label ?? task.status}
+                  <span style={{ display: 'inline-flex', alignItems: 'center', fontSize: 10, fontWeight: 600,
+                    padding: '2px 7px', borderRadius: 99, background: sc.bg, color: sc.color, whiteSpace: 'nowrap' }}>
+                    {sc.label}
                   </span>
 
                   {/* Assignee */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    {task.assignee ? (
-                      <>
-                        <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'var(--border)',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: 9, fontWeight: 700, color: 'var(--text-secondary)', flexShrink: 0 }}>
-                          {task.assignee.name[0]?.toUpperCase()}
-                        </div>
-                        <span style={{ fontSize: 11, color: 'var(--text-secondary)', overflow: 'hidden',
-                          whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
-                          {task.assignee.name.split(' ')[0]}
-                        </span>
-                      </>
-                    ) : (
-                      <span style={{ fontSize: 11, color: '#d97706', fontWeight: 500 }}>⊘ Unassigned</span>
-                    )}
-                  </div>
+                  <span style={{ fontSize: 11, color: task.assignee ? 'var(--text-secondary)' : 'var(--text-muted)',
+                    fontStyle: task.assignee ? 'normal' : 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {task.assignee?.name ?? '—'}
+                  </span>
 
                   {/* Due date */}
-                  <span style={{ fontSize: 11, color: ov ? '#dc2626' : 'var(--text-secondary)',
-                    fontWeight: ov ? 700 : 400 }}>
-                    {task.due_date ? fmtDate(task.due_date) : '—'}
-                    {ov && <span style={{ marginLeft: 3 }}>⚠</span>}
+                  <span style={{ fontSize: 11, fontWeight: ov ? 700 : 400, color: ov ? '#dc2626' : 'var(--text-secondary)' }}>
+                    {task.due_date
+                      ? new Date(task.due_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
+                      : '—'}
                   </span>
-                </button>
+                </div>
               )
             })}
           </div>
         ))}
       </div>
 
-      {/* Panel loading overlay */}
-      {panelLoading && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 9998, display: 'flex', alignItems: 'center',
-          justifyContent: 'center', background: 'rgba(0,0,0,0.15)' }}>
-          <div style={{ background: 'var(--surface)', borderRadius: 12, padding: '20px 28px',
-            fontSize: 13, color: 'var(--text-muted)', boxShadow: '0 8px 32px rgba(0,0,0,0.15)' }}>
-            Loading task…
-          </div>
-        </div>
-      )}
-
-      {/* TaskDetailPanel — read-only (no edit/create actions shown because userRole is passed as 'viewer') */}
+      {/* Task detail panel */}
       <TaskDetailPanel
         task={panelTask}
         members={members}
