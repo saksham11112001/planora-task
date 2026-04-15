@@ -1,6 +1,6 @@
 'use client'
 import React from 'react'
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useRef, useEffect } from 'react'
 import { useRouter }    from 'next/navigation'
 import { RefreshCw, CheckCheck, CheckCircle2, Clock, FolderOpen, Trash2, User, SortAsc, Copy } from 'lucide-react'
 import { PriorityBadge, Avatar } from '@/components/ui/Badge'
@@ -153,6 +153,8 @@ export function MyTasksView({
   const [assignedByMeList, setAssignedByMeList] = useState<Task[]>(assignedByMeTasks)
   const [tab,          setTab]          = useState<'List'|'Board'>('Board')
   const [selTask,    setSelTask]    = useState<Task | null>(null)
+  const panelHasUpdates = useRef(false)
+  useEffect(() => { panelHasUpdates.current = false }, [selTask?.id])
   const [dragTaskId, setDragTaskId] = useState<string | null>(null)
   const [checked,    setChecked]    = useState<Set<string>>(new Set())
   const [completing, setCompleting] = useState<Set<string>>(new Set())
@@ -217,6 +219,7 @@ export function MyTasksView({
     if (fields && selTask) {
       setTasks(prev => prev.map(t => t.id === selTask.id ? { ...t, ...fields } as Task : t))
       setSelTask(prev => prev ? { ...prev, ...fields } as Task : null)
+      panelHasUpdates.current = true
       // If task moved out of pending approval, remove it from that list too
       if (fields.status && fields.status !== 'in_review') {
         setPendingTasks(prev => prev.filter(t => t.id !== selTask.id))
@@ -1330,7 +1333,13 @@ export function MyTasksView({
 
       <TaskDetailPanel task={selTask} members={members} clients={clients}
         currentUserId={currentUserId} userRole={userRole}
-        onClose={() => setSelTask(null)}
+        onClose={() => {
+          if (panelHasUpdates.current) {
+            toast.success('Task updated')
+            panelHasUpdates.current = false
+          }
+          setSelTask(null)
+        }}
         onUpdated={handleTaskUpdated}/>
     </>
   )
@@ -1692,7 +1701,14 @@ export function MyTasksView({
       </div>
       <TaskDetailPanel task={selTask} members={members} clients={clients}
         currentUserId={currentUserId} userRole={userRole}
-        onClose={() => setSelTask(null)} onUpdated={handleTaskUpdated}/>
+        onClose={() => {
+          if (panelHasUpdates.current) {
+            toast.success('Task updated')
+            panelHasUpdates.current = false
+          }
+          setSelTask(null)
+        }}
+        onUpdated={handleTaskUpdated}/>
     </>
   )
 }

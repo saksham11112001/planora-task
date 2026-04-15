@@ -1,6 +1,6 @@
 'use client'
 import React from 'react'
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useRef, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { CheckCheck, Clock, SortAsc, Trash2, Copy } from 'lucide-react'
 import { InlineOneTimeTask } from '@/components/tasks/InlineOneTimeTask'
@@ -31,6 +31,8 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
 
   const [localTasks,      setLocalTasks]      = useState<Task[]>(tasks)
   const [selectedTask,    setSelectedTask]    = useState<Task | null>(null)
+  const panelHasUpdates = useRef(false)
+  useEffect(() => { panelHasUpdates.current = false }, [selectedTask?.id])
   const [checked,         setChecked]         = useState<Set<string>>(new Set())
   const [completing,      setCompleting]      = useState<Set<string>>(new Set())
   const [, startT]                            = useTransition()
@@ -58,6 +60,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
     if (fields) {
       setLocalTasks(prev => prev.map(t => t.id === selectedTask?.id ? { ...t, ...fields } as Task : t))
       setSelectedTask(prev => prev ? { ...prev, ...fields } as Task : null)
+      panelHasUpdates.current = true
     }
     startT(() => router.refresh())
   }
@@ -411,7 +414,13 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
           </div>
           <TaskDetailPanel task={selectedTask} members={members} clients={clients}
             currentUserId={currentUserId} userRole={userRole}
-            onClose={() => setSelectedTask(null)}
+            onClose={() => {
+              if (panelHasUpdates.current) {
+                toast.success('Task updated')
+                panelHasUpdates.current = false
+              }
+              setSelectedTask(null)
+            }}
             onUpdated={handleTaskUpdated}/>
         </div>
       )}
@@ -787,7 +796,13 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
           )}
           <TaskDetailPanel task={selectedTask} members={members} clients={clients}
             currentUserId={currentUserId} userRole={userRole}
-            onClose={() => setSelectedTask(null)}
+            onClose={() => {
+              if (panelHasUpdates.current) {
+                toast.success('Task updated')
+                panelHasUpdates.current = false
+              }
+              setSelectedTask(null)
+            }}
             onUpdated={handleTaskUpdated}/>
         </div>
       )}
