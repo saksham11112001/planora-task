@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
   const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).single()
   if (!mb) return NextResponse.json({ data: [] })
   const sp  = request.nextUrl.searchParams
-  const lim = parseInt(sp.get('limit') ?? '100')
+  const lim = Math.min(parseInt(sp.get('limit') ?? '100'), 500)
   // Strict project visibility: everyone only sees org-wide projects OR projects they're in
   // Only the org owner sees all projects (safety net)
   const isOwner = mb.role === 'owner'

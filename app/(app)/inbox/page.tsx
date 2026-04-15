@@ -35,7 +35,7 @@ export default async function InboxPage() {
         return (canViewAll
           ? q
           : q.or(`assignee_id.eq.${user.id},approver_id.eq.${user.id}`)
-        ).limit(2000)
+        ).limit(500)
       })(),
 
       // Members

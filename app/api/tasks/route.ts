@@ -27,7 +27,9 @@ export async function GET(request: NextRequest) {
     const btid = sp.get('blocks_task_id')!
     q = (q as any).contains('custom_fields', { _blocked_by: [btid] })
   }
-  q = q.order('due_date', { ascending: true, nullsFirst: false }).limit(parseInt(sp.get('limit') ?? '100'))
+  const _limit  = Math.min(parseInt(sp.get('limit')  ?? '100'), 500)
+  const _offset = Math.max(parseInt(sp.get('offset') ?? '0'),   0)
+  q = q.order('due_date', { ascending: true, nullsFirst: false }).range(_offset, _offset + _limit - 1)
 
   const { data, error } = await q
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

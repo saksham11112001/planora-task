@@ -72,12 +72,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (body.status === 'completed' || body.status === 'in_review') {
     const blockedByIds: string[] = (task as any).custom_fields?._blocked_by ?? []
     if (blockedByIds.length > 0) {
-      const results = await Promise.all(
-        blockedByIds.map(bid =>
-          supabase.from('tasks').select('id, title, status').eq('id', bid).eq('org_id', mb.org_id).maybeSingle()
-        )
-      )
-      const incomplete = results.filter(r => r.data && r.data.status !== 'completed').map(r => r.data!.title as string)
+      const { data: blockerTasks } = await supabase
+        .from('tasks').select('id, title, status')
+        .in('id', blockedByIds).eq('org_id', mb.org_id)
+      const incomplete = (blockerTasks ?? []).filter(t => t.status !== 'completed').map(t => t.title as string)
       if (incomplete.length > 0) {
         const names = incomplete.slice(0, 2).join(', ') + (incomplete.length > 2 ? ` +${incomplete.length - 2} more` : '')
         return NextResponse.json({

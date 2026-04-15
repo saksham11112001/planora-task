@@ -94,6 +94,8 @@ export function RecurringView({
   const [sortBy, setSortBy] = useState<'due_date'|'created_at'|'updated_at'>('due_date')
   const [sortDir, setSortDir] = useState<'asc'|'desc'>('asc')
   const [sortOpen, setSortOpen] = useState(false)
+  const RECURRING_PAGE_SIZE = 100
+  const [recurringShown, setRecurringShown] = useState(RECURRING_PAGE_SIZE)
 
   // Global filters
   const { clientId: clientFilter, priority: filterPriority, search: filterSearch, assigneeId: filterAssignee, creatorId: filterCreator, createdFrom, createdTo, updatedFrom, updatedTo } = useFilterStore()
@@ -625,7 +627,7 @@ export function RecurringView({
             </div>
           )}
 
-          {sortedVisibleTasks.map((task) => {
+          {sortedVisibleTasks.slice(0, recurringShown).map((task) => {
             const isEditing = editingId === task.id
             const approver = members.find((m) => m.id === task.approver_id)
 
@@ -1052,6 +1054,16 @@ export function RecurringView({
               </div>
             )
           })}
+
+          {sortedVisibleTasks.length > recurringShown && (
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'center', padding:'12px 16px' }}>
+              <button
+                onClick={() => setRecurringShown(n => n + RECURRING_PAGE_SIZE)}
+                style={{ fontSize:12, fontWeight:600, color:'var(--brand)', background:'rgba(13,148,136,0.06)', border:'1.5px solid rgba(13,148,136,0.2)', borderRadius:20, padding:'6px 20px', cursor:'pointer' }}>
+                Show {Math.min(RECURRING_PAGE_SIZE, sortedVisibleTasks.length - recurringShown)} more ({recurringShown} of {sortedVisibleTasks.length} shown)
+              </button>
+            </div>
+          )}
 
           {canManage && (
             <InlineRecurringTask
