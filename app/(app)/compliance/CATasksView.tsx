@@ -89,7 +89,10 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
     newAssigneeId: string
     newAssigneeName: string
   } | null>(null)
-  const [masterUpdating, setMasterUpdating] = useState(false)
+  const [masterUpdating,  setMasterUpdating]  = useState(false)
+  const [bulkAssignId,    setBulkAssignId]    = useState('')   // member id to bulk-assign to
+  const [bulkAssigning,   setBulkAssigning]   = useState(false)
+  const [filterQuick,     setFilterQuick]     = useState<'overdue' | 'week' | 'pending' | ''>('')  // quick health filter
 
   const canManage = ['owner', 'admin', 'manager'].includes(userRole)
 
@@ -127,7 +130,10 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
         creator:          t.creator ?? null,
       }))
       setTasks(enriched)
-    } catch {}
+    } catch (e) {
+      console.error('[CATasksView] loadTasks failed:', e)
+      toast.error('Failed to load compliance tasks — please refresh')
+    }
     setLoading(false)
   }, [clients, members])
 
@@ -168,6 +174,32 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
     setTasks(p => p.filter(t => !ids.includes(t.id)))
     await Promise.all(ids.map(id => fetch(`/api/tasks/${id}`, { method: 'DELETE' })))
     toast.success(`${ids.length} task${ids.length !== 1 ? 's' : ''} deleted`)
+    startT(() => router.refresh())
+  }
+
+  async function bulkAssign() {
+    if (!bulkAssignId || !checked.size) return
+    const ids = [...checked]
+    const assignee = members.find(m => m.id === bulkAssignId)
+    if (!assignee) return
+    setBulkAssigning(true)
+    // Optimistic update
+    setTasks(p => p.map(t => checked.has(t.id)
+      ? { ...t, assignee_id: bulkAssignId, assignee: { id: bulkAssignId, name: assignee.name } }
+      : t
+    ))
+    const results = await Promise.allSettled(
+      ids.map(id => fetch(`/api/tasks/${id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assignee_id: bulkAssignId }),
+      }))
+    )
+    const failed = results.filter(r => r.status === 'rejected').length
+    if (failed > 0) toast.error(`${failed} task${failed !== 1 ? 's' : ''} could not be assigned`)
+    else toast.success(`${ids.length} task${ids.length !== 1 ? 's' : ''} assigned to ${assignee.name}`)
+    setChecked(new Set())
+    setBulkAssignId('')
+    setBulkAssigning(false)
     startT(() => router.refresh())
   }
 
@@ -247,6 +279,10 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
       if (filterStatus && t.status    !== filterStatus) return false
       if (filterAssignee === 'unassigned' && t.assignee_id !== null) return false
       if (filterAssignee && filterAssignee !== 'unassigned' && t.assignee_id !== filterAssignee) return false
+      // Quick health filters from stat tiles
+      if (filterQuick === 'overdue'  && !(t.due_date && t.due_date < today && !['completed','cancelled'].includes(t.status))) return false
+      if (filterQuick === 'week'     && !(t.due_date && t.due_date >= today && t.due_date <= weekFromNow && t.status !== 'completed')) return false
+      if (filterQuick === 'pending'  && t.status !== 'in_review') return false
       if (search && !t.title.toLowerCase().includes(search.toLowerCase())) return false
       return true
     })
@@ -256,7 +292,7 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
       return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av)
     })
 
-  const activeFilters = [filterPrio, filterClient, filterStatus, filterAssignee, search].filter(Boolean).length
+  const activeFilters = [filterPrio, filterClient, filterStatus, filterAssignee, search, filterQuick].filter(Boolean).length
 
   /* ── Render ────────────────────────────────────────────────── */
   return (
@@ -305,33 +341,50 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
         }}
       />
 
-      {/* ── Health stats bar ── */}
+      {/* ── Health stats bar — clickable to filter ── */}
       {!loading && tasks.length > 0 && (
         <div style={{
-          display: 'flex', gap: 10, padding: '10px 18px',
+          display: 'flex', gap: 8, padding: '10px 18px',
           background: 'var(--surface)', borderBottom: '1px solid var(--border)',
-          flexShrink: 0, flexWrap: 'wrap',
+          flexShrink: 0, flexWrap: 'wrap', alignItems: 'center',
         }}>
-          {[
-            { label: 'Total tasks',       value: healthStats.total,           bg: 'var(--surface-subtle)', color: 'var(--text-primary)',  border: 'var(--border)',   dot: '' },
-            { label: 'Overdue',           value: healthStats.overdue,         bg: healthStats.overdue > 0 ? '#fef2f2' : 'var(--surface-subtle)', color: healthStats.overdue > 0 ? '#dc2626' : 'var(--text-muted)', border: healthStats.overdue > 0 ? '#fecaca' : 'var(--border)', dot: '🔴' },
-            { label: 'Due this week',     value: healthStats.dueThisWeek,     bg: healthStats.dueThisWeek > 0 ? '#fefce8' : 'var(--surface-subtle)', color: healthStats.dueThisWeek > 0 ? '#b45309' : 'var(--text-muted)', border: healthStats.dueThisWeek > 0 ? '#fde68a' : 'var(--border)', dot: '⚠️' },
-            { label: 'Pending approval',  value: healthStats.pendingApproval, bg: healthStats.pendingApproval > 0 ? '#fdf4ff' : 'var(--surface-subtle)', color: healthStats.pendingApproval > 0 ? '#7c3aed' : 'var(--text-muted)', border: healthStats.pendingApproval > 0 ? '#e9d5ff' : 'var(--border)', dot: '🔵' },
-          ].map(stat => (
-            <div key={stat.label} style={{
-              display: 'flex', flexDirection: 'column', alignItems: 'center',
-              padding: '6px 14px', borderRadius: 10,
-              background: stat.bg, border: `1px solid ${stat.border}`,
-              minWidth: 90, gap: 2,
-            }}>
-              <span style={{ fontSize: 20, fontWeight: 800, color: stat.color, lineHeight: 1 }}>
-                {stat.value}
-              </span>
-              <span style={{ fontSize: 10, color: stat.color, fontWeight: 500, opacity: 0.85, whiteSpace: 'nowrap' }}>
-                {stat.label}
-              </span>
-            </div>
-          ))}
+          {([
+            { key: '',        label: 'Total tasks',      value: healthStats.total,           activeBg: 'var(--surface-subtle)', color: 'var(--text-primary)',  border: 'var(--border)' },
+            { key: 'overdue', label: '🔴 Overdue',       value: healthStats.overdue,         activeBg: '#fef2f2', color: '#dc2626', border: '#fecaca' },
+            { key: 'week',    label: '⚠️ Due this week', value: healthStats.dueThisWeek,     activeBg: '#fefce8', color: '#b45309', border: '#fde68a' },
+            { key: 'pending', label: '🔵 Pending approval', value: healthStats.pendingApproval, activeBg: '#fdf4ff', color: '#7c3aed', border: '#e9d5ff' },
+          ] as { key: '' | 'overdue' | 'week' | 'pending'; label: string; value: number; activeBg: string; color: string; border: string }[]).map(stat => {
+            const isActive = filterQuick === stat.key || (stat.key === '' && filterQuick === '')
+            const hasValue = stat.value > 0 || stat.key === ''
+            return (
+              <button key={stat.label}
+                onClick={() => setFilterQuick(stat.key === filterQuick ? '' : stat.key)}
+                disabled={stat.key !== '' && stat.value === 0}
+                style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center',
+                  padding: '6px 14px', borderRadius: 10, cursor: stat.key !== '' && stat.value === 0 ? 'default' : 'pointer',
+                  background: isActive && hasValue ? stat.activeBg : 'var(--surface-subtle)',
+                  border: `1.5px solid ${isActive && hasValue ? stat.color : 'var(--border)'}`,
+                  boxShadow: isActive && hasValue ? `0 0 0 2px ${stat.color}22` : 'none',
+                  minWidth: 90, gap: 2, fontFamily: 'inherit',
+                  opacity: stat.key !== '' && stat.value === 0 ? 0.5 : 1,
+                  transition: 'all 0.12s',
+                }}>
+                <span style={{ fontSize: 20, fontWeight: 800, color: isActive && hasValue ? stat.color : 'var(--text-primary)', lineHeight: 1 }}>
+                  {stat.value}
+                </span>
+                <span style={{ fontSize: 10, color: isActive && hasValue ? stat.color : 'var(--text-muted)', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                  {stat.label}
+                </span>
+              </button>
+            )
+          })}
+          {filterQuick && (
+            <button onClick={() => setFilterQuick('')}
+              style={{ padding: '3px 10px', borderRadius: 20, border: '1px solid var(--border)', background: 'none', fontSize: 11, color: 'var(--text-muted)', cursor: 'pointer', fontFamily: 'inherit' }}>
+              ✕ Clear filter
+            </button>
+          )}
         </div>
       )}
 
@@ -421,7 +474,7 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
 
         {/* Clear filters */}
         {activeFilters > 0 && (
-          <button onClick={() => { setFilterPrio(''); setFilterClient(''); setFilterStatus(''); setFilterAssignee(''); setSearch('') }}
+          <button onClick={() => { setFilterPrio(''); setFilterClient(''); setFilterStatus(''); setFilterAssignee(''); setSearch(''); setFilterQuick('') }}
             style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 20, border: '1px solid #dc2626', background: 'rgba(220,38,38,0.06)', color: '#dc2626', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
             ✕ Clear ({activeFilters})
           </button>
@@ -440,33 +493,77 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
 
       {/* ── Bulk action bar ── */}
       {checked.size > 0 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '7px 18px', background: '#fef2f2', borderBottom: '1px solid #fecaca', flexShrink: 0 }}>
-          <span style={{ fontSize: 13, fontWeight: 500, color: '#991b1b' }}>{checked.size} selected</span>
-          <button onClick={bulkDelete}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 14px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-            <Trash2 style={{ width: 13, height: 13 }}/> Delete
-          </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 18px', background: 'rgba(124,58,237,0.06)', borderBottom: '1px solid rgba(124,58,237,0.2)', flexShrink: 0, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#5b21b6' }}>{checked.size} selected</span>
+
+          {/* Bulk assign */}
+          {canManage && members.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <select value={bulkAssignId} onChange={e => setBulkAssignId(e.target.value)}
+                style={{ fontSize: 12, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-primary)', fontFamily: 'inherit', cursor: 'pointer' }}>
+                <option value=''>Assign to…</option>
+                {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </select>
+              <button onClick={bulkAssign} disabled={!bulkAssignId || bulkAssigning}
+                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 12px', background: bulkAssignId ? '#0d9488' : 'var(--border)', color: bulkAssignId ? '#fff' : 'var(--text-muted)', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: bulkAssignId ? 'pointer' : 'not-allowed', fontFamily: 'inherit', transition: 'background 0.15s' }}>
+                {bulkAssigning ? '…' : '✓ Assign'}
+              </button>
+            </div>
+          )}
+
+          {/* WhatsApp — per-client grouped messages */}
           <button
             onClick={() => {
               const selectedTasks = tasks.filter(t => checked.has(t.id))
-              const lines = selectedTasks.map(t => {
-                const client = t.client?.name ?? 'Client'
-                const due = t.due_date ? new Date(t.due_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'TBD'
-                return `• ${t.title} (${client}) — due ${due}`
+              // Group by client
+              const byClient = new Map<string, { clientName: string; tasks: CATask[] }>()
+              selectedTasks.forEach(t => {
+                const key = t.client_id ?? '__no_client__'
+                const name = t.client?.name ?? 'General'
+                if (!byClient.has(key)) byClient.set(key, { clientName: name, tasks: [] })
+                byClient.get(key)!.tasks.push(t)
               })
-              const msg = `Dear Client,\n\nThis is a reminder for the following pending compliance tasks:\n\n${lines.join('\n')}\n\nKindly arrange the required documents at the earliest.\n\nRegards`
-              window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
+              if (byClient.size === 1) {
+                // Single client — one message
+                const [{ clientName, tasks: ct }] = [...byClient.values()]
+                const lines = ct.map(t => {
+                  const due = t.due_date ? new Date(t.due_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'TBD'
+                  return `• ${t.title} — due ${due}`
+                })
+                const msg = `Dear ${clientName},\n\nThis is a reminder for the following pending compliance tasks:\n\n${lines.join('\n')}\n\nKindly arrange the required documents at the earliest.\n\nRegards`
+                window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
+              } else {
+                // Multiple clients — open one tab per client (up to 5)
+                const entries = [...byClient.values()].slice(0, 5)
+                entries.forEach(({ clientName, tasks: ct }) => {
+                  const lines = ct.map(t => {
+                    const due = t.due_date ? new Date(t.due_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'TBD'
+                    return `• ${t.title} — due ${due}`
+                  })
+                  const msg = `Dear ${clientName},\n\nThis is a reminder for the following pending compliance tasks:\n\n${lines.join('\n')}\n\nKindly arrange the required documents at the earliest.\n\nRegards`
+                  window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
+                })
+                if (byClient.size > 5) toast.info(`Opened 5 of ${byClient.size} client chats — deselect some and retry for the rest`)
+              }
             }}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 14px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-            <MessageCircle style={{ width: 13, height: 13 }}/> WhatsApp Reminder
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 12px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+            <MessageCircle style={{ width: 13, height: 13 }}/> WhatsApp
           </button>
+
+          {canManage && (
+            <button onClick={bulkDelete}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 12px', background: 'none', color: '#dc2626', border: '1px solid #fecaca', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+              <Trash2 style={{ width: 12, height: 12 }}/> Delete
+            </button>
+          )}
+
           <button onClick={() => setChecked(new Set(visible.map(t => t.id)))}
             style={{ background: 'transparent', border: '1px solid var(--border)', padding: '4px 10px', borderRadius: 6, fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)', cursor: 'pointer', fontFamily: 'inherit' }}>
             Select all
           </button>
-          <button onClick={() => setChecked(new Set())}
-            style={{ padding: '4px 10px', background: 'transparent', border: 'none', fontSize: 12, color: 'var(--text-secondary)', cursor: 'pointer', fontFamily: 'inherit' }}>
-            Cancel
+          <button onClick={() => { setChecked(new Set()); setBulkAssignId('') }}
+            style={{ padding: '4px 10px', background: 'transparent', border: 'none', fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer', fontFamily: 'inherit' }}>
+            ✕ Cancel
           </button>
         </div>
       )}

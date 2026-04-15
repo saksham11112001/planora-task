@@ -86,7 +86,10 @@ export function CADSCTrackerView({ userRole }: Props) {
       }
       enriched.sort((a, b) => order(a) - order(b) || a.name.localeCompare(b.name))
       setClients(enriched)
-    } catch {}
+    } catch (e) {
+      console.error('[DSCTracker] loadClients failed:', e)
+      toast.error('Failed to load client data — please refresh')
+    }
     setLoading(false)
   }, [])
 
