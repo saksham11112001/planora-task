@@ -5,30 +5,29 @@ import { assertCan }     from '@/lib/utils/permissionGate'
 
 // Map granular frequencies to DB-allowed values
 function normalizeFrequency(freq: string): string {
-  if (freq.startsWith('weekly_')) return 'weekly'
-  if (freq.startsWith('monthly_')) return 'monthly'
+  if (freq.startsWith('weekly_'))    return 'weekly'
+  if (freq.startsWith('monthly_'))   return 'monthly'
+  if (freq.startsWith('quarterly_')) return 'quarterly'
+  if (freq.startsWith('annual_'))    return 'annual'
   return freq  // daily, bi_weekly, quarterly, annual — already valid
 }
 
 function nextOccurrence(freq: string, from: string): string {
   const d = new Date(from)
-  switch (freq) {
-    case 'daily':      d.setDate(d.getDate() + 1);       break
-    case 'weekly':
-    case 'weekly_mon':
-    case 'weekly_tue':
-    case 'weekly_wed':
-    case 'weekly_thu':
-    case 'weekly_fri':
-    case 'weekly_sat':
-    case 'weekly_sun': d.setDate(d.getDate() + 7);       break
-    case 'bi_weekly':  d.setDate(d.getDate() + 14);      break
-    case 'monthly':
-    case 'monthly_1':
-    case 'monthly_15': d.setMonth(d.getMonth() + 1);     break
-    case 'quarterly':  d.setMonth(d.getMonth() + 3);     break
-    case 'annual':     d.setFullYear(d.getFullYear() + 1); break
-    default:           d.setDate(d.getDate() + 7);       break
+  // Normalise granular variants to their base interval
+  const base = freq.startsWith('weekly_')    ? 'weekly'
+             : freq.startsWith('monthly_')   ? 'monthly'
+             : freq.startsWith('quarterly_') ? 'quarterly'
+             : freq.startsWith('annual_')    ? 'annual'
+             : freq
+  switch (base) {
+    case 'daily':     d.setDate(d.getDate() + 1);          break
+    case 'weekly':    d.setDate(d.getDate() + 7);          break
+    case 'bi_weekly': d.setDate(d.getDate() + 14);         break
+    case 'monthly':   d.setMonth(d.getMonth() + 1);        break
+    case 'quarterly': d.setMonth(d.getMonth() + 3);        break
+    case 'annual':    d.setFullYear(d.getFullYear() + 1);  break
+    default:          d.setDate(d.getDate() + 7);          break
   }
   return d.toISOString().split('T')[0]
 }

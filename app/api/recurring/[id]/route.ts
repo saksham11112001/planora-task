@@ -14,8 +14,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (recurringEditDenied) return NextResponse.json({ error: recurringEditDenied.error }, { status: recurringEditDenied.status })
 
   const { title, frequency, priority, assignee_id, project_id, client_id } = await req.json()
+  const dbFreq = frequency
+    ? (frequency.startsWith('weekly_')    ? 'weekly'
+    :  frequency.startsWith('monthly_')   ? 'monthly'
+    :  frequency.startsWith('quarterly_') ? 'quarterly'
+    :  frequency.startsWith('annual_')    ? 'annual'
+    :  frequency)
+    : undefined
   const { data, error } = await supabase.from('tasks')
-    .update({ title, frequency, priority, assignee_id: assignee_id || null, project_id: project_id || null, client_id: client_id || null })
+    .update({ title, frequency: dbFreq, priority, assignee_id: assignee_id || null, project_id: project_id || null, client_id: client_id || null })
     .eq('id', id).eq('org_id', mb.org_id).select('*').single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

@@ -14,7 +14,9 @@
       "Bash(cat /c/Users/saksh/Desktop/planora-task/supabase/migrations/*.sql)",
       "Bash(psql -U postgres -h localhost -d planora -c \"\\\\d tasks\")",
       "Bash(grep -E \"\\\\.\\(tsx|ts\\)$\")",
-      "Bash(ls -la /c/Users/saksh/Desktop/planora-task/app/api/tasks/[id]/)"
+      "Bash(ls -la /c/Users/saksh/Desktop/planora-task/app/api/tasks/[id]/)",
+      "Bash(xargs grep:*)",
+      "Bash(find /c/Users/saksh/Desktop/planora-task -type f \\\\\\( -name \"*.ts\" -o -name \"*.tsx\" -o -name \"*.sql\" \\\\\\) -exec grep -l \"Membership\\\\|membership\" {} \\\\;)"
     ]
   }
 }
