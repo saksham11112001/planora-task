@@ -7,7 +7,8 @@
       "WebSearch",
       "WebFetch(domain:www.softwaresuggest.com)",
       "WebFetch(domain:indianbusinesstimes.com)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(npx next:*)"
     ]
   }
 }

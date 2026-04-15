@@ -381,11 +381,9 @@ export function PermissionsView({ orgId, savedPermissions, isPaid, planTier }: P
                         onClick={() => toggle(feature.key, r.key)}
                         disabled={!canClick}
                         style={{
-                          width: 32, height: 32, borderRadius: 8, border: 'none',
+                          width: 32, height: 32, borderRadius: 8,
                           cursor: canClick ? 'pointer' : 'default',
-                          background: on
-                            ? `${r.color}18`
-                            : 'var(--surface-subtle)',
+                          background: on ? `${r.color}18` : 'var(--surface-subtle)',
                           border: `1.5px solid ${on ? r.color + '44' : 'var(--border)'}`,
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           margin: '0 auto', transition: 'all 0.12s',

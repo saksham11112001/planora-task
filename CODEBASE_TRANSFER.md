@@ -1,5 +1,5 @@
 # Planora Task — Codebase Transfer Document
-> Use this at the start of a new chat to give the AI full context. Last updated: 2026-04-14 (Session 8)
+> Use this at the start of a new chat to give the AI full context. Last updated: 2026-04-15 (Session 9)
 
 ---
 
@@ -29,7 +29,7 @@
 | `org_members` | `user_id, org_id, role (owner/admin/manager/member/viewer), is_active` |
 | `tasks` | `id, org_id, title, description, status (todo/in_progress/in_review/completed), priority, due_date, assignee_id, approver_id, approval_status (pending/approved/rejected), approval_required, is_recurring, is_archived, parent_task_id, project_id, client_id, custom_fields (jsonb), estimated_hours, completed_at, approved_by, approved_at, created_by, sort_order` |
 | `projects` | `id, org_id, name, color, status, due_date, client_id, owner_id, is_archived` |
-| `clients` | `id, org_id, name, color, status (active/inactive)` |
+| `clients` | `id, org_id, name, color, status (active/inactive), email, phone, company, website, industry, notes, custom_fields (jsonb)` — custom_fields used for: DSC data (`_dsc_expiry`, `_dsc_holder`), GST data (`gstin`, `pan`, `gst_status`, `gst_state`, `gst_reg_date`) |
 | `time_logs` | `id, org_id, task_id, project_id, user_id, hours, is_billable` |
 | `task_attachments` | `id, task_id, org_id, file_url, file_name` |
 | `task_comments` | `id, task_id, org_id, user_id, content` |
@@ -178,6 +178,15 @@ app/(app)/projects/[projectId]/ProjectView.tsx  — Project board/list with inli
   — "+ Assign to me" only shows when task.assignee_id is null (not just members.find() miss)
   — TaskRow() color coding: _isCaComp ? #d97706 : #7c3aed; borderLeft 3px (Session 4)
 
+app/(app)/clients/new/NewClientForm.tsx — New client creation form (steps 1 + 2)
+  — Step 1: GSTIN auto-fill section added at the top  ← Session 9
+    Input: monospace, auto-uppercases, strips non-alphanumeric, max 15 chars
+    Auto-triggers lookupGSTIN() when 15th character typed; manual "Fetch" button
+    lookupGSTIN(): calls GET /api/gst/lookup?gstin=X; auto-fills name, company, industry, notes
+    Info strip: PAN chip (monospace), state chip, gst_status (green=Active/red=other), constitution, reg date
+    partial:true shows italic hint message (e.g. "Set GSTIN_API_KEY for full lookup")
+    gstInfo stored in state; saved to custom_fields on submit
+  — Submit: includes custom_fields { gstin, pan, gst_status, gst_state, gst_reg_date }  ← Session 9
 app/(app)/clients/page.tsx            — Server wrapper: fetches clients + canManage, renders ClientsView
 app/(app)/clients/ClientsView.tsx     — NEW Session 5: client component for the clients grid
   — Inline edit button (Pencil icon) → navigates to /clients/[id]/edit
@@ -248,8 +257,31 @@ app/(app)/inbox/InboxView.tsx         — Client: List / Board view for quick ta
 app/(app)/time/page.tsx               — Time logs
 app/(app)/reports/page.tsx            — Reports + Excel export
 app/(app)/compliance/page.tsx         — CA compliance module
+app/(app)/compliance/ComplianceShell.tsx — Tab shell: steps 1-5, tab router, shared members/clients fetch
+  — step type widened: 1|2|3|4 → 1|2|3|4|5  ← Session 9
+  — ?tab=dsctracker URL param routes to step 5  ← Session 9
+  — Step 5 tab: ShieldCheck icon + "DSC Tracker" label; ChevronRight separator before it  ← Session 9
+  — Step 5 content: <CADSCTrackerView userRole={userRole} />  ← Session 9
+  — CAKanbanView client column headers now show overdue/due-today badges  ← Session 9
+    overdueN: allTasks where _nextDueDate < today and status !== 'completed'
+    dueTodayN: allTasks where _nextDueDate === today and status !== 'completed'
+    Red "N overdue" badge shown when overdueN > 0; teal "N today" when only dueTodayN > 0
+app/(app)/compliance/CADSCTrackerView.tsx — NEW Session 9: DSC expiry tracker component
+  — 'use client'; fetches /api/clients and reads custom_fields._dsc_expiry + _dsc_holder
+  — getDSCStatus(daysLeft): returns { label, color, bg, border, icon: 'ok'|'warn'|'danger'|'none' }
+    danger ≤7d or expired, warn 8-30d, ok >30d, none = not set
+  — Stats bar: 4 clickable filter tiles (total, danger, warn, not set) — filters the table
+  — Red alert banner when any danger clients exist
+  — Table columns: Client | DSC Holder | Expiry Date | Status | Action
+  — Sorted: danger → warn → ok → none, then alphabetical within each group
+  — Inline edit: date picker + holder name input, saves via PATCH /api/clients/{id}
+    Uses custom_fields merge pattern: { _dsc_expiry, _dsc_holder } merged into existing JSONB
+  — canManage gate (owner/admin/manager): edit button only shown to these roles
+  — Search filter, status filter, refresh button
+  — Export CSV button: downloads client name, holder, expiry, status as CSV
 app/(app)/compliance/CATasksView.tsx  — CA Tasks tab (step 4 in ComplianceShell)
   — patchStatus: now reads d.error from response body, surfaces real API error  ← Session 7
+  — patchStatus: fixed snapshot rollback bug — now uses prevSelTask snapshot not tasks array  ← Session 9
   — filterAssignee state: '' | 'unassigned' | memberId  ← Session 7
     Toolbar: "All assignees / ⊘ Unassigned / <member>" select — included in activeFilters
   — doMasterUpdate(data) + updateMasterAssignment() refactored  ← Session 8
@@ -258,6 +290,16 @@ app/(app)/compliance/CATasksView.tsx  — CA Tasks tab (step 4 in ComplianceShel
     If task was ALREADY ASSIGNED: shows masterUpdatePrompt popup to confirm overwrite
   — masterUpdatePrompt state + updateMasterAssignment(): when assignee_id changes in
     onUpdated, show popup asking to also PATCH ca_client_assignments.assignee_id  ← Session 7
+  — Health stats bar: 4 tiles above toolbar  ← Session 9
+    Total tasks | Overdue (red, count from all tasks not just filtered) | Due this week (amber) | Pending approval (purple)
+    Computed from tasks[] (not visible[]); only shown when tasks.length > 0 and not loading
+  — Urgency chips on list rows: inline below client name  ← Session 9
+    urgencyChip(due_date, status) → { label, bg, color } | null
+    "Overdue Xd" red | "Due today" teal | "Xd left" amber (only for ≤7d) | null otherwise
+    Hidden for completed/cancelled tasks
+  — WhatsApp Reminder button in bulk action bar (green, MessageCircle icon)  ← Session 9
+    Generates multi-task reminder message → opens wa.me/?text=<encoded> in new tab
+    Message: "Dear Client, reminder for: • Task (Client) — due DD Mon YYYY ..."
 app/(app)/monitor/page.tsx            — NEW Session 8: Monitor server page (read-only, all roles)
   — export const dynamic = 'force-dynamic'
   — Fetches ALL org tasks (no role scoping — always full org view)
@@ -316,9 +358,23 @@ app/api/projects/[id]/route.ts        — Project CRUD
   — DELETE: assertCan(projects.delete)  ← Session 4
 app/api/clients/route.ts              — Clients list/create
   — POST: assertCan(clients.create)  ← Session 4
+  — POST: now accepts custom_fields (JSONB) in body  ← Session 9
 app/api/clients/[id]/route.ts         — Client CRUD
   — PATCH: assertCan(clients.edit)  ← Session 4
+  — PATCH: custom_fields merge — fetches existing JSONB then spreads new keys over it  ← Session 9
+    Pattern: { ...(existing?.custom_fields ?? {}), ...(body.custom_fields as object) }
+    Prevents overwriting unrelated keys (e.g. DSC keys when saving GST keys)
   — DELETE: assertCan(clients.delete)  ← Session 4
+app/api/gst/lookup/route.ts           — NEW Session 9: GST number lookup proxy
+  — GET /api/gst/lookup?gstin=XX (auth-gated: must be logged-in org member)
+  — Validates GSTIN format: /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/
+  — With GSTIN_API_KEY env var: POSTs to Surepass KYC API → full business data
+    (name, trade_name, gst_status, state, address, pincode, constitution, nature_of_business,
+     registration_date) + parsed PAN + state from format
+  — Without key: parses GSTIN format only → returns pan (digits 2-11) + state (STATE_CODES map)
+    Returns { partial: true, message: "Set GSTIN_API_KEY..." }
+  — On API error/404: returns partial:true with parsed fallback instead of 500
+  — STATE_CODES: 01-99 → Indian state names (all 36 states + UTs)
 app/api/recurring/route.ts            — Recurring tasks CRUD
   — POST: assertCan(recurring.create)  ← Session 4
   — PATCH: assertCan(recurring.edit)  ← Session 4
@@ -378,6 +434,10 @@ components/layout/Sidebar.tsx         — Left nav sidebar
 
 components/layout/Header.tsx          — Top header with user menu
   — Quick-create label: "Repeat task" (was "Recurring task")  ← Session 8
+components/clients/QuickAddClientModal.tsx — Quick-add client modal (used in task creation flows)
+  — GSTIN auto-fill section added  ← Session 9
+    Same pattern as NewClientForm: auto-triggers at 15 chars, fills name + company + gstInfo chips
+    Saves { gstin, pan, gst_status, gst_state } to custom_fields on create
 components/search/SearchModal.tsx     — Global search (Cmd+K)
 
 components/filters/UniversalFilterBar.tsx — Shared filter UI
@@ -683,6 +743,68 @@ lib/data/caDefaultTasks.ts            — Default CA task templates
 
 ---
 
+### SESSION 9 FEATURES
+
+### 29. CA Compliance — DSC Tracker (step 5)
+- **New file**: `app/(app)/compliance/CADSCTrackerView.tsx`
+- **Purpose**: Track Digital Signature Certificate expiry dates for all clients in one place.
+- **Data storage**: `client.custom_fields._dsc_expiry` (ISO date string) + `_dsc_holder` (string). No schema change needed — uses existing `custom_fields` JSONB column.
+- **Features**:
+  - Stats bar with 4 clickable filter tiles: Total / Danger (≤7d/expired) / Warning (8-30d) / Not set
+  - Red alert banner when any client is in danger zone
+  - Sortable table: danger → warn → ok → none, then alphabetical
+  - Inline edit: click Edit → date picker + holder name input → saves via `PATCH /api/clients/{id}` with custom_fields merge
+  - Search by client name/holder; filter by status; CSV export
+- **Wired into**: `ComplianceShell.tsx` as step 5 with ShieldCheck icon and "DSC Tracker" tab label; `?tab=dsctracker` URL param routes directly to it; step type widened to `1|2|3|4|5`
+- **canManage gate**: only owner/admin/manager see Edit button
+
+### 30. CA Compliance — CAKanbanView overdue/due-today badges on column headers
+- **File**: `app/(app)/compliance/ComplianceShell.tsx` (CAKanbanView component inside it)
+- **What changed**: Each client column header now shows a badge when tasks have past/today due dates:
+  - Red "N overdue" badge when `_nextDueDate < today && status !== 'completed'`
+  - Teal "N today" badge (only when no overdue) when `_nextDueDate === today && status !== 'completed'`
+  - No badge shown when all tasks are on track
+- Computed inline via IIFE in the column header render; uses `allTasks` (not filtered subset)
+
+### 31. CA Tasks — health stats bar + urgency chips + WhatsApp reminder
+- **File**: `app/(app)/compliance/CATasksView.tsx`
+- **Health stats bar**: 4 stat tiles rendered above the toolbar when tasks exist and loading is done.
+  - Tiles: Total tasks | Overdue (red highlight when >0) | Due this week (amber when >0) | Pending approval (purple when >0)
+  - Counts from `tasks[]` (all tasks, ignoring current filters) so stats represent true org health
+  - `weekFromNow = today + 7 days`; "pending approval" = `status === 'in_review'`
+- **Urgency chips**: Inline chip in list row title cell, below client name
+  - `urgencyChip(due_date, status)` helper: returns `{ label, bg, color }` or null
+  - Red "Overdue Xd" | Teal "Due today" | Amber "Xd left" (only 1-7 days) | null (>7 days or completed)
+  - Hidden for completed/cancelled tasks; visible only in List view (not Board)
+- **WhatsApp Reminder**: Green button in bulk action bar (appears when ≥1 task checked)
+  - Groups selected tasks into a single message: "Dear Client, reminder for: • Task (Client) — due date..."
+  - Opens `https://wa.me/?text=<encoded>` in new tab (no phone number needed — user picks contact in WhatsApp)
+  - Uses `MessageCircle` icon from lucide-react
+- **Bug fixed**: `patchStatus` rollback was spreading the `tasks` array snapshot into `setSelTask` (type error). Fixed to use a separate `prevSelTask` snapshot.
+
+### 32. GSTIN auto-fill for client creation
+- **New API route**: `app/api/gst/lookup/route.ts`
+  - Auth-gated: requires logged-in org member
+  - GSTIN format validation regex before any external call
+  - With `GSTIN_API_KEY` env var (Surepass API): returns full data — legal name, trade name, gst_status, state, address, pincode, constitution, nature of business, registration date
+  - Without key: parses GSTIN format → PAN (digits 2-11) + state from STATE_CODES map (all 36 states + UTs)
+  - On API error: returns partial:true with format-parsed fallback (never returns 500 to client)
+  - `GSTIN_API_KEY` comment added to `.env.local` pointing to Surepass free tier (100 calls/month)
+- **NewClientForm** (`app/(app)/clients/new/NewClientForm.tsx`):
+  - Green GSTIN auto-fill section added before name field in Step 1
+  - Auto-triggers lookup when 15th character is typed; manual "Fetch" button also available
+  - Auto-fills: name, company, industry, notes (with GST status/state/entity/reg date)
+  - Info strip shows: PAN chip, state chip, gst_status (green Active / red otherwise), constitution, registration date
+  - `partial: true` response shows italic hint (e.g. "Set GSTIN_API_KEY in .env.local for full lookup")
+  - On submit: stores `{ gstin, pan, gst_status, gst_state, gst_reg_date }` in client's `custom_fields`
+- **QuickAddClientModal** (`components/clients/QuickAddClientModal.tsx`):
+  - Same GSTIN section added; auto-fills name + company; shows PAN/state/status chips
+  - Saves same custom_fields on create
+- **clients POST API** (`app/api/clients/route.ts`): now accepts `custom_fields` body key → passed to Supabase insert
+- **custom_fields PATCH merge** (`app/api/clients/[id]/route.ts`): already supported from Session 9 DSC work — fetches existing JSONB, spreads new keys over it; prevents overwriting unrelated keys
+
+---
+
 ## PATTERNS TO KNOW
 
 ### Server component data fetching pattern
@@ -978,6 +1100,105 @@ style={{
 <style>{`.my-title-input::placeholder {
   color: rgba(13,148,136,0.55); font-weight: 500; font-style: italic;
 }`}</style>
+```
+
+### custom_fields JSONB merge pattern for clients (Session 9)
+```typescript
+// In PATCH /api/clients/[id]:
+if ('custom_fields' in body && body.custom_fields && typeof body.custom_fields === 'object') {
+  const { data: existing } = await supabase
+    .from('clients').select('custom_fields').eq('id', id).eq('org_id', mb.org_id).maybeSingle()
+  updates.custom_fields = { ...(existing?.custom_fields ?? {}), ...(body.custom_fields as object) }
+}
+// NEVER do: updates.custom_fields = body.custom_fields
+// That would wipe DSC keys when saving GST keys, or vice versa.
+// Always fetch-then-merge so unrelated keys are preserved.
+
+// In POST /api/clients:
+const cf = (body.custom_fields && typeof body.custom_fields === 'object') ? body.custom_fields : null
+// then in insert: custom_fields: cf
+```
+
+### GSTIN lookup pattern (Session 9)
+```typescript
+// Client-side (in any form):
+async function lookupGSTIN(raw: string) {
+  const g = raw.trim().toUpperCase()
+  if (g.length !== 15) return        // validate length before fetching
+  const res  = await fetch(`/api/gst/lookup?gstin=${encodeURIComponent(g)}`)
+  const json = await res.json()
+  // json.data: { gstin, pan, name, gst_status, state, constitution, registration_date, ... }
+  // json.partial: true when GSTIN_API_KEY not set or API error (still has pan + state)
+  // json.message: hint string when partial
+}
+
+// Auto-trigger on input change (triggers when exactly 15 chars):
+onChange={e => {
+  const v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 15)
+  setGstin(v)
+  if (v.length === 15) lookupGSTIN(v)   // auto-fetch, no button click needed
+}}
+
+// custom_fields to save on submit:
+const gstCustomFields = gstin.length === 15 ? {
+  gstin:        gstin.toUpperCase(),
+  pan:          gstInfo?.pan         ?? null,
+  gst_status:   gstInfo?.gst_status  ?? null,
+  gst_state:    gstInfo?.state       ?? null,
+  gst_reg_date: gstInfo?.registration_date ?? null,
+} : undefined
+```
+
+### DSC Tracker urgency pattern (Session 9)
+```typescript
+// getDSCStatus(daysLeft: number | null): icon 'danger'|'warn'|'ok'|'none'
+// danger: daysLeft === null? No — null → icon:'none'. daysLeft <= 7 (includes negative) → danger
+// warn: 8-30 days. ok: >30 days.
+
+// client.custom_fields._dsc_expiry format: ISO date string "2025-06-30"
+// daysLeft computation:
+const daysLeft = expiry
+  ? Math.round((new Date(expiry + 'T00:00:00').getTime() - Date.now()) / 86400000)
+  : null
+
+// Save via PATCH (merge pattern):
+await fetch(`/api/clients/${clientId}`, {
+  method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ custom_fields: { _dsc_expiry: dateStr, _dsc_holder: holderName } })
+})
+// The PATCH handler merges this into existing JSONB — other keys (gstin, etc.) are preserved.
+```
+
+### CATasksView urgency chip pattern (Session 9)
+```typescript
+function urgencyChip(due_date: string | null, status: string) {
+  if (!due_date || status === 'completed' || status === 'cancelled') return null
+  const now = new Date(); now.setHours(0, 0, 0, 0)
+  const due = new Date(due_date); due.setHours(0, 0, 0, 0)
+  const diff = Math.round((due.getTime() - now.getTime()) / 86400000)
+  if (diff < 0)  return { label: `Overdue ${Math.abs(diff)}d`, bg: '#fef2f2', color: '#dc2626' }
+  if (diff === 0) return { label: 'Due today',                  bg: '#f0fdf4', color: '#0d9488' }
+  if (diff <= 7)  return { label: `${diff}d left`,              bg: '#fefce8', color: '#b45309' }
+  return null   // >7 days — no chip needed
+}
+// Rendered inline in the title cell, below client name dot+label
+```
+
+### WhatsApp bulk reminder pattern (Session 9)
+```typescript
+// In bulk action bar onClick:
+const selectedTasks = tasks.filter(t => checked.has(t.id))
+const lines = selectedTasks.map(t => {
+  const client = t.client?.name ?? 'Client'
+  const due = t.due_date
+    ? new Date(t.due_date).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })
+    : 'TBD'
+  return `• ${t.title} (${client}) — due ${due}`
+})
+const msg = `Dear Client,\n\nThis is a reminder for the following pending compliance tasks:\n\n${lines.join('\n')}\n\nKindly arrange the required documents at the earliest.\n\nRegards`
+window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
+// wa.me/?text= opens WhatsApp web/app with pre-filled message; user picks the contact.
+// No phone number required in the URL — CA manually selects client contact in WhatsApp.
 ```
 
 ---

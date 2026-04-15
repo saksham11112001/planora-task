@@ -779,7 +779,7 @@ export function MyTasksView({
           <div style={{ position:'relative' }}>
             <button onClick={() => setSortOpen(v => !v)}
               style={{ display:'flex', alignItems:'center', gap:4, padding:'3px 10px', borderRadius:6,
-                border:'1px solid var(--border)', background:'var(--surface)', cursor:'pointer',
+                border:'1px solid var(--border)', cursor:'pointer',
                 fontSize:11, fontWeight:500, color: sortBy !== 'due_date' ? 'var(--brand)' : 'var(--text-secondary)',
                 background: sortBy !== 'due_date' ? 'var(--brand-light)' : 'var(--surface)' }}>
               <SortAsc style={{ width:12, height:12 }}/>
@@ -909,8 +909,8 @@ export function MyTasksView({
                           textDecoration: task.status==='completed'?'line-through':'none',
                           overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis',
                           display:'flex', alignItems:'center', gap:6 }}>
-                          {task.is_recurring && <RefreshCw style={{ flexShrink:0, width:11, height:11, color:'var(--brand)', marginRight:2 }} title="Recurring task"/>}
-                          {task.project_id && !task.is_recurring && <FolderOpen style={{ flexShrink:0, width:11, height:11, color:'#7c3aed', marginRight:2 }} title="Project task"/>}
+                          {task.is_recurring && <RefreshCw style={{ flexShrink:0, width:11, height:11, color:'var(--brand)', marginRight:2 }}/>}
+                          {task.project_id && !task.is_recurring && <FolderOpen style={{ flexShrink:0, width:11, height:11, color:'#7c3aed', marginRight:2 }}/>}
                           {isCompliance && <span style={{ flexShrink:0, fontSize:9, fontWeight:700, background:'rgba(234,179,8,0.15)', color:'#b45309', padding:'1px 4px', borderRadius:3 }}>CA</span>}
                           <span className="task-title" style={{ overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis', flex:1 }}>{task.title}</span>
                           {((task as any).custom_fields?._blocked_by?.length > 0) && task.status !== 'completed' && (

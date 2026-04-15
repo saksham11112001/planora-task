@@ -41,6 +41,14 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
   const countFetchRef = useRef(false)
   const flyoutRef    = useRef<HTMLDivElement>(null)
 
+  // Derive role-based values BEFORE any useEffect that references them
+  const plan      = session?.org.plan_tier ?? 'free'
+  const isPaid    = plan !== 'free'
+  const role      = session?.role ?? ''
+  const userName  = session?.user.name ?? session?.user.email?.split('@')[0] ?? ''
+  const userInit  = userName[0]?.toUpperCase() ?? 'U'
+  const canManage = ['owner','admin','manager'].includes(role)
+
   useEffect(() => {
     const now = Date.now()
     if (now - _cacheTime < CACHE_TTL && _projectCache.length > 0) {
@@ -119,12 +127,6 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
     return pathname === href || pathname.startsWith(href + '/')
   }
 
-  const plan      = session?.org.plan_tier ?? 'free'
-  const isPaid    = plan !== 'free'
-  const role      = session?.role ?? ''
-  const userName  = session?.user.name ?? session?.user.email?.split('@')[0] ?? ''
-  const userInit  = userName[0]?.toUpperCase() ?? 'U'
-  const canManage = ['owner','admin','manager'].includes(role)
   const { navFeatures } = useOrgSettings()
   const nav = navFeatures
 

@@ -192,9 +192,9 @@ export function FeaturesView({ features: initial, plan = 'free' }: { features: R
               const reqPlan  = FEATURE_MIN_PLAN[f.key]
               return (
                 <div key={f.key} style={{ padding:'14px 16px', display:'flex', alignItems:'center',
-                  gap:12, background: locked ? 'var(--surface-subtle)' : 'var(--surface)', opacity: locked ? 0.85 : 1,
+                  gap:12, background: locked ? 'var(--surface-subtle)' : 'var(--surface)',
                   borderBottom: idx < arr.length-1 ? '1px solid var(--border-light)' : 'none',
-                  opacity: isSaving ? 0.7 : 1, transition:'opacity 0.15s' }}>
+                  opacity: locked ? 0.85 : isSaving ? 0.7 : 1, transition:'opacity 0.15s' }}>
                   <div style={{ width:32, height:32, borderRadius:8, flexShrink:0,
                     background: enabled ? f.color : 'var(--surface-subtle)',
                     display:'flex', alignItems:'center', justifyContent:'center',
