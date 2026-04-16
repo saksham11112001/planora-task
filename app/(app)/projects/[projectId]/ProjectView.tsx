@@ -66,6 +66,8 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
   const [newSectionName, setNewSectionName] = useState('')
   const [customSections, setCustomSections] = useState<{key:string;label:string}[]>([])
   const [newSubInputs,    setNewSubInputs]    = useState<Record<string,string>>({})
+  const [newSubAssignees, setNewSubAssignees] = useState<Record<string,string|null>>({})   // parentId → assigneeId for new subtask row
+  const [newSubAssigneeOpen, setNewSubAssigneeOpen] = useState<Record<string,boolean>>({}) // parentId → dropdown open
   const [subAssigneeOpen, setSubAssigneeOpen] = useState<Record<string, boolean>>({})
   const [subDueDateEdit,  setSubDueDateEdit]  = useState<string | null>(null)          // subtask id
   const [taskAssigneeOpen,setTaskAssigneeOpen]= useState<Record<string, boolean>>({})
@@ -194,14 +196,15 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
     startT(() => router.refresh())
   }
 
-  async function addSubtaskInline(parentId: string, title: string) {
+  async function addSubtaskInline(parentId: string, title: string, assigneeId?: string | null) {
     if (!title.trim()) return
     const res = await fetch('/api/tasks', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: title.trim(), parent_task_id: parentId, status: 'todo', priority: 'medium' }),
+      body: JSON.stringify({ title: title.trim(), parent_task_id: parentId, status: 'todo', priority: 'medium', assignee_id: assigneeId ?? null }),
     })
     if (res.ok) {
       setNewSubInputs(p => ({ ...p, [parentId]: '' }))
+      setNewSubAssignees(p => ({ ...p, [parentId]: null }))
       const r = await fetch(`/api/tasks?parent_id=${parentId}&limit=50`)
       const d = await r.json()
       setSubtaskData(p => ({ ...p, [parentId]: d.data ?? [] }))
@@ -450,8 +453,9 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
           {subs.length > 0 ? `${subsDone}/${subs.length}` : '+'}
         </button>
         {/* ── Assignee inline picker ── */}
-        <div className="w-36 hidden md:flex items-center gap-2 pl-2" style={{ position: 'relative' }}>
-          {taskAssigneeOpen[task.id] && (
+        <div className="w-36 hidden md:flex items-center gap-2 pl-2" style={{ position: 'relative' }}
+          onClick={e => { e.stopPropagation(); if (canManage) setTaskAssigneeOpen(p => ({...p, [task.id]: !p[task.id]})); else setSelectedTask(task) }}>
+          {taskAssigneeOpen[task.id] && canManage && (
             <>
               <div style={{ position:'fixed', inset:0, zIndex:49 }}
                 onClick={e => { e.stopPropagation(); setTaskAssigneeOpen(p => ({...p, [task.id]:false})) }}/>
@@ -477,27 +481,24 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
               </div>
             </>
           )}
-          <button
-            onClick={e => { e.stopPropagation(); if (canManage) setTaskAssigneeOpen(p => ({...p, [task.id]: !p[task.id]})); else setSelectedTask(task) }}
-            style={{ background:'none', border:'none', padding:0, cursor: canManage?'pointer':'default', display:'flex', alignItems:'center' }}>
-            {assignee
-              ? <span style={{ display:'inline-flex', alignItems:'center', padding:'2px 8px', borderRadius:99,
-                  background: canManage?'var(--brand-light)':'var(--surface-subtle)',
-                  border:`1px solid ${canManage?'var(--brand-border)':'var(--border)'}`,
-                  fontSize:11, fontWeight:500, color: canManage?'var(--brand)':'var(--text-secondary)',
-                  maxWidth:120, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
-                  {assignee.name.split(' ')[0]}
+          {assignee
+            ? <span style={{ display:'inline-flex', alignItems:'center', padding:'2px 8px', borderRadius:99,
+                background: canManage?'var(--brand-light)':'var(--surface-subtle)',
+                border:`1px solid ${canManage?'var(--brand-border)':'var(--border)'}`,
+                fontSize:11, fontWeight:500, color: canManage?'var(--brand)':'var(--text-secondary)',
+                maxWidth:120, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis',
+                cursor: canManage?'pointer':'default' }}>
+                {assignee.name.split(' ')[0]}
+              </span>
+            : task.assignee_id
+              ? <span className="text-xs" style={{ color:'var(--text-muted)' }}>Assigned</span>
+              : <span className="opacity-0 group-hover:opacity-100 transition-opacity"
+                  style={{ fontSize:11, color:'var(--brand)', background:'var(--brand-light)',
+                    border:'1px solid var(--brand-border)', borderRadius:6, padding:'2px 8px',
+                    whiteSpace:'nowrap', fontWeight:600, display: canManage?'inline':'none' }}>
+                  + Assign
                 </span>
-              : task.assignee_id
-                ? <span className="text-xs" style={{ color:'var(--text-muted)' }}>Assigned</span>
-                : <span className="opacity-0 group-hover:opacity-100 transition-opacity"
-                    style={{ fontSize:11, color:'var(--brand)', background:'var(--brand-light)',
-                      border:'1px solid var(--brand-border)', borderRadius:6, padding:'2px 8px',
-                      whiteSpace:'nowrap', fontWeight:600, display: canManage?'inline':'none' }}>
-                    + Assign
-                  </span>
-            }
-          </button>
+          }
         </div>
         {/* ── Due date inline picker ── */}
         <div className="w-24 hidden md:block text-center" style={{ position:'relative' }}
@@ -723,17 +724,60 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
               onChange={e => setNewSubInputs(p => ({...p, [task.id]: e.target.value}))}
               onKeyDown={e => {
                 if (e.key === 'Enter' && (newSubInputs[task.id] ?? '').trim()) {
-                  addSubtaskInline(task.id, newSubInputs[task.id])
+                  addSubtaskInline(task.id, newSubInputs[task.id], newSubAssignees[task.id])
                   setNewSubInputs(p => ({...p, [task.id]: ''}))
                 }
-                if (e.key === 'Escape') setNewSubInputs(p => ({...p, [task.id]: ''}))
+                if (e.key === 'Escape') {
+                  setNewSubInputs(p => ({...p, [task.id]: ''}))
+                  setNewSubAssignees(p => ({...p, [task.id]: null}))
+                }
               }}
-              placeholder="Add subtask… (press Enter)"
+              placeholder="Add subtask… (Enter)"
               style={{
                 flex: 1, fontSize: 12, border: 'none', outline: 'none',
                 background: 'transparent', color: 'var(--text-primary)',
               }}
             />
+            {/* Assignee picker for new subtask */}
+            <div style={{ position: 'relative', flexShrink: 0 }}>
+              {newSubAssigneeOpen[task.id] && (
+                <>
+                  <div style={{ position: 'fixed', inset: 0, zIndex: 49 }}
+                    onClick={() => setNewSubAssigneeOpen(p => ({...p, [task.id]: false}))}/>
+                  <div style={{ position: 'absolute', right: 0, bottom: 'calc(100% + 4px)', zIndex: 50,
+                    background: 'var(--surface)', border: '1px solid var(--border)',
+                    borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+                    minWidth: 148, overflow: 'hidden' }}>
+                    <button
+                      onClick={() => { setNewSubAssignees(p => ({...p,[task.id]:null})); setNewSubAssigneeOpen(p=>({...p,[task.id]:false})) }}
+                      style={{ width:'100%', textAlign:'left', padding:'7px 12px', fontSize:12,
+                        background: !newSubAssignees[task.id]?'var(--surface-subtle)':'transparent',
+                        border:'none', cursor:'pointer', color:'var(--text-muted)', fontFamily:'inherit' }}>
+                      Unassigned
+                    </button>
+                    {members.map(m => (
+                      <button key={m.id}
+                        onClick={() => { setNewSubAssignees(p => ({...p,[task.id]:m.id})); setNewSubAssigneeOpen(p=>({...p,[task.id]:false})) }}
+                        style={{ width:'100%', textAlign:'left', padding:'7px 12px', fontSize:12,
+                          background: newSubAssignees[task.id]===m.id?'var(--surface-subtle)':'transparent',
+                          border:'none', cursor:'pointer', fontFamily:'inherit', color:'var(--text-primary)',
+                          fontWeight: newSubAssignees[task.id]===m.id?600:400 }}>
+                        {m.name}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+              <button
+                onClick={() => setNewSubAssigneeOpen(p => ({...p, [task.id]: !p[task.id]}))}
+                style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, cursor: 'pointer',
+                  border: '1px solid var(--border)',
+                  background: newSubAssignees[task.id] ? 'rgba(13,148,136,0.07)' : 'var(--surface)',
+                  color: newSubAssignees[task.id] ? 'var(--brand)' : 'var(--text-muted)',
+                  whiteSpace: 'nowrap', fontWeight: newSubAssignees[task.id] ? 600 : 400, fontFamily: 'inherit' }}>
+                {newSubAssignees[task.id] ? (memberMap[newSubAssignees[task.id]!]?.split(' ')[0] ?? 'Assigned') : '+ Assign'}
+              </button>
+            </div>
           </div>
         </div>
       )}
