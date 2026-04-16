@@ -58,14 +58,20 @@ function buildTaskList(assignJson: any, taskJson: any): KanbanTask[] {
   const assignmentTasks: KanbanTask[] = assignments.map((a: any) => {
     const master = a.master_task ?? {}
     const spawned = spawnedByName.get(master.name ?? '')
+    // Completed instances mean the period is done — show upcoming with the NEXT date
+    const isCompleted = spawned?.status === 'completed'
+    const nextFromMaster = nextDueDateFromDates(master.dates ?? {})
     return {
       id: a.id, name: master.name ?? 'Unnamed', group_name: master.group_name ?? '',
-      status: spawned?.status ?? 'upcoming', priority: master.priority ?? 'medium',
-      due_date: spawned?.due_date ?? null, is_recurring: spawned?.is_recurring ?? false,
+      status: isCompleted ? 'upcoming' : (spawned?.status ?? 'upcoming'),
+      priority: master.priority ?? 'medium',
+      due_date: isCompleted ? nextFromMaster : (spawned?.due_date ?? null),
+      is_recurring: spawned?.is_recurring ?? false,
       next_occurrence_date: spawned?.next_occurrence_date ?? null,
-      custom_fields: spawned?.custom_fields ?? null, _raw: spawned ?? null,
+      custom_fields: spawned?.custom_fields ?? null,
+      _raw: isCompleted ? null : (spawned ?? null),
       _taskId: spawned?.id ?? null, _assignmentActive: a.is_active ?? true,
-      _nextDueDate: spawned?.due_date ?? nextDueDateFromDates(master.dates ?? {}),
+      _nextDueDate: isCompleted ? nextFromMaster : (spawned?.due_date ?? nextFromMaster),
       _daysBeforeDue: master.days_before_due ?? 7,
     }
   })
