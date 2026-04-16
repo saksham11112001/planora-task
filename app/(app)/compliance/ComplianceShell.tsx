@@ -28,6 +28,8 @@ interface KanbanTask {
   _assignmentActive: boolean
   _nextDueDate?: string | null
   _daysBeforeDue?: number
+  assignee?: { id: string; name: string } | null
+  approver?: { id: string; name: string } | null
 }
 
 interface KanbanClient { id: string; name: string; color: string }
@@ -73,6 +75,8 @@ function buildTaskList(assignJson: any, taskJson: any): KanbanTask[] {
       _taskId: spawned?.id ?? null, _assignmentActive: a.is_active ?? true,
       _nextDueDate: isCompleted ? nextFromMaster : (spawned?.due_date ?? nextFromMaster),
       _daysBeforeDue: master.days_before_due ?? 7,
+      assignee: (a.assignee as { id: string; name: string } | null) ?? null,
+      approver: (a.approver as { id: string; name: string } | null) ?? null,
     }
   })
   const assignedNames = new Set(assignments.map((a: any) => (a.master_task?.name ?? '').toLowerCase().trim()))
@@ -202,6 +206,26 @@ function CAKanbanView({ userRole, currentUserId }: { userRole: string; currentUs
             </span>
           )}
         </div>
+        {(task.assignee || task.approver) && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 5, flexWrap: 'wrap' }}>
+            {task.assignee && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 10, color: 'var(--text-muted)' }}>
+                <span style={{ width: 14, height: 14, borderRadius: '50%', background: '#0d9488', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 8, fontWeight: 700, flexShrink: 0 }}>
+                  {task.assignee.name.charAt(0).toUpperCase()}
+                </span>
+                {task.assignee.name}
+              </span>
+            )}
+            {task.approver && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 10, color: 'var(--text-muted)' }}>
+                <span style={{ width: 14, height: 14, borderRadius: '50%', background: '#7c3aed', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 8, fontWeight: 700, flexShrink: 0 }}>
+                  {task.approver.name.charAt(0).toUpperCase()}
+                </span>
+                {task.approver.name} <span style={{ opacity: 0.5 }}>(approver)</span>
+              </span>
+            )}
+          </div>
+        )}
         {/* Pause / Activate toggle */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
           <button
@@ -273,6 +297,28 @@ function CAKanbanView({ userRole, currentUserId }: { userRole: string; currentUs
                   {selUpcoming._daysBeforeDue ?? 7} days before due date
                 </span>
               </div>
+              {selUpcoming.assignee && (
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)', width: 110 }}>Assignee</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <span style={{ width: 18, height: 18, borderRadius: '50%', background: '#0d9488', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 9, fontWeight: 700, flexShrink: 0 }}>
+                      {selUpcoming.assignee.name.charAt(0).toUpperCase()}
+                    </span>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>{selUpcoming.assignee.name}</span>
+                  </span>
+                </div>
+              )}
+              {selUpcoming.approver && (
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)', width: 110 }}>Approver</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <span style={{ width: 18, height: 18, borderRadius: '50%', background: '#7c3aed', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 9, fontWeight: 700, flexShrink: 0 }}>
+                      {selUpcoming.approver.name.charAt(0).toUpperCase()}
+                    </span>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>{selUpcoming.approver.name}</span>
+                  </span>
+                </div>
+              )}
               {selUpcoming._nextDueDate && selUpcoming._daysBeforeDue && (
                 <div style={{ marginTop: 6, padding: '10px 14px', borderRadius: 8, background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
                   <span style={{ fontSize: 12, color: '#15803d' }}>
