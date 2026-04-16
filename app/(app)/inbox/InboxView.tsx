@@ -57,6 +57,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
   const [sortBy, setSortBy] = useState<'due_date'|'created_at'|'updated_at'>('due_date')
   const [sortDir, setSortDir] = useState<'asc'|'desc'>('asc')
   const [sortOpen, setSortOpen] = useState(false)
+  const [inlineEdit, setInlineEdit] = useState<{taskId:string;field:string}|null>(null)
 
   function handleTaskUpdated(fields?: Record<string, unknown>) {
     if (fields) {
@@ -231,6 +232,24 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
     const failed = results.filter(r => !r.ok).length
     if (ids.length - failed > 0) toast.success(`${ids.length - failed} task(s) deleted`)
     if (failed > 0) { toast.error(`${failed} task(s) could not be deleted`); startT(() => router.refresh()) }
+  }
+
+  async function patchTaskField(taskId: string, field: string, value: unknown) {
+    setInlineEdit(null)
+    const prev = localTasks.find(t => t.id === taskId)
+    const updates: any = { [field]: value }
+    if (field === 'assignee_id') {
+      updates.assignee = value ? (members.find(m => m.id === value) ?? null) : null
+    }
+    setLocalTasks(p => p.map(t => t.id === taskId ? { ...t, ...updates } as Task : t))
+    const res = await fetch(`/api/tasks/${taskId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [field]: value || null }),
+    })
+    if (!res.ok && prev) {
+      setLocalTasks(p => p.map(t => t.id === taskId ? prev : t))
+      toast.error('Could not update task')
+    }
   }
 
   async function handleBoardDrop(targetStatus: string) {
@@ -604,16 +623,30 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                               </label>
                             )}
                           </div>
-                          {/* Assignee column */}
-                          <div className="hide-mobile" style={{ display:'flex', alignItems:'center', overflow:'hidden' }}>
-                            {(() => {
+                          {/* Assignee column — inline editable */}
+                          <div className="hide-mobile" style={{ display:'flex', alignItems:'center', overflow:'hidden', cursor: canManage ? 'pointer' : 'default' }}
+                            onClick={e => { e.stopPropagation(); if (canManage) setInlineEdit({taskId:task.id,field:'assignee_id'}) }}>
+                            {inlineEdit?.taskId===task.id && inlineEdit.field==='assignee_id' ? (
+                              <select autoFocus defaultValue={(task as any).assignee_id ?? ''}
+                                onChange={e => patchTaskField(task.id,'assignee_id',e.target.value||null)}
+                                onBlur={() => setInlineEdit(null)}
+                                onClick={e => e.stopPropagation()}
+                                style={{ fontSize:11, padding:'2px 5px', borderRadius:6, border:'1px solid var(--brand)',
+                                  background:'var(--surface)', color:'var(--text-primary)', outline:'none',
+                                  fontFamily:'inherit', maxWidth:84, cursor:'pointer' }}>
+                                <option value="">Unassigned</option>
+                                {members.map(m => <option key={m.id} value={m.id}>{m.name.split(' ')[0]}</option>)}
+                              </select>
+                            ) : (() => {
                               const assignee = (task as any).assignee as { id:string; name:string } | null
-                              if (!assignee) return <span style={{ fontSize:11, color:'var(--text-muted)' }}>—</span>
+                              if (!assignee) return <span style={{ fontSize:11, color:'var(--text-muted)', cursor: canManage ? 'pointer' : 'default' }} title={canManage ? 'Click to assign' : undefined}>—</span>
                               return (
-                                <span style={{ display:'inline-flex', alignItems:'center', padding:'2px 8px', borderRadius:99,
+                                <span title={canManage ? 'Click to reassign' : undefined}
+                                  style={{ display:'inline-flex', alignItems:'center', padding:'2px 8px', borderRadius:99,
                                   background:'var(--surface-subtle)', border:'1px solid var(--border)',
                                   fontSize:11, fontWeight:500, color:'var(--text-secondary)',
-                                  maxWidth:82, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
+                                  maxWidth:82, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis',
+                                  cursor: canManage ? 'pointer' : 'default' }}>
                                   {assignee.name.split(' ')[0]}
                                 </span>
                               )
@@ -628,8 +661,21 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                               </>
                             ) : <span style={{ fontSize:11, color:'var(--text-muted)' }}>—</span>}
                           </div>
-                          <div className="hide-mobile" style={{ textAlign:'center', fontSize:12, color:ov?'#f87171':task.due_date===today?'var(--brand)':'var(--text-muted)', fontWeight:ov||task.due_date===today?600:400 }}>
-                            {task.due_date ? fmtDate(task.due_date) : '—'}
+                          {/* Due date — inline editable */}
+                          <div className="hide-mobile" style={{ textAlign:'center', fontSize:12, color:ov?'#f87171':task.due_date===today?'var(--brand)':'var(--text-muted)', fontWeight:ov||task.due_date===today?600:400, cursor: canManage ? 'pointer' : 'default' }}
+                            onClick={e => { e.stopPropagation(); if (canManage) setInlineEdit({taskId:task.id,field:'due_date'}) }}>
+                            {inlineEdit?.taskId===task.id && inlineEdit.field==='due_date' ? (
+                              <input autoFocus type="date" defaultValue={task.due_date ?? ''}
+                                onChange={e => patchTaskField(task.id,'due_date',e.target.value||null)}
+                                onBlur={() => setInlineEdit(null)}
+                                onClick={e => e.stopPropagation()}
+                                style={{ fontSize:11, padding:'1px 4px', borderRadius:5, border:'1px solid var(--brand)',
+                                  background:'var(--surface)', outline:'none', colorScheme:'light dark', fontFamily:'inherit' }}/>
+                            ) : (
+                              <span title={canManage ? 'Click to change due date' : undefined}>
+                                {task.due_date ? fmtDate(task.due_date) : '—'}
+                              </span>
+                            )}
                           </div>
                           {/* Assigned by column */}
                           <div className="hide-mobile" style={{ display:'flex', alignItems:'center', overflow:'hidden' }}>

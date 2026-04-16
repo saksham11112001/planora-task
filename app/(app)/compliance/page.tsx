@@ -1,6 +1,7 @@
 import { createClient }     from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect }          from 'next/navigation'
+import { Suspense }          from 'react'
 import { ComplianceShell }   from './ComplianceShell'
 import { UpgradeWall }       from '@/components/ui/UpgradeWall'
 import { effectivePlan, canUseFeature } from '@/lib/utils/planGate'
@@ -29,5 +30,14 @@ export default async function CompliancePage() {
     />
   }
 
-  return <ComplianceShell userRole={mb.role} currentUserId={user.id} />
+  return (
+    <Suspense fallback={
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:300 }}>
+        <div style={{ width:24, height:24, border:'2px solid var(--brand)', borderTopColor:'transparent', borderRadius:'50%', animation:'spin 0.7s linear infinite' }}/>
+        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      </div>
+    }>
+      <ComplianceShell userRole={mb.role} currentUserId={user.id} />
+    </Suspense>
+  )
 }

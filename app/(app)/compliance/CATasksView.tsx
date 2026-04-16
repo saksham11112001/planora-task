@@ -93,6 +93,7 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
   const [bulkAssignId,    setBulkAssignId]    = useState('')   // member id to bulk-assign to
   const [bulkAssigning,   setBulkAssigning]   = useState(false)
   const [filterQuick,     setFilterQuick]     = useState<'overdue' | 'week' | 'pending' | ''>('')  // quick health filter
+  const [inlineEdit,      setInlineEdit]      = useState<{ taskId: string; field: string } | null>(null)
 
   const canManage = ['owner', 'admin', 'manager'].includes(userRole)
 
@@ -165,6 +166,25 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
     const res = await fetch(`/api/tasks/${id}`, { method: 'DELETE' })
     if (!res.ok) { setTasks(snap); toast.error('Failed to delete') }
     else { toast.success('Deleted'); startT(() => router.refresh()) }
+  }
+
+  async function patchField(taskId: string, field: string, value: unknown) {
+    setInlineEdit(null)
+    const snap = [...tasks]
+    const updates: Partial<CATask> = { [field]: value as any }
+    if (field === 'assignee_id') {
+      updates.assignee = value ? (members.find(m => m.id === value) ?? null) : null
+    }
+    setTasks(p => p.map(t => t.id === taskId ? { ...t, ...updates } : t))
+    if (selTask?.id === taskId) setSelTask(p => p ? { ...p, ...updates } : null)
+    const res = await fetch(`/api/tasks/${taskId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [field]: value || null }),
+    })
+    if (!res.ok) {
+      setTasks(snap)
+      toast.error('Could not update task')
+    }
   }
 
   async function bulkDelete() {
@@ -697,24 +717,49 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
                     </span>
                   </div>
 
-                  {/* Assignee */}
-                  <div style={{ display: 'flex', justifyContent: 'center' }}>
-                    {task.assignee ? (
-                      <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 99, background: 'var(--surface-subtle)', border: '1px solid var(--border)', color: 'var(--text-secondary)', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', maxWidth: 74 }}>
+                  {/* Assignee — inline editable */}
+                  <div style={{ display: 'flex', justifyContent: 'center', cursor: canManage ? 'pointer' : 'default' }}
+                    onClick={e => { e.stopPropagation(); if (canManage) setInlineEdit({ taskId: task.id, field: 'assignee_id' }) }}>
+                    {inlineEdit?.taskId === task.id && inlineEdit.field === 'assignee_id' ? (
+                      <select autoFocus defaultValue={task.assignee_id ?? ''}
+                        onChange={e => patchField(task.id, 'assignee_id', e.target.value || null)}
+                        onBlur={() => setInlineEdit(null)}
+                        onClick={e => e.stopPropagation()}
+                        style={{ fontSize: 11, padding: '2px 5px', borderRadius: 6, border: '1px solid var(--brand)',
+                          background: 'var(--surface)', color: 'var(--text-primary)', outline: 'none',
+                          fontFamily: 'inherit', maxWidth: 80, cursor: 'pointer' }}>
+                        <option value="">Unassigned</option>
+                        {members.map(m => <option key={m.id} value={m.id}>{m.name.split(' ')[0]}</option>)}
+                      </select>
+                    ) : task.assignee ? (
+                      <span title={canManage ? 'Click to reassign' : undefined}
+                        style={{ fontSize: 11, padding: '2px 7px', borderRadius: 99, background: 'var(--surface-subtle)', border: '1px solid var(--border)', color: 'var(--text-secondary)', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', maxWidth: 74 }}>
                         {task.assignee.name.split(' ')[0]}
                       </span>
                     ) : (
-                      <div style={{ width: 18, height: 18, borderRadius: '50%', border: '1.5px dashed var(--border)' }}/>
+                      <div title={canManage ? 'Click to assign' : undefined}
+                        style={{ width: 18, height: 18, borderRadius: '50%', border: '1.5px dashed var(--border)' }}/>
                     )}
                   </div>
 
-                  {/* Due date */}
-                  <div style={{ textAlign: 'center', fontSize: 11, fontWeight: 500, color: ov ? '#dc2626' : 'var(--text-muted)' }}>
-                    {task.due_date ? (
-                      <span style={{ padding: '2px 6px', borderRadius: 6, background: ov ? '#fef2f2' : 'transparent' }}>
+                  {/* Due date — inline editable */}
+                  <div style={{ textAlign: 'center', fontSize: 11, fontWeight: 500, color: ov ? '#dc2626' : 'var(--text-muted)', cursor: canManage ? 'pointer' : 'default' }}
+                    onClick={e => { e.stopPropagation(); if (canManage) setInlineEdit({ taskId: task.id, field: 'due_date' }) }}>
+                    {inlineEdit?.taskId === task.id && inlineEdit.field === 'due_date' ? (
+                      <input autoFocus type="date" defaultValue={task.due_date ?? ''}
+                        onChange={e => patchField(task.id, 'due_date', e.target.value || null)}
+                        onBlur={() => setInlineEdit(null)}
+                        onClick={e => e.stopPropagation()}
+                        style={{ fontSize: 11, padding: '1px 4px', borderRadius: 5, border: '1px solid var(--brand)',
+                          background: 'var(--surface)', outline: 'none', colorScheme: 'light dark', fontFamily: 'inherit' }}/>
+                    ) : task.due_date ? (
+                      <span title={canManage ? 'Click to change due date' : undefined}
+                        style={{ padding: '2px 6px', borderRadius: 6, background: ov ? '#fef2f2' : 'transparent' }}>
                         {fmtDate(task.due_date)}
                       </span>
-                    ) : '—'}
+                    ) : (
+                      <span title={canManage ? 'Click to set due date' : undefined}>—</span>
+                    )}
                   </div>
 
                   {/* Actions */}
