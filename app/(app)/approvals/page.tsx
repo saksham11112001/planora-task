@@ -1,6 +1,9 @@
 import { createClient }   from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect }        from 'next/navigation'
 import { ApprovalsView }   from './ApprovalsView'
+import { UpgradeWall }     from '@/components/ui/UpgradeWall'
+import { effectivePlan, canUseFeature } from '@/lib/utils/planGate'
 import type { Metadata }   from 'next'
 
 export const dynamic   = 'force-dynamic'
@@ -16,6 +19,20 @@ export default async function ApprovalsPage() {
     .from('org_members').select('org_id, role')
     .eq('user_id', user.id).eq('is_active', true).maybeSingle()
   if (!mb) redirect('/onboarding')
+
+  // Gate: Approvals requires Starter plan or above
+  const admin = createAdminClient()
+  const { data: orgData } = await admin.from('organisations')
+    .select('plan_tier, status, trial_ends_at').eq('id', mb.org_id).single()
+  const plan = effectivePlan(orgData ?? { plan_tier: 'free', status: 'active' })
+  if (!canUseFeature(plan, 'approvals')) {
+    return <UpgradeWall
+      feature="Approval Workflows"
+      description="Assign approvers to tasks and track sign-offs with a full approval audit trail. Upgrade to unlock."
+      requiredPlan="Starter"
+      icon="✍️"
+    />
+  }
 
   // Only fetch tasks where this user is the designated approver
   // (any role can be an approver; non-approvers see an empty list)

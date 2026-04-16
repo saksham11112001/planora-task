@@ -47,7 +47,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const formData = await req.formData()
   const file     = formData.get('file') as File | null
   if (!file) return NextResponse.json({ error: 'No file' }, { status: 400 })
-  if (file.size > 20 * 1024 * 1024) return NextResponse.json({ error: 'Max file size is 20 MB' }, { status: 400 })
+  if (file.size > 100 * 1024 * 1024) return NextResponse.json({ error: 'Max file size is 100 MB' }, { status: 400 })
 
   const ext         = file.name.split('.').pop() ?? 'bin'
   const storagePath = `${mb.org_id}/${id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`

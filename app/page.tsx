@@ -69,7 +69,7 @@ export default async function LandingPage() {
         </Link>
 
         <div style={{ flex: 1, display: 'flex', justifyContent: 'center', gap: 32 }} className="hide-mobile">
-          {[['Features','#features'],['Solutions','#solutions'],['Pricing','#pricing'],['Testimonials','#testimonials']].map(([l,h]) => (
+          {[['Features','#features'],['Solutions','#solutions'],['Compare','#compare'],['Pricing','#pricing'],['Testimonials','#testimonials']].map(([l,h]) => (
             <a key={l} href={h} className="nav-link"
               style={{ color: '#64748b', fontSize: 14, textDecoration: 'none', fontWeight: 500 }}>{l}</a>
           ))}
@@ -566,6 +566,132 @@ export default async function LandingPage() {
                 <p style={{ fontSize: 13, color: '#64748b', lineHeight: 1.65, margin: 0 }}>{u.desc}</p>
               </div>
             ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── COMPARE ── */}
+      <div id="compare" style={{ background: '#fff', borderTop: '1px solid #f1f5f9', padding: '80px 6%' }}>
+        <div style={{ maxWidth: 1060, margin: '0 auto' }}>
+          {/* Header */}
+          <div style={{ textAlign: 'center', marginBottom: 52 }}>
+            <div style={{ display: 'inline-block', background: '#fff7ed', color: '#f97316', fontSize: 12, fontWeight: 700, padding: '4px 16px', borderRadius: 99, border: '1px solid #fed7aa', marginBottom: 16 }}>
+              WHY TASKA
+            </div>
+            <h2 style={{ fontSize: 'clamp(26px,4vw,42px)', fontWeight: 900, letterSpacing: '-1.5px', marginBottom: 14 }}>
+              How we stack up
+            </h2>
+            <p style={{ fontSize: 16, color: '#64748b', maxWidth: 520, margin: '0 auto', lineHeight: 1.7 }}>
+              Built specifically for Indian teams — the features that matter most, at a price that makes sense.
+            </p>
+          </div>
+
+          {/* Table wrapper */}
+          <div style={{ overflowX: 'auto', borderRadius: 20, boxShadow: '0 4px 32px rgba(0,0,0,0.08)', border: '1px solid #e2e8f0' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 680 }}>
+              <thead>
+                <tr>
+                  {/* Feature column */}
+                  <th style={{ padding: '20px 24px', textAlign: 'left', fontSize: 12, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.6px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', width: '30%' }}>
+                    Feature
+                  </th>
+                  {/* Taska */}
+                  <th style={{ padding: '20px 16px', textAlign: 'center', background: 'linear-gradient(160deg,#0f172a,#0d4a44)', borderBottom: '1px solid #0d9488', minWidth: 130 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                      <div style={{ width: 30, height: 30, borderRadius: 9, background: 'rgba(45,212,191,0.2)', border: '1px solid rgba(45,212,191,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 800, color: '#2dd4bf' }}>T</div>
+                      <span style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>Taska</span>
+                      <span style={{ fontSize: 10, color: '#2dd4bf', fontWeight: 600 }}>₹999/mo</span>
+                    </div>
+                  </th>
+                  {/* Asana */}
+                  <th style={{ padding: '20px 16px', textAlign: 'center', background: '#fafaf9', borderBottom: '1px solid #e2e8f0', minWidth: 110 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                      <div style={{ fontSize: 18 }}>🔴</div>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: '#374151' }}>Asana</span>
+                      <span style={{ fontSize: 10, color: '#9ca3af', fontWeight: 600 }}>$10.99/user</span>
+                    </div>
+                  </th>
+                  {/* Worklenz */}
+                  <th style={{ padding: '20px 16px', textAlign: 'center', background: '#fafaf9', borderBottom: '1px solid #e2e8f0', minWidth: 110 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                      <div style={{ fontSize: 18 }}>🟣</div>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: '#374151' }}>Worklenz</span>
+                      <span style={{ fontSize: 10, color: '#9ca3af', fontWeight: 600 }}>Free / Open</span>
+                    </div>
+                  </th>
+                  {/* Plane */}
+                  <th style={{ padding: '20px 16px', textAlign: 'center', background: '#fafaf9', borderBottom: '1px solid #e2e8f0', minWidth: 110 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                      <div style={{ fontSize: 18 }}>🔵</div>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: '#374151' }}>Plane</span>
+                      <span style={{ fontSize: 10, color: '#9ca3af', fontWeight: 600 }}>$8/user</span>
+                    </div>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { feature: '🇮🇳 INR billing (no USD)',       usp: true,  taska: true,  asana: false, worklenz: false, plane: false },
+                  { feature: '💬 WhatsApp notifications',       usp: true,  taska: true,  asana: false, worklenz: false, plane: false },
+                  { feature: '🏛️ CA / compliance workflows',   usp: true,  taska: true,  asana: false, worklenz: false, plane: false },
+                  { feature: '🔁 Recurring task engine',        usp: false, taska: true,  asana: true,  worklenz: 'partial', plane: 'partial' },
+                  { feature: '✍️ Approval workflows',           usp: false, taska: true,  asana: true,  worklenz: false, plane: false },
+                  { feature: '🌐 Client-facing portal',         usp: false, taska: true,  asana: false, worklenz: false, plane: false },
+                  { feature: '⏱️ Time tracking',                usp: false, taska: true,  asana: true,  worklenz: true,  plane: true  },
+                  { feature: '📊 Built-in reports & exports',   usp: false, taska: true,  asana: true,  worklenz: 'partial', plane: true  },
+                  { feature: '📱 Mobile-friendly web app',      usp: false, taska: true,  asana: true,  worklenz: true,  plane: true  },
+                  { feature: '🔗 API access',                   usp: false, taska: true,  asana: true,  worklenz: false, plane: true  },
+                  { feature: '🛡️ Data stored in India',        usp: true,  taska: true,  asana: false, worklenz: false, plane: false },
+                  { feature: '💰 Flat team pricing (not /user)',usp: true,  taska: true,  asana: false, worklenz: 'partial', plane: false },
+                ].map((row, i) => {
+                  const bg = i % 2 === 0 ? '#fff' : '#fafafa'
+                  const Cell = ({ val, highlight }: { val: boolean | string; highlight?: boolean }) => (
+                    <td style={{ padding: '14px 16px', textAlign: 'center', background: highlight ? 'rgba(13,148,136,0.04)' : bg, borderBottom: '1px solid #f1f5f9' }}>
+                      {val === true  ? <span style={{ fontSize: 18, lineHeight: 1 }}>✅</span>
+                      : val === false ? <span style={{ fontSize: 16, color: '#cbd5e1', lineHeight: 1 }}>—</span>
+                      : <span style={{ fontSize: 12, fontWeight: 600, color: '#f59e0b', background: '#fffbeb', border: '1px solid #fde68a', padding: '2px 7px', borderRadius: 99 }}>Partial</span>}
+                    </td>
+                  )
+                  return (
+                    <tr key={row.feature}>
+                      <td style={{ padding: '14px 24px', fontSize: 13, fontWeight: row.usp ? 700 : 500, color: '#374151', background: bg, borderBottom: '1px solid #f1f5f9' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          {row.feature}
+                          {row.usp && <span style={{ fontSize: 9, fontWeight: 800, background: '#fff7ed', color: '#f97316', border: '1px solid #fed7aa', padding: '1px 6px', borderRadius: 99, textTransform: 'uppercase', letterSpacing: '0.3px', whiteSpace: 'nowrap' }}>USP</span>}
+                        </div>
+                      </td>
+                      <Cell val={row.taska} highlight />
+                      <Cell val={row.asana} />
+                      <Cell val={row.worklenz} />
+                      <Cell val={row.plane} />
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Bottom callout */}
+          <div style={{
+            marginTop: 36, display: 'flex', flexWrap: 'wrap', gap: 14,
+            background: 'linear-gradient(135deg,#0f172a,#0d4a44)',
+            borderRadius: 18, padding: '28px 32px', alignItems: 'center', justifyContent: 'space-between',
+          }}>
+            <div>
+              <p style={{ fontSize: 16, fontWeight: 800, color: '#fff', marginBottom: 6, letterSpacing: '-0.3px' }}>
+                Taska — built for India, priced for India
+              </p>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', maxWidth: 480, lineHeight: 1.6 }}>
+                All features included from ₹999/month flat. No per-user fees, no USD pricing surprises, no upsell traps.
+              </p>
+            </div>
+            <Link href="/login" style={{
+              background: '#f97316', color: '#fff', padding: '12px 28px', borderRadius: 12,
+              fontSize: 14, fontWeight: 800, textDecoration: 'none', flexShrink: 0,
+              boxShadow: '0 6px 24px rgba(249,115,22,0.5)', display: 'inline-block',
+            }}>
+              Start free trial →
+            </Link>
           </div>
         </div>
       </div>

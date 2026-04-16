@@ -79,6 +79,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
   const [driveUrl,      setDriveUrl]      = useState('')
   const [driveTitle,    setDriveTitle]    = useState('')
   const [caHeaders,     setCaHeaders]     = useState<string[]>([])
+  const [previewAtt,   setPreviewAtt]   = useState<{ url: string; mimeType: string; name: string; storagePath: string } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [aiLoading, setAiLoading] = useState(false)
   const [isSaving,  setIsSaving]  = useState(false)
@@ -560,14 +561,28 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     toast.success('Deleted')
   }
 
-  async function getSignedUrl(storagePath: string, fileName: string) {
-    // Use Supabase client to get signed URL for download
+  async function viewAttachment(storagePath: string, mimeType: string, fileName: string) {
     const { createClient } = await import('@/lib/supabase/client')
     const sb = createClient()
-    const { data } = await sb.storage.from('attachments').createSignedUrl(storagePath, 60)
+    const { data } = await sb.storage.from('attachments').createSignedUrl(storagePath, 300)
+    if (!data?.signedUrl) return
+    const isImage = mimeType?.startsWith('image/')
+    const isPdf   = mimeType?.includes('pdf')
+    const isVideo = mimeType?.startsWith('video/')
+    if (isImage || isPdf || isVideo) {
+      setPreviewAtt({ url: data.signedUrl, mimeType, name: fileName, storagePath })
+    } else {
+      window.open(data.signedUrl, '_blank', 'noopener,noreferrer')
+    }
+  }
+
+  async function downloadAttachment(storagePath: string, fileName: string) {
+    const { createClient } = await import('@/lib/supabase/client')
+    const sb = createClient()
+    const { data } = await sb.storage.from('attachments').createSignedUrl(storagePath, 60, { download: fileName })
     if (data?.signedUrl) {
       const a = document.createElement('a')
-      a.href = data.signedUrl; a.download = fileName; a.click()
+      a.href = data.signedUrl; a.click()
     }
   }
 
@@ -1458,11 +1473,19 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                                 style={{ color: 'var(--brand)' }}>
                                 Open
                               </a>
-                            : <button onClick={() => getSignedUrl(att.storage_path, att.file_name)}
-                                className="text-xs font-medium px-2 py-1 rounded transition-colors flex-shrink-0"
-                                style={{ color: 'var(--brand)' }}>
-                                Download
-                              </button>
+                            : <div className="flex items-center gap-1 flex-shrink-0">
+                                <button onClick={() => viewAttachment(att.storage_path, att.mime_type, att.file_name)}
+                                  className="text-xs font-medium px-2 py-1 rounded transition-colors"
+                                  style={{ color: 'var(--brand)' }}>
+                                  View
+                                </button>
+                                <button onClick={() => downloadAttachment(att.storage_path, att.file_name)}
+                                  title="Download"
+                                  className="text-xs px-1 py-1 rounded transition-colors"
+                                  style={{ color: 'var(--text-muted)' }}>
+                                  ↓
+                                </button>
+                              </div>
                           }
                           <button onClick={() => deleteAttachment(att.id, att.storage_path)}
                             className="text-xs px-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
@@ -1605,6 +1628,83 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
           </>
         )}
       </div>
+
+      {/* ── Attachment preview overlay ── */}
+      {previewAtt && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9999,
+            background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(4px)',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          }}
+          onClick={() => setPreviewAtt(null)}
+        >
+          {/* Toolbar */}
+          <div
+            style={{
+              position: 'absolute', top: 0, left: 0, right: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '14px 20px',
+              background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)',
+              borderBottom: '1px solid rgba(255,255,255,0.08)',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0', maxWidth: '60%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {previewAtt.name}
+            </span>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => downloadAttachment(previewAtt.storagePath, previewAtt.name)}
+                style={{
+                  background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)',
+                  color: '#e2e8f0', borderRadius: 8, padding: '6px 14px',
+                  fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                }}
+              >
+                ↓ Download
+              </button>
+              <button
+                onClick={() => setPreviewAtt(null)}
+                style={{
+                  background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)',
+                  color: '#e2e8f0', borderRadius: 8, padding: '6px 14px',
+                  fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                }}
+              >
+                ✕ Close
+              </button>
+            </div>
+          </div>
+
+          {/* Content */}
+          <div
+            style={{ maxWidth: '92vw', maxHeight: '80vh', marginTop: 64 }}
+            onClick={e => e.stopPropagation()}
+          >
+            {previewAtt.mimeType?.startsWith('image/') ? (
+              <img
+                src={previewAtt.url}
+                alt={previewAtt.name}
+                style={{ maxWidth: '92vw', maxHeight: '80vh', borderRadius: 10, objectFit: 'contain', boxShadow: '0 24px 80px rgba(0,0,0,0.6)' }}
+              />
+            ) : previewAtt.mimeType?.includes('pdf') ? (
+              <iframe
+                src={previewAtt.url}
+                title={previewAtt.name}
+                style={{ width: '80vw', height: '80vh', border: 'none', borderRadius: 10 }}
+              />
+            ) : (
+              <video
+                src={previewAtt.url}
+                controls
+                autoPlay
+                style={{ maxWidth: '92vw', maxHeight: '80vh', borderRadius: 10, boxShadow: '0 24px 80px rgba(0,0,0,0.6)' }}
+              />
+            )}
+          </div>
+        </div>
+      )}
     </>
   )
 }

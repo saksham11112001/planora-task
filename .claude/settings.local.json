@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(python3 -c \"import openpyxl; print\\('ok'\\)\")",
-      "Bash(python scripts/gen_plan.py)"
+      "Bash(python scripts/gen_plan.py)",
+      "Bash(npx tsc:*)",
+      "Bash(xargs grep:*)"
     ]
   }
 }
