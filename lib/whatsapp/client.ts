@@ -8,36 +8,65 @@ export interface WaMessage {
   variables:    string[] // positional template variables
 }
 
+/**
+ * Send a WhatsApp message via MSG91 with exponential backoff retry.
+ * Retries up to 3 times on network errors or non-success responses.
+ * Returns true if delivered, false after all retries exhausted.
+ */
 export async function sendWhatsApp(msg: WaMessage): Promise<boolean> {
   if (!AUTH_KEY || !SENDER_ID) {
     console.warn('[WhatsApp] MSG91 not configured — skipping')
     return false
   }
 
-  try {
-    const body = {
-      sender:    SENDER_ID,
-      recipient: [{
-        mobiles: msg.to.replace(/^\+/, ''),
-        // Variables are passed as VAR1, VAR2... based on MSG91 template
-        ...Object.fromEntries(msg.variables.map((v, i) => [`VAR${i + 1}`, v])),
-      }],
-      template_name: msg.template_name,
+  const body = {
+    sender:    SENDER_ID,
+    recipient: [{
+      mobiles: msg.to.replace(/^\+/, ''),
+      ...Object.fromEntries(msg.variables.map((v, i) => [`VAR${i + 1}`, v])),
+    }],
+    template_name: msg.template_name,
+  }
+
+  const MAX_ATTEMPTS = 3
+  let lastError: unknown
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      const res = await fetch(BASE_URL, {
+        method:  'POST',
+        headers: { authkey: AUTH_KEY, 'Content-Type': 'application/json' },
+        body:    JSON.stringify(body),
+        // Hard timeout per attempt — prevents indefinitely hanging requests
+        signal:  AbortSignal.timeout(10_000),
+      })
+
+      const data = await res.json()
+
+      if (data.type === 'success') return true
+
+      // MSG91 returned a non-success response — may be retryable (rate limit)
+      // or terminal (invalid template). Log and decide.
+      console.error(`[WhatsApp] Send failed (attempt ${attempt}/${MAX_ATTEMPTS}):`, data)
+
+      // Terminal errors — don't retry (wrong template name, invalid number, etc.)
+      if (data.code === 'INVALID_TEMPLATE' || data.code === 'INVALID_MOBILE') {
+        return false
+      }
+
+      lastError = data
+    } catch (err) {
+      // Network / timeout error — retryable
+      console.error(`[WhatsApp] Network error (attempt ${attempt}/${MAX_ATTEMPTS}):`, err)
+      lastError = err
     }
 
-    const res = await fetch(BASE_URL, {
-      method:  'POST',
-      headers: { authkey: AUTH_KEY, 'Content-Type': 'application/json' },
-      body:    JSON.stringify(body),
-    })
-
-    const data = await res.json()
-    if (data.type === 'success') return true
-
-    console.error('[WhatsApp] Send failed:', data)
-    return false
-  } catch (err) {
-    console.error('[WhatsApp] Network error:', err)
-    return false
+    // Exponential backoff: 500ms, 1000ms before attempts 2 and 3
+    if (attempt < MAX_ATTEMPTS) {
+      await new Promise(r => setTimeout(r, 500 * attempt))
+    }
   }
+
+  console.error('[WhatsApp] All retries exhausted. Last error:', lastError)
+  return false
 }

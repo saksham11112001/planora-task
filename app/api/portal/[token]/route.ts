@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient }         from '@/lib/supabase/admin'
 import crypto                        from 'crypto'
 
+export const maxDuration = 30 // seconds — portal has multiple queries
+
 // GET /api/portal/[token]
 // Validates the token and returns client portal data.
 // No auth required — token IS the auth.
@@ -37,33 +39,12 @@ export async function GET(
 
   if (!org || !client) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  // 3. Load upcoming compliance tasks (due in next 60 days, not completed)
-  const now    = new Date()
-  const cutoff = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000)
+  // 3. Load this client's active assignment IDs first (small, fast query)
+  const now       = new Date()
+  const cutoff    = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000)
   const todayStr  = now.toISOString().split('T')[0]
   const cutoffStr = cutoff.toISOString().split('T')[0]
 
-  const { data: upcomingInstances } = await admin
-    .from('ca_task_instances')
-    .select(`
-      id, assignment_id, task_id, due_date, month_key, status,
-      task:tasks!ca_task_instances_task_id_fkey(
-        id, title, status, due_date, custom_fields,
-        assignee:users!tasks_assignee_id_fkey(id, name)
-      ),
-      assignment:ca_client_assignments!ca_task_instances_assignment_id_fkey(
-        id, master_task_id,
-        master_task:ca_master_tasks!ca_client_assignments_master_task_id_fkey(
-          id, name, attachment_headers, task_types
-        )
-      )
-    `)
-    .eq('org_id', org_id)
-    .gte('due_date', todayStr)
-    .lte('due_date', cutoffStr)
-    .order('due_date', { ascending: true })
-
-  // Filter to this client's assignments
   const { data: clientAssignments } = await admin
     .from('ca_client_assignments')
     .select('id')
@@ -71,11 +52,38 @@ export async function GET(
     .eq('org_id', org_id)
     .eq('is_active', true)
 
-  const clientAssignmentIds = new Set((clientAssignments ?? []).map((a: any) => a.id))
-  const upcoming = (upcomingInstances ?? []).filter((inst: any) =>
-    clientAssignmentIds.has(inst.assignment_id) &&
-    inst.task?.status !== 'completed'
-  )
+  const clientAssignmentIds = (clientAssignments ?? []).map((a: any) => a.id as string)
+
+  // 4. Load upcoming compliance tasks filtered directly to this client's assignments.
+  // Uses .in('assignment_id', [...]) so the DB does the filter — not JavaScript.
+  // This replaces fetching ALL org instances then filtering in-memory.
+  let upcoming: any[] = []
+  if (clientAssignmentIds.length > 0) {
+    const { data: upcomingInstances } = await admin
+      .from('ca_task_instances')
+      .select(`
+        id, assignment_id, task_id, due_date, month_key, status,
+        task:tasks!ca_task_instances_task_id_fkey(
+          id, title, status, due_date, custom_fields,
+          assignee:users!tasks_assignee_id_fkey(id, name)
+        ),
+        assignment:ca_client_assignments!ca_task_instances_assignment_id_fkey(
+          id, master_task_id,
+          master_task:ca_master_tasks!ca_client_assignments_master_task_id_fkey(
+            id, name, attachment_headers, task_types
+          )
+        )
+      `)
+      .eq('org_id', org_id)
+      .in('assignment_id', clientAssignmentIds)
+      .gte('due_date', todayStr)
+      .lte('due_date', cutoffStr)
+      .neq('status', 'completed')
+      .order('due_date', { ascending: true })
+      .limit(200)
+
+    upcoming = (upcomingInstances ?? []).filter((inst: any) => inst.task?.status !== 'completed')
+  }
 
   // 4. Load document uploads for this client
   const { data: uploads } = await admin
@@ -104,26 +112,28 @@ export async function GET(
     .eq('is_active', true)
     .order('sort_order', { ascending: true })
 
-  // 6. Completed tasks (last 6 months)
+  // 6. Completed tasks (last 6 months) — filtered by client assignments in DB
   const sixMonthsAgo = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-  const { data: historyInstances } = await admin
-    .from('ca_task_instances')
-    .select(`
-      id, due_date, month_key,
-      task:tasks!ca_task_instances_task_id_fkey(
-        id, title, status, completed_at,
-        assignee:users!tasks_assignee_id_fkey(id, name)
-      )
-    `)
-    .eq('org_id', org_id)
-    .gte('due_date', sixMonthsAgo)
-    .lt('due_date', todayStr)
-    .order('due_date', { ascending: false })
+  let history: any[] = []
+  if (clientAssignmentIds.length > 0) {
+    const { data: historyInstances } = await admin
+      .from('ca_task_instances')
+      .select(`
+        id, assignment_id, due_date, month_key,
+        task:tasks!ca_task_instances_task_id_fkey(
+          id, title, status, completed_at,
+          assignee:users!tasks_assignee_id_fkey(id, name)
+        )
+      `)
+      .eq('org_id', org_id)
+      .in('assignment_id', clientAssignmentIds)
+      .gte('due_date', sixMonthsAgo)
+      .lt('due_date', todayStr)
+      .order('due_date', { ascending: false })
+      .limit(100)
 
-  const history = (historyInstances ?? []).filter((inst: any) =>
-    clientAssignmentIds.has(inst.assignment_id) &&
-    inst.task?.status === 'completed'
-  )
+    history = (historyInstances ?? []).filter((inst: any) => inst.task?.status === 'completed')
+  }
 
   // 7. Evergreen uploads
   const evergreenUploads = (uploads ?? []).filter((u: any) => u.period_key === 'evergreen')

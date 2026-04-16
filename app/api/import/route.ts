@@ -3,6 +3,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse }       from 'next/server'
 import type { NextRequest }   from 'next/server'
 import { COMPLIANCE_TASKS }   from '@/lib/data/complianceTasks'
+
+export const maxDuration = 300 // seconds — bulk import can process hundreds of rows
 import { CA_DEFAULT_TASKS }   from '@/lib/data/caDefaultTasks'
 
 export const maxDuration = 300

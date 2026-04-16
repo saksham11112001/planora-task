@@ -3,18 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse }      from 'next/server'
 import type { NextRequest }  from 'next/server'
 import { assertCan }         from '@/lib/utils/permissionGate'
-
-// ── Plan limits ───────────────────────────────────────────────────────────
-function memberLimit(plan: string) {
-  return { free: 3, starter: 10, pro: 25, business: 100 }[plan] ?? 3
-}
-function isAtMemberLimit(plan: string, count: number) {
-  return count >= memberLimit(plan)
-}
-function effectivePlan(org: { plan_tier: string; status: string; trial_ends_at?: string | null }) {
-  if (org.status === 'trialing') return 'pro'
-  return org.plan_tier
-}
+import { effectivePlan, isAtMemberLimit, memberLimit } from '@/lib/utils/planGate'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://sng-adwisers.com'
 
@@ -29,7 +18,9 @@ export async function GET() {
     .select('id, role, joined_at, user_id, can_view_all_tasks, users(id, name, email, avatar_url)')
     .eq('org_id', mb.org_id).eq('is_active', true).order('joined_at')
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ data })
+  return NextResponse.json({ data }, {
+    headers: { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' },
+  })
 }
 
 export async function POST(request: NextRequest) {

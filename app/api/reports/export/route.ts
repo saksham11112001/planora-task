@@ -4,6 +4,8 @@ import { effectivePlan, canUseFeature } from '@/lib/utils/planGate'
 import { NextResponse }    from 'next/server'
 import type { NextRequest } from 'next/server'
 
+export const maxDuration = 60 // seconds — report export can be slow on large orgs
+
 export async function GET(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

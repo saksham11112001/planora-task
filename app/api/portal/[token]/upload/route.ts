@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient }         from '@/lib/supabase/admin'
 import crypto                        from 'crypto'
 
+export const maxDuration = 60 // seconds — file upload to storage can be slow
+
 const MAX_SIZE = 20 * 1024 * 1024 // 20 MB
 
 // POST /api/portal/[token]/upload
@@ -27,7 +29,15 @@ export async function POST(
 
   const { org_id, client_id } = tokenRow
 
-  // 2. Parse form data
+  // 2. Reject oversized requests BEFORE parsing the body into memory.
+  // Content-Length is set by all standard HTTP clients. Checking here prevents
+  // a 500 MB multipart from being buffered into RAM before we can reject it.
+  const contentLength = parseInt(req.headers.get('content-length') ?? '0', 10)
+  if (contentLength > MAX_SIZE) {
+    return NextResponse.json({ error: 'File exceeds 20 MB limit' }, { status: 400 })
+  }
+
+  // 3. Parse form data (now safe — we already know it's within size)
   let formData: FormData
   try {
     formData = await req.formData()
@@ -44,6 +54,7 @@ export async function POST(
 
   if (!file)      return NextResponse.json({ error: 'file is required' }, { status: 400 })
   if (!periodKey) return NextResponse.json({ error: 'period_key is required' }, { status: 400 })
+  // Double-check actual file size (catches Content-Length spoofing)
   if (file.size > MAX_SIZE) return NextResponse.json({ error: 'File exceeds 20 MB limit' }, { status: 400 })
 
   // 3. Resolve document type — optional if task_id + header_name provided as fallback

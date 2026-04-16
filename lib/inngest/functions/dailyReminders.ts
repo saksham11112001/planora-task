@@ -45,6 +45,7 @@ export const dailyReminders = inngest.createFunction(
         .lte('due_date', in3day)
         .not('assignee_id', 'is', null)
         .eq('is_archived', false)
+        .limit(500)   // cap per run — prevents memory blowout at scale
       return tasks ?? []
     })
 
@@ -124,6 +125,7 @@ export const dailyReminders = inngest.createFunction(
         .eq('due_date', yesterday)
         .not('assignee_id', 'is', null)
         .eq('is_archived', false)
+        .limit(300)
       return tasks ?? []
     })
 
