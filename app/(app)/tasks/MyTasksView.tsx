@@ -182,7 +182,10 @@ export function MyTasksView({
   const [sortDir, setSortDir] = useState<'asc'|'desc'>('asc')
   const [sortOpen, setSortOpen] = useState(false)
   // Inline editing: maps taskId → field name being edited
-  const [inlineEdit, setInlineEdit] = useState<{taskId:string;field:string}|null>(null)
+  const [inlineEdit,    setInlineEdit]    = useState<{taskId:string;field:string}|null>(null)
+  // Inline editing for subtask rows
+  const [subInlineEdit, setSubInlineEdit] = useState<{parentId:string;subId:string;field:string}|null>(null)
+  const [subAssigneeOpen, setSubAssigneeOpen] = useState<{parentId:string;subId:string}|null>(null)
 
   function toggleGroup(key: string) {
     setCollapsedGroups(prev => { const s = new Set(prev); s.has(key) ? s.delete(key) : s.add(key); return s })
@@ -526,6 +529,19 @@ export function MyTasksView({
       setAssignedByMeList(p => p.map(rollback))
       toast.error('Could not update task')
     }
+  }
+
+  async function patchSubtaskField(parentId: string, subId: string, field: string, value: unknown) {
+    setSubInlineEdit(null)
+    setSubAssigneeOpen(null)
+    setSubtaskMap(p => ({
+      ...p,
+      [parentId]: (p[parentId] ?? []).map(s => s.id === subId ? { ...s, [field]: value } : s),
+    }))
+    await fetch(`/api/tasks/${subId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [field]: value }),
+    })
   }
 
   // Circle button: pending approval shows purple clock; completed shows green tick; others show submit-for-approval on click
@@ -1126,14 +1142,71 @@ export function MyTasksView({
                             <span style={{ flex:1, fontSize:11,
                               color: sub.status==='completed'?'var(--text-muted)':'var(--text-primary)',
                               textDecoration: sub.status==='completed'?'line-through':'none' }}>{sub.title}</span>
-                            {sub.assignee_id && (
-                              <span style={{ fontSize:10, color:'var(--text-muted)', flexShrink:0 }}>
-                                {members.find(m=>m.id===sub.assignee_id)?.name.split(' ')[0] ?? ''}
-                              </span>
-                            )}
-                            {sub.due_date && (
-                              <span style={{ fontSize:10, color:'var(--text-muted)', flexShrink:0 }}>{fmtDate(sub.due_date)}</span>
-                            )}
+                            {/* Subtask due date — inline editable */}
+                            <div style={{ position:'relative', flexShrink:0 }}>
+                              {subInlineEdit !== null && subInlineEdit.subId===sub.id && subInlineEdit.field==='due_date' ? (
+                                <>
+                                  <div style={{ position:'fixed', inset:0, zIndex:49 }}
+                                    onClick={e => { e.stopPropagation(); setSubInlineEdit(null) }}/>
+                                  <input
+                                    autoFocus type="date" defaultValue={sub.due_date ?? ''}
+                                    onClick={e => e.stopPropagation()}
+                                    onChange={e => patchSubtaskField(task.id, sub.id, 'due_date', e.target.value||null)}
+                                    onBlur={() => setSubInlineEdit(null)}
+                                    style={{ fontSize:11, padding:'2px 4px', borderRadius:5, border:'1px solid var(--brand)',
+                                      background:'var(--surface)', outline:'none', colorScheme:'light dark',
+                                      fontFamily:'inherit', zIndex:50, position:'relative', width:118 }}/>
+                                </>
+                              ) : (
+                                <button
+                                  onClick={e => { e.stopPropagation(); setSubInlineEdit({parentId:task.id,subId:sub.id,field:'due_date'}) }}
+                                  style={{ fontSize:10, padding:'2px 7px', borderRadius:99, cursor:'pointer',
+                                    border:'1px solid var(--border)', fontFamily:'inherit',
+                                    background: sub.due_date?'rgba(13,148,136,0.07)':'var(--surface)',
+                                    color: sub.due_date?(isOverdue(sub.due_date,sub.status)?'#dc2626':'var(--brand)'):'var(--text-muted)',
+                                    fontWeight: sub.due_date?600:400, whiteSpace:'nowrap' }}>
+                                  {sub.due_date ? fmtDate(sub.due_date) : '+ Date'}
+                                </button>
+                              )}
+                            </div>
+                            {/* Subtask assignee — inline editable dropdown */}
+                            <div style={{ position:'relative', flexShrink:0 }}>
+                              {subAssigneeOpen?.subId===sub.id && (
+                                <>
+                                  <div style={{ position:'fixed', inset:0, zIndex:49 }}
+                                    onClick={e => { e.stopPropagation(); setSubAssigneeOpen(null) }}/>
+                                  <div style={{ position:'absolute', right:0, top:'calc(100% + 4px)', zIndex:50,
+                                    background:'var(--surface)', border:'1px solid var(--border)',
+                                    borderRadius:8, boxShadow:'0 4px 16px rgba(0,0,0,0.12)',
+                                    minWidth:148, overflow:'hidden' }}>
+                                    <button onClick={e => { e.stopPropagation(); patchSubtaskField(task.id, sub.id,'assignee_id',null) }}
+                                      style={{ width:'100%', textAlign:'left', padding:'7px 12px', fontSize:12, border:'none',
+                                        cursor:'pointer', color:'var(--text-muted)', fontFamily:'inherit',
+                                        background: !sub.assignee_id?'var(--surface-subtle)':'transparent' }}>
+                                      Unassigned
+                                    </button>
+                                    {members.map(m => (
+                                      <button key={m.id} onClick={e => { e.stopPropagation(); patchSubtaskField(task.id, sub.id,'assignee_id',m.id) }}
+                                        style={{ width:'100%', textAlign:'left', padding:'7px 12px', fontSize:12, border:'none',
+                                          cursor:'pointer', fontFamily:'inherit', color:'var(--text-primary)',
+                                          fontWeight: sub.assignee_id===m.id?600:400,
+                                          background: sub.assignee_id===m.id?'var(--surface-subtle)':'transparent' }}>
+                                        {m.name}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </>
+                              )}
+                              <button
+                                onClick={e => { e.stopPropagation(); setSubAssigneeOpen(p => p?.subId===sub.id ? null : {parentId:task.id,subId:sub.id}) }}
+                                style={{ fontSize:10, padding:'2px 7px', borderRadius:99, cursor:'pointer',
+                                  border:'1px solid var(--border)', fontFamily:'inherit',
+                                  background: sub.assignee_id?'rgba(13,148,136,0.07)':'var(--surface)',
+                                  color: sub.assignee_id?'var(--brand)':'var(--text-muted)',
+                                  fontWeight: sub.assignee_id?600:400, whiteSpace:'nowrap' }}>
+                                {sub.assignee_id ? (members.find(m=>m.id===sub.assignee_id)?.name.split(' ')[0] ?? 'Assigned') : '+ Assign'}
+                              </button>
+                            </div>
                             {sub.status !== 'completed' && (
                               <label style={{ cursor:'pointer', flexShrink:0, display:'flex', alignItems:'center',
                                 gap:3, padding:'1px 6px', borderRadius:99, fontSize:10, fontWeight:600,

@@ -65,8 +65,11 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
   const [addSectionOpen, setAddSectionOpen] = useState(false)
   const [newSectionName, setNewSectionName] = useState('')
   const [customSections, setCustomSections] = useState<{key:string;label:string}[]>([])
-  const [newSubInputs,   setNewSubInputs]   = useState<Record<string,string>>({})
+  const [newSubInputs,    setNewSubInputs]    = useState<Record<string,string>>({})
   const [subAssigneeOpen, setSubAssigneeOpen] = useState<Record<string, boolean>>({})
+  const [subDueDateEdit,  setSubDueDateEdit]  = useState<string | null>(null)          // subtask id
+  const [taskAssigneeOpen,setTaskAssigneeOpen]= useState<Record<string, boolean>>({})
+  const [taskDueDateEdit,  setTaskDueDateEdit] = useState<string | null>(null)          // task id
 
   const memberMap = React.useMemo(() => {
     const m: Record<string, string> = {}
@@ -216,6 +219,22 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
     await fetch(`/api/tasks/${subId}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ assignee_id: assigneeId }),
+    })
+  }
+
+  async function patchTaskInline(taskId: string, field: string, value: unknown, parentId?: string) {
+    if (parentId) {
+      setSubtaskData(p => ({
+        ...p,
+        [parentId]: (p[parentId] ?? []).map(s => s.id === taskId ? { ...s, [field]: value } : s),
+      }))
+    } else {
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, [field]: value } as Task : t))
+      if (selectedTask?.id === taskId) setSelectedTask(prev => prev ? { ...prev, [field]: value } as Task : null)
+    }
+    await fetch(`/api/tasks/${taskId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [field]: value }),
     })
   }
 
@@ -430,40 +449,82 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
           </svg>
           {subs.length > 0 ? `${subsDone}/${subs.length}` : '+'}
         </button>
-        <div className="w-36 hidden md:flex items-center gap-2 pl-2" onClick={() => setSelectedTask(task)}>
-          {assignee
-            ? <span style={{ display:'inline-flex', alignItems:'center', padding:'2px 8px', borderRadius:99,
-                background:'var(--surface-subtle)', border:'1px solid var(--border)',
-                fontSize:11, fontWeight:500, color:'var(--text-secondary)',
-                maxWidth:120, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
-                {assignee.name.split(' ')[0]}
-              </span>
-            : task.assignee_id
-              ? <span className="text-xs text-gray-400 truncate">Assigned</span>
-              : currentUserId
-              ? <button
-                  onClick={async e => {
-                    e.stopPropagation()
-                    setTasks(prev => prev.map(t => t.id === task.id
-                      ? { ...t, assignee_id: currentUserId, assignee: members.find(m => m.id === currentUserId) ?? null as any }
-                      : t))
-                    await fetch(`/api/tasks/${task.id}`, {
-                      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ assignee_id: currentUserId }),
-                    })
-                    toast.success('Assigned to you ✓')
-                  }}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity"
-                  style={{ fontSize:11, color:'var(--brand)', background:'var(--brand-light)',
-                    border:'1px solid var(--brand-border)', borderRadius:6, padding:'2px 8px',
-                    cursor:'pointer', fontFamily:'inherit', fontWeight:600, whiteSpace:'nowrap' }}>
-                  + Assign to me
+        {/* ── Assignee inline picker ── */}
+        <div className="w-36 hidden md:flex items-center gap-2 pl-2" style={{ position: 'relative' }}>
+          {taskAssigneeOpen[task.id] && (
+            <>
+              <div style={{ position:'fixed', inset:0, zIndex:49 }}
+                onClick={e => { e.stopPropagation(); setTaskAssigneeOpen(p => ({...p, [task.id]:false})) }}/>
+              <div style={{ position:'absolute', left:0, top:'calc(100% + 4px)', zIndex:50,
+                background:'var(--surface)', border:'1px solid var(--border)',
+                borderRadius:8, boxShadow:'0 4px 16px rgba(0,0,0,0.12)',
+                minWidth:160, overflow:'hidden' }}>
+                <button onClick={e => { e.stopPropagation(); setTaskAssigneeOpen(p=>({...p,[task.id]:false})); patchTaskInline(task.id,'assignee_id',null) }}
+                  style={{ width:'100%', textAlign:'left', padding:'7px 12px', fontSize:12, border:'none',
+                    cursor:'pointer', color:'var(--text-muted)', fontFamily:'inherit',
+                    background: !task.assignee_id?'var(--surface-subtle)':'transparent' }}>
+                  Unassigned
                 </button>
-              : <div className="h-5 w-5 rounded-full border border-dashed border-gray-300 opacity-0 group-hover:opacity-100"/>
-          }
+                {members.map(m => (
+                  <button key={m.id} onClick={e => { e.stopPropagation(); setTaskAssigneeOpen(p=>({...p,[task.id]:false})); patchTaskInline(task.id,'assignee_id',m.id) }}
+                    style={{ width:'100%', textAlign:'left', padding:'7px 12px', fontSize:12, border:'none',
+                      cursor:'pointer', fontFamily:'inherit', color:'var(--text-primary)',
+                      fontWeight: task.assignee_id===m.id?600:400,
+                      background: task.assignee_id===m.id?'var(--surface-subtle)':'transparent' }}>
+                    {m.name}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+          <button
+            onClick={e => { e.stopPropagation(); if (canManage) setTaskAssigneeOpen(p => ({...p, [task.id]: !p[task.id]})); else setSelectedTask(task) }}
+            style={{ background:'none', border:'none', padding:0, cursor: canManage?'pointer':'default', display:'flex', alignItems:'center' }}>
+            {assignee
+              ? <span style={{ display:'inline-flex', alignItems:'center', padding:'2px 8px', borderRadius:99,
+                  background: canManage?'var(--brand-light)':'var(--surface-subtle)',
+                  border:`1px solid ${canManage?'var(--brand-border)':'var(--border)'}`,
+                  fontSize:11, fontWeight:500, color: canManage?'var(--brand)':'var(--text-secondary)',
+                  maxWidth:120, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
+                  {assignee.name.split(' ')[0]}
+                </span>
+              : task.assignee_id
+                ? <span className="text-xs" style={{ color:'var(--text-muted)' }}>Assigned</span>
+                : <span className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    style={{ fontSize:11, color:'var(--brand)', background:'var(--brand-light)',
+                      border:'1px solid var(--brand-border)', borderRadius:6, padding:'2px 8px',
+                      whiteSpace:'nowrap', fontWeight:600, display: canManage?'inline':'none' }}>
+                    + Assign
+                  </span>
+            }
+          </button>
         </div>
-        <div className="w-24 hidden md:block text-center" onClick={() => setSelectedTask(task)}>
-          {task.due_date && <span className="text-xs" style={{ color: ov ? '#dc2626' : '#94a3b8' }}>{fmtDate(task.due_date)}</span>}
+        {/* ── Due date inline picker ── */}
+        <div className="w-24 hidden md:block text-center" style={{ position:'relative' }}
+          onClick={e => { e.stopPropagation(); if (canManage) setTaskDueDateEdit(task.id); else setSelectedTask(task) }}>
+          {taskDueDateEdit === task.id ? (
+            <>
+              <div style={{ position:'fixed', inset:0, zIndex:49 }}
+                onClick={e => { e.stopPropagation(); setTaskDueDateEdit(null) }}/>
+              <input
+                autoFocus
+                type="date"
+                defaultValue={task.due_date ?? ''}
+                onClick={e => e.stopPropagation()}
+                onChange={e => { patchTaskInline(task.id, 'due_date', e.target.value || null); setTaskDueDateEdit(null) }}
+                onBlur={() => setTaskDueDateEdit(null)}
+                style={{ fontSize:11, padding:'2px 5px', borderRadius:6, border:'1px solid var(--brand)',
+                  background:'var(--surface)', outline:'none', colorScheme:'light dark',
+                  fontFamily:'inherit', position:'absolute', right:0, top:'50%', transform:'translateY(-50%)',
+                  zIndex:50, width:130 }}
+              />
+            </>
+          ) : (
+            <span className="text-xs" title={canManage ? 'Click to set date' : undefined}
+              style={{ color: ov?'#dc2626':'#94a3b8', cursor: canManage?'pointer':'default' }}>
+              {task.due_date ? fmtDate(task.due_date) : (canManage ? <span className="opacity-0 group-hover:opacity-60" style={{fontSize:11}}>+ Date</span> : null)}
+            </span>
+          )}
         </div>
         <div className="w-28 hidden lg:flex justify-center" onClick={() => setSelectedTask(task)}>
           {task.status !== 'todo' && (
@@ -571,6 +632,38 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
                 color: sub.status === 'completed' ? 'var(--text-muted)' : 'var(--text-primary)',
                 textDecoration: sub.status === 'completed' ? 'line-through' : 'none',
               }}>{sub.title}</span>
+              {/* Inline due date picker */}
+              <div style={{ position: 'relative', flexShrink: 0 }}>
+                {subDueDateEdit === sub.id ? (
+                  <>
+                    <div style={{ position:'fixed', inset:0, zIndex:49 }}
+                      onClick={() => setSubDueDateEdit(null)}/>
+                    <input
+                      autoFocus
+                      type="date"
+                      defaultValue={sub.due_date ?? ''}
+                      onClick={e => e.stopPropagation()}
+                      onChange={e => { patchTaskInline(sub.id, 'due_date', e.target.value||null, task.id); setSubDueDateEdit(null) }}
+                      onBlur={() => setSubDueDateEdit(null)}
+                      style={{ fontSize:11, padding:'2px 5px', borderRadius:6, border:'1px solid var(--brand)',
+                        background:'var(--surface)', outline:'none', colorScheme:'light dark',
+                        fontFamily:'inherit', zIndex:50, position:'relative', width:120 }}
+                    />
+                  </>
+                ) : (
+                  <button
+                    onClick={e => { e.stopPropagation(); setSubDueDateEdit(sub.id) }}
+                    style={{ fontSize:11, padding:'2px 8px', borderRadius:20, cursor:'pointer',
+                      border:'1px solid var(--border)',
+                      background: sub.due_date ? 'rgba(13,148,136,0.07)' : 'var(--surface)',
+                      color: sub.due_date
+                        ? (isOverdue(sub.due_date, sub.status) ? '#dc2626' : 'var(--brand)')
+                        : 'var(--text-muted)',
+                      whiteSpace:'nowrap', fontWeight: sub.due_date ? 600 : 400, fontFamily:'inherit' }}>
+                    {sub.due_date ? fmtDate(sub.due_date) : '+ Date'}
+                  </button>
+                )}
+              </div>
               {/* Inline assignee selector */}
               <div style={{ position: 'relative', flexShrink: 0 }}>
                 <button
