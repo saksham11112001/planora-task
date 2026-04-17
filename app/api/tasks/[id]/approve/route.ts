@@ -24,6 +24,9 @@ export async function POST(
   if (!task) return NextResponse.json({ error: 'Task not found' }, { status: 404 })
 
   const { decision, comment } = await req.json()
+  if (!['submit', 'approve', 'reject'].includes(decision)) {
+    return NextResponse.json({ error: 'Invalid decision' }, { status: 400 })
+  }
   const isAssignee    = task.assignee_id === user.id
   const isOwnerOrAdmin = ['owner', 'admin'].includes(mb.role)
 
@@ -35,12 +38,11 @@ export async function POST(
     // Block submit if this task is blocked by incomplete tasks
     const blockedByIds: string[] = (task as any).custom_fields?._blocked_by ?? []
     if (blockedByIds.length > 0) {
-      const blockerResults = await Promise.all(
-        blockedByIds.map(bid =>
-          supabase.from('tasks').select('id, title, status').eq('id', bid).eq('org_id', mb.org_id).maybeSingle()
-        )
-      )
-      const incomplete = blockerResults.filter(r => r.data && r.data.status !== 'completed').map(r => r.data!.title as string)
+      // Use a single .in() query instead of N individual queries
+      const { data: blockerTasks } = await supabase
+        .from('tasks').select('id, title, status')
+        .in('id', blockedByIds).eq('org_id', mb.org_id)
+      const incomplete = (blockerTasks ?? []).filter(t => t.status !== 'completed').map(t => t.title as string)
       if (incomplete.length > 0) {
         const names = incomplete.slice(0, 2).join(', ') + (incomplete.length > 2 ? ` +${incomplete.length - 2} more` : '')
         return NextResponse.json({
@@ -172,8 +174,6 @@ export async function POST(
       approved_at: new Date().toISOString(),
       custom_fields: updatedCf,
     }).eq('id', id)
-  } else {
-    return NextResponse.json({ error: 'Invalid decision' }, { status: 400 })
   }
 
   // Notify assignee

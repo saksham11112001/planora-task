@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse }  from 'next/server'
 import type { NextRequest } from 'next/server'
 import { assertCan }     from '@/lib/utils/permissionGate'
+import { inngest }       from '@/lib/inngest/client'
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -13,6 +14,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const projectEditDenied = await assertCan(supabase, mb.org_id, mb.role, 'projects.edit')
   if (projectEditDenied) return NextResponse.json({ error: projectEditDenied.error }, { status: projectEditDenied.status })
 
+  // Fetch existing project first — needed for status-change notification and org verification
+  const { data: existingProject } = await supabase
+    .from('projects').select('id, status, name').eq('id', id).eq('org_id', mb.org_id).maybeSingle()
+  if (!existingProject) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
   const body = await req.json()
   const ALLOWED = ['name','description','color','status','client_id','owner_id','due_date','start_date','budget','hours_budget','is_archived','member_ids']
   const updates: Record<string, unknown> = {}
@@ -23,14 +29,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   // Fire project status change notification if status changed
   try {
-    if (body.status && body.status !== existingProject?.status) {
+    if (body.status && body.status !== existingProject.status) {
       const { data: mb2 } = await supabase.from('org_members')
         .select('users(name), organisations(name)').eq('user_id', user.id).maybeSingle()
       await inngest.send({
         name: 'project/status-updated',
         data: {
           project_id: id, project_name: data.name,
-          old_status: existingProject?.status ?? '', new_status: body.status,
+          old_status: existingProject.status ?? '', new_status: body.status,
           updated_by_id: user.id,
           updated_by_name: (mb2 as any)?.users?.name ?? 'Someone',
           org_id: mb.org_id,

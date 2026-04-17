@@ -7,11 +7,22 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-  const { data: mb } = await supabase.from('org_members').select('org_id').eq('user_id', user.id).eq('is_active', true).single()
+  const { data: mb } = await supabase.from('org_members').select('org_id, role, can_view_all_tasks').eq('user_id', user.id).eq('is_active', true).single()
   if (!mb) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  // Verify user can access this task (org_id match + visibility rules)
+  const canSeeAll = ['owner','admin','manager'].includes(mb.role) || mb.can_view_all_tasks
+  const taskQ = supabase.from('tasks').select('id').eq('id', id).eq('org_id', mb.org_id)
+  const taskFilter = canSeeAll ? taskQ : taskQ.or(`assignee_id.eq.${user.id},approver_id.eq.${user.id}`)
+  const { data: taskAccess } = await taskFilter.maybeSingle()
+  if (!taskAccess) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  const sp = req.nextUrl.searchParams
+  const limit  = Math.min(parseInt(sp.get('limit') ?? '200', 10) || 200, 500)
+  const offset = Math.max(parseInt(sp.get('offset') ?? '0', 10) || 0,   0)
   const { data, error } = await supabase.from('task_attachments')
     .select('id, file_name, file_size, mime_type, storage_path, created_at, uploaded_by, uploader:users!task_attachments_uploaded_by_fkey(name)')
     .eq('task_id', id).eq('org_id', mb.org_id).order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ data })
 }
@@ -21,8 +32,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-  const { data: mb } = await supabase.from('org_members').select('org_id').eq('user_id', user.id).eq('is_active', true).single()
+  const { data: mb } = await supabase.from('org_members').select('org_id, role, can_view_all_tasks').eq('user_id', user.id).eq('is_active', true).single()
   if (!mb) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  // Verify task exists in this org and user has access
+  const canSeeAll = ['owner','admin','manager'].includes(mb.role) || mb.can_view_all_tasks
+  const taskQ2 = supabase.from('tasks').select('id').eq('id', id).eq('org_id', mb.org_id)
+  const taskFilter2 = canSeeAll ? taskQ2 : taskQ2.or(`assignee_id.eq.${user.id},approver_id.eq.${user.id}`)
+  const { data: taskAccess2 } = await taskFilter2.maybeSingle()
+  if (!taskAccess2) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const contentType = req.headers.get('content-type') ?? ''
 
@@ -31,6 +48,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const body = await req.json()
     const { drive_url, file_name, attachment_type } = body
     if (!drive_url) return NextResponse.json({ error: 'drive_url required' }, { status: 400 })
+    // Validate URL format and only allow http/https schemes
+    try {
+      const parsed = new URL(drive_url)
+      if (!['http:', 'https:'].includes(parsed.protocol)) {
+        return NextResponse.json({ error: 'Only http/https URLs are allowed' }, { status: 400 })
+      }
+    } catch {
+      return NextResponse.json({ error: 'Invalid URL format' }, { status: 400 })
+    }
     const { data: row, error: dbErr } = await supabase.from('task_attachments').insert({
       task_id: id, org_id: mb.org_id, uploaded_by: user.id,
       file_name: file_name || drive_url,

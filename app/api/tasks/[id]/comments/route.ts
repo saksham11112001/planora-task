@@ -3,17 +3,27 @@ import { NextResponse } from 'next/server'
 import { inngest }       from '@/lib/inngest/client'
 import type { NextRequest } from 'next/server'
 
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-  const { data: mb } = await supabase.from('org_members').select('org_id').eq('user_id', user.id).eq('is_active', true).single()
+  const { data: mb } = await supabase.from('org_members').select('org_id, role, can_view_all_tasks').eq('user_id', user.id).eq('is_active', true).single()
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
+  // Verify task access
+  const canSeeAll = ['owner','admin','manager'].includes(mb.role) || mb.can_view_all_tasks
+  const taskQ = supabase.from('tasks').select('id').eq('id', id).eq('org_id', mb.org_id)
+  const { data: taskAccess } = await (canSeeAll ? taskQ : taskQ.or(`assignee_id.eq.${user.id},approver_id.eq.${user.id}`)).maybeSingle()
+  if (!taskAccess) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  const sp = req.nextUrl.searchParams
+  const limit  = Math.min(parseInt(sp.get('limit') ?? '200', 10) || 200, 500)
+  const offset = Math.max(parseInt(sp.get('offset') ?? '0', 10) || 0,   0)
   const { data, error } = await supabase.from('task_comments')
     .select('id, content, created_at, author:users!task_comments_author_id_fkey(id, name)')
     .eq('task_id', id).eq('org_id', mb.org_id)
     .order('created_at', { ascending: true })
+    .range(offset, offset + limit - 1)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ data: data ?? [] })
 }
@@ -23,10 +33,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-  const { data: mb } = await supabase.from('org_members').select('org_id').eq('user_id', user.id).eq('is_active', true).single()
+  const { data: mb } = await supabase.from('org_members').select('org_id, role, can_view_all_tasks').eq('user_id', user.id).eq('is_active', true).single()
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
+  // Verify task access before allowing comment
+  const canSeeAll2 = ['owner','admin','manager'].includes(mb.role) || mb.can_view_all_tasks
+  const taskQ2 = supabase.from('tasks').select('id').eq('id', id).eq('org_id', mb.org_id)
+  const { data: taskAccess2 } = await (canSeeAll2 ? taskQ2 : taskQ2.or(`assignee_id.eq.${user.id},approver_id.eq.${user.id}`)).maybeSingle()
+  if (!taskAccess2) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const { content } = await req.json()
   if (!content?.trim()) return NextResponse.json({ error: 'Empty comment' }, { status: 400 })
+  if (content.trim().length > 5000) return NextResponse.json({ error: 'Comment too long (max 5000 chars)' }, { status: 400 })
   const { data, error } = await supabase.from('task_comments')
     .insert({ task_id: id, org_id: mb.org_id, author_id: user.id, content: content.trim() })
     .select('*').single()

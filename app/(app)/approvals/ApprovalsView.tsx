@@ -88,6 +88,7 @@ function ColHeader({ allChecked, onCheckAll }: { allChecked: boolean; onCheckAll
       textTransform: 'uppercase', letterSpacing: '0.06em',
     }}>
       <input type="checkbox" checked={allChecked} onChange={onCheckAll}
+        aria-label="Select all tasks in this section"
         style={{ cursor: 'pointer', accentColor: 'var(--brand)', width: 13, height: 13 }}/>
       <div/>
       <div>Task</div>

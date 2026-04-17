@@ -95,7 +95,10 @@ export async function middleware(request: NextRequest) {
   if (error || !user) {
     if (pathname === '/') return NextResponse.next({ request })
     const loginUrl = new URL('/login', request.url)
-    loginUrl.searchParams.set('redirect', pathname)
+    // Only pass same-origin paths — never redirect to external URLs
+    if (pathname.startsWith('/') && !pathname.startsWith('//')) {
+      loginUrl.searchParams.set('redirect', pathname)
+    }
     return NextResponse.redirect(loginUrl)
   }
 
