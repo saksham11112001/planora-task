@@ -223,8 +223,13 @@ export function MyTasksView({
   function handleTaskUpdated(fields?: Record<string, unknown>) {
     const taskId = panelTaskIdRef.current  // stable even after panel closes
     if (fields && taskId) {
-      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...fields } as Task : t))
-      setSelTask(prev => prev ? { ...prev, ...fields } as Task : null)
+      const enriched: Record<string, unknown> = { ...fields }
+      if ('assignee_id' in fields) {
+        const m = members.find(mb => mb.id === fields.assignee_id)
+        enriched.assignee = m ? { id: m.id, name: m.name } : null
+      }
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...enriched } as Task : t))
+      setSelTask(prev => prev ? { ...prev, ...enriched } as Task : null)
       panelHasUpdates.current = true
       // If task moved out of pending approval, remove it from that list too
       if (fields.status && fields.status !== 'in_review') {
@@ -1451,6 +1456,7 @@ export function MyTasksView({
         currentUserId={currentUserId} userRole={userRole}
         onClose={() => {
           if (panelHasUpdates.current) {
+            if (selTask) setTasks(prev => prev.map(t => t.id === panelTaskIdRef.current ? { ...t, ...selTask as unknown as Task } : t))
             toast.success('Task updated')
             panelHasUpdates.current = false
           }
@@ -1819,6 +1825,7 @@ export function MyTasksView({
         currentUserId={currentUserId} userRole={userRole}
         onClose={() => {
           if (panelHasUpdates.current) {
+            if (selTask) setTasks(prev => prev.map(t => t.id === panelTaskIdRef.current ? { ...t, ...selTask as unknown as Task } : t))
             toast.success('Task updated')
             panelHasUpdates.current = false
           }

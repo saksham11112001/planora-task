@@ -11,7 +11,9 @@ const config: NextConfig = {
   // Experimental optimizations
   experimental: {
     optimizePackageImports: ['lucide-react', 'recharts', '@supabase/supabase-js'],
-    staleTimes: { dynamic: 0 },
+    // Cache navigated pages on the client for 30 s — reduces server round trips
+    // for back/forward navigation and repeated visits to the same page.
+    staleTimes: { dynamic: 30 },
   },
 
   // xlsx uses native Node.js modules — prevent webpack from bundling it

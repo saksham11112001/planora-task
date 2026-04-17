@@ -136,8 +136,13 @@ export function RecurringView({
   function handleTaskUpdated(fields?: Record<string, unknown>) {
     const taskId = panelTaskIdRef.current  // stable even after panel closes
     if (fields && taskId) {
-      setLocalTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...fields } as Task : t))
-      setSelectedTask(prev => prev ? { ...prev, ...fields } as Task : null)
+      const enriched: Record<string, unknown> = { ...fields }
+      if ('assignee_id' in fields) {
+        const m = members.find(mb => mb.id === fields.assignee_id)
+        enriched.assignee = m ? { id: m.id, name: m.name } : null
+      }
+      setLocalTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...enriched } as Task : t))
+      setSelectedTask(prev => prev ? { ...prev, ...enriched } as Task : null)
       panelHasUpdates.current = true
     }
     startT(() => router.refresh())
@@ -1103,6 +1108,7 @@ export function RecurringView({
             userRole={userRole}
             onClose={() => {
               if (panelHasUpdates.current) {
+                if (selectedTask) setLocalTasks(prev => prev.map(t => t.id === panelTaskIdRef.current ? { ...t, ...selectedTask as unknown as Task } : t))
                 toast.success('Task updated')
                 panelHasUpdates.current = false
               }
