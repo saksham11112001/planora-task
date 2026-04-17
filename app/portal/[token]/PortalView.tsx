@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
+import { fmtDate } from '@/lib/utils/format'
 
 interface DocType {
   id: string
@@ -464,11 +465,6 @@ function ErrorState({ message }: { message: string }) {
   )
 }
 
-function fmtDate(d: string) {
-  try {
-    return new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-  } catch { return d }
-}
 
 function daysBetween(from: string, to: string): number {
   return Math.floor((new Date(to).getTime() - new Date(from).getTime()) / (1000 * 60 * 60 * 24))

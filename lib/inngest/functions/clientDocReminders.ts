@@ -2,6 +2,7 @@ import { inngest }                        from '../client'
 import { createAdminClient }              from '@/lib/supabase/admin'
 import { sendClientDocReminderEmail }     from '@/lib/email/send'
 import { sendClientUploadNotifyEmail }    from '@/lib/email/send'
+import { fmtDate }                        from '@/lib/utils/format'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://taska.in'
 
@@ -257,8 +258,3 @@ function daysBetween(from: string, to: string): number {
   return Math.floor((new Date(to).getTime() - new Date(from).getTime()) / (1000 * 60 * 60 * 24))
 }
 
-function fmtDate(d: string): string {
-  try {
-    return new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-  } catch { return d }
-}

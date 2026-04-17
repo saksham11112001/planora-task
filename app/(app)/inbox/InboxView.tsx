@@ -443,11 +443,6 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
             currentUserId={currentUserId} userRole={userRole}
             onClose={() => {
               if (panelHasUpdates.current) {
-                if (selectedTask) {
-                  setLocalTasks(prev => prev.map(t =>
-                    t.id === selectedTask.id ? { ...t, ...selectedTask as unknown as Task } : t
-                  ))
-                }
                 toast.success('Task updated')
                 panelHasUpdates.current = false
               }
@@ -866,11 +861,6 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
             currentUserId={currentUserId} userRole={userRole}
             onClose={() => {
               if (panelHasUpdates.current) {
-                if (selectedTask) {
-                  setLocalTasks(prev => prev.map(t =>
-                    t.id === selectedTask.id ? { ...t, ...selectedTask as unknown as Task } : t
-                  ))
-                }
                 toast.success('Task updated')
                 panelHasUpdates.current = false
               }

@@ -3,7 +3,7 @@ import { useState, useMemo, useRef, useEffect } from 'react'
 import { Search, Filter, BarChart2, Download, Calendar } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
-import { isOverdue } from '@/lib/utils/format'
+import { isOverdue, fmtDate } from '@/lib/utils/format'
 import type { Task } from '@/types'
 
 interface MonTask {
@@ -685,9 +685,7 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
 
                   {/* Due date */}
                   <span style={{ fontSize: 11, fontWeight: ov ? 700 : 400, color: ov ? '#dc2626' : 'var(--text-secondary)' }}>
-                    {task.due_date
-                      ? new Date(task.due_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
-                      : '—'}
+                    {fmtDate(task.due_date)}
                   </span>
                 </div>
               )

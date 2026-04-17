@@ -1168,11 +1168,6 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
         currentUserId={currentUserId} userRole={userRole}
         onClose={() => {
           if (panelHasUpdates.current) {
-            if (selectedTask) {
-              setTasks(prev => prev.map(t =>
-                t.id === selectedTask.id ? { ...t, ...selectedTask as unknown as Task } : t
-              ))
-            }
             toast.success('Task updated')
             panelHasUpdates.current = false
           }

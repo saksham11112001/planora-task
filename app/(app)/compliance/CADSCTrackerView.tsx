@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { ShieldCheck, AlertTriangle, Clock, Edit2, Check, X, Search, RefreshCw } from 'lucide-react'
 import { toast } from '@/store/appStore'
+import { fmtDate } from '@/lib/utils/format'
 
 /* ── Types ─────────────────────────────────────────────────────── */
 interface ClientDSC {
@@ -27,10 +28,6 @@ function daysUntil(dateStr: string): number {
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const target = new Date(dateStr); target.setHours(0, 0, 0, 0)
   return Math.round((target.getTime() - today.getTime()) / 86_400_000)
-}
-
-function fmtDate(d: string) {
-  return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
 function getDSCStatus(daysLeft: number | null): {

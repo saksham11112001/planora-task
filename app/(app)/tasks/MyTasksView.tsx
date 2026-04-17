@@ -1451,11 +1451,6 @@ export function MyTasksView({
         currentUserId={currentUserId} userRole={userRole}
         onClose={() => {
           if (panelHasUpdates.current) {
-            if (selTask) {
-              setTasks(prev => prev.map(t =>
-                t.id === selTask.id ? { ...t, ...selTask as unknown as Task } : t
-              ))
-            }
             toast.success('Task updated')
             panelHasUpdates.current = false
           }
@@ -1824,11 +1819,6 @@ export function MyTasksView({
         currentUserId={currentUserId} userRole={userRole}
         onClose={() => {
           if (panelHasUpdates.current) {
-            if (selTask) {
-              setTasks(prev => prev.map(t =>
-                t.id === selTask.id ? { ...t, ...selTask as unknown as Task } : t
-              ))
-            }
             toast.success('Task updated')
             panelHasUpdates.current = false
           }

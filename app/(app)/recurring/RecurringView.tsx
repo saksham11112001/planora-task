@@ -1103,11 +1103,6 @@ export function RecurringView({
             userRole={userRole}
             onClose={() => {
               if (panelHasUpdates.current) {
-                if (selectedTask) {
-                  setLocalTasks(prev => prev.map(t =>
-                    t.id === selectedTask.id ? { ...t, ...selectedTask as unknown as Task } : t
-                  ))
-                }
                 toast.success('Task updated')
                 panelHasUpdates.current = false
               }

@@ -574,11 +574,7 @@ function HistoryTable({ history }: { history: Task[] }) {
                     </span>
                   </div>
                   <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                    {(t as any).approved_at
-                      ? new Date((t as any).approved_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
-                      : t.completed_at
-                        ? new Date(t.completed_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
-                        : '—'}
+                    {fmtDate((t as any).approved_at ?? t.completed_at)}
                   </div>
                 </div>
               )
