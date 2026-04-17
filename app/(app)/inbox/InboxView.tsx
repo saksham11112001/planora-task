@@ -32,7 +32,11 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
   const [localTasks,      setLocalTasks]      = useState<Task[]>(tasks)
   const [selectedTask,    setSelectedTask]    = useState<Task | null>(null)
   const panelHasUpdates = useRef(false)
+  // Keeps the last-selected task ID — NOT cleared when panel closes, so in-flight
+  // onUpdated callbacks can still find the correct task to update in localTasks.
+  const panelTaskIdRef  = useRef<string | null>(null)
   useEffect(() => { panelHasUpdates.current = false }, [selectedTask?.id])
+  useEffect(() => { if (selectedTask?.id) panelTaskIdRef.current = selectedTask.id }, [selectedTask?.id])
   const [checked,         setChecked]         = useState<Set<string>>(new Set())
   const [completing,      setCompleting]      = useState<Set<string>>(new Set())
   const [, startT]                            = useTransition()
@@ -60,8 +64,9 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
   const [inlineEdit, setInlineEdit] = useState<{taskId:string;field:string}|null>(null)
 
   function handleTaskUpdated(fields?: Record<string, unknown>) {
-    if (fields) {
-      setLocalTasks(prev => prev.map(t => t.id === selectedTask?.id ? { ...t, ...fields } as Task : t))
+    const taskId = panelTaskIdRef.current  // stable even after panel closes
+    if (fields && taskId) {
+      setLocalTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...fields } as Task : t))
       setSelectedTask(prev => prev ? { ...prev, ...fields } as Task : null)
       panelHasUpdates.current = true
     }
@@ -105,7 +110,8 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
     })
     if (!res.ok) {
       setSubtaskMap(p => ({ ...p, [parentId]: (p[parentId]??[]).map(s => s.id===subId ? { ...s, status } : s) }))
-      toast.error('Could not update subtask')
+      const d = await res.json().catch(() => ({}))
+      toast.error((d as any).error ?? 'Could not update subtask')
     } else {
       const r = await fetch(`/api/tasks?parent_id=${parentId}&limit=50`)
       const d = await r.json()
@@ -437,6 +443,11 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
             currentUserId={currentUserId} userRole={userRole}
             onClose={() => {
               if (panelHasUpdates.current) {
+                if (selectedTask) {
+                  setLocalTasks(prev => prev.map(t =>
+                    t.id === selectedTask.id ? { ...t, ...selectedTask as unknown as Task } : t
+                  ))
+                }
                 toast.success('Task updated')
                 panelHasUpdates.current = false
               }
@@ -855,6 +866,11 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
             currentUserId={currentUserId} userRole={userRole}
             onClose={() => {
               if (panelHasUpdates.current) {
+                if (selectedTask) {
+                  setLocalTasks(prev => prev.map(t =>
+                    t.id === selectedTask.id ? { ...t, ...selectedTask as unknown as Task } : t
+                  ))
+                }
                 toast.success('Task updated')
                 panelHasUpdates.current = false
               }

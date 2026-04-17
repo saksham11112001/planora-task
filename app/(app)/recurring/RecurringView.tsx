@@ -81,7 +81,9 @@ export function RecurringView({
   const [viewTab, setViewTab] = useState<'List' | 'Board'>('List')
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const panelHasUpdates = useRef(false)
+  const panelTaskIdRef  = useRef<string | null>(null)
   useEffect(() => { panelHasUpdates.current = false }, [selectedTask?.id])
+  useEffect(() => { if (selectedTask?.id) panelTaskIdRef.current = selectedTask.id }, [selectedTask?.id])
   const [editingId, setEditingId] = useState<string | null>(null)
 
   const [checked,     setChecked]     = useState<Set<string>>(new Set())
@@ -132,8 +134,9 @@ export function RecurringView({
   }, [visibleTasks, sortBy, sortDir])
 
   function handleTaskUpdated(fields?: Record<string, unknown>) {
-    if (fields && selectedTask) {
-      setLocalTasks(prev => prev.map(t => t.id === selectedTask.id ? { ...t, ...fields } as Task : t))
+    const taskId = panelTaskIdRef.current  // stable even after panel closes
+    if (fields && taskId) {
+      setLocalTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...fields } as Task : t))
       setSelectedTask(prev => prev ? { ...prev, ...fields } as Task : null)
       panelHasUpdates.current = true
     }
@@ -1100,6 +1103,11 @@ export function RecurringView({
             userRole={userRole}
             onClose={() => {
               if (panelHasUpdates.current) {
+                if (selectedTask) {
+                  setLocalTasks(prev => prev.map(t =>
+                    t.id === selectedTask.id ? { ...t, ...selectedTask as unknown as Task } : t
+                  ))
+                }
                 toast.success('Task updated')
                 panelHasUpdates.current = false
               }

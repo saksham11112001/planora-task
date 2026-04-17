@@ -414,7 +414,8 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     if (!res.ok) {
       // Revert on failure
       setSubtasks(p => p.map(s => s.id === sub.id ? { ...s, status: sub.status } : s))
-      toast.error('Could not update subtask')
+      const d = await res.json().catch(() => ({}))
+      toast.error((d as any).error ?? 'Could not update subtask')
     }
   }
 
@@ -434,7 +435,8 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     })
     if (!res.ok) {
       setSubtasks(p => p.map(s => s.id === sub.id ? { ...s, status: sub.status } : s))
-      toast.error('Could not update subtask')
+      const d = await res.json().catch(() => ({}))
+      toast.error((d as any).error ?? 'Could not update subtask')
     } else {
       toast.success('Subtask marked as not available')
     }

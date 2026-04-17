@@ -37,7 +37,9 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
   const visibleTasks = clientFilter ? tasks.filter(t => (t as any).client?.id === clientFilter || t.client_id === clientFilter) : tasks
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const panelHasUpdates = useRef(false)
+  const panelTaskIdRef  = useRef<string | null>(null)
   React.useEffect(() => { panelHasUpdates.current = false }, [selectedTask?.id])
+  React.useEffect(() => { if (selectedTask?.id) panelTaskIdRef.current = selectedTask.id }, [selectedTask?.id])
   const [checked,      setChecked]      = useState<Set<string>>(new Set())
   const [completing,   setCompleting]   = useState<Set<string>>(new Set())
   const [collapsed,    setCollapsed]    = useState<Record<string, boolean>>({})
@@ -49,8 +51,9 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
   const toolbarRef = useRef<HTMLDivElement>(null)
 
   function handleTaskUpdated(fields?: Record<string, unknown>) {
-    if (fields && selectedTask) {
-      setTasks(prev => prev.map(t => t.id === selectedTask.id ? { ...t, ...fields } as Task : t))
+    const taskId = panelTaskIdRef.current  // stable even after panel closes
+    if (fields && taskId) {
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...fields } as Task : t))
       setSelectedTask(prev => prev ? { ...prev, ...fields } as Task : null)
       panelHasUpdates.current = true
     }
@@ -1165,6 +1168,11 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
         currentUserId={currentUserId} userRole={userRole}
         onClose={() => {
           if (panelHasUpdates.current) {
+            if (selectedTask) {
+              setTasks(prev => prev.map(t =>
+                t.id === selectedTask.id ? { ...t, ...selectedTask as unknown as Task } : t
+              ))
+            }
             toast.success('Task updated')
             panelHasUpdates.current = false
           }

@@ -154,7 +154,9 @@ export function MyTasksView({
   const [tab,          setTab]          = useState<'List'|'Board'>('Board')
   const [selTask,    setSelTask]    = useState<Task | null>(null)
   const panelHasUpdates = useRef(false)
+  const panelTaskIdRef  = useRef<string | null>(null)
   useEffect(() => { panelHasUpdates.current = false }, [selTask?.id])
+  useEffect(() => { if (selTask?.id) panelTaskIdRef.current = selTask.id }, [selTask?.id])
   const [dragTaskId, setDragTaskId] = useState<string | null>(null)
   const [checked,    setChecked]    = useState<Set<string>>(new Set())
   const [completing, setCompleting] = useState<Set<string>>(new Set())
@@ -219,13 +221,14 @@ export function MyTasksView({
   function refresh() { startT(() => router.refresh()) }
 
   function handleTaskUpdated(fields?: Record<string, unknown>) {
-    if (fields && selTask) {
-      setTasks(prev => prev.map(t => t.id === selTask.id ? { ...t, ...fields } as Task : t))
+    const taskId = panelTaskIdRef.current  // stable even after panel closes
+    if (fields && taskId) {
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...fields } as Task : t))
       setSelTask(prev => prev ? { ...prev, ...fields } as Task : null)
       panelHasUpdates.current = true
       // If task moved out of pending approval, remove it from that list too
       if (fields.status && fields.status !== 'in_review') {
-        setPendingTasks(prev => prev.filter(t => t.id !== selTask.id))
+        setPendingTasks(prev => prev.filter(t => t.id !== taskId))
       }
     }
     refresh()
@@ -1448,6 +1451,11 @@ export function MyTasksView({
         currentUserId={currentUserId} userRole={userRole}
         onClose={() => {
           if (panelHasUpdates.current) {
+            if (selTask) {
+              setTasks(prev => prev.map(t =>
+                t.id === selTask.id ? { ...t, ...selTask as unknown as Task } : t
+              ))
+            }
             toast.success('Task updated')
             panelHasUpdates.current = false
           }
@@ -1816,6 +1824,11 @@ export function MyTasksView({
         currentUserId={currentUserId} userRole={userRole}
         onClose={() => {
           if (panelHasUpdates.current) {
+            if (selTask) {
+              setTasks(prev => prev.map(t =>
+                t.id === selTask.id ? { ...t, ...selTask as unknown as Task } : t
+              ))
+            }
             toast.success('Task updated')
             panelHasUpdates.current = false
           }

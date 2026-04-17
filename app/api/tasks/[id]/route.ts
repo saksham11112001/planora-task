@@ -43,7 +43,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     ? task.approver_id === user.id
     : isManager
 
-  if (!isManager && !isAssignee)
+  // For subtasks: also allow the parent task's assignee to act on the subtask.
+  // This covers the common case where a member is assigned the parent compliance task
+  // and needs to check off individual subtasks (e.g. "Computation", "Reconciliation").
+  let isParentAssignee = false
+  if (!isManager && !isAssignee && task.parent_task_id) {
+    const { data: parentTask } = await supabase
+      .from('tasks').select('assignee_id').eq('id', task.parent_task_id).single()
+    isParentAssignee = parentTask?.assignee_id === user.id
+  }
+
+  if (!isManager && !isAssignee && !isParentAssignee)
     return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
 
   const body = await req.json()
@@ -59,9 +69,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const denied = await assertCan(supabase, mb.org_id, mb.role, 'tasks.assign')
     if (denied) return NextResponse.json({ error: denied.error }, { status: denied.status })
   }
-  // General edit permission: assignees check edit_own, non-assignees check edit
+  // General edit permission: assignees (or parent-task assignees) check edit_own, others check edit
   {
-    const perm = isAssignee ? 'tasks.edit_own' : 'tasks.edit'
+    const perm = (isAssignee || isParentAssignee) ? 'tasks.edit_own' : 'tasks.edit'
     const denied = await assertCan(supabase, mb.org_id, mb.role, perm)
     if (denied) return NextResponse.json({ error: denied.error }, { status: denied.status })
   }
