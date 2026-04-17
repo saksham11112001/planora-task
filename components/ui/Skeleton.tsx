@@ -1,26 +1,33 @@
 import { cn } from '@/lib/utils/cn'
 
-export function Skeleton({ className }: { className?: string }) {
+// Shimmer keyframes — injected once; browsers ignore duplicate @keyframes with identical content
+const SHIMMER_CSS = `
+  @keyframes shimmer {
+    0%   { background-position: -400% 0; }
+    100% { background-position: 400% 0; }
+  }
+`
+
+export function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
   return (
-    <div
-      className={cn('rounded', className)}
-      style={{
-        background: 'var(--border)',
-        animation: 'skeletonPulse 1.4s ease-in-out infinite',
-      }}
-    />
+    <>
+      <style>{SHIMMER_CSS}</style>
+      <div
+        className={cn('rounded', className)}
+        style={{
+          background: 'linear-gradient(90deg, var(--border) 25%, rgba(255,255,255,0.28) 50%, var(--border) 75%)',
+          backgroundSize: '400% 100%',
+          animation: 'shimmer 1.6s ease-in-out infinite',
+          ...style,
+        }}
+      />
+    </>
   )
 }
 
 export function SkeletonRows({ count = 5 }: { count?: number }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
-      <style>{`
-        @keyframes skeletonPulse {
-          0%, 100% { opacity: 0.5; }
-          50% { opacity: 1; }
-        }
-      `}</style>
       {Array.from({ length: count }).map((_, i) => (
         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 18px',
           borderBottom: '1px solid var(--border-light)' }}>
@@ -39,7 +46,6 @@ export function TaskListSkeleton({ rows = 6 }: { rows?: number }) {
   const widths = ['75%', '55%', '85%', '45%', '70%', '60%']
   return (
     <div style={{ flex: 1, background: 'var(--surface-subtle)' }}>
-      <style>{`@keyframes skeletonPulse { 0%,100%{opacity:0.45} 50%{opacity:0.9} }`}</style>
       {/* Column header */}
       <div style={{ display: 'grid', gridTemplateColumns: '28px 22px 1fr 160px 100px 110px',
         padding: '8px 18px', borderBottom: '1px solid var(--border)', background: 'var(--surface)' }}>
@@ -57,8 +63,7 @@ export function TaskListSkeleton({ rows = 6 }: { rows?: number }) {
         <div key={i} style={{ display: 'grid', gridTemplateColumns: '28px 22px 1fr 160px 100px 110px',
           alignItems: 'center', padding: '0 18px', minHeight: 48,
           borderBottom: '1px solid var(--border-light)',
-          background: 'var(--surface)',
-          animationDelay: `${i * 0.06}s` }}>
+          background: 'var(--surface)' }}>
           <Skeleton style={{ width: 13, height: 13, borderRadius: 3 }}/>
           <Skeleton style={{ width: 16, height: 16, borderRadius: '50%' }}/>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingRight: 12 }}>
@@ -81,7 +86,6 @@ export function KanbanSkeleton({ cols = 4 }: { cols?: number }) {
   const LABELS = ['Overdue', 'To do', 'Pending approval', 'Done']
   return (
     <div style={{ display: 'flex', gap: 12, padding: '14px 20px', background: 'var(--surface-subtle)', flex: 1 }}>
-      <style>{`@keyframes skeletonPulse { 0%,100%{opacity:0.45} 50%{opacity:0.9} }`}</style>
       {Array.from({ length: cols }).map((_, col) => (
         <div key={col} style={{ width: 268, flexShrink: 0, borderRadius: 10,
           background: 'var(--border-light)', border: '1px solid var(--border)', overflow: 'hidden' }}>
@@ -93,8 +97,7 @@ export function KanbanSkeleton({ cols = 4 }: { cols?: number }) {
           <div style={{ padding: 8, display: 'flex', flexDirection: 'column', gap: 7 }}>
             {Array.from({ length: col === 0 ? 2 : col === 3 ? 3 : 4 }).map((_, card) => (
               <div key={card} style={{ background: 'var(--surface)', borderRadius: 8,
-                padding: '10px 11px', border: '1px solid var(--border)',
-                animationDelay: `${(col * 4 + card) * 0.04}s` }}>
+                padding: '10px 11px', border: '1px solid var(--border)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8 }}>
                   <Skeleton style={{ width: 15, height: 15, borderRadius: '50%', flexShrink: 0 }}/>
                   <Skeleton style={{ height: 13, flex: 1, borderRadius: 4 }}/>
