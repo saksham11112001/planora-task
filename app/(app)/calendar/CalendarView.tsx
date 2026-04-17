@@ -75,7 +75,6 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
   const [clientFilter,  setClientFilter]  = useState('')
   const [memberFilter,  setMemberFilter]  = useState('')
   const [panelTask, setPanelTask] = useState<Task | null>(null)
-  const [panelLoading, setPanelLoading] = useState(false)
   const timelineScrollRef = useRef<HTMLDivElement>(null)
 
   // Auto-scroll timeline to today when entering timeline view or changing month
@@ -93,13 +92,26 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
     el.scrollLeft = scrollTo
   }, [viewMode, year, month])
 
-  async function openTask(id: string) {
-    setPanelLoading(true)
-    try {
-      const res  = await fetch(`/api/tasks/${id}`)
-      const data = await res.json()
-      if (data?.data) setPanelTask(data.data as Task)
-    } finally { setPanelLoading(false) }
+  function openTask(t: CalTask) {
+    // Open panel immediately with data we already have — no loading overlay
+    setPanelTask({
+      ...t,
+      description:      null,
+      org_id:           '',
+      approval_required: false,
+      approval_status:  null,
+      is_archived:      false,
+      created_by:       null,
+      approver_id:      null,
+      updated_at:       null,
+      completed_at:     null,
+      project:          t.projects ?? null,
+    } as unknown as Task)
+    // Background-fetch full task (description, approver, etc.) and update silently
+    fetch(`/api/tasks/${t.id}`)
+      .then(r => r.json())
+      .then(d => { if (d?.data) setPanelTask(d.data as Task) })
+      .catch(() => {})
   }
 
   function prevMonth() { if (month===0){setYear(y=>y-1);setMonth(11)}else setMonth(m=>m-1) }
@@ -376,7 +388,7 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
                       const bgClr     = taskTypeBg(t)
                       const isDone    = t.status === 'completed'
                       return (
-                        <button key={t.id} onClick={() => openTask(t.id)}
+                        <button key={t.id} onClick={() => openTask(t)}
                           style={{ display:'block', textAlign:'left', width:'100%', padding:'6px 8px',
                             borderRadius:6, cursor:'pointer', fontFamily:'inherit',
                             background: bgClr,
@@ -447,13 +459,6 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
         {Legend}
       </div>
 
-      {panelLoading && (
-        <div style={{ position:'fixed',inset:0,zIndex:9998,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.15)' }}>
-          <div style={{ background:'var(--surface)',borderRadius:12,padding:'20px 28px',fontSize:13,color:'var(--text-muted)',boxShadow:'0 8px 32px rgba(0,0,0,0.15)' }}>
-            Loading task…
-          </div>
-        </div>
-      )}
       <TaskDetailPanel task={panelTask} members={members} clients={clients} currentUserId={currentUserId} userRole={userRole}
         onClose={() => setPanelTask(null)} onUpdated={() => setPanelTask(null)} />
     </>)
@@ -652,7 +657,7 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
                     const priClr    = PRIORITY_COLORS[t.priority]??'#94a3b8'
                     const priBg     = PRIORITY_BG[t.priority]??'#f8fafc'
                     return (
-                      <button key={t.id} onClick={() => openTask(t.id)}
+                      <button key={t.id} onClick={() => openTask(t)}
                         style={{ display:'block',textAlign:'left',width:'100%',padding:'12px 14px',
                           background: bgClr,
                           borderRadius:12,cursor:'pointer',

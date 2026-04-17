@@ -6,7 +6,12 @@
       "Bash(npx tsc:*)",
       "Bash(xargs grep:*)",
       "Bash(wc -l /c/Users/saksh/Desktop/planora-task/components/tasks/*.tsx)",
-      "Bash(grep -E \"\\\\.tsx$\")"
+      "Bash(grep -E \"\\\\.tsx$\")",
+      "Bash(find /c/Users/saksh/Desktop/planora-task/supabase/migrations -name \"*.sql\" -exec grep -l \"custom_fields\" {} \\\\;)",
+      "Bash(cat next.config.js)",
+      "Bash(cat next.config.mjs)",
+      "Bash(cat next.config.ts)",
+      "Bash(node -e \"const p=require\\('./node_modules/next/package.json'\\); console.log\\(p.version\\)\")"
     ]
   }
 }

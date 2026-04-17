@@ -909,6 +909,18 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [pendingChanges, setPendingChanges] = useState<Record<string, Partial<CAMasterTask>>>({})
   const [savingAll, setSavingAll] = useState(false)
+  // Tracks server-confirmed task values (before any pending edits)
+  const originalValuesRef = useRef<Record<string, CAMasterTask>>({})
+  // Propagation modal state
+  const [propagateModal, setPropagateModal] = useState<{
+    old_name: string
+    fields: {
+      title?: string
+      priority?: string
+      attachment_headers?: { old: string[]; new: string[] }
+    }
+  } | null>(null)
+  const [propagating, setPropagating] = useState(false)
   // Track which task IDs have been explicitly saved by the user (persisted per FY)
   const [savedIds, setSavedIds] = useState<Set<string>>(() => {
     try {
@@ -942,6 +954,9 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
       const json = (await res.json()) as { data?: CAMasterTask[]; error?: string }
       if (!res.ok) throw new Error(json.error ?? 'Failed to load')
       setTasks(json.data ?? [])
+      // Store server-confirmed values so we can detect what changed on save
+      originalValuesRef.current = {}
+      ;(json.data ?? []).forEach(t => { originalValuesRef.current[t.id] = { ...t } })
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to load tasks')
     } finally {
@@ -1003,6 +1018,7 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
     const patch = pendingChanges[id]
     if (!patch) return
     const prev = tasks.find(t => t.id === id)
+    const original = originalValuesRef.current[id]
     try {
       const res = await fetch(`/api/ca/master/${id}`, {
         method: 'PATCH',
@@ -1012,9 +1028,27 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
       const json = (await res.json()) as { data?: CAMasterTask; error?: string }
       if (!res.ok) throw new Error(json.error ?? 'Update failed')
       setPendingChanges(p => { const n = { ...p }; delete n[id]; return n })
-      // Mark this task as explicitly saved
       setSavedIds(prev => new Set([...prev, id]))
+      // Update our baseline so next save compares against fresh values
+      if (original) originalValuesRef.current[id] = { ...original, ...patch }
       toast.success('Task saved')
+
+      // Check if any propagation-relevant fields changed
+      if (original) {
+        const propFields: { title?: string; priority?: string; attachment_headers?: { old: string[]; new: string[] } } = {}
+        if (patch.name && patch.name !== original.name) propFields.title = patch.name
+        if (patch.priority && patch.priority !== original.priority) propFields.priority = patch.priority
+        if (patch.attachment_headers) {
+          const oldH = original.attachment_headers ?? []
+          const newH = patch.attachment_headers
+          if (JSON.stringify(oldH) !== JSON.stringify(newH)) {
+            propFields.attachment_headers = { old: oldH, new: newH }
+          }
+        }
+        if (Object.keys(propFields).length > 0) {
+          setPropagateModal({ old_name: original.name, fields: propFields })
+        }
+      }
     } catch (err) {
       if (prev) setTasks(ts => ts.map(t => t.id === id ? prev : t))
       toast.error(err instanceof Error ? err.message : 'Save failed')
@@ -1047,6 +1081,30 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
 
   function requestDelete(id: string) {
     setDeleteConfirm(id)
+  }
+
+  /* ── Propagate changes to existing tasks ── */
+  async function handlePropagate() {
+    if (!propagateModal) return
+    setPropagating(true)
+    try {
+      const res = await fetch('/api/ca/propagate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          old_name: propagateModal.old_name,
+          fields: propagateModal.fields,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Propagation failed')
+      toast.success(`Updated ${json.updated} pending task${json.updated !== 1 ? 's' : ''}`)
+      setPropagateModal(null)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Propagation failed')
+    } finally {
+      setPropagating(false)
+    }
   }
 
   /* ── Grouped + filtered tasks ── */
@@ -1364,6 +1422,66 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       `}</style>
+
+      {/* ── Propagate changes modal ── */}
+      {propagateModal && (
+        <div style={{ position:'fixed', inset:0, zIndex:1000, background:'rgba(0,0,0,0.35)',
+          display:'flex', alignItems:'center', justifyContent:'center' }}
+          onClick={() => !propagating && setPropagateModal(null)}>
+          <div onClick={e => e.stopPropagation()} style={{ background:'var(--surface)', borderRadius:14,
+            padding:28, minWidth:380, maxWidth:460, boxShadow:'0 8px 40px rgba(0,0,0,0.18)',
+            border:'1px solid var(--border)' }}>
+            <div style={{ fontSize:16, fontWeight:700, color:'var(--text-primary)', marginBottom:6 }}>
+              Apply changes to pending tasks?
+            </div>
+            <p style={{ fontSize:13, color:'var(--text-muted)', margin:'0 0 16px' }}>
+              Update all incomplete tasks spawned from <strong>"{propagateModal.old_name}"</strong> across all clients:
+            </p>
+            <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:20 }}>
+              {propagateModal.fields.title && (
+                <div style={{ display:'flex', alignItems:'center', gap:8, fontSize:12,
+                  padding:'7px 12px', borderRadius:8, background:'var(--surface-subtle)',
+                  border:'1px solid var(--border)' }}>
+                  <span style={{ color:'var(--text-muted)', width:110 }}>Task name</span>
+                  <span style={{ fontWeight:600, color:'var(--text-primary)' }}>"{propagateModal.fields.title}"</span>
+                </div>
+              )}
+              {propagateModal.fields.priority && (
+                <div style={{ display:'flex', alignItems:'center', gap:8, fontSize:12,
+                  padding:'7px 12px', borderRadius:8, background:'var(--surface-subtle)',
+                  border:'1px solid var(--border)' }}>
+                  <span style={{ color:'var(--text-muted)', width:110 }}>Priority</span>
+                  <span style={{ fontWeight:600, color:'var(--text-primary)', textTransform:'capitalize' }}>{propagateModal.fields.priority}</span>
+                </div>
+              )}
+              {propagateModal.fields.attachment_headers && (
+                <div style={{ display:'flex', alignItems:'center', gap:8, fontSize:12,
+                  padding:'7px 12px', borderRadius:8, background:'var(--surface-subtle)',
+                  border:'1px solid var(--border)' }}>
+                  <span style={{ color:'var(--text-muted)', width:110 }}>Attachments</span>
+                  <span style={{ fontWeight:600, color:'var(--text-primary)' }}>Rename document subtasks</span>
+                </div>
+              )}
+            </div>
+            <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
+              <button onClick={() => setPropagateModal(null)} disabled={propagating}
+                style={{ padding:'8px 18px', borderRadius:8, border:'1px solid var(--border)',
+                  background:'var(--surface)', color:'var(--text-secondary)', fontSize:13,
+                  cursor:propagating ? 'not-allowed' : 'pointer', fontFamily:'inherit' }}>
+                Skip
+              </button>
+              <button onClick={handlePropagate} disabled={propagating}
+                style={{ padding:'8px 20px', borderRadius:8, border:'none',
+                  background:'var(--brand)', color:'#fff', fontSize:13, fontWeight:600,
+                  cursor:propagating ? 'not-allowed' : 'pointer', fontFamily:'inherit',
+                  opacity: propagating ? 0.7 : 1 }}>
+                {propagating ? 'Updating…' : 'Yes, update pending tasks'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }

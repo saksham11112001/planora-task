@@ -320,6 +320,13 @@ function TaskGroup({ groupName, tasks, selections, members, onToggle, onSelectCh
 
 /* ─── Main Component ──────────────────────────────────────────── */
 
+interface PropagateChange {
+  masterTaskName: string
+  clientId: string
+  assignee_id: string | null
+  approver_id: string | null
+}
+
 interface Props { userRole: string; financialYear?: string }
 
 export function CAClientSetupView({ userRole, financialYear = '2026-27' }: Props) {
@@ -336,6 +343,8 @@ export function CAClientSetupView({ userRole, financialYear = '2026-27' }: Props
   const [showAddModal,   setShowAddModal]   = useState(false)
   const [saving,         setSaving]         = useState(false)
   const [loadingTasks,   setLoadingTasks]   = useState(false)
+  const [propagateModal, setPropagateModal] = useState<PropagateChange[] | null>(null)
+  const [propagating,    setPropagating]    = useState(false)
 
   /* Bulk fields */
   const [bulkAssignee,   setBulkAssignee]   = useState('')
@@ -474,6 +483,39 @@ export function CAClientSetupView({ userRole, financialYear = '2026-27' }: Props
     })
   }
 
+  /* Propagate assignee/approver changes to incomplete triggered tasks */
+  async function handlePropagate() {
+    if (!propagateModal) return
+    setPropagating(true)
+    try {
+      let totalUpdated = 0
+      await Promise.all(propagateModal.map(async change => {
+        const res = await fetch('/api/ca/propagate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            old_name: change.masterTaskName,
+            client_id: change.clientId,
+            fields: {
+              assignee_id: change.assignee_id,
+              approver_id: change.approver_id,
+            },
+          }),
+        })
+        if (res.ok) {
+          const json = await res.json()
+          totalUpdated += json.updated ?? 0
+        }
+      }))
+      toast.success(`Updated ${totalUpdated} pending task${totalUpdated !== 1 ? 's' : ''}`)
+    } catch {
+      toast.error('Failed to propagate some changes')
+    } finally {
+      setPropagating(false)
+      setPropagateModal(null)
+    }
+  }
+
   /* Save assignments */
   async function handleSave() {
     if (!selectedClient || !canEdit) return
@@ -486,6 +528,9 @@ export function CAClientSetupView({ userRole, financialYear = '2026-27' }: Props
       /* Existing assignment ids keyed by master_task_id */
       const existingByTaskId: Record<string, Assignment> = {}
       assignments.forEach(a => { existingByTaskId[a.master_task_id] = a })
+
+      /* Collect assignee/approver changes for propagation (existing assignments only) */
+      const propagatableChanges: PropagateChange[] = []
 
       masterTasks.forEach(task => {
         const sel = selections[task.id]
@@ -503,10 +548,10 @@ export function CAClientSetupView({ userRole, financialYear = '2026-27' }: Props
             })
           } else {
             /* Update if changed — delete + re-add */
-            const changed =
-              (sel.assignee_id || null) !== existing.assignee_id ||
-              (sel.approver_id || null) !== existing.approver_id ||
-              (sel.start_date  || null) !== ((existing as any).start_date ?? null)
+            const assigneeChanged = (sel.assignee_id || null) !== existing.assignee_id
+            const approverChanged = (sel.approver_id || null) !== existing.approver_id
+            const startDateChanged = (sel.start_date || null) !== ((existing as any).start_date ?? null)
+            const changed = assigneeChanged || approverChanged || startDateChanged
             if (changed) {
               toRemove.push(existing.id)
               toAdd.push({
@@ -516,6 +561,15 @@ export function CAClientSetupView({ userRole, financialYear = '2026-27' }: Props
                 approver_id: sel.approver_id || null,
                 start_date:  sel.start_date  || null,
               })
+              /* Only propagate assignee/approver changes, not start_date */
+              if (assigneeChanged || approverChanged) {
+                propagatableChanges.push({
+                  masterTaskName: task.name,
+                  clientId: selectedClient.id,
+                  assignee_id: sel.assignee_id || null,
+                  approver_id: sel.approver_id || null,
+                })
+              }
             }
           }
         } else if (existing) {
@@ -549,6 +603,11 @@ export function CAClientSetupView({ userRole, financialYear = '2026-27' }: Props
       await loadAssignments(selectedClient.id)
       const checkedCount = Object.values(selections).filter(s => s.checked).length
       setAssignmentCounts(prev => ({ ...prev, [selectedClient.id]: checkedCount }))
+
+      /* Offer to propagate assignee/approver changes to already-triggered tasks */
+      if (propagatableChanges.length > 0) {
+        setPropagateModal(propagatableChanges)
+      }
     } catch {
       toast.error('Failed to save assignments')
     } finally {
@@ -816,6 +875,80 @@ export function CAClientSetupView({ userRole, financialYear = '2026-27' }: Props
           onClose={() => setShowAddModal(false)}
           onCreated={handleClientCreated}
         />
+      )}
+
+      {/* Propagation modal */}
+      {propagateModal && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 1100,
+            background: 'rgba(0,0,0,0.45)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <div
+            style={{
+              background: 'var(--surface)', borderRadius: 14, padding: 28,
+              width: 440, maxWidth: '92vw',
+              boxShadow: '0 24px 64px rgba(0,0,0,0.35)',
+              border: '1px solid var(--border)',
+            }}
+          >
+            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 10 }}>
+              Apply changes to pending tasks?
+            </div>
+            <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '0 0 16px' }}>
+              The following assignments were updated. Would you like to apply the new assignee/approver
+              to all already-triggered, incomplete tasks for this client?
+            </p>
+            <div style={{
+              background: 'var(--surface-subtle)', borderRadius: 8,
+              border: '1px solid var(--border)', padding: '10px 14px',
+              marginBottom: 22, display: 'flex', flexDirection: 'column', gap: 8,
+              maxHeight: 200, overflowY: 'auto',
+            }}>
+              {propagateModal.map((c, i) => {
+                const assigneeName = members.find(m => m.id === c.assignee_id)?.name ?? 'Unassigned'
+                const approverName = members.find(m => m.id === c.approver_id)?.name ?? 'None'
+                return (
+                  <div key={i} style={{ fontSize: 12, color: 'var(--text-primary)' }}>
+                    <span style={{ fontWeight: 600 }}>{c.masterTaskName}</span>
+                    <span style={{ color: 'var(--text-muted)', marginLeft: 8 }}>
+                      Assignee: {assigneeName} · Approver: {approverName}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setPropagateModal(null)}
+                disabled={propagating}
+                style={{
+                  padding: '8px 18px', borderRadius: 8,
+                  border: '1px solid var(--border)', background: 'var(--surface-alt)',
+                  color: 'var(--text-secondary)', fontSize: 13, fontWeight: 600,
+                  cursor: propagating ? 'not-allowed' : 'pointer', opacity: propagating ? 0.6 : 1,
+                }}
+              >
+                Skip
+              </button>
+              <button
+                onClick={handlePropagate}
+                disabled={propagating}
+                style={{
+                  padding: '8px 20px', borderRadius: 8, border: 'none',
+                  background: 'var(--brand)', color: '#fff',
+                  fontSize: 13, fontWeight: 700,
+                  cursor: propagating ? 'not-allowed' : 'pointer',
+                  opacity: propagating ? 0.7 : 1,
+                }}
+              >
+                {propagating ? 'Updating…' : 'Yes, update pending tasks'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
