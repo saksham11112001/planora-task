@@ -11,9 +11,9 @@ const config: NextConfig = {
   // Experimental optimizations
   experimental: {
     optimizePackageImports: ['lucide-react', 'recharts', '@supabase/supabase-js'],
-    // Cache navigated pages on the client for 30 s — reduces server round trips
-    // for back/forward navigation and repeated visits to the same page.
-    staleTimes: { dynamic: 30 },
+    // Keep at 0 — auth layout reads session cookies on every request.
+    // Caching dynamic pages could serve stale org/session data to the wrong user.
+    staleTimes: { dynamic: 0 },
   },
 
   // xlsx uses native Node.js modules — prevent webpack from bundling it
