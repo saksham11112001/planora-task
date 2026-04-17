@@ -15,40 +15,43 @@ export async function POST(request: NextRequest) {
     const admin = createAdminClient()
 
     // 1. Upsert public.users row
+    const rawName = (
+      user.user_metadata?.full_name ??
+      user.user_metadata?.name ??
+      ((user.user_metadata?.given_name && user.user_metadata?.family_name)
+        ? `${user.user_metadata.given_name} ${user.user_metadata.family_name}`
+        : null) ??
+      user.user_metadata?.given_name ??
+      user.email?.split('@')[0]?.replace(/[._]/g, ' ')?.replace(/\b\w/g, (l: string) => l.toUpperCase()) ??
+      'User'
+    )
     await admin.from('users').upsert({
       id:         user.id,
-      email:      user.email ?? '',
-      name: (
-        user.user_metadata?.full_name ??
-        user.user_metadata?.name ??
-        ((user.user_metadata?.given_name && user.user_metadata?.family_name)
-          ? `${user.user_metadata.given_name} ${user.user_metadata.family_name}`
-          : null) ??
-        user.user_metadata?.given_name ??
-        user.email?.split('@')[0]?.replace(/[._]/g, ' ')?.replace(/\b\w/g, (l: string) => l.toUpperCase()) ??
-        'User'
-      ),
+      email:      (user.email ?? '').slice(0, 255),
+      name:       String(rawName).slice(0, 100),
       avatar_url: user.user_metadata?.avatar_url ?? null,
     }, { onConflict: 'id' })
 
     // 2. Handle invite metadata if present
+    const VALID_ROLES = new Set(['member', 'manager', 'admin', 'owner'])
     const invitedOrgId = user.user_metadata?.invited_to_org as string | undefined
-    const invitedRole  = (user.user_metadata?.invited_role as string | undefined) ?? 'member'
+    const rawRole      = user.user_metadata?.invited_role as string | undefined
+    const invitedRole  = VALID_ROLES.has(rawRole ?? '') ? (rawRole as string) : 'member'
 
     if (invitedOrgId) {
-      const { data: existing } = await admin
-        .from('org_members').select('id, is_active')
-        .eq('org_id', invitedOrgId).eq('user_id', user.id).maybeSingle()
+      // Upsert avoids check-then-insert race condition
+      await admin.from('org_members').upsert(
+        { org_id: invitedOrgId, user_id: user.id, role: invitedRole, is_active: true },
+        { onConflict: 'org_id,user_id', ignoreDuplicates: false }
+      )
 
-      if (existing && !existing.is_active) {
-        await admin.from('org_members').update({ is_active: true, role: invitedRole }).eq('id', existing.id)
-      } else if (!existing) {
-        await admin.from('org_members').insert({ org_id: invitedOrgId, user_id: user.id, role: invitedRole, is_active: true })
+      try {
+        await admin.auth.admin.updateUserById(user.id, {
+          user_metadata: { ...user.user_metadata, invited_to_org: null, invited_role: null },
+        })
+      } catch (err) {
+        console.error('[api/auth/provision] clearInviteMetadata failed:', err)
       }
-
-      await admin.auth.admin.updateUserById(user.id, {
-        user_metadata: { ...user.user_metadata, invited_to_org: null, invited_role: null },
-      })
 
       return NextResponse.json({ success: true, redirect: '/dashboard' })
     }

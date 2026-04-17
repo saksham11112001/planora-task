@@ -410,11 +410,12 @@ export function MyTasksView({
 
   async function bulkComplete() {
     const ids = [...checked]
-    // ALL selected tasks → submit for approval (in_review)
     const toSubmit = tasks.filter(t =>
       ids.includes(t.id) && t.status !== 'in_review' && t.approval_status !== 'pending'
     )
     setChecked(new Set())
+    // Snapshot before optimistic update for per-task rollback
+    const snapshots = new Map(toSubmit.map(t => [t.id, { status: t.status, approval_status: t.approval_status }]))
     // Optimistic: mark all as pending
     setTasks(prev => prev.map(t =>
       toSubmit.find(s => s.id === t.id)
@@ -425,9 +426,18 @@ export function MyTasksView({
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ decision: 'submit' }),
     })))
-    const failed = results.filter(r => !r.ok).length
-    if (toSubmit.length - failed > 0) toast.success(`${toSubmit.length - failed} task(s) submitted for approval ✓`)
-    if (failed > 0) toast.error(`${failed} task(s) could not be submitted`)
+    const failedIds = toSubmit.filter((_, i) => !results[i].ok).map(t => t.id)
+    const successCount = toSubmit.length - failedIds.length
+    if (successCount > 0) toast.success(`${successCount} task(s) submitted for approval ✓`)
+    if (failedIds.length > 0) {
+      // Rollback only the failed tasks
+      setTasks(prev => prev.map(t => {
+        const snap = snapshots.get(t.id)
+        if (!snap) return t
+        return { ...t, status: snap.status, approval_status: snap.approval_status ?? null } as Task
+      }))
+      toast.error(`${failedIds.length} task(s) could not be submitted`)
+    }
   }
 
   async function bulkDelete() {
@@ -435,12 +445,24 @@ export function MyTasksView({
     if (!ids.length) return
     if (!confirm(`Delete ${ids.length} task(s)? They will be moved to Trash.`)) return
     setChecked(new Set())
+    // Snapshot for restoring failed deletes
+    const snapshot = tasks.filter(t => ids.includes(t.id))
+    const snapshotABM = assignedByMeList.filter(t => ids.includes(t.id))
+    // Optimistic remove
     setTasks(prev => prev.filter(t => !ids.includes(t.id)))
     setAssignedByMeList(prev => prev.filter(t => !ids.includes(t.id)))
     const results = await Promise.all(ids.map(id => fetch(`/api/tasks/${id}`, { method: 'DELETE' })))
-    const failed = results.filter(r => !r.ok).length
-    if (ids.length - failed > 0) toast.success(`${ids.length - failed} task(s) deleted`)
-    if (failed > 0) { toast.error(`${failed} task(s) could not be deleted`); refresh() }
+    const failedIds = ids.filter((_, i) => !results[i].ok)
+    const successCount = ids.length - failedIds.length
+    if (successCount > 0) toast.success(`${successCount} task(s) deleted`)
+    if (failedIds.length > 0) {
+      // Restore only the tasks that failed to delete
+      const failedTasks    = snapshot.filter(t => failedIds.includes(t.id))
+      const failedABMTasks = snapshotABM.filter(t => failedIds.includes(t.id))
+      setTasks(prev => [...prev, ...failedTasks])
+      setAssignedByMeList(prev => [...prev, ...failedABMTasks])
+      toast.error(`${failedIds.length} task(s) could not be deleted`)
+    }
   }
 
   // Approve or reject a task (for managers/approvers)
@@ -552,7 +574,9 @@ export function MyTasksView({
     const ov        = isOverdue(task.due_date, task.status)
 
     if (isPending) return (
-      <div onClick={e => toggleDone(task, e)} title="Pending approval — click to reopen"
+      <div onClick={e => toggleDone(task, e)}
+        role="button" tabIndex={0} aria-label="Pending approval — click to reopen"
+        title="Pending approval — click to reopen"
         style={{ width:16, height:16, borderRadius:'50%', flexShrink:0,
           border:'1.5px solid #7c3aed', background:'rgba(124,58,237,0.1)',
           display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
@@ -561,6 +585,8 @@ export function MyTasksView({
     )
     return (
       <div onClick={e => toggleDone(task, e)}
+        role="button" tabIndex={0}
+        aria-label={isDone ? 'Mark incomplete' : 'Submit for approval'}
         title={isDone ? 'Mark incomplete' : 'Submit for approval'}
         style={{ width:16, height:16, borderRadius:'50%', flexShrink:0,
           border:`1.5px solid ${isDone?'var(--brand)':ov?'#dc2626':'#cbd5e1'}`,
@@ -575,10 +601,12 @@ export function MyTasksView({
   }
 
   const Tabs = () => (
-    <div style={{ display:'flex', alignItems:'center', borderBottom:`1px solid var(--border)`, padding:'0 20px',
+    <div role="tablist" style={{ display:'flex', alignItems:'center', borderBottom:`1px solid var(--border)`, padding:'0 20px',
       background:'var(--surface)', flexShrink:0, gap:8 }}>
       {(['List','Board'] as const).map(t => (
         <button key={t} onClick={() => setTab(t)}
+          role="tab"
+          aria-selected={tab === t}
           style={{ padding:'10px 15px', fontSize:14, fontWeight:500, border:'none',
             background:'transparent', cursor:'pointer', marginBottom:-1,
             borderBottom:`2px solid ${tab===t?'var(--brand)':'transparent'}`,
@@ -864,6 +892,18 @@ export function MyTasksView({
           {showAssignedByMe && (
             <div style={{ padding:'10px 18px 4px', fontSize:12, fontWeight:600, color:'#0d9488' }}>
               Tasks assigned by me to others
+            </div>
+          )}
+          {/* Empty state when filters yield no results */}
+          {displayTasks.length === 0 && (
+            <div style={{ padding:'48px 24px', textAlign:'center' }}>
+              <div style={{ fontSize:32, marginBottom:12 }}>🔍</div>
+              <p style={{ fontSize:14, fontWeight:600, color:'var(--text-primary)', margin:'0 0 6px' }}>
+                No tasks match your filters
+              </p>
+              <p style={{ fontSize:13, color:'var(--text-muted)', margin:0 }}>
+                Try adjusting or clearing the filters above.
+              </p>
             </div>
           )}
           {LIST_SECS.map(sec => {

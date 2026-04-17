@@ -27,8 +27,10 @@ export async function GET(request: NextRequest) {
     const btid = sp.get('blocks_task_id')!
     q = (q as any).contains('custom_fields', { _blocked_by: [btid] })
   }
-  const _limit  = Math.min(parseInt(sp.get('limit')  ?? '100'), 500)
-  const _offset = Math.max(parseInt(sp.get('offset') ?? '0'),   0)
+  const parsedLimit  = parseInt(sp.get('limit')  ?? '100', 10)
+  const parsedOffset = parseInt(sp.get('offset') ?? '0',   10)
+  const _limit  = Math.min(isNaN(parsedLimit)  ? 100 : parsedLimit,  500)
+  const _offset = Math.max(isNaN(parsedOffset) ? 0   : parsedOffset, 0)
   q = q.order('due_date', { ascending: true, nullsFirst: false }).range(_offset, _offset + _limit - 1)
 
   const { data, error } = await q
@@ -50,16 +52,16 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json()
 
-  // Skip permission check for subtask creation (internal / compliance flow)
-  if (!body.parent_task_id) {
-    const denied = await assertCan(supabase, mb.org_id, mb.role, 'tasks.create')
-    if (denied) return NextResponse.json({ error: denied.error }, { status: denied.status })
-  }
+  // Always check tasks.create permission — subtask creation is not exempt
+  const denied = await assertCan(supabase, mb.org_id, mb.role, 'tasks.create')
+  if (denied) return NextResponse.json({ error: denied.error }, { status: denied.status })
+
   const { title, description, status = 'todo', priority = 'medium', assignee_id, approver_id,
           client_id, project_id, due_date, estimated_hours, approval_required = false,
           parent_task_id, is_recurring = false, frequency, next_occurrence_date,
           custom_fields } = body
   if (!title?.trim()) return NextResponse.json({ error: 'Title required' }, { status: 400 })
+  if (title.trim().length > 500) return NextResponse.json({ error: 'Title too long (max 500 chars)' }, { status: 400 })
 
   // If attaching to a parent task, verify it belongs to the same org
   if (parent_task_id) {
@@ -106,24 +108,22 @@ export async function POST(request: NextRequest) {
   // Create compliance subtasks if provided
   const subtasks = body.subtasks as { title: string; required: boolean; due_date?: string }[] | undefined
   if (subtasks && subtasks.length > 0 && task?.id) {
-    try {
-      const subtaskInserts = subtasks.map(s => ({
-        org_id:         mb.org_id,
-        title:          s.title,
-        status:         'todo' as const,
-        priority:       body.priority ?? 'medium',
-        assignee_id:    (s as any).assignee_id || body.assignee_id || null,
-        client_id:      body.client_id || null,
-        project_id:     body.project_id || null,
-        due_date:       s.due_date || body.due_date || null,
-        parent_task_id: task.id,
-        created_by:     user.id,
-        is_recurring:   false,
-        // Flag compliance subtasks so attachment is enforced on completion
-        custom_fields:  s.required ? { _compliance_subtask: true } : null,
-      }))
-      await supabase.from('tasks').insert(subtaskInserts)
-    } catch {}
+    const subtaskInserts = subtasks.map(s => ({
+      org_id:         mb.org_id,
+      title:          String(s.title ?? '').slice(0, 500),
+      status:         'todo' as const,
+      priority:       body.priority ?? 'medium',
+      assignee_id:    (s as any).assignee_id || body.assignee_id || null,
+      client_id:      body.client_id || null,
+      project_id:     body.project_id || null,
+      due_date:       s.due_date || body.due_date || null,
+      parent_task_id: task.id,
+      created_by:     user.id,
+      is_recurring:   false,
+      custom_fields:  s.required ? { _compliance_subtask: true } : null,
+    }))
+    const { error: subErr } = await supabase.from('tasks').insert(subtaskInserts)
+    if (subErr) console.error('[tasks POST] subtask insert failed:', subErr.message)
   }
 
   return NextResponse.json({ data: task }, { status: 201 })

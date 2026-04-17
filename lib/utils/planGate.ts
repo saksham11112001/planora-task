@@ -14,8 +14,10 @@ export const PLAN_LIMITS = {
 export type PlanKey = keyof typeof PLAN_LIMITS
 
 /**
- * Returns the effective plan — if trial has expired, treat as 'free'
- * regardless of what's in the DB.
+ * Returns the effective plan.
+ * - Active trial → 'pro' (full access during trial, consistent with planGuard)
+ * - Expired trial → 'free'
+ * - Cancelled / past_due → 'free'
  */
 export function effectivePlan(org: {
   plan_tier:    string
@@ -25,10 +27,10 @@ export function effectivePlan(org: {
   const plan   = (org.plan_tier ?? 'free') as PlanKey
   const status = org.status ?? 'active'
 
-  // Trial expired → downgrade to free
-  if (status === 'trialing' && org.trial_ends_at) {
-    const expired = new Date(org.trial_ends_at) < new Date()
-    if (expired) return 'free'
+  if (status === 'trialing') {
+    if (!org.trial_ends_at) return 'pro'
+    const expired = new Date() > new Date(org.trial_ends_at)
+    return expired ? 'free' : 'pro'
   }
 
   // Subscription cancelled / past due → free

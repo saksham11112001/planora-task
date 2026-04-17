@@ -4,10 +4,19 @@ import { cookies }            from 'next/headers'
 import { NextResponse }       from 'next/server'
 import type { NextRequest }   from 'next/server'
 
+const VALID_ROLES = new Set(['member', 'manager', 'admin', 'owner'])
+
+function safeRedirect(next: string | null, fallback = '/dashboard'): string {
+  if (!next) return fallback
+  // Only allow same-origin relative paths
+  if (next.startsWith('/') && !next.startsWith('//')) return next
+  return fallback
+}
+
 export async function GET(request: NextRequest) {
   const url  = new URL(request.url)
   const code = url.searchParams.get('code')
-  const next = url.searchParams.get('next') ?? '/dashboard'
+  const next = safeRedirect(url.searchParams.get('next'))
 
   // IMPLICIT FLOW: token is in the URL hash (#access_token=...).
   // Hashes are never sent to the server, so if there's no ?code,
@@ -43,7 +52,8 @@ export async function GET(request: NextRequest) {
   await provisionUser(user)
 
   const invitedOrgId = user.user_metadata?.invited_to_org as string | undefined
-  const invitedRole  = (user.user_metadata?.invited_role as string | undefined) ?? 'member'
+  const rawRole      = user.user_metadata?.invited_role as string | undefined
+  const invitedRole  = VALID_ROLES.has(rawRole ?? '') ? (rawRole as string) : 'member'
 
   if (invitedOrgId) {
     await provisionInvitedMember(user, invitedOrgId, invitedRole)
@@ -56,22 +66,25 @@ export async function GET(request: NextRequest) {
 async function provisionUser(user: any) {
   const admin = createAdminClient()
   try {
+    const rawName = (
+      user.user_metadata?.full_name ??
+      user.user_metadata?.name ??
+      ((user.user_metadata?.given_name && user.user_metadata?.family_name)
+        ? `${user.user_metadata.given_name} ${user.user_metadata.family_name}`
+        : null) ??
+      user.user_metadata?.given_name ??
+      user.email?.split('@')[0]?.replace(/[._]/g, ' ')?.replace(/\b\w/g, (l: string) => l.toUpperCase()) ??
+      'User'
+    )
     await admin.from('users').upsert({
       id:         user.id,
-      email:      user.email ?? '',
-      name: (
-        user.user_metadata?.full_name ??
-        user.user_metadata?.name ??
-        ((user.user_metadata?.given_name && user.user_metadata?.family_name)
-          ? `${user.user_metadata.given_name} ${user.user_metadata.family_name}`
-          : null) ??
-        user.user_metadata?.given_name ??
-        user.email?.split('@')[0]?.replace(/[._]/g, ' ')?.replace(/\b\w/g, (l: string) => l.toUpperCase()) ??
-        'User'
-      ),
+      email:      (user.email ?? '').slice(0, 255),
+      name:       String(rawName).slice(0, 100),
       avatar_url: user.user_metadata?.avatar_url ?? null,
     }, { onConflict: 'id' })
-  } catch (_) {}
+  } catch (err) {
+    console.error('[auth/callback] provisionUser failed:', err)
+  }
 }
 
 async function provisionInvitedMember(user: any, orgId: string, role: string) {
@@ -79,17 +92,18 @@ async function provisionInvitedMember(user: any, orgId: string, role: string) {
 
   await provisionUser(user)
 
-  const { data: existing } = await admin
-    .from('org_members').select('id, is_active')
-    .eq('org_id', orgId).eq('user_id', user.id).maybeSingle()
+  // Use upsert to avoid check-then-insert race condition
+  await admin.from('org_members').upsert(
+    { org_id: orgId, user_id: user.id, role, is_active: true },
+    { onConflict: 'org_id,user_id', ignoreDuplicates: false }
+  )
 
-  if (existing && !existing.is_active) {
-    await admin.from('org_members').update({ is_active: true, role }).eq('id', existing.id)
-  } else if (!existing) {
-    await admin.from('org_members').insert({ org_id: orgId, user_id: user.id, role, is_active: true })
+  // Clear invite metadata so it can't be replayed
+  try {
+    await admin.auth.admin.updateUserById(user.id, {
+      user_metadata: { ...user.user_metadata, invited_to_org: null, invited_role: null },
+    })
+  } catch (err) {
+    console.error('[auth/callback] clearInviteMetadata failed:', err)
   }
-
-  await admin.auth.admin.updateUserById(user.id, {
-    user_metadata: { ...user.user_metadata, invited_to_org: null, invited_role: null },
-  })
 }

@@ -11,7 +11,8 @@ export async function GET(request: NextRequest) {
   const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).single()
   if (!mb) return NextResponse.json({ data: [] })
   const sp  = request.nextUrl.searchParams
-  const lim = Math.min(parseInt(sp.get('limit') ?? '100'), 500)
+  const parsedLim = parseInt(sp.get('limit') ?? '100', 10)
+  const lim = Math.min(isNaN(parsedLim) ? 100 : parsedLim, 500)
   // Strict project visibility: everyone only sees org-wide projects OR projects they're in
   // Only the org owner sees all projects (safety net)
   const isOwner = mb.role === 'owner'
@@ -48,7 +49,7 @@ export async function POST(request: NextRequest) {
   if (isAtProjectLimit(plan, projectCount ?? 0)) {
     return NextResponse.json({
       error: `Your ${plan} plan allows up to ${projectLimit(plan)} projects. Upgrade to create more.`
-    }, { status: 403 })
+    }, { status: 402 })
   }
   const body = await request.json()
   if (!body.name?.trim()) return NextResponse.json({ error: 'Name required' }, { status: 400 })

@@ -36,7 +36,9 @@ export const useToastStore = create<ToastState>((set) => ({
   push: (t) => {
     const id = Math.random().toString(36).slice(2)
     set(s => ({ toasts: [...s.toasts, { ...t, id }] }))
-    setTimeout(() => set(s => ({ toasts: s.toasts.filter(x => x.id !== id) })), 3500)
+    // Errors stay visible longer (8s); success/info auto-dismiss after 3.5s
+    const delay = t.type === 'error' ? 8000 : 3500
+    setTimeout(() => set(s => ({ toasts: s.toasts.filter(x => x.id !== id) })), delay)
   },
   remove: (id) => set(s => ({ toasts: s.toasts.filter(x => x.id !== id) })),
 }))
