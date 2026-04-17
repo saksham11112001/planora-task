@@ -45,6 +45,15 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    // Deactivate any active memberships in OTHER orgs.
+    // A user must belong to exactly one active org at a time — multiple active rows
+    // cause membership lookups to return the wrong org (cross-org data leakage).
+    await admin.from('org_members')
+      .update({ is_active: false })
+      .eq('user_id', user.id)
+      .neq('org_id', org_id)
+      .eq('is_active', true)
+
     // Clear invite metadata from user
     await supabase.auth.updateUser({
       data: { invited_to_org: null, invited_role: null }

@@ -49,7 +49,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   let isParentAssignee = false
   if (!isManager && !isAssignee && task.parent_task_id) {
     const { data: parentTask } = await supabase
-      .from('tasks').select('assignee_id').eq('id', task.parent_task_id).single()
+      .from('tasks').select('assignee_id').eq('id', task.parent_task_id).eq('org_id', mb.org_id).maybeSingle()
     isParentAssignee = parentTask?.assignee_id === user.id
   }
 
@@ -100,7 +100,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   // Owner/admin bypass: they can force-complete regardless of subtask state
   if (body.status === 'completed' && !task.parent_task_id && !isOwnerOrAdmin) {
     const { data: subtasks } = await supabase
-      .from('tasks').select('id, status').eq('parent_task_id', id)
+      .from('tasks').select('id, status').eq('parent_task_id', id).eq('org_id', mb.org_id)
     if (subtasks && subtasks.length > 0) {
       const incomplete = subtasks.filter(s => s.status !== 'completed')
       if (incomplete.length > 0) {
@@ -119,11 +119,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (isComplianceSubtask) {
       // Check attachments on the subtask itself first, then fall back to parent task
       const { data: subtaskAttachments } = await supabase
-        .from('task_attachments').select('id').eq('task_id', id).limit(1)
+        .from('task_attachments').select('id').eq('task_id', id).eq('org_id', mb.org_id).limit(1)
       let hasAttachment = !!(subtaskAttachments && subtaskAttachments.length > 0)
       if (!hasAttachment) {
         const { data: parentAttachments } = await supabase
-          .from('task_attachments').select('id').eq('task_id', task.parent_task_id).limit(1)
+          .from('task_attachments').select('id').eq('task_id', task.parent_task_id).eq('org_id', mb.org_id).limit(1)
         hasAttachment = !!(parentAttachments && parentAttachments.length > 0)
       }
       if (!hasAttachment) {
@@ -193,11 +193,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (updates.status === 'completed' && data?.parent_task_id) {
     const { data: siblings } = await supabase
       .from('tasks').select('id, status')
-      .eq('parent_task_id', data.parent_task_id)
+      .eq('parent_task_id', data.parent_task_id).eq('org_id', mb.org_id)
     if (siblings?.length && siblings.every(s => s.status === 'completed')) {
       const { data: parentTask } = await supabase
         .from('tasks').select('approval_required, approval_status')
-        .eq('id', data.parent_task_id).single()
+        .eq('id', data.parent_task_id).eq('org_id', mb.org_id).maybeSingle()
       // Skip auto-complete if parent requires approval and hasn't been approved yet
       if (!parentTask?.approval_required || parentTask?.approval_status === 'approved') {
         await supabase.from('tasks')

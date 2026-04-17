@@ -45,6 +45,15 @@ export async function POST(request: NextRequest) {
         { onConflict: 'org_id,user_id', ignoreDuplicates: false }
       )
 
+      // Deactivate any active memberships in OTHER orgs.
+      // A user must belong to exactly one active org at a time — multiple active rows
+      // cause membership lookups to return the wrong org (cross-org data leakage).
+      await admin.from('org_members')
+        .update({ is_active: false })
+        .eq('user_id', user.id)
+        .neq('org_id', invitedOrgId)
+        .eq('is_active', true)
+
       try {
         await admin.auth.admin.updateUserById(user.id, {
           user_metadata: { ...user.user_metadata, invited_to_org: null, invited_role: null },

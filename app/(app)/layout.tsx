@@ -52,6 +52,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           await admin.from('org_members').update({ is_active: true, role: pendingRole }).eq('id', existingMember.id)
         }
 
+        // Deactivate any active memberships in OTHER orgs to ensure single active org per user.
+        await admin.from('org_members')
+          .update({ is_active: false })
+          .eq('user_id', user!.id)
+          .neq('org_id', pendingOrgId)
+          .eq('is_active', true)
+
         await admin.auth.admin.updateUserById(user!.id, {
           user_metadata: { ...authUserData?.user?.user_metadata, invited_to_org: null, invited_role: null },
         })
@@ -70,8 +77,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         .maybeSingle()
 
       if (anyMembership) {
-        // Reactivate and proceed
+        // Reactivate this membership and deactivate any others to ensure single active org per user.
         await admin.from('org_members').update({ is_active: true }).eq('id', anyMembership.id)
+        await admin.from('org_members')
+          .update({ is_active: false })
+          .eq('user_id', user!.id)
+          .neq('id', anyMembership.id)
+          .eq('is_active', true)
         redirect('/dashboard')
       }
 

@@ -11,7 +11,19 @@
       "Bash(cat next.config.js)",
       "Bash(cat next.config.mjs)",
       "Bash(cat next.config.ts)",
-      "Bash(node -e \"const p=require\\('./node_modules/next/package.json'\\); console.log\\(p.version\\)\")"
+      "Bash(node -e \"const p=require\\('./node_modules/next/package.json'\\); console.log\\(p.version\\)\")",
+      "Bash(find \"C:\\\\Users\\\\saksh\\\\Desktop\\\\planora-task/app\" -type f \\\\\\( -name \"*.tsx\" -o -name \"*.ts\" \\\\\\) -exec grep -l \"toLocaleDateString\\\\|toLocaleString\" {} \\\\;)",
+      "Bash(ls C:\\\\Users\\\\saksh\\\\Desktop\\\\planora-task/*.md)",
+      "Bash(sed -n '52p' /c/Users/saksh/Desktop/planora-task/app/api/tasks/\\\\[id\\\\]/route.ts)",
+      "Bash(sed -n '52,53p' /c/Users/saksh/Desktop/planora-task/app/api/tasks/\\\\[id\\\\]/route.ts)",
+      "Bash(sed -n '102,104p' /c/Users/saksh/Desktop/planora-task/app/api/tasks/\\\\[id\\\\]/route.ts)",
+      "Bash(sed -n '121,123p' /c/Users/saksh/Desktop/planora-task/app/api/tasks/\\\\[id\\\\]/route.ts)",
+      "Bash(sed -n '125,127p' /c/Users/saksh/Desktop/planora-task/app/api/tasks/\\\\[id\\\\]/route.ts)",
+      "Bash(sed -n '42,44p' /c/Users/saksh/Desktop/planora-task/app/api/tasks/\\\\[id\\\\]/approve/route.ts)",
+      "Bash(sed -n '57,59p' /c/Users/saksh/Desktop/planora-task/app/api/tasks/\\\\[id\\\\]/approve/route.ts)",
+      "Bash(sed -n '85,87p' /c/Users/saksh/Desktop/planora-task/app/api/tasks/\\\\[id\\\\]/approve/route.ts)",
+      "Bash(sed -n '151,153p' /c/Users/saksh/Desktop/planora-task/app/api/tasks/\\\\[id\\\\]/approve/route.ts)",
+      "Bash(grep -n \"eq\\('parent_task_id'\" app/\\\\\\(app\\\\\\)/**/*.tsx)"
     ]
   }
 }

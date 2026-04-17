@@ -55,7 +55,7 @@ export async function POST(
     // Block submit if subtasks are incomplete
     // Owner/admin bypass: they can force-submit regardless of subtask state
     const { data: subtasks } = await supabase
-      .from('tasks').select('id, status, parent_task_id, custom_fields').eq('parent_task_id', id)
+      .from('tasks').select('id, status, parent_task_id, custom_fields').eq('parent_task_id', id).eq('org_id', mb.org_id)
     if (!isOwnerOrAdmin && subtasks && subtasks.length > 0) {
       const incomplete = subtasks.filter((s: any) => s.status !== 'completed')
       if (incomplete.length > 0) {
@@ -83,7 +83,7 @@ export async function POST(
 
       const requiredCount = Math.max(1, masterTask?.attachment_count ?? 1)
       const { data: attachments } = await supabase
-        .from('task_attachments').select('id').eq('task_id', id)
+        .from('task_attachments').select('id').eq('task_id', id).eq('org_id', mb.org_id)
       const actualCount = attachments?.length ?? 0
 
       if (actualCount < requiredCount) {
@@ -149,7 +149,7 @@ export async function POST(
     // Block approving a parent task if subtasks are still incomplete
     // Owner/admin bypass: they can force-approve regardless of subtask state
     const { data: subtasksForApprove } = await supabase
-      .from('tasks').select('id, status').eq('parent_task_id', id)
+      .from('tasks').select('id, status').eq('parent_task_id', id).eq('org_id', mb.org_id)
     if (!isOwnerOrAdmin && subtasksForApprove && subtasksForApprove.length > 0) {
       const incomplete = subtasksForApprove.filter((s: any) => s.status !== 'completed')
       if (incomplete.length > 0) {

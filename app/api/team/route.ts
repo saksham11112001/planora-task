@@ -65,6 +65,16 @@ export async function POST(request: NextRequest) {
     if (existing?.is_active)
       return NextResponse.json({ error: 'User is already a member' }, { status: 409 })
 
+    // Deactivate any active memberships in OTHER orgs before activating in this one.
+    // A user must belong to exactly one active org at a time — having multiple active rows
+    // causes .single()/.maybeSingle() lookups to fail or return the wrong org, which is
+    // the root cause of cross-org data leakage.
+    await admin.from('org_members')
+      .update({ is_active: false })
+      .eq('user_id', existingUser.id)
+      .neq('org_id', mb.org_id)
+      .eq('is_active', true)
+
     if (existing) {
       await admin.from('org_members').update({ is_active: true, role }).eq('id', existing.id)
     } else {
