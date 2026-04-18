@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
     .eq('org_id', mb.org_id)
     .eq('title', old_name.trim())
     .not('status', 'eq', 'completed')
-    .not('is_archived', 'eq', true)
+    .or('is_archived.is.null,is_archived.eq.false')
     .is('parent_task_id', null)
     .contains('custom_fields', { _ca_compliance: true })
 

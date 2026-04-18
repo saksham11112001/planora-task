@@ -1551,10 +1551,24 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
   }
 
   async function handleSaveRow(id: string) {
-    const patch = pendingChanges[id]
-    if (!patch) return
-    const prev = tasks.find(t => t.id === id)
+    let patch = { ...(pendingChanges[id] ?? {}) }
     const original = originalValuesRef.current[id]
+
+    // Re-compute attachment_headers from current template selections so that
+    // template ITEM edits (which don't change selection IDs) also trigger
+    // the propagation modal.
+    const selectedIds = taskSel[id] ?? []
+    if (selectedIds.length > 0) {
+      const recomputed = mergeTemplateItems(selectedIds, attTemplates)
+      const oldH = original?.attachment_headers ?? []
+      if (JSON.stringify(recomputed) !== JSON.stringify(oldH)) {
+        patch = { ...patch, attachment_headers: recomputed, attachment_count: recomputed.length }
+        setTasks(ts => ts.map(t => t.id === id ? { ...t, attachment_headers: recomputed, attachment_count: recomputed.length } : t))
+      }
+    }
+
+    if (Object.keys(patch).length === 0) return
+    const prev = tasks.find(t => t.id === id)
     try {
       const res = await fetch(`/api/ca/master/${id}`, {
         method: 'PATCH',
