@@ -136,6 +136,19 @@ export function RecurringView({
   function handleTaskUpdated(fields?: Record<string, unknown>) {
     const taskId = panelTaskIdRef.current  // stable even after panel closes
     if (fields && taskId) {
+      // Reassigned away from me → remove from Repeat Tasks immediately
+      if ('assignee_id' in fields && fields.assignee_id !== currentUserId) {
+        const currentTask = localTasks.find(t => t.id === taskId)
+        const newApprover = 'approver_id' in fields ? fields.approver_id : currentTask?.approver_id
+        const stillRelevant = newApprover === currentUserId
+        if (!stillRelevant) {
+          setLocalTasks(prev => prev.filter(t => t.id !== taskId))
+          setSelectedTask(null)
+          panelHasUpdates.current = false
+          startT(() => router.refresh())
+          return
+        }
+      }
       const enriched: Record<string, unknown> = { ...fields }
       if ('assignee_id' in fields) {
         const m = members.find(mb => mb.id === fields.assignee_id)

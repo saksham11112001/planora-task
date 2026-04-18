@@ -27,11 +27,9 @@ export default async function MyTasksPage() {
       .eq('org_id', mb.org_id).neq('is_archived', true)
       .order('due_date', { ascending: true, nullsFirst: false })
 
-    // ── Scope: all roles see only tasks they are assignee OR approver of.
-    //    Owner/admin (or flag-granted) see every task in the org.
-    const scopedBase = canViewAll
-      ? base
-      : base.or(`assignee_id.eq.${user.id},approver_id.eq.${user.id}`)
+    // ── "My Tasks" always scoped to the current user regardless of role.
+    //    Owner/admin see all org tasks in Reports; here "My" means assigned to me.
+    const scopedBase = base.or(`assignee_id.eq.${user.id},approver_id.eq.${user.id}`)
 
     const [
       { data: tasks },

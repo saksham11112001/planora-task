@@ -32,10 +32,8 @@ export default async function InboxPage() {
           .eq('org_id', mb.org_id).is('project_id', null).is('parent_task_id', null)
           .neq('is_archived', true).or('is_recurring.is.null,is_recurring.eq.false')
           .order('created_at', { ascending: false })
-        return (canViewAll
-          ? q
-          : q.or(`assignee_id.eq.${user.id},approver_id.eq.${user.id}`)
-        ).limit(500)
+        // "Quick Tasks" always scoped to current user — "My" means assigned to me.
+        return q.or(`assignee_id.eq.${user.id},approver_id.eq.${user.id}`).limit(500)
       })(),
 
       // Members

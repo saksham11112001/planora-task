@@ -66,6 +66,19 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
   function handleTaskUpdated(fields?: Record<string, unknown>) {
     const taskId = panelTaskIdRef.current  // stable even after panel closes
     if (fields && taskId) {
+      // Reassigned away from me → remove from Quick Tasks immediately
+      if ('assignee_id' in fields && fields.assignee_id !== currentUserId) {
+        const currentTask = localTasks.find(t => t.id === taskId)
+        const newApprover = 'approver_id' in fields ? fields.approver_id : currentTask?.approver_id
+        const stillRelevant = newApprover === currentUserId
+        if (!stillRelevant) {
+          setLocalTasks(prev => prev.filter(t => t.id !== taskId))
+          setSelectedTask(null)
+          panelHasUpdates.current = false
+          startT(() => router.refresh())
+          return
+        }
+      }
       // Enrich assignee_id with the full { id, name } object so list rows
       // update the avatar/name immediately without waiting for router.refresh()
       const enriched: Record<string, unknown> = { ...fields }

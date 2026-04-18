@@ -223,6 +223,21 @@ export function MyTasksView({
   function handleTaskUpdated(fields?: Record<string, unknown>) {
     const taskId = panelTaskIdRef.current  // stable even after panel closes
     if (fields && taskId) {
+      // If the assignee was changed to someone else and we are not the approver either,
+      // the task no longer belongs in "My Tasks" — remove it immediately and close the panel.
+      if ('assignee_id' in fields && fields.assignee_id !== currentUserId) {
+        const currentTask = tasks.find(t => t.id === taskId)
+        const newApprover = 'approver_id' in fields ? fields.approver_id : currentTask?.approver_id
+        const stillRelevant = newApprover === currentUserId
+        if (!stillRelevant) {
+          setTasks(prev => prev.filter(t => t.id !== taskId))
+          setPendingTasks(prev => prev.filter(t => t.id !== taskId))
+          setSelTask(null)
+          panelHasUpdates.current = false
+          refresh()
+          return
+        }
+      }
       const enriched: Record<string, unknown> = { ...fields }
       if ('assignee_id' in fields) {
         const m = members.find(mb => mb.id === fields.assignee_id)
