@@ -23,7 +23,8 @@
       "Bash(sed -n '57,59p' /c/Users/saksh/Desktop/planora-task/app/api/tasks/\\\\[id\\\\]/approve/route.ts)",
       "Bash(sed -n '85,87p' /c/Users/saksh/Desktop/planora-task/app/api/tasks/\\\\[id\\\\]/approve/route.ts)",
       "Bash(sed -n '151,153p' /c/Users/saksh/Desktop/planora-task/app/api/tasks/\\\\[id\\\\]/approve/route.ts)",
-      "Bash(grep -n \"eq\\('parent_task_id'\" app/\\\\\\(app\\\\\\)/**/*.tsx)"
+      "Bash(grep -n \"eq\\('parent_task_id'\" app/\\\\\\(app\\\\\\)/**/*.tsx)",
+      "Bash(node -e ':*)"
     ]
   }
 }

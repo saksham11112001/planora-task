@@ -7,6 +7,7 @@ import { CAClientSetupView } from './CAClientSetupView'
 import { CATasksView } from './CATasksView'
 import { CADSCTrackerView } from './CADSCTrackerView'
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
+import { toast } from '@/store/appStore'
 import type { Task } from '@/types'
 
 interface Props { userRole: string; currentUserId: string }
@@ -101,6 +102,38 @@ function CAKanbanView({ userRole, currentUserId }: { userRole: string; currentUs
   const [selTask,       setSelTask]       = useState<Task | null>(null)
   const [selUpcoming,   setSelUpcoming]   = useState<KanbanTask | null>(null)
   const pausedDatesRef = useRef<Record<string, string | null>>({})
+
+  // Propagate assignee/approver changes to all pending/todo instances
+  const [propagateModal, setPropagateModal] = useState<{
+    taskTitle: string
+    clientId: string
+    clientName: string
+    fields: { assignee_id?: string | null; approver_id?: string | null }
+  } | null>(null)
+  const [propagating, setPropagating] = useState(false)
+
+  async function handlePropagate() {
+    if (!propagateModal) return
+    setPropagating(true)
+    try {
+      const res = await fetch('/api/ca/propagate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          old_name:  propagateModal.taskTitle,
+          client_id: propagateModal.clientId,
+          fields:    propagateModal.fields,
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) toast.error(json.error ?? 'Failed to propagate changes')
+      else toast.success(`Updated ${json.updated ?? 0} pending task${(json.updated ?? 0) !== 1 ? 's' : ''}`)
+    } catch {
+      toast.error('Failed to propagate changes')
+    }
+    setPropagating(false)
+    setPropagateModal(null)
+  }
 
   const loadClientTasks = useCallback(async (clientId: string) => {
     setClientLoading(p => ({ ...p, [clientId]: true }))
@@ -260,8 +293,110 @@ function CAKanbanView({ userRole, currentUserId }: { userRole: string; currentUs
         currentUserId={currentUserId}
         userRole={userRole}
         onClose={() => setSelTask(null)}
-        onUpdated={() => { setSelTask(null); clients.forEach(c => loadClientTasks(c.id)) }}
+        onUpdated={(fields) => {
+          if (fields) {
+            // Keep panel open — update selTask optimistically so fields reflect immediately
+            setSelTask(prev => prev ? { ...prev, ...fields } as Task : null)
+
+            // Offer to propagate assignee / approver changes to all pending instances
+            const taskClientId = (selTask as any)?.client_id ?? null
+            if (taskClientId) {
+              const assigneeChanged = 'assignee_id' in fields && fields.assignee_id !== (selTask as any)?.assignee_id
+              const approverChanged = 'approver_id' in fields && (fields.approver_id as any) !== (selTask as any)?.approver_id
+              if (assigneeChanged || approverChanged) {
+                const propFields: { assignee_id?: string | null; approver_id?: string | null } = {}
+                if (assigneeChanged) propFields.assignee_id = fields.assignee_id as string | null
+                if (approverChanged) propFields.approver_id = fields.approver_id as string | null
+                setPropagateModal({
+                  taskTitle:  selTask?.title ?? '',
+                  clientId:   taskClientId,
+                  clientName: clients.find(c => c.id === taskClientId)?.name ?? 'this client',
+                  fields:     propFields,
+                })
+              }
+            }
+          }
+          // Reload cards in the background
+          clients.forEach(c => loadClientTasks(c.id))
+        }}
       />
+
+      {/* ── Propagation modal ── */}
+      {propagateModal && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 1200,
+          background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}
+          onClick={() => !propagating && setPropagateModal(null)}>
+          <div onClick={e => e.stopPropagation()}
+            style={{
+              background: 'var(--surface)', borderRadius: 14,
+              boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
+              padding: '28px 28px 22px', maxWidth: 440, width: '90%',
+              border: '1px solid var(--border)',
+            }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 16 }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+                background: 'rgba(13,148,136,0.12)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0d9488" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                  <circle cx="9" cy="7" r="4"/>
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
+              </div>
+              <div>
+                <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 4px' }}>
+                  Update pending tasks?
+                </p>
+                <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>
+                  {propagateModal.fields.assignee_id !== undefined && propagateModal.fields.approver_id !== undefined
+                    ? 'The assignee and approver were changed.'
+                    : propagateModal.fields.assignee_id !== undefined
+                    ? 'The assignee was changed.'
+                    : 'The approver was changed.'}
+                  {' '}Would you like to apply this to all pending &amp; in-progress{' '}
+                  <em>&quot;{propagateModal.taskTitle}&quot;</em> tasks for{' '}
+                  <strong style={{ color: 'var(--text-primary)' }}>{propagateModal.clientName}</strong>?
+                </p>
+              </div>
+            </div>
+            <div style={{ height: 1, background: 'var(--border)', margin: '0 0 18px' }}/>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setPropagateModal(null)}
+                disabled={propagating}
+                style={{
+                  padding: '8px 18px', borderRadius: 8, border: '1px solid var(--border)',
+                  background: 'transparent', color: 'var(--text-secondary)',
+                  fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit',
+                  opacity: propagating ? 0.5 : 1,
+                }}>
+                No, just this task
+              </button>
+              <button
+                onClick={handlePropagate}
+                disabled={propagating}
+                style={{
+                  padding: '8px 18px', borderRadius: 8, border: 'none',
+                  background: '#0d9488', color: '#fff',
+                  fontSize: 13, fontWeight: 600, cursor: propagating ? 'not-allowed' : 'pointer',
+                  fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6,
+                  opacity: propagating ? 0.7 : 1,
+                }}>
+                {propagating && (
+                  <div style={{ width: 12, height: 12, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }}/>
+                )}
+                Yes, update pending tasks
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Upcoming overlay */}
       {selUpcoming && !selTask && (

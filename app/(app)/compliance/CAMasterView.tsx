@@ -55,6 +55,58 @@ type GroupFilter = typeof GROUP_FILTERS[number]
 
 const isAdmin = (role: string) => ['admin', 'owner'].includes(role)
 
+/* ─── Attachment Template types + helpers ─────────────────────── */
+
+interface AttachTemplate {
+  id: string
+  name: string
+  items: string[]
+}
+
+const ATT_TMPL_KEY = 'ca_att_templates'
+const ATT_SEL_KEY  = 'ca_task_tmpl_sel'  // Record<taskId, templateId[]>
+
+const DEFAULT_TEMPLATES: AttachTemplate[] = [
+  { id: 'dflt-1', name: 'Computation',   items: ['Computation Sheet'] },
+  { id: 'dflt-2', name: 'Returns',        items: ['Filed Return', 'Acknowledgement'] },
+  { id: 'dflt-3', name: 'Challans',       items: ['Challan Copy'] },
+  { id: 'dflt-4', name: 'Bank Docs',      items: ['Bank Statement', 'Bank Certificate'] },
+  { id: 'dflt-5', name: 'ROC',            items: ['Form MGT-7', 'Form AOC-4', 'Director Report'] },
+  { id: 'dflt-6', name: 'Balance Sheet',  items: ['Balance Sheet', 'P&L Account', 'Notes to Accounts'] },
+  { id: 'dflt-7', name: 'Income Tax',     items: ['ITR Form', 'Computation', 'Form 26AS'] },
+]
+
+function loadAttTemplates(): AttachTemplate[] {
+  if (typeof window === 'undefined') return DEFAULT_TEMPLATES
+  try {
+    const raw = localStorage.getItem(ATT_TMPL_KEY)
+    if (!raw) return DEFAULT_TEMPLATES
+    return JSON.parse(raw) as AttachTemplate[]
+  } catch { return DEFAULT_TEMPLATES }
+}
+function saveAttTemplates(ts: AttachTemplate[]): void {
+  try { localStorage.setItem(ATT_TMPL_KEY, JSON.stringify(ts)) } catch {}
+}
+function loadTaskSel(): Record<string, string[]> {
+  if (typeof window === 'undefined') return {}
+  try { return JSON.parse(localStorage.getItem(ATT_SEL_KEY) ?? '{}') as Record<string, string[]> } catch { return {} }
+}
+function saveTaskSel(m: Record<string, string[]>): void {
+  try { localStorage.setItem(ATT_SEL_KEY, JSON.stringify(m)) } catch {}
+}
+function mergeTemplateItems(templateIds: string[], templates: AttachTemplate[]): string[] {
+  const seen = new Set<string>()
+  const result: string[] = []
+  for (const id of templateIds) {
+    const t = templates.find(t => t.id === id)
+    if (!t) continue
+    for (const item of t.items) {
+      if (!seen.has(item)) { seen.add(item); result.push(item) }
+    }
+  }
+  return result
+}
+
 /* ─── Quick-fill helper ───────────────────────────────────────── */
 
 function parseYears(fy: string): [number, number] {
@@ -309,6 +361,164 @@ function AttachHeadersCell({
           </div>
         </div>
       )}
+    </td>
+  )
+}
+
+/** Per-task template selector — multi-check dropdown with per-template preview */
+function TemplateSelectCell({
+  templates,
+  selectedIds,
+  editable,
+  onSelect,
+}: {
+  templates: AttachTemplate[]
+  selectedIds: string[]
+  editable: boolean
+  onSelect: (ids: string[]) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [previewId, setPreviewId] = useState<string | null>(null)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false); setPreviewId(null)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  const selectedTemplates = selectedIds
+    .map(id => templates.find(t => t.id === id))
+    .filter((t): t is AttachTemplate => Boolean(t))
+
+  return (
+    <td style={{ padding: '4px 6px', verticalAlign: 'middle', position: 'relative', minWidth: 150 }}>
+      <div ref={ref}>
+        {/* Trigger */}
+        <div
+          onClick={() => editable && setOpen(o => !o)}
+          style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', cursor: editable ? 'pointer' : 'default' }}
+        >
+          {selectedTemplates.length > 0 ? (
+            <>
+              {selectedTemplates.map(t => (
+                <span key={t.id} style={{
+                  fontSize: 10, padding: '1px 6px', borderRadius: 10,
+                  background: 'rgba(13,148,136,0.12)', color: '#0d9488',
+                  border: '1px solid rgba(13,148,136,0.3)', fontWeight: 600, whiteSpace: 'nowrap',
+                }}>{t.name}</span>
+              ))}
+              {editable && <ChevronDown size={9} style={{ color: 'var(--text-muted)', flexShrink: 0 }}/>}
+            </>
+          ) : editable ? (
+            <span style={{
+              fontSize: 11, color: 'var(--brand)', display: 'flex', alignItems: 'center', gap: 3,
+              padding: '2px 7px', borderRadius: 6,
+              border: '1px dashed rgba(13,148,136,0.4)', background: 'rgba(13,148,136,0.04)',
+            }}>
+              <Plus size={9}/> Templates
+            </span>
+          ) : (
+            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>—</span>
+          )}
+        </div>
+
+        {/* Dropdown */}
+        {open && editable && (
+          <div style={{
+            position: 'absolute', top: '100%', left: 0, zIndex: 100,
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+            minWidth: 250, padding: 8, marginTop: 4,
+          }}>
+            {templates.length === 0 ? (
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '10px 8px', textAlign: 'center' }}>
+                No templates yet.<br/>
+                <span style={{ fontSize: 11 }}>Use "Manage Templates" in the toolbar to create some.</span>
+              </div>
+            ) : templates.map(tpl => {
+              const checked = selectedIds.includes(tpl.id)
+              const isPrev = previewId === tpl.id
+              return (
+                <div key={tpl.id}>
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    padding: '7px 8px', borderRadius: 7,
+                    background: checked ? 'rgba(13,148,136,0.08)' : 'transparent',
+                    cursor: 'pointer',
+                  }}
+                    onClick={() => {
+                      const next = checked ? selectedIds.filter(id => id !== tpl.id) : [...selectedIds, tpl.id]
+                      onSelect(next)
+                    }}
+                  >
+                    <input
+                      type="checkbox" checked={checked}
+                      onChange={() => {}}
+                      onClick={e => e.stopPropagation()}
+                      style={{ width: 13, height: 13, accentColor: '#0d9488', cursor: 'pointer', flexShrink: 0 }}
+                    />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: checked ? '#0d9488' : 'var(--text-primary)' }}>{tpl.name}</div>
+                      <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{tpl.items.length} attachment{tpl.items.length !== 1 ? 's' : ''}</div>
+                    </div>
+                    <button
+                      onClick={e => { e.stopPropagation(); setPreviewId(isPrev ? null : tpl.id) }}
+                      title="Preview attachments"
+                      style={{
+                        background: isPrev ? 'rgba(13,148,136,0.12)' : 'none',
+                        border: 'none', cursor: 'pointer', padding: '2px 5px',
+                        borderRadius: 4, fontSize: 11,
+                        color: isPrev ? '#0d9488' : 'var(--text-muted)',
+                        flexShrink: 0, fontFamily: 'inherit',
+                      }}
+                    >👁</button>
+                  </div>
+                  {isPrev && (
+                    <div style={{
+                      margin: '2px 8px 6px 28px', padding: '8px 10px',
+                      background: 'var(--surface-subtle)', borderRadius: 6,
+                      border: '1px solid var(--border)',
+                    }}>
+                      {tpl.items.length === 0 ? (
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>No attachments defined</span>
+                      ) : tpl.items.map((item, i) => (
+                        <div key={i} style={{ fontSize: 11, color: 'var(--text-secondary)', padding: '1px 0', display: 'flex', gap: 6 }}>
+                          <span style={{ color: 'var(--text-muted)', fontSize: 10, minWidth: 14, textAlign: 'right' }}>{i + 1}.</span>
+                          <span>{item}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+            {/* Summary of merged result */}
+            {selectedTemplates.length > 0 && (
+              <div style={{
+                marginTop: 8, padding: '8px 10px',
+                background: 'rgba(13,148,136,0.06)', borderRadius: 8,
+                border: '1px solid rgba(13,148,136,0.2)',
+              }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#0d9488', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Merged result — {mergeTemplateItems(selectedIds, templates).length} attachments
+                </div>
+                {mergeTemplateItems(selectedIds, templates).map((item, i) => (
+                  <div key={i} style={{ fontSize: 10, color: 'var(--text-secondary)', padding: '1px 0', display: 'flex', gap: 5 }}>
+                    <span style={{ color: 'var(--text-muted)', minWidth: 12, textAlign: 'right' }}>{i + 1}.</span>
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </td>
   )
 }
@@ -623,6 +833,216 @@ function AddTaskModal({
   )
 }
 
+/* ─── Template Manager Modal ──────────────────────────────── */
+
+function TemplateManageModal({
+  templates,
+  onClose,
+  onChange,
+}: {
+  templates: AttachTemplate[]
+  onClose: () => void
+  onChange: (templates: AttachTemplate[]) => void
+}) {
+  const [local, setLocal] = useState<AttachTemplate[]>(
+    templates.map(t => ({ ...t, items: [...t.items] }))
+  )
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editName,  setEditName]  = useState('')
+  const [editItems, setEditItems] = useState('')
+  const [newName,   setNewName]   = useState('')
+  const [newItems,  setNewItems]  = useState('')
+
+  function startEdit(t: AttachTemplate) {
+    setEditingId(t.id)
+    setEditName(t.name)
+    setEditItems(t.items.join('\n'))
+  }
+
+  function commitEdit(id: string) {
+    const items = editItems.split('\n').map(s => s.trim()).filter(Boolean)
+    setLocal(prev => prev.map(t => t.id === id ? { ...t, name: editName.trim() || t.name, items } : t))
+    setEditingId(null)
+  }
+
+  function addNew() {
+    if (!newName.trim()) { return }
+    const items = newItems.split('\n').map(s => s.trim()).filter(Boolean)
+    const t: AttachTemplate = { id: `tmpl-${Date.now()}`, name: newName.trim(), items }
+    setLocal(prev => [...prev, t])
+    setNewName('')
+    setNewItems('')
+  }
+
+  function del(id: string) {
+    setLocal(prev => prev.filter(t => t.id !== id))
+    if (editingId === id) setEditingId(null)
+  }
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 300,
+      background: 'rgba(0,0,0,0.5)', display: 'flex',
+      alignItems: 'center', justifyContent: 'center', padding: 16,
+    }}
+      onClick={e => { if (e.target === e.currentTarget) { onChange(local); onClose() } }}
+    >
+      <div style={{
+        background: 'var(--surface)', borderRadius: 16,
+        width: '100%', maxWidth: 540,
+        maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column',
+        boxShadow: '0 24px 64px rgba(0,0,0,0.25)',
+        border: '1px solid var(--border)',
+      }}>
+        {/* Header */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '18px 22px', borderBottom: '1px solid var(--border)', flexShrink: 0,
+        }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>
+              Attachment Templates
+            </h3>
+            <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>
+              Define reusable attachment sets. Select multiple templates per task to merge them.
+            </p>
+          </div>
+          <button onClick={() => { onChange(local); onClose() }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4 }}>
+            <X size={18}/>
+          </button>
+        </div>
+
+        {/* Template list */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '14px 22px' }}>
+          {local.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-muted)', fontSize: 13 }}>
+              No templates yet. Create one below.
+            </div>
+          )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {local.map(t => (
+              <div key={t.id} style={{
+                border: '1px solid var(--border)', borderRadius: 10,
+                overflow: 'hidden',
+              }}>
+                {editingId === t.id ? (
+                  <div style={{ padding: '12px 14px', background: 'var(--surface-subtle)' }}>
+                    <div style={{ marginBottom: 8 }}>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
+                        Template name
+                      </label>
+                      <input
+                        value={editName}
+                        onChange={e => setEditName(e.target.value)}
+                        autoFocus
+                        style={{ width: '100%', fontSize: 13, padding: '6px 10px', border: '1px solid var(--border)', borderRadius: 7, background: 'var(--surface)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
+                      />
+                    </div>
+                    <div style={{ marginBottom: 10 }}>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
+                        Attachments (one per line)
+                      </label>
+                      <textarea
+                        value={editItems}
+                        onChange={e => setEditItems(e.target.value)}
+                        rows={4}
+                        placeholder="Computation Sheet&#10;Filed Return&#10;Acknowledgement"
+                        style={{ width: '100%', fontSize: 12, padding: '7px 10px', border: '1px solid var(--border)', borderRadius: 7, background: 'var(--surface)', color: 'var(--text-primary)', outline: 'none', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                      <button onClick={() => setEditingId(null)} style={btnGhost}>Cancel</button>
+                      <button onClick={() => commitEdit(t.id)} style={btnPrimary}>Save</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>{t.name}</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                        {t.items.length === 0 ? (
+                          <span style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic' }}>No attachments defined</span>
+                        ) : t.items.map((item, i) => (
+                          <span key={i} style={{
+                            fontSize: 11, padding: '1px 7px', borderRadius: 6,
+                            background: 'var(--surface-subtle)', border: '1px solid var(--border-light)',
+                            color: 'var(--text-secondary)',
+                          }}>{item}</span>
+                        ))}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                      <button onClick={() => startEdit(t)} title="Edit"
+                        style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', padding: '4px 8px', color: 'var(--text-secondary)', fontSize: 11, fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 3 }}>
+                        <Pencil size={11}/> Edit
+                      </button>
+                      <button onClick={() => del(t.id)} title="Delete"
+                        style={{ background: 'none', border: '1px solid #fecaca', borderRadius: 6, cursor: 'pointer', padding: '4px 8px', color: '#dc2626', fontSize: 11, fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 3 }}>
+                        <Trash2 size={11}/>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Add new template */}
+          <div style={{ marginTop: 16, padding: '14px 16px', border: '1.5px dashed var(--border)', borderRadius: 10 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 10 }}>
+              + New template
+            </div>
+            <div style={{ marginBottom: 8 }}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
+                Template name *
+              </label>
+              <input
+                value={newName}
+                onChange={e => setNewName(e.target.value)}
+                placeholder="e.g. ROC Filing"
+                onKeyDown={e => { if (e.key === 'Enter' && newName.trim()) addNew() }}
+                style={{ width: '100%', fontSize: 13, padding: '6px 10px', border: '1px solid var(--border)', borderRadius: 7, background: 'var(--surface-alt)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
+              />
+            </div>
+            <div style={{ marginBottom: 10 }}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
+                Attachments (one per line)
+              </label>
+              <textarea
+                value={newItems}
+                onChange={e => setNewItems(e.target.value)}
+                rows={3}
+                placeholder="Form MGT-7&#10;Form AOC-4&#10;Director Report"
+                style={{ width: '100%', fontSize: 12, padding: '7px 10px', border: '1px solid var(--border)', borderRadius: 7, background: 'var(--surface-alt)', color: 'var(--text-primary)', outline: 'none', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }}
+              />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                onClick={addNew}
+                disabled={!newName.trim()}
+                style={{ ...btnPrimary, opacity: newName.trim() ? 1 : 0.5, display: 'flex', alignItems: 'center', gap: 6 }}
+              >
+                <Plus size={13}/> Add template
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div style={{
+          padding: '14px 22px', borderTop: '1px solid var(--border)',
+          display: 'flex', justifyContent: 'flex-end', gap: 10, flexShrink: 0,
+        }}>
+          <button onClick={() => { onChange(local); onClose() }} style={{ ...btnPrimary, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Check size={14}/> Save templates
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const labelStyle: React.CSSProperties = {
   display: 'block', fontSize: 12, fontWeight: 600,
   color: 'var(--text-secondary)', marginBottom: 5,
@@ -639,6 +1059,7 @@ const inputStyle: React.CSSProperties = {
 function TaskRow({
   task, editable, fy,
   onUpdate, onDelete, hasPendingChanges, onSave,
+  templates, selectedTemplateIds, onTemplateSelect,
 }: {
   task: CAMasterTask
   editable: boolean
@@ -647,6 +1068,9 @@ function TaskRow({
   onDelete: () => void
   hasPendingChanges: boolean
   onSave: () => Promise<void>
+  templates: AttachTemplate[]
+  selectedTemplateIds: string[]
+  onTemplateSelect: (ids: string[]) => void
 }) {
   const [hovered, setHovered] = useState(false)
   const [nameEditing, setNameEditing] = useState(false)
@@ -730,20 +1154,35 @@ function TaskRow({
         </div>
       </td>
 
-      {/* Attach count */}
-      <NumberCell
-        value={task.attachment_count}
-        min={0} max={10}
+      {/* Template selector */}
+      <TemplateSelectCell
+        templates={templates}
+        selectedIds={selectedTemplateIds}
         editable={editable}
-        onChange={v => onUpdate({ attachment_count: v, attachment_headers: task.attachment_headers.slice(0, v) })}
+        onSelect={ids => {
+          onTemplateSelect(ids)
+          const merged = mergeTemplateItems(ids, templates)
+          onUpdate({ attachment_headers: merged, attachment_count: merged.length })
+        }}
       />
 
-      {/* Attach headers */}
+      {/* Attach count — read-only, computed from selected templates */}
+      <td style={{ padding: '4px 6px', verticalAlign: 'middle', textAlign: 'center' }}>
+        <span style={{
+          fontSize: 13, fontWeight: 600,
+          color: task.attachment_count > 0 ? 'var(--text-primary)' : 'var(--text-muted)',
+          minWidth: 28, display: 'inline-block',
+        }}>
+          {task.attachment_count > 0 ? task.attachment_count : '—'}
+        </span>
+      </td>
+
+      {/* Attach headers — view-only */}
       <AttachHeadersCell
         count={task.attachment_count}
         headers={task.attachment_headers}
-        editable={editable}
-        onSave={h => onUpdate({ attachment_headers: h })}
+        editable={false}
+        onSave={() => {}}
       />
 
       {/* Days before */}
@@ -836,6 +1275,7 @@ function TaskRow({
 function GroupSection({
   groupName, tasks, editable, fy,
   pendingChanges, onUpdate, onDelete, onSaveRow,
+  templates, taskSel, onTemplateSelect,
 }: {
   groupName: string
   tasks: CAMasterTask[]
@@ -845,6 +1285,9 @@ function GroupSection({
   onUpdate: (id: string, patch: Partial<CAMasterTask>) => void
   onDelete: (id: string) => void
   onSaveRow: (id: string) => Promise<void>
+  templates: AttachTemplate[]
+  taskSel: Record<string, string[]>
+  onTemplateSelect: (taskId: string, ids: string[]) => void
 }) {
   const [expanded, setExpanded] = useState(true)
 
@@ -856,7 +1299,7 @@ function GroupSection({
         style={{ cursor: 'pointer', userSelect: 'none' }}
       >
         <td
-          colSpan={5 + 12 + 2}
+          colSpan={6 + 12 + 2}
           style={{
             background: '#1e293b', color: '#fff',
             padding: '8px 14px', fontWeight: 700, fontSize: 13,
@@ -887,6 +1330,9 @@ function GroupSection({
           onDelete={() => onDelete(task.id)}
           hasPendingChanges={!!pendingChanges[task.id]}
           onSave={() => onSaveRow(task.id)}
+          templates={templates}
+          selectedTemplateIds={taskSel[task.id] ?? []}
+          onTemplateSelect={ids => onTemplateSelect(task.id, ids)}
         />
       ))}
     </>
@@ -932,6 +1378,23 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
     }
   } | null>(null)
   const [propagating, setPropagating] = useState(false)
+
+  // Attachment templates
+  const [attTemplates,       setAttTemplates]       = useState<AttachTemplate[]>(() => loadAttTemplates())
+  const [taskSel,            setTaskSel]            = useState<Record<string, string[]>>(() => loadTaskSel())
+  const [showManageTemplates, setShowManageTemplates] = useState(false)
+
+  function handleTemplateChange(templates: AttachTemplate[]) {
+    setAttTemplates(templates)
+    saveAttTemplates(templates)
+  }
+
+  function handleTaskTemplateSelect(taskId: string, ids: string[]) {
+    const next = { ...taskSel, [taskId]: ids }
+    setTaskSel(next)
+    saveTaskSel(next)
+  }
+
   // Track which task IDs have been explicitly saved by the user (persisted per FY)
   const [savedIds, setSavedIds] = useState<Set<string>>(() => {
     try {
@@ -1254,6 +1717,16 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
 
         {canEdit && (
           <button
+            onClick={() => setShowManageTemplates(true)}
+            style={{ ...btnGhost, display: 'flex', alignItems: 'center', gap: 6 }}
+          >
+            <Paperclip size={14}/>
+            Manage Templates
+          </button>
+        )}
+
+        {canEdit && (
+          <button
             onClick={handleTriggerSpawn}
             disabled={triggering}
             title="Create tasks now for all assigned clients whose trigger date has passed"
@@ -1414,6 +1887,7 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
                   <th style={{ ...thStyle, position: 'sticky', left: 0, zIndex: 4, minWidth: 200, textAlign: 'left', background: 'var(--surface-alt)', borderRight: '1px solid var(--border-light)' }}>
                     Task name
                   </th>
+                  <th style={{ ...thStyle, minWidth: 150 }}>Templates</th>
                   <th style={{ ...thStyle, minWidth: 60 }}>Attach#</th>
                   <th style={{ ...thStyle, minWidth: 100 }} title="Attachment headers">
                     <Paperclip size={12} />
@@ -1442,6 +1916,9 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
                     onUpdate={handleUpdate}
                     onDelete={requestDelete}
                     onSaveRow={handleSaveRow}
+                    templates={attTemplates}
+                    taskSel={taskSel}
+                    onTemplateSelect={handleTaskTemplateSelect}
                   />
                 ))}
               </tbody>
@@ -1482,6 +1959,15 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── Attachment Templates Manager ── */}
+      {showManageTemplates && (
+        <TemplateManageModal
+          templates={attTemplates}
+          onClose={() => setShowManageTemplates(false)}
+          onChange={handleTemplateChange}
+        />
       )}
 
       {/* ── Add task modal ── */}

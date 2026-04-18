@@ -48,7 +48,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid website URL (must start with http:// or https://)' }, { status: 400 })
     }
   }
-  const cf = (body.custom_fields && typeof body.custom_fields === 'object') ? body.custom_fields : null
   const { data, error } = await supabase.from('clients').insert({
     org_id:        mb.org_id,
     name:          body.name.trim().slice(0, 200),
@@ -60,7 +59,6 @@ export async function POST(request: NextRequest) {
     notes:         body.notes                  || null,
     status:        body.status                 || 'active',
     color:         body.color                  || '#0d9488',
-    custom_fields: cf,
     created_by:    user.id,
   }).select('*').single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
