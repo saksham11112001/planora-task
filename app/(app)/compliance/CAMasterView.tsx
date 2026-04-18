@@ -6,6 +6,7 @@ import {
 import {
   ChevronDown, ChevronRight, Plus, Trash2, Pencil, Check, X,
   RefreshCw, Calendar, Paperclip, AlertCircle, Save, Search,
+  UploadCloud, Download, FileText,
 } from 'lucide-react'
 import { MONTH_KEYS, MONTH_LABELS, CA_GROUP_NAMES } from '@/lib/data/caDefaultTasks'
 import type { MonthKey } from '@/lib/data/caDefaultTasks'
@@ -911,6 +912,16 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
   const [savingAll, setSavingAll] = useState(false)
   // Tracks server-confirmed task values (before any pending edits)
   const originalValuesRef = useRef<Record<string, CAMasterTask>>({})
+  // CSV import state
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [importFy,        setImportFy]        = useState<string>('2026-27')
+  const [importFile,      setImportFile]      = useState<File | null>(null)
+  const [importing,       setImporting]       = useState(false)
+  const [importResult,    setImportResult]    = useState<{
+    imported: number; skipped: number; errors: string[]
+  } | null>(null)
+  const importFileRef = useRef<HTMLInputElement>(null)
+
   // Propagation modal state
   const [propagateModal, setPropagateModal] = useState<{
     old_name: string
@@ -1002,6 +1013,63 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
       toast.error(err instanceof Error ? err.message : 'Error loading defaults')
     } finally {
       setLoadingDefaults(false)
+    }
+  }
+
+  /* ── CSV template download (client-side blob) ── */
+  function downloadTemplate() {
+    const HEADERS = [
+      'code','name','group_name','task_type','priority','days_before_due','attachment_count',
+      'due_apr','due_may','due_jun','due_jul','due_aug','due_sep',
+      'due_oct','due_nov','due_dec','due_jan','due_feb','due_mar',
+      'attachment_1','attachment_2','attachment_3','attachment_4','attachment_5',
+      'attachment_6','attachment_7','attachment_8','attachment_9','attachment_10',
+    ]
+    const EXAMPLES = [
+      ['GST-001','GSTR 1 (Monthly)','GST','Monthly','medium','7','2',
+       '2026-05-11','2026-06-11','2026-07-11','2026-08-11','2026-09-11','2026-10-11',
+       '2026-11-11','2026-12-11','2027-01-11','2027-02-11','2027-03-11','',
+       'Computation','Return','','','','','','','',''],
+      ['TDS-001','TDS Return Q1','TDS / TCS','Quarterly','medium','14','3',
+       '','','','2026-07-31','','','','2026-10-31','','2027-01-31','','2027-05-31',
+       'Computation','Challan','Return','','','','','','',''],
+      ['IT-001','Advance Tax - Q1','Income Tax','Quarterly','high','7','1',
+       '','','2026-06-15','','','','','','','','','',
+       'Challan','','','','','','','','',''],
+    ]
+    const csv = [HEADERS, ...EXAMPLES].map(r => r.map(v => v.includes(',') ? `"${v}"` : v).join(',')).join('\r\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = 'ca-master-template.csv'
+    a.click()
+    URL.revokeObjectURL(a.href)
+  }
+
+  /* ── CSV import ── */
+  async function handleImportCSV() {
+    if (!importFile) { toast.error('Select a CSV file first'); return }
+    setImporting(true)
+    setImportResult(null)
+    try {
+      const fd = new FormData()
+      fd.append('csv', importFile)
+      fd.append('financial_year', importFy)
+      const res  = await fetch('/api/ca/import-csv', { method: 'POST', body: fd })
+      const json = await res.json() as { imported?: number; skipped?: number; errors?: string[]; error?: string }
+      if (!res.ok) {
+        toast.error(json.error ?? 'Import failed')
+        setImportResult({ imported: 0, skipped: 0, errors: json.errors ?? [json.error ?? 'Unknown error'] })
+        return
+      }
+      setImportResult({ imported: json.imported ?? 0, skipped: json.skipped ?? 0, errors: json.errors ?? [] })
+      toast.success(`Imported ${json.imported} task${json.imported === 1 ? '' : 's'} ✓`)
+      // Reload the task list if we imported for the currently viewed FY
+      if (importFy === fy) await fetchTasks(fy)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Import failed')
+    } finally {
+      setImporting(false)
     }
   }
 
@@ -1171,6 +1239,16 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
           >
             <RefreshCw size={14} style={{ animation: loadingDefaults ? 'spin 1s linear infinite' : 'none' }} />
             {loadingDefaults ? 'Loading…' : 'Load defaults'}
+          </button>
+        )}
+
+        {canEdit && (
+          <button
+            onClick={() => { setImportResult(null); setImportFile(null); setImportFy(fy); setShowImportModal(true) }}
+            style={{ ...btnGhost, display: 'flex', alignItems: 'center', gap: 6 }}
+          >
+            <UploadCloud size={14} />
+            Import CSV
           </button>
         )}
 
@@ -1422,6 +1500,144 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       `}</style>
+
+      {/* ── CSV Import modal ── */}
+      {showImportModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1100, background: 'rgba(0,0,0,0.45)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+          onClick={() => !importing && setShowImportModal(false)}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: 'var(--surface)', borderRadius: 14, padding: 28,
+            width: '100%', maxWidth: 520, boxShadow: '0 20px 60px rgba(0,0,0,0.18)',
+          }}>
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--brand-light, #f0fdf4)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <UploadCloud size={18} style={{ color: 'var(--brand, #0d9488)' }} />
+                </div>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--text-primary)' }}>Import CA Master from CSV</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 1 }}>Upserts tasks — existing codes are updated, new ones are created</div>
+                </div>
+              </div>
+              <button onClick={() => setShowImportModal(false)} disabled={importing}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4 }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Download template */}
+            <div style={{ background: 'var(--surface-subtle)', border: '1px solid var(--border)',
+              borderRadius: 10, padding: '12px 16px', marginBottom: 18,
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <FileText size={15} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>Download the template first</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Fill it in and upload below</div>
+                </div>
+              </div>
+              <button onClick={downloadTemplate}
+                style={{ ...btnGhost, display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0, fontSize: 12 }}>
+                <Download size={13} /> Template
+              </button>
+            </div>
+
+            {/* Financial year selector */}
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 5 }}>
+                Financial Year
+              </label>
+              <select value={importFy} onChange={e => setImportFy(e.target.value)}
+                style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)',
+                  background: 'var(--surface)', color: 'var(--text-primary)', fontSize: 13, outline: 'none' }}>
+                {FY_OPTIONS.map(f => <option key={f} value={f}>FY {f}</option>)}
+              </select>
+            </div>
+
+            {/* File picker */}
+            <div style={{ marginBottom: 18 }}>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 5 }}>
+                CSV File
+              </label>
+              <div
+                onClick={() => importFileRef.current?.click()}
+                style={{
+                  border: `2px dashed ${importFile ? 'var(--brand, #0d9488)' : 'var(--border)'}`,
+                  borderRadius: 10, padding: '18px 16px', cursor: 'pointer', textAlign: 'center',
+                  background: importFile ? 'var(--brand-light, #f0fdf4)' : 'var(--surface-subtle)',
+                  transition: 'all 0.15s',
+                }}>
+                {importFile ? (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                    <FileText size={16} style={{ color: 'var(--brand, #0d9488)' }} />
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--brand, #0d9488)' }}>{importFile.name}</span>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>({(importFile.size / 1024).toFixed(1)} KB)</span>
+                  </div>
+                ) : (
+                  <div>
+                    <UploadCloud size={22} style={{ color: 'var(--text-muted)', margin: '0 auto 6px' }} />
+                    <div style={{ fontSize: 13, color: 'var(--text-secondary)', fontWeight: 500 }}>Click to select your CSV file</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>or drag and drop here</div>
+                  </div>
+                )}
+                <input ref={importFileRef} type="file" accept=".csv" style={{ display: 'none' }}
+                  onChange={e => { setImportFile(e.target.files?.[0] ?? null); setImportResult(null) }} />
+              </div>
+            </div>
+
+            {/* Result panel */}
+            {importResult && (
+              <div style={{
+                borderRadius: 10, padding: '12px 14px', marginBottom: 16,
+                background: importResult.errors.length && importResult.imported === 0 ? '#fef2f2' : '#f0fdf4',
+                border: `1px solid ${importResult.errors.length && importResult.imported === 0 ? '#fecaca' : '#bbf7d0'}`,
+              }}>
+                {importResult.imported > 0 && (
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#15803d', marginBottom: importResult.errors.length ? 6 : 0 }}>
+                    ✓ {importResult.imported} task{importResult.imported !== 1 ? 's' : ''} imported
+                    {importResult.skipped > 0 && `, ${importResult.skipped} row${importResult.skipped !== 1 ? 's' : ''} skipped`}
+                  </div>
+                )}
+                {importResult.errors.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#dc2626', marginBottom: 4 }}>
+                      {importResult.errors.length} row{importResult.errors.length !== 1 ? 's' : ''} had errors:
+                    </div>
+                    <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12, color: '#dc2626' }}>
+                      {importResult.errors.slice(0, 8).map((e, i) => <li key={i}>{e}</li>)}
+                      {importResult.errors.length > 8 && <li>…and {importResult.errors.length - 8} more</li>}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button onClick={() => setShowImportModal(false)} disabled={importing} style={btnGhost}>
+                {importResult?.imported ? 'Close' : 'Cancel'}
+              </button>
+              <button
+                onClick={handleImportCSV}
+                disabled={!importFile || importing}
+                style={{
+                  ...btnPrimary,
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  opacity: !importFile || importing ? 0.6 : 1,
+                  cursor: !importFile || importing ? 'not-allowed' : 'pointer',
+                }}>
+                {importing
+                  ? <><RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> Importing…</>
+                  : <><UploadCloud size={14} /> Import</>
+                }
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Propagate changes modal ── */}
       {propagateModal && (
