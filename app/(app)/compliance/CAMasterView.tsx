@@ -459,7 +459,12 @@ function TemplateSelectCell({
                   >
                     <input
                       type="checkbox" checked={checked}
-                      onChange={() => {}}
+                      onChange={() => {
+                        const next = checked
+                          ? selectedIds.filter(id => id !== tpl.id)
+                          : [...selectedIds, tpl.id]
+                        onSelect(next)
+                      }}
                       onClick={e => e.stopPropagation()}
                       style={{ width: 13, height: 13, accentColor: '#0d9488', cursor: 'pointer', flexShrink: 0 }}
                     />

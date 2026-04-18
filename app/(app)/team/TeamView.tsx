@@ -1,7 +1,7 @@
 'use client'
 import { useState }   from 'react'
 import { useRouter }  from 'next/navigation'
-import { UserPlus, Mail, Crown, Shield, User, ChevronDown, Check, Plus, X, Send } from 'lucide-react'
+import { UserPlus, Mail, Crown, Shield, User, ChevronDown, Check, Plus, X, Send, Pencil } from 'lucide-react'
 import { cn }         from '@/lib/utils/cn'
 import { toast }      from '@/store/appStore'
 import { fmtDate }    from '@/lib/utils/format'
@@ -23,6 +23,7 @@ interface InviteRow { email: string; role: 'admin'|'manager'|'member'|'viewer' }
 interface Member {
   id: string; name: string; email: string; avatar_url: string | null
   role: string; joined_at: string; tasks_30d: number; done_30d: number; inprog_30d?: number
+  phone_number?: string | null
 }
 
 export function TeamView({ members, canManage, currentUserId }: {
@@ -50,6 +51,12 @@ export function TeamView({ members, canManage, currentUserId }: {
   const [saving,      setSaving]      = useState<string | null>(null)
   const [removingId,  setRemovingId]  = useState<string | null>(null)  // user_id being removed
   const [removeConfirm, setRemoveConfirm] = useState<string | null>(null) // user_id in confirm state
+
+  // Edit member info
+  const [editingMember, setEditingMember] = useState<Member | null>(null)
+  const [editName,      setEditName]      = useState('')
+  const [editPhone,     setEditPhone]     = useState('')
+  const [editSaving,    setEditSaving]    = useState(false)
 
   // ── Single invite ──────────────────────────────────────────────────────
   async function invite(e: React.FormEvent) {
@@ -160,6 +167,32 @@ export function TeamView({ members, canManage, currentUserId }: {
     setRoleEditing(null)
     if (res.ok) { toast.success('Role updated'); router.refresh() }
     else { const d = await res.json(); toast.error(d.error ?? 'Failed to update role') }
+  }
+
+  // ── Edit member info ───────────────────────────────────────────────────
+  function openEditMember(m: Member) {
+    setEditingMember(m)
+    setEditName(m.name)
+    setEditPhone(m.phone_number ?? '')
+  }
+
+  async function saveMemberEdit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!editingMember || !editName.trim()) return
+    setEditSaving(true)
+    const res = await fetch('/api/team', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: editingMember.id, name: editName.trim(), phone_number: editPhone.trim() || null }),
+    })
+    setEditSaving(false)
+    const d = await res.json().catch(() => ({}))
+    if (res.ok) {
+      toast.success('Member info updated')
+      setEditingMember(null)
+      router.refresh()
+    } else {
+      toast.error(d.error ?? 'Failed to update member')
+    }
   }
 
   return (
@@ -444,6 +477,31 @@ export function TeamView({ members, canManage, currentUserId }: {
                   )}
                 </div>
 
+                {/* Edit member info — owner/admin only, not self, not other owners */}
+                {canManage && !isMe && !isOwner && (
+                  <div style={{ marginLeft: 4, flexShrink: 0 }}>
+                    <button
+                      onClick={() => openEditMember(m)}
+                      title="Edit member info"
+                      style={{ width: 28, height: 28, borderRadius: 7, border: '1px solid var(--border)',
+                        background: 'var(--surface-subtle)', cursor: 'pointer', display: 'flex',
+                        alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)',
+                        transition: 'all 0.15s', flexShrink: 0 }}
+                      onMouseEnter={e => {
+                        (e.currentTarget as HTMLElement).style.background = '#eff6ff'
+                        ;(e.currentTarget as HTMLElement).style.borderColor = '#bfdbfe'
+                        ;(e.currentTarget as HTMLElement).style.color = '#2563eb'
+                      }}
+                      onMouseLeave={e => {
+                        (e.currentTarget as HTMLElement).style.background = 'var(--surface-subtle)'
+                        ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'
+                        ;(e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'
+                      }}>
+                      <Pencil style={{ width: 12, height: 12 }} />
+                    </button>
+                  </div>
+                )}
+
                 {/* Remove member button — owners/admins only, not self, not other owners */}
                 {canManage && !isMe && !isOwner && (
                   <div style={{ marginLeft: 8, flexShrink: 0 }}>
@@ -494,6 +552,97 @@ export function TeamView({ members, canManage, currentUserId }: {
             )
           })}
         </div>
+
+        {/* Edit member modal */}
+        {editingMember && (
+          <div style={{
+            position: 'fixed', inset: 0, zIndex: 1000,
+            background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(2px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+            onClick={() => !editSaving && setEditingMember(null)}>
+            <div onClick={e => e.stopPropagation()}
+              style={{
+                background: 'var(--surface)', borderRadius: 14,
+                boxShadow: '0 20px 60px rgba(0,0,0,0.22)',
+                padding: '28px 28px 22px', width: 420, maxWidth: '92vw',
+                border: '1px solid var(--border)',
+              }}>
+              {/* Header */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: ROLE_COLORS[editingMember.role] ?? '#94a3b8',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 14 }}>
+                    {editingMember.name?.[0]?.toUpperCase() ?? '?'}
+                  </div>
+                  <div>
+                    <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Edit member</p>
+                    <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>{editingMember.email}</p>
+                  </div>
+                </div>
+                <button onClick={() => setEditingMember(null)} disabled={editSaving}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4 }}>
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <form onSubmit={saveMemberEdit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {/* Name */}
+                <div>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, textTransform: 'uppercase',
+                    letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: 6 }}>
+                    Full name
+                  </label>
+                  <input
+                    type="text" value={editName} onChange={e => setEditName(e.target.value)}
+                    required autoFocus placeholder="e.g. Ravi Kumar"
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, outline: 'none',
+                      border: '1px solid var(--border)', background: 'var(--surface)',
+                      color: 'var(--text-primary)', boxSizing: 'border-box' }}
+                    onFocus={e => (e.currentTarget.style.borderColor = 'var(--brand)')}
+                    onBlur={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+                  />
+                </div>
+
+                {/* Phone */}
+                <div>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, textTransform: 'uppercase',
+                    letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: 6 }}>
+                    Phone number <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
+                  </label>
+                  <input
+                    type="tel" value={editPhone} onChange={e => setEditPhone(e.target.value)}
+                    placeholder="e.g. +91 98765 43210"
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, outline: 'none',
+                      border: '1px solid var(--border)', background: 'var(--surface)',
+                      color: 'var(--text-primary)', boxSizing: 'border-box' }}
+                    onFocus={e => (e.currentTarget.style.borderColor = 'var(--brand)')}
+                    onBlur={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+                  />
+                </div>
+
+                <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
+
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                  <button type="button" onClick={() => setEditingMember(null)} disabled={editSaving}
+                    style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)',
+                      background: 'transparent', color: 'var(--text-secondary)', fontSize: 13,
+                      fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', opacity: editSaving ? 0.5 : 1 }}>
+                    Cancel
+                  </button>
+                  <button type="submit" disabled={editSaving || !editName.trim()}
+                    style={{ padding: '8px 18px', borderRadius: 8, border: 'none',
+                      background: 'var(--brand)', color: '#fff', fontSize: 13, fontWeight: 600,
+                      cursor: editSaving ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      opacity: editSaving || !editName.trim() ? 0.6 : 1 }}>
+                    {editSaving ? 'Saving…' : 'Save changes'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
         {/* Empty state */}
         {members.length === 0 && (

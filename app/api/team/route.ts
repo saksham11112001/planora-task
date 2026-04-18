@@ -125,6 +125,22 @@ export async function PATCH(request: NextRequest) {
   if (!idToCheck || !UUID_RE.test(idToCheck))
     return NextResponse.json({ error: 'Valid member_id or user_id is required' }, { status: 400 })
 
+  // ── Edit member info (name / phone) ───────────────────────────────────────
+  if (body.name !== undefined || body.phone_number !== undefined) {
+    if (!['owner', 'admin'].includes(mb.role))
+      return NextResponse.json({ error: 'Only owners and admins can edit member info' }, { status: 403 })
+    const { data: targetMember } = await admin.from('org_members')
+      .select('role').eq('org_id', mb.org_id).eq('user_id', user_id).maybeSingle()
+    if (!targetMember)
+      return NextResponse.json({ error: 'Member not found in this organisation' }, { status: 404 })
+    const update: Record<string, any> = { updated_at: new Date().toISOString() }
+    if (body.name?.trim()) update.name = body.name.trim()
+    if (typeof body.phone_number !== 'undefined') update.phone_number = body.phone_number || null
+    const { error: updateErr } = await admin.from('users').update(update).eq('id', user_id)
+    if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 })
+    return NextResponse.json({ success: true })
+  }
+
   const admin = createAdminClient()
 
   // ── Remove member (soft-deactivate) ──────────────────────────────────────
