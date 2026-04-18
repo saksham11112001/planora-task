@@ -15,6 +15,7 @@ interface CATask {
   due_date: string | null
   approval_status: string | null
   assignee_id: string | null
+  approver_id: string | null
   client_id: string | null
   created_by: string | null
   custom_fields?: Record<string, any> | null
@@ -90,6 +91,15 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
     newAssigneeName: string
   } | null>(null)
   const [masterUpdating,  setMasterUpdating]  = useState(false)
+
+  // Propagate assignee/approver changes to existing pending/todo instances
+  const [propInstanceModal, setPropInstanceModal] = useState<{
+    taskTitle: string
+    clientId: string
+    clientName: string
+    fields: { assignee_id?: string | null; approver_id?: string | null }
+  } | null>(null)
+  const [propInstanceUpdating, setPropInstanceUpdating] = useState(false)
   const [bulkAssignId,    setBulkAssignId]    = useState('')   // member id to bulk-assign to
   const [bulkAssigning,   setBulkAssigning]   = useState(false)
   const [filterQuick,     setFilterQuick]     = useState<'overdue' | 'week' | 'pending' | ''>('')  // quick health filter
@@ -121,6 +131,7 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
         due_date:         t.due_date ?? null,
         approval_status:  t.approval_status ?? null,
         assignee_id:      t.assignee_id ?? null,
+        approver_id:      t.approver_id ?? null,
         client_id:        t.client_id ?? null,
         created_by:       t.created_by ?? null,
         custom_fields:    t.custom_fields ?? null,
@@ -268,6 +279,34 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
     await doMasterUpdate(data)
   }
 
+  /* ── Propagate assignee/approver to all pending/todo instances ── */
+  async function handlePropagateInstances() {
+    if (!propInstanceModal) return
+    setPropInstanceUpdating(true)
+    try {
+      const res = await fetch('/api/ca/propagate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          old_name:  propInstanceModal.taskTitle,
+          client_id: propInstanceModal.clientId,
+          fields:    propInstanceModal.fields,
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error(json.error ?? 'Failed to propagate changes')
+      } else {
+        const n = json.updated ?? 0
+        toast.success(`Updated ${n} pending task${n !== 1 ? 's' : ''}`)
+      }
+    } catch {
+      toast.error('Failed to propagate changes')
+    }
+    setPropInstanceUpdating(false)
+    setPropInstanceModal(null)
+  }
+
   /* ── Urgency chip helper ──────────────────────────────────── */
   function urgencyChip(due_date: string | null, status: string): { label: string; bg: string; color: string } | null {
     if (!due_date || status === 'completed' || status === 'cancelled') return null
@@ -328,7 +367,15 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
         onClose={() => setSelTask(null)}
         onUpdated={fields => {
           if (fields && selTask) {
-            // Detect assignee change on a CA task with a client
+            // Enrich nested objects so the list updates immediately
+            const enriched: Record<string, unknown> = { ...fields }
+            if ('assignee_id' in fields) {
+              const m = members.find(mb => mb.id === fields.assignee_id)
+              enriched.assignee = m ? { id: m.id, name: m.name } : null
+            }
+
+            // ── Recurring-assignment prompt (update future tasks) ──
+            // Only offered when the assignee changes on a CA task that has a client
             if (
               canManage &&
               'assignee_id' in fields &&
@@ -354,8 +401,27 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
                 }
               }
             }
-            setTasks(p => p.map(t => t.id === selTask.id ? { ...t, ...fields } as CATask : t))
-            setSelTask(p => p ? { ...p, ...fields } as CATask : null)
+
+            // ── Propagation prompt (update existing pending/todo instances) ──
+            // Offered when assignee OR approver changes on a CA task that has a client
+            if (canManage && selTask.client_id) {
+              const assigneeChanged = 'assignee_id' in fields && fields.assignee_id !== selTask.assignee_id
+              const approverChanged = 'approver_id' in fields && (fields.approver_id as any) !== selTask.approver_id
+              if (assigneeChanged || approverChanged) {
+                const propFields: { assignee_id?: string | null; approver_id?: string | null } = {}
+                if (assigneeChanged) propFields.assignee_id = fields.assignee_id as string | null
+                if (approverChanged) propFields.approver_id = fields.approver_id as string | null
+                setPropInstanceModal({
+                  taskTitle:  selTask.title,
+                  clientId:   selTask.client_id,
+                  clientName: selTask.client?.name ?? 'this client',
+                  fields:     propFields,
+                })
+              }
+            }
+
+            setTasks(p => p.map(t => t.id === selTask.id ? { ...t, ...enriched } as CATask : t))
+            setSelTask(p => p ? { ...p, ...enriched } as CATask : null)
           }
           startT(() => router.refresh())
         }}
@@ -854,6 +920,84 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
                   <div style={{ width: 12, height: 12, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }}/>
                 )}
                 Yes, update assignment
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─────────────── PROPAGATE-TO-INSTANCES MODAL ─────────────── */}
+      {propInstanceModal && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 210,
+          background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}
+          onClick={() => !propInstanceUpdating && setPropInstanceModal(null)}>
+          <div onClick={e => e.stopPropagation()}
+            style={{
+              background: 'var(--surface)', borderRadius: 14,
+              boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
+              padding: '28px 28px 22px', maxWidth: 440, width: '90%',
+              border: '1px solid var(--border)',
+            }}>
+            {/* Icon + heading */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 16 }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+                background: 'rgba(13,148,136,0.12)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0d9488" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                  <circle cx="9" cy="7" r="4"/>
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
+              </div>
+              <div>
+                <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 4px' }}>
+                  Update pending tasks?
+                </p>
+                <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>
+                  {propInstanceModal.fields.assignee_id !== undefined && propInstanceModal.fields.approver_id !== undefined
+                    ? 'The assignee and approver were changed.'
+                    : propInstanceModal.fields.assignee_id !== undefined
+                    ? 'The assignee was changed.'
+                    : 'The approver was changed.'}
+                  {' '}Would you like to apply this to all pending &amp; in-progress{' '}
+                  <em>&quot;{propInstanceModal.taskTitle}&quot;</em> tasks for{' '}
+                  <strong style={{ color: 'var(--text-primary)' }}>{propInstanceModal.clientName}</strong>?
+                </p>
+              </div>
+            </div>
+            <div style={{ height: 1, background: 'var(--border)', margin: '0 0 18px' }}/>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setPropInstanceModal(null)}
+                disabled={propInstanceUpdating}
+                style={{
+                  padding: '8px 18px', borderRadius: 8, border: '1px solid var(--border)',
+                  background: 'transparent', color: 'var(--text-secondary)',
+                  fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit',
+                  opacity: propInstanceUpdating ? 0.5 : 1,
+                }}>
+                No, just this task
+              </button>
+              <button
+                onClick={handlePropagateInstances}
+                disabled={propInstanceUpdating}
+                style={{
+                  padding: '8px 18px', borderRadius: 8, border: 'none',
+                  background: '#0d9488', color: '#fff',
+                  fontSize: 13, fontWeight: 600, cursor: propInstanceUpdating ? 'not-allowed' : 'pointer',
+                  fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6,
+                  opacity: propInstanceUpdating ? 0.7 : 1,
+                }}>
+                {propInstanceUpdating && (
+                  <div style={{ width: 12, height: 12, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }}/>
+                )}
+                Yes, update pending tasks
               </button>
             </div>
           </div>

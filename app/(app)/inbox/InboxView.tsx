@@ -87,6 +87,10 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
         const m = members.find(mb => mb.id === fields.assignee_id)
         enriched.assignee = m ? { id: m.id, name: m.name } : null
       }
+      if ('client_id' in fields) {
+        const c = clients.find(cl => cl.id === fields.client_id)
+        enriched.client = c ? { id: c.id, name: c.name, color: c.color } : null
+      }
       setLocalTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...enriched } as Task : t))
       setSelectedTask(prev => prev ? { ...prev, ...enriched } as Task : null)
       panelHasUpdates.current = true
