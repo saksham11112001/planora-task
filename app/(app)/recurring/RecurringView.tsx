@@ -137,7 +137,8 @@ export function RecurringView({
     const taskId = panelTaskIdRef.current  // stable even after panel closes
     if (fields && taskId) {
       // Reassigned away from me → remove from Repeat Tasks immediately
-      if ('assignee_id' in fields && fields.assignee_id !== currentUserId) {
+      // (only for non-manager users who see only their own tasks)
+      if (!canManage && 'assignee_id' in fields && fields.assignee_id !== currentUserId) {
         const currentTask = localTasks.find(t => t.id === taskId)
         const newApprover = 'approver_id' in fields ? fields.approver_id : currentTask?.approver_id
         const stillRelevant = newApprover === currentUserId

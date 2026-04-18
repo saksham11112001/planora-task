@@ -67,7 +67,8 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
     const taskId = panelTaskIdRef.current  // stable even after panel closes
     if (fields && taskId) {
       // Reassigned away from me → remove from Quick Tasks immediately
-      if ('assignee_id' in fields && fields.assignee_id !== currentUserId) {
+      // (only for non-admin users who see only their own tasks)
+      if (!canViewAllTasks && 'assignee_id' in fields && fields.assignee_id !== currentUserId) {
         const currentTask = localTasks.find(t => t.id === taskId)
         const newApprover = 'approver_id' in fields ? fields.approver_id : currentTask?.approver_id
         const stillRelevant = newApprover === currentUserId
