@@ -415,7 +415,12 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
       // Revert on failure
       setSubtasks(p => p.map(s => s.id === sub.id ? { ...s, status: sub.status } : s))
       const d = await res.json().catch(() => ({}))
-      toast.error((d as any).error ?? 'Could not update subtask')
+      // If the API says attachment is required, show the nil strip instead of an error toast
+      if ((d as any).code === 'ATTACHMENT_REQUIRED') {
+        setNilSubtaskId(sub.id)
+      } else {
+        toast.error((d as any).error ?? 'Could not update subtask')
+      }
     }
   }
 
@@ -1092,7 +1097,24 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
 
                 <FieldRow label="Assignee">
                   {assigneeId && <Avatar name={assignee?.name ?? '?'} size="xs" />}
-                  <select value={assigneeId} onChange={e => { if (!canEdit) return; const prev = assigneeId; setAssigneeId(e.target.value); patch({ assignee_id: e.target.value || null }, () => setAssigneeId(prev)) }}
+                  <select value={assigneeId} onChange={e => {
+                    if (!canEdit) return
+                    const prev = assigneeId
+                    const newId = e.target.value || null
+                    setAssigneeId(e.target.value)
+                    // If subtasks share the old assignee, update them too
+                    if (prev && newId !== prev) {
+                      const matching = subtasks.filter(s => s.assignee_id === prev)
+                      if (matching.length > 0) {
+                        setSubtasks(p => p.map(s => s.assignee_id === prev ? { ...s, assignee_id: newId } : s))
+                        matching.forEach(s => fetch(`/api/tasks/${s.id}`, {
+                          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ assignee_id: newId }),
+                        }))
+                      }
+                    }
+                    patch({ assignee_id: newId }, () => setAssigneeId(prev))
+                  }}
                     disabled={!canEdit}
                     className="text-sm bg-transparent outline-none flex-1"
                     style={{ color: 'var(--text-primary)', cursor: canEdit ? 'pointer' : 'default' }}>
@@ -1401,10 +1423,10 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                 ) : (
                   <div className="rounded-xl p-4 mb-4 space-y-2" style={{ border: '1px solid var(--border)', background: 'var(--surface-subtle)' }}>
                     <input
-                      type="url"
+                      type="text"
                       value={driveUrl}
                       onChange={e => setDriveUrl(e.target.value)}
-                      placeholder="Paste Google Drive, Notion, or any link…"
+                      placeholder="Paste Google Drive, Notion, or any link… (or type nil)"
                       className="w-full text-sm rounded-lg px-3 py-2 outline-none"
                       style={{ border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-primary)' }}
                     />

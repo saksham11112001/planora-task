@@ -92,12 +92,12 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
   } | null>(null)
   const [masterUpdating,  setMasterUpdating]  = useState(false)
 
-  // Propagate assignee/approver changes to existing pending/todo instances
+  // Propagate assignee/approver/client changes to existing pending/todo instances
   const [propInstanceModal, setPropInstanceModal] = useState<{
     taskTitle: string
     clientId: string
     clientName: string
-    fields: { assignee_id?: string | null; approver_id?: string | null }
+    fields: { assignee_id?: string | null; approver_id?: string | null; client_id?: string | null }
   } | null>(null)
   const [propInstanceUpdating, setPropInstanceUpdating] = useState(false)
   const [bulkAssignId,    setBulkAssignId]    = useState('')   // member id to bulk-assign to
@@ -373,6 +373,10 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
               const m = members.find(mb => mb.id === fields.assignee_id)
               enriched.assignee = m ? { id: m.id, name: m.name } : null
             }
+            if ('client_id' in fields) {
+              const c = clients.find(cl => cl.id === fields.client_id)
+              enriched.client = c ? { id: c.id, name: c.name, color: c.color } : null
+            }
 
             // ── Recurring-assignment prompt (update future tasks) ──
             // Only offered when the assignee changes on a CA task that has a client
@@ -403,14 +407,16 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
             }
 
             // ── Propagation prompt (update existing pending/todo instances) ──
-            // Offered when assignee OR approver changes on a CA task that has a client
+            // Offered when assignee, approver, OR client changes on a CA task that has a client
             if (canManage && selTask.client_id) {
               const assigneeChanged = 'assignee_id' in fields && fields.assignee_id !== selTask.assignee_id
               const approverChanged = 'approver_id' in fields && (fields.approver_id as any) !== selTask.approver_id
-              if (assigneeChanged || approverChanged) {
-                const propFields: { assignee_id?: string | null; approver_id?: string | null } = {}
+              const clientChanged   = 'client_id'   in fields && fields.client_id   !== selTask.client_id
+              if (assigneeChanged || approverChanged || clientChanged) {
+                const propFields: { assignee_id?: string | null; approver_id?: string | null; client_id?: string | null } = {}
                 if (assigneeChanged) propFields.assignee_id = fields.assignee_id as string | null
                 if (approverChanged) propFields.approver_id = fields.approver_id as string | null
+                if (clientChanged)   propFields.client_id   = fields.client_id   as string | null
                 setPropInstanceModal({
                   taskTitle:  selTask.title,
                   clientId:   selTask.client_id,
@@ -960,11 +966,18 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
                   Update pending tasks?
                 </p>
                 <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>
-                  {propInstanceModal.fields.assignee_id !== undefined && propInstanceModal.fields.approver_id !== undefined
-                    ? 'The assignee and approver were changed.'
-                    : propInstanceModal.fields.assignee_id !== undefined
-                    ? 'The assignee was changed.'
-                    : 'The approver was changed.'}
+                  {(() => {
+                    const f = propInstanceModal.fields
+                    const parts: string[] = []
+                    if (f.assignee_id !== undefined && f.approver_id !== undefined) parts.push('the assignee and approver')
+                    else if (f.assignee_id !== undefined) parts.push('the assignee')
+                    else if (f.approver_id !== undefined) parts.push('the approver')
+                    if (f.client_id !== undefined) parts.push('the client')
+                    const changed = parts.length > 0
+                      ? parts.join(' and ') + (parts.length === 1 ? ' was' : ' were') + ' changed.'
+                      : 'Fields were changed.'
+                    return changed.charAt(0).toUpperCase() + changed.slice(1)
+                  })()}
                   {' '}Would you like to apply this to all pending &amp; in-progress{' '}
                   <em>&quot;{propInstanceModal.taskTitle}&quot;</em> tasks for{' '}
                   <strong style={{ color: 'var(--text-primary)' }}>{propInstanceModal.clientName}</strong>?

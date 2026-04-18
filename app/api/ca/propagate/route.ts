@@ -42,6 +42,7 @@ export async function POST(req: NextRequest) {
       priority?: string
       assignee_id?: string | null
       approver_id?: string | null
+      client_id?: string | null
       attachment_headers?: { old: string[]; new: string[] }
     }
   }
@@ -76,6 +77,7 @@ export async function POST(req: NextRequest) {
   if (fields.priority)  taskUpdate.priority = fields.priority
   if ('assignee_id' in fields) taskUpdate.assignee_id = fields.assignee_id ?? null
   if ('approver_id' in fields) taskUpdate.approver_id = fields.approver_id ?? null
+  if ('client_id'   in fields) taskUpdate.client_id   = fields.client_id   ?? null
 
   let updated = 0
 
