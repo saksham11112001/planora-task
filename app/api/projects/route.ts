@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse }  from 'next/server'
 import type { NextRequest } from 'next/server'
 import { assertCan }     from '@/lib/utils/permissionGate'
+import { dbError } from '@/lib/api-error'
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest) {
   }
   // templates are stored in org_feature_settings, not in projects table
   const { data, error } = await projectQuery
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json(dbError(error, 'projects'), { status: 500 })
   return NextResponse.json({ data }, {
     headers: { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' },
   })
@@ -67,7 +68,7 @@ export async function POST(request: NextRequest) {
     status:      'active',
     member_ids:  Array.isArray(body.member_ids) && body.member_ids.length > 0 ? body.member_ids : null,
   }).select('*').single()
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json(dbError(error, 'projects'), { status: 500 })
 
   // Create template tasks (with subtasks) if provided
   const templateTasks: { title: string; priority: string; subtasks?: string[] }[] = body.template_tasks ?? []

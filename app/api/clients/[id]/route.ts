@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse }  from 'next/server'
 import type { NextRequest } from 'next/server'
 import { assertCan }     from '@/lib/utils/permissionGate'
+import { dbError } from '@/lib/api-error'
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -26,7 +27,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   const { data, error } = await supabase.from('clients').update(updates).eq('id', id).eq('org_id', mb.org_id).select('*').single()
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json(dbError(error, 'clients/[id]'), { status: 500 })
   return NextResponse.json({ data })
 }
 
@@ -41,6 +42,6 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   if (clientDeleteDenied) return NextResponse.json({ error: clientDeleteDenied.error }, { status: clientDeleteDenied.status })
 
   const { error } = await supabase.from('clients').delete().eq('id', id).eq('org_id', mb.org_id)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json(dbError(error, 'clients/[id]'), { status: 500 })
   return NextResponse.json({ success: true })
 }

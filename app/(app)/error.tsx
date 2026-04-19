@@ -24,15 +24,11 @@ export default function AppError({ error, reset }: { error: Error & { digest?: s
         </h1>
         <p style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 8, lineHeight: 1.6 }}>
           Your workspace couldn't load. This is usually fixed by signing out and back in.
-        </p>
-        <p style={{ fontFamily: 'monospace', fontSize: 11, color: '#dc2626',
-          marginBottom: 12, wordBreak: 'break-all', background: 'var(--surface-subtle)',
-          padding: '8px 12px', borderRadius: 6, textAlign: 'left' }}>
-          {error.message || 'Unknown error'}
+          If the problem persists, please contact support.
         </p>
         {error.digest && (
           <p style={{ fontFamily: 'monospace', fontSize: 11, color: '#94a3b8', marginBottom: 24 }}>
-            Ref: {error.digest}
+            Error ref: {error.digest}
           </p>
         )}
         <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>

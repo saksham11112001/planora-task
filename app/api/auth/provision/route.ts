@@ -2,6 +2,7 @@ import { createClient }      from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse }      from 'next/server'
 import type { NextRequest }  from 'next/server'
+import { dbError }           from '@/lib/api-error'
 
 // Called client-side after implicit OAuth flow establishes a session.
 // Creates/updates the public.users row and handles invite metadata.
@@ -68,6 +69,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true })
   } catch (err: any) {
     console.error('[api/auth/provision]', err?.message)
-    return NextResponse.json({ error: err?.message }, { status: 500 })
+    return NextResponse.json(dbError(err, 'auth/provision'), { status: 500 })
   }
 }

@@ -2,6 +2,7 @@ import { NextResponse }      from 'next/server'
 import { createClient }      from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { NextRequest }  from 'next/server'
+import { dbError } from '@/lib/api-error'
 
 async function ownerGuard(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser()
@@ -24,7 +25,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const { data, error } = await admin
     .from('coupons').update(body).eq('id', params.id).select().single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json(dbError(error, 'admin/coupons/[id]'), { status: 500 })
   return NextResponse.json({ data })
 }
 
@@ -36,6 +37,6 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
 
   const admin = createAdminClient()
   const { error } = await admin.from('coupons').delete().eq('id', params.id)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json(dbError(error, 'admin/coupons/[id]'), { status: 500 })
   return NextResponse.json({ success: true })
 }

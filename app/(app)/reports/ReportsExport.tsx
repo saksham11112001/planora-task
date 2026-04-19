@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { Download, FileText, FileSpreadsheet, Printer } from 'lucide-react'
+import { toast } from '@/store/appStore'
 
 export function ReportsExport() {
   const [downloading, setDownloading] = useState<string|null>(null)
@@ -9,7 +10,7 @@ export function ReportsExport() {
     setDownloading(type)
     try {
       const res = await fetch('/api/reports/export?type=' + type)
-      if (!res.ok) { alert('Export failed'); return }
+      if (!res.ok) { toast.error('Export failed. Please try again.'); return }
       const blob    = await res.blob()
       const url     = URL.createObjectURL(blob)
       const a       = document.createElement('a')

@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse }  from 'next/server'
 import type { NextRequest } from 'next/server'
+import { dbError } from '@/lib/api-error'
 
 export async function GET() {
   try {
@@ -70,13 +71,12 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('[features POST]', error.message, error.code)
-      // If table doesn't exist, return the error clearly
-      return NextResponse.json({ error: error.message, code: error.code }, { status: 500 })
+      return NextResponse.json(dbError(error, 'settings/features'), { status: 500 })
     }
 
     return NextResponse.json({ success: true, feature_key, is_enabled })
   } catch (e: any) {
     console.error('[features POST crash]', e?.message)
-    return NextResponse.json({ error: e?.message ?? 'Unknown error' }, { status: 500 })
+    return NextResponse.json(dbError(e, 'settings/features'), { status: 500 })
   }
 }

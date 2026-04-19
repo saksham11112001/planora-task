@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse }  from 'next/server'
 import type { NextRequest } from 'next/server'
+import { dbError } from '@/lib/api-error'
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -17,7 +18,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
 
   const { error } = await supabase.from('time_logs').delete().eq('id', id)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json(dbError(error, 'time-logs/[id]'), { status: 500 })
   return NextResponse.json({ success: true })
 }
 
@@ -40,6 +41,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   for (const k of ALLOWED) { if (k in body) updates[k] = body[k] }
 
   const { data, error } = await supabase.from('time_logs').update(updates).eq('id', id).select('*').single()
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json(dbError(error, 'time-logs/[id]'), { status: 500 })
   return NextResponse.json({ data })
 }

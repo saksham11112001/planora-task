@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient }              from '@/lib/supabase/server'
 import { createAdminClient }         from '@/lib/supabase/admin'
+import { dbError } from '@/lib/api-error'
 
 async function getOrgAndRole(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser()
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest) {
     .select('id, name, category, linked_task_types, sort_order, is_active')
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json(dbError(error, 'settings/document-types'), { status: 500 })
   return NextResponse.json({ document_type: data })
 }
 
@@ -84,7 +85,7 @@ export async function PATCH(req: NextRequest) {
     .select('id, name, category, linked_task_types, sort_order, is_active')
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json(dbError(error, 'settings/document-types'), { status: 500 })
   return NextResponse.json({ document_type: data })
 }
 
@@ -105,6 +106,6 @@ export async function DELETE(req: NextRequest) {
     .eq('id', id)
     .eq('org_id', mb.org_id)
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json(dbError(error, 'settings/document-types'), { status: 500 })
   return NextResponse.json({ success: true })
 }

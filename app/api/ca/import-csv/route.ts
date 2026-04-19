@@ -2,6 +2,7 @@ import { NextResponse }     from 'next/server'
 import { createClient }     from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { NextRequest }  from 'next/server'
+import { dbError } from '@/lib/api-error'
 
 export const maxDuration = 60
 
@@ -187,7 +188,7 @@ export async function POST(req: NextRequest) {
       .from('ca_master_tasks')
       .upsert(chunk, { onConflict: 'org_id,code,financial_year', ignoreDuplicates: false })
     if (upsertErr)
-      return NextResponse.json({ error: upsertErr.message }, { status: 500 })
+      return NextResponse.json(dbError(upsertErr, 'ca/import-csv'), { status: 500 })
   }
 
   return NextResponse.json({

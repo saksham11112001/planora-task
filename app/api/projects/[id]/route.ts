@@ -3,6 +3,7 @@ import { NextResponse }  from 'next/server'
 import type { NextRequest } from 'next/server'
 import { assertCan }     from '@/lib/utils/permissionGate'
 import { inngest }       from '@/lib/inngest/client'
+import { dbError } from '@/lib/api-error'
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -26,7 +27,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!Object.keys(updates).length) return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
 
   const { data, error } = await supabase.from('projects').update(updates).eq('id', id).eq('org_id', mb.org_id).select('*').single()
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json(dbError(error, 'projects/[id]'), { status: 500 })
   // Fire project status change notification if status changed
   try {
     if (body.status && body.status !== existingProject.status) {
@@ -60,6 +61,6 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
   // Soft delete (archive)
   const { error } = await supabase.from('projects').update({ is_archived: true }).eq('id', id).eq('org_id', mb.org_id)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json(dbError(error, 'projects/[id]'), { status: 500 })
   return NextResponse.json({ success: true })
 }

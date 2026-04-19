@@ -53,7 +53,7 @@ export function ProjectsView({ projects, counts, clients, canManage }: Props) {
     if (!confirm(`Archive project "${name}"? All tasks will be preserved.`)) return
     const res = await fetch(`/api/projects/${id}`, { method: 'DELETE' })
     if (res.ok) window.location.reload()
-    else { const d = await res.json().catch(() => ({})); alert(d.error ?? 'Could not delete project') }
+    else { const d = await res.json().catch(() => ({})); toast.error(d.error ?? 'Could not delete project') }
   }
 
   async function cloneProject(id: string, name: string) {

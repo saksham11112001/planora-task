@@ -2,6 +2,7 @@ import { createClient }      from '@/lib/supabase/server'
 import { createAdminClient }  from '@/lib/supabase/admin'
 import { NextResponse }        from 'next/server'
 import type { NextRequest }    from 'next/server'
+import { dbError } from '@/lib/api-error'
 
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -37,7 +38,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   }).select('id').single()
 
   if (projErr || !newProject)
-    return NextResponse.json({ error: projErr?.message ?? 'Clone failed' }, { status: 500 })
+    return NextResponse.json(dbError(projErr, 'projects/[id]/clone'), { status: 500 })
 
   // Fetch top-level tasks from the source project
   const { data: tasks } = await supabase.from('tasks')

@@ -81,9 +81,24 @@ export async function POST(
   const typeSegment = documentTypeId ?? 'direct'
   const storagePath = `portal/${org_id}/${client_id}/${typeSegment}/${periodKey}/${Date.now()}_${safeName}`
 
-  const { data: storageData, error: storageError } = await admin.storage
+  function normaliseContentType(mime: string): string {
+    if (!mime) return 'application/octet-stream'
+    const zipTypes = ['application/x-zip-compressed', 'application/x-zip', 'application/zip', 'multipart/x-zip']
+    if (zipTypes.includes(mime)) return 'application/zip'
+    return mime
+  }
+
+  const uploadContentType = normaliseContentType(file.type || 'application/octet-stream')
+  let { data: storageData, error: storageError } = await admin.storage
     .from('task-attachments')
-    .upload(storagePath, fileBuffer, { contentType: file.type || 'application/octet-stream', upsert: false })
+    .upload(storagePath, fileBuffer, { contentType: uploadContentType, upsert: false })
+
+  // Retry with generic binary if Supabase Storage rejects the specific MIME type
+  if (storageError && storageError.message?.toLowerCase().includes('mime type')) {
+    ;({ data: storageData, error: storageError } = await admin.storage
+      .from('task-attachments')
+      .upload(storagePath, fileBuffer, { contentType: 'application/octet-stream', upsert: true }))
+  }
 
   if (storageError) {
     console.error('[portal-upload] storage error:', storageError.message)
@@ -151,7 +166,7 @@ export async function POST(
       mime_type:         file.type,
     })
     .select('id')
-    .single()
+    .maybeSingle()
 
   if (uploadError || !upload) {
     console.error('[portal-upload] db insert error:', uploadError?.message)
@@ -287,7 +302,7 @@ async function autoLinkToTasks({
         drive_url:       null,
       })
       .select('id')
-      .single()
+      .maybeSingle()
 
     // Insert link (ignore if already exists)
     await admin

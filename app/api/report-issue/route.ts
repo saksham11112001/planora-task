@@ -37,11 +37,22 @@ export async function POST(req: Request) {
 
     // Upload any attached files to storage
     const attachmentUrls: string[] = []
+    function normaliseContentType(mime: string): string {
+      if (!mime) return 'application/octet-stream'
+      const zipTypes = ['application/x-zip-compressed', 'application/x-zip', 'application/zip', 'multipart/x-zip']
+      if (zipTypes.includes(mime)) return 'application/zip'
+      return mime
+    }
     for (const file of files) {
       if (!(file instanceof File) || file.size === 0) continue
-      const path = `issue-reports/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+      const path  = `issue-reports/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
       const bytes = Buffer.from(await file.arrayBuffer())
-      const { error } = await admin.storage.from('attachments').upload(path, bytes, { contentType: file.type })
+      const uploadContentType = normaliseContentType(file.type || 'application/octet-stream')
+      let { error } = await admin.storage.from('attachments').upload(path, bytes, { contentType: uploadContentType })
+      // Retry with a generic binary type if storage rejects the specific MIME type
+      if (error && error.message?.toLowerCase().includes('mime type')) {
+        ;({ error } = await admin.storage.from('attachments').upload(path, bytes, { contentType: 'application/octet-stream', upsert: true }))
+      }
       if (!error) {
         const { data: urlData } = admin.storage.from('attachments').getPublicUrl(path)
         attachmentUrls.push(urlData.publicUrl)

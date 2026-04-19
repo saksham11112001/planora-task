@@ -1,6 +1,7 @@
 import { createClient }    from '@/lib/supabase/server'
 import { NextResponse }    from 'next/server'
 import type { NextRequest } from 'next/server'
+import { dbError } from '@/lib/api-error'
 
 export async function PATCH(req: NextRequest) {
   const supabase = await createClient()
@@ -18,7 +19,7 @@ export async function PATCH(req: NextRequest) {
     updated_at:        new Date().toISOString(),
   }).eq('id', user.id)
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json(dbError(error, 'profile'), { status: 500 })
   return NextResponse.json({ ok: true })
 }
 

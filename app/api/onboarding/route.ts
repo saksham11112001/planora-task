@@ -1,5 +1,6 @@
 import { NextResponse }  from 'next/server'
 import type { NextRequest } from 'next/server'
+import { dbError } from '@/lib/api-error'
 
 export async function POST(request: NextRequest) {
   try {
@@ -48,7 +49,7 @@ export async function POST(request: NextRequest) {
       name: org_name.trim(), slug, plan_tier: 'free', status: 'active',
       industry: industry || null, team_size: team_size || null,
     }).select('id').single()
-    if (orgErr) return NextResponse.json({ error: orgErr.message }, { status: 500 })
+    if (orgErr) return NextResponse.json(dbError(orgErr, 'onboarding'), { status: 500 })
 
     // Add owner member
     await admin.from('org_members').insert({ org_id: org.id, user_id: user.id, role: 'owner', is_active: true })
@@ -58,7 +59,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, org_id: org.id }, { status: 201 })
   } catch (err: any) {
-    return NextResponse.json({ error: err?.message ?? 'Unexpected error' }, { status: 500 })
+    return NextResponse.json(dbError(err, 'onboarding'), { status: 500 })
   }
 }
 

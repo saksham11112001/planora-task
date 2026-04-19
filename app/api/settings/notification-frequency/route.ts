@@ -1,6 +1,7 @@
 import { createClient }   from '@/lib/supabase/server'
 import { NextResponse }    from 'next/server'
 import type { NextRequest } from 'next/server'
+import { dbError } from '@/lib/api-error'
 
 export async function GET() {
   const supabase = await createClient()
@@ -49,6 +50,6 @@ export async function POST(request: NextRequest) {
       config:      { mode },
     }, { onConflict: 'org_id,feature_key' })
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json(dbError(error, 'settings/notification-frequency'), { status: 500 })
   return NextResponse.json({ mode })
 }

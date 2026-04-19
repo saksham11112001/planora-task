@@ -4,6 +4,7 @@ import { inngest }            from '@/lib/inngest/client'
 import { NextResponse }       from 'next/server'
 import type { NextRequest }   from 'next/server'
 import { assertCan }          from '@/lib/utils/permissionGate'
+import { dbError } from '@/lib/api-error'
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -186,8 +187,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   const { data, error } = await supabase
-    .from('tasks').update(updates).eq('id', id).select('*').single()
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    .from('tasks').update(updates).eq('id', id).select('*').maybeSingle()
+  if (error) return NextResponse.json(dbError(error, 'tasks/[id]'), { status: 500 })
+  // maybeSingle() returns null when RLS hides the updated row — treat as success
+  if (!data) return NextResponse.json({ data: { id } })
 
   // Auto-complete parent when all subtasks done — only if parent doesn't require approval
   if (updates.status === 'completed' && data?.parent_task_id) {
@@ -260,7 +263,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     .from('tasks')
     .update({ is_archived: true, deleted_at: deletedAt })
     .eq('id', id).eq('org_id', mb.org_id)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json(dbError(error, 'tasks/[id]'), { status: 500 })
 
   // Also archive all subtasks so they don't linger in other views
   await supabase

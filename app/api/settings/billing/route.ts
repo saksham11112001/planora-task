@@ -1,6 +1,7 @@
 import { createClient }  from '@/lib/supabase/server'
 import { NextResponse }   from 'next/server'
 import type { NextRequest } from 'next/server'
+import { dbError } from '@/lib/api-error'
 
 const PLAN_IDS: Record<string, string> = {
   starter:  process.env.RAZORPAY_STARTER_PLAN_ID  ?? '',
@@ -50,6 +51,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ subscription_id: sub.id, key_id: keyId })
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    return NextResponse.json(dbError(err, 'settings/billing'), { status: 500 })
   }
 }

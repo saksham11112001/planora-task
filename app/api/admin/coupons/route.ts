@@ -2,6 +2,7 @@ import { NextResponse }      from 'next/server'
 import { createClient }      from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { NextRequest }  from 'next/server'
+import { dbError } from '@/lib/api-error'
 
 async function ownerGuard(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser()
@@ -25,7 +26,7 @@ export async function GET() {
     .select('*, coupon_redemptions(count)')
     .order('created_at', { ascending: false })
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json(dbError(error, 'admin/coupons'), { status: 500 })
   return NextResponse.json({ data })
 }
 
@@ -73,7 +74,7 @@ export async function POST(req: NextRequest) {
 
   if (error) {
     if (error.code === '23505') return NextResponse.json({ error: 'Coupon code already exists' }, { status: 409 })
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json(dbError(error, 'admin/coupons'), { status: 500 })
   }
   return NextResponse.json({ data }, { status: 201 })
 }

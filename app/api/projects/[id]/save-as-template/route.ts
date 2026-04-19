@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse }  from 'next/server'
 import type { NextRequest } from 'next/server'
+import { dbError } from '@/lib/api-error'
 
 export async function POST(
   _request: NextRequest,
@@ -42,7 +43,7 @@ export async function POST(
     .order('sort_order')
     .order('created_at', { ascending: true })
 
-  if (tasksErr) return NextResponse.json({ error: tasksErr.message }, { status: 500 })
+  if (tasksErr) return NextResponse.json(dbError(tasksErr, 'projects/[id]/save-as-template'), { status: 500 })
 
   const tasks = allTasks ?? []
   const parents  = tasks.filter(t => !t.parent_task_id)
@@ -89,7 +90,7 @@ export async function POST(
       config:      updatedTemplates,
     }, { onConflict: 'org_id,feature_key' })
 
-  if (upsertErr) return NextResponse.json({ error: upsertErr.message }, { status: 500 })
+  if (upsertErr) return NextResponse.json(dbError(upsertErr, 'projects/[id]/save-as-template'), { status: 500 })
 
   return NextResponse.json({
     message: `Saved "${project.name}" as org template with ${parents.length} tasks and ${children.length} subtasks.`,

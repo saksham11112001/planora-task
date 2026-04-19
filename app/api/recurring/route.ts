@@ -3,6 +3,7 @@ import { NextResponse }        from 'next/server'
 import type { NextRequest }    from 'next/server'
 import { assertCan }           from '@/lib/utils/permissionGate'
 import { normalizeFrequency, nextOccurrence } from '@/lib/utils/recurringSchedule'
+import { dbError } from '@/lib/api-error'
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
@@ -41,7 +42,7 @@ export async function POST(request: NextRequest) {
     created_by:           user.id,
   }).select('*').single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json(dbError(error, 'recurring'), { status: 500 })
 
   // Create compliance subtasks if provided
   if (subtasks && subtasks.length > 0 && task?.id) {
@@ -99,6 +100,6 @@ export async function PATCH(request: NextRequest) {
     })
     .eq('id', id).eq('org_id', mb.org_id).select('*').single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json(dbError(error, 'recurring'), { status: 500 })
   return NextResponse.json({ data })
 }

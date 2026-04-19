@@ -4,6 +4,7 @@ import { effectivePlan, canUseFeature } from '@/lib/utils/planGate'
 import { NextResponse }      from 'next/server'
 import type { NextRequest }  from 'next/server'
 import { assertCan }         from '@/lib/utils/permissionGate'
+import { dbError } from '@/lib/api-error'
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
@@ -37,7 +38,7 @@ export async function POST(request: NextRequest) {
     task_id:     task_id    || null,
     is_billable: is_billable,
   }).select('*').single()
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json(dbError(error, 'time-logs'), { status: 500 })
   return NextResponse.json({ data }, { status: 201 })
 }
 
@@ -55,6 +56,6 @@ export async function GET(request: NextRequest) {
   if (sp.get('project_id')) q = q.eq('project_id', sp.get('project_id')!)
   if (sp.get('from')) q = q.gte('logged_date', sp.get('from')!)
   const { data, error } = await q.order('logged_date', { ascending: false }).limit(200)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json(dbError(error, 'time-logs'), { status: 500 })
   return NextResponse.json({ data })
 }

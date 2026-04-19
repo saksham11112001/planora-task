@@ -273,7 +273,7 @@ wsRM.views = [
     })
   } catch (e: any) {
     return NextResponse.json(
-      { error: 'Could not generate template: ' + e?.message },
+      { error: 'Could not generate the import template. Please try again.' },
       { status: 500 }
     )
   }

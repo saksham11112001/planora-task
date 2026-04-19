@@ -1,6 +1,7 @@
 import { createClient }    from '@/lib/supabase/server'
 import { NextResponse }    from 'next/server'
 import type { NextRequest } from 'next/server'
+import { dbError } from '@/lib/api-error'
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -20,10 +21,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const limit  = Math.min(parseInt(sp.get('limit') ?? '200', 10) || 200, 500)
   const offset = Math.max(parseInt(sp.get('offset') ?? '0', 10) || 0,   0)
   const { data, error } = await supabase.from('task_attachments')
-    .select('id, file_name, file_size, mime_type, storage_path, created_at, uploaded_by, uploader:users!task_attachments_uploaded_by_fkey(name)')
+    .select('id, file_name, file_size, mime_type, storage_path, drive_url, attachment_type, created_at, uploaded_by, uploader:users!task_attachments_uploaded_by_fkey(name)')
     .eq('task_id', id).eq('org_id', mb.org_id).order('created_at', { ascending: false })
     .range(offset, offset + limit - 1)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json(dbError(error, 'tasks/[id]/attachments'), { status: 500 })
   return NextResponse.json({ data })
 }
 
@@ -48,14 +49,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const body = await req.json()
     const { drive_url, file_name, attachment_type } = body
     if (!drive_url) return NextResponse.json({ error: 'drive_url required' }, { status: 400 })
-    // Validate URL format and only allow http/https schemes
-    try {
-      const parsed = new URL(drive_url)
-      if (!['http:', 'https:'].includes(parsed.protocol)) {
-        return NextResponse.json({ error: 'Only http/https URLs are allowed' }, { status: 400 })
+    // 'nil' is a valid sentinel meaning "document not available"
+    const isNilSentinel = drive_url === 'nil'
+    if (!isNilSentinel) {
+      // Validate URL format and only allow http/https schemes
+      try {
+        const parsed = new URL(drive_url)
+        if (!['http:', 'https:'].includes(parsed.protocol)) {
+          return NextResponse.json({ error: 'Only http/https URLs are allowed' }, { status: 400 })
+        }
+      } catch {
+        return NextResponse.json({ error: 'Invalid URL format' }, { status: 400 })
       }
-    } catch {
-      return NextResponse.json({ error: 'Invalid URL format' }, { status: 400 })
     }
     const { data: row, error: dbErr } = await supabase.from('task_attachments').insert({
       task_id: id, org_id: mb.org_id, uploaded_by: user.id,
@@ -65,9 +70,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       file_size: 0,
       mime_type: 'text/uri-list',
       storage_path: '',
-    }).select('*').single()
-    if (dbErr) return NextResponse.json({ error: dbErr.message }, { status: 500 })
-    return NextResponse.json({ data: row }, { status: 201 })
+    }).select('*').maybeSingle()
+    if (dbErr) return NextResponse.json(dbError(dbErr, 'tasks/[id]/attachments'), { status: 500 })
+    return NextResponse.json({ data: row ?? { id: 'ok' } }, { status: 201 })
   }
 
   const formData = await req.formData()
@@ -79,16 +84,30 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const storagePath = `${mb.org_id}/${id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
   const bytes       = await file.arrayBuffer()
 
-  const { error: upErr } = await supabase.storage.from('attachments')
-    .upload(storagePath, bytes, { contentType: file.type, upsert: false })
-  if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 })
+  // Normalise MIME types that Supabase Storage may not accept — fall back to octet-stream
+  function normaliseContentType(mime: string): string {
+    if (!mime) return 'application/octet-stream'
+    const zipTypes = ['application/x-zip-compressed', 'application/x-zip', 'application/zip', 'multipart/x-zip']
+    if (zipTypes.includes(mime)) return 'application/zip'
+    return mime
+  }
+
+  const uploadContentType = normaliseContentType(file.type || 'application/octet-stream')
+  let { error: upErr } = await supabase.storage.from('attachments')
+    .upload(storagePath, bytes, { contentType: uploadContentType, upsert: false })
+  // If the specific MIME type is still rejected, retry as a generic binary blob
+  if (upErr && upErr.message?.toLowerCase().includes('mime type')) {
+    ;({ error: upErr } = await supabase.storage.from('attachments')
+      .upload(storagePath, bytes, { contentType: 'application/octet-stream', upsert: true }))
+  }
+  if (upErr) return NextResponse.json(dbError(upErr, 'tasks/[id]/attachments'), { status: 500 })
 
   const { data: row, error: dbErr } = await supabase.from('task_attachments').insert({
     task_id: id, org_id: mb.org_id, uploaded_by: user.id,
     file_name: file.name, file_size: file.size, mime_type: file.type, storage_path: storagePath,
-  }).select('*').single()
-  if (dbErr) return NextResponse.json({ error: dbErr.message }, { status: 500 })
-  return NextResponse.json({ data: row }, { status: 201 })
+  }).select('*').maybeSingle()
+  if (dbErr) return NextResponse.json(dbError(dbErr, 'tasks/[id]/attachments'), { status: 500 })
+  return NextResponse.json({ data: row ?? { id: 'ok', storage_path: storagePath } }, { status: 201 })
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

@@ -1,6 +1,7 @@
 import { NextResponse }  from 'next/server'
 import type { NextRequest } from 'next/server'
 import { inngest }          from '@/lib/inngest/client'
+import { dbError } from '@/lib/api-error'
 
 export async function POST(request: NextRequest) {
   try {
@@ -76,6 +77,6 @@ export async function POST(request: NextRequest) {
     } catch {}
     return NextResponse.json({ success: true, org_name: org.name })
   } catch (err: any) {
-    return NextResponse.json({ error: err?.message ?? 'Unexpected error' }, { status: 500 })
+    return NextResponse.json(dbError(err, 'onboarding/join-invite'), { status: 500 })
   }
 }

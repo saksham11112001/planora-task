@@ -1,6 +1,7 @@
 import { NextResponse }        from 'next/server'
 import { createClient }        from '@/lib/supabase/server'
 import { createAdminClient }   from '@/lib/supabase/admin'
+import { dbError } from '@/lib/api-error'
 
 /**
  * POST /api/ca/trigger
@@ -40,7 +41,7 @@ export async function POST() {
 
   if (asgErr) {
     console.error('[ca/trigger] fetch assignments:', asgErr.message)
-    return NextResponse.json({ error: 'Failed to fetch assignments: ' + asgErr.message }, { status: 500 })
+    return NextResponse.json(dbError(asgErr, 'ca/trigger'), { status: 500 })
   }
   if (!assignments || assignments.length === 0) {
     return NextResponse.json({ ok: true, spawned: 0, message: 'No active assignments found. Import clients in Step 2 first.' })

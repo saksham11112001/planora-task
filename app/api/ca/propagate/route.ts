@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { NextRequest } from 'next/server'
+import { dbError } from '@/lib/api-error'
 
 export const maxDuration = 30
 
@@ -66,7 +67,7 @@ export async function POST(req: NextRequest) {
   if (client_id) query = query.eq('client_id', client_id)
 
   const { data: matchingTasks, error: fetchErr } = await query
-  if (fetchErr) return NextResponse.json({ error: fetchErr.message }, { status: 500 })
+  if (fetchErr) return NextResponse.json(dbError(fetchErr, 'ca/propagate'), { status: 500 })
   if (!matchingTasks?.length) return NextResponse.json({ updated: 0 })
 
   const taskIds = matchingTasks.map(t => t.id)
@@ -85,7 +86,7 @@ export async function POST(req: NextRequest) {
     const { error: updateErr } = await admin.from('tasks')
       .update(taskUpdate)
       .in('id', taskIds)
-    if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 })
+    if (updateErr) return NextResponse.json(dbError(updateErr, 'ca/propagate'), { status: 500 })
     updated += taskIds.length
   }
 

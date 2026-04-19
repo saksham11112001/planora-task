@@ -4,6 +4,7 @@ import { NextResponse }      from 'next/server'
 import type { NextRequest }  from 'next/server'
 import { assertCan }         from '@/lib/utils/permissionGate'
 import { effectivePlan, isAtMemberLimit, memberLimit } from '@/lib/utils/planGate'
+import { dbError } from '@/lib/api-error'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://sng-adwisers.com'
 
@@ -17,7 +18,7 @@ export async function GET() {
   const { data, error } = await supabase.from('org_members')
     .select('id, role, joined_at, user_id, can_view_all_tasks, users(id, name, email, avatar_url)')
     .eq('org_id', mb.org_id).eq('is_active', true).order('joined_at')
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json(dbError(error, 'team'), { status: 500 })
   return NextResponse.json({ data }, {
     headers: { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' },
   })
@@ -93,7 +94,7 @@ export async function POST(request: NextRequest) {
 
   if (inviteErr) {
     console.error('[/api/team POST] inviteUserByEmail failed:', inviteErr.message)
-    return NextResponse.json({ error: inviteErr.message }, { status: 500 })
+    return NextResponse.json(dbError(inviteErr, 'team'), { status: 500 })
   }
 
   return NextResponse.json({ success: true, message: 'Invitation sent!' })
@@ -137,7 +138,7 @@ export async function PATCH(request: NextRequest) {
     if (body.name?.trim()) update.name = body.name.trim()
     if (typeof body.phone_number !== 'undefined') update.phone_number = body.phone_number || null
     const { error: updateErr } = await admin.from('users').update(update).eq('id', user_id)
-    if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 })
+    if (updateErr) return NextResponse.json(dbError(updateErr, 'team'), { status: 500 })
     return NextResponse.json({ success: true })
   }
 
@@ -154,7 +155,7 @@ export async function PATCH(request: NextRequest) {
     if (member_id) removeQuery = removeQuery.eq('id', member_id)
     else           removeQuery = removeQuery.eq('user_id', user_id)
     const { error: removeErr } = await removeQuery
-    if (removeErr) return NextResponse.json({ error: removeErr.message }, { status: 500 })
+    if (removeErr) return NextResponse.json(dbError(removeErr, 'team'), { status: 500 })
     return NextResponse.json({ success: true, message: 'Member removed' })
   }
 
@@ -169,7 +170,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Cannot override permissions for owners or admins' }, { status: 400 })
     const { error: flagErr } = await admin.from('org_members')
       .update({ can_view_all_tasks }).eq('org_id', mb.org_id).eq('id', member_id)
-    if (flagErr) return NextResponse.json({ error: flagErr.message }, { status: 500 })
+    if (flagErr) return NextResponse.json(dbError(flagErr, 'team'), { status: 500 })
     return NextResponse.json({ success: true })
   }
 
@@ -182,6 +183,6 @@ export async function PATCH(request: NextRequest) {
   else           query = query.eq('user_id', user_id)
 
   const { error } = await query
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json(dbError(error, 'team'), { status: 500 })
   return NextResponse.json({ success: true })
 }

@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse }  from 'next/server'
 import type { NextRequest } from 'next/server'
 import { assertCan }     from '@/lib/utils/permissionGate'
+import { dbError } from '@/lib/api-error'
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest) {
   const { data, error } = await supabase.from('clients')
     .select('id, name, color, status, email, company').eq('org_id', mb.org_id)
     .order('name').range(offset, offset + limit - 1)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json(dbError(error, 'clients'), { status: 500 })
   return NextResponse.json({ data }, {
     headers: { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' },
   })
@@ -61,6 +62,6 @@ export async function POST(request: NextRequest) {
     color:         body.color                  || '#0d9488',
     created_by:    user.id,
   }).select('*').single()
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json(dbError(error, 'clients'), { status: 500 })
   return NextResponse.json({ data }, { status: 201 })
 }

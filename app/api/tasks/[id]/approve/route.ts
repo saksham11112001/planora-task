@@ -97,22 +97,15 @@ export async function POST(
       }
     }
 
-    // If no approver is assigned and approval is not required → auto-complete
-    if (!task.approver_id && !task.approval_required) {
+    // If no approver is assigned → auto-complete regardless of approval_required
+    // (there is nobody who could approve it, so just complete the task)
+    if (!task.approver_id) {
       await supabase.from('tasks').update({
         status: 'completed',
         completed_at: new Date().toISOString(),
         approval_status: 'approved',
       }).eq('id', id)
       return NextResponse.json({ ok: true, message: 'Task completed', auto_completed: true })
-    }
-
-    // If approval_required but no approver is set → block with a clear message
-    if (!task.approver_id && task.approval_required) {
-      return NextResponse.json({
-        error: 'No approver assigned — ask a manager to add an approver before submitting',
-        code: 'NO_APPROVER',
-      }, { status: 422 })
     }
 
     await supabase.from('tasks').update({ approval_status: 'pending', status: 'in_review' }).eq('id', id)

@@ -295,7 +295,7 @@ export async function POST(request: NextRequest) {
       sheets = await parseXlsx(await file.arrayBuffer())
     } catch (e: any) {
       return NextResponse.json(
-        { error: 'Could not parse file: ' + (e?.message ?? 'unknown') },
+        { error: 'Could not read the file. Please make sure it is a valid Excel (.xlsx) file.' },
         { status: 400 }
       )
     }
@@ -378,7 +378,7 @@ export async function POST(request: NextRequest) {
         )
       if (error) {
         console.error('[import] flushCaLinks upsert failed:', error.message)
-        return error.message
+        return 'Failed to save compliance links'
       }
       return null
     }
@@ -659,7 +659,7 @@ export async function POST(request: NextRequest) {
                   results.members.skipped++
                 }
               } else {
-                results.members.errors.push(`${email}: ${invErr.message}`)
+                results.members.errors.push(`${email}: Invitation failed. Check the email address and try again.`)
                 results.members.skipped++
               }
             } else {
@@ -761,7 +761,7 @@ export async function POST(request: NextRequest) {
           const rows2insert = batch.map(({ _lname: _, ...rest }: any) => rest)
           const { data: created, error } = await admin.from('clients').insert(rows2insert).select('id, name')
           if (error) {
-            results.clients.errors.push(`Batch error: ${error.message}`)
+            results.clients.errors.push('Some clients could not be imported. Please check for duplicates or invalid data.')
             results.clients.skipped += batch.length
           } else {
             ;(created ?? []).forEach((c: any) => { clientNameToId[c.name.toLowerCase()] = c.id })
@@ -829,7 +829,7 @@ export async function POST(request: NextRequest) {
           }).select('id').single()
 
           if (error) {
-            results.projects.errors.push(`"${name}": ${error.message}`)
+            results.projects.errors.push(`"${name}": Could not save this project. Check for duplicates and try again.`)
             results.projects.skipped++
           } else {
             projectNameToId[name.toLowerCase()] = proj.id
@@ -918,7 +918,7 @@ export async function POST(request: NextRequest) {
           const batch = toInsertTasks.slice(bi, bi + TASK_INSERT_BATCH)
           const { error } = await admin.from('tasks').insert(batch)
           if (error) {
-            results.tasks.errors.push(`Batch insert error: ${error.message}`)
+            results.tasks.errors.push('Some rows could not be saved. Please check the data format and try again.')
             results.tasks.skipped += batch.length
           } else {
             results.tasks.created += batch.length
@@ -1049,7 +1049,7 @@ export async function POST(request: NextRequest) {
           const batch = toInsertOneTasks.slice(bi, bi + ONE_INSERT_BATCH)
           const { error } = await admin.from('tasks').insert(batch)
           if (error) {
-            results.onetasks.errors.push(`Batch insert error: ${error.message}`)
+            results.onetasks.errors.push('Some rows could not be saved. Please check the data format and try again.')
             results.onetasks.skipped += batch.length
           } else {
             results.onetasks.created += batch.length
@@ -1058,7 +1058,7 @@ export async function POST(request: NextRequest) {
 
         const oneTimeFlushErr = await flushCaLinks(oneTimeCaLinks, user.id)
         if (oneTimeFlushErr) {
-          results.onetasks.errors.push(`Failed to save compliance assignments to database: ${oneTimeFlushErr}`)
+          results.onetasks.errors.push('Some compliance assignments could not be saved. Please try again.')
           // Rollback the created count for the links that failed
           results.onetasks.created -= oneTimeCaLinks.length
           results.onetasks.skipped += oneTimeCaLinks.length
@@ -1151,7 +1151,7 @@ export async function POST(request: NextRequest) {
           const batch = toInsertRecurring.slice(bi, bi + REC_INSERT_BATCH)
           const { error } = await admin.from('tasks').insert(batch)
           if (error) {
-            results.recurring.errors.push(`Batch insert error: ${error.message}`)
+            results.recurring.errors.push('Some rows could not be saved. Please check the data format and try again.')
             results.recurring.skipped += batch.length
           } else {
             results.recurring.created += batch.length
@@ -1242,7 +1242,7 @@ export async function POST(request: NextRequest) {
 
         const caFlushErr = await flushCaLinks(caLinksToCreate, user.id)
         if (caFlushErr) {
-          results.compliance.errors.push(`Failed to save compliance assignments to database: ${caFlushErr}`)
+          results.compliance.errors.push('Some compliance assignments could not be saved. Please try again.')
           results.compliance.created = 0
           results.compliance.skipped += caLinksToCreate.length
         }
@@ -1260,7 +1260,7 @@ export async function POST(request: NextRequest) {
     console.error('[bulk-import] fatal error:', e)
     return NextResponse.json(
       {
-        error: e?.message || 'Import failed unexpectedly',
+        error: 'Import failed unexpectedly. Please try again or contact support if the problem persists.',
         detail: String(e),
       },
       { status: 500 }

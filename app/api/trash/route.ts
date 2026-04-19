@@ -2,6 +2,7 @@ import { createClient }      from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse }       from 'next/server'
 import type { NextRequest }   from 'next/server'
+import { dbError } from '@/lib/api-error'
 
 function isPaidPlan(planTier: string, status: string, trialEndsAt: string|null): boolean {
   if (status === 'trialing' && trialEndsAt && new Date(trialEndsAt) > new Date()) return true
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest) {
     .eq('id', task_id)
     .eq('org_id', mb.org_id)
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json(dbError(error, 'trash'), { status: 500 })
   return NextResponse.json({ success: true })
 }
 

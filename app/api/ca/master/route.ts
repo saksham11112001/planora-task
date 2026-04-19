@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { CA_DEFAULT_TASKS } from '@/lib/data/caDefaultTasks'
 import type { NextRequest } from 'next/server'
+import { dbError } from '@/lib/api-error'
 
 async function getOrgMember(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser()
@@ -33,7 +34,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await q
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json(dbError(error, 'ca/master'), { status: 500 })
   return NextResponse.json({ data: data ?? [] })
 }
 
@@ -62,7 +63,7 @@ export async function POST(req: NextRequest) {
     // Upsert — always refresh defaults (attachment_count, attachment_headers, dates, sort_order)
     const { error } = await admin.from('ca_master_tasks')
       .upsert(rows, { onConflict: 'org_id,code,financial_year', ignoreDuplicates: false })
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return NextResponse.json(dbError(error, 'ca/master'), { status: 500 })
     return NextResponse.json({ success: true, count: rows.length })
   }
 
@@ -81,6 +82,6 @@ export async function POST(req: NextRequest) {
     sort_order: sort_order ?? 999,
   }).select().single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json(dbError(error, 'ca/master'), { status: 500 })
   return NextResponse.json({ data }, { status: 201 })
 }

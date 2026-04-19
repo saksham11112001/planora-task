@@ -312,12 +312,18 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ decision: 'submit' }),
     })
+    const d = await res.json().catch(() => ({}))
     if (res.ok) {
-      toast.success('Submitted for approval ✓')
-      onUpdated?.({ status: 'in_review', approval_status: 'pending' })
+      if (d.auto_completed) {
+        setStatus('completed')
+        toast.success('Task completed ✓')
+        onUpdated?.({ status: 'completed', approval_status: 'approved' })
+      } else {
+        toast.success('Submitted for approval ✓')
+        onUpdated?.({ status: 'in_review', approval_status: 'pending' })
+      }
     } else {
       setStatus(prevStatus)   // rollback
-      const d = await res.json().catch(() => ({}))
       toast.error(d.error ?? 'Could not submit — please try again')
     }
     setCompleting(false)
@@ -348,9 +354,21 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     }
     if (decision === 'approve') toast.success('Task approved! ✅')
     if (decision === 'reject')  toast.info('Task rejected — sent back to assignee')
-    if (decision === 'submit')  toast.success('Submitted for approval ✓')
-    const newStatus = decision === 'approve' ? 'completed' : decision === 'reject' ? 'todo' : 'in_review'
-    const newApprovalStatus = decision === 'approve' ? 'approved' : decision === 'reject' ? 'rejected' : 'pending'
+    if (decision === 'submit') {
+      if ((d as any).auto_completed) {
+        toast.success('Task completed ✓')
+      } else {
+        toast.success('Submitted for approval ✓')
+      }
+    }
+    const newStatus = decision === 'approve' ? 'completed'
+      : decision === 'reject' ? 'todo'
+      : (decision === 'submit' && (d as any).auto_completed) ? 'completed'
+      : 'in_review'
+    const newApprovalStatus = decision === 'approve' ? 'approved'
+      : decision === 'reject' ? 'rejected'
+      : (decision === 'submit' && (d as any).auto_completed) ? 'approved'
+      : 'pending'
     onUpdated?.({ status: newStatus, approval_status: newApprovalStatus })
   }
 

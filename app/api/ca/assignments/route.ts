@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { NextRequest } from 'next/server'
+import { dbError } from '@/lib/api-error'
 
 export const maxDuration = 30
 
@@ -34,7 +35,7 @@ export async function GET(req: NextRequest) {
   if (clientId) query = query.eq('client_id', clientId)
   const { data, error } = await query
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json(dbError(error, 'ca/assignments'), { status: 500 })
   return NextResponse.json({ data: data ?? [] })
 }
 
@@ -65,6 +66,6 @@ export async function POST(req: NextRequest) {
     .upsert(rows, { onConflict: 'master_task_id,client_id', ignoreDuplicates: false })
     .select()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json(dbError(error, 'ca/assignments'), { status: 500 })
   return NextResponse.json({ data }, { status: 201 })
 }

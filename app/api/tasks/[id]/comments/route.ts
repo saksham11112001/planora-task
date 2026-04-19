@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { inngest }       from '@/lib/inngest/client'
 import type { NextRequest } from 'next/server'
+import { dbError } from '@/lib/api-error'
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -24,7 +25,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     .eq('task_id', id).eq('org_id', mb.org_id)
     .order('created_at', { ascending: true })
     .range(offset, offset + limit - 1)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json(dbError(error, 'tasks/[id]/comments'), { status: 500 })
   return NextResponse.json({ data: data ?? [] })
 }
 
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { data, error } = await supabase.from('task_comments')
     .insert({ task_id: id, org_id: mb.org_id, author_id: user.id, content: content.trim() })
     .select('*').single()
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json(dbError(error, 'tasks/[id]/comments'), { status: 500 })
   // Fire comment notification
   try {
     // Get task + assignee info

@@ -3,6 +3,7 @@ import { NextResponse }   from 'next/server'
 import type { NextRequest } from 'next/server'
 import { inngest }        from '@/lib/inngest/client'
 import { assertCan }      from '@/lib/utils/permissionGate'
+import { dbError } from '@/lib/api-error'
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest) {
   q = q.order('due_date', { ascending: true, nullsFirst: false }).range(_offset, _offset + _limit - 1)
 
   const { data, error } = await q
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json(dbError(error, 'tasks'), { status: 500 })
   return NextResponse.json({ data }, {
     headers: { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' },
   })
@@ -81,7 +82,7 @@ export async function POST(request: NextRequest) {
     parent_task_id: parent_task_id || null,
   }).select('*').single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json(dbError(error, 'tasks'), { status: 500 })
 
   if (assignee_id && assignee_id !== user.id) {
     try {
