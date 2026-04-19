@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { ChevronLeft, ChevronRight, RefreshCw, FolderOpen, CheckSquare, Clock, AlertTriangle, LayoutGrid, AlignJustify } from 'lucide-react'
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
+import { nextOccurrence } from '@/lib/utils/recurringSchedule'
 import type { Task } from '@/types'
 
 interface CalTask {
@@ -130,11 +131,49 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
     return true
   })
 
+  // Window bounds for the currently viewed month (used to expand recurring tasks)
+  const winStart = `${year}-${String(month + 1).padStart(2, '0')}-01`
+  const winEnd   = `${year}-${String(month + 1).padStart(2, '0')}-${String(new Date(year, month + 1, 0).getDate()).padStart(2, '0')}`
+
   const byDate: Record<string,CalTask[]> = {}
   filtered.forEach(t => {
     if (!t.due_date) return
-    if (!byDate[t.due_date]) byDate[t.due_date] = []
-    byDate[t.due_date].push(t)
+
+    if (t.is_recurring && t.frequency) {
+      // Expand recurring template to every occurrence date within the visible month.
+      // t.due_date = next_occurrence_date on the template.
+      let cursor = t.due_date
+
+      // Fast-forward cursor to window start if the next occurrence is before it
+      let safety = 0
+      while (cursor < winStart && safety++ < 500) {
+        cursor = nextOccurrence(t.frequency, cursor)
+      }
+
+      // Collect all occurrences inside the window
+      safety = 0
+      let placed = false
+      while (cursor <= winEnd && safety++ < 500) {
+        if (cursor >= winStart) {
+          if (!byDate[cursor]) byDate[cursor] = []
+          if (!byDate[cursor].find(x => x.id === t.id)) {
+            byDate[cursor].push(t)
+            placed = true
+          }
+        }
+        cursor = nextOccurrence(t.frequency, cursor)
+      }
+
+      // Fallback: if due_date itself is in the window but no expansion landed (e.g. frequency
+      // jumps past the window end), still show the task on its own due_date.
+      if (!placed && t.due_date >= winStart && t.due_date <= winEnd) {
+        if (!byDate[t.due_date]) byDate[t.due_date] = []
+        if (!byDate[t.due_date].find(x => x.id === t.id)) byDate[t.due_date].push(t)
+      }
+    } else {
+      if (!byDate[t.due_date]) byDate[t.due_date] = []
+      byDate[t.due_date].push(t)
+    }
   })
 
   // Upcoming CA triggers indexed by their triggerDate (the day they will be spawned)
@@ -764,13 +803,6 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
       </div>{/* end calendar + panel row */}
     </div>{/* end height wrapper */}
 
-    {panelLoading && (
-      <div style={{ position:'fixed',inset:0,zIndex:9998,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.15)' }}>
-        <div style={{ background:'var(--surface)',borderRadius:12,padding:'20px 28px',fontSize:13,color:'var(--text-muted)',boxShadow:'0 8px 32px rgba(0,0,0,0.15)' }}>
-          Loading task…
-        </div>
-      </div>
-    )}
     <TaskDetailPanel task={panelTask} members={members} clients={clients} currentUserId={currentUserId} userRole={userRole}
       onClose={() => setPanelTask(null)} onUpdated={() => setPanelTask(null)} />
   </>)

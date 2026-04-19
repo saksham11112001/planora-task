@@ -346,7 +346,7 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
 
         {/* ── Chart (collapsible) ── */}
         {showChart && (
-          <div style={{ marginTop: 16, padding: '12px 0 4px', borderTop: '1px solid var(--border-light)' }}>
+          <div style={{ marginTop: 16, padding: '12px 0 4px', borderTop: '1px solid var(--border-light)', maxHeight: 420, overflowY: 'auto' }}>
 
             {/* ── Distribution bar charts ── */}
             <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Task distribution</p>

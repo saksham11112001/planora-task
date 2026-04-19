@@ -175,6 +175,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     updates.approval_status = null
     updates.completed_at    = null
   }
+  // Submitting for approval: always mark approval_status pending when task moves to in_review.
+  // This ensures non-manager members (who cannot explicitly set approval_status) still produce
+  // a row that the Approvals page query (.eq('approval_status','pending')) can find.
+  if (updates.status === 'in_review') {
+    updates.approval_status = 'pending'
+  }
   if (!Object.keys(updates).length)
     return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
 

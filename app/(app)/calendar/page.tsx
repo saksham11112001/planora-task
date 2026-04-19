@@ -48,6 +48,7 @@ export default async function CalendarPage() {
       ? supabase.from('ca_client_assignments')
           .select('id, client_id, assignee_id, master_task:ca_master_tasks(id, name, priority, dates, days_before_due)')
           .eq('org_id', orgId)
+          .eq('is_active', true)
       : Promise.resolve({ data: [] as any[] }),
     isOwnerAdmin
       ? supabase.from('ca_task_instances').select('assignment_id, due_date').eq('org_id', orgId)
@@ -87,7 +88,7 @@ export default async function CalendarPage() {
         const triggerD = new Date(dueD)
         triggerD.setDate(dueD.getDate() - daysBeforeDue)
         const triggerS = triggerD.toISOString().slice(0, 10)
-        if (triggerS > todayS && triggerS <= limitS && !existingSet.has(`${asgn.id}__${dueDateStr}`)) {
+        if (triggerS >= todayS && triggerS <= limitS && !existingSet.has(`${asgn.id}__${dueDateStr}`)) {
           const cl = clientMap[asgn.client_id]
           upcomingCATriggers.push({
             id: `upcoming-${asgn.id}-${dueDateStr}`,
