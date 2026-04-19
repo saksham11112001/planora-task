@@ -11,7 +11,7 @@ export type TaskaEvents = {
   'task/assigned': {
     data: {
       task_id: string; task_title: string
-      assignee_id: string; assignee_email: string; assignee_phone?: string | null
+      assignee_id: string; assignee_email: string; assignee_name?: string | null; assignee_phone?: string | null
       assigner_name: string; org_id: string; org_name: string
       due_date?: string | null; project_name?: string | null
     }

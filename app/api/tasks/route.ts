@@ -97,6 +97,7 @@ export async function POST(request: NextRequest) {
           data: {
             task_id: task.id, task_title: task.title,
             assignee_id, assignee_email: assignee.email,
+            assignee_name: assignee.name ?? null,
             assignee_phone: assignee.phone_number ?? null,
             assigner_name: (mb.users as any)?.name ?? 'Someone',
             org_id: mb.org_id, org_name: (mb.organisations as any)?.name ?? '',

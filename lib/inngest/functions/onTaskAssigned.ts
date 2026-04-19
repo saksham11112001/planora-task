@@ -53,7 +53,7 @@ export const onTaskAssigned = inngest.createFunction(
     if (sendWhatsApp && d.assignee_phone) {
       await waTaskAssigned({
         phone:        d.assignee_phone,
-        assigneeName: d.assignee_email.split('@')[0],
+        assigneeName: d.assignee_name ?? d.assignee_email.split('@')[0],
         assignerName: d.assigner_name,
         taskTitle:    d.task_title,
         dueDate:      d.due_date,
