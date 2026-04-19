@@ -9,7 +9,11 @@
       "Bash(grep -v \"//.*alert\")",
       "Bash(grep -v \"//.*confirm\\\\|deleteConfirm\\\\|setConfirm\\\\|setDeleteConfirm\\\\|showConfirm\\\\|confirmModal\\\\|isConfirm\\\\|onConfirm\\\\|handleConfirm\\\\|Confirm\\\\b\\\\|confirm:\")",
       "Bash(grep -v \"dbError\\\\|console\\\\.error\\\\|//\")",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(npx tsc *)",
+      "Bash(npx next *)",
+      "Bash(grep -E \"\\\\.\\(sql|ts|json\\)$\")",
+      "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")"
     ]
   }
 }

@@ -1,55 +1,109 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Zap, Building2, Users, Phone, ChevronRight, CheckCircle } from 'lucide-react'
+import { Zap, Building2, Users, Phone, ChevronRight, CheckCircle, UserCircle2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 const INDUSTRIES = ['Technology','Finance','Healthcare','Education','E-commerce','Marketing','Consulting','Real Estate','Manufacturing','Legal','Non-profit','Other']
 const TEAM_SIZES = ['Just me','2–5','6–15','16–50','51–200','200+']
 
-export default function OnboardingPage() {
-  const router  = useRouter()
-  const [step,        setStep]        = useState(1)
-  const [saving,      setSaving]      = useState(false)
-  const [error,       setError]       = useState('')
-  const [form,        setForm]        = useState({
-    org_name: '', industry: '', team_size: '', phone: '',
-  })
-  const [inviteCheck, setInviteCheck] = useState<'checking'|'invited'|'none'>('checking')
-  const [inviteOrg,   setInviteOrg]   = useState<{ name: string } | null>(null)
+type Phase = 'checking' | 'form' | 'joining' | 'joined'
 
+interface InviteData { orgId: string; role: string }
+
+export default function OnboardingPage() {
+  const router = useRouter()
+
+  const [phase,      setPhase]      = useState<Phase>('checking')
+  const [step,       setStep]       = useState(0)   // 0 = profile, 1 = org, 2 = team, 3 = phone
+  const [saving,     setSaving]     = useState(false)
+  const [error,      setError]      = useState('')
+  const [inviteData, setInviteData] = useState<InviteData | null>(null)
+  const [joinedOrg,  setJoinedOrg]  = useState('')
+
+  const [form, setForm] = useState({
+    name:      '',
+    email:     '',
+    phone:     '',
+    org_name:  '',
+    industry:  '',
+    team_size: '',
+  })
+
+  function set(k: string, v: string) { setForm(f => ({ ...f, [k]: v })) }
+
+  // ── On mount: load user data + detect invite ─────────────────────────────
   useEffect(() => {
-    async function checkInvite() {
+    async function init() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { setInviteCheck('none'); return }
+      if (!user) { setPhase('form'); return }
+
+      // Pre-fill name from OAuth metadata
+      const metaName =
+        user.user_metadata?.full_name ??
+        user.user_metadata?.name ??
+        (user.user_metadata?.given_name && user.user_metadata?.family_name
+          ? `${user.user_metadata.given_name} ${user.user_metadata.family_name}`
+          : null) ??
+        user.user_metadata?.given_name ??
+        ''
+
+      setForm(f => ({
+        ...f,
+        name:  metaName,
+        email: user.email ?? '',
+      }))
 
       const invitedOrgId = user.user_metadata?.invited_to_org
       const invitedRole  = user.user_metadata?.invited_role ?? 'member'
 
-      if (!invitedOrgId) { setInviteCheck('none'); return }
+      if (invitedOrgId) {
+        setInviteData({ orgId: invitedOrgId, role: invitedRole })
+      }
 
+      setPhase('form')
+    }
+    init()
+  }, [])
+
+  // ── Step 0 submit ────────────────────────────────────────────────────────
+  async function handleProfileNext() {
+    if (!form.name.trim()) { setError('Name is required'); return }
+    setError('')
+
+    if (inviteData) {
+      // Invited user — save profile + join org
+      setSaving(true)
       try {
         const res = await fetch('/api/onboarding/join-invite', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ org_id: invitedOrgId, role: invitedRole }),
+          body: JSON.stringify({
+            org_id: inviteData.orgId,
+            role:   inviteData.role,
+            name:   form.name.trim(),
+            phone:  form.phone.trim() || null,
+          }),
         })
         if (res.ok) {
           const data = await res.json()
-          setInviteOrg({ name: data.org_name })
-          setInviteCheck('invited')
+          setJoinedOrg(data.org_name ?? '')
+          setPhase('joined')
           setTimeout(() => { router.push('/dashboard'); router.refresh() }, 1800)
         } else {
-          setInviteCheck('none')
+          const data = await res.json()
+          setError(data.error ?? 'Failed to join organisation')
         }
-      } catch { setInviteCheck('none') }
+      } catch { setError('Network error — please try again') }
+      finally { setSaving(false) }
+    } else {
+      // Fresh signup — advance to org setup
+      setStep(1)
     }
-    checkInvite()
-  }, [router])
+  }
 
-  function set(k: string, v: string) { setForm(f => ({ ...f, [k]: v })) }
-
+  // ── Final submit (fresh signup, after step 3) ────────────────────────────
   async function handleSubmit() {
     if (!form.org_name.trim()) { setError('Organisation name is required'); return }
     setSaving(true); setError('')
@@ -57,6 +111,7 @@ export default function OnboardingPage() {
       const res = await fetch('/api/onboarding', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          name:      form.name.trim(),
           org_name:  form.org_name,
           industry:  form.industry,
           team_size: form.team_size,
@@ -69,8 +124,8 @@ export default function OnboardingPage() {
     } catch { setError('Network error — please try again') } finally { setSaving(false) }
   }
 
-  /* ── Loading / invite states ─────────────────────────────────── */
-  if (inviteCheck === 'checking') {
+  /* ── Checking / spinner ─────────────────────────────────────────── */
+  if (phase === 'checking') {
     return (
       <div className="min-h-screen flex items-center justify-center"
         style={{ background: 'linear-gradient(135deg,#134e4a 0%,#0f766e 50%,#0d9488 100%)' }}>
@@ -86,7 +141,20 @@ export default function OnboardingPage() {
     )
   }
 
-  if (inviteCheck === 'invited') {
+  /* ── Joining / saving invited profile ───────────────────────────── */
+  if (phase === 'joining') {
+    return (
+      <div className="min-h-screen flex items-center justify-center"
+        style={{ background: 'linear-gradient(135deg,#134e4a 0%,#0f766e 50%,#0d9488 100%)' }}>
+        <div style={{ textAlign: 'center', color: '#fff' }}>
+          <Dots/>
+        </div>
+      </div>
+    )
+  }
+
+  /* ── Joined screen ──────────────────────────────────────────────── */
+  if (phase === 'joined') {
     return (
       <div className="min-h-screen flex items-center justify-center"
         style={{ background: 'linear-gradient(135deg,#134e4a 0%,#0f766e 50%,#0d9488 100%)' }}>
@@ -97,7 +165,7 @@ export default function OnboardingPage() {
           </div>
           <h2 style={{ fontSize: 22, fontWeight: 700, color: '#0f172a', marginBottom: 10 }}>You&apos;re in!</h2>
           <p style={{ fontSize: 14, color: '#64748b', lineHeight: 1.6 }}>
-            You&apos;ve joined <strong>{inviteOrg?.name}</strong>.<br/>Taking you to your dashboard…
+            You&apos;ve joined <strong>{joinedOrg}</strong>.<br/>Taking you to your dashboard…
           </p>
           <Dots color="#0d9488" style={{ marginTop: 20 }}/>
         </div>
@@ -105,7 +173,11 @@ export default function OnboardingPage() {
     )
   }
 
-  /* ── Main onboarding ─────────────────────────────────────────── */
+  /* ── Main onboarding form ───────────────────────────────────────── */
+  // Invited users only see step 0; fresh signup sees steps 0–3
+  const totalSteps = inviteData ? 1 : 4
+  const progressStep = inviteData ? 1 : step + 1
+
   return (
     <div className="min-h-screen flex items-center justify-center px-4"
       style={{ background: 'linear-gradient(135deg,#134e4a 0%,#0f766e 50%,#0d9488 100%)' }}>
@@ -119,19 +191,84 @@ export default function OnboardingPage() {
             </div>
             <span className="text-2xl font-bold text-white">Taska</span>
           </div>
-          <p className="text-teal-200 text-sm">Set up your workspace in 3 quick steps</p>
+          <p className="text-teal-200 text-sm">
+            {inviteData ? 'Complete your profile to get started' : 'Set up your workspace in a few quick steps'}
+          </p>
         </div>
 
         {/* Progress bar */}
         <div className="flex items-center gap-2 mb-6">
-          {[1,2,3].map(s => (
-            <div key={s} className={`flex-1 h-1.5 rounded-full transition-all ${s <= step ? 'bg-white' : 'bg-white/30'}`}/>
+          {Array.from({ length: totalSteps }).map((_, i) => (
+            <div key={i} className={`flex-1 h-1.5 rounded-full transition-all ${i < progressStep ? 'bg-white' : 'bg-white/30'}`}/>
           ))}
         </div>
 
         <div className="bg-white rounded-2xl p-8 shadow-2xl">
 
-          {/* Step 1 — Organisation */}
+          {/* ── Step 0: Profile ── */}
+          {step === 0 && (
+            <>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="h-10 w-10 rounded-xl bg-teal-50 flex items-center justify-center">
+                  <UserCircle2 className="h-5 w-5 text-teal-600"/>
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">Your profile</h2>
+                  <p className="text-sm text-gray-500">Let us know who you are</p>
+                </div>
+              </div>
+              {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>}
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Full name *</label>
+                  <input
+                    value={form.name}
+                    onChange={e => set('name', e.target.value)}
+                    className="input"
+                    placeholder="Your full name"
+                    autoFocus
+                    onKeyDown={e => e.key === 'Enter' && handleProfileNext()}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
+                  <input
+                    value={form.email}
+                    readOnly
+                    className="input bg-gray-50 text-gray-500 cursor-default select-none"
+                    tabIndex={-1}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Phone number
+                    <span className="ml-2 text-xs text-gray-400 font-normal">optional</span>
+                  </label>
+                  <input
+                    type="tel"
+                    value={form.phone}
+                    onChange={e => set('phone', e.target.value)}
+                    className="input"
+                    placeholder="+91 98765 43210"
+                    onKeyDown={e => e.key === 'Enter' && handleProfileNext()}
+                  />
+                  <p className="mt-1.5 text-xs text-gray-400">
+                    Include country code. Used only for WhatsApp task notifications.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleProfileNext}
+                disabled={saving}
+                className="w-full mt-6 btn btn-brand flex items-center justify-center gap-2"
+              >
+                {saving ? 'Saving…' : inviteData ? 'Join workspace' : 'Continue'}
+                {!saving && <ChevronRight className="h-4 w-4"/>}
+              </button>
+            </>
+          )}
+
+          {/* ── Step 1: Organisation ── */}
           {step === 1 && (
             <>
               <div className="flex items-center gap-3 mb-6">
@@ -151,6 +288,7 @@ export default function OnboardingPage() {
                     value={form.org_name}
                     onChange={e => set('org_name', e.target.value)}
                     className="input" placeholder="e.g. Acme Corp"
+                    autoFocus
                     onKeyDown={e => e.key === 'Enter' && form.org_name.trim() && (setError(''), setStep(2))}
                   />
                 </div>
@@ -162,16 +300,19 @@ export default function OnboardingPage() {
                   </select>
                 </div>
               </div>
-              <button
-                onClick={() => { if (!form.org_name.trim()) { setError('Name required'); return } setError(''); setStep(2) }}
-                className="w-full mt-6 btn btn-brand flex items-center justify-center gap-2"
-              >
-                Continue <ChevronRight className="h-4 w-4"/>
-              </button>
+              <div className="flex gap-3 mt-6">
+                <button onClick={() => { setError(''); setStep(0) }} className="btn btn-outline flex-1">Back</button>
+                <button
+                  onClick={() => { if (!form.org_name.trim()) { setError('Name required'); return } setError(''); setStep(2) }}
+                  className="btn btn-brand flex-1 flex items-center justify-center gap-2"
+                >
+                  Continue <ChevronRight className="h-4 w-4"/>
+                </button>
+              </div>
             </>
           )}
 
-          {/* Step 2 — Team size */}
+          {/* ── Step 2: Team size ── */}
           {step === 2 && (
             <>
               <div className="flex items-center gap-3 mb-6">
@@ -204,7 +345,7 @@ export default function OnboardingPage() {
             </>
           )}
 
-          {/* Step 3 — Phone number */}
+          {/* ── Step 3: Phone (fresh signup only — org phone preference) ── */}
           {step === 3 && (
             <>
               <div className="flex items-center gap-3 mb-6">
@@ -212,45 +353,23 @@ export default function OnboardingPage() {
                   <Phone className="h-5 w-5 text-teal-600"/>
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-gray-900">Your phone number</h2>
-                  <p className="text-sm text-gray-500">For WhatsApp task alerts (optional)</p>
+                  <h2 className="text-lg font-bold text-gray-900">Almost done!</h2>
+                  <p className="text-sm text-gray-500">Confirm your details before we launch</p>
                 </div>
               </div>
               {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>}
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Phone number
-                    <span className="ml-2 text-xs text-gray-400 font-normal">optional</span>
-                  </label>
-                  <input
-                    type="tel"
-                    value={form.phone}
-                    onChange={e => set('phone', e.target.value)}
-                    className="input"
-                    placeholder="+91 98765 43210"
-                    onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-                  />
-                  <p className="mt-1.5 text-xs text-gray-400">
-                    Include country code. Used only for WhatsApp task notifications — you can change this anytime in Profile.
-                  </p>
-                </div>
+              {/* Summary of collected profile */}
+              <div className="mb-5 p-3 bg-gray-50 rounded-xl space-y-1.5 text-sm">
+                <div className="flex gap-2"><span className="text-gray-400 w-12 shrink-0">Name</span><span className="font-medium text-gray-800 truncate">{form.name}</span></div>
+                <div className="flex gap-2"><span className="text-gray-400 w-12 shrink-0">Email</span><span className="text-gray-600 truncate">{form.email}</span></div>
+                {form.phone && <div className="flex gap-2"><span className="text-gray-400 w-12 shrink-0">Phone</span><span className="text-gray-600">{form.phone}</span></div>}
               </div>
-              <div className="flex gap-3 mt-6">
+              <div className="flex gap-3 mt-2">
                 <button onClick={() => setStep(2)} className="btn btn-outline flex-1">Back</button>
                 <button onClick={handleSubmit} disabled={saving} className="btn btn-brand flex-1">
                   {saving ? 'Setting up…' : 'Launch Taska 🚀'}
                 </button>
               </div>
-              {!form.phone && (
-                <button
-                  onClick={handleSubmit}
-                  disabled={saving}
-                  className="w-full mt-2 text-xs text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  Skip for now →
-                </button>
-              )}
             </>
           )}
 

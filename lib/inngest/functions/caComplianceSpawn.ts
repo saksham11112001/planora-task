@@ -56,18 +56,30 @@ export const caComplianceSpawn = inngest.createFunction(
     })
 
     // ── 2. Build a Set of already-created (assignment_id, due_date) pairs ──
-    const existingKeys: Set<string> = await step.run('fetch-existing-instances', async () => {
+    // Scope to assignment IDs in this run — prevents a full-table scan that
+    // grows O(all-time instances) as the platform scales.
+    // Return an array (JSON-serializable) from step.run; convert to Set outside.
+    const assignmentIds = assignments.map((a: any) => a.id)
+    const existingKeysArr: string[] = await step.run('fetch-existing-instances', async () => {
+      if (assignmentIds.length === 0) return []
       const { data } = await admin
         .from('ca_task_instances')
         .select('assignment_id, due_date')
-      return new Set((data ?? []).map((r: any) => `${r.assignment_id}__${r.due_date}`))
+        .in('assignment_id', assignmentIds)
+      return (data ?? []).map((r: any) => `${r.assignment_id}__${r.due_date}`)
     })
+    const existingKeys = new Set<string>(existingKeysArr)
 
     let spawned = 0
     let alreadyExisted = 0
+    // Hard cap: Inngest recommends <1 000 steps per function run.
+    // If more are needed, the next daily cron will pick up the remainder
+    // (instance-key dedup ensures no double-creation).
+    const MAX_STEPS_PER_RUN = 800
 
     // ── 3. Walk each assignment × each date ────────────────────────────────
     for (const asgn of assignments) {
+      if (spawned >= MAX_STEPS_PER_RUN) break
       const master = asgn.master_task as any
       if (!master) continue
 
@@ -104,6 +116,8 @@ export const caComplianceSpawn = inngest.createFunction(
           alreadyExisted++
           continue
         }
+
+        if (spawned >= MAX_STEPS_PER_RUN) break
 
         // Spawn in its own step so one failure doesn't block others
         await step.run(`spawn-${asgn.id}-${monthKey}`, async () => {

@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
     const body = await request.json()
-    const { org_name, industry, team_size, phone } = body
+    const { name, org_name, industry, team_size, phone } = body
     if (!org_name?.trim()) return NextResponse.json({ error: 'Organisation name required' }, { status: 400 })
 
     const admin = createSupabaseClient(
@@ -21,22 +21,23 @@ export async function POST(request: NextRequest) {
       { auth: { autoRefreshToken: false, persistSession: false }, global: { headers: { apikey: process.env.SUPABASE_SERVICE_ROLE_KEY!, Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY!}` } } }
     )
 
-    // Upsert user profile — include phone if provided
+    // Upsert user profile — prefer the name the user explicitly typed over OAuth metadata
+    const resolvedName =
+      (name as string | undefined)?.trim() ||
+      user.user_metadata?.full_name ||
+      user.user_metadata?.name ||
+      (user.user_metadata?.given_name && user.user_metadata?.family_name
+        ? `${user.user_metadata.given_name} ${user.user_metadata.family_name}`
+        : null) ||
+      user.user_metadata?.given_name ||
+      user.email?.split('@')[0]?.replace(/[._]/g, ' ')?.replace(/\b\w/g, (l: string) => l.toUpperCase()) ||
+      'User'
     await admin.from('users').upsert({
-      id:           user.id,
-      email:        user.email ?? '',
-      name: (
-          user.user_metadata?.full_name ??
-          user.user_metadata?.name ??
-          ((user.user_metadata?.given_name && user.user_metadata?.family_name)
-            ? `${user.user_metadata.given_name} ${user.user_metadata.family_name}`
-            : null) ??
-          user.user_metadata?.given_name ??
-          user.email?.split('@')[0]?.replace(/[._]/g, ' ')?.replace(/\b\w/g, (l: string) => l.toUpperCase()) ??
-          'User'
-        ),
-      avatar_url:   user.user_metadata?.avatar_url ?? null,
-      phone_number: phone?.trim() || null,
+      id:                user.id,
+      email:             user.email ?? '',
+      name:              resolvedName,
+      avatar_url:        user.user_metadata?.avatar_url ?? null,
+      phone_number:      phone?.trim() || null,
       whatsapp_opted_in: !!(phone?.trim()),
     }, { onConflict: 'id' })
 

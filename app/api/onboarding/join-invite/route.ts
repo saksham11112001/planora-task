@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
-    const { org_id, role } = await request.json()
+    const { org_id, role, name, phone } = await request.json()
     if (!org_id) return NextResponse.json({ error: 'org_id required' }, { status: 400 })
 
     const admin = createSupabaseClient(
@@ -25,11 +25,20 @@ export async function POST(request: NextRequest) {
     const { data: org } = await admin.from('organisations').select('id, name').eq('id', org_id).single()
     if (!org) return NextResponse.json({ error: 'Organisation not found or invite expired' }, { status: 404 })
 
-    // Ensure user profile exists
+    // Ensure user profile exists — prefer explicitly supplied name over OAuth metadata
+    const resolvedName =
+      (name as string | undefined)?.trim() ||
+      user.user_metadata?.full_name ||
+      user.user_metadata?.name ||
+      user.email?.split('@')[0] ||
+      'User'
     await admin.from('users').upsert({
-      id: user.id, email: user.email ?? '',
-      name: user.user_metadata?.full_name ?? user.email?.split('@')[0] ?? 'User',
-      avatar_url: user.user_metadata?.avatar_url ?? null,
+      id:                user.id,
+      email:             user.email ?? '',
+      name:              resolvedName,
+      avatar_url:        user.user_metadata?.avatar_url ?? null,
+      phone_number:      (phone as string | undefined)?.trim() || null,
+      whatsapp_opted_in: !!((phone as string | undefined)?.trim()),
     }, { onConflict: 'id' })
 
     // Check if already a member

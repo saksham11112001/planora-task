@@ -31,7 +31,8 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
     supabase.from('tasks')
       .select('id, title, description, status, priority, due_date, assignee_id, approver_id, client_id, project_id, approval_status, approval_required, estimated_hours, is_recurring, created_at, updated_at, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), approver:users!tasks_approver_id_fkey(id, name)')
       .eq('project_id', projectId).neq('is_archived', true)
-      .order('sort_order').order('created_at', { ascending: true }),
+      .order('sort_order').order('created_at', { ascending: true })
+      .limit(500),
     supabase.from('time_logs').select('hours, is_billable').eq('project_id', projectId),
     supabase.from('org_members').select('user_id, users(id, name)').eq('org_id', mb.org_id).eq('is_active', true),
     supabase.from('clients').select('id, name, color').eq('org_id', mb.org_id).eq('status', 'active').order('name'),
