@@ -1234,29 +1234,31 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                       )
                     })}
                     {canEdit && (
-                      <div style={{ display:'flex', alignItems:'center', gap:4 }}>
-                        <input
-                          value={blockingSearch}
-                          onChange={e => { setBlockingSearch(e.target.value); searchBlockingTasks(e.target.value) }}
-                          placeholder="Search task to block by…"
-                          style={{ flex:1, fontSize:11, padding:'3px 8px', borderRadius:6, border:'1px solid var(--border)',
-                            background:'var(--surface-subtle)', color:'var(--text-primary)', outline:'none', fontFamily:'inherit' }}
-                        />
-                      </div>
-                    )}
-                    {blockingResults.length > 0 && (
-                      <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:8,
-                        boxShadow:'0 4px 16px rgba(0,0,0,0.1)', zIndex:50, maxHeight:140, overflowY:'auto' }}>
-                        {blockingResults.map(t => (
-                          <button key={t.id} onClick={() => addBlockedBy(t.id)}
-                            style={{ display:'flex', alignItems:'center', gap:6, width:'100%', padding:'6px 10px',
-                              border:'none', background:'transparent', cursor:'pointer', textAlign:'left', fontSize:11,
-                              color:'var(--text-primary)', fontFamily:'inherit' }}
-                            onMouseEnter={e => (e.currentTarget as HTMLElement).style.background='var(--surface-subtle)'}
-                            onMouseLeave={e => (e.currentTarget as HTMLElement).style.background='transparent'}>
-                            <span style={{ flex:1, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{t.title}</span>
-                          </button>
-                        ))}
+                      <div style={{ position:'relative' }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                          <input
+                            value={blockingSearch}
+                            onChange={e => { setBlockingSearch(e.target.value); searchBlockingTasks(e.target.value) }}
+                            placeholder="Search task to block by…"
+                            style={{ flex:1, fontSize:11, padding:'3px 8px', borderRadius:6, border:'1px solid var(--border)',
+                              background:'var(--surface-subtle)', color:'var(--text-primary)', outline:'none', fontFamily:'inherit', width:'100%' }}
+                          />
+                        </div>
+                        {blockingResults.length > 0 && (
+                          <div style={{ position:'absolute', top:'100%', left:0, right:0, background:'var(--surface)', border:'1px solid var(--border)', borderRadius:8,
+                            boxShadow:'0 4px 16px rgba(0,0,0,0.15)', zIndex:200, maxHeight:140, overflowY:'auto', marginTop:2 }}>
+                            {blockingResults.map(t => (
+                              <button key={t.id} onClick={() => addBlockedBy(t.id)}
+                                style={{ display:'flex', alignItems:'center', gap:6, width:'100%', padding:'6px 10px',
+                                  border:'none', background:'transparent', cursor:'pointer', textAlign:'left', fontSize:11,
+                                  color:'var(--text-primary)', fontFamily:'inherit' }}
+                                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background='var(--surface-subtle)'}
+                                onMouseLeave={e => (e.currentTarget as HTMLElement).style.background='transparent'}>
+                                <span style={{ flex:1, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{t.title}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1289,29 +1291,31 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                         </div>
                       ))}
                       {canEdit && (
-                        <div style={{ display:'flex', alignItems:'center', gap:4 }}>
-                          <input
-                            value={blocksSearch}
-                            onChange={e => { setBlocksSearch(e.target.value); searchBlocksTasks(e.target.value) }}
-                            placeholder="Search task this blocks…"
-                            style={{ flex:1, fontSize:11, padding:'3px 8px', borderRadius:6, border:'1px solid var(--border)',
-                              background:'var(--surface-subtle)', color:'var(--text-primary)', outline:'none', fontFamily:'inherit' }}
-                          />
-                        </div>
-                      )}
-                      {blocksResults.length > 0 && (
-                        <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:8,
-                          boxShadow:'0 4px 16px rgba(0,0,0,0.1)', zIndex:50, maxHeight:140, overflowY:'auto' }}>
-                          {blocksResults.map(t => (
-                            <button key={t.id} onClick={() => addBlocksTask(t.id)}
-                              style={{ display:'flex', alignItems:'center', gap:6, width:'100%', padding:'6px 10px',
-                                border:'none', background:'transparent', cursor:'pointer', textAlign:'left', fontSize:11,
-                                color:'var(--text-primary)', fontFamily:'inherit' }}
-                              onMouseEnter={e => (e.currentTarget as HTMLElement).style.background='var(--surface-subtle)'}
-                              onMouseLeave={e => (e.currentTarget as HTMLElement).style.background='transparent'}>
-                              <span style={{ flex:1, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{t.title}</span>
-                            </button>
-                          ))}
+                        <div style={{ position:'relative' }}>
+                          <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                            <input
+                              value={blocksSearch}
+                              onChange={e => { setBlocksSearch(e.target.value); searchBlocksTasks(e.target.value) }}
+                              placeholder="Search task this blocks…"
+                              style={{ flex:1, fontSize:11, padding:'3px 8px', borderRadius:6, border:'1px solid var(--border)',
+                                background:'var(--surface-subtle)', color:'var(--text-primary)', outline:'none', fontFamily:'inherit', width:'100%' }}
+                            />
+                          </div>
+                          {blocksResults.length > 0 && (
+                            <div style={{ position:'absolute', top:'100%', left:0, right:0, background:'var(--surface)', border:'1px solid var(--border)', borderRadius:8,
+                              boxShadow:'0 4px 16px rgba(0,0,0,0.15)', zIndex:200, maxHeight:140, overflowY:'auto', marginTop:2 }}>
+                              {blocksResults.map(t => (
+                                <button key={t.id} onClick={() => addBlocksTask(t.id)}
+                                  style={{ display:'flex', alignItems:'center', gap:6, width:'100%', padding:'6px 10px',
+                                    border:'none', background:'transparent', cursor:'pointer', textAlign:'left', fontSize:11,
+                                    color:'var(--text-primary)', fontFamily:'inherit' }}
+                                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background='var(--surface-subtle)'}
+                                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background='transparent'}>
+                                  <span style={{ flex:1, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{t.title}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>

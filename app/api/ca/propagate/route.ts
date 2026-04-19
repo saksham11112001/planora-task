@@ -88,6 +88,19 @@ export async function POST(req: NextRequest) {
       .in('id', taskIds)
     if (updateErr) return NextResponse.json(dbError(updateErr, 'ca/propagate'), { status: 500 })
     updated += taskIds.length
+
+    // Also cascade assignee / approver changes to compliance subtasks
+    if ('assignee_id' in fields || 'approver_id' in fields) {
+      const subtaskUpdate: Record<string, unknown> = {}
+      if ('assignee_id' in fields) subtaskUpdate.assignee_id = fields.assignee_id ?? null
+      if ('approver_id' in fields) subtaskUpdate.approver_id = fields.approver_id ?? null
+      const { error: subtaskErr } = await admin.from('tasks')
+        .update(subtaskUpdate)
+        .in('parent_task_id', taskIds)
+        .not('status', 'eq', 'completed')
+        .contains('custom_fields', { _compliance_subtask: true })
+      if (subtaskErr) console.error('[ca/propagate] subtask cascade error:', subtaskErr.message)
+    }
   }
 
   // Rename subtasks whose titles match old attachment headers

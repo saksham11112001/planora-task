@@ -57,7 +57,7 @@ export default async function RecurringPage() {
 
   return (
     <RecurringView
-      tasks={(tasks ?? []).map(t => ({ ...t, assignee: (t.assignee as any) ?? null, approver: (t as any).approver ?? null, creator: (t as any).creator ?? null, project: (t.projects as any) ?? null, client: (t.clients as any) ?? null, created_at: (t as any).created_at ?? '', updated_at: (t as any).updated_at ?? null }))}
+      tasks={(tasks ?? []).map(t => ({ ...t, is_recurring: true, assignee: (t.assignee as any) ?? null, approver: (t as any).approver ?? null, creator: (t as any).creator ?? null, project: (t.projects as any) ?? null, client: (t.clients as any) ?? null, created_at: (t as any).created_at ?? '', updated_at: (t as any).updated_at ?? null }))}
       members={memberListWithRoles} projects={projects ?? []} clients={clients ?? []} currentUserId={user.id} canManage={canManage} userRole={mb.role}/>
   )
   } catch (err: any) {
