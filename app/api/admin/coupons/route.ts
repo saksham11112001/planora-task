@@ -4,20 +4,18 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import type { NextRequest }  from 'next/server'
 import { dbError } from '@/lib/api-error'
 
-async function ownerGuard(supabase: Awaited<ReturnType<typeof createClient>>) {
+async function superAdminGuard(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
-  const { data: mb } = await supabase
-    .from('org_members').select('org_id, role')
-    .eq('user_id', user.id).eq('is_active', true).single()
-  if (!mb || !['owner', 'admin'].includes(mb.role)) return null
-  return mb
+  const superEmail = process.env.SUPER_ADMIN_EMAIL
+  if (!superEmail || user.email?.toLowerCase() !== superEmail.toLowerCase()) return null
+  return user
 }
 
 // GET /api/admin/coupons — list all coupons with redemption counts
 export async function GET() {
   const supabase = await createClient()
-  const mb = await ownerGuard(supabase)
+  const mb = await superAdminGuard(supabase)
   if (!mb) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const admin = createAdminClient()
@@ -33,7 +31,7 @@ export async function GET() {
 // POST /api/admin/coupons — create a new coupon
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
-  const mb = await ownerGuard(supabase)
+  const mb = await superAdminGuard(supabase)
   if (!mb) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const body = await req.json() as {
