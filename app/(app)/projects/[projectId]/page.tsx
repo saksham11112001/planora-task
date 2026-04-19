@@ -28,11 +28,18 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
     supabase.from('projects')
       .select('*, owner_id, clients(id, name, color)')
       .eq('id', projectId).eq('org_id', mb.org_id).single(),
-    supabase.from('tasks')
-      .select('id, title, description, status, priority, due_date, assignee_id, approver_id, client_id, project_id, approval_status, approval_required, estimated_hours, is_recurring, created_at, updated_at, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), approver:users!tasks_approver_id_fkey(id, name)')
-      .eq('project_id', projectId).neq('is_archived', true)
-      .order('sort_order').order('created_at', { ascending: true })
-      .limit(500),
+    (() => {
+      const isAdminOwner = ['owner', 'admin'].includes(mb.role)
+      const tq = supabase.from('tasks')
+        .select('id, title, description, status, priority, due_date, assignee_id, approver_id, client_id, project_id, approval_status, approval_required, estimated_hours, is_recurring, created_at, updated_at, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), approver:users!tasks_approver_id_fkey(id, name)')
+        .eq('project_id', projectId).neq('is_archived', true)
+        .order('sort_order').order('created_at', { ascending: true })
+        .limit(500)
+      // Non-admin/owner only see project tasks they are involved in
+      return isAdminOwner
+        ? tq
+        : tq.or(`assignee_id.eq.${user.id},approver_id.eq.${user.id},created_by.eq.${user.id}`)
+    })(),
     supabase.from('time_logs').select('hours, is_billable').eq('project_id', projectId),
     supabase.from('org_members').select('user_id, users(id, name)').eq('org_id', mb.org_id).eq('is_active', true),
     supabase.from('clients').select('id, name, color').eq('org_id', mb.org_id).eq('status', 'active').order('name'),

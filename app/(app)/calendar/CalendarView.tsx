@@ -65,6 +65,22 @@ function taskTypeDot(t: CalTask): string {
   return '#0891b2'
 }
 
+/* ── Step one period backward — used to seed the forward expansion from a
+   point guaranteed to be before the viewed window start ── */
+function prevOccurrence(freq: string, dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00')
+  switch (freq) {
+    case 'daily':     d.setDate(d.getDate() - 1);         break
+    case 'weekly':    d.setDate(d.getDate() - 7);         break
+    case 'bi_weekly': d.setDate(d.getDate() - 14);        break
+    case 'monthly':   d.setMonth(d.getMonth() - 1);       break
+    case 'quarterly': d.setMonth(d.getMonth() - 3);       break
+    case 'annual':    d.setFullYear(d.getFullYear() - 1); break
+    default:          d.setDate(d.getDate() - 7);         break
+  }
+  return d.toISOString().split('T')[0]
+}
+
 export function CalendarView({ tasks, clients = [], members = [], canViewAll, currentUserId, userRole, upcomingCATriggers = [] }: Props) {
   const now = new Date()
   const [year,     setYear]     = useState(now.getFullYear())
@@ -140,17 +156,20 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
     if (!t.due_date) return
 
     if (t.is_recurring && t.frequency) {
-      // Expand recurring template to every occurrence date within the visible month.
-      // t.due_date = next_occurrence_date on the template.
+      // Expand the recurring template to every occurrence date within the viewed month.
+      // Strategy: step BACKWARD from t.due_date (= next_occurrence_date) until the cursor
+      // is at or before winStart, then iterate FORWARD through the window.
+      // This works whether next_occurrence_date is before, inside, or after the window.
       let cursor = t.due_date
-
-      // Fast-forward cursor to window start if the next occurrence is before it
       let safety = 0
-      while (cursor < winStart && safety++ < 500) {
-        cursor = nextOccurrence(t.frequency, cursor)
+
+      // Step backward until cursor <= winStart
+      while (cursor > winStart && safety++ < 500) {
+        cursor = prevOccurrence(t.frequency, cursor)
       }
 
-      // Collect all occurrences inside the window
+      // Now cursor is the last occurrence on or before winStart.
+      // Iterate forward, collecting every date that falls in [winStart, winEnd].
       safety = 0
       let placed = false
       while (cursor <= winEnd && safety++ < 500) {
@@ -164,8 +183,8 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
         cursor = nextOccurrence(t.frequency, cursor)
       }
 
-      // Fallback: if due_date itself is in the window but no expansion landed (e.g. frequency
-      // jumps past the window end), still show the task on its own due_date.
+      // Fallback: next_occurrence_date itself lands in the window but the loop somehow
+      // missed it (edge-case with large period frequencies like annual/quarterly).
       if (!placed && t.due_date >= winStart && t.due_date <= winEnd) {
         if (!byDate[t.due_date]) byDate[t.due_date] = []
         if (!byDate[t.due_date].find(x => x.id === t.id)) byDate[t.due_date].push(t)

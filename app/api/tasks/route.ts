@@ -9,13 +9,18 @@ export async function GET(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-  const { data: mb } = await supabase.from('org_members').select('org_id').eq('user_id', user.id).eq('is_active', true).single()
+  const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).single()
   if (!mb) return NextResponse.json({ data: [] })
 
   const sp  = request.nextUrl.searchParams
   let q = supabase.from('tasks')
     .select('id, title, status, priority, due_date, assignee_id, project_id, client_id, is_recurring, frequency, next_occurrence_date, parent_task_id, custom_fields, created_at, updated_at')
     .eq('org_id', mb.org_id).neq('is_archived', true)
+
+  // Non-admin/owner users only see tasks they are involved in
+  if (!['owner', 'admin'].includes(mb.role)) {
+    q = q.or(`assignee_id.eq.${user.id},approver_id.eq.${user.id},created_by.eq.${user.id}`)
+  }
   if (sp.get('project_id'))   q = q.eq('project_id', sp.get('project_id')!)
   if (sp.get('assignee_id'))  q = q.eq('assignee_id', sp.get('assignee_id')!)
   if (sp.get('client_id'))    q = q.eq('client_id', sp.get('client_id')!)

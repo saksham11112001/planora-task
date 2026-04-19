@@ -1609,8 +1609,95 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
     const ids = Object.keys(pendingChanges)
     if (ids.length === 0) return
     setSavingAll(true)
-    await Promise.all(ids.map(id => handleSaveRow(id)))
-    setSavingAll(false)
+
+    // Snapshot current tasks for rollback on failure
+    const prevTasks = tasks
+
+    // Compute effective patch for every pending id (mirrors handleSaveRow logic)
+    type PropEntry = { old_name: string; fields: NonNullable<typeof propagateModal>['fields'] }
+    const rows: Array<{ id: string; [key: string]: unknown }> = []
+    const propagationQueue: PropEntry[] = []
+
+    for (const id of ids) {
+      let patch: Record<string, unknown> = { ...(pendingChanges[id] ?? {}) }
+      const original = originalValuesRef.current[id]
+
+      // Re-compute attachment_headers from current template selections
+      const selectedIds = taskSel[id] ?? []
+      if (selectedIds.length > 0) {
+        const recomputed = mergeTemplateItems(selectedIds, attTemplates)
+        const oldH = original?.attachment_headers ?? []
+        if (JSON.stringify(recomputed) !== JSON.stringify(oldH)) {
+          patch = { ...patch, attachment_headers: recomputed, attachment_count: recomputed.length }
+          setTasks(ts => ts.map(t => t.id === id ? { ...t, attachment_headers: recomputed, attachment_count: recomputed.length } : t))
+        }
+      }
+
+      if (Object.keys(patch).length === 0) continue
+      rows.push({ id, ...patch })
+
+      // Collect propagation-relevant changes
+      if (original) {
+        const propFields: NonNullable<typeof propagateModal>['fields'] = {}
+        if (patch.name && patch.name !== original.name) propFields.title = patch.name as string
+        if (patch.priority && patch.priority !== original.priority) propFields.priority = patch.priority as string
+        if (patch.attachment_headers) {
+          const oldH = original.attachment_headers ?? []
+          const newH = patch.attachment_headers as string[]
+          if (JSON.stringify(oldH) !== JSON.stringify(newH)) {
+            propFields.attachment_headers = { old: oldH, new: newH }
+          }
+        }
+        if (Object.keys(propFields).length > 0) {
+          propagationQueue.push({ old_name: original.name, fields: propFields })
+        }
+      }
+    }
+
+    if (rows.length === 0) { setSavingAll(false); return }
+
+    try {
+      const res = await fetch('/api/ca/master/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rows }),
+      })
+      const json = await res.json() as { saved: number; failed: number; errors: Array<{ id: string; error: string }> }
+      if (!res.ok) throw new Error('Bulk save failed')
+
+      const failedIdSet = new Set((json.errors ?? []).map(e => e.id))
+      const savedRowIds = rows.filter(r => !failedIdSet.has(r.id as string)).map(r => r.id as string)
+
+      // Clear pending changes for saved rows and mark them saved
+      setPendingChanges(prev => {
+        const next = { ...prev }
+        savedRowIds.forEach(id => delete next[id])
+        return next
+      })
+      setSavedIds(prev => new Set([...prev, ...savedRowIds]))
+
+      // Advance baselines so the next save compares against fresh values
+      savedRowIds.forEach(id => {
+        const row = rows.find(r => r.id === id)
+        if (row && originalValuesRef.current[id]) {
+          const { id: _id, ...fields } = row
+          originalValuesRef.current[id] = { ...originalValuesRef.current[id], ...fields } as typeof originalValuesRef.current[string]
+        }
+      })
+
+      if (json.saved > 0) toast.success(`${json.saved} task${json.saved !== 1 ? 's' : ''} saved`)
+      if (json.failed > 0) toast.error(`${json.failed} task${json.failed !== 1 ? 's' : ''} failed to save`)
+
+      // Show first propagation modal (if any saved row triggered it)
+      if (propagationQueue.length > 0) {
+        setPropagateModal(propagationQueue[0])
+      }
+    } catch (err) {
+      setTasks(prevTasks)
+      toast.error(err instanceof Error ? err.message : 'Save failed')
+    } finally {
+      setSavingAll(false)
+    }
   }
 
   /* ── Optimistic delete ── */

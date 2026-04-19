@@ -37,7 +37,7 @@ export default async function CalendarPage() {
 
   const taskQuery = canViewAll
     ? base
-    : base.or(`assignee_id.eq.${user.id},approver_id.eq.${user.id}`)
+    : base.or(`assignee_id.eq.${user.id},approver_id.eq.${user.id},created_by.eq.${user.id}`)
 
   const [{ data: tasks }, { data: clients }, { data: members }, { data: caAssignments }, { data: caInstances }] = await Promise.all([
     taskQuery.limit(2000),

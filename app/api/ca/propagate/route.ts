@@ -103,18 +103,21 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Rename subtasks whose titles match old attachment headers
+  // Rename subtasks whose titles match old attachment headers — run all pairs in parallel
   if (fields.attachment_headers) {
     const { old: oldH, new: newH } = fields.attachment_headers
-    for (let i = 0; i < Math.min(oldH.length, newH.length); i++) {
-      if (oldH[i] && newH[i] && oldH[i] !== newH[i]) {
-        await admin.from('tasks')
+    const renameOps = Array.from(
+      { length: Math.min(oldH.length, newH.length) },
+      (_, i) => {
+        if (!oldH[i] || !newH[i] || oldH[i] === newH[i]) return null
+        return admin.from('tasks')
           .update({ title: newH[i] })
           .in('parent_task_id', taskIds)
           .eq('title', oldH[i])
           .not('status', 'eq', 'completed')
-      }
-    }
+      },
+    ).filter(Boolean) as Promise<any>[]
+    if (renameOps.length > 0) await Promise.all(renameOps)
   }
 
   return NextResponse.json({ updated })
