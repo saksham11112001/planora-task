@@ -161,7 +161,7 @@ export const dailyReminders = inngest.createFunction(
             continue
           }
 
-          if (!(await acquireEmailSlot(mgrUser.id, 'escalation_alert'))) continue
+          if (!(await acquireEmailSlot(mgrUser.id, `escalation_${task.id}`))) continue
           await sendEscalationEmail({
             to:           mgrUser.email,
             managerName:  mgrUser.name,

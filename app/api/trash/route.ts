@@ -64,7 +64,8 @@ export async function POST(request: NextRequest) {
 // DELETE: permanently purge tasks older than 30 days (called by cron)
 export async function DELETE(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`)
+  const cronSecret = process.env.CRON_SECRET
+  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`)
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const admin = createAdminClient()

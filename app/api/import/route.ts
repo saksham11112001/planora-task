@@ -4,9 +4,12 @@ import { NextResponse }       from 'next/server'
 import type { NextRequest }   from 'next/server'
 import { COMPLIANCE_TASKS }   from '@/lib/data/complianceTasks'
 import { CA_DEFAULT_TASKS }   from '@/lib/data/caDefaultTasks'
+import { effectivePlan, canUseFeature } from '@/lib/utils/planGate'
 
 export const maxDuration = 300 // seconds — bulk import can process hundreds of rows
 export const dynamic = 'force-dynamic'
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXT_PUBLIC_PLANORA_URL ?? 'https://planora.in'
 
 const COMPLIANCE_MAP = new Map(
   COMPLIANCE_TASKS.map(t => [t.title.toLowerCase().trim(), t])
@@ -271,6 +274,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Only managers and above can import' },
         { status: 403 }
+      )
+    }
+
+    // Server-side plan gate: import/export requires Pro plan or above
+    const { data: orgData } = await supabase
+      .from('organisations')
+      .select('plan_tier, status, trial_ends_at')
+      .eq('id', mb.org_id)
+      .single()
+    const plan = effectivePlan(orgData ?? { plan_tier: 'free', status: 'active' })
+    if (!canUseFeature(plan, 'import_export')) {
+      return NextResponse.json(
+        { error: 'Bulk import is available on the Pro plan and above. Upgrade to use this feature.' },
+        { status: 402 }
       )
     }
 
@@ -642,7 +659,7 @@ export async function POST(request: NextRequest) {
           } else {
             const { data: invData, error: invErr } = await admin.auth.admin.inviteUserByEmail(email, {
               data: { invited_to_org: orgId, invited_role: role, full_name: name || null },
-              redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
+              redirectTo: `${APP_URL}/auth/callback`,
             })
             if (invErr) {
               if (invErr.message?.toLowerCase().includes('already') || invErr.message?.toLowerCase().includes('registered')) {

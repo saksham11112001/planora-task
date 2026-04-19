@@ -14,14 +14,13 @@ export async function GET(request: NextRequest) {
   const sp  = request.nextUrl.searchParams
   const parsedLim = parseInt(sp.get('limit') ?? '100', 10)
   const lim = Math.min(isNaN(parsedLim) ? 100 : parsedLim, 500)
-  // Strict project visibility: everyone only sees org-wide projects OR projects they're in
-  // Only the org owner sees all projects (safety net)
-  const isOwner = mb.role === 'owner'
+  // Owners and admins see all projects; everyone else only sees org-wide or member projects
+  const canSeeAll = mb.role === 'owner' || mb.role === 'admin'
   let projectQuery = supabase.from('projects')
     .select('id, name, color, status, due_date, client_id, member_ids')
     .eq('org_id', mb.org_id).neq('is_archived', true)
     .order('updated_at', { ascending: false }).limit(lim)
-  if (!isOwner) {
+  if (!canSeeAll) {
     projectQuery = projectQuery.or(`member_ids.is.null,member_ids.cs.{${user.id}}`)
   }
   // templates are stored in org_feature_settings, not in projects table

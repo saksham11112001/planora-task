@@ -8,7 +8,8 @@
       "Bash(grep -v \"//.*toast\\\\|^ *//\")",
       "Bash(grep -v \"//.*alert\")",
       "Bash(grep -v \"//.*confirm\\\\|deleteConfirm\\\\|setConfirm\\\\|setDeleteConfirm\\\\|showConfirm\\\\|confirmModal\\\\|isConfirm\\\\|onConfirm\\\\|handleConfirm\\\\|Confirm\\\\b\\\\|confirm:\")",
-      "Bash(grep -v \"dbError\\\\|console\\\\.error\\\\|//\")"
+      "Bash(grep -v \"dbError\\\\|console\\\\.error\\\\|//\")",
+      "Bash(npm run *)"
     ]
   }
 }

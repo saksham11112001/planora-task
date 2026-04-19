@@ -6,7 +6,7 @@ import { assertCan }         from '@/lib/utils/permissionGate'
 import { effectivePlan, isAtMemberLimit, memberLimit } from '@/lib/utils/planGate'
 import { dbError } from '@/lib/api-error'
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://sng-adwisers.com'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXT_PUBLIC_PLANORA_URL ?? 'https://planora.in'
 
 export async function GET() {
   const supabase = await createClient()
@@ -126,6 +126,8 @@ export async function PATCH(request: NextRequest) {
   if (!idToCheck || !UUID_RE.test(idToCheck))
     return NextResponse.json({ error: 'Valid member_id or user_id is required' }, { status: 400 })
 
+  const admin = createAdminClient()
+
   // ── Edit member info (name / phone) ───────────────────────────────────────
   if (body.name !== undefined || body.phone_number !== undefined) {
     if (!['owner', 'admin'].includes(mb.role))
@@ -141,8 +143,6 @@ export async function PATCH(request: NextRequest) {
     if (updateErr) return NextResponse.json(dbError(updateErr, 'team'), { status: 500 })
     return NextResponse.json({ success: true })
   }
-
-  const admin = createAdminClient()
 
   // ── Remove member (soft-deactivate) ──────────────────────────────────────
   if (is_active === false) {

@@ -80,7 +80,23 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!file) return NextResponse.json({ error: 'No file' }, { status: 400 })
   if (file.size > 100 * 1024 * 1024) return NextResponse.json({ error: 'Max file size is 100 MB' }, { status: 400 })
 
-  const ext         = file.name.split('.').pop() ?? 'bin'
+  // Block executable and script file types that could be used for malicious purposes
+  const BLOCKED_EXTENSIONS = new Set([
+    'exe','bat','cmd','com','msi','dll','scr','pif',   // Windows executables
+    'sh','bash','zsh','fish','ps1','psm1','psd1',       // Shell scripts
+    'py','rb','php','pl','cgi','asp','aspx','jsp',      // Server-side scripts
+    'js','mjs','cjs','ts','vbs','vbe','wsf','wsh',      // Client/server scripts
+    'jar','class','war',                                 // Java executables
+    'app','dmg','pkg',                                   // macOS executables
+    'elf',                                               // Linux executables
+  ])
+  const ext = (file.name.split('.').pop() ?? 'bin').toLowerCase()
+  if (BLOCKED_EXTENSIONS.has(ext)) {
+    return NextResponse.json(
+      { error: `File type ".${ext}" is not allowed for security reasons.` },
+      { status: 400 }
+    )
+  }
   const storagePath = `${mb.org_id}/${id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
   const bytes       = await file.arrayBuffer()
 
