@@ -206,7 +206,10 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
       rollback?.()   // restore previous field value
       return
     }
-    onUpdated?.(fields)
+    // Read server response to capture server-side implicit changes
+    // (e.g. approval_status/completed_at cleared on reopen, parent auto-complete)
+    const { data: serverData } = await res.json().catch(() => ({}))
+    onUpdated?.(serverData && typeof serverData === 'object' ? { ...fields, ...serverData } : fields)
   }, [task, onUpdated])
 
   /* debounced patch — for text fields that change frequently */

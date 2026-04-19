@@ -54,6 +54,11 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
     const taskId = panelTaskIdRef.current  // stable even after panel closes
     if (fields && taskId) {
       const enriched: Record<string, unknown> = { ...fields }
+      // Mirror server-side implicit clears: status→'todo' always nulls these fields
+      if (fields.status === 'todo') {
+        enriched.approval_status = enriched.approval_status ?? null
+        enriched.completed_at    = enriched.completed_at    ?? null
+      }
       if ('assignee_id' in fields) {
         const m = members.find(mb => mb.id === fields.assignee_id)
         enriched.assignee = m ? { id: m.id, name: m.name } : null

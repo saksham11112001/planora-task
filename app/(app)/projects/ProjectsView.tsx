@@ -1,5 +1,6 @@
 'use client'
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Plus, FolderOpen, Clock, Trash2, Search, LayoutGrid, List, Copy, ChevronDown, ChevronRight } from 'lucide-react'
 import { fmtDate } from '@/lib/utils/format'
@@ -25,12 +26,16 @@ const STATUS_TABS = [
 ]
 
 export function ProjectsView({ projects, counts, clients, canManage }: Props) {
+  const router = useRouter()
+  const [, startT] = useTransition()
   const [search,       setSearch]       = useState('')
   const [clientFilter, setClientFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [viewMode,     setViewMode]     = useState<'grid' | 'list'>('grid')
   const [cloning,      setCloning]      = useState<string | null>(null)
   const [collapsed,    setCollapsed]    = useState<Set<string>>(new Set())
+
+  function refresh() { startT(() => router.refresh()) }
 
   function toggleGroup(key: string) {
     setCollapsed(prev => { const s = new Set(prev); s.has(key) ? s.delete(key) : s.add(key); return s })
@@ -52,7 +57,7 @@ export function ProjectsView({ projects, counts, clients, canManage }: Props) {
   async function deleteProject(id: string, name: string) {
     if (!confirm(`Archive project "${name}"? All tasks will be preserved.`)) return
     const res = await fetch(`/api/projects/${id}`, { method: 'DELETE' })
-    if (res.ok) window.location.reload()
+    if (res.ok) refresh()
     else { const d = await res.json().catch(() => ({})); toast.error(d.error ?? 'Could not delete project') }
   }
 
@@ -63,7 +68,7 @@ export function ProjectsView({ projects, counts, clients, canManage }: Props) {
       const d   = await res.json()
       if (!res.ok) { toast.error(d.error ?? 'Clone failed'); return }
       toast.success(`Cloned "${name}" → "Copy of ${name}" (${d.task_count} tasks)`)
-      window.location.reload()
+      refresh()
     } finally { setCloning(null) }
   }
 
