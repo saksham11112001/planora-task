@@ -466,7 +466,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
   }
 
   async function searchBlockingTasks(q: string) {
-    if (!q.trim()) { setBlockingResults([]); return }
+    if (!q.trim() || q.trim().length < 2) { setBlockingResults([]); return }
     try {
       const r = await fetch(`/api/search?q=${encodeURIComponent(q.trim())}`)
       const d = await r.json()
@@ -508,7 +508,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
 
   /* ── "Blocks" reverse side: this task blocks other tasks ──────── */
   async function searchBlocksTasks(q: string) {
-    if (!q.trim()) { setBlocksResults([]); return }
+    if (!q.trim() || q.trim().length < 2) { setBlocksResults([]); return }
     try {
       const r = await fetch(`/api/search?q=${encodeURIComponent(q.trim())}`)
       const d = await r.json()
@@ -1239,6 +1239,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                           <input
                             value={blockingSearch}
                             onChange={e => { setBlockingSearch(e.target.value); searchBlockingTasks(e.target.value) }}
+                            onBlur={() => setTimeout(() => setBlockingResults([]), 150)}
                             placeholder="Search task to block by…"
                             style={{ flex:1, fontSize:11, padding:'3px 8px', borderRadius:6, border:'1px solid var(--border)',
                               background:'var(--surface-subtle)', color:'var(--text-primary)', outline:'none', fontFamily:'inherit', width:'100%' }}
@@ -1296,6 +1297,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                             <input
                               value={blocksSearch}
                               onChange={e => { setBlocksSearch(e.target.value); searchBlocksTasks(e.target.value) }}
+                              onBlur={() => setTimeout(() => setBlocksResults([]), 150)}
                               placeholder="Search task this blocks…"
                               style={{ flex:1, fontSize:11, padding:'3px 8px', borderRadius:6, border:'1px solid var(--border)',
                                 background:'var(--surface-subtle)', color:'var(--text-primary)', outline:'none', fontFamily:'inherit', width:'100%' }}
