@@ -17,7 +17,8 @@
       "Bash(find /c/Users/saksh/Desktop/planora-task/supabase -name \"*.sql\" -exec grep -l \"org_settings\" {} \\\\;)",
       "Bash(find /c/Users/saksh/Desktop/planora-task/supabase/migrations -type f -name \"*.sql\" -exec grep -l \"org_settings\" {} \\\\;)",
       "mcp__Claude_Preview__preview_start",
-      "mcp__Claude_in_Chrome__tabs_context_mcp"
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "Bash(node -e \"const l = require\\('lucide-react'\\); console.log\\('Repeat2' in l, 'Repeat' in l, 'RefreshCw' in l\\)\")"
     ]
   }
 }

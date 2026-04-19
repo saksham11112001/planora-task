@@ -53,6 +53,28 @@ const BOARD_COLUMNS = [
   { key: 'annual', label: 'Annual', color: '#0891b2' },
 ]
 
+/**
+ * Returns a short sub-label showing the specific recurrence date when
+ * the frequency label alone doesn't reveal it (e.g. "monthly" → "8th of each month").
+ */
+function formatRecurrenceDetail(freq: string | null, nextDate: string | null): string | null {
+  if (!freq || !nextDate) return null
+  const [, m, d] = nextDate.split('-').map(Number)
+  const day   = d
+  const mon   = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m - 1]
+  const ord   = (n: number) => n === 1 ? '1st' : n === 2 ? '2nd' : n === 3 ? '3rd' : `${n}th`
+  // "same date" variants — label doesn't show which date
+  if (freq === 'monthly')              return `${ord(day)} of each month`
+  if (freq === 'quarterly')            return `${ord(day)} ${mon} (quarterly)`
+  if (freq === 'annual' || freq === 'yearly') return `${ord(day)} ${mon} (yearly)`
+  // custom every-N-days: show next date
+  if (/^every_\d+_days$/.test(freq))   return `Next: ${day} ${mon}`
+  // weekly/bi-weekly: show next date for context
+  if (freq === 'bi_weekly')            return `Next: ${day} ${mon}`
+  // everything else (monthly_15, weekly_mon, etc.) — label already precise, no extra needed
+  return null
+}
+
 function normalizeFrequency(freq: string | null | undefined): string {
   if (!freq) return 'other'
   if (freq === 'daily' || /^every_\d+_days$/.test(freq)) return 'daily'
@@ -490,7 +512,7 @@ export function RecurringView({
                           {task.title}
                         </p>
 
-                        <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
                           <span
                             style={{
                               fontSize: 10,
@@ -506,6 +528,11 @@ export function RecurringView({
                           {task.next_occurrence_date && (
                             <span style={{ fontSize: 10, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 2 }}>
                               📅 {fmtDate(task.next_occurrence_date)}
+                              {formatRecurrenceDetail(task.frequency, task.next_occurrence_date) && (
+                                <span style={{ color: 'var(--text-muted)', opacity: 0.7 }}>
+                                  · {formatRecurrenceDetail(task.frequency, task.next_occurrence_date)}
+                                </span>
+                              )}
                             </span>
                           )}
                         </div>
@@ -788,7 +815,7 @@ export function RecurringView({
                     </div>
                   </div>
 
-                  <div style={{ textAlign: 'center' }}>
+                  <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
                     <span
                       style={{
                         fontSize: 11,
@@ -802,6 +829,11 @@ export function RecurringView({
                     >
                       {FREQ_LABEL[task.frequency ?? ''] ?? task.frequency ?? '—'}
                     </span>
+                    {formatRecurrenceDetail(task.frequency, task.next_occurrence_date) && (
+                      <span style={{ fontSize: 10, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                        {formatRecurrenceDetail(task.frequency, task.next_occurrence_date)}
+                      </span>
+                    )}
                   </div>
 
                   <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-muted)' }}>

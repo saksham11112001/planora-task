@@ -8,7 +8,7 @@ import { QuickAddClientModal }   from '@/components/clients/QuickAddClientModal'
 import { InlineCustomFields } from '@/components/tasks/InlineCustomFields'
 
 // ── Granular frequency options ─────────────────────────────────
-const FREQUENCIES = [
+export const FREQUENCIES = [
   { group: 'Daily',     v: 'daily',            l: 'Every day' },
   { group: 'Daily',     v: 'custom_daily',     l: 'Every N days…' },
   { group: 'Weekly',    v: 'weekly_mon',       l: 'Every Monday' },
