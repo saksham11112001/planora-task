@@ -92,6 +92,13 @@ const FEATURE_GROUPS = [
       { key: 'compliance.manage_tasks', label: 'Manage custom tasks',       desc: 'Add or delete organisation-specific compliance tasks' },
     ],
   },
+  {
+    group: 'Monitor',
+    color: '#0d9488',
+    features: [
+      { key: 'monitor.view', label: 'View Monitor page', desc: 'Access the org-wide Monitor with task trends and stats' },
+    ],
+  },
 ]
 
 const ROLES: { key: Role; label: string; color: string; icon: any }[] = [
@@ -137,6 +144,7 @@ const DEFAULT_PERMISSIONS: RolePermissions = {
   'compliance.edit':          { admin: true,  manager: true,  member: false, viewer: false },
   'compliance.assign':        { admin: true,  manager: true,  member: false, viewer: false },
   'compliance.manage_tasks':  { admin: true,  manager: false, member: false, viewer: false },
+  'monitor.view':             { admin: true,  manager: true,  member: false, viewer: false },
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────

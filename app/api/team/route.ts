@@ -174,6 +174,18 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ success: true })
   }
 
+  // ── Toggle "View monitor" permission ──────────────────────────────────────
+  // Grants the member access to the Monitor page regardless of their role.
+  const { can_view_monitor } = body
+  if (typeof can_view_monitor === 'boolean') {
+    if (!['owner', 'admin'].includes(mb.role))
+      return NextResponse.json({ error: 'Only owners and admins can change this permission' }, { status: 403 })
+    const { error: monErr } = await admin.from('org_members')
+      .update({ can_view_monitor }).eq('org_id', mb.org_id).eq('id', member_id)
+    if (monErr) return NextResponse.json(dbError(monErr, 'team'), { status: 500 })
+    return NextResponse.json({ success: true })
+  }
+
   // ── Change role ───────────────────────────────────────────────────────────
   if (!role || !['admin', 'manager', 'member', 'viewer'].includes(role))
     return NextResponse.json({ error: 'Invalid role' }, { status: 400 })

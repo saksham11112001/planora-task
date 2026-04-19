@@ -49,6 +49,7 @@ const DEFAULT_PERMISSIONS: RolePermissions = {
   'compliance.edit':           { admin: true,  manager: true,  member: false, viewer: false },
   'compliance.assign':         { admin: true,  manager: true,  member: false, viewer: false },
   'compliance.manage_tasks':   { admin: true,  manager: false, member: false, viewer: false },
+  'monitor.view':              { admin: true,  manager: true,  member: false, viewer: false },
 }
 
 /**

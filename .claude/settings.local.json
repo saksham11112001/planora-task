@@ -13,7 +13,9 @@
       "Bash(npx tsc *)",
       "Bash(npx next *)",
       "Bash(grep -E \"\\\\.\\(sql|ts|json\\)$\")",
-      "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")"
+      "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")",
+      "Bash(find /c/Users/saksh/Desktop/planora-task/supabase -name \"*.sql\" -exec grep -l \"org_settings\" {} \\\\;)",
+      "Bash(find /c/Users/saksh/Desktop/planora-task/supabase/migrations -type f -name \"*.sql\" -exec grep -l \"org_settings\" {} \\\\;)"
     ]
   }
 }

@@ -1,7 +1,7 @@
 'use client'
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { Search, Filter, BarChart2, Download, Calendar } from 'lucide-react'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LineChart, Line, Legend } from 'recharts'
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
 import { isOverdue, fmtDate } from '@/lib/utils/format'
 import type { Task } from '@/types'
@@ -20,6 +20,7 @@ interface MonTask {
   approval_status: string | null
   custom_fields?: Record<string, any> | null
   created_at: string
+  completed_at?: string | null
   updated_at?: string | null
   assignee: { id: string; name: string } | null
   approver: { id: string; name: string } | null
@@ -231,6 +232,24 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
     }
   }, [tasks, today])
 
+  // ── Trend data (last 14 days, derived from full task list) ──
+  const trendData = useMemo(() => {
+    const DAYS = 14
+    const result = []
+    for (let i = DAYS - 1; i >= 0; i--) {
+      const d = new Date()
+      d.setDate(d.getDate() - i)
+      const dateStr = d.toISOString().slice(0, 10)
+      const label   = d.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })
+      result.push({
+        date:      label,
+        created:   tasks.filter(t => t.created_at?.slice(0, 10) === dateStr).length,
+        completed: tasks.filter(t => t.completed_at?.slice(0, 10) === dateStr).length,
+      })
+    }
+    return result
+  }, [tasks])
+
   // ── Grouping ──
   const groups = useMemo<{ key: string; label: string; color: string; tasks: MonTask[] }[]>(() => {
     if (groupBy === 'none') return [{ key: 'all', label: 'All tasks', color: 'var(--brand)', tasks: visible }]
@@ -328,6 +347,8 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
         {/* ── Chart (collapsible) ── */}
         {showChart && (
           <div style={{ marginTop: 16, padding: '12px 0 4px', borderTop: '1px solid var(--border-light)' }}>
+
+            {/* ── Distribution bar charts ── */}
             <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Task distribution</p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
               <div>
@@ -370,6 +391,70 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
                 </ResponsiveContainer>
               </div>
             </div>
+
+            {/* ── Activity trend line graphs (last 14 days) ── */}
+            <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border-light)' }}>
+              <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Activity trends — last 14 days</p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+
+                {/* Tasks created per day */}
+                <div>
+                  <p style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Tasks created</p>
+                  <ResponsiveContainer width="100%" height={150}>
+                    <LineChart data={trendData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                      <XAxis dataKey="date" tick={{ fontSize: 8 }} interval={1} angle={-30} textAnchor="end" height={36}/>
+                      <YAxis tick={{ fontSize: 9 }} allowDecimals={false}/>
+                      <Tooltip
+                        contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #e2e8f0' }}
+                        formatter={(v: number) => [v, 'Created']}
+                      />
+                      <Line
+                        type="monotone" dataKey="created" stroke="#0d9488" strokeWidth={2}
+                        dot={{ r: 3, fill: '#0d9488', strokeWidth: 0 }}
+                        activeDot={{ r: 5 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Tasks completed per day */}
+                <div>
+                  <p style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Tasks completed</p>
+                  <ResponsiveContainer width="100%" height={150}>
+                    <LineChart data={trendData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                      <XAxis dataKey="date" tick={{ fontSize: 8 }} interval={1} angle={-30} textAnchor="end" height={36}/>
+                      <YAxis tick={{ fontSize: 9 }} allowDecimals={false}/>
+                      <Tooltip
+                        contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #e2e8f0' }}
+                        formatter={(v: number) => [v, 'Completed']}
+                      />
+                      <Line
+                        type="monotone" dataKey="completed" stroke="#16a34a" strokeWidth={2}
+                        dot={{ r: 3, fill: '#16a34a', strokeWidth: 0 }}
+                        activeDot={{ r: 5 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+
+              </div>
+
+              {/* Combined created vs completed */}
+              <div style={{ marginTop: 16 }}>
+                <p style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Created vs completed</p>
+                <ResponsiveContainer width="100%" height={160}>
+                  <LineChart data={trendData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                    <XAxis dataKey="date" tick={{ fontSize: 8 }} interval={1} angle={-30} textAnchor="end" height={36}/>
+                    <YAxis tick={{ fontSize: 9 }} allowDecimals={false}/>
+                    <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #e2e8f0' }}/>
+                    <Legend wrapperStyle={{ fontSize: 10, paddingTop: 4 }}/>
+                    <Line type="monotone" dataKey="created"   name="Created"   stroke="#0d9488" strokeWidth={2} dot={{ r: 2.5, fill: '#0d9488', strokeWidth: 0 }} activeDot={{ r: 4 }}/>
+                    <Line type="monotone" dataKey="completed" name="Completed" stroke="#16a34a" strokeWidth={2} dot={{ r: 2.5, fill: '#16a34a', strokeWidth: 0 }} activeDot={{ r: 4 }} strokeDasharray="4 2"/>
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
           </div>
         )}
       </div>

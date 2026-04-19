@@ -5,7 +5,7 @@ import { UserPlus, X } from 'lucide-react'
 import { Avatar, RoleBadge } from '@/components/ui/Badge'
 import { toast }      from '@/store/appStore'
 
-interface Member { id: string; role: string; joined_at: string; user_id: string; can_view_all_tasks: boolean; users: { id: string; name: string; email: string; avatar_url: string | null } | null }
+interface Member { id: string; role: string; joined_at: string; user_id: string; can_view_all_tasks: boolean; can_view_monitor: boolean; users: { id: string; name: string; email: string; avatar_url: string | null } | null }
 interface Props { members: Member[]; currentUserId: string; isAdmin: boolean }
 
 const ROLES = ['admin','manager','member','viewer']
@@ -46,6 +46,15 @@ export function MembersView({ members, currentUserId, isAdmin }: Props) {
       body: JSON.stringify({ member_id: memberId, can_view_all_tasks: !current }),
     })
     if (res.ok) { toast.success(!current ? 'View all tasks enabled' : 'View all tasks disabled'); startT(() => router.refresh()) }
+    else toast.error('Failed to update permission')
+  }
+
+  async function toggleMonitor(memberId: string, current: boolean) {
+    const res = await fetch('/api/team', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ member_id: memberId, can_view_monitor: !current }),
+    })
+    if (res.ok) { toast.success(!current ? 'Monitor access granted' : 'Monitor access revoked'); startT(() => router.refresh()) }
     else toast.error('Failed to update permission')
   }
 
@@ -120,6 +129,27 @@ export function MembersView({ members, currentUserId, isAdmin }: Props) {
                     display: 'inline-block',
                   }}/>
                   View all tasks
+                </button>
+              )}
+              {/* Monitor access toggle — grants access to the Monitor analytics page */}
+              {isAdmin && !isMe && !['owner','admin'].includes(m.role) && (
+                <button
+                  onClick={() => toggleMonitor(m.id, m.can_view_monitor)}
+                  title={m.can_view_monitor ? 'Click to revoke Monitor access' : 'Click to grant Monitor access'}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px',
+                    borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                    border: `1px solid ${m.can_view_monitor ? '#7c3aed' : '#e2e8f0'}`,
+                    background: m.can_view_monitor ? 'rgba(124,58,237,0.08)' : 'var(--surface-subtle, #f8fafc)',
+                    color: m.can_view_monitor ? '#7c3aed' : '#94a3b8',
+                    fontFamily: 'inherit', transition: 'all 0.12s', whiteSpace: 'nowrap',
+                  }}>
+                  <span style={{
+                    width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                    background: m.can_view_monitor ? '#7c3aed' : '#cbd5e1',
+                    display: 'inline-block',
+                  }}/>
+                  Monitor
                 </button>
               )}
               {isAdmin && !isMe && (

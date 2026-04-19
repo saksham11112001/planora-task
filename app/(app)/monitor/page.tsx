@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect }     from 'next/navigation'
 import { MonitorView }  from './MonitorView'
+import { canDo }        from '@/lib/utils/permissionGate'
 import type { Metadata } from 'next'
 
 export const dynamic = 'force-dynamic'
@@ -13,10 +14,19 @@ export default async function MonitorPage() {
     if (!user) redirect('/login')
 
     const { data: mb } = await supabase.from('org_members')
-      .select('org_id, role, can_view_all_tasks').eq('user_id', user.id).eq('is_active', true).maybeSingle()
+      .select('org_id, role, can_view_all_tasks, can_view_monitor')
+      .eq('user_id', user.id).eq('is_active', true).maybeSingle()
     if (!mb) redirect('/onboarding')
 
-    const TASK_COLS = 'id, title, status, priority, due_date, assignee_id, approver_id, client_id, project_id, approval_status, approval_required, is_recurring, custom_fields, created_at, updated_at, assignee:users!tasks_assignee_id_fkey(id, name), approver:users!tasks_approver_id_fkey(id, name), creator:users!tasks_created_by_fkey(id, name), projects(id, name, color)'
+    // Access control — owner/admin always pass; others need monitor.view permission
+    // OR the per-member can_view_monitor flag toggled by an admin in Settings → Members.
+    const hasRoleAccess    = await canDo(supabase, mb.org_id, mb.role, 'monitor.view')
+    const hasMemberAccess  = mb.can_view_monitor === true
+    if (!hasRoleAccess && !hasMemberAccess) {
+      redirect('/dashboard?error=monitor_access_denied')
+    }
+
+    const TASK_COLS = 'id, title, status, priority, due_date, completed_at, assignee_id, approver_id, client_id, project_id, approval_status, approval_required, is_recurring, custom_fields, created_at, updated_at, assignee:users!tasks_assignee_id_fkey(id, name), approver:users!tasks_approver_id_fkey(id, name), creator:users!tasks_created_by_fkey(id, name), projects(id, name, color)'
 
     // Monitor page always fetches ALL org tasks — that is its purpose
     const [
@@ -47,19 +57,20 @@ export default async function MonitorPage() {
 
     const taskList = (tasks ?? []).map((t: any) => ({
       ...t,
-      due_date: t.due_date ?? null,
-      assignee_id: t.assignee_id ?? null,
-      client_id: t.client_id ?? null,
-      project_id: t.project_id ?? null,
+      due_date:        t.due_date ?? null,
+      completed_at:    t.completed_at ?? null,
+      assignee_id:     t.assignee_id ?? null,
+      client_id:       t.client_id ?? null,
+      project_id:      t.project_id ?? null,
       approval_status: t.approval_status ?? null,
-      is_recurring: t.is_recurring ?? false,
-      created_at: t.created_at ?? '',
-      updated_at: t.updated_at ?? null,
-      assignee: (t.assignee as any) ?? null,
-      approver: (t.approver as any) ?? null,
-      creator: (t.creator as any) ?? null,
-      client: t.client_id ? (clientMap[t.client_id] ?? null) : null,
-      project: (t.projects as any) ?? null,
+      is_recurring:    t.is_recurring ?? false,
+      created_at:      t.created_at ?? '',
+      updated_at:      t.updated_at ?? null,
+      assignee:        (t.assignee as any) ?? null,
+      approver:        (t.approver as any) ?? null,
+      creator:         (t.creator as any) ?? null,
+      client:          t.client_id ? (clientMap[t.client_id] ?? null) : null,
+      project:         (t.projects as any) ?? null,
     }))
 
     return <MonitorView
