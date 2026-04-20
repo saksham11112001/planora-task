@@ -13,7 +13,7 @@ interface Result {
 }
 
 export function SearchModal() {
-  const { searchOpen, setSearchOpen } = useAppStore()
+  const { searchOpen, setSearchOpen, session } = useAppStore()
   const router = useRouter()
   const inputRef = useRef<HTMLInputElement>(null)
   const [query,    setQuery]    = useState('')
@@ -132,6 +132,8 @@ export function SearchModal() {
         task={panelTask}
         members={members}
         clients={clients}
+        currentUserId={session?.user.id}
+        userRole={session?.role}
         onClose={() => setPanelTask(null)}
         onUpdated={() => setPanelTask(null)}
       />
