@@ -605,10 +605,16 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
 
       {/* Inline subtasks */}
       {expandedSubs[task.id] && (
-        <div style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface-subtle)' }}>
+        <div style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface-subtle)', position: 'relative' }}>
+          {/* Vertical tree connector line */}
+          <div style={{
+            position: 'absolute', left: 34, top: 0, bottom: 20,
+            width: 1.5, background: 'rgba(13,148,136,0.18)', borderRadius: 1,
+            pointerEvents: 'none',
+          }}/>
           {/* Progress bar */}
           {subs.length > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 16px 3px 48px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 16px 3px 52px' }}>
               <div style={{ flex: 1, height: 3, background: 'var(--border)', borderRadius: 99, overflow: 'hidden' }}>
                 <div style={{
                   height: '100%', borderRadius: 99,
@@ -628,9 +634,13 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
           {subs.map((sub: any) => (
             <div key={sub.id} style={{
               display: 'flex', alignItems: 'center', gap: 8,
-              padding: '5px 16px 5px 48px',
+              padding: '5px 16px 5px 44px',
               borderBottom: '1px solid var(--border-light)',
             }}>
+              {/* Tree corner connector */}
+              <svg viewBox="0 0 10 10" fill="none" style={{ width: 9, height: 9, flexShrink: 0, marginRight: -2, opacity: 0.5 }}>
+                <path d="M2 0v6h8" stroke="var(--brand)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
               <button onClick={() => toggleSubDone(sub.id, sub.status, task.id)}
                 style={{
                   width: 14, height: 14, borderRadius: '50%', flexShrink: 0, border: 'none',
@@ -734,7 +744,7 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
             </div>
           ))}
           {/* Inline add subtask */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 16px 6px 48px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 16px 6px 62px' }}>
             <div style={{ width: 14, height: 14, borderRadius: '50%', flexShrink: 0, border: '1.5px dashed var(--brand)', opacity: 0.5 }}/>
             <input
               value={newSubInputs[task.id] ?? ''}
