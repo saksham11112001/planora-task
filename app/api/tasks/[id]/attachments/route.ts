@@ -108,13 +108,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return mime
   }
 
-  const uploadContentType = normaliseContentType(file.type || 'application/octet-stream')
+  // Archive formats are uploaded as generic binary to avoid bucket MIME restrictions;
+  // the real mime_type is still stored in the DB record below.
+  const ARCHIVE_EXTS = new Set(['zip', 'rar', '7z', 'gz', 'tar', 'bz2', 'tgz', 'xz'])
+  const uploadContentType = ARCHIVE_EXTS.has(ext)
+    ? 'application/octet-stream'
+    : normaliseContentType(file.type || 'application/octet-stream')
   let { error: upErr } = await supabase.storage.from('attachments')
     .upload(storagePath, bytes, { contentType: uploadContentType, upsert: false })
   // If the specific MIME type is still rejected, retry as a generic binary blob
-  if (upErr && upErr.message?.toLowerCase().includes('mime type')) {
-    ;({ error: upErr } = await supabase.storage.from('attachments')
-      .upload(storagePath, bytes, { contentType: 'application/octet-stream', upsert: true }))
+  if (upErr) {
+    const msg = upErr.message?.toLowerCase() ?? ''
+    if (msg.includes('mime') || msg.includes('content-type') || msg.includes('media type') || msg.includes('not supported') || msg.includes('not allowed')) {
+      ;({ error: upErr } = await supabase.storage.from('attachments')
+        .upload(storagePath, bytes, { contentType: 'application/octet-stream', upsert: true }))
+    }
   }
   if (upErr) return NextResponse.json(dbError(upErr, 'tasks/[id]/attachments'), { status: 500 })
 
