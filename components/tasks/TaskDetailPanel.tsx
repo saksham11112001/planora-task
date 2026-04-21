@@ -1183,12 +1183,17 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
 
                 {/* Assigned by */}
                 {(() => {
-                  const creator = members.find(m => m.id === (task as any).created_by)
+                  const creator = ((task as any).creator as { id: string; name: string } | null)
+                    ?? members.find(m => m.id === (task as any).created_by)
+                    ?? null
                   if (!creator) return null
+                  const isSelf = creator.id === currentUserId
                   return (
                     <FieldRow label="Assigned by">
                       <Avatar name={creator.name} size="xs" />
-                      <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{creator.name}</span>
+                      <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                        {isSelf ? `${creator.name} (you)` : creator.name}
+                      </span>
                     </FieldRow>
                   )
                 })()}
