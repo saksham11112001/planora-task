@@ -55,6 +55,33 @@ type GroupFilter = typeof GROUP_FILTERS[number]
 
 const isAdmin = (role: string) => ['admin', 'owner'].includes(role)
 
+/* ─── Searchable select option sets ──────────────────────────── */
+
+interface SelectOption { value: string; label: string; description?: string }
+
+const FY_SELECT_OPTS: SelectOption[] = FY_OPTIONS.map(f => ({ value: f, label: `FY ${f}` }))
+const PRIORITY_SELECT_OPTS: SelectOption[] = [
+  { value: 'low',    label: 'Low',    description: 'Can be addressed later' },
+  { value: 'medium', label: 'Medium', description: 'Normal workflow timeline' },
+  { value: 'high',   label: 'High',   description: 'Needs attention soon' },
+  { value: 'urgent', label: 'Urgent', description: 'Immediate action required' },
+]
+const GROUP_SELECT_OPTS: SelectOption[] = CA_GROUP_NAMES.map(g => ({ value: g, label: g }))
+const FREQ_SELECT_OPTS: SelectOption[] = [
+  { value: 'monthly',     label: 'Monthly',     description: 'Due each month' },
+  { value: 'quarterly',   label: 'Quarterly',   description: 'Due every 3 months' },
+  { value: 'half_yearly', label: 'Half-yearly', description: 'Due every 6 months' },
+  { value: 'annual',      label: 'Annual',      description: 'Due once per year' },
+]
+const MONTH_SELECT_OPTS: SelectOption[] = [
+  { value: 'apr', label: 'Apr' }, { value: 'may', label: 'May' },
+  { value: 'jun', label: 'Jun' }, { value: 'jul', label: 'Jul' },
+  { value: 'aug', label: 'Aug' }, { value: 'sep', label: 'Sep' },
+  { value: 'oct', label: 'Oct' }, { value: 'nov', label: 'Nov' },
+  { value: 'dec', label: 'Dec' }, { value: 'jan', label: 'Jan' },
+  { value: 'feb', label: 'Feb' }, { value: 'mar', label: 'Mar' },
+]
+
 /* ─── Attachment Template types + helpers ─────────────────────── */
 
 interface AttachTemplate {
@@ -624,16 +651,18 @@ function QuickFillCell({
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <div>
               <label style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, display: 'block', marginBottom: 3 }}>Frequency</label>
-              <select value={freq} onChange={e => setFreq(e.target.value)} style={{
-                width: '100%', fontSize: 12, padding: '4px 8px', borderRadius: 6,
-                border: '1px solid var(--border)', background: 'var(--surface-alt)',
-                color: 'var(--text-primary)', outline: 'none',
-              }}>
-                <option value="monthly">Monthly</option>
-                <option value="quarterly">Quarterly</option>
-                <option value="half_yearly">Half-yearly</option>
-                <option value="annual">Annual</option>
-              </select>
+              <SearchableSelect
+                value={freq}
+                options={FREQ_SELECT_OPTS}
+                onChange={setFreq}
+                wrapperStyle={{ width: '100%' }}
+                buttonStyle={{
+                  width: '100%', fontSize: 12, padding: '4px 8px', borderRadius: 6,
+                  border: '1px solid var(--border)', background: 'var(--surface-alt)',
+                  color: 'var(--text-primary)', boxSizing: 'border-box',
+                }}
+                dropdownWidth={200}
+              />
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <div style={{ flex: 1 }}>
@@ -650,24 +679,18 @@ function QuickFillCell({
               </div>
               <div style={{ flex: 1 }}>
                 <label style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, display: 'block', marginBottom: 3 }}>Start month</label>
-                <select value={startMonth} onChange={e => setStartMonth(e.target.value as MonthKey)} style={{
-                  width: '100%', fontSize: 12, padding: '4px 8px', borderRadius: 6,
-                  border: '1px solid var(--border)', background: 'var(--surface-alt)',
-                  color: 'var(--text-primary)', outline: 'none',
-                }}>
-                  <option value="apr">Apr</option>
-                  <option value="may">May</option>
-                  <option value="jun">Jun</option>
-                  <option value="jul">Jul</option>
-                  <option value="aug">Aug</option>
-                  <option value="sep">Sep</option>
-                  <option value="oct">Oct</option>
-                  <option value="nov">Nov</option>
-                  <option value="dec">Dec</option>
-                  <option value="jan">Jan</option>
-                  <option value="feb">Feb</option>
-                  <option value="mar">Mar</option>
-                </select>
+                <SearchableSelect
+                  value={startMonth}
+                  options={MONTH_SELECT_OPTS}
+                  onChange={v => setStartMonth(v as MonthKey)}
+                  wrapperStyle={{ width: '100%' }}
+                  buttonStyle={{
+                    width: '100%', fontSize: 12, padding: '4px 8px', borderRadius: 6,
+                    border: '1px solid var(--border)', background: 'var(--surface-alt)',
+                    color: 'var(--text-primary)', boxSizing: 'border-box',
+                  }}
+                  dropdownWidth={160}
+                />
               </div>
             </div>
             <div style={{ display: 'flex', gap: 6, marginTop: 4, justifyContent: 'flex-end' }}>
@@ -687,6 +710,134 @@ function QuickFillCell({
         </div>
       )}
     </td>
+  )
+}
+
+/* ─── Searchable Select ───────────────────────────────────────── */
+
+function SearchableSelect({
+  value,
+  options,
+  onChange,
+  placeholder = 'Select…',
+  buttonStyle,
+  wrapperStyle,
+  dropdownWidth = 220,
+  disabled = false,
+}: {
+  value: string
+  options: SelectOption[]
+  onChange: (val: string) => void
+  placeholder?: string
+  buttonStyle?: React.CSSProperties
+  wrapperStyle?: React.CSSProperties
+  dropdownWidth?: number
+  disabled?: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const [q, setQ] = useState('')
+  const ref = useRef<HTMLDivElement>(null)
+  const searchRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (!open) { setQ(''); return }
+    setTimeout(() => searchRef.current?.focus(), 0)
+    function onDown(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [open])
+
+  const selected = options.find(o => o.value === value)
+  const filtered = q
+    ? options.filter(o =>
+        o.label.toLowerCase().includes(q.toLowerCase()) ||
+        o.description?.toLowerCase().includes(q.toLowerCase())
+      )
+    : options
+
+  return (
+    <div ref={ref} style={{ position: 'relative', display: 'inline-block', ...wrapperStyle }}>
+      <button
+        type="button"
+        onClick={() => !disabled && setOpen(o => !o)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 5,
+          cursor: disabled ? 'default' : 'pointer',
+          fontFamily: 'inherit', border: 'none', background: 'transparent',
+          padding: 0, ...buttonStyle,
+        }}
+      >
+        <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {selected?.label ?? placeholder}
+        </span>
+        <ChevronDown size={11} style={{ flexShrink: 0, opacity: 0.6 }} />
+      </button>
+
+      {open && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 9999,
+          width: dropdownWidth, background: 'var(--surface)',
+          border: '1px solid var(--border)', borderRadius: 10,
+          boxShadow: '0 8px 28px rgba(0,0,0,0.15)', overflow: 'hidden',
+        }}>
+          <div style={{ padding: '8px 8px 4px' }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 6, padding: '5px 9px',
+              borderRadius: 7, border: '1px solid var(--border)', background: 'var(--surface-alt)',
+            }}>
+              <Search size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+              <input
+                ref={searchRef}
+                value={q}
+                onChange={e => setQ(e.target.value)}
+                placeholder="Search"
+                style={{
+                  border: 'none', outline: 'none', background: 'transparent',
+                  fontSize: 12, color: 'var(--text-primary)', fontFamily: 'inherit', flex: 1, width: 0,
+                }}
+              />
+            </div>
+          </div>
+
+          <div style={{ maxHeight: 240, overflowY: 'auto', padding: '4px 0 6px' }}>
+            {filtered.length === 0 ? (
+              <div style={{ padding: 12, fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
+                No results
+              </div>
+            ) : filtered.map(opt => {
+              const active = opt.value === value
+              return (
+                <div
+                  key={opt.value}
+                  onMouseDown={() => { onChange(opt.value); setOpen(false) }}
+                  style={{
+                    padding: opt.description ? '7px 12px' : '8px 12px',
+                    cursor: 'pointer',
+                    background: active ? 'var(--brand, #0d9488)' : 'transparent',
+                    color: active ? '#fff' : 'var(--text-primary)',
+                  }}
+                  onMouseEnter={e => {
+                    if (!active) (e.currentTarget as HTMLDivElement).style.background = 'var(--surface-subtle, #f8fafc)'
+                  }}
+                  onMouseLeave={e => {
+                    if (!active) (e.currentTarget as HTMLDivElement).style.background = 'transparent'
+                  }}
+                >
+                  <div style={{ fontSize: 13, fontWeight: active ? 600 : 400 }}>{opt.label}</div>
+                  {opt.description && (
+                    <div style={{ fontSize: 11, marginTop: 2, color: active ? 'rgba(255,255,255,0.8)' : 'var(--text-muted)' }}>
+                      {opt.description}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -797,9 +948,14 @@ function AddTaskModal({
           </div>
           <div>
             <label style={labelStyle}>Group</label>
-            <select value={draft.group_name} onChange={e => set('group_name', e.target.value)} style={inputStyle}>
-              {CA_GROUP_NAMES.map(g => <option key={g} value={g}>{g}</option>)}
-            </select>
+            <SearchableSelect
+              value={draft.group_name}
+              options={GROUP_SELECT_OPTS}
+              onChange={v => set('group_name', v)}
+              wrapperStyle={{ width: '100%' }}
+              buttonStyle={{ ...inputStyle, display: 'flex' }}
+              dropdownWidth={280}
+            />
           </div>
           <div>
             <label style={labelStyle}>Task type</label>
@@ -812,9 +968,14 @@ function AddTaskModal({
           </div>
           <div>
             <label style={labelStyle}>Priority</label>
-            <select value={draft.priority} onChange={e => set('priority', e.target.value)} style={inputStyle}>
-              {PRIORITY_OPTS.map(p => <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>)}
-            </select>
+            <SearchableSelect
+              value={draft.priority}
+              options={PRIORITY_SELECT_OPTS}
+              onChange={v => set('priority', v)}
+              wrapperStyle={{ width: '100%' }}
+              buttonStyle={{ ...inputStyle, display: 'flex' }}
+              dropdownWidth={220}
+            />
           </div>
           <div>
             <label style={labelStyle}>Days before due</label>
@@ -1201,19 +1362,18 @@ function TaskRow({
       {/* Priority */}
       <td style={{ padding: '6px 8px', verticalAlign: 'middle' }}>
         {editable ? (
-          <select
+          <SearchableSelect
             value={task.priority}
-            onChange={e => onUpdate({ priority: e.target.value })}
-            style={{
+            options={PRIORITY_SELECT_OPTS}
+            onChange={v => onUpdate({ priority: v })}
+            buttonStyle={{
               fontSize: 12, padding: '3px 6px', borderRadius: 999, fontWeight: 600,
               background: PRI_STYLE[task.priority]?.bg ?? '#fff',
               color: PRI_STYLE[task.priority]?.color ?? '#000',
               border: `1px solid ${PRI_STYLE[task.priority]?.border ?? '#ddd'}`,
-              cursor: 'pointer', outline: 'none',
             }}
-          >
-            {PRIORITY_OPTS.map(p => <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>)}
-          </select>
+            dropdownWidth={200}
+          />
         ) : (
           <PriorityBadge value={task.priority} />
         )}
@@ -1783,17 +1943,17 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <Calendar size={15} style={{ color: 'var(--text-muted)' }} />
-          <select
+          <SearchableSelect
             value={fy}
-            onChange={e => setFy(e.target.value as FYOption)}
-            style={{
+            options={FY_SELECT_OPTS}
+            onChange={v => setFy(v as FYOption)}
+            buttonStyle={{
               fontSize: 14, fontWeight: 600, padding: '5px 10px', borderRadius: 8,
               border: '1px solid var(--border)', background: 'var(--surface-alt)',
-              color: 'var(--text-primary)', outline: 'none', cursor: 'pointer',
+              color: 'var(--text-primary)',
             }}
-          >
-            {FY_OPTIONS.map(f => <option key={f} value={f}>FY {f}</option>)}
-          </select>
+            dropdownWidth={160}
+          />
         </div>
 
         {canEdit && (
@@ -2142,11 +2302,18 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
               <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 5 }}>
                 Financial Year
               </label>
-              <select value={importFy} onChange={e => setImportFy(e.target.value)}
-                style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)',
-                  background: 'var(--surface)', color: 'var(--text-primary)', fontSize: 13, outline: 'none' }}>
-                {FY_OPTIONS.map(f => <option key={f} value={f}>FY {f}</option>)}
-              </select>
+              <SearchableSelect
+                value={importFy}
+                options={FY_SELECT_OPTS}
+                onChange={setImportFy}
+                wrapperStyle={{ width: '100%' }}
+                buttonStyle={{
+                  width: '100%', padding: '8px 12px', borderRadius: 8,
+                  border: '1px solid var(--border)', background: 'var(--surface)',
+                  color: 'var(--text-primary)', fontSize: 13, boxSizing: 'border-box',
+                }}
+                dropdownWidth={200}
+              />
             </div>
 
             {/* File picker */}
