@@ -333,7 +333,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
     return true
   })
   const overdue  = visibleTasks.filter(t => t.status!=='completed' && isOverdue(t.due_date, t.status))
-  const inProg   = visibleTasks.filter(t => t.status!=='completed' && !isOverdue(t.due_date, t.status) && t.approval_status!=='pending')
+  const inProg   = visibleTasks.filter(t => t.status!=='completed' && t.status!=='cancelled' && !isOverdue(t.due_date, t.status) && t.approval_status!=='pending')
   const inReview = visibleTasks.filter(t => t.approval_status==='pending')
   const done     = visibleTasks.filter(t => t.status==='completed')
   const filterTasks = (list: Task[]) => !searchQuery.trim() ? list : list.filter(t => t.title.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -390,7 +390,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
             {INBOX_BOARD_COLS.map(col => {
               const t2 = todayStr()
               let colTasks = col.status==='overdue'
-                ? localTasks.filter(t => !!t.due_date && t.due_date<t2 && !['completed','in_review'].includes(t.status))
+                ? localTasks.filter(t => !!t.due_date && t.due_date<t2 && !['completed','in_review','cancelled'].includes(t.status))
                 : col.status==='in_review' ? localTasks.filter(t => t.approval_status==='pending'||t.status==='in_review')
                 : col.status==='todo' ? localTasks.filter(t => ['todo','in_progress'].includes(t.status) && t.approval_status!=='pending' && !(!!t.due_date && t.due_date<t2))
                 : localTasks.filter(t => t.status===col.status && t.approval_status!=='pending')
