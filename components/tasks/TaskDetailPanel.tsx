@@ -1133,7 +1133,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
               <>
               <div className="px-5 py-3">
                 <FieldRow label="Status">
-                  <select value={status} onChange={e => { if (!canEdit) return; const prev = status; setStatus(e.target.value); patch({ status: e.target.value }, () => setStatus(prev)) }}
+                  <select value={status} onChange={e => { if (!canEdit) return; const prev = status; const next = e.target.value; setStatus(next); onUpdated?.({ status: next }); patch({ status: next }, () => { setStatus(prev); onUpdated?.({ status: prev }) }) }}
                     disabled={!canEdit}
                     className="text-sm bg-transparent outline-none flex-1"
                     style={{ color: 'var(--text-primary)', cursor: canEdit ? 'pointer' : 'default' }}>
