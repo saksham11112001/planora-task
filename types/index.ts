@@ -33,7 +33,7 @@ export interface Project {
 }
 
 export interface Task {
-  id: string; org_id: string; project_id?: string | null; client_id?: string | null
+  id: string; org_id: string; parent_task_id?: string | null; project_id?: string | null; client_id?: string | null
   title: string; description?: string | null; status: TaskStatus; priority: TaskPriority
   assignee_id?: string | null; due_date?: string | null; completed_at?: string | null
   estimated_hours?: number | null; is_recurring: boolean; frequency?: Frequency | null

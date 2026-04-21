@@ -999,31 +999,39 @@ export function MyTasksView({
                         onChange={() => setChecked(p => { const s=new Set(p); s.has(task.id)?s.delete(task.id):s.add(task.id); return s })}
                         onClick={e => e.stopPropagation()} style={{ accentColor:'var(--brand)', width:13, height:13 }}/>
                       <CircleBtn task={task}/>
-                      {/* Expand button — toggle subtasks inline */}
-                      <button
-                        onClick={async e => {
-                          e.stopPropagation()
-                          setExpandedTasks(prev => { const s=new Set(prev); s.has(task.id)?s.delete(task.id):s.add(task.id); return s })
-                          if (!subtaskMap[task.id]) {
-                            const r = await fetch(`/api/tasks?parent_id=${task.id}&limit=50`)
-                            const d = await r.json()
-                            setSubtaskMap(p => ({ ...p, [task.id]: d.data ?? [] }))
-                          }
-                        }}
-                        title="Subtasks"
-                        style={{ width:16, height:16, display:'flex', alignItems:'center', justifyContent:'center',
-                          border:'none', background:'transparent', cursor:'pointer', padding:0, borderRadius:3,
-                          color: expandedTasks.has(task.id) ? 'var(--brand)' : 'var(--text-muted)',
-                          fontSize:9, fontWeight:700, transition:'color 0.1s', flexShrink:0 }}
-                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.color='var(--brand)'}
-                        onMouseLeave={e => (e.currentTarget as HTMLElement).style.color=expandedTasks.has(task.id)?'var(--brand)':'var(--text-muted)'}>
-                        {expandedTasks.has(task.id) ? '▼' : '▶'}
-                        {(subtaskMap[task.id]??[]).length > 0 && (
-                          <span style={{ fontSize:8, marginLeft:1, opacity:0.7 }}>
-                            {(subtaskMap[task.id]??[]).filter((s:any)=>s.status==='completed').length}/{(subtaskMap[task.id]??[]).length}
-                          </span>
-                        )}
-                      </button>
+                      {/* Expand button — toggle subtasks inline (hidden for subtasks) */}
+                      {task.parent_task_id ? (
+                        <div title="Subtask" style={{ width:16, height:16, display:'flex', alignItems:'center',
+                          justifyContent:'center', fontSize:10, color:'var(--text-muted)', flexShrink:0,
+                          userSelect:'none' }}>
+                          ↳
+                        </div>
+                      ) : (
+                        <button
+                          onClick={async e => {
+                            e.stopPropagation()
+                            setExpandedTasks(prev => { const s=new Set(prev); s.has(task.id)?s.delete(task.id):s.add(task.id); return s })
+                            if (!subtaskMap[task.id]) {
+                              const r = await fetch(`/api/tasks?parent_id=${task.id}&limit=50`)
+                              const d = await r.json()
+                              setSubtaskMap(p => ({ ...p, [task.id]: d.data ?? [] }))
+                            }
+                          }}
+                          title="Subtasks"
+                          style={{ width:16, height:16, display:'flex', alignItems:'center', justifyContent:'center',
+                            border:'none', background:'transparent', cursor:'pointer', padding:0, borderRadius:3,
+                            color: expandedTasks.has(task.id) ? 'var(--brand)' : 'var(--text-muted)',
+                            fontSize:9, fontWeight:700, transition:'color 0.1s', flexShrink:0 }}
+                          onMouseEnter={e => (e.currentTarget as HTMLElement).style.color='var(--brand)'}
+                          onMouseLeave={e => (e.currentTarget as HTMLElement).style.color=expandedTasks.has(task.id)?'var(--brand)':'var(--text-muted)'}>
+                          {expandedTasks.has(task.id) ? '▼' : '▶'}
+                          {(subtaskMap[task.id]??[]).length > 0 && (
+                            <span style={{ fontSize:8, marginLeft:1, opacity:0.7 }}>
+                              {(subtaskMap[task.id]??[]).filter((s:any)=>s.status==='completed').length}/{(subtaskMap[task.id]??[]).length}
+                            </span>
+                          )}
+                        </button>
+                      )}
                       <div style={{ minWidth:0, overflow:'hidden' }}>
                         <div style={{ fontSize:13,
                           color: task.status==='completed'?'#94a3b8':isPending?'#7c3aed':ov?'#dc2626':'var(--text-primary)',
