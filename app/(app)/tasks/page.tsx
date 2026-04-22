@@ -113,9 +113,35 @@ export default async function MyTasksPage() {
       project: (t.projects as any) ?? null,
     })
 
-    const taskList        = (tasks ?? []).filter(isVisible).map(enrich)
+    const taskList        = (tasks ?? []).filter(isVisible).map(enrich) as any[]
     const approvalList    = (approvalTasks ?? []).filter(isVisible).map(enrich)
     const assignedByMeList = (assignedByMeRaw ?? []).filter(isVisible).map(enrich)
+
+    // ── Context tasks: parent tasks whose subtasks are assigned to the current user ──
+    // When a user is only assigned to a subtask, the parent task won't appear in their
+    // My Tasks (since it's assigned to someone else). Fetch those parents and show them
+    // as read-only "context" so the user can see the backstory and manage their subtask.
+    const subtaskParentIds = (tasks ?? [])
+      .filter((t: any) => t.parent_task_id != null)
+      .map((t: any) => t.parent_task_id as string)
+    const uniqueParentIds = [...new Set(subtaskParentIds)]
+      .filter(id => !taskList.some((t: any) => t.id === id)) // skip if already in list
+
+    if (uniqueParentIds.length > 0) {
+      const { data: parentRows } = await supabase.from('tasks')
+        .select(TASK_COLS)
+        .in('id', uniqueParentIds)
+        .eq('org_id', mb.org_id)
+        .neq('is_archived', true)
+      ;(parentRows ?? []).forEach((t: any) => {
+        taskList.push(enrich({
+          ...t,
+          // _context_task signals the UI that this task is shown for context only —
+          // the current user is NOT the assignee of this parent task.
+          custom_fields: { ...(t.custom_fields ?? {}), _context_task: true },
+        }))
+      })
+    }
 
     // Compute CA triggers firing in the next 3 days (not yet spawned)
     type UpcomingCATrigger = {

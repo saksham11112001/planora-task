@@ -36,6 +36,9 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
   const isAssignee = task?.assignee_id === currentUserId
   // canEdit: only managers or the main task assignee can edit the parent task
   const canEdit = canManage || isAssignee
+  // isContextTask: this parent task was surfaced because the current user is assigned
+  // to one of its subtasks, not to the task itself — show read-only with a banner.
+  const isContextTask = !!(task as any)?.custom_fields?._context_task
 
   /* local editable state */
   const [title,       setTitle]       = useState('')
@@ -624,6 +627,20 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     toast.success('Deleted')
   }
 
+  async function markAsNil() {
+    if (!task) return
+    setUploading(true)
+    const r = await fetch(`/api/tasks/${task.id}/attachments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ drive_url: 'nil', file_name: 'Not available (nil)', attachment_type: 'link' }),
+    })
+    const d = await r.json()
+    if (r.ok) { setAttachments(p => [d.data, ...p]); toast.success('Marked as NIL — document noted as unavailable') }
+    else toast.error(d.error ?? 'Failed to mark as NIL')
+    setUploading(false)
+  }
+
   async function viewAttachment(storagePath: string, mimeType: string, fileName: string) {
     const { createClient } = await import('@/lib/supabase/client')
     const sb = createClient()
@@ -796,6 +813,21 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                 <X className="h-4 w-4" />
               </button>
             </div>
+
+            {/* ── Context task banner ── */}
+            {isContextTask && (
+              <div style={{ padding:'9px 16px', background:'rgba(8,145,178,0.08)',
+                borderBottom:'1px solid rgba(8,145,178,0.2)',
+                display:'flex', alignItems:'flex-start', gap:8 }}>
+                <span style={{ fontSize:15, flexShrink:0, lineHeight:1 }}>📋</span>
+                <div>
+                  <p style={{ margin:0, fontSize:12, fontWeight:600, color:'#0369a1' }}>Context task</p>
+                  <p style={{ margin:'2px 0 0', fontSize:11, color:'#0891b2', lineHeight:1.4 }}>
+                    You are assigned a subtask here. You can view all details and manage your subtask below — but only the main assignee can edit this task.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* ── Approval banners ── */}
             {isPending && isDesignatedApprover && (
@@ -1564,6 +1596,33 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                     }}>
                     <Link2 className="h-3 w-3" />
                     Paste link
+                  </button>
+                  <button
+                    onClick={markAsNil}
+                    disabled={uploading}
+                    className="text-xs font-medium px-3 py-1.5 rounded-md transition-colors flex items-center gap-1"
+                    title="Mark as NIL — records that this document is not available"
+                    style={{
+                      background: 'transparent',
+                      color: 'var(--text-muted)',
+                      border: '1px solid transparent',
+                      cursor: uploading ? 'not-allowed' : 'pointer',
+                      opacity: uploading ? 0.6 : 1,
+                    }}
+                    onMouseEnter={e => {
+                      const el = e.currentTarget as HTMLElement
+                      el.style.background = 'rgba(220,38,38,0.07)'
+                      el.style.color = '#dc2626'
+                      el.style.borderColor = 'rgba(220,38,38,0.25)'
+                    }}
+                    onMouseLeave={e => {
+                      const el = e.currentTarget as HTMLElement
+                      el.style.background = 'transparent'
+                      el.style.color = 'var(--text-muted)'
+                      el.style.borderColor = 'transparent'
+                    }}>
+                    <span style={{ fontSize:10 }}>⊘</span>
+                    Mark as NIL
                   </button>
                 </div>
 

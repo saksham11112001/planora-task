@@ -761,7 +761,7 @@ export function MyTasksView({
                 <Trash2 style={{width:13,height:13}}/> Delete
               </button>
             )}
-            <button onClick={() => setChecked(new Set(displayTasks.map(t => t.id)))}
+            <button onClick={() => setChecked(new Set(displayTasks.filter((t: any) => !t.custom_fields?._context_task).map(t => t.id)))}
               style={{ background:'transparent', border:'1px solid var(--border)', padding:'5px 12px',
                 borderRadius:7, fontSize:12, fontWeight:500, color:'var(--text-secondary)', cursor:'pointer' }}>
               Select all
@@ -970,6 +970,7 @@ export function MyTasksView({
                   <span style={{ opacity:0.4, fontWeight:400, textTransform:'none', fontSize:10 }}>({secTasks.length})</span>
                 </div>
                 {secTasks.map(task => {
+                  const isContextTask = (task as any).custom_fields?._context_task === true
                   const ov         = isOverdue(task.due_date, task.status)
                   const isPending  = task.approval_status === 'pending' || task.status === 'in_review'
                   const client     = (task as any).client as {id:string;name:string;color:string}|null
@@ -995,10 +996,26 @@ export function MyTasksView({
                         background: typeBg,
                         cursor:'pointer' }}
                       onClick={() => setSelTask(selTask?.id === task.id ? null : task)}>
-                      <input type="checkbox" checked={checked.has(task.id)}
-                        onChange={() => setChecked(p => { const s=new Set(p); s.has(task.id)?s.delete(task.id):s.add(task.id); return s })}
-                        onClick={e => e.stopPropagation()} style={{ accentColor:'var(--brand)', width:13, height:13 }}/>
-                      <CircleBtn task={task}/>
+                      {isContextTask ? (
+                        /* Context tasks can't be checked — they're read-only parent tasks */
+                        <div style={{ width:13, height:13 }}/>
+                      ) : (
+                        <input type="checkbox" checked={checked.has(task.id)}
+                          onChange={() => setChecked(p => { const s=new Set(p); s.has(task.id)?s.delete(task.id):s.add(task.id); return s })}
+                          onClick={e => e.stopPropagation()} style={{ accentColor:'var(--brand)', width:13, height:13 }}/>
+                      )}
+                      {isContextTask ? (
+                        /* Eye icon — signals read-only context */
+                        <div style={{ width:16, height:16, borderRadius:'50%', flexShrink:0,
+                          border:'1.5px solid #94a3b8', background:'transparent',
+                          display:'flex', alignItems:'center', justifyContent:'center' }}
+                          title="Context task — you are assigned a subtask here">
+                          <svg viewBox="0 0 10 10" fill="none" style={{width:8,height:8}}>
+                            <path d="M1 5s1.5-2.5 4-2.5S9 5 9 5s-1.5 2.5-4 2.5S1 5 1 5Z" stroke="#94a3b8" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <circle cx="5" cy="5" r="1.2" fill="#94a3b8"/>
+                          </svg>
+                        </div>
+                      ) : <CircleBtn task={task}/>}
                       {/* Expand button — toggle subtasks inline (hidden for subtasks) */}
                       {task.parent_task_id ? (
                         <div title="Subtask" style={{ width:16, height:16, display:'flex', alignItems:'center',
@@ -1041,6 +1058,11 @@ export function MyTasksView({
                           {task.is_recurring && <RefreshCw style={{ flexShrink:0, width:11, height:11, color:'var(--brand)', marginRight:2 }}/>}
                           {task.project_id && !task.is_recurring && <FolderOpen style={{ flexShrink:0, width:11, height:11, color:'#7c3aed', marginRight:2 }}/>}
                           {isCompliance && <span style={{ flexShrink:0, fontSize:9, fontWeight:700, background:'rgba(234,179,8,0.15)', color:'#b45309', padding:'1px 4px', borderRadius:3 }}>CA</span>}
+                          {isContextTask && (
+                            <span title="You have a subtask here — this task is shown for context" style={{ flexShrink:0, fontSize:9, fontWeight:700, background:'rgba(8,145,178,0.12)', color:'#0891b2', padding:'1px 5px', borderRadius:3, whiteSpace:'nowrap' }}>
+                              📋 context
+                            </span>
+                          )}
                           <span className="task-title" style={{ overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis', flex:1 }}>{task.title}</span>
                           {((task as any).custom_fields?._blocked_by?.length > 0) && task.status !== 'completed' && (
                             <span title="Blocked by incomplete tasks" style={{ flexShrink:0, display:'inline-flex', alignItems:'center', gap:2, padding:'1px 5px', borderRadius:4, fontSize:9, fontWeight:700, background:'rgba(220,38,38,0.1)', color:'#dc2626', letterSpacing:'0.02em', whiteSpace:'nowrap' }}>
@@ -1165,32 +1187,34 @@ export function MyTasksView({
                           </span>
                         )}
                       </div>
-                      {/* Actions — last grid cell: priority dot + clone + delete */}
+                      {/* Actions — last grid cell: priority dot + clone + delete (hidden for context tasks) */}
                       <div style={{ display:'flex', alignItems:'center', justifyContent:'flex-end', gap:4 }}
                         onClick={e => e.stopPropagation()}>
                         <div title={task.priority}
                           style={{ width:8, height:8, borderRadius:'50%', flexShrink:0,
                             background: PRIORITY_CONFIG[task.priority]?.color ?? '#94a3b8' }}/>
-                        <button onClick={e => { e.stopPropagation(); cloneTask(task) }} title="Clone task"
-                          className="delete-task-btn"
-                          style={{ opacity:0, transition:'opacity 0.15s', display:'flex', alignItems:'center',
-                            justifyContent:'center', width:22, height:22, borderRadius:5, border:'none',
-                            background:'transparent', cursor:'pointer', color:'var(--text-muted)' }}
-                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background='rgba(13,148,136,0.1)'; (e.currentTarget as HTMLElement).style.color='var(--brand)' }}
-                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background='transparent'; (e.currentTarget as HTMLElement).style.color='var(--text-muted)' }}>
-                          <Copy style={{ width:11, height:11 }}/>
-                        </button>
-                        {canManage && (
-                          <button onClick={() => deleteTask(task.id)} title="Delete task"
+                        {!isContextTask && <>
+                          <button onClick={e => { e.stopPropagation(); cloneTask(task) }} title="Clone task"
                             className="delete-task-btn"
                             style={{ opacity:0, transition:'opacity 0.15s', display:'flex', alignItems:'center',
                               justifyContent:'center', width:22, height:22, borderRadius:5, border:'none',
                               background:'transparent', cursor:'pointer', color:'var(--text-muted)' }}
-                            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background='rgba(220,38,38,0.1)'; (e.currentTarget as HTMLElement).style.color='#dc2626' }}
+                            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background='rgba(13,148,136,0.1)'; (e.currentTarget as HTMLElement).style.color='var(--brand)' }}
                             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background='transparent'; (e.currentTarget as HTMLElement).style.color='var(--text-muted)' }}>
-                            <Trash2 style={{ width:11, height:11 }}/>
+                            <Copy style={{ width:11, height:11 }}/>
                           </button>
-                        )}
+                          {canManage && (
+                            <button onClick={() => deleteTask(task.id)} title="Delete task"
+                              className="delete-task-btn"
+                              style={{ opacity:0, transition:'opacity 0.15s', display:'flex', alignItems:'center',
+                                justifyContent:'center', width:22, height:22, borderRadius:5, border:'none',
+                                background:'transparent', cursor:'pointer', color:'var(--text-muted)' }}
+                              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background='rgba(220,38,38,0.1)'; (e.currentTarget as HTMLElement).style.color='#dc2626' }}
+                              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background='transparent'; (e.currentTarget as HTMLElement).style.color='var(--text-muted)' }}>
+                              <Trash2 style={{ width:11, height:11 }}/>
+                            </button>
+                          )}
+                        </>}
                       </div>
                     </div>
                     {/* Inline subtasks — shown when expanded */}
@@ -1621,6 +1645,7 @@ export function MyTasksView({
 
           // ── Shared task card renderer ──────────────────────────────────────
           const TaskCard = ({ task }: { task: Task }) => {
+            const isContextTask = (task as any).custom_fields?._context_task === true
             const assignee  = task.assignee as {id:string;name:string}|null
             const client    = (task as any).client as {id:string;name:string;color:string}|null
             const pri       = PRIORITY_CONFIG[task.priority]
@@ -1630,17 +1655,17 @@ export function MyTasksView({
             const _isComp   = (task as any).custom_fields?._ca_compliance === true
             const _isRec    = task.is_recurring === true
             const _isPrj    = !!task.project_id && !_isRec && !_isComp
-            const _accent   = _isComp ? '#d97706' : _isRec ? '#0d9488' : _isPrj ? '#7c3aed' : '#0891b2'
-            const _cardBg   = _isComp ? 'rgba(234,179,8,0.07)' : _isRec ? 'rgba(13,148,136,0.06)' : _isPrj ? 'rgba(124,58,237,0.06)' : 'var(--surface)'
+            const _accent   = isContextTask ? '#0891b2' : _isComp ? '#d97706' : _isRec ? '#0d9488' : _isPrj ? '#7c3aed' : '#0891b2'
+            const _cardBg   = isContextTask ? 'rgba(8,145,178,0.05)' : _isComp ? 'rgba(234,179,8,0.07)' : _isRec ? 'rgba(13,148,136,0.06)' : _isPrj ? 'rgba(124,58,237,0.06)' : 'var(--surface)'
             const isSelected = dragTaskId===task.id || selTask?.id===task.id
             return (
               <div
-                draggable
-                onDragStart={() => handleDragStart(task.id)}
+                draggable={!isContextTask}
+                onDragStart={() => { if (!isContextTask) handleDragStart(task.id) }}
                 onDragEnd={() => { setDragTaskId(null); setDragOverCol(null) }}
                 onClick={() => setSelTask(selTask?.id === task.id ? null : task)}
                 style={{ background:_cardBg, borderRadius:8, padding:'9px 10px',
-                  cursor:'grab',
+                  cursor: isContextTask ? 'pointer' : 'grab',
                   border:`1px solid ${isSelected?'var(--brand)':isPending?'#ddd6fe':'var(--border)'}`,
                   borderLeft:`3px solid ${isSelected?'var(--brand)':_accent}`,
                   boxShadow: dragTaskId===task.id ? '0 4px 14px rgba(0,0,0,0.12)' : '0 1px 3px rgba(0,0,0,0.05)',
@@ -1649,7 +1674,18 @@ export function MyTasksView({
                   transition: 'opacity 0.15s, transform 0.1s' }}>
                 {/* Title row */}
                 <div style={{ display:'flex', alignItems:'flex-start', gap:6, marginBottom:7 }}>
-                  {isPending
+                  {isContextTask ? (
+                    /* Eye icon — read-only context */
+                    <div style={{ width:14, height:14, borderRadius:'50%', flexShrink:0, marginTop:1,
+                      border:'1.5px solid #94a3b8', background:'transparent',
+                      display:'flex', alignItems:'center', justifyContent:'center' }}
+                      title="Context task — you have a subtask here">
+                      <svg viewBox="0 0 10 10" fill="none" style={{width:7,height:7}}>
+                        <path d="M1 5s1.5-2.5 4-2.5S9 5 9 5s-1.5 2.5-4 2.5S1 5 1 5Z" stroke="#94a3b8" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <circle cx="5" cy="5" r="1.2" fill="#94a3b8"/>
+                      </svg>
+                    </div>
+                  ) : isPending
                     ? <div style={{ width:14, height:14, borderRadius:'50%', flexShrink:0, marginTop:1,
                         background:'rgba(124,58,237,0.1)', border:'1.5px solid #7c3aed',
                         display:'flex', alignItems:'center', justifyContent:'center' }}>
@@ -1670,8 +1706,17 @@ export function MyTasksView({
                     {task.title}
                   </span>
                 </div>
-                {/* Chips row: client + assignee (compact, with full-name tooltip) */}
+                {/* Chips row: context badge + client + assignee */}
                 <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:6, flexWrap:'wrap', opacity: 0.85 }}>
+                  {isContextTask && (
+                    <span title="You have a subtask here — this task is shown for context"
+                      style={{ display:'inline-flex', alignItems:'center', gap:3,
+                        padding:'2px 6px', borderRadius:99, fontSize:9, fontWeight:700,
+                        background:'rgba(8,145,178,0.12)', border:'1px solid rgba(8,145,178,0.25)',
+                        color:'#0891b2', whiteSpace:'nowrap' }}>
+                      📋 context
+                    </span>
+                  )}
                   {client && (
                     <span title={client.name}
                       style={{ display:'inline-flex', alignItems:'center', gap:3,
@@ -1721,7 +1766,7 @@ export function MyTasksView({
                       </span>
                     )}
                     {task.is_recurring && <RefreshCw style={{width:8,height:8,color:'var(--brand)'}}/>}
-                    {canManage && (
+                    {canManage && !isContextTask && (
                       <button onClick={e => { e.stopPropagation(); deleteTask(task.id) }}
                         title="Delete" style={{ background:'none', border:'none', cursor:'pointer',
                           color:'var(--text-muted)', padding:2, display:'flex', alignItems:'center',
