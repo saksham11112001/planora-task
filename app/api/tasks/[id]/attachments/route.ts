@@ -101,27 +101,25 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const storagePath = `${mb.org_id}/${id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
   const bytes       = await file.arrayBuffer()
 
-  // Normalise MIME types that Supabase Storage may not accept — fall back to octet-stream
+  // Normalise MIME types — ZIP has many variants across OS/browser combinations
   function normaliseContentType(mime: string): string {
     if (!mime) return 'application/octet-stream'
-    const zipTypes = ['application/x-zip-compressed', 'application/x-zip', 'application/zip', 'multipart/x-zip']
+    const zipTypes = [
+      'application/zip', 'application/x-zip', 'application/x-zip-compressed',
+      'application/x-compressed', 'application/zip-compressed', 'multipart/x-zip',
+    ]
     if (zipTypes.includes(mime)) return 'application/zip'
     return mime
   }
 
-  // Use the admin (service-role) client for storage so bucket MIME-type
-  // restrictions never block legitimate file types like ZIP archives.
   const adminSb = createAdminClient()
   const uploadContentType = normaliseContentType(file.type || 'application/octet-stream')
   let { error: upErr } = await adminSb.storage.from('attachments')
     .upload(storagePath, bytes, { contentType: uploadContentType, upsert: false })
-  // If the specific MIME type is still rejected, retry as a generic binary blob
+  // Always retry as generic binary if the specific MIME type is rejected for any reason
   if (upErr) {
-    const msg = upErr.message?.toLowerCase() ?? ''
-    if (msg.includes('mime') || msg.includes('content-type') || msg.includes('media type') || msg.includes('not supported') || msg.includes('not allowed')) {
-      ;({ error: upErr } = await adminSb.storage.from('attachments')
-        .upload(storagePath, bytes, { contentType: 'application/octet-stream', upsert: true }))
-    }
+    ;({ error: upErr } = await adminSb.storage.from('attachments')
+      .upload(storagePath, bytes, { contentType: 'application/octet-stream', upsert: true }))
   }
   if (upErr) return NextResponse.json(dbError(upErr, 'tasks/[id]/attachments'), { status: 500 })
 
