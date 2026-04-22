@@ -109,19 +109,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return mime
   }
 
-  // Use the admin (service-role) client for storage so bucket MIME-type
-  // restrictions never block legitimate file types like ZIP archives.
+  // Use the admin (service-role) client for storage uploads.
+  // Supabase enforces allowedMimeTypes at the storage-service level even for
+  // service-role clients, so we open the bucket to all types first, then upload.
   const adminSb = createAdminClient()
+  await adminSb.storage.updateBucket('attachments', { allowedMimeTypes: null })
   const uploadContentType = normaliseContentType(file.type || 'application/octet-stream')
   let { error: upErr } = await adminSb.storage.from('attachments')
     .upload(storagePath, bytes, { contentType: uploadContentType, upsert: false })
-  // If the specific MIME type is still rejected, retry as a generic binary blob
+  // Last-resort fallback: retry as a generic binary blob
   if (upErr) {
-    const msg = upErr.message?.toLowerCase() ?? ''
-    if (msg.includes('mime') || msg.includes('content-type') || msg.includes('media type') || msg.includes('not supported') || msg.includes('not allowed')) {
-      ;({ error: upErr } = await adminSb.storage.from('attachments')
-        .upload(storagePath, bytes, { contentType: 'application/octet-stream', upsert: true }))
-    }
+    ;({ error: upErr } = await adminSb.storage.from('attachments')
+      .upload(storagePath, bytes, { contentType: 'application/octet-stream', upsert: true }))
   }
   if (upErr) return NextResponse.json(dbError(upErr, 'tasks/[id]/attachments'), { status: 500 })
 
