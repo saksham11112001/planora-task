@@ -43,15 +43,16 @@ export default async function MyTasksPage() {
       // Main task list — includes subtasks directly assigned to me
       scopedBase.limit(500),
 
-      // Pending approval tasks — tasks in review waiting on this user's approval.
-      // Owner/admin: all pending-approval tasks in the org.
-      // Others: only tasks where they are explicitly the approver.
+      // Pending approval tasks — tasks in review waiting on this user's approval decision.
+      // Always scoped to the current user as approver, regardless of role.
+      // Owners/admins can see all org-wide pending tasks on the /approvals page instead.
       (() => {
         const q = supabase.from('tasks').select(TASK_COLS)
           .eq('org_id', mb.org_id).eq('status', 'in_review').eq('approval_status', 'pending')
           .neq('is_archived', true).is('parent_task_id', null)
+          .eq('approver_id', user.id)
           .order('due_date', { ascending: true, nullsFirst: false })
-        return (canViewAll ? q : q.eq('approver_id', user.id)).limit(500)
+        return q.limit(500)
       })(),
 
       // Team members for filter/assignee dropdowns
