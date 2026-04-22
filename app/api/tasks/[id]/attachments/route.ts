@@ -1,4 +1,5 @@
 import { createClient }    from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse }    from 'next/server'
 import type { NextRequest } from 'next/server'
 import { dbError } from '@/lib/api-error'
@@ -108,19 +109,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return mime
   }
 
-  // Archive formats are uploaded as generic binary to avoid bucket MIME restrictions;
-  // the real mime_type is still stored in the DB record below.
-  const ARCHIVE_EXTS = new Set(['zip', 'rar', '7z', 'gz', 'tar', 'bz2', 'tgz', 'xz'])
-  const uploadContentType = ARCHIVE_EXTS.has(ext)
-    ? 'application/octet-stream'
-    : normaliseContentType(file.type || 'application/octet-stream')
-  let { error: upErr } = await supabase.storage.from('attachments')
+  // Use the admin (service-role) client for storage so bucket MIME-type
+  // restrictions never block legitimate file types like ZIP archives.
+  const adminSb = createAdminClient()
+  const uploadContentType = normaliseContentType(file.type || 'application/octet-stream')
+  let { error: upErr } = await adminSb.storage.from('attachments')
     .upload(storagePath, bytes, { contentType: uploadContentType, upsert: false })
   // If the specific MIME type is still rejected, retry as a generic binary blob
   if (upErr) {
     const msg = upErr.message?.toLowerCase() ?? ''
     if (msg.includes('mime') || msg.includes('content-type') || msg.includes('media type') || msg.includes('not supported') || msg.includes('not allowed')) {
-      ;({ error: upErr } = await supabase.storage.from('attachments')
+      ;({ error: upErr } = await adminSb.storage.from('attachments')
         .upload(storagePath, bytes, { contentType: 'application/octet-stream', upsert: true }))
     }
   }
@@ -150,7 +149,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   // Only remove from storage for real file uploads (drive links have no storage_path)
   const isFileUpload = !att.drive_url && !att.attachment_type?.includes('link') && att.storage_path
   if (isFileUpload) {
-    await supabase.storage.from('attachments').remove([att.storage_path])
+    await createAdminClient().storage.from('attachments').remove([att.storage_path])
   }
   await supabase.from('task_attachments').delete().eq('id', attId)
   return NextResponse.json({ ok: true })
