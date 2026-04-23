@@ -94,6 +94,10 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
   const [aiLoading, setAiLoading] = useState(false)
   const [isSaving,  setIsSaving]  = useState(false)
   const [converting, setConverting] = useState(false)
+  const [showProjectPicker, setShowProjectPicker] = useState(false)
+  const [availableProjects, setAvailableProjects] = useState<{id:string;name:string;color:string}[]>([])
+  const [loadingProjects, setLoadingProjects] = useState(false)
+  const [selectedProjectId, setSelectedProjectId] = useState('')
   const titleRef = useRef<HTMLTextAreaElement>(null)
 
   // Fallback: if pre-fetch didn't load yet, load on tab switch or on open
@@ -289,29 +293,36 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     } finally { setConverting(false) }
   }
 
-  /* add one-time task to a project */
+  /* add one-time task to a project — opens project picker */
   async function addToProject() {
     if (!task || converting) return
-    const projectName = prompt('Enter the project name to add this task to:')
-    if (!projectName?.trim()) return
+    setSelectedProjectId('')
+    setShowProjectPicker(true)
+    setLoadingProjects(true)
+    try {
+      const res = await fetch('/api/projects?limit=200')
+      const d = await res.json()
+      setAvailableProjects(d.data ?? [])
+    } catch {
+      toast.error('Failed to load projects')
+      setShowProjectPicker(false)
+    } finally {
+      setLoadingProjects(false)
+    }
+  }
+
+  async function confirmAddToProject() {
+    if (!task || !selectedProjectId || converting) return
     setConverting(true)
     try {
-      // Look up project by name
-      const res = await fetch(`/api/projects?search=${encodeURIComponent(projectName.trim())}`)
-      const d = await res.json()
-      const projects: any[] = d.data ?? []
-      const match = projects.find((p: any) => p.name.toLowerCase() === projectName.trim().toLowerCase())
-      if (!match) {
-        toast.error(`Project "${projectName}" not found. Check the name and try again.`)
-        setConverting(false)
-        return
-      }
       const patchRes = await fetch(`/api/tasks/${task.id}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ project_id: match.id }),
+        body: JSON.stringify({ project_id: selectedProjectId }),
       })
       if (patchRes.ok) {
-        toast.success(`Added to "${match.name}" ✓`)
+        const proj = availableProjects.find(p => p.id === selectedProjectId)
+        toast.success(`Added to "${proj?.name}" ✓`)
+        setShowProjectPicker(false)
         onUpdated?.()
         onClose()
       } else {
@@ -1647,11 +1658,11 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                       : <>
                         <div className="text-3xl mb-2">📎</div>
                         <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Click to upload a file</p>
-                        <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>PDF, Word, Excel, images, ZIP · Max 20 MB</p>
+                        <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>PDF, Word, Excel, images, ZIP, Tally (TDF/TDL/XML) · Max 100 MB</p>
                       </>
                     }
                     <input ref={fileInputRef} type="file" className="hidden" onChange={uploadFile}
-                      accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.gif,.webp,.txt,.csv,.zip"/>
+                      accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.gif,.webp,.txt,.csv,.zip,.tdf,.tdl,.tally,.xml,.json"/>
                   </div>
                 ) : (
                   <div className="rounded-xl p-4 mb-4 space-y-2" style={{ border: '1px solid var(--border)', background: 'var(--surface-subtle)' }}>
@@ -1972,6 +1983,68 @@ function FieldRow({ label, children }: { label: string; children: React.ReactNod
       style={{ borderBottom: '1px solid var(--border-light)' }}>
       <div className="w-24 text-xs flex-shrink-0" style={{ color: 'var(--text-muted)' }}>{label}</div>
       <div className="flex items-center gap-2 flex-1 min-w-0">{children}</div>
+      {/* ── Project picker modal ── */}
+      {showProjectPicker && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 10000,
+            display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={() => setShowProjectPicker(false)}
+        >
+          <div
+            style={{ background: 'var(--surface)', borderRadius: 14, padding: 24, width: 380,
+              boxShadow: '0 24px 64px rgba(0,0,0,0.35)', border: '1px solid var(--border)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>
+              Add to Project
+            </h3>
+            <p style={{ margin: '0 0 16px', fontSize: 12, color: 'var(--text-muted)' }}>
+              Select a project to move this task into.
+            </p>
+            {loadingProjects ? (
+              <p style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', padding: '12px 0' }}>
+                Loading projects…
+              </p>
+            ) : availableProjects.length === 0 ? (
+              <p style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', padding: '12px 0' }}>
+                No projects found.
+              </p>
+            ) : (
+              <select
+                value={selectedProjectId}
+                onChange={e => setSelectedProjectId(e.target.value)}
+                style={{ width: '100%', padding: '9px 12px', borderRadius: 8,
+                  border: '1px solid var(--border)', background: 'var(--surface)',
+                  color: 'var(--text-primary)', fontSize: 13, marginBottom: 16, outline: 'none' }}
+              >
+                <option value="">Select a project…</option>
+                {availableProjects.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            )}
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowProjectPicker(false)}
+                style={{ padding: '7px 16px', borderRadius: 8, border: '1px solid var(--border)',
+                  background: 'transparent', color: 'var(--text-primary)', fontSize: 13, cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmAddToProject}
+                disabled={!selectedProjectId || converting || loadingProjects}
+                style={{ padding: '7px 18px', borderRadius: 8, border: 'none',
+                  background: 'var(--brand)', color: '#fff', fontSize: 13, fontWeight: 600,
+                  cursor: !selectedProjectId || converting || loadingProjects ? 'not-allowed' : 'pointer',
+                  opacity: !selectedProjectId || converting || loadingProjects ? 0.6 : 1 }}
+              >
+                {converting ? 'Moving…' : 'Add to Project'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

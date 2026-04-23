@@ -4,6 +4,9 @@ import { NextResponse }    from 'next/server'
 import type { NextRequest } from 'next/server'
 import { dbError } from '@/lib/api-error'
 
+// Allow up to 60s for large file uploads to Supabase storage
+export const maxDuration = 60
+
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createClient()
@@ -99,7 +102,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     )
   }
   const storagePath = `${mb.org_id}/${id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
-  const bytes       = await file.arrayBuffer()
 
   // Normalise MIME types — ZIP has many variants across OS/browser combinations
   function normaliseContentType(mime: string): string {
@@ -112,14 +114,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return mime
   }
 
+  // Pass the File (Blob) directly — avoids loading the entire file into an
+  // ArrayBuffer in memory first, which is especially slow for large ZIPs.
   const adminSb = createAdminClient()
   const uploadContentType = normaliseContentType(file.type || 'application/octet-stream')
   let { error: upErr } = await adminSb.storage.from('attachments')
-    .upload(storagePath, bytes, { contentType: uploadContentType, upsert: false })
-  // Always retry as generic binary if the specific MIME type is rejected for any reason
+    .upload(storagePath, file, { contentType: uploadContentType, upsert: false })
+  // Always retry as generic binary if the specific MIME type is rejected
   if (upErr) {
     ;({ error: upErr } = await adminSb.storage.from('attachments')
-      .upload(storagePath, bytes, { contentType: 'application/octet-stream', upsert: true }))
+      .upload(storagePath, file, { contentType: 'application/octet-stream', upsert: true }))
   }
   if (upErr) return NextResponse.json(dbError(upErr, 'tasks/[id]/attachments'), { status: 500 })
 
