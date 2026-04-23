@@ -1,14 +1,5 @@
 import { inngest }           from '../client'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { COMPLIANCE_TASKS }  from '@/lib/data/complianceTasks'
-
-// Build a lookup map: normalised name → subtasks
-const SUBTASK_MAP = new Map(
-  COMPLIANCE_TASKS.map(t => [t.title.toLowerCase().trim(), t.subtasks])
-)
-function findSubtasks(name: string) {
-  return SUBTASK_MAP.get(name.toLowerCase().trim()) ?? []
-}
 
 /**
  * Runs every day at 7:00 AM IST (1:30 AM UTC).
@@ -21,8 +12,8 @@ function findSubtasks(name: string) {
  * If triggerDate ≤ today AND no ca_task_instances row exists for this
  * (assignment_id, due_date) pair, it:
  *   1. Creates a task in the `tasks` table (flagged _ca_compliance: true)
- *   2. Creates any compliance subtasks (flagged _compliance_subtask: true)
- *   3. Inserts a ca_task_instances row to prevent re-creation
+ *   2. Inserts a ca_task_instances row to prevent re-creation
+ * Attachment headers are surfaced as a checklist in the task detail panel — not as subtasks.
  */
 export const caComplianceSpawn = inngest.createFunction(
   {
@@ -144,30 +135,6 @@ export const caComplianceSpawn = inngest.createFunction(
           if (taskErr || !newTask?.id) {
             console.error(`[caComplianceSpawn] task insert failed (${asgn.id}/${monthKey}):`, taskErr?.message)
             return
-          }
-
-          // Create subtasks for this compliance task (if defined in static data)
-          const subtasks = findSubtasks(master.name)
-          if (subtasks.length > 0) {
-            const subtaskRows = subtasks.map(s => ({
-              org_id:            asgn.org_id,
-              title:             s.title,
-              status:            'todo' as const,
-              priority:          master.priority ?? 'medium',
-              assignee_id:       asgn.assignee_id  ?? null,
-              approver_id:       asgn.approver_id  ?? null,
-              approval_required: !!asgn.approver_id,
-              client_id:         asgn.client_id,
-              due_date:          dueDateStr,
-              parent_task_id:    newTask.id,
-              is_recurring:      false,
-              created_by:        null,
-              custom_fields:     s.required ? { _compliance_subtask: true } : null,
-            }))
-            const { error: subErr } = await admin.from('tasks').insert(subtaskRows)
-            if (subErr) {
-              console.error(`[caComplianceSpawn] subtask insert failed (${asgn.id}/${monthKey}):`, subErr.message)
-            }
           }
 
           // Record the instance — prevents re-creation on subsequent cron runs
