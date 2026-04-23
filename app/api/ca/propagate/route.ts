@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
       assignee_id?: string | null
       approver_id?: string | null
       client_id?: string | null
-      attachment_headers?: { old: string[]; new: string[] }
+      attachment_headers?: { old: string[]; new: string[] } // retained in type for backwards-compat; no longer spawns subtasks
     }
   }
 
@@ -101,23 +101,6 @@ export async function POST(req: NextRequest) {
         .contains('custom_fields', { _compliance_subtask: true })
       if (subtaskErr) console.error('[ca/propagate] subtask cascade error:', subtaskErr.message)
     }
-  }
-
-  // Rename subtasks whose titles match old attachment headers — run all pairs in parallel
-  if (fields.attachment_headers) {
-    const { old: oldH, new: newH } = fields.attachment_headers
-    const renameOps = Array.from(
-      { length: Math.min(oldH.length, newH.length) },
-      (_, i) => {
-        if (!oldH[i] || !newH[i] || oldH[i] === newH[i]) return null
-        return admin.from('tasks')
-          .update({ title: newH[i] })
-          .in('parent_task_id', taskIds)
-          .eq('title', oldH[i])
-          .not('status', 'eq', 'completed')
-      },
-    ).filter(Boolean) as Promise<any>[]
-    if (renameOps.length > 0) await Promise.all(renameOps)
   }
 
   return NextResponse.json({ updated })

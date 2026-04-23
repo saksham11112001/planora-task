@@ -29,6 +29,23 @@ export async function POST() {
   const nowIST = new Date(Date.now() + 5.5 * 60 * 60 * 1000)
   const today  = nowIST.toISOString().split('T')[0]
 
+  // ── 0. Clean up any legacy compliance subtasks (attachment headers that were
+  //       incorrectly created as subtask rows). Attachment headers are now shown
+  //       only as a UI checklist — not as subtasks.
+  const { data: legacyRows } = await admin
+    .from('tasks')
+    .select('id')
+    .eq('org_id', mb.org_id)
+    .not('parent_task_id', 'is', null)
+    .contains('custom_fields', { _compliance_subtask: true })
+
+  if (legacyRows && legacyRows.length > 0) {
+    const legacyIds = legacyRows.map(r => r.id)
+    const { error: cleanErr } = await admin.from('tasks').delete().in('id', legacyIds)
+    if (cleanErr) console.error('[ca/trigger] legacy subtask cleanup failed:', cleanErr.message)
+    else console.log(`[ca/trigger] cleaned up ${legacyIds.length} legacy compliance subtask(s)`)
+  }
+
   // ── 1. Fetch all active assignments for this org ──────────────────
   const { data: assignments, error: asgErr } = await admin
     .from('ca_client_assignments')
@@ -135,29 +152,6 @@ export async function POST() {
         continue
       }
 
-      // ── Create subtasks from master task's attachment_headers ──
-      // Each required attachment becomes a subtask so assignees know exactly what to upload.
-      const attachmentHeaders: string[] = master.attachment_headers ?? []
-      if (attachmentHeaders.length > 0) {
-        const subtaskRows = attachmentHeaders.map((header: string) => ({
-          org_id:            asgn.org_id,
-          title:             header,
-          status:            'todo' as const,
-          priority:          master.priority ?? 'medium',
-          assignee_id:       asgn.assignee_id  ?? null,
-          approver_id:       asgn.approver_id  ?? null,
-          approval_required: !!asgn.approver_id,
-          client_id:         asgn.client_id,
-          due_date:          dueDateStr,
-          parent_task_id:    newTask.id,
-          is_recurring:      false,
-          created_by:        user.id,
-          custom_fields:     { _compliance_subtask: true },
-        }))
-        const { error: subErr } = await admin.from('tasks').insert(subtaskRows)
-        if (subErr) console.error('[ca/trigger] subtask insert failed:', subErr.message)
-      }
-
       // ── Record instance to prevent re-spawn ──
       await admin.from('ca_task_instances').insert({
         org_id:        asgn.org_id,
@@ -184,6 +178,7 @@ export async function POST() {
     skipped,
     today,
     assignments_checked: assignments.length,
+    legacy_subtasks_removed: legacyRows?.length ?? 0,
     errors: errors.length > 0 ? errors : undefined,
     detail,
     message,
