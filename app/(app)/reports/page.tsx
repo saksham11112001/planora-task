@@ -39,20 +39,28 @@ export default async function ReportsPage() {
 
   const [
     { data: allTasks },
+    { count: overdueCount },
     { data: timeLogs },
     { data: projects },
     { data: members },
     { data: clients },
   ] = await Promise.all([
-    // Fetch all active (non-completed) tasks with no date limit so in_progress /
-    // overdue / in_review counts are accurate regardless of when the task was created.
-    // Also fetch completed tasks from the last 90 days for trend + completion stats.
-    // .limit(5000) prevents Supabase's silent 1000-row default from truncating results.
+    // Fetch tasks from the last 90 days only — non-completed OR recently completed.
+    // This caps the payload at ~2000 rows for large orgs instead of an unlimited
+    // non-completed fetch that could run into tens of thousands for long-running orgs.
+    // Employee performance stats already use a 90-day window, so this is accurate.
     supabase.from('tasks')
       .select('id, title, status, priority, due_date, assignee_id, created_at, completed_at, project_id')
       .eq('org_id', orgId).eq('is_recurring', false).neq('is_archived', true).is('parent_task_id', null)
       .or(`status.neq.completed,completed_at.gte.${from90}`)
-      .limit(5000),
+      .gte('created_at', from90)
+      .limit(2000),
+    // Separate lightweight COUNT for overdue — covers tasks of any age, not just 90 days
+    supabase.from('tasks')
+      .select('*', { count: 'exact', head: true })
+      .eq('org_id', orgId).neq('is_archived', true).is('parent_task_id', null)
+      .not('status', 'in', '("completed","cancelled")')
+      .not('due_date', 'is', null).lt('due_date', today),
     supabase.from('time_logs')
       .select('hours, is_billable, project_id, logged_date, user_id')
       .eq('org_id', orgId).gte('logged_date', from30.split('T')[0]),
@@ -70,7 +78,7 @@ export default async function ReportsPage() {
   // ── KPIs (last 30 days) ───────────────────────────────────────
   const totalTasks     = tasks30.length
   const completed      = tasks30.filter(t => t.status === 'completed').length
-  const overdue        = tasks.filter(t => t.due_date && t.due_date < today && t.status !== 'completed').length
+  const overdue        = overdueCount ?? 0  // from dedicated COUNT query — covers any task age
   const completionRate = totalTasks > 0 ? Math.round((completed / totalTasks) * 100) : 0
   const totalHours     = logs.reduce((s, l) => s + (l.hours ?? 0), 0)
   const billableHours  = logs.filter(l => l.is_billable).reduce((s, l) => s + (l.hours ?? 0), 0)

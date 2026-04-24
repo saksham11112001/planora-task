@@ -1,29 +1,19 @@
 import { redirect }  from 'next/navigation'
 import { AppShell }  from './AppShell'
-import { createClient } from '@/lib/supabase/server'
+import { getSessionUser, getOrgMembership, getUserProfile } from '@/lib/supabase/cached'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   try {
-    const supabase = await createClient()
+    // Use React-cached helpers so the layout and child page components share
+    // a single set of DB calls per request — no double-fetching.
+    const user = await getSessionUser()
+    if (!user) redirect('/login')
 
-    // Get user — if no valid session, go to login
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    if (userError || !user) redirect('/login')
-
-    // Get membership with org details in one query
-    const { data: membership } = await supabase
-      .from('org_members')
-      .select('id, org_id, role, is_active, organisations(id, name, slug, plan_tier, logo_color, status, trial_ends_at)')
-      .eq('user_id', user!.id)
-      .eq('is_active', true)
-      .maybeSingle()
-
-    // Get user profile
-    const { data: profile } = await supabase
-      .from('users')
-      .select('id, name, email, avatar_url')
-      .eq('id', user!.id)
-      .maybeSingle()
+    // Membership + profile can run in parallel — both only need user.id
+    const [membership, profile] = await Promise.all([
+      getOrgMembership(user.id),
+      getUserProfile(user.id),
+    ])
 
     // No active membership — try to recover before giving up
     if (!membership) {
@@ -32,7 +22,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
       // 1. Check if the user has a pending invite in their auth metadata
       //    (covers cross-device Google OAuth where callback ran but org_members wasn't written)
-      const { data: authUserData } = await admin.auth.admin.getUserById(user!.id)
+      const { data: authUserData } = await admin.auth.admin.getUserById(user.id)
       const pendingOrgId = authUserData?.user?.user_metadata?.invited_to_org as string | undefined
       const pendingRole  = (authUserData?.user?.user_metadata?.invited_role as string | undefined) ?? 'member'
 
@@ -41,12 +31,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           .from('org_members')
           .select('id, is_active')
           .eq('org_id', pendingOrgId)
-          .eq('user_id', user!.id)
+          .eq('user_id', user.id)
           .maybeSingle()
 
         if (!existingMember) {
           await admin.from('org_members').insert({
-            org_id: pendingOrgId, user_id: user!.id, role: pendingRole, is_active: true,
+            org_id: pendingOrgId, user_id: user.id, role: pendingRole, is_active: true,
           })
         } else if (!existingMember.is_active) {
           await admin.from('org_members').update({ is_active: true, role: pendingRole }).eq('id', existingMember.id)
@@ -55,11 +45,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         // Deactivate any active memberships in OTHER orgs to ensure single active org per user.
         await admin.from('org_members')
           .update({ is_active: false })
-          .eq('user_id', user!.id)
+          .eq('user_id', user.id)
           .neq('org_id', pendingOrgId)
           .eq('is_active', true)
 
-        await admin.auth.admin.updateUserById(user!.id, {
+        await admin.auth.admin.updateUserById(user.id, {
           user_metadata: { ...authUserData?.user?.user_metadata, invited_to_org: null, invited_role: null },
         })
 
@@ -71,7 +61,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       const { data: anyMembership } = await admin
         .from('org_members')
         .select('id, org_id, role, organisations(id, name, slug, plan_tier, logo_color, status, trial_ends_at)')
-        .eq('user_id', user!.id)
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle()
@@ -81,7 +71,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         await admin.from('org_members').update({ is_active: true }).eq('id', anyMembership.id)
         await admin.from('org_members')
           .update({ is_active: false })
-          .eq('user_id', user!.id)
+          .eq('user_id', user.id)
           .neq('id', anyMembership.id)
           .eq('is_active', true)
         redirect('/dashboard')
@@ -98,9 +88,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     return (
       <AppShell
         user={{
-          id:         user!.id,
-          name:       profile?.name ?? user!.email?.split('@')[0] ?? 'User',
-          email:      user!.email ?? '',
+          id:         user.id,
+          name:       profile?.name ?? user.email?.split('@')[0] ?? 'User',
+          email:      user.email ?? '',
           avatar_url: profile?.avatar_url ?? null,
         }}
         org={{

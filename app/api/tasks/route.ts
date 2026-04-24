@@ -28,6 +28,8 @@ export async function GET(request: NextRequest) {
   if (sp.get('mine') === 'true') q = q.eq('assignee_id', user.id)
   if (sp.get('parent_id'))    q = q.eq('parent_task_id', sp.get('parent_id')!)
   if (sp.get('top_level') === 'true') q = q.is('parent_task_id', null)
+  // Filter to CA compliance tasks only (custom_fields @> '{"_ca_compliance":true}')
+  if (sp.get('ca_compliance') === 'true') q = (q as any).contains('custom_fields', { _ca_compliance: true })
   // Find all tasks that are blocking a given task id (reverse lookup via JSONB @> contains)
   if (sp.get('blocks_task_id')) {
     const btid = sp.get('blocks_task_id')!
@@ -35,7 +37,11 @@ export async function GET(request: NextRequest) {
   }
   const parsedLimit  = parseInt(sp.get('limit')  ?? '100', 10)
   const parsedOffset = parseInt(sp.get('offset') ?? '0',   10)
-  const _limit  = Math.min(isNaN(parsedLimit)  ? 100 : parsedLimit,  500)
+  // ca_compliance=true queries are pre-filtered server-side (JSONB @>) so allow a higher cap.
+  // 2000 handles large orgs (200 clients × ~10 active tasks each = 2000).
+  // All other callers stay capped at 500 to protect against accidental over-fetching.
+  const hardCap = sp.get('ca_compliance') === 'true' ? 2000 : 500
+  const _limit  = Math.min(isNaN(parsedLimit)  ? 100 : parsedLimit,  hardCap)
   const _offset = Math.max(isNaN(parsedOffset) ? 0   : parsedOffset, 0)
   q = q.order('due_date', { ascending: true, nullsFirst: false }).range(_offset, _offset + _limit - 1)
 

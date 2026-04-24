@@ -103,11 +103,12 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
   const loadTasks = useCallback(async () => {
     setLoading(true)
     try {
-      // Fetch all top-level tasks and filter for CA compliance on client side
-      const res = await fetch('/api/tasks?top_level=true&limit=2000')
+      // ca_compliance=true filters server-side via JSONB @> query — avoids fetching
+      // all org tasks and discarding non-CA rows on the client.
+      const res = await fetch('/api/tasks?top_level=true&ca_compliance=true&limit=1000')
       const json = await res.json().catch(() => ({}))
       const all: any[] = json.data ?? json ?? []
-      const caTasks = all.filter((t: any) => t.custom_fields?._ca_compliance === true)
+      const caTasks = all // already filtered server-side
 
       // Enrich with client data
       const clientMap: Record<string, { id: string; name: string; color: string }> = {}

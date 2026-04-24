@@ -97,7 +97,7 @@ function CAKanbanView({ userRole, currentUserId }: { userRole: string; currentUs
   const [members,       setMembers]       = useState<{ id: string; name: string }[]>([])
   const [search,        setSearch]        = useState('')
   const [clientTasks,   setClientTasks]   = useState<Record<string, KanbanTask[]>>({})
-  const [clientLoading, setClientLoading] = useState<Record<string, boolean>>({})
+  const [batchLoading,  setBatchLoading]  = useState(true)   // true until first batch load completes
   const [allBoards,     setAllBoards]     = useState<Record<string, Record<string, 'active' | 'paused'>>>({})
   const [selTask,       setSelTask]       = useState<Task | null>(null)
   const [selUpcoming,   setSelUpcoming]   = useState<KanbanTask | null>(null)
@@ -135,40 +135,81 @@ function CAKanbanView({ userRole, currentUserId }: { userRole: string; currentUs
     setPropagateModal(null)
   }
 
-  const loadClientTasks = useCallback(async (clientId: string) => {
-    setClientLoading(p => ({ ...p, [clientId]: true }))
+  // ── Batch load: 4 requests total regardless of client count ──────────────────
+  // Old pattern: 2 + (N × 2) requests (N = number of clients).
+  // With 200 clients that was 402 simultaneous API calls on mount.
+  // New pattern: fetch clients, team, ALL org assignments, and ALL CA compliance
+  // tasks in one Promise.all, then group by client_id in memory.
+  const loadAll = useCallback(async () => {
+    setBatchLoading(true)
     try {
-      const [assignRes, taskRes] = await Promise.all([
-        fetch(`/api/ca/assignments?client_id=${clientId}`),
-        fetch(`/api/tasks?client_id=${clientId}&top_level=true&limit=500`),
+      const [clientsRes, teamRes, assignRes, tasksRes] = await Promise.all([
+        fetch('/api/clients').then(r => r.json()),
+        fetch('/api/team').then(r => r.json()),
+        // No client_id → returns all org assignments (the API already supports this)
+        fetch('/api/ca/assignments').then(r => r.json()),
+        // ca_compliance=true filters server-side; limit=2000 handles large orgs
+        fetch('/api/tasks?top_level=true&ca_compliance=true&limit=2000').then(r => r.json()),
       ])
-      const tasks = buildTaskList(await assignRes.json(), await taskRes.json())
-      setClientTasks(p => ({ ...p, [clientId]: tasks }))
-      const defaultBoard: Record<string, 'active' | 'paused'> = {}
-      for (const t of tasks) { if (!t._assignmentActive) defaultBoard[t.id] = 'paused' }
-      try {
-        const stored = localStorage.getItem(`ca_board_${clientId}`)
-        setAllBoards(p => ({ ...p, [clientId]: stored ? { ...defaultBoard, ...JSON.parse(stored) } : defaultBoard }))
-      } catch { setAllBoards(p => ({ ...p, [clientId]: defaultBoard })) }
+
+      const clientList: KanbanClient[] = (Array.isArray(clientsRes) ? clientsRes : (clientsRes.data ?? []))
+        .map((c: any) => ({ id: c.id, name: c.name, color: c.color ?? '#94a3b8' }))
+
+      setClients(clientList)
+      setMembers(((teamRes.data ?? []) as any[]).map((m: any) => ({
+        id: m.user_id, name: (m.users as any)?.name ?? '',
+      })))
+
+      // Group assignments by client_id
+      const allAssignments: any[] = assignRes.data ?? []
+      const assignsByClient = new Map<string, any[]>()
+      for (const a of allAssignments) {
+        const cid = a.client_id
+        if (!assignsByClient.has(cid)) assignsByClient.set(cid, [])
+        assignsByClient.get(cid)!.push(a)
+      }
+
+      // Group CA compliance tasks by client_id
+      const allCATasks: any[] = tasksRes.data ?? []
+      const tasksByClient = new Map<string, any[]>()
+      for (const t of allCATasks) {
+        const cid = t.client_id
+        if (!cid) continue
+        if (!tasksByClient.has(cid)) tasksByClient.set(cid, [])
+        tasksByClient.get(cid)!.push(t)
+      }
+
+      // Build task lists and board states for every client at once
+      const newClientTasks: Record<string, KanbanTask[]> = {}
+      const newBoards:      Record<string, Record<string, 'active' | 'paused'>> = {}
+
+      for (const client of clientList) {
+        const tasks = buildTaskList(
+          { data: assignsByClient.get(client.id) ?? [] },
+          { data: tasksByClient.get(client.id) ?? [] },
+        )
+        newClientTasks[client.id] = tasks
+
+        const defaultBoard: Record<string, 'active' | 'paused'> = {}
+        for (const t of tasks) { if (!t._assignmentActive) defaultBoard[t.id] = 'paused' }
+        try {
+          const stored = localStorage.getItem(`ca_board_${client.id}`)
+          newBoards[client.id] = stored ? { ...defaultBoard, ...JSON.parse(stored) } : defaultBoard
+        } catch {
+          newBoards[client.id] = defaultBoard
+        }
+      }
+
+      setClientTasks(newClientTasks)
+      setAllBoards(newBoards)
     } catch {
-      setClientTasks(p => ({ ...p, [clientId]: [] }))
+      // silent — columns remain empty, user can refresh
     } finally {
-      setClientLoading(p => ({ ...p, [clientId]: false }))
+      setBatchLoading(false)
     }
   }, [])
 
-  useEffect(() => {
-    Promise.all([
-      fetch('/api/clients').then(r => r.json()),
-      fetch('/api/team').then(r => r.json()),
-    ]).then(([cd, td]) => {
-      const clientList: KanbanClient[] = (Array.isArray(cd) ? cd : (cd.data ?? []))
-        .map((c: any) => ({ id: c.id, name: c.name, color: c.color ?? '#94a3b8' }))
-      setClients(clientList)
-      setMembers(((td.data ?? []) as any[]).map((m: any) => ({ id: m.user_id, name: (m.users as any)?.name ?? '' })))
-      clientList.forEach(c => loadClientTasks(c.id))
-    }).catch(() => {})
-  }, [loadClientTasks])
+  useEffect(() => { loadAll() }, [loadAll])
 
   async function toggleTaskBoard(clientId: string, taskId: string, newCol: 'active' | 'paused') {
     const task = (clientTasks[clientId] ?? []).find(t => t.id === taskId)
@@ -316,8 +357,8 @@ function CAKanbanView({ userRole, currentUserId }: { userRole: string; currentUs
               }
             }
           }
-          // Reload cards in the background
-          clients.forEach(c => loadClientTasks(c.id))
+          // Batch-reload all client cards in the background
+          loadAll()
         }}
       />
 
@@ -498,7 +539,12 @@ function CAKanbanView({ userRole, currentUserId }: { userRole: string; currentUs
       {/* Horizontal client columns */}
       <div style={{ display: 'flex', gap: 14, padding: '14px 16px', overflowX: 'auto',
         flex: 1, minHeight: 0, alignItems: 'flex-start', background: 'var(--surface-subtle)' }}>
-        {visibleClients.length === 0 ? (
+        {batchLoading ? (
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'var(--text-muted)', fontSize: 13 }}>
+            Loading clients…
+          </div>
+        ) : visibleClients.length === 0 ? (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
             color: 'var(--text-muted)', fontSize: 13 }}>
             {search ? `No clients or tasks matching "${search}"` : 'No clients found'}
@@ -506,7 +552,6 @@ function CAKanbanView({ userRole, currentUserId }: { userRole: string; currentUs
         ) : visibleClients.map(client => {
           const allTasks = clientTasks[client.id] ?? []
           const board    = allBoards[client.id] ?? {}
-          const loading  = clientLoading[client.id] ?? false
 
           // Filter tasks by search if query doesn't match client name directly
           const taskFilter = (q && !client.name.toLowerCase().includes(q))
@@ -555,11 +600,7 @@ function CAKanbanView({ userRole, currentUserId }: { userRole: string; currentUs
                 )
               })()}
 
-              {loading ? (
-                <div style={{ padding: '24px', textAlign: 'center', fontSize: 12, color: 'var(--text-muted)' }}>
-                  Loading…
-                </div>
-              ) : allTasks.length === 0 ? (
+              {allTasks.length === 0 ? (
                 <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', opacity: 0.7 }}>
                   No tasks assigned
                 </div>

@@ -28,7 +28,11 @@ export default async function MonitorPage() {
 
     const TASK_COLS = 'id, title, status, priority, due_date, completed_at, assignee_id, approver_id, client_id, project_id, approval_status, approval_required, is_recurring, custom_fields, created_at, updated_at, assignee:users!tasks_assignee_id_fkey(id, name), approver:users!tasks_approver_id_fkey(id, name), creator:users!tasks_created_by_fkey(id, name), projects(id, name, color)'
 
-    // Monitor page always fetches ALL org tasks — that is its purpose
+    // Monitor shows all non-completed tasks (any age) + completed tasks from the last
+    // 90 days. This replaces the previous unlimited non-completed fetch which could
+    // return tens of thousands of rows for long-running orgs.
+    const from90 = new Date(Date.now() - 90 * 86400000).toISOString()
+
     const [
       { data: tasks },
       { data: members },
@@ -39,8 +43,9 @@ export default async function MonitorPage() {
         .eq('org_id', mb.org_id)
         .neq('is_archived', true)
         .is('parent_task_id', null)
+        .or(`status.neq.completed,completed_at.gte.${from90}`)
         .order('due_date', { ascending: true, nullsFirst: false })
-        .limit(3000),
+        .limit(1500),
       supabase.from('org_members')
         .select('user_id, users(id, name)').eq('org_id', mb.org_id).eq('is_active', true),
       supabase.from('clients').select('id, name, color, status').eq('org_id', mb.org_id).order('name'),
