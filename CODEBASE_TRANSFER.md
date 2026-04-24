@@ -1,5 +1,5 @@
 # Planora Task — Codebase Transfer Document
-> Use this at the start of a new chat to give the AI full context. Last updated: 2026-04-24 (Session 10)
+> Use this at the start of a new chat to give the AI full context. Last updated: 2026-04-24 (Session 11)
 
 ---
 
@@ -131,6 +131,7 @@ app/onboarding/page.tsx               — New org onboarding flow
 #### Protected App Layout
 ```
 app/(app)/layout.tsx                  — Auth guard + org validation wrapper
+  — uses cached.ts helpers + Promise.all for parallel membership+profile  ← Session 11
 app/(app)/AppShell.tsx                — Main shell: sidebar + header + routing
 ```
 
@@ -350,6 +351,8 @@ app/api/tasks/[id]/approve/route.ts   — POST: submit / approve / reject
   — approve subtask gate: `!isOwnerOrAdmin &&` — owner/admin can force-approve  ← Session 7
   — both gates filter _compliance_subtask:true rows before counting  ← Session 10
 app/api/admin/fix-compliance-tasks/route.ts — POST: owner/admin one-shot cleanup of stale _compliance_subtask rows  ← Session 10
+app/api/tasks/route.ts (GET)
+  — ca_compliance=true param: server-side JSONB filter + raised cap (2000 vs 500)  ← Session 11
 app/api/tasks/[id]/comments/route.ts  — Comments CRUD
 app/api/tasks/[id]/attachments/route.ts — Attachments upload/delete
 
@@ -890,6 +893,81 @@ lib/data/caDefaultTasks.ts            — Default CA task templates
   ```
   Button renders `{isOwnerAdmin && (<button onClick={fixComplianceTasks} ...>⚙ Fix tasks</button>)}` inside the Tabs component, `marginLeft: 'auto'` to push it right.
 - **Files**: `app/api/admin/fix-compliance-tasks/route.ts` (new), `app/(app)/tasks/MyTasksView.tsx`
+
+---
+
+### SESSION 11 — PERFORMANCE FIXES
+
+### 37. App layout ran 3 DB queries sequentially on every page load — 1 round-trip wasted per request
+- **Root cause A**: `app/(app)/layout.tsx` called `supabase.from('org_members')` and `supabase.from('users')` with sequential `await` instead of `Promise.all`. Since both queries only need `user.id` (already available after `auth.getUser()`), there was no dependency between them — they were just blocking each other.
+- **Root cause B**: The layout used direct `createClient()` queries instead of the `React.cache()`-wrapped helpers in `lib/supabase/cached.ts`. When a page component (e.g. Dashboard) also called `getOrgMembership()` in the same request, the layout's unrelated query didn't share the cache — Supabase was hit twice for identical data.
+- **Fix**:
+  - Switched layout to import `getSessionUser`, `getOrgMembership`, `getUserProfile` from `lib/supabase/cached.ts`
+  - Ran membership + profile in `Promise.all` (both only need `user.id`):
+    ```typescript
+    const user = await getSessionUser()
+    const [membership, profile] = await Promise.all([
+      getOrgMembership(user.id),
+      getUserProfile(user.id),
+    ])
+    ```
+  - Removed the now-unused `createClient` import from the layout
+- **Result**: One full DB round-trip (~80ms) saved on every page load for every user. Any page component that also calls `getOrgMembership()` / `getUserProfile()` gets the cached result — zero double-fetching within a request.
+- **File**: `app/(app)/layout.tsx`
+
+### 38. Compliance Kanban Board fired 2N+2 API requests on mount (N = number of clients)
+- **Root cause**: `CAKanbanView.useEffect` fetched `/api/clients` + `/api/team`, then called `loadClientTasks(clientId)` for every client via `forEach`. Each `loadClientTasks` call fired 2 requests: `/api/ca/assignments?client_id=X` + `/api/tasks?client_id=X`. With 200 clients = **402 simultaneous API calls** on mount, saturating the browser connection pool and hammering the Supabase connection pool.
+- **Fix**:
+  - Replaced `loadClientTasks(clientId)` + per-client `useEffect` with a single `loadAll()` function that fires 4 requests total in one `Promise.all`:
+    1. `/api/clients`
+    2. `/api/team`
+    3. `/api/ca/assignments` (no `client_id` → returns all org assignments; the API already supported this via its optional `client_id` filter)
+    4. `/api/tasks?top_level=true&ca_compliance=true&limit=2000` (server-side JSONB filter)
+  - After the 4 responses arrive, groups assignments by `client_id` into a `Map`, groups CA tasks by `client_id` into a `Map`, then runs `buildTaskList({ data: clientAssigns }, { data: clientTasks })` per client in memory
+  - Initialises localStorage board state per client in the same loop — no extra calls
+  - Replaced per-client `clientLoading` spinner state with a single `batchLoading` boolean; all columns appear at once when the batch completes instead of filling in one by one
+  - `loadAll()` is also used for post-edit refresh (`onUpdated` previously called `clients.forEach(c => loadClientTasks(c.id))` — same 400-call storm on every task edit)
+- **Request count**: 402 → **4** (99% reduction for 200-client org)
+- **File**: `app/(app)/compliance/ComplianceShell.tsx`
+
+### 39. `/api/tasks` CA compliance cap was 500 rows — silently truncated for large orgs
+- **Root cause**: The tasks GET route hard-capped all requests at 500 rows (`Math.min(limit, 500)`). `CATasksView` was requesting `limit=2000` but only ever got 500 rows. The Compliance Kanban batch load now fetches all CA compliance tasks in one call — it needs a higher cap.
+- **Fix**: When `ca_compliance=true` is passed, the cap is raised to 2000. All other callers remain at 500.
+  ```typescript
+  const hardCap = sp.get('ca_compliance') === 'true' ? 2000 : 500
+  const _limit  = Math.min(isNaN(parsedLimit) ? 100 : parsedLimit, hardCap)
+  ```
+- **File**: `app/api/tasks/route.ts`
+
+### 40. Reports page fetched up to 5000 task rows with no date cap; overdue count could be wrong
+- **Root cause**: The main task query used `.or('status.neq.completed,completed_at.gte.from90')` with `.limit(5000)`. For orgs that have been running for years, the "all non-completed tasks" portion could be enormous. The 5000-row cap would silently truncate results, making the overdue KPI tile incorrect. All aggregations (KPIs, priority breakdown, employee stats, daily trend) ran as server-side `.filter()` loops over the entire 5000-row array.
+- **Fix**:
+  - Added `.gte('created_at', from90)` to the main task query — limits to tasks created in the last 90 days. Employee performance stats already label themselves "last 90 days", so this is semantically accurate.
+  - Lowered limit from 5000 → 2000 (90-day window produces far fewer rows)
+  - Added a separate lightweight `{ count: 'exact', head: true }` query for overdue — HEAD request, zero row transfer, covers tasks of any age:
+    ```typescript
+    supabase.from('tasks')
+      .select('*', { count: 'exact', head: true })
+      .eq('org_id', orgId).neq('is_archived', true).is('parent_task_id', null)
+      .not('status', 'in', '("completed","cancelled")')
+      .not('due_date', 'is', null).lt('due_date', today)
+    ```
+  - Used `overdueCount` from the HEAD query for the KPI tile instead of the scanned array
+- **File**: `app/(app)/reports/page.tsx`
+
+### 41. Monitor page fetched up to 3000 tasks with no date filter — slow for large orgs
+- **Root cause**: Monitor fetched all non-archived top-level tasks with a flat `.limit(3000)` and no date filter. For long-running orgs, completed tasks from years past were included in every page load, bloating the JSON payload and increasing DB query time.
+- **Fix**: Applied the same filter pattern used by Reports — non-completed tasks (any age) + completed tasks from last 90 days only:
+  ```typescript
+  const from90 = new Date(Date.now() - 90 * 86400000).toISOString()
+  supabase.from('tasks')
+    .select(TASK_COLS)
+    ...
+    .or(`status.neq.completed,completed_at.gte.${from90}`)
+    .limit(1500)  // was 3000
+  ```
+- **No UI or interface changes**: `MonitorView` props are identical. The completed count in the stats bar now reflects "completed in last 90 days" — appropriate for a real-time monitoring dashboard.
+- **File**: `app/(app)/monitor/page.tsx`
 
 ---
 
