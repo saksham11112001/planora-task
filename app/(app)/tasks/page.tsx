@@ -114,6 +114,7 @@ export default async function MyTasksPage() {
       project: (t.projects as any) ?? null,
     })
 
+    // taskList is mutable so the context-task loop can push into it below
     const taskList        = (tasks ?? []).filter(isVisible).map(enrich) as any[]
     const approvalList    = (approvalTasks ?? []).filter(isVisible).map(enrich)
     const assignedByMeList = (assignedByMeRaw ?? []).filter(isVisible).map(enrich)
@@ -143,6 +144,11 @@ export default async function MyTasksPage() {
         }))
       })
     }
+
+    // Remove raw subtasks from My Tasks view.
+    // Users assigned only to a subtask should see the PARENT task (as a context task)
+    // rather than the isolated subtask row — they manage their work via the parent's panel.
+    const displayTaskList = taskList.filter((t: any) => !t.parent_task_id)
 
     // Compute CA triggers firing in the next 3 days (not yet spawned)
     type UpcomingCATrigger = {
@@ -185,7 +191,7 @@ export default async function MyTasksPage() {
     }
 
     return <MyTasksView
-      tasks={taskList as any}
+      tasks={displayTaskList as any}
       pendingApprovalTasks={approvalList as any}
       assignedByMeTasks={assignedByMeList as any}
       // isManager controls "Assigned by me" tab — now limited to owner/admin only

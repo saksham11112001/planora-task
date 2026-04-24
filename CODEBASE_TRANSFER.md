@@ -1,5 +1,5 @@
 # Planora Task — Codebase Transfer Document
-> Use this at the start of a new chat to give the AI full context. Last updated: 2026-04-15 (Session 9)
+> Use this at the start of a new chat to give the AI full context. Last updated: 2026-04-24 (Session 10)
 
 ---
 
@@ -348,6 +348,8 @@ app/api/tasks/[id]/approve/route.ts   — POST: submit / approve / reject
   — CA compliance: checks attachment_count vs ca_master_tasks before submit
   — submit subtask gate: `!isOwnerOrAdmin &&` — owner/admin can force-submit  ← Session 7
   — approve subtask gate: `!isOwnerOrAdmin &&` — owner/admin can force-approve  ← Session 7
+  — both gates filter _compliance_subtask:true rows before counting  ← Session 10
+app/api/admin/fix-compliance-tasks/route.ts — POST: owner/admin one-shot cleanup of stale _compliance_subtask rows  ← Session 10
 app/api/tasks/[id]/comments/route.ts  — Comments CRUD
 app/api/tasks/[id]/attachments/route.ts — Attachments upload/delete
 
@@ -802,6 +804,92 @@ lib/data/caDefaultTasks.ts            — Default CA task templates
   - Saves same custom_fields on create
 - **clients POST API** (`app/api/clients/route.ts`): now accepts `custom_fields` body key → passed to Supabase insert
 - **custom_fields PATCH merge** (`app/api/clients/[id]/route.ts`): already supported from Session 9 DSC work — fetches existing JSONB, spreads new keys over it; prevents overwriting unrelated keys
+
+---
+
+### SESSION 10 FIXES
+
+### 33. Task detail panel crashed on open — entire main area replaced by error boundary
+- **Symptom**: Clicking any task replaced the main content area with "Something went wrong — Your workspace couldn't load". Sidebar stayed visible (it lives outside the `<Suspense>` boundary in `AppShell.tsx`).
+- **Root cause**: The `FieldRow` helper component is defined **outside** `TaskDetailPanel`'s function body. A block of project-picker modal JSX was placed inside `FieldRow`, causing it to reference state variables (`showProjectPicker`, `setShowProjectPicker`, `loadingProjects`, `availableProjects`, `selectedProjectId`, `converting`, `confirmAddToProject`) that only exist in `TaskDetailPanel`'s closure scope. Every render threw a `ReferenceError`, caught by `app/(app)/error.tsx`.
+- **Fix**: Moved the entire project-picker modal (`showProjectPicker && (<div className="fixed inset-0 ...">...</div>)`) out of `FieldRow` and into `TaskDetailPanel`'s own return fragment — positioned between the main panel `<div>` and the attachment preview overlay. Stripped `FieldRow` back to a pure layout wrapper with zero state references.
+- **`FieldRow` after fix**:
+  ```typescript
+  function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
+    return (
+      <div className="flex items-center gap-3 py-2.5 last:border-0"
+        style={{ borderBottom: '1px solid var(--border-light)' }}>
+        <div className="w-24 text-xs flex-shrink-0" style={{ color: 'var(--text-muted)' }}>{label}</div>
+        <div className="flex items-center gap-2 flex-1 min-w-0">{children}</div>
+      </div>
+    )
+  }
+  ```
+- **Rule**: Helper components defined outside a parent component's function body are **pure** — they must receive all data they need via props. Never place JSX that references parent-scope state/functions inside a helper defined at module level.
+- **File**: `components/tasks/TaskDetailPanel.tsx`
+
+### 34. "Complete all subtasks first" gate fired for CA compliance tasks with no real subtasks
+- **Root cause**: Old `_compliance_subtask: true` placeholder rows (attachment-header stubs, created before commit `da486c7` stopped their creation) were still present in the DB. The approve API's subtask gate queried all rows with `parent_task_id = taskId` — these stale rows were found and counted as incomplete subtasks, blocking submission even though no real subtasks were visible.
+- **Fix**: Both gates in `app/api/tasks/[id]/approve/route.ts` now filter out `_compliance_subtask: true` rows before counting:
+  ```typescript
+  // submit gate:
+  const { data: subtasks } = await supabase
+    .from('tasks').select('id, status, parent_task_id, custom_fields')
+    .eq('parent_task_id', id).eq('org_id', mb.org_id)
+  const realSubtasks = (subtasks ?? []).filter((s: any) => s.custom_fields?._compliance_subtask !== true)
+  if (!isOwnerOrAdmin && realSubtasks.length > 0) { /* check incomplete */ }
+
+  // approve gate:
+  const { data: subtasksForApprove } = await supabase
+    .from('tasks').select('id, status, custom_fields').eq('parent_task_id', id).eq('org_id', mb.org_id)
+  const realSubtasksForApprove = (subtasksForApprove ?? []).filter((s: any) => s.custom_fields?._compliance_subtask !== true)
+  if (!isOwnerOrAdmin && realSubtasksForApprove.length > 0) { /* check incomplete */ }
+  ```
+- **File**: `app/api/tasks/[id]/approve/route.ts`
+
+### 35. Subtasks assigned to different users appeared as standalone top-level tasks in My Tasks
+- **Root cause**: `tasks/page.tsx` queried all tasks where `assignee_id = user.id OR approver_id = user.id`. This included subtasks (`parent_task_id != null`). A subtask assigned to User B (whose parent is assigned to User A) would appear as a floating top-level item in User B's My Tasks — with no parent context and no way to understand why it existed.
+- **Fix**: After the context-task fetch loop (which already fetched parent tasks and injected them with `_context_task: true`), filter raw subtasks out of the display list:
+  ```typescript
+  // Remove raw subtasks from My Tasks view.
+  // Users assigned only to a subtask should see the PARENT task (as a context task)
+  // rather than the isolated subtask row — they manage their work via the parent's panel.
+  const displayTaskList = taskList.filter((t: any) => !t.parent_task_id)
+  ```
+  Changed `<MyTasksView tasks={taskList as any} ...>` → `<MyTasksView tasks={displayTaskList as any} ...>`.
+- **Context task UX** (pre-existing behaviour, now properly activated):
+  - Parent tasks injected with `custom_fields._context_task: true` show a read-only "Context task" banner in `TaskDetailPanel`.
+  - `isContextTask` disables the Complete/Submit button on the parent — the subtask assignee cannot complete the parent task, only their own subtask.
+  - `canEdit = canManage || isAssignee` — subtask assignee is NOT the assignee of the parent, so the panel is fully read-only for the parent task.
+  - Subtask assignees find their subtask listed inside the parent panel and can complete it there.
+- **File**: `app/(app)/tasks/page.tsx`
+
+### 36. Admin cleanup for stale `_compliance_subtask` rows left in the database
+- **Background**: Commit `da486c7` stopped future creation of attachment-header subtasks. But rows already in the DB continued to trigger the subtask gate (issue 34). A one-shot idempotent cleanup was needed.
+- **New endpoint**: `app/api/admin/fix-compliance-tasks/route.ts` (POST)
+  - Owner/admin only (403 for others).
+  - Finds all `tasks` rows in the org with `parent_task_id IS NOT NULL` AND `custom_fields @> '{"_compliance_subtask":true}'`.
+  - Deletes them in a single `.delete().in('id', ids)` call.
+  - Returns `{ ok, removed, message }` — safe to call multiple times (idempotent, returns `removed: 0` if none found).
+- **Related**: `app/api/ca/cleanup-subtasks/route.ts` was added in commit `da486c7` as a CA-specific cleanup; this new endpoint is the broader admin-facing version.
+- **Admin UI button**: Added to `MyTasksView.tsx` Tabs bar (owner/admin only, right-aligned):
+  ```typescript
+  const [fixLoading, setFixLoading] = useState(false)
+  const isOwnerAdmin = ['owner','admin'].includes(userRole ?? '')
+
+  async function fixComplianceTasks() {
+    setFixLoading(true)
+    try {
+      const res = await fetch('/api/admin/fix-compliance-tasks', { method: 'POST' })
+      const d   = await res.json()
+      if (res.ok) { toast.success(d.message ?? 'Compliance tasks cleaned up ✓'); refresh() }
+      else         toast.error(d.error ?? 'Cleanup failed')
+    } catch { toast.error('Network error during cleanup') }
+    finally { setFixLoading(false) }
+  }
+  ```
+  Button renders `{isOwnerAdmin && (<button onClick={fixComplianceTasks} ...>⚙ Fix tasks</button>)}` inside the Tabs component, `marginLeft: 'auto'` to push it right.
+- **Files**: `app/api/admin/fix-compliance-tasks/route.ts` (new), `app/(app)/tasks/MyTasksView.tsx`
 
 ---
 

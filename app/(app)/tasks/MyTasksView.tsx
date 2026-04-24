@@ -188,6 +188,27 @@ export function MyTasksView({
   // Inline editing for subtask rows
   const [subInlineEdit, setSubInlineEdit] = useState<{parentId:string;subId:string;field:string}|null>(null)
   const [subAssigneeOpen, setSubAssigneeOpen] = useState<{parentId:string;subId:string}|null>(null)
+  // Admin: one-shot cleanup of stale compliance-subtask rows
+  const [fixLoading, setFixLoading] = useState(false)
+
+  async function fixComplianceTasks() {
+    if (fixLoading) return
+    setFixLoading(true)
+    try {
+      const res = await fetch('/api/admin/fix-compliance-tasks', { method: 'POST' })
+      const d   = await res.json()
+      if (res.ok) {
+        toast.success(d.message ?? 'Compliance tasks cleaned up ✓')
+        refresh()
+      } else {
+        toast.error(d.error ?? 'Cleanup failed')
+      }
+    } catch {
+      toast.error('Network error during cleanup')
+    } finally {
+      setFixLoading(false)
+    }
+  }
 
   function toggleGroup(key: string) {
     setCollapsedGroups(prev => { const s = new Set(prev); s.has(key) ? s.delete(key) : s.add(key); return s })
@@ -639,6 +660,8 @@ export function MyTasksView({
     )
   }
 
+  const isOwnerAdmin = ['owner','admin'].includes(userRole ?? '')
+
   const Tabs = () => (
     <div role="tablist" style={{ display:'flex', alignItems:'center', borderBottom:`1px solid var(--border)`, padding:'0 20px',
       background:'var(--surface)', flexShrink:0, gap:8 }}>
@@ -665,6 +688,26 @@ export function MyTasksView({
             transition: 'all 0.15s',
           }}>
           Assigned by me
+        </button>
+      )}
+      {/* Admin-only: clean up stale compliance-subtask rows created before the fix */}
+      {isOwnerAdmin && (
+        <button
+          type="button"
+          onClick={fixComplianceTasks}
+          disabled={fixLoading}
+          title="Remove stale compliance attachment-header subtasks that were created before the fix. Safe to run multiple times."
+          style={{
+            marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5,
+            padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600,
+            border: '1.5px solid var(--border)', cursor: fixLoading ? 'wait' : 'pointer',
+            background: 'transparent', color: 'var(--text-muted)',
+            opacity: fixLoading ? 0.6 : 1, transition: 'all 0.15s',
+          }}
+          onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.borderColor='#d97706'; el.style.color='#d97706'; el.style.background='rgba(234,179,8,0.07)' }}
+          onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.borderColor='var(--border)'; el.style.color='var(--text-muted)'; el.style.background='transparent' }}>
+          {fixLoading ? '⟳' : '⚙'}
+          {fixLoading ? 'Fixing…' : 'Fix tasks'}
         </button>
       )}
     </div>

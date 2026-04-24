@@ -54,10 +54,13 @@ export async function POST(
 
     // Block submit if subtasks are incomplete
     // Owner/admin bypass: they can force-submit regardless of subtask state
+    // _compliance_subtask rows are attachment-header placeholders — not real work items,
+    // so they are always excluded from this gate.
     const { data: subtasks } = await supabase
       .from('tasks').select('id, status, parent_task_id, custom_fields').eq('parent_task_id', id).eq('org_id', mb.org_id)
-    if (!isOwnerOrAdmin && subtasks && subtasks.length > 0) {
-      const incomplete = subtasks.filter((s: any) => s.status !== 'completed')
+    const realSubtasks = (subtasks ?? []).filter((s: any) => s.custom_fields?._compliance_subtask !== true)
+    if (!isOwnerOrAdmin && realSubtasks.length > 0) {
+      const incomplete = realSubtasks.filter((s: any) => s.status !== 'completed')
       if (incomplete.length > 0) {
         return NextResponse.json({
           error: `Complete all subtasks first — ${incomplete.length} remaining`,
@@ -139,12 +142,14 @@ export async function POST(
   }
 
   if (decision === 'approve') {
-    // Block approving a parent task if subtasks are still incomplete
+    // Block approving a parent task if real subtasks are still incomplete.
+    // _compliance_subtask rows are attachment-header placeholders — excluded from this gate.
     // Owner/admin bypass: they can force-approve regardless of subtask state
     const { data: subtasksForApprove } = await supabase
-      .from('tasks').select('id, status').eq('parent_task_id', id).eq('org_id', mb.org_id)
-    if (!isOwnerOrAdmin && subtasksForApprove && subtasksForApprove.length > 0) {
-      const incomplete = subtasksForApprove.filter((s: any) => s.status !== 'completed')
+      .from('tasks').select('id, status, custom_fields').eq('parent_task_id', id).eq('org_id', mb.org_id)
+    const realSubtasksForApprove = (subtasksForApprove ?? []).filter((s: any) => s.custom_fields?._compliance_subtask !== true)
+    if (!isOwnerOrAdmin && realSubtasksForApprove.length > 0) {
+      const incomplete = realSubtasksForApprove.filter((s: any) => s.status !== 'completed')
       if (incomplete.length > 0) {
         return NextResponse.json({
           error: `Cannot approve — ${incomplete.length} subtask${incomplete.length > 1 ? 's are' : ' is'} still incomplete`,
