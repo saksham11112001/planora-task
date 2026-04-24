@@ -1897,6 +1897,69 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
         )}
       </div>
 
+      {/* ── Project picker modal ── */}
+      {showProjectPicker && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 10000,
+            display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={() => setShowProjectPicker(false)}
+        >
+          <div
+            style={{ background: 'var(--surface)', borderRadius: 14, padding: 24, width: 380,
+              boxShadow: '0 24px 64px rgba(0,0,0,0.35)', border: '1px solid var(--border)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>
+              Add to Project
+            </h3>
+            <p style={{ margin: '0 0 16px', fontSize: 12, color: 'var(--text-muted)' }}>
+              Select a project to move this task into.
+            </p>
+            {loadingProjects ? (
+              <p style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', padding: '12px 0' }}>
+                Loading projects…
+              </p>
+            ) : availableProjects.length === 0 ? (
+              <p style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', padding: '12px 0' }}>
+                No projects found.
+              </p>
+            ) : (
+              <select
+                value={selectedProjectId}
+                onChange={e => setSelectedProjectId(e.target.value)}
+                style={{ width: '100%', padding: '9px 12px', borderRadius: 8,
+                  border: '1px solid var(--border)', background: 'var(--surface)',
+                  color: 'var(--text-primary)', fontSize: 13, marginBottom: 16, outline: 'none' }}
+              >
+                <option value="">Select a project…</option>
+                {availableProjects.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            )}
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowProjectPicker(false)}
+                style={{ padding: '7px 16px', borderRadius: 8, border: '1px solid var(--border)',
+                  background: 'transparent', color: 'var(--text-primary)', fontSize: 13, cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmAddToProject}
+                disabled={!selectedProjectId || converting || loadingProjects}
+                style={{ padding: '7px 18px', borderRadius: 8, border: 'none',
+                  background: 'var(--brand)', color: '#fff', fontSize: 13, fontWeight: 600,
+                  cursor: !selectedProjectId || converting || loadingProjects ? 'not-allowed' : 'pointer',
+                  opacity: !selectedProjectId || converting || loadingProjects ? 0.6 : 1 }}
+              >
+                {converting ? 'Moving…' : 'Add to Project'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Attachment preview overlay ── */}
       {previewAtt && (
         <div
@@ -1983,68 +2046,6 @@ function FieldRow({ label, children }: { label: string; children: React.ReactNod
       style={{ borderBottom: '1px solid var(--border-light)' }}>
       <div className="w-24 text-xs flex-shrink-0" style={{ color: 'var(--text-muted)' }}>{label}</div>
       <div className="flex items-center gap-2 flex-1 min-w-0">{children}</div>
-      {/* ── Project picker modal ── */}
-      {showProjectPicker && (
-        <div
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 10000,
-            display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          onClick={() => setShowProjectPicker(false)}
-        >
-          <div
-            style={{ background: 'var(--surface)', borderRadius: 14, padding: 24, width: 380,
-              boxShadow: '0 24px 64px rgba(0,0,0,0.35)', border: '1px solid var(--border)' }}
-            onClick={e => e.stopPropagation()}
-          >
-            <h3 style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>
-              Add to Project
-            </h3>
-            <p style={{ margin: '0 0 16px', fontSize: 12, color: 'var(--text-muted)' }}>
-              Select a project to move this task into.
-            </p>
-            {loadingProjects ? (
-              <p style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', padding: '12px 0' }}>
-                Loading projects…
-              </p>
-            ) : availableProjects.length === 0 ? (
-              <p style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', padding: '12px 0' }}>
-                No projects found.
-              </p>
-            ) : (
-              <select
-                value={selectedProjectId}
-                onChange={e => setSelectedProjectId(e.target.value)}
-                style={{ width: '100%', padding: '9px 12px', borderRadius: 8,
-                  border: '1px solid var(--border)', background: 'var(--surface)',
-                  color: 'var(--text-primary)', fontSize: 13, marginBottom: 16, outline: 'none' }}
-              >
-                <option value="">Select a project…</option>
-                {availableProjects.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-            )}
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button
-                onClick={() => setShowProjectPicker(false)}
-                style={{ padding: '7px 16px', borderRadius: 8, border: '1px solid var(--border)',
-                  background: 'transparent', color: 'var(--text-primary)', fontSize: 13, cursor: 'pointer' }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmAddToProject}
-                disabled={!selectedProjectId || converting || loadingProjects}
-                style={{ padding: '7px 18px', borderRadius: 8, border: 'none',
-                  background: 'var(--brand)', color: '#fff', fontSize: 13, fontWeight: 600,
-                  cursor: !selectedProjectId || converting || loadingProjects ? 'not-allowed' : 'pointer',
-                  opacity: !selectedProjectId || converting || loadingProjects ? 0.6 : 1 }}
-              >
-                {converting ? 'Moving…' : 'Add to Project'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
