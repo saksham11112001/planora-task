@@ -429,7 +429,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     if (subtasksLoaded) return
     const r = await fetch(`/api/tasks?parent_id=${taskId}&limit=50`)
     const d = await r.json()
-    setSubtasks(d.data ?? [])
+    setSubtasks((d.data ?? []).filter((s: any) => !s.custom_fields?._compliance_subtask))
     setSubtasksLoaded(true)
   }
 
@@ -1120,7 +1120,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
             </div>
 
             {/* ── Convert task actions (top of panel) ── */}
-            {!task.is_recurring && canEdit && (
+            {canEdit && !(task as any).custom_fields?._ca_compliance && (!task.is_recurring || !task.project_id) && (
               <div style={{
                 padding: '6px 20px 10px',
                 borderBottom: '1px solid var(--border)',
@@ -1131,19 +1131,21 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                   <ArrowRightLeft style={{ width: 10, height: 10 }}/>
                   Convert
                 </span>
-                <button
-                  onClick={convertToRecurring}
-                  disabled={converting}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5,
-                    padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600,
-                    background: 'rgba(13,148,136,0.1)', color: 'var(--brand)',
-                    border: '1px solid rgba(13,148,136,0.25)', cursor: 'pointer',
-                    opacity: converting ? 0.6 : 1, transition: 'all 0.12s' }}
-                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(13,148,136,0.18)'}
-                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'rgba(13,148,136,0.1)'}>
-                  <RefreshCw style={{ width: 10, height: 10 }}/>
-                  Make recurring
-                </button>
+                {!task.is_recurring && (
+                  <button
+                    onClick={convertToRecurring}
+                    disabled={converting}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 5,
+                      padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600,
+                      background: 'rgba(13,148,136,0.1)', color: 'var(--brand)',
+                      border: '1px solid rgba(13,148,136,0.25)', cursor: 'pointer',
+                      opacity: converting ? 0.6 : 1, transition: 'all 0.12s' }}
+                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(13,148,136,0.18)'}
+                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'rgba(13,148,136,0.1)'}>
+                    <RefreshCw style={{ width: 10, height: 10 }}/>
+                    Make recurring
+                  </button>
+                )}
                 {!task.project_id && (
                   <button
                     onClick={addToProject}

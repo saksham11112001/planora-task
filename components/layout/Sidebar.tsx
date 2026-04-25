@@ -56,7 +56,7 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
     }
     if (fetchRef.current) return
     fetchRef.current = true
-    fetch('/api/projects?limit=5')
+    fetch('/api/projects?limit=100')
       .then(r => r.json()).then(d => {
         if (Array.isArray(d.data)) { _projectCache = d.data; _cacheTime = Date.now(); setProjects(d.data) }
       }).catch(() => {}).finally(() => { fetchRef.current = false })
@@ -247,8 +247,8 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
           </Link>
         </div>
         {projectsOpen && (
-          <>
-            {projects.slice(0, 4).map(p => (
+          <div style={{ maxHeight: 240, overflowY: 'auto' }}>
+            {projects.map(p => (
               <Link key={p.id} href={`/projects/${p.id}`}
                 className={cn('flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm transition-colors',
                   pathname.startsWith(`/projects/${p.id}`)
@@ -258,13 +258,7 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
                 <span className="truncate text-xs">{p.name}</span>
               </Link>
             ))}
-            <button onClick={openFlyout}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-md w-full transition-colors text-white/40 hover:text-white/70 hover:bg-white/5"
-              style={{ fontSize: 11, border: 'none', background: 'none', cursor: 'pointer', textAlign: 'left' }}>
-              <span style={{ fontSize: 10 }}>•••</span>
-              <span>Show more</span>
-            </button>
-          </>
+          </div>
         )}
         {nav.clients && <SI href="/clients"    active={isActive('/clients')}    icon={<Users2    className="h-4 w-4"/>} label="Clients"/>}
         {nav.ca_compliance_mode && <SI href="/compliance" active={isActive('/compliance')} icon={<FileCheck className="h-4 w-4"/>} label="CA Compliance"/>}

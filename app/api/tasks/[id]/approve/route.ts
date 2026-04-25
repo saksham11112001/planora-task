@@ -111,7 +111,11 @@ export async function POST(
       return NextResponse.json({ ok: true, message: 'Task completed', auto_completed: true })
     }
 
-    await supabase.from('tasks').update({ approval_status: 'pending', status: 'in_review' }).eq('id', id)
+    const existingCfForSubmit = (task as any).custom_fields ?? {}
+    await supabase.from('tasks').update({
+      approval_status: 'pending', status: 'in_review',
+      custom_fields: { ...existingCfForSubmit, _submitted_by: user.id },
+    }).eq('id', id)
 
     // Notify designated approver
     const { data: approverProfile } = await supabase
@@ -140,6 +144,11 @@ export async function POST(
   if (task.approver_id && task.approver_id !== user.id && !isOwnerOrAdmin) {
     return NextResponse.json({ error: 'Only the designated approver can approve or reject this task' }, { status: 403 })
   }
+  // Block self-approval: whoever submitted cannot also approve/reject
+  const submittedBy = (task as any).custom_fields?._submitted_by
+  if (submittedBy && submittedBy === user.id) {
+    return NextResponse.json({ error: 'You submitted this task for approval — another approver must review it' }, { status: 403 })
+  }
 
   if (decision === 'approve') {
     // Block approving a parent task if real subtasks are still incomplete.
@@ -158,12 +167,16 @@ export async function POST(
       }
     }
 
+    const cfForApprove = { ...((task as any).custom_fields ?? {}) }
+    delete cfForApprove._submitted_by
     await supabase.from('tasks').update({
       approval_status: 'approved', status: 'completed',
       approved_by: user.id, approved_at: new Date().toISOString(), completed_at: new Date().toISOString(),
+      custom_fields: cfForApprove,
     }).eq('id', id)
   } else if (decision === 'reject') {
-    const existingCf = (task as any).custom_fields ?? {}
+    const existingCf = { ...((task as any).custom_fields ?? {}) }
+    delete existingCf._submitted_by
     const updatedCf  = comment?.trim()
       ? { ...existingCf, _rejection_comment: comment.trim() }
       : existingCf

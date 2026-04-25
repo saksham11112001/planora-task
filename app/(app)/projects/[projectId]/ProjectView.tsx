@@ -964,10 +964,13 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
               </>
             )}
           </div>
-          <div className="flex items-center gap-2 px-5 py-3 border-b text-xs font-semibold text-gray-400 uppercase tracking-wide sticky top-0 z-10"
-            style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
-            <div className="w-8 flex-shrink-0"/>
+          <div className="flex items-center px-5 py-3 border-b text-xs font-semibold text-gray-400 uppercase tracking-wide sticky top-0 z-10"
+            style={{ gap: 12, background: 'var(--surface)', borderColor: 'var(--border)' }}>
+            {/* checkbox (14px) + gap(12) + check-circle (18px) = 44px */}
+            <div style={{ width: 44, flexShrink: 0 }}/>
             <div className="flex-1">Task name</div>
+            {/* subtask toggle button placeholder */}
+            <div style={{ width: 52, flexShrink: 0 }}/>
             <div className="w-36 pl-2 hidden md:block">Assignee</div>
             <div className="w-24 text-center hidden md:block">Due date</div>
             <div className="w-28 text-center hidden lg:block">Status</div>
@@ -1183,6 +1186,12 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
                 <p className="text-sm text-gray-600 leading-relaxed">{project.description}</p>
               ) : <p className="text-sm text-gray-400 italic">No description added.</p>}
               {project.due_date && <p className="text-xs text-gray-400 mt-3">Due: {fmtDate(project.due_date, { day: 'numeric', month: 'long', year: 'numeric' })}</p>}
+              {(project as any).clients && (
+                <div className="flex items-center gap-2 mt-3">
+                  <div style={{ width: 8, height: 8, borderRadius: 2, background: ((project as any).clients as any).color ?? '#94a3b8', flexShrink: 0 }}/>
+                  <span className="text-xs text-gray-500">Client: <span className="font-medium text-gray-700">{((project as any).clients as any).name}</span></span>
+                </div>
+              )}
             </div>
           </div>
         </div>
