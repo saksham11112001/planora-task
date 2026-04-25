@@ -1,5 +1,5 @@
 # Planora Task — Codebase Transfer Document
-> Use this at the start of a new chat to give the AI full context. Last updated: 2026-04-24 (Session 11)
+> Use this at the start of a new chat to give the AI full context. Last updated: 2026-04-25 (Session 12)
 
 ---
 
@@ -132,7 +132,10 @@ app/onboarding/page.tsx               — New org onboarding flow
 ```
 app/(app)/layout.tsx                  — Auth guard + org validation wrapper
   — uses cached.ts helpers + Promise.all for parallel membership+profile  ← Session 11
+  — passes user.created_at to AppShell (for walkthrough first-time detection)  ← Session 12
 app/(app)/AppShell.tsx                — Main shell: sidebar + header + routing
+  — Props.user now includes created_at: string  ← Session 12
+  — Renders <WalkthroughOverlay userId={user.id} userCreatedAt={user.created_at}/>  ← Session 12
 ```
 
 #### Core Pages
@@ -178,6 +181,9 @@ app/(app)/projects/[projectId]/page.tsx  — Fetches project + tasks (with appro
 app/(app)/projects/[projectId]/ProjectView.tsx  — Project board/list with inline task rows
   — "+ Assign to me" only shows when task.assignee_id is null (not just members.find() miss)
   — TaskRow() color coding: _isCaComp ? #d97706 : #7c3aed; borderLeft 3px (Session 4)
+  — toggleDone submit-for-approval path: optimistic state update on API success (Session 12)
+    Reads response body auto_completed flag: true → sets completed, false → sets in_review+pending
+    No longer requires router.refresh() for the UI to reflect pending state
 
 app/(app)/clients/new/NewClientForm.tsx — New client creation form (steps 1 + 2)
   — Step 1: GSTIN auto-fill section added at the top  ← Session 9
@@ -444,6 +450,17 @@ components/clients/QuickAddClientModal.tsx — Quick-add client modal (used in t
     Same pattern as NewClientForm: auto-triggers at 15 chars, fills name + company + gstInfo chips
     Saves { gstin, pan, gst_status, gst_state } to custom_fields on create
 components/search/SearchModal.tsx     — Global search (Cmd+K)
+components/walkthrough/WalkthroughOverlay.tsx  — NEW Session 12: first-time user onboarding walkthrough
+  — 10-step feature tour + 1 welcome + 1 done = 12 cards total
+  — Only shows to accounts < 7 days old (userCreatedAt check) — never to existing users
+  — Per-user localStorage key: planora_wt_v1_${userId} — dismissed once, never returns
+  — createPortal to document.body (z-index 99999) — renders above all app content
+  — 4-quadrant spotlight overlay with pulsing teal ring on sidebar nav targets
+  — Smart tooltip positioning: right → left → below → above of spotlight
+  — useRouter().push(step.path) on Next (forward only) — navigates user to each feature's page
+  — Quick Tasks step has action CTA "Create your first task" → /inbox (dismisses tour on click)
+  — Progress bar, clickable step dots, Skip/Back/Next/Start/Let's go buttons
+  — Welcome + Done: centered modal, 80px emoji icon, feature chips
 
 components/filters/UniversalFilterBar.tsx — Shared filter UI
   — Props: showSearch, showPriority, showStatus, showAssignee, showAssignor, showDueDate
@@ -1366,6 +1383,72 @@ window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
 // wa.me/?text= opens WhatsApp web/app with pre-filled message; user picks the contact.
 // No phone number required in the URL — CA manually selects client contact in WhatsApp.
 ```
+
+---
+
+---
+
+### SESSION 12 — WALKTHROUGH, BUG FIXES & DEPENDENCY UPDATE
+
+### 42. First-time user onboarding walkthrough
+- **New file**: `components/walkthrough/WalkthroughOverlay.tsx`
+- **Purpose**: Interactive product tour shown once to brand-new users so they understand all major features.
+- **Trigger condition**: Account `created_at` < 7 days old AND `localStorage.planora_wt_v1_${userId}` not set. Existing users (accounts older than 7 days) never see it — even if they clear local storage. The 7-day window is generous so users who sign up but don't explore right away still see it on return.
+- **Storage key change**: `planora_wt_v1_${userId}` (per-user) — NOT `planora_wt_v1_${orgId}`. Prevents re-showing for the same user across org changes or browser sessions.
+- **Data flow**: `layout.tsx` passes `user.created_at` → `AppShell.tsx` Props `user.created_at: string` → `<WalkthroughOverlay userId={user.id} userCreatedAt={user.created_at}/>`.
+- **Steps** (10 feature steps + Welcome + Done = 12 cards):
+  1. Welcome (center, no target) — "Let's create your first task"
+  2. Quick Tasks — `/inbox` — "Create your first task" action CTA
+  3. Repeat Tasks — `/recurring`
+  4. My Tasks — `/tasks`
+  5. Projects — `/projects`
+  6. Clients — `/clients`
+  7. Approvals — `/approvals`
+  8. Calendar — `/calendar`
+  9. CA Compliance — `/compliance`
+  10. Done (center, no target) — directs to add a client
+- **Navigation**: `next()` calls `router.push(nextStep.path)` on forward navigation only. Back button does NOT navigate (avoids disorienting backward page jumps). The user sees the actual feature page while reading about it.
+- **"Create your first task" CTA**: On the Quick Tasks step, a full-width gradient button inside the card. Clicking it calls `dismiss()` (stores the key, hides the overlay) and navigates to `/inbox` so the user lands directly in the task creation flow.
+- **Architecture**:
+  - `createPortal(…, document.body)` — renders above all content at z-index 99990/99999
+  - `mounted` state guard — prevents SSR access to `localStorage`/`window`/`document.body`
+  - 4-quadrant overlay (`top/bottom/left/right` fixed divs) around spotlight `getBoundingClientRect`
+  - `SPOTLIGHT_PAD=10px` border + pulsing teal `box-shadow` ring (`wt-pulse-ring` keyframe)
+  - Smart tooltip: prefers right → left → below → above based on `vpW`/`vpH` vs spotlight bounds
+  - `animKey` bumped on step change re-triggers CSS keyframe animation
+  - 80ms `setTimeout` on `measure()` lets navigation settle before re-measuring spotlight target
+- **Files**: `components/walkthrough/WalkthroughOverlay.tsx` (new), `app/(app)/AppShell.tsx`, `app/(app)/layout.tsx`
+
+### 43. Project view — submit for approval shows "Pending" instantly without refresh
+- **Root cause**: In `ProjectView.tsx` `toggleDone()`, the approval submit path (`task.approval_required === true`) called the approve API and then only called `router.refresh()` to reflect the new state. The task's circle stayed unchanged until the server round-trip completed (~300–600ms).
+- **Fix**: After `res.ok`, read the JSON response body and update local state immediately:
+  ```typescript
+  const data = await res.json()
+  if (data.auto_completed) {
+    // No approver assigned — API auto-completed the task
+    const completedAt = new Date().toISOString()
+    setTasks(prev => prev.map(t => t.id === task.id
+      ? { ...t, status: 'completed', approval_status: 'approved', completed_at: completedAt } as Task : t))
+    setSelectedTask(prev => prev?.id === task.id
+      ? { ...prev, status: 'completed', approval_status: 'approved', completed_at: completedAt } as Task : prev)
+    toast.success('Task completed ✓')
+  } else {
+    // Pending approval — clock icon and purple tint appear immediately
+    setTasks(prev => prev.map(t => t.id === task.id
+      ? { ...t, status: 'in_review', approval_status: 'pending' } as Task : t))
+    setSelectedTask(prev => prev?.id === task.id
+      ? { ...prev, status: 'in_review', approval_status: 'pending' } as Task : prev)
+    toast.success('Submitted for approval ✓')
+  }
+  ```
+- **Two paths handled**: (a) task has an approver → `in_review + pending`; (b) no approver (auto-complete) → `completed + approved`. The API already returned `auto_completed: true` for path (b); client now uses it.
+- **`router.refresh()` still runs** in the background (via `startT`) to sync server state. It no longer gates the visual change.
+- **File**: `app/(app)/projects/[projectId]/ProjectView.tsx`
+
+### 44. inngest security advisory — updated to 3.54.0
+- **Trigger**: Vercel build warning: "Vulnerable version of inngest detected (3.52.7). Please update to version 3.54.0 or later."
+- **Fix**: `package.json` `inngest` range changed from `^3.25.0` → `^3.54.0`; `npm install` resolved to `inngest@3.54.0`.
+- **File**: `package.json`
 
 ---
 

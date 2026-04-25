@@ -2,7 +2,7 @@
 **GitHub:** saksham11112001/planora-task  
 **Live URL:** sng-adwisers.com  
 **Stack:** Next.js 15.5 · Supabase (xjaybcthnneppfdgmtaq) · Tailwind v4 · Inngest · Resend · Vercel  
-**Last Updated:** April 2026 (post AI session)
+**Last Updated:** 2026-04-25 (Session 12)
 
 ---
 
@@ -280,6 +280,9 @@ components/layout/Header.tsx      – Search, notifications (rgba bg fixed), use
 components/auth/AuthErrorBoundary.tsx
 components/search/SearchModal.tsx
 components/clients/QuickAddClientModal.tsx
+components/walkthrough/WalkthroughOverlay.tsx – First-time user tour (accounts < 7 days old)
+  Shows 12-card walkthrough; navigates to each feature page on Next; Quick Tasks step has
+  "Create your first task" CTA. localStorage key: planora_wt_v1_${userId}. SSR-safe.
 components/theme/ThemeProvider.tsx – light/dark/system. Uses localStorage.
 components/theme/ThemeToggle.tsx
 ```
@@ -433,6 +436,9 @@ setAll(toSet) {
 | Features page no plan lock | FeaturesView had no plan prop | Pass plan from page, lock in UI with toast |
 | Remove member missing from Team page | Only in Settings/Members | Added 2-step confirm + PATCH is_active:false |
 | Invite link fails silently (otp_expired) | /auth/confirm showed wrong error | Parse hash error params, show correct message |
+| Project view submit-for-approval required refresh | No optimistic state update in toggleDone | Read API response body; setTasks instantly |
+| Walkthrough showed to all users including existing | Used orgId localStorage key, no account age check | userCreatedAt < 7 days + per-userId key |
+| inngest security advisory (3.52.7) | Outdated dependency | Updated to 3.54.0 |
 
 ---
 
