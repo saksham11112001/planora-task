@@ -8,6 +8,7 @@ import { RouteLoader }   from '@/components/ui/RouteLoader'
 import { AppLoader }     from '@/components/ui/AppLoader'
 import { SearchModal }    from '@/components/search/SearchModal'
 import { useAppStore }    from '@/store/appStore'
+import { WalkthroughOverlay } from '@/components/walkthrough/WalkthroughOverlay'
 
 interface Props {
   user:        { id: string; name: string; email: string; avatar_url: string | null }
@@ -93,6 +94,7 @@ export function AppShell({ user, org, role, workspaceId, children }: Props) {
       <Suspense fallback={null}>
         <RouteLoader/>
       </Suspense>
+      <WalkthroughOverlay orgId={org.id}/>
     </div>
   )
 }
