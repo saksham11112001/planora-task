@@ -309,8 +309,28 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
         body: JSON.stringify({ decision: 'submit' }),
       })
       setCompleting(p => { const s = new Set(p); s.delete(task.id); return s })
-      if (res.ok) toast.success('Submitted for approval ✓')
-      else { const d = await res.json(); toast.error(d.error ?? 'Could not submit') }
+      if (res.ok) {
+        const data = await res.json()
+        if (data.auto_completed) {
+          // No approver assigned — API auto-completed the task
+          const completedAt = new Date().toISOString()
+          setTasks(prev => prev.map(t => t.id === task.id
+            ? { ...t, status: 'completed', approval_status: 'approved', completed_at: completedAt } as Task : t))
+          setSelectedTask(prev => prev?.id === task.id
+            ? { ...prev, status: 'completed', approval_status: 'approved', completed_at: completedAt } as Task : prev)
+          toast.success('Task completed ✓')
+        } else {
+          // Pending approval — show clock icon immediately
+          setTasks(prev => prev.map(t => t.id === task.id
+            ? { ...t, status: 'in_review', approval_status: 'pending' } as Task : t))
+          setSelectedTask(prev => prev?.id === task.id
+            ? { ...prev, status: 'in_review', approval_status: 'pending' } as Task : prev)
+          toast.success('Submitted for approval ✓')
+        }
+      } else {
+        const d = await res.json()
+        toast.error(d.error ?? 'Could not submit')
+      }
       startT(() => router.refresh()); return
     }
 
