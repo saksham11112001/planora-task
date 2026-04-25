@@ -92,6 +92,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           name:       profile?.name ?? user.email?.split('@')[0] ?? 'User',
           email:      user.email ?? '',
           avatar_url: profile?.avatar_url ?? null,
+          created_at: user.created_at,
         }}
         org={{
           id:            org.id ?? '',
