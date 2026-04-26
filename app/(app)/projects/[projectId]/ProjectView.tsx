@@ -471,16 +471,17 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
         <div className="flex-1 min-w-0 flex items-center gap-2" onClick={() => setSelectedTask(task)}>
           <span className={cn('text-sm', isComp ? 'line-through text-gray-400' : ov ? 'text-red-700' : 'text-gray-900')}>{task.title}</span>
         </div>
-        {/* Subtask expand toggle — shows count + warns if incomplete */}
+        {/* Subtask expand toggle — fixed 52 px wide to match column header placeholder */}
         <button
           onClick={e => { e.stopPropagation(); toggleSubExpand(task.id) }}
           style={{
-            display: 'flex', alignItems: 'center', gap: 4, padding: '2px 8px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '2px 4px',
             borderRadius: 6,
+            width: 52, flexShrink: 0,
             border: `1px solid ${hasUndone ? '#fbbf24' : expandedSubs[task.id] ? 'var(--brand-border)' : 'var(--border)'}`,
             background: hasUndone ? '#fffbeb' : expandedSubs[task.id] ? 'var(--brand-light)' : 'transparent',
             color: hasUndone ? '#92400e' : expandedSubs[task.id] ? 'var(--brand)' : 'var(--text-muted)',
-            fontSize: 10, fontWeight: 600, cursor: 'pointer', flexShrink: 0,
+            fontSize: 10, fontWeight: 600, cursor: 'pointer',
             transition: 'all 0.1s',
           }}
           title={subs.length ? `${subsDone}/${subs.length} subtasks done` : 'Add subtasks'}>
@@ -989,11 +990,13 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
             {/* checkbox (14px) + gap(12) + check-circle (18px) = 44px */}
             <div style={{ width: 44, flexShrink: 0 }}/>
             <div className="flex-1">Task name</div>
-            {/* subtask toggle button placeholder */}
+            {/* subtask toggle button — fixed 52 px to match task rows */}
             <div style={{ width: 52, flexShrink: 0 }}/>
             <div className="w-36 pl-2 hidden md:block">Assignee</div>
             <div className="w-24 text-center hidden md:block">Due date</div>
             <div className="w-28 text-center hidden lg:block">Status</div>
+            {/* Spacer matching the priority-dot + clone + delete group in each task row */}
+            <div style={{ width: canManage ? 68 : 38, flexShrink: 0 }}/>
           </div>
           <div className="flex-1 overflow-y-auto">
             {SECTIONS.map(section => {
