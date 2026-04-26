@@ -23,10 +23,12 @@ export function AppShell({ user, org, role, workspaceId, children }: Props) {
   const pathname    = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
 
+  const isTrialExpired =
+    org.status === 'trialing' && !!org.trial_ends_at && new Date(org.trial_ends_at) < new Date()
+
   const isLocked =
     org.status === 'expired' ||
-    org.status === 'payment_failed' ||
-    (org.status === 'trialing' && !!org.trial_ends_at && new Date(org.trial_ends_at) < new Date())
+    org.status === 'payment_failed'
 
   useEffect(() => { setMobileOpen(false) }, [pathname])
 
@@ -60,20 +62,37 @@ export function AppShell({ user, org, role, workspaceId, children }: Props) {
       {/* Main content */}
       <div className="app-main">
         <Header onMenuClick={() => setMobileOpen(o => !o)}/>
-        {/* Trial expired / payment failed banner */}
+        {/* Hard lock banner — expired / payment failed */}
         {(() => {
           if (!isLocked) return null
           return (
-            <div style={{ padding:'10px 20px', background:'#7c3aed',
+            <div style={{ padding:'10px 20px', background:'#dc2626',
               display:'flex', alignItems:'center', justifyContent:'space-between',
               fontSize:13, color:'#fff', flexShrink:0, zIndex:20, gap:12 }}>
               <span style={{ fontWeight:500 }}>
-                {org.status === 'payment_failed' ? '⚠️ Payment failed — ' : '🔒 Trial ended — '}
-                Your workspace is in read-only mode. Tasks are visible but cannot be edited.
+                {org.status === 'payment_failed' ? '⚠️ Payment failed — update your payment method to restore access.' : '⚠️ Account expired — please renew to continue.'}
               </span>
               <a href="/settings/billing" style={{ color:'#fff', fontWeight:700,
                 textDecoration:'none', border:'1px solid rgba(255,255,255,0.5)',
                 padding:'4px 12px', borderRadius:6, flexShrink:0 }}>
+                Fix now
+              </a>
+            </div>
+          )
+        })()}
+
+        {/* Friendly trial-expired banner — free features still work */}
+        {(() => {
+          if (!isTrialExpired) return null
+          return (
+            <div style={{ padding:'10px 20px', background:'#fffbeb', borderBottom:'1px solid #fde68a',
+              display:'flex', alignItems:'center', justifyContent:'space-between',
+              fontSize:13, color:'#92400e', flexShrink:0, zIndex:20, gap:12 }}>
+              <span style={{ fontWeight:500 }}>
+                🎉 Your 14-day free trial has ended. You&apos;re now on the <strong>Free plan</strong> — paid features are restricted. Upgrade anytime to restore full access.
+              </span>
+              <a href="/settings/billing" style={{ background:'#f59e0b', color:'#fff', fontWeight:700,
+                textDecoration:'none', padding:'5px 14px', borderRadius:6, flexShrink:0, fontSize:12 }}>
                 Upgrade now
               </a>
             </div>
@@ -81,7 +100,7 @@ export function AppShell({ user, org, role, workspaceId, children }: Props) {
         })()}
         <main className="app-content" style={{
           pointerEvents: isLocked ? 'none' : undefined,
-          opacity:       isLocked ? 0.6   : undefined,
+          opacity:       isLocked ? 0.55  : undefined,
         }}>
           <Suspense fallback={<PageFallback/>}>
             {children}

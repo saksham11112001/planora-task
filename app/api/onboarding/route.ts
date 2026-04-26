@@ -45,9 +45,11 @@ export async function POST(request: NextRequest) {
     const base = org_name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
     const slug = `${base}-${Date.now().toString(36)}`
 
-    // Create org
+    // Create org with 14-day pro trial
+    const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
     const { data: org, error: orgErr } = await admin.from('organisations').insert({
-      name: org_name.trim(), slug, plan_tier: 'free', status: 'active',
+      name: org_name.trim(), slug, plan_tier: 'pro', status: 'trialing',
+      trial_ends_at: trialEndsAt,
       industry: industry || null, team_size: team_size || null,
     }).select('id').single()
     if (orgErr) return NextResponse.json(dbError(orgErr, 'onboarding'), { status: 500 })

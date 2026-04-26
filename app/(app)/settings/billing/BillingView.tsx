@@ -10,17 +10,17 @@ const PLANS = [
     color: '#64748b',
   },
   {
-    key: 'starter', name: 'Starter', monthlyINR: 999, annualINR: 799,
+    key: 'starter', name: 'Starter', monthlyINR: 1499, annualINR: 1199,
     features: ['Up to 15 members','15 projects','Time tracking','Recurring tasks','Approval workflow','20 GB storage','Priority support'],
     color: '#0d9488', popular: false,
   },
   {
-    key: 'pro', name: 'Pro', monthlyINR: 2999, annualINR: 2399,
+    key: 'pro', name: 'Pro', monthlyINR: 4499, annualINR: 3599,
     features: ['Up to 50 members','Unlimited projects','Advanced reports','API access','CSV/PDF exports','File attachments (unlimited)','100 GB storage'],
     color: '#7c3aed', popular: true,
   },
   {
-    key: 'business', name: 'Business', monthlyINR: 7999, annualINR: 6399,
+    key: 'business', name: 'Business', monthlyINR: 11999, annualINR: 9599,
     features: ['Unlimited members','All Pro features','White-label branding','SSO / SAML','Dedicated support','SLA guarantee','Unlimited storage'],
     color: '#0891b2',
   },
@@ -300,7 +300,7 @@ export function BillingView({ orgName, currentPlan, status, subscriptionId, tria
           }}>
             <span style={{ fontSize: 20 }}>💡</span>
             <p style={{ fontSize: 13, color: 'var(--brand-dark)' }}>
-              <strong>Save 20%</strong> by switching to annual billing. Starter saves ₹{(999-799)*12} · Pro saves ₹{(2999-2399)*12} · Business saves ₹{(7999-6399)*12} per year.
+              <strong>Save 20%</strong> by switching to annual billing. Starter saves ₹{(1499-1199)*12} · Pro saves ₹{(4499-3599)*12} · Business saves ₹{(11999-9599)*12} per year.
             </p>
             <button onClick={() => setAnnual(true)} style={{
               flexShrink: 0, padding: '6px 14px', borderRadius: 8, border: 'none',

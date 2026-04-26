@@ -27,33 +27,20 @@ export default async function MyTasksPage() {
       .eq('org_id', mb.org_id).neq('is_archived', true)
       .order('due_date', { ascending: true, nullsFirst: false })
 
-    // ── "My Tasks" always scoped to the current user regardless of role.
-    //    Owner/admin see all org tasks in Reports; here "My" means assigned to me.
-    const scopedBase = base.or(`assignee_id.eq.${user.id},approver_id.eq.${user.id}`)
+    // ── "My Tasks" shows only tasks where the current user is the assignee.
+    //    Tasks where the user is an approver appear in the /approvals page instead.
+    const scopedBase = base.eq('assignee_id', user.id)
 
     const [
       { data: tasks },
-      { data: approvalTasks },
       { data: members },
       { data: clientsData },
       { data: assignedByMeRaw },
       { data: caAssignments },
       { data: caInstances },
     ] = await Promise.all([
-      // Main task list — includes subtasks directly assigned to me
+      // Main task list — only tasks assigned to me (approver tasks go to /approvals)
       scopedBase.limit(500),
-
-      // Pending approval tasks — tasks in review waiting on this user's approval decision.
-      // Always scoped to the current user as approver, regardless of role.
-      // Owners/admins can see all org-wide pending tasks on the /approvals page instead.
-      (() => {
-        const q = supabase.from('tasks').select(TASK_COLS)
-          .eq('org_id', mb.org_id).eq('status', 'in_review').eq('approval_status', 'pending')
-          .neq('is_archived', true).is('parent_task_id', null)
-          .eq('approver_id', user.id)
-          .order('due_date', { ascending: true, nullsFirst: false })
-        return q.limit(500)
-      })(),
 
       // Team members for filter/assignee dropdowns
       supabase.from('org_members')
@@ -115,8 +102,7 @@ export default async function MyTasksPage() {
     })
 
     // taskList is mutable so the context-task loop can push into it below
-    const taskList        = (tasks ?? []).filter(isVisible).map(enrich) as any[]
-    const approvalList    = (approvalTasks ?? []).filter(isVisible).map(enrich)
+    const taskList         = (tasks ?? []).filter(isVisible).map(enrich) as any[]
     const assignedByMeList = (assignedByMeRaw ?? []).filter(isVisible).map(enrich)
 
     // ── Context tasks: parent tasks whose subtasks are assigned to the current user ──
@@ -192,7 +178,6 @@ export default async function MyTasksPage() {
 
     return <MyTasksView
       tasks={displayTaskList as any}
-      pendingApprovalTasks={approvalList as any}
       assignedByMeTasks={assignedByMeList as any}
       // isManager controls "Assigned by me" tab — now limited to owner/admin only
       isManager={isOwnerAdmin}
