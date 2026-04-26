@@ -1,20 +1,18 @@
 export const dynamic = 'force-dynamic'
 
 import { createClient } from '@/lib/supabase/server'
+import { getSessionUser, getOrgMembership } from '@/lib/supabase/cached'
 import { redirect }     from 'next/navigation'
 import { TrashView }    from './TrashView'
 import type { Metadata } from 'next'
 export const metadata: Metadata = { title: 'Trash & Recovery' }
 
 export default async function TrashPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getSessionUser()
   if (!user) redirect('/login')
 
-  const { data: mb } = await supabase
-    .from('org_members')
-    .select('org_id, role, organisations(plan_tier, status, trial_ends_at)')
-    .eq('user_id', user.id).eq('is_active', true).maybeSingle()
+  const mb = await getOrgMembership(user.id)
+  const supabase = await createClient()
   if (!mb) redirect('/onboarding')
 
   const org       = mb.organisations as any

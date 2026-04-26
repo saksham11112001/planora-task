@@ -1,17 +1,19 @@
 export const dynamic = 'force-dynamic'
 
 import { createClient } from '@/lib/supabase/server'
+import { getSessionUser, getOrgMembership } from '@/lib/supabase/cached'
 import { redirect }     from 'next/navigation'
 import { CategoriesForm } from './CategoriesForm'
 import type { Metadata }  from 'next'
 export const metadata: Metadata = { title: 'Client categories' }
 
 export default async function CategoriesPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getSessionUser()
   if (!user) redirect('/login')
-  const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).maybeSingle()
+  const mb = await getOrgMembership(user.id)
   if (!mb || !['owner','admin'].includes(mb.role)) redirect('/settings')
+
+  const supabase = await createClient()
   const { data: settings } = await supabase.from('org_settings').select('client_categories').eq('org_id', mb.org_id).maybeSingle()
   const categories: string[] = (settings?.client_categories as string[]) ?? ['Retainer','Project-based','One-time','Enterprise','SMB','Startup']
   return (

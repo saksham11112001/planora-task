@@ -1,5 +1,6 @@
 export const dynamic = 'force-dynamic'
 import { createClient }     from '@/lib/supabase/server'
+import { getSessionUser, getOrgMembership } from '@/lib/supabase/cached'
 import { redirect }         from 'next/navigation'
 import { DocumentTypesForm } from './DocumentTypesForm'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -8,18 +9,14 @@ import type { Metadata }     from 'next'
 export const metadata: Metadata = { title: 'Document Types — Settings' }
 
 export default async function DocumentTypesPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getSessionUser()
   if (!user) redirect('/login')
 
-  const { data: mb } = await supabase
-    .from('org_members')
-    .select('org_id, role')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .maybeSingle()
+  const mb = await getOrgMembership(user.id)
   if (!mb) redirect('/onboarding')
   if (!['owner', 'admin'].includes(mb.role)) redirect('/settings')
+
+  const supabase = await createClient()
 
   const admin = createAdminClient()
   const { data: docTypes } = await admin

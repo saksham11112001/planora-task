@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getSessionUser, getOrgMembership } from '@/lib/supabase/cached'
 import { redirect }     from 'next/navigation'
 import { ProjectsView } from './ProjectsView'
 import type { Metadata } from 'next'
@@ -8,13 +9,14 @@ export const metadata: Metadata = { title: 'Projects' }
 
 export default async function ProjectsPage() {
   try {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  // Use cached fetchers — layout already called these, so no extra DB round trips
+  const user = await getSessionUser()
   if (!user) redirect('/login')
 
-  const { data: mb } = await supabase.from('org_members')
-    .select('org_id, role').eq('user_id', user.id).eq('is_active', true).maybeSingle()
+  const mb = await getOrgMembership(user.id)
   if (!mb) redirect('/onboarding')
+
+  const supabase = await createClient()
 
   const isOwner = mb.role === 'owner'
   let projectsQuery = supabase.from('projects').select('*, clients(id, name, color), member_ids')
@@ -25,19 +27,28 @@ export default async function ProjectsPage() {
   if (!isOwner) {
     projectsQuery = projectsQuery.or(`member_ids.is.null,member_ids.cs.{${user.id}}`)
   }
-  const [{ data: projects }, { data: taskCounts }, { data: clients }] = await Promise.all([
+
+  // Fetch projects and clients in parallel first
+  const [{ data: projects }, { data: clients }] = await Promise.all([
     projectsQuery,
-    supabase.from('tasks').select('project_id, status').eq('org_id', mb.org_id).not('project_id', 'is', null).neq('is_archived', true).is('parent_task_id', null).limit(5000),
     supabase.from('clients').select('id, name, color').eq('org_id', mb.org_id).eq('status', 'active').order('name'),
   ])
 
+  // Build task counts with parallel HEAD queries — zero row transfer, correct for any task volume
   const counts: Record<string, { total: number; done: number }> = {}
-  taskCounts?.forEach(t => {
-    if (!t.project_id) return
-    if (!counts[t.project_id]) counts[t.project_id] = { total: 0, done: 0 }
-    counts[t.project_id].total++
-    if (t.status === 'completed') counts[t.project_id].done++
-  })
+  if (projects && projects.length > 0) {
+    const countResults = await Promise.all(
+      projects.map(p => Promise.all([
+        supabase.from('tasks').select('*', { count: 'exact', head: true })
+          .eq('org_id', mb.org_id).eq('project_id', p.id).neq('is_archived', true).is('parent_task_id', null),
+        supabase.from('tasks').select('*', { count: 'exact', head: true })
+          .eq('org_id', mb.org_id).eq('project_id', p.id).eq('status', 'completed').neq('is_archived', true).is('parent_task_id', null),
+      ]))
+    )
+    projects.forEach((p, i) => {
+      counts[p.id] = { total: countResults[i][0].count ?? 0, done: countResults[i][1].count ?? 0 }
+    })
+  }
 
   return (
     <ProjectsView

@@ -150,6 +150,12 @@ export const dailyReminders = inngest.createFunction(
           // Don't escalate to themselves if manager is also the assignee
           if (mgrUser.id === assignee?.id) continue
 
+          // Respect manager's email preference
+          const { data: mgrPrefs } = await admin.from('notification_preferences')
+            .select('via_email')
+            .eq('user_id', mgrUser.id).eq('event_type', 'task_overdue').maybeSingle()
+          if ((mgrPrefs?.via_email ?? true) === false) continue
+
           const orgMode = await getOrgNotifMode((task as any).org_id)
           if (orgMode === 'digest') {
             await queueNotification({
@@ -178,7 +184,14 @@ export const dailyReminders = inngest.createFunction(
         }
 
         // Also notify the assignee directly that their task has been escalated
-        if (assignee?.email && (await acquireEmailSlot(assignee.id, `escalation_assignee_${task.id}`))) {
+        const { data: assigneeEscPrefs } = await admin.from('notification_preferences')
+          .select('via_email')
+          .eq('user_id', assignee.id).eq('event_type', 'task_overdue').maybeSingle()
+        if (
+          (assigneeEscPrefs?.via_email ?? true) &&
+          assignee?.email &&
+          (await acquireEmailSlot(assignee.id, `escalation_assignee_${task.id}`))
+        ) {
           await sendEscalationEmail({
             to:           assignee.email,
             managerName:  'Your manager',
@@ -267,6 +280,12 @@ export const dailyReminders = inngest.createFunction(
 
       let sent = 0
       for (const { approver, tasks } of byApprover.values()) {
+        // Respect approver's email preference
+        const { data: approverPrefs } = await admin.from('notification_preferences')
+          .select('via_email')
+          .eq('user_id', approver.id).eq('event_type', 'task_approved').maybeSingle()
+        if ((approverPrefs?.via_email ?? true) === false) continue
+
         if (!(await acquireEmailSlot(approver.id, 'approver_digest'))) continue
         await sendApprovalDigestEmail({
           to:           approver.email,

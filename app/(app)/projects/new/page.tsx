@@ -1,5 +1,6 @@
 import { Suspense }       from 'react'
 import { createClient }   from '@/lib/supabase/server'
+import { getSessionUser, getOrgMembership } from '@/lib/supabase/cached'
 import { redirect }       from 'next/navigation'
 import { NewProjectForm } from './NewProjectForm'
 import type { Metadata }  from 'next'
@@ -8,11 +9,12 @@ export const metadata: Metadata = { title: 'New project' }
 export const revalidate = 20
 
 export default async function NewProjectPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getSessionUser()
   if (!user) redirect('/login')
-  const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).maybeSingle()
+  const mb = await getOrgMembership(user.id)
   if (!mb || !['owner','admin','manager'].includes(mb.role)) redirect('/projects')
+
+  const supabase = await createClient()
   const [{ data: clients }, { data: members }, { data: templateSettings }] = await Promise.all([
     supabase.from('clients').select('id, name, color').eq('org_id', mb.org_id).eq('status', 'active').order('name'),
     supabase.from('org_members').select('user_id, users(id, name)').eq('org_id', mb.org_id).eq('is_active', true),

@@ -1,5 +1,5 @@
 import { createClient }     from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getSessionUser, getOrgMembership } from '@/lib/supabase/cached'
 import { redirect }          from 'next/navigation'
 import { Suspense }          from 'react'
 import { ComplianceShell }   from './ComplianceShell'
@@ -9,18 +9,17 @@ import { effectivePlan, canUseFeature } from '@/lib/utils/planGate'
 export const dynamic = 'force-dynamic'
 
 export default async function CompliancePage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  // Use cached fetchers — layout already called these, so no extra DB round trips.
+  // getOrgMembership joins organisations, eliminating the separate admin org query.
+  const user = await getSessionUser()
   if (!user) redirect('/login')
-  const { data: mb } = await supabase.from('org_members')
-    .select('org_id, role').eq('user_id', user.id).eq('is_active', true).maybeSingle()
+  const mb = await getOrgMembership(user.id)
   if (!mb) redirect('/onboarding')
 
-  // Gate: CA Compliance requires Pro plan or above
-  const admin = createAdminClient()
-  const { data: orgData } = await admin.from('organisations')
-    .select('plan_tier, status, trial_ends_at').eq('id', mb.org_id).single()
-  const plan = effectivePlan(orgData ?? { plan_tier: 'free', status: 'active' })
+  const supabase = await createClient()
+
+  // Gate: CA Compliance requires Pro plan or above — org data comes from the cached membership join
+  const plan = effectivePlan((mb.organisations as any) ?? { plan_tier: 'free', status: 'active' })
   if (!canUseFeature(plan, 'ca_compliance')) {
     return <UpgradeWall
       feature="CA Compliance Workflows"

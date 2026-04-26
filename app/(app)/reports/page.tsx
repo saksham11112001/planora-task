@@ -1,4 +1,5 @@
 import { createClient }   from '@/lib/supabase/server'
+import { getSessionUser, getOrgMembership } from '@/lib/supabase/cached'
 import { effectivePlan, canUseFeature } from '@/lib/utils/planGate'
 import { redirect }       from 'next/navigation'
 import { ReportsCharts }  from './ReportsCharts'
@@ -11,17 +12,18 @@ export const dynamic = 'force-dynamic'
 export const metadata: Metadata = { title: 'Reports' }
 
 export default async function ReportsPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  // Use cached fetchers — layout already called these, so no extra DB round trips.
+  // getOrgMembership joins organisations, so no separate org query needed.
+  const user = await getSessionUser()
   if (!user) redirect('/login')
 
-  const { data: mb } = await supabase
-    .from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).maybeSingle()
+  const mb = await getOrgMembership(user.id)
   if (!mb) redirect('/onboarding')
 
-  // Reports is a paid feature (Starter+)
-  const { data: orgData } = await supabase.from('organisations')
-    .select('plan_tier, status, trial_ends_at').eq('id', mb.org_id).maybeSingle()
+  const supabase = await createClient()
+
+  // Reports is a paid feature (Starter+) — org data comes from the cached membership join
+  const orgData = mb.organisations as any
   const plan = effectivePlan(orgData ?? { plan_tier: 'free', status: 'active' })
   if (!canUseFeature(plan, 'reports')) {
     return <UpgradeWall

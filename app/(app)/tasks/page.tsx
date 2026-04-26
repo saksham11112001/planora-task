@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getSessionUser, getOrgMembership } from '@/lib/supabase/cached'
 import { redirect }     from 'next/navigation'
 import { MyTasksView }  from './MyTasksView'
 import type { Metadata } from 'next'
@@ -8,13 +9,14 @@ export const metadata: Metadata = { title: 'My tasks' }
 
 export default async function MyTasksPage() {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    // Use cached fetchers — layout already called these, so no extra DB round trips
+    const user = await getSessionUser()
     if (!user) redirect('/login')
 
-    const { data: mb } = await supabase.from('org_members')
-      .select('org_id, role, can_view_all_tasks').eq('user_id', user.id).eq('is_active', true).maybeSingle()
+    const mb = await getOrgMembership(user.id)
     if (!mb) redirect('/onboarding')
+
+    const supabase = await createClient()
 
     // canViewAll: owner/admin always; others only if explicitly granted via Members settings
     const isOwnerAdmin = ['owner', 'admin'].includes(mb.role)
@@ -24,6 +26,7 @@ export default async function MyTasksPage() {
 
     // ── Shared base (all non-archived top-level tasks for this org) ──────────
     const base = supabase.from('tasks').select(TASK_COLS)
+
       .eq('org_id', mb.org_id).neq('is_archived', true)
       .order('due_date', { ascending: true, nullsFirst: false })
 

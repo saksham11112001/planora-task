@@ -1,5 +1,6 @@
 export const dynamic = 'force-dynamic'
 import { createClient } from '@/lib/supabase/server'
+import { getSessionUser, getOrgMembership } from '@/lib/supabase/cached'
 import { redirect }     from 'next/navigation'
 import { TaskSettingsForm } from './TaskSettingsForm'
 import type { Metadata }   from 'next'
@@ -7,11 +8,12 @@ export const metadata: Metadata = { title: 'Task settings' }
 export const revalidate = 20
 
 export default async function TaskSettingsPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getSessionUser()
   if (!user) redirect('/login')
-  const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).maybeSingle()
+  const mb = await getOrgMembership(user.id)
   if (!mb || !['owner','admin'].includes(mb.role)) redirect('/settings')
+
+  const supabase = await createClient()
   // Load existing settings
   const { data: settings } = await supabase.from('org_settings').select('task_fields').eq('org_id', mb.org_id).maybeSingle()
   return (

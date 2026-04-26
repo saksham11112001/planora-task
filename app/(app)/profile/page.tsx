@@ -1,4 +1,5 @@
 import { createClient }  from '@/lib/supabase/server'
+import { getSessionUser } from '@/lib/supabase/cached'
 import { redirect }      from 'next/navigation'
 import { ProfileForm }   from './ProfileForm'
 import type { Metadata } from 'next'
@@ -8,9 +9,10 @@ export const metadata: Metadata = { title: 'My profile' }
 
 
 export default async function ProfilePage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getSessionUser()
   if (!user) redirect('/login')
+
+  const supabase = await createClient()
   const { data: profile } = await supabase.from('users')
     .select('id, name, email, avatar_url, phone_number, timezone, whatsapp_opted_in')
     .eq('id', user.id).single()

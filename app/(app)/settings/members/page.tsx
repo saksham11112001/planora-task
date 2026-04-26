@@ -1,5 +1,6 @@
 export const dynamic = 'force-dynamic'
 import { createClient } from '@/lib/supabase/server'
+import { getSessionUser, getOrgMembership } from '@/lib/supabase/cached'
 import { redirect }     from 'next/navigation'
 import { MembersView }  from './MembersView'
 import type { Metadata } from 'next'
@@ -8,11 +9,12 @@ export const metadata: Metadata = { title: 'Team members' }
 export const revalidate = 20
 
 export default async function MembersPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getSessionUser()
   if (!user) redirect('/login')
-  const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).maybeSingle()
+  const mb = await getOrgMembership(user.id)
   if (!mb) redirect('/onboarding')
+
+  const supabase = await createClient()
 
   const { data: members } = await supabase.from('org_members')
     .select('id, role, joined_at, user_id, can_view_all_tasks, can_view_monitor, users(id, name, email, avatar_url)')

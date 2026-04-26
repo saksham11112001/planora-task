@@ -1,5 +1,6 @@
 export const dynamic = 'force-dynamic'
 import { createClient }       from '@/lib/supabase/server'
+import { getSessionUser, getOrgMembership } from '@/lib/supabase/cached'
 import { redirect }           from 'next/navigation'
 import Link                   from 'next/link'
 import { ArrowLeft, FolderOpen, ExternalLink, Pencil, Clock, CheckSquare, AlertCircle } from 'lucide-react'
@@ -13,11 +14,12 @@ export const revalidate = 30
 
 export default async function ClientDetailPage({ params }: { params: Promise<{ clientId: string }> }) {
   const { clientId } = await params
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getSessionUser()
   if (!user) redirect('/login')
-  const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).maybeSingle()
+  const mb = await getOrgMembership(user.id)
   if (!mb) redirect('/onboarding')
+
+  const supabase = await createClient()
 
   const { data: client } = await supabase.from('clients').select('*').eq('id', clientId).eq('org_id', mb.org_id).single()
   if (!client) redirect('/clients')

@@ -1,5 +1,5 @@
 export const dynamic = 'force-dynamic'
-import { createClient } from '@/lib/supabase/server'
+import { getSessionUser, getOrgMembership } from '@/lib/supabase/cached'
 import { redirect }     from 'next/navigation'
 import { BillingView }  from './BillingView'
 import type { Metadata } from 'next'
@@ -8,11 +8,11 @@ export const metadata: Metadata = { title: 'Billing' }
 export const revalidate = 20
 
 export default async function BillingPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getSessionUser()
   if (!user) redirect('/login')
-  const { data: mb } = await supabase.from('org_members').select('org_id, role, organisations(name, plan_tier, status, subscription_id)').eq('user_id', user.id).eq('is_active', true).maybeSingle()
+  const mb = await getOrgMembership(user.id)
   if (!mb || !['owner','admin'].includes(mb.role)) redirect('/settings')
+  // org data (including subscription_id) comes from the cached membership join
   const org = mb.organisations as any
   return (
     <div className="p-6 max-w-2xl mx-auto">

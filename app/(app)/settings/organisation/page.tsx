@@ -1,5 +1,6 @@
 export const dynamic = 'force-dynamic'
 import { createClient } from '@/lib/supabase/server'
+import { getSessionUser, getOrgMembership } from '@/lib/supabase/cached'
 import { redirect }     from 'next/navigation'
 import { OrgForm }      from './OrgForm'
 import type { Metadata } from 'next'
@@ -8,11 +9,12 @@ export const metadata: Metadata = { title: 'Organisation settings' }
 export const revalidate = 20
 
 export default async function OrgSettingsPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getSessionUser()
   if (!user) redirect('/login')
-  const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).maybeSingle()
+  const mb = await getOrgMembership(user.id)
   if (!mb || !['owner','admin'].includes(mb.role)) redirect('/settings')
+
+  const supabase = await createClient()
   const { data: org } = await supabase.from('organisations').select('*').eq('id', mb.org_id).single()
   if (!org) redirect('/settings')
   return (

@@ -20,7 +20,7 @@ export async function GET() {
     .eq('feature_key', 'notification_frequency')
     .maybeSingle()
 
-  const config = (data?.config as any) ?? { mode: 'immediate' }
+  const config = (data?.config as any) ?? { mode: 'digest' }
   return NextResponse.json({ config })
 }
 
