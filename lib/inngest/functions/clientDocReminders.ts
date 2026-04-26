@@ -37,8 +37,8 @@ export const clientDocReminders = inngest.createFunction(
         const admin = createAdminClient()
 
         // Get org name
-        const { data: org } = await admin.from('organisations').select('name').eq('id', org_id).single()
-        const { data: client } = await admin.from('clients').select('name').eq('id', client_id).single()
+        const { data: org } = await admin.from('organisations').select('name').eq('id', org_id).maybeSingle()
+        const { data: client } = await admin.from('clients').select('name').eq('id', client_id).maybeSingle()
         // Get upload filename
         const { data: upload } = await admin.from('client_document_uploads').select('file_name').eq('id', upload_id).maybeSingle()
 

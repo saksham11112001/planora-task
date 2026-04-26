@@ -73,7 +73,7 @@ function AuthConfirmInner() {
             avatar_url: user.user_metadata?.avatar_url ?? null,
           }),
         })
-      } catch (_) {}
+      } catch (e) { console.warn('[auth/confirm] provision fetch failed:', e) }
     }
 
     handleAuth()

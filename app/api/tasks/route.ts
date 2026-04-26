@@ -104,6 +104,7 @@ export async function POST(request: NextRequest) {
         : { data: null }
       if (assignee?.email) {
         await inngest.send({
+          id: `task-assigned-${task.id}-${assignee_id}`,
           name: 'task/assigned',
           data: {
             task_id: task.id, task_title: task.title,
@@ -116,7 +117,7 @@ export async function POST(request: NextRequest) {
           },
         })
       }
-    } catch {}
+    } catch (e) { console.error('[tasks POST] inngest send failed:', e) }
   }
   // Create compliance subtasks if provided
   const subtasks = body.subtasks as { title: string; required: boolean; due_date?: string }[] | undefined

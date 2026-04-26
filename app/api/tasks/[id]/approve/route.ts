@@ -100,6 +100,16 @@ export async function POST(
       }
     }
 
+    // Owner/admin submitting: auto-complete without entering approval queue
+    if (isOwnerOrAdmin) {
+      await supabase.from('tasks').update({
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+        approval_status: 'approved',
+      }).eq('id', id)
+      return NextResponse.json({ ok: true, message: 'Task completed', auto_completed: true })
+    }
+
     // If no approver is assigned → auto-complete regardless of approval_required
     // (there is nobody who could approve it, so just complete the task)
     if (!task.approver_id) {
@@ -132,7 +142,7 @@ export async function POST(
             org_name:       (mb.organisations as any)?.name ?? 'Your org',
           },
         })
-      } catch {}
+      } catch (e) { console.error('[approve] inngest send failed:', e) }
     }
     return NextResponse.json({ ok: true, message: 'Submitted for approval' })
   }
@@ -146,7 +156,7 @@ export async function POST(
   }
   // Block self-approval: whoever submitted cannot also approve/reject
   const submittedBy = (task as any).custom_fields?._submitted_by
-  if (submittedBy && submittedBy === user.id) {
+  if (submittedBy && submittedBy === user.id && !isOwnerOrAdmin) {
     return NextResponse.json({ error: 'You submitted this task for approval — another approver must review it' }, { status: 403 })
   }
 
@@ -207,7 +217,7 @@ export async function POST(
           },
         })
       }
-    } catch {}
+    } catch (e) { console.error('[approve] completion notify failed:', e) }
   }
 
   return NextResponse.json({ ok: true })

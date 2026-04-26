@@ -173,7 +173,7 @@ export default function LoginPage() {
   async function provisionUser() {
     try {
       await fetch('/api/auth/provision', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
-    } catch (_) {}
+    } catch (e) { console.warn('[login] provision fetch failed:', e) }
   }
 
   // ─────────────────────────────────────────────────────────────────────────

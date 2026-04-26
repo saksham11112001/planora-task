@@ -230,6 +230,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         .select('name').eq('id', mb.org_id).single()
       if (assignee?.email) {
         await inngest.send({
+          id: `task-reassigned-${id}-${newAssigneeId}-${Date.now()}`,
           name: 'task/assigned',
           data: {
             task_id: id,
@@ -245,7 +246,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           },
         })
       }
-    } catch (e) { console.error('[task PATCH notify]', e) }
+    } catch (e) { console.error('[tasks PATCH] inngest send failed:', e) }
   }
 
   return NextResponse.json({ data })

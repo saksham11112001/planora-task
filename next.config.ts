@@ -1,6 +1,10 @@
 import type { NextConfig } from 'next'
 
 const config: NextConfig = {
+  // Resolve workspace-root detection warning caused by multiple lockfiles on the machine.
+  // Set to the project directory so Next.js traces files correctly.
+  outputFileTracingRoot: __dirname,
+
   // Skip ESLint during builds (run separately)
   eslint: { ignoreDuringBuilds: true },
   // Skip TypeScript errors during builds (type-check separately)
