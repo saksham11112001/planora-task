@@ -11,7 +11,7 @@ import { useAppStore }    from '@/store/appStore'
 import { WalkthroughOverlay } from '@/components/walkthrough/WalkthroughOverlay'
 
 interface Props {
-  user:        { id: string; name: string; email: string; avatar_url: string | null; created_at: string }
+  user:        { id: string; name: string; email: string; avatar_url: string | null; created_at: string; tour_completed_at?: string | null }
   org:         { id: string; name: string; slug: string; plan_tier: any; logo_color: string; status: string | null; trial_ends_at: string | null }
   role:        string
   workspaceId: string | null
@@ -113,7 +113,7 @@ export function AppShell({ user, org, role, workspaceId, children }: Props) {
       <Suspense fallback={null}>
         <RouteLoader/>
       </Suspense>
-      <WalkthroughOverlay userId={user.id} userCreatedAt={user.created_at}/>
+      <WalkthroughOverlay userId={user.id} userCreatedAt={user.created_at} tourCompletedAt={user.tour_completed_at ?? null}/>
     </div>
   )
 }

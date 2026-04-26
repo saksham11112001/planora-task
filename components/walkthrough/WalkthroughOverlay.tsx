@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { createPortal }    from 'react-dom'
 import { useRouter }       from 'next/navigation'
 import { X, ChevronRight, ChevronLeft, Sparkles, ArrowRight, CheckCircle2, ExternalLink } from 'lucide-react'
@@ -147,6 +147,8 @@ const TOOLTIP_GAP    = 18
 // Show to accounts created within the last 7 days
 const MAX_AGE_MS     = 7 * 24 * 60 * 60 * 1000
 
+const CONFETTI_COLORS = ['#0d9488','#7c3aed','#0891b2','#d97706','#16a34a','#ec4899','#f43f5e']
+
 function storageKey(userId: string) { return STORAGE_PREFIX + userId }
 
 interface Rect { top: number; left: number; right: number; bottom: number; width: number; height: number }
@@ -155,30 +157,63 @@ interface Rect { top: number; left: number; right: number; bottom: number; width
 // Component
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface Props { userId: string; userCreatedAt: string }
+interface Props {
+  userId:           string
+  userCreatedAt:    string
+  tourCompletedAt:  string | null
+}
 
-export function WalkthroughOverlay({ userId, userCreatedAt }: Props) {
+export function WalkthroughOverlay({ userId, userCreatedAt, tourCompletedAt }: Props) {
   const router                            = useRouter()
-  const [step,      setStep]    = useState(0)
-  const [visible,   setVisible] = useState(false)
-  const [mounted,   setMounted] = useState(false)
-  const [spotlight, setSpot]    = useState<Rect | null>(null)
-  const [animKey,   setAnimKey] = useState(0)
-  const resizeTimer             = useRef<ReturnType<typeof setTimeout>>()
+  const [step,           setStep]         = useState(0)
+  const [visible,        setVisible]      = useState(false)
+  const [mounted,        setMounted]      = useState(false)
+  const [spotlight,      setSpot]         = useState<Rect | null>(null)
+  const [animKey,        setAnimKey]      = useState(0)
+  const [confettiActive, setConfetti]     = useState(false)
+  const resizeTimer                       = useRef<ReturnType<typeof setTimeout>>()
+
+  // Stable confetti pieces (random values computed once)
+  const confettiPieces = useMemo(() =>
+    Array.from({ length: 40 }, (_, i) => ({
+      id:    i,
+      color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+      left:  8 + (i / 40) * 84 + (i % 7) * 0.8,
+      delay: i * 0.018,
+      size:  6 + (i % 6),
+      round: i % 3 === 0,
+      speed: 0.7 + (i % 5) * 0.12,
+    }))
+  , [])
 
   // 1. Mount guard (no SSR)
   useEffect(() => { setMounted(true) }, [])
 
-  // 2. Show only for new users (account < 7 days old) who haven't dismissed
+  // 2. Show only for new users (account < 7 days old) who haven't completed
+  //    Checks DB flag first (cross-device), then localStorage (fast path)
   useEffect(() => {
     if (!mounted) return
+    if (tourCompletedAt) return                                   // DB says done — never show
     const accountAge = Date.now() - new Date(userCreatedAt).getTime()
-    if (accountAge > MAX_AGE_MS) return          // existing user — never show
+    if (accountAge > MAX_AGE_MS) return                           // existing user
     const done = localStorage.getItem(storageKey(userId))
     if (!done) setVisible(true)
-  }, [mounted, userId, userCreatedAt])
+  }, [mounted, userId, userCreatedAt, tourCompletedAt])
 
-  // 3. Measure spotlight target whenever step changes
+  // 3. Keyboard navigation: → next, ← back, Esc dismiss
+  useEffect(() => {
+    if (!visible) return
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape')       { dismiss(); return }
+      if (e.key === 'ArrowRight')   { next();    return }
+      if (e.key === 'ArrowLeft')    { back();    return }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, step])
+
+  // 4. Measure spotlight target whenever step changes
   const measure = useCallback(() => {
     const s = STEPS[step]
     if (!s?.target) { setSpot(null); return }
@@ -198,7 +233,6 @@ export function WalkthroughOverlay({ userId, userCreatedAt }: Props) {
 
   useEffect(() => {
     if (!visible) return
-    // Small delay on first spotlight steps to let any navigation settle
     const t = setTimeout(measure, 80)
     setAnimKey(k => k + 1)
 
@@ -215,6 +249,8 @@ export function WalkthroughOverlay({ userId, userCreatedAt }: Props) {
   function dismiss() {
     localStorage.setItem(storageKey(userId), '1')
     setVisible(false)
+    // Persist cross-device — fire-and-forget
+    fetch('/api/user/tour-complete', { method: 'POST' }).catch(() => {})
   }
 
   function goTo(n: number) {
@@ -224,13 +260,18 @@ export function WalkthroughOverlay({ userId, userCreatedAt }: Props) {
   function next() {
     if (step === STEPS.length - 1) { dismiss(); return }
     const nextStep = STEPS[step + 1]
-    // Navigate to the next step's page (forward only)
     if (nextStep?.path) router.push(nextStep.path)
     goTo(step + 1)
   }
 
   function back() {
     if (step > 0) goTo(step - 1)
+  }
+
+  // Last step gets a confetti burst before closing
+  function handleFinish() {
+    setConfetti(true)
+    setTimeout(() => dismiss(), 900)
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -304,9 +345,9 @@ export function WalkthroughOverlay({ userId, userCreatedAt }: Props) {
           100%{ opacity:1; transform: translate(-50%,-50%) scale(1);    }
         }
         @keyframes wt-pulse-ring {
-          0%   { box-shadow: 0 0 0 3px #14b8a6, 0 0 0 6px rgba(20,184,166,0.25); }
-          50%  { box-shadow: 0 0 0 4px #14b8a6, 0 0 0 10px rgba(20,184,166,0.1); }
-          100% { box-shadow: 0 0 0 3px #14b8a6, 0 0 0 6px rgba(20,184,166,0.25); }
+          0%   { transform: scale(1);    opacity: 1;   }
+          50%  { transform: scale(1.05); opacity: 0.6; }
+          100% { transform: scale(1);    opacity: 1;   }
         }
         @keyframes wt-chip-bounce {
           0%   { opacity:0; transform: translateY(6px); }
@@ -315,6 +356,11 @@ export function WalkthroughOverlay({ userId, userCreatedAt }: Props) {
         @keyframes wt-action-pop {
           0%   { opacity:0; transform: translateY(8px) scale(0.97); }
           100% { opacity:1; transform: translateY(0)   scale(1);    }
+        }
+        @keyframes wt-confetti-fall {
+          0%   { transform: translateY(-20px) rotate(0deg)   scale(1);   opacity: 1; }
+          80%  { opacity: 0.9; }
+          100% { transform: translateY(105vh) rotate(540deg) scale(0.8); opacity: 0; }
         }
         .wt-chip       { animation: wt-chip-bounce 0.25s ease both; }
         .wt-action-btn { animation: wt-action-pop  0.3s 0.12s cubic-bezier(0.34,1.56,0.64,1) both; }
@@ -325,28 +371,49 @@ export function WalkthroughOverlay({ userId, userCreatedAt }: Props) {
         .wt-dot:hover { opacity:0.8; }
       `}</style>
 
+      {/* ── Confetti burst ─────────────────────────────────────────────── */}
+      {confettiActive && (
+        <div style={{ position:'fixed', inset:0, pointerEvents:'none', zIndex:999999, overflow:'hidden' }}>
+          {confettiPieces.map(p => (
+            <div key={p.id} style={{
+              position:    'absolute',
+              left:        `${p.left}%`,
+              top:         '-12px',
+              width:       p.size,
+              height:      p.size,
+              background:  p.color,
+              borderRadius: p.round ? '50%' : 3,
+              animation:   `wt-confetti-fall ${p.speed}s ${p.delay}s ease-in forwards`,
+            }}/>
+          ))}
+        </div>
+      )}
+
       {/* ── Backdrop (4 quadrants around spotlight) ─────────────────────── */}
       <div style={{ position: 'fixed', inset: 0, zIndex: 99990, pointerEvents: 'none' }}>
         {spotlight ? (
           <>
             <div style={{ position:'fixed', top:0, left:0, right:0, height: Math.max(0, spotlight.top),
-              background:'rgba(2,6,23,0.78)', pointerEvents:'all', transition:'height 0.25s ease' }}/>
+              background:'rgba(2,6,23,0.65)', pointerEvents:'all', transition:'height 0.25s ease' }}/>
             <div style={{ position:'fixed', top: spotlight.bottom, left:0, right:0, bottom:0,
-              background:'rgba(2,6,23,0.78)', pointerEvents:'all', transition:'top 0.25s ease' }}/>
+              background:'rgba(2,6,23,0.65)', pointerEvents:'all', transition:'top 0.25s ease' }}/>
             <div style={{ position:'fixed', top: spotlight.top, left:0, width: Math.max(0, spotlight.left), height: spotlight.height,
-              background:'rgba(2,6,23,0.78)', pointerEvents:'all', transition:'all 0.25s ease' }}/>
+              background:'rgba(2,6,23,0.65)', pointerEvents:'all', transition:'all 0.25s ease' }}/>
             <div style={{ position:'fixed', top: spotlight.top, left: spotlight.right, right:0, height: spotlight.height,
-              background:'rgba(2,6,23,0.78)', pointerEvents:'all', transition:'all 0.25s ease' }}/>
+              background:'rgba(2,6,23,0.65)', pointerEvents:'all', transition:'all 0.25s ease' }}/>
+            {/* Spotlight ring — color matches current step */}
             <div style={{
               position:'fixed',
               top: spotlight.top, left: spotlight.left, width: spotlight.width, height: spotlight.height,
               borderRadius: 10, pointerEvents:'none',
+              border: `2px solid ${cur.color}`,
+              boxShadow: `0 0 0 4px ${cur.color}30`,
               animation: 'wt-pulse-ring 2s ease-in-out infinite',
               transition: 'all 0.25s ease',
             }}/>
           </>
         ) : (
-          <div style={{ position:'fixed', inset:0, background:'rgba(2,6,23,0.78)', pointerEvents:'all' }}/>
+          <div style={{ position:'fixed', inset:0, background:'rgba(2,6,23,0.65)', pointerEvents:'all' }}/>
         )}
       </div>
 
@@ -373,7 +440,7 @@ export function WalkthroughOverlay({ userId, userCreatedAt }: Props) {
           <div style={{ height: 3, background: '#f1f5f9', position: 'relative' }}>
             <div style={{
               position:'absolute', inset:0, width:`${pct}%`,
-              background:'linear-gradient(90deg,#0d9488,#14b8a6)',
+              background:`linear-gradient(90deg,${cur.color},${cur.color}99)`,
               borderRadius:99, transition:'width 0.4s cubic-bezier(0.65,0,0.35,1)',
             }}/>
           </div>
@@ -395,7 +462,7 @@ export function WalkthroughOverlay({ userId, userCreatedAt }: Props) {
                   <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:6, marginBottom:8 }}>
                     <Sparkles size={12} style={{ color:cur.color }}/>
                     <span style={{ fontSize:11, fontWeight:700, color:cur.color, textTransform:'uppercase', letterSpacing:'0.1em' }}>
-                      Quick tour
+                      Quick tour · ~60 seconds
                     </span>
                     <Sparkles size={12} style={{ color:cur.color }}/>
                   </div>
@@ -464,7 +531,6 @@ export function WalkthroughOverlay({ userId, userCreatedAt }: Props) {
                   textDecoration:'none',
                   boxShadow:`0 4px 16px ${cur.color}40`,
                   transition:'all 0.15s ease',
-                  // CSS custom prop for hover shadow
                   ['--wt-color-shadow' as any]: `${cur.color}55`,
                 }}
               >
@@ -496,14 +562,14 @@ export function WalkthroughOverlay({ userId, userCreatedAt }: Props) {
             {/* Step dots */}
             <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:18,
               justifyContent: isFirst || isLast ? 'center' : 'flex-start' }}>
-              {STEPS.map((_, i) => (
+              {STEPS.map((s, i) => (
                 <button key={i} className="wt-dot" onClick={() => goTo(i)}
                   title={`Go to step ${i + 1}`}
                   style={{
                     width: i === step ? 20 : 6,
                     height: 6,
                     borderRadius: 99,
-                    background: i === step ? cur.color : i < step ? '#99f6e4' : '#e2e8f0',
+                    background: i === step ? cur.color : i < step ? `${cur.color}55` : '#e2e8f0',
                     boxShadow: i === step ? `0 0 6px ${cur.color}60` : 'none',
                   }}/>
               ))}
@@ -512,17 +578,24 @@ export function WalkthroughOverlay({ userId, userCreatedAt }: Props) {
             {/* Action row */}
             <div style={{ display:'flex', alignItems:'center', gap:8 }}>
 
-              {/* Skip (always left) */}
+              {/* Skip (always left, intentionally low-contrast) */}
               <button onClick={dismiss} style={{
-                fontSize:12, fontWeight:500, color:'#94a3b8',
+                fontSize:11.5, fontWeight:500, color:'#b0bec5',
                 background:'none', border:'none', cursor:'pointer',
                 padding:'6px 2px', marginRight:'auto',
                 transition:'color 0.12s',
               }}
               onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color='#64748b' }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color='#94a3b8' }}>
-                Skip tour
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color='#b0bec5' }}>
+                Skip
               </button>
+
+              {/* Keyboard hint */}
+              {!isFirst && !isLast && (
+                <span style={{ fontSize:10, color:'#cbd5e1', fontWeight:500, marginRight:4 }}>
+                  ← →
+                </span>
+              )}
 
               {/* Back */}
               {step > 0 && (
@@ -540,7 +613,7 @@ export function WalkthroughOverlay({ userId, userCreatedAt }: Props) {
               )}
 
               {/* Next / Start / Finish */}
-              <button className="wt-next-btn" onClick={next} style={{
+              <button className="wt-next-btn" onClick={isLast ? handleFinish : next} style={{
                 display:'flex', alignItems:'center', gap:6,
                 padding: isLast ? '10px 22px' : '8px 18px',
                 borderRadius:10, border:'none',

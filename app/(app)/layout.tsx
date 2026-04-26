@@ -88,11 +88,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     return (
       <AppShell
         user={{
-          id:         user.id,
-          name:       profile?.name ?? user.email?.split('@')[0] ?? 'User',
-          email:      user.email ?? '',
-          avatar_url: profile?.avatar_url ?? null,
-          created_at: user.created_at,
+          id:                 user.id,
+          name:               profile?.name ?? user.email?.split('@')[0] ?? 'User',
+          email:              user.email ?? '',
+          avatar_url:         profile?.avatar_url ?? null,
+          created_at:         user.created_at,
+          tour_completed_at:  (profile as any)?.tour_completed_at ?? null,
         }}
         org={{
           id:            org.id ?? '',
