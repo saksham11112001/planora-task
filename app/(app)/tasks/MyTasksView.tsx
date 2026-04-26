@@ -155,6 +155,21 @@ export function MyTasksView({
   const [selTask,    setSelTask]    = useState<Task | null>(null)
   const panelHasUpdates = useRef(false)
   const panelTaskIdRef  = useRef<string | null>(null)
+  const inlineOpenRef   = useRef<(() => void) | null>(null)
+
+  // Keyboard shortcut: N → open inline task form (skip when focus is in an input/textarea)
+  useEffect(() => {
+    function handle(e: KeyboardEvent) {
+      if (!canCreate) return
+      if (e.key !== 'n' && e.key !== 'N') return
+      const tag = (e.target as HTMLElement)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return
+      e.preventDefault()
+      inlineOpenRef.current?.()
+    }
+    window.addEventListener('keydown', handle)
+    return () => window.removeEventListener('keydown', handle)
+  }, [canCreate])
   useEffect(() => { panelHasUpdates.current = false }, [selTask?.id])
   useEffect(() => { if (selTask?.id) panelTaskIdRef.current = selTask.id }, [selTask?.id])
   const [dragTaskId, setDragTaskId] = useState<string | null>(null)
@@ -327,7 +342,7 @@ export function MyTasksView({
     if (res.ok) {
       const d = await res.json().catch(() => ({}))
       if (d.auto_completed) {
-        // No approver required → auto-completed; show 2.5s undo banner
+        // No approver required → auto-completed; show 10s undo banner
         const completedAt = new Date().toISOString()
         setTasks(prev => prev.map(t => t.id === task.id
           ? { ...t, status: 'completed', approval_status: 'approved', completed_at: completedAt } : t))
@@ -335,14 +350,14 @@ export function MyTasksView({
           ? { ...prev, status: 'completed', approval_status: 'approved' } : prev)
         const timer = setTimeout(() => {
           setPendingUndo(prev => prev.filter(u => u.taskId !== task.id))
-        }, 2600)
+        }, 10000)
         setPendingUndo(prev => [...prev.filter(u => u.taskId !== task.id),
           { taskId: task.id, task, action: 'completed', timer }])
       } else {
-        // Sent for approval → show 2.5s undo banner too
+        // Sent for approval → show 10s undo banner too
         const timer = setTimeout(() => {
           setPendingUndo(prev => prev.filter(u => u.taskId !== task.id))
-        }, 2600)
+        }, 10000)
         setPendingUndo(prev => [...prev.filter(u => u.taskId !== task.id),
           { taskId: task.id, task, action: 'submitted', timer }])
       }
@@ -752,6 +767,7 @@ export function MyTasksView({
           <div style={{ borderBottom: '1px solid var(--border-light)', background: 'var(--surface)' }}>
             <InlineOneTimeTask
               members={members} clients={clients} currentUserId={currentUserId}
+              openRef={inlineOpenRef}
               onCreated={(newTask) => {
                 if (newTask?.id) {
                   // Only add to "My Tasks" state if the task is assigned to current user
@@ -977,9 +993,26 @@ export function MyTasksView({
             </div>
           )}
           {/* Empty state when filters yield no results */}
-          {displayTasks.length === 0 && (
+          {displayTasks.length === 0 && tasks.length === 0 && (
+            <div style={{ padding:'56px 24px', textAlign:'center' }}>
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2"
+                style={{ margin:'0 auto 14px', display:'block', color:'var(--border)' }}>
+                <rect x="3" y="4" width="18" height="18" rx="3"/><path d="M3 9h18M9 4v5M15 4v5M7 14h4M7 17h6"/>
+              </svg>
+              <p style={{ fontSize:15, fontWeight:600, color:'var(--text-primary)', margin:'0 0 6px' }}>
+                No tasks yet
+              </p>
+              <p style={{ fontSize:13, color:'var(--text-muted)', margin:'0 0 16px' }}>
+                Create your first task using the + button above, or press <kbd style={{ padding:'1px 5px', borderRadius:4, border:'1px solid var(--border)', fontSize:11, background:'var(--surface-subtle)', fontFamily:'inherit' }}>N</kbd> anywhere on this page.
+              </p>
+            </div>
+          )}
+          {displayTasks.length === 0 && tasks.length > 0 && (
             <div style={{ padding:'48px 24px', textAlign:'center' }}>
-              <div style={{ fontSize:32, marginBottom:12 }}>🔍</div>
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"
+                style={{ margin:'0 auto 12px', display:'block', opacity:0.3, color:'var(--text-muted)' }}>
+                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+              </svg>
               <p style={{ fontSize:14, fontWeight:600, color:'var(--text-primary)', margin:'0 0 6px' }}>
                 No tasks match your filters
               </p>

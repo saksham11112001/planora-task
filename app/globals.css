@@ -20,6 +20,10 @@
 /* ── Base ─────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
 
+html {
+  scroll-behavior: smooth;
+}
+
 html, body {
   height: 100%;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
@@ -1222,14 +1226,24 @@ html.dark .bg-white { background-color: var(--surface) !important; }
   /* Smaller header height */
   header { height: 52px !important; }
 
-  /* Task detail panel full screen on mobile */
+  /* Task detail panel — full-screen slide-up on mobile */
   .detail-panel {
     position: fixed !important;
     inset: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
-    z-index: 60 !important;
+    max-height: 100% !important;
+    /* z-index MUST beat the JS-rendered backdrop (z-index: 199) */
+    z-index: 300 !important;
     border-radius: 0 !important;
+    /* Replace the desktop center-scale with a slide-up from below */
+    transform: translateY(105%) !important;
+    opacity: 1 !important;
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  }
+  .detail-panel.open {
+    transform: translateY(0) !important;
+    opacity: 1 !important;
   }
 
   /* Reports charts — stack on mobile */
@@ -1248,8 +1262,73 @@ html.dark .bg-white { background-color: var(--surface) !important; }
     grid-template-columns: 28px 22px 1fr 70px !important;
   }
   /* Also hide priority on very small screens, keep only title */
-  .mytasks-row > *:nth-child(6) { 
-    display: none !important; 
+  .mytasks-row > *:nth-child(6) {
+    display: none !important;
+  }
+}
+
+/* ── Mobile touch + layout improvements ─────────────────────────── */
+@media (max-width: 768px) {
+  /* Bigger tap targets for all task rows */
+  .mytasks-row {
+    min-height: 48px;
+  }
+
+  /* Tab bars: horizontal scroll instead of wrapping */
+  .tab-bar {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    flex-wrap: nowrap !important;
+    white-space: nowrap;
+  }
+  .tab-bar::-webkit-scrollbar { display: none; }
+
+  /* Tab items: no shrink so they stay readable */
+  .tab-item {
+    flex-shrink: 0 !important;
+  }
+
+  /* Toolbar wraps gracefully rather than overflowing */
+  .toolbar {
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+  }
+
+  /* Settings/form grids collapse to single column */
+  .card-elevated > form [style*="grid-template-columns: '1fr 1fr'"],
+  .card-elevated > form [style*="gridTemplateColumns: '1fr 1fr'"],
+  .card-elevated > form div[style*="display: 'grid'"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Page padding tighter on tablet/phone */
+  .page-container { padding: 16px !important; }
+
+  /* Inline task creation pills: allow wrap */
+  .inline-task-pills { flex-wrap: wrap !important; gap: 6px !important; }
+
+  /* Ensure detail panel header close button is tappable (44 × 44) */
+  .detail-panel .h-8.w-8 {
+    width: 44px !important;
+    height: 44px !important;
+  }
+}
+
+/* ── Extra-small: stack form action rows ─────────────────────────── */
+@media (max-width: 480px) {
+  /* Form submit/cancel rows stack vertically */
+  [style*="justifyContent: 'flex-end'"][style*="display: 'flex'"][style*="gap"] {
+    flex-direction: column-reverse !important;
+    gap: 8px !important;
+  }
+
+  /* Full-width buttons in stacked rows */
+  [style*="justifyContent: 'flex-end'"] a,
+  [style*="justifyContent: 'flex-end'"] button[type="submit"] {
+    width: 100% !important;
+    text-align: center !important;
+    justify-content: center !important;
   }
 }
 
@@ -2013,4 +2092,45 @@ html.dark [class*="overlay"] { background: var(--surface) !important; }
 /* Inline task row teal highlight */
 html.dark [style*="borderLeft: '3px solid var(--brand)'"] {
   background: rgba(13,148,136,0.06) !important;
+}
+
+/* ── Mobile panel drag-handle pill ─────────────────────────────── */
+.detail-panel-handle {
+  display: none;  /* hidden on desktop */
+}
+@media (max-width: 640px) {
+  .detail-panel-handle {
+    display: block;
+    width: 36px;
+    height: 4px;
+    border-radius: 99px;
+    background: var(--border);
+    margin: 10px auto 4px;
+    flex-shrink: 0;
+  }
+  /* Hide the dim backdrop on mobile — panel is fullscreen */
+  .detail-panel-backdrop {
+    display: none !important;
+  }
+}
+
+/* ── Navigation link hover affordance ──────────────────────────── */
+.nav-link {
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.nav-link:hover { color: var(--brand); }
+
+/* Clickable entity names (project / client / task titles used as links) */
+.entity-link {
+  color: inherit;
+  text-decoration: none;
+  transition: color 0.15s;
+  cursor: pointer;
+}
+.entity-link:hover {
+  color: var(--brand);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }

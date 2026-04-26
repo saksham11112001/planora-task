@@ -1,5 +1,5 @@
 'use client'
-import { useState }  from 'react'
+import { useState, useEffect, useRef }  from 'react'
 import { useRouter } from 'next/navigation'
 import Link          from 'next/link'
 import { ArrowLeft } from 'lucide-react'
@@ -22,6 +22,17 @@ export function ClientEditForm({ client }: { client: any }) {
     status:   client.status   ?? 'active',
     color:    client.color    ?? '#0d9488',
   })
+
+  const initialForm = useRef(form)
+
+  // Warn before navigating away with unsaved changes
+  useEffect(() => {
+    const isDirty = JSON.stringify(form) !== JSON.stringify(initialForm.current)
+    if (!isDirty) return
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [form])
 
   function set(k: string, v: string) { setForm(f => ({ ...f, [k]: v })) }
 

@@ -15,6 +15,7 @@ interface Props {
   currentUserId?: string
   onCreated?:     (task?: any) => void
   defaultOpen?:   boolean
+  openRef?:       React.MutableRefObject<(() => void) | null>
 }
 
 const PRIORITY_OPTIONS = [
@@ -25,7 +26,7 @@ const PRIORITY_OPTIONS = [
   { value: 'urgent', label: 'Urgent',      color: '#dc2626' },
 ]
 
-export function InlineOneTimeTask({ members, clients, currentUserId, onCreated, defaultOpen = false }: Props) {
+export function InlineOneTimeTask({ members, clients, currentUserId, onCreated, defaultOpen = false, openRef }: Props) {
   const router   = useRouter()
   const inputRef = useRef<HTMLInputElement>(null)
   const rowRef   = useRef<HTMLDivElement>(null)
@@ -96,6 +97,9 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated, 
   }, [open])
 
   function openRow() { setOpen(true); setTimeout(() => inputRef.current?.focus(), 50) }
+
+  // Expose openRow to parent via ref (used for keyboard shortcut N)
+  useEffect(() => { if (openRef) openRef.current = openRow }, [openRef])
 
   function validate(): boolean {
     const errs: Record<string,string> = {}

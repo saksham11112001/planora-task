@@ -149,6 +149,28 @@ export function CustomFieldsSettingsForm({ orgId, initial }: { orgId: string; in
         </div>
       </div>
 
+      {/* Field-type reference */}
+      <div style={{ padding:'14px 16px',borderRadius:10,background:'rgba(13,148,136,0.06)',
+        border:'1px solid rgba(13,148,136,0.18)',marginBottom:20 }}>
+        <p style={{ fontSize:11,fontWeight:700,color:'var(--brand)',textTransform:'uppercase',
+          letterSpacing:'0.06em',margin:'0 0 10px' }}>Field type guide</p>
+        <div style={{ display:'flex',flexDirection:'column',gap:6 }}>
+          {[
+            { type:'Short text',  example:'Case Number → "ITO/123/2024", PAN → "ABCDE1234F"' },
+            { type:'Long text',   example:'Officer Details → "Name, Designation, Room No."' },
+            { type:'Date',        example:'Filing Date → date picker; Hearing Date → date picker' },
+            { type:'Number',      example:'Amount (₹) → "150000"; Tax Rate → "18"' },
+            { type:'Dropdown',    example:'Stage → "Draft / Review / Filed"; Quarter → "Q1 / Q2 / Q3 / Q4"' },
+          ].map(({ type, example }) => (
+            <div key={type} style={{ display:'flex',gap:8,alignItems:'flex-start' }}>
+              <span style={{ fontSize:11,fontWeight:600,color:'var(--brand)',
+                minWidth:72,flexShrink:0,paddingTop:1 }}>{type}</span>
+              <span style={{ fontSize:11,color:'var(--text-muted)',lineHeight:1.5 }}>{example}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <button onClick={save} disabled={saving}
         style={{ padding:'10px 24px',borderRadius:8,border:'none',background:'var(--brand)',color:'#fff',
           fontSize:14,fontWeight:600,cursor:saving?'not-allowed':'pointer',opacity:saving?0.7:1,fontFamily:'inherit' }}>

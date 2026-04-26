@@ -93,6 +93,8 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [aiLoading, setAiLoading] = useState(false)
   const [isSaving,  setIsSaving]  = useState(false)
+  const [isSaved,   setIsSaved]   = useState(false)
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [converting, setConverting] = useState(false)
   const [showProjectPicker, setShowProjectPicker] = useState(false)
   const [availableProjects, setAvailableProjects] = useState<{id:string;name:string;color:string}[]>([])
@@ -236,6 +238,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
   const patch = useCallback(async (fields: Record<string, unknown>, rollback?: () => void) => {
     if (!task) return
     setIsSaving(true)
+    setIsSaved(false)
     const res = await fetch(`/api/tasks/${task.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -252,6 +255,10 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     // (e.g. approval_status/completed_at cleared on reopen, parent auto-complete)
     const { data: serverData } = await res.json().catch(() => ({}))
     onUpdated?.(serverData && typeof serverData === 'object' ? { ...fields, ...serverData } : fields)
+    // Brief "Saved ✓" flash
+    if (savedTimerRef.current) clearTimeout(savedTimerRef.current)
+    setIsSaved(true)
+    savedTimerRef.current = setTimeout(() => setIsSaved(false), 2000)
   }, [task, onUpdated])
 
   /* debounced patch — for text fields that change frequently */
@@ -355,6 +362,13 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
       toast.info('Already submitted — awaiting approver.')
       setCompleting(false)
       return
+    }
+
+    // Warn (non-blocking) if open subtasks exist
+    if (subtasksLoaded) {
+      const openCount = subtasks.filter(s => s.status !== 'completed').length
+      if (openCount > 0)
+        toast.info(`${openCount} subtask${openCount > 1 ? 's are' : ' is'} still open — you can still submit, but consider completing them first.`)
     }
 
     // All other tasks: submit for approval (optimistic → in_review)
@@ -784,13 +798,18 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
 
   return (
     <>
+      {/* Backdrop — hidden on mobile (panel is fullscreen, tap close btn instead) */}
       {isOpen && (
-        <div className="fixed inset-0 bg-black/50" onClick={onClose} style={{ zIndex: 199, backdropFilter: "blur(2px)" }} />
+        <div className="fixed inset-0 bg-black/50 detail-panel-backdrop" onClick={onClose}
+          style={{ zIndex: 199, backdropFilter: 'blur(2px)' }} />
       )}
 
       <div className={cn('detail-panel', isOpen && 'open')} onClick={e => e.stopPropagation()} role="dialog" aria-modal="true">
         {task && (
           <>
+            {/* Mobile drag-handle pill */}
+            <div className="detail-panel-handle" aria-hidden="true"/>
+
             {/* ── Panel header ── */}
             <div className="flex items-center gap-2 px-4 py-3 border-b sticky top-0 z-10"
               style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
@@ -814,6 +833,14 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
               </span>
               {isSaving && (
                 <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>Saving…</span>
+              )}
+              {!isSaving && isSaved && (
+                <span style={{ fontSize: 11, color: '#16a34a', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 3 }}>
+                  <svg viewBox="0 0 12 12" fill="none" style={{ width: 10, height: 10 }}>
+                    <path d="M2 6l3 3 5-5" stroke="#16a34a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  Saved
+                </span>
               )}
               <button onClick={onClose}
                 className="h-8 w-8 flex items-center justify-center rounded-lg transition-colors"

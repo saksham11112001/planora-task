@@ -1,5 +1,5 @@
 'use client'
-import { useState }  from 'react'
+import { useState, useEffect, useRef }  from 'react'
 import { useRouter } from 'next/navigation'
 import Link          from 'next/link'
 import { ArrowLeft } from 'lucide-react'
@@ -24,6 +24,18 @@ export function ProjectEditForm({ project, clients, members }: { project: any; c
     hours_budget:project.hours_budget?? '',
   })
   const [memberIds, setMemberIds] = useState<string[]>(project.member_ids ?? [])
+  const initialForm   = useRef(form)
+  const initialMembers = useRef(memberIds)
+
+  // Warn before navigating away with unsaved changes
+  useEffect(() => {
+    const isDirty = JSON.stringify(form) !== JSON.stringify(initialForm.current) ||
+                    JSON.stringify(memberIds) !== JSON.stringify(initialMembers.current)
+    if (!isDirty) return
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [form, memberIds])
 
   function set(k: string, v: string) { setForm(f => ({ ...f, [k]: v })) }
 

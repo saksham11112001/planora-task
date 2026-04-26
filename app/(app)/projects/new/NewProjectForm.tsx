@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import { toast } from '@/store/appStore'
 
 // ── Rich industry project templates ────────────────────────────────────────
@@ -457,10 +458,22 @@ export function NewProjectForm({ clients: initialClients, members, orgTemplates 
         Save this project as a reusable template for your organisation
       </label>
 
-      <button type="submit" disabled={saving}
-        className="w-full py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-60">
-        {saving ? 'Creating…' : selectedTemplate && selectedTemplate !== 'Blank project' ? `Create project with ${templateTasksPreview.length} tasks →` : 'Create project'}
-      </button>
+      <div style={{ display: 'flex', gap: 10 }}>
+        <Link href="/projects"
+          style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '10px 18px', borderRadius: 8, border: '1.5px solid #e2e8f0',
+            fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)', textDecoration: 'none',
+            transition: 'border-color 0.15s, color 0.15s' }}
+          onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.borderColor='#0d9488'; el.style.color='#0d9488' }}
+          onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.borderColor='#e2e8f0'; el.style.color='var(--text-secondary)' }}>
+          Cancel
+        </Link>
+        <button type="submit" disabled={saving}
+          style={{ flex: 2 }}
+          className="py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-60">
+          {saving ? 'Creating…' : selectedTemplate && selectedTemplate !== 'Blank project' ? `Create project with ${templateTasksPreview.length} tasks →` : 'Create project'}
+        </button>
+      </div>
     </form>
   )
 }
