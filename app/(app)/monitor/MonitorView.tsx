@@ -107,6 +107,7 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
   const [filterType,     setFilterType]     = useState('')
   // ── Date filter state ──
   const [dateOpen,          setDateOpen]          = useState(false)
+  const [alignDateRight,    setAlignDateRight]     = useState(false)
   const [duePreset,         setDuePreset]          = useState('')
   const [dueDateFrom,       setDueDateFrom]        = useState('')
   const [dueDateTo,         setDueDateTo]          = useState('')
@@ -512,7 +513,13 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
 
         {/* Date filter — single button with dropdown panel */}
         <div ref={dateRef} style={{ position: 'relative' }}>
-          <button onClick={() => setDateOpen(o => !o)}
+          <button onClick={() => {
+              if (!dateOpen && dateRef.current) {
+                const r = dateRef.current.getBoundingClientRect()
+                setAlignDateRight(r.left + 260 > window.innerWidth - 8)
+              }
+              setDateOpen(o => !o)
+            }}
             style={{ ...selectStyle(hasDateFilter), display: 'flex', alignItems: 'center', gap: 5, paddingRight: hasDateFilter ? 28 : 10 }}>
             <Calendar style={{ width: 11, height: 11, flexShrink: 0 }}/>
             {activeDateLabel}
@@ -530,7 +537,7 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
           )}
 
           {dateOpen && (
-            <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 1000,
+            <div style={{ position: 'absolute', top: 'calc(100% + 6px)', ...(alignDateRight ? {right:0} : {left:0}), zIndex: 1000,
               background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12,
               boxShadow: '0 10px 40px rgba(0,0,0,0.15)', padding: '10px 12px', minWidth: 260 }}>
 

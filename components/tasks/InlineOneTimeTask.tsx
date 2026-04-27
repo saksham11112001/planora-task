@@ -41,6 +41,8 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated, 
   const [assignee,   setAssignee]   = useState(currentUserId ?? '')
   const [coAssignees,   setCoAssignees]   = useState<string[]>([])
   const [coAssigneesOpen, setCoAssigneesOpen] = useState(false)
+  const coRef = useRef<HTMLDivElement>(null)
+  const [coAlignRight, setCoAlignRight] = useState(false)
   const [makeRecurring, setMakeRecurring] = useState(false)
   const [recurringFreq, setRecurringFreq] = useState('weekly')
   const [addToProjectId, setAddToProjectId] = useState('')
@@ -262,9 +264,15 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated, 
 
         {/* Co-assignees — compact dropdown */}
         {members.length > 1 && (
-          <div style={{ position:'relative' }}>
+          <div ref={coRef} style={{ position:'relative' }}>
             <button type="button"
-              onClick={() => setCoAssigneesOpen(p => !p)}
+              onClick={() => {
+                if (!coAssigneesOpen && coRef.current) {
+                  const r = coRef.current.getBoundingClientRect()
+                  setCoAlignRight(r.left + 170 > window.innerWidth - 8)
+                }
+                setCoAssigneesOpen(p => !p)
+              }}
               style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px', borderRadius:20,
                 border: coAssignees.length > 0 ? '1.5px solid var(--brand)' : '1px solid var(--border)',
                 background: coAssignees.length > 0 ? 'rgba(13,148,136,0.08)' : 'var(--surface-subtle)',
@@ -274,7 +282,7 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated, 
               {coAssignees.length > 0 ? `+${coAssignees.length} co-assignee${coAssignees.length>1?'s':''}` : '+ Co-assignee'}
             </button>
             {coAssigneesOpen && (
-              <div style={{ position:'absolute', top:'calc(100% + 4px)', left:0, zIndex:100,
+              <div style={{ position:'absolute', top:'calc(100% + 4px)', ...(coAlignRight ? {right:0} : {left:0}), zIndex:100,
                 background:'var(--surface)', border:'1px solid var(--border)', borderRadius:10,
                 boxShadow:'0 8px 24px rgba(0,0,0,0.12)', padding:'6px 8px', minWidth:170 }}>
                 {members.filter(m => m.id !== assignee).map(m => (

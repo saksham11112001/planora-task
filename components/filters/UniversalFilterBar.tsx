@@ -84,6 +84,7 @@ export function UniversalFilterBar({
   } = useFilterStore()
 
   const [dateOpen, setDateOpen] = useState(false)
+  const [alignDateRight, setAlignDateRight] = useState(false)
   const [duePreset, setDuePreset] = useState('')
   const [createdPreset, setCreatedPreset] = useState('')
   const [updatedPreset, setUpdatedPreset] = useState('')
@@ -178,7 +179,13 @@ export function UniversalFilterBar({
       {showDate && (
         <div ref={dateRef} style={{ position:'relative' }}>
           <button
-            onClick={() => setDateOpen(o => !o)}
+            onClick={() => {
+              if (!dateOpen && dateRef.current) {
+                const r = dateRef.current.getBoundingClientRect()
+                setAlignDateRight(r.left + 260 > window.innerWidth - 8)
+              }
+              setDateOpen(o => !o)
+            }}
             style={{
               ...(hasDateFilter ? PILL_ACTIVE : PILL),
               paddingRight: hasDateFilter ? 28 : 10,
@@ -206,7 +213,7 @@ export function UniversalFilterBar({
           )}
 
           {dateOpen && (
-            <div style={{ position:'absolute', top:'calc(100% + 6px)', left:0, zIndex:1000,
+            <div style={{ position:'absolute', top:'calc(100% + 6px)', ...(alignDateRight ? {right:0} : {left:0}), zIndex:1000,
               background:'var(--surface)', border:'1px solid var(--border)', borderRadius:12,
               boxShadow:'0 10px 40px rgba(0,0,0,0.15)', padding:'10px 12px', minWidth:260 }}>
 
