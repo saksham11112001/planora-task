@@ -319,11 +319,17 @@ function AttachHeadersCell({
   onSave: (h: string[]) => void
 }) {
   const [open, setOpen] = useState(false)
+  const [alignRight, setAlignRight] = useState(false)
   const [draft, setDraft] = useState<string[]>([])
   const ref = useRef<HTMLDivElement>(null)
 
-  function openPopover() {
+  function openPopover(e: React.MouseEvent) {
     if (!editable) return
+    const td = (e.currentTarget as HTMLElement).closest('td')
+    if (td) {
+      const r = td.getBoundingClientRect()
+      setAlignRight(r.left + 200 > window.innerWidth - 8)
+    }
     const filled = Array.from({ length: count }, (_, i) => headers[i] ?? '')
     setDraft(filled)
     setOpen(true)
@@ -355,7 +361,7 @@ function AttachHeadersCell({
       </div>
       {open && (
         <div ref={ref} style={{
-          position: 'absolute', top: '100%', left: 0, zIndex: 50,
+          position: 'absolute', top: '100%', ...(alignRight ? {right:0} : {left:0}), zIndex: 50,
           background: 'var(--surface)', border: '1px solid var(--border)',
           borderRadius: 8, boxShadow: '0 4px 20px rgba(0,0,0,0.12)',
           padding: 12, minWidth: 200,
@@ -405,6 +411,7 @@ function TemplateSelectCell({
   onSelect: (ids: string[]) => void
 }) {
   const [open, setOpen] = useState(false)
+  const [alignRight, setAlignRight] = useState(false)
   const [previewId, setPreviewId] = useState<string | null>(null)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -428,7 +435,17 @@ function TemplateSelectCell({
       <div ref={ref}>
         {/* Trigger */}
         <div
-          onClick={() => editable && setOpen(o => !o)}
+          onClick={(e) => {
+            if (!editable) return
+            if (!open) {
+              const td = (e.currentTarget as HTMLElement).closest('td')
+              if (td) {
+                const r = td.getBoundingClientRect()
+                setAlignRight(r.left + 250 > window.innerWidth - 8)
+              }
+            }
+            setOpen(o => !o)
+          }}
           style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', cursor: editable ? 'pointer' : 'default' }}
         >
           {selectedTemplates.length > 0 ? (
@@ -458,7 +475,7 @@ function TemplateSelectCell({
         {/* Dropdown */}
         {open && editable && (
           <div style={{
-            position: 'absolute', top: '100%', left: 0, zIndex: 100,
+            position: 'absolute', top: '100%', ...(alignRight ? {right:0} : {left:0}), zIndex: 100,
             background: 'var(--surface)', border: '1px solid var(--border)',
             borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
             minWidth: 250, padding: 8, marginTop: 4,
@@ -609,6 +626,7 @@ function QuickFillCell({
   onApply: (dates: Record<string, string>) => void
 }) {
   const [open, setOpen] = useState(false)
+  const [alignRight, setAlignRight] = useState(false)
   const [freq, setFreq] = useState('monthly')
   const [day, setDay] = useState(7)
   const [startMonth, setStartMonth] = useState<MonthKey>('apr')
@@ -628,7 +646,16 @@ function QuickFillCell({
   return (
     <td style={{ padding: '2px 4px', verticalAlign: 'middle', position: 'relative', width: 32 }}>
       <button
-        onClick={() => setOpen(o => !o)}
+        onClick={(e) => {
+          if (!open) {
+            const td = (e.currentTarget as HTMLElement).closest('td')
+            if (td) {
+              const r = td.getBoundingClientRect()
+              setAlignRight(r.left + 220 > window.innerWidth - 8)
+            }
+          }
+          setOpen(o => !o)
+        }}
         title="Quick fill dates"
         style={{
           background: 'none', border: '1px solid var(--border)', cursor: 'pointer',
@@ -640,7 +667,7 @@ function QuickFillCell({
       </button>
       {open && (
         <div ref={ref} style={{
-          position: 'absolute', top: '100%', left: 0, zIndex: 60,
+          position: 'absolute', top: '100%', ...(alignRight ? {right:0} : {left:0}), zIndex: 60,
           background: 'var(--surface)', border: '1px solid var(--border)',
           borderRadius: 10, boxShadow: '0 4px 24px rgba(0,0,0,0.15)',
           padding: 14, minWidth: 220, marginTop: 4,
@@ -735,6 +762,7 @@ function SearchableSelect({
   disabled?: boolean
 }) {
   const [open, setOpen] = useState(false)
+  const [alignRight, setAlignRight] = useState(false)
   const [q, setQ] = useState('')
   const ref = useRef<HTMLDivElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
@@ -761,7 +789,14 @@ function SearchableSelect({
     <div ref={ref} style={{ position: 'relative', display: 'inline-block', ...wrapperStyle }}>
       <button
         type="button"
-        onClick={() => !disabled && setOpen(o => !o)}
+        onClick={() => {
+          if (disabled) return
+          if (!open && ref.current) {
+            const r = ref.current.getBoundingClientRect()
+            setAlignRight(r.left + dropdownWidth > window.innerWidth - 8)
+          }
+          setOpen(o => !o)
+        }}
         style={{
           display: 'flex', alignItems: 'center', gap: 5,
           cursor: disabled ? 'default' : 'pointer',
@@ -777,7 +812,7 @@ function SearchableSelect({
 
       {open && (
         <div style={{
-          position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 9999,
+          position: 'absolute', top: '100%', ...(alignRight ? {right:0} : {left:0}), marginTop: 4, zIndex: 9999,
           width: dropdownWidth, background: 'var(--surface)',
           border: '1px solid var(--border)', borderRadius: 10,
           boxShadow: '0 8px 28px rgba(0,0,0,0.15)', overflow: 'hidden',

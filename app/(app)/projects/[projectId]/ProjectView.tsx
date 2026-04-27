@@ -88,6 +88,7 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
   const [subAssigneeOpen, setSubAssigneeOpen] = useState<Record<string, boolean>>({})
   const [subDueDateEdit,  setSubDueDateEdit]  = useState<string | null>(null)          // subtask id
   const [taskAssigneeOpen,setTaskAssigneeOpen]= useState<Record<string, boolean>>({})
+  const [taskAssigneeAlign,setTaskAssigneeAlign]= useState<Record<string,'left'|'right'>>({})
   const [taskDueDateEdit,  setTaskDueDateEdit] = useState<string | null>(null)          // task id
 
   const memberMap = React.useMemo(() => {
@@ -96,7 +97,9 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
     return m
   }, [members])
   const [filterOpen,        setFilterOpen]        = useState(false)
+  const [filterAlign,       setFilterAlign]       = useState<'left'|'right'>('left')
   const [sortOpen,          setSortOpen]          = useState(false)
+  const filterBtnRef = React.useRef<HTMLDivElement>(null)
   const [savingTemplate,    setSavingTemplate]    = useState(false)
   const [templateSavedMsg,  setTemplateSavedMsg]  = useState('')
   const [cloning,           setCloning]           = useState(false)
@@ -492,12 +495,20 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
         </button>
         {/* ── Assignee inline picker ── */}
         <div className="w-36 hidden md:flex items-center gap-2 pl-2" style={{ position: 'relative' }}
-          onClick={e => { e.stopPropagation(); if (canManage) setTaskAssigneeOpen(p => ({...p, [task.id]: !p[task.id]})); else setSelectedTask(task) }}>
+          onClick={e => {
+            e.stopPropagation()
+            if (!canManage) { setSelectedTask(task); return }
+            if (!taskAssigneeOpen[task.id]) {
+              const r = e.currentTarget.getBoundingClientRect()
+              setTaskAssigneeAlign(p => ({ ...p, [task.id]: r.left + 160 > window.innerWidth - 8 ? 'right' : 'left' }))
+            }
+            setTaskAssigneeOpen(p => ({ ...p, [task.id]: !p[task.id] }))
+          }}>
           {taskAssigneeOpen[task.id] && canManage && (
             <>
               <div style={{ position:'fixed', inset:0, zIndex:49 }}
                 onClick={e => { e.stopPropagation(); setTaskAssigneeOpen(p => ({...p, [task.id]:false})) }}/>
-              <div style={{ position:'absolute', left:0, top:'calc(100% + 4px)', zIndex:50,
+              <div style={{ position:'absolute', ...(taskAssigneeAlign[task.id]==='right'?{right:0}:{left:0}), top:'calc(100% + 4px)', zIndex:50,
                 background:'var(--surface)', border:'1px solid var(--border)',
                 borderRadius:8, boxShadow:'0 4px 16px rgba(0,0,0,0.12)',
                 minWidth:160, overflow:'hidden' }}>
@@ -869,8 +880,14 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
             ) : (
               <>
                 {/* Filter button */}
-                <div style={{position:'relative'}}>
-                  <button onClick={() => { setFilterOpen(o=>!o); setSortOpen(false) }}
+                <div ref={filterBtnRef} style={{position:'relative'}}>
+                  <button onClick={() => {
+                    if (!filterOpen && filterBtnRef.current) {
+                      const r = filterBtnRef.current.getBoundingClientRect()
+                      setFilterAlign(r.left + 220 > window.innerWidth - 8 ? 'right' : 'left')
+                    }
+                    setFilterOpen(o=>!o); setSortOpen(false)
+                  }}
                     className="toolbar-btn"
                     style={{ color: activeFilters > 0 ? 'var(--brand)' : undefined,
                              background: activeFilters > 0 ? 'var(--brand-light)' : undefined }}>
@@ -878,7 +895,7 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
                     Filter{activeFilters > 0 ? ` (${activeFilters})` : ''}
                   </button>
                   {filterOpen && (
-                    <div style={{ position:'absolute', top:'100%', left:0, marginTop:4,
+                    <div style={{ position:'absolute', top:'100%', ...(filterAlign==='right'?{right:0}:{left:0}), marginTop:4,
                       background:'var(--surface)', border:'1px solid var(--border)',
                       borderRadius:10, boxShadow:'0 8px 24px rgba(0,0,0,0.12)', zIndex:9999,
                       padding:12, minWidth:220 }} onClick={e=>e.stopPropagation()}>
@@ -956,7 +973,7 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
                     Sort{sortBy !== 'due_date' ? ': '+sortBy.replace('_',' ') : ''}
                   </button>
                   {sortOpen && (
-                    <div style={{ position:'absolute', top:'100%', left:0, marginTop:4,
+                    <div style={{ position:'absolute', top:'100%', right:0, marginTop:4,
                       background:'var(--surface)', border:'1px solid var(--border)',
                       borderRadius:10, boxShadow:'0 8px 24px rgba(0,0,0,0.12)', zIndex:9999,
                       padding:12, minWidth:200 }} onClick={e=>e.stopPropagation()}>
