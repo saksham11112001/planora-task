@@ -29,6 +29,7 @@ export async function POST(
   }
   const isAssignee    = task.assignee_id === user.id
   const isOwnerOrAdmin = ['owner', 'admin'].includes(mb.role)
+  const isManager      = ['owner', 'admin', 'manager'].includes(mb.role)
 
   // ── Who can do what ────────────────────────────────────────────────────────
   // submit: the assignee OR any owner/admin
@@ -147,8 +148,8 @@ export async function POST(
     return NextResponse.json({ ok: true, message: 'Submitted for approval' })
   }
 
-  // approve / reject: designated approver OR any owner/admin
-  if (!task.approver_id && !isOwnerOrAdmin) {
+  // approve / reject: designated approver OR any manager/owner/admin
+  if (!task.approver_id && !isManager) {
     return NextResponse.json({ error: 'No approver assigned to this task' }, { status: 403 })
   }
   if (task.approver_id && task.approver_id !== user.id && !isOwnerOrAdmin) {
