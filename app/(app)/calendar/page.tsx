@@ -17,9 +17,10 @@ export default async function CalendarPage() {
 
   const orgId = mb.org_id
   const isOwnerAdmin = ['owner', 'admin'].includes(mb.role)
+  const isManager    = ['owner', 'admin', 'manager'].includes(mb.role)
 
-  // canViewAll: owner/admin always; others only if explicitly granted via Members settings
-  const canViewAll = isOwnerAdmin || (mb as any).can_view_all_tasks === true
+  // canViewAll: owner/admin/manager always; others only if explicitly granted via Members settings
+  const canViewAll = isManager || (mb as any).can_view_all_tasks === true
 
   // Fetch 12 months of tasks with due dates — wide enough that navigating months always has data
   const from = new Date(); from.setMonth(from.getMonth() - 6)
@@ -37,7 +38,7 @@ export default async function CalendarPage() {
 
   const taskQuery = canViewAll
     ? base
-    : base.or(`assignee_id.eq.${user.id},approver_id.eq.${user.id},created_by.eq.${user.id}`)
+    : base.or(`assignee_id.eq.${user.id},approver_id.eq.${user.id}`)
 
   const [{ data: tasks }, { data: clients }, { data: members }, { data: caAssignments }, { data: caInstances }] = await Promise.all([
     taskQuery.limit(2000),
