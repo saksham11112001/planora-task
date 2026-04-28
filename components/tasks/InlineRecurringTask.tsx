@@ -47,9 +47,21 @@ const MONTHS_LABEL = ['January','February','March','April','May','June','July','
 
 const FREQ_LABEL_MAP: Record<string, string> = Object.fromEntries(FREQUENCIES.map(f => [f.v, f.l]))
 
+const WEEKDAY_NAMES: Record<string, string> = { mon:'Mon', tue:'Tue', wed:'Wed', thu:'Thu', fri:'Fri', sat:'Sat', sun:'Sun' }
+const WEEKDAY_ORDER = ['mon','tue','wed','thu','fri','sat','sun']
+
 /** Returns a human-readable label for any frequency string, including dynamic ones */
 function getFreqLabel(freq: string): string {
   if (FREQ_LABEL_MAP[freq]) return FREQ_LABEL_MAP[freq]
+  // weekly_days:mon,wed,fri
+  const wdMatch = freq.match(/^weekly_days:(.+)$/)
+  if (wdMatch) return 'Every ' + wdMatch[1].split(',').map(d => WEEKDAY_NAMES[d] ?? d).join(', ')
+  // monthly_days:1,15,25
+  const mdMatch = freq.match(/^monthly_days:(.+)$/)
+  if (mdMatch) {
+    const days = mdMatch[1].split(',').map(Number).sort((a, b) => a - b)
+    return days.join(', ') + ' of every month'
+  }
   // every_N_days
   const everyMatch = freq.match(/^every_(\d+)_days$/)
   if (everyMatch) return `Every ${everyMatch[1]} day${everyMatch[1]==='1'?'':'s'}`
@@ -131,9 +143,9 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, defa
   const [freqModalOpen,  setFreqModalOpen]  = useState(false)
   const [draftType,      setDraftType]      = useState<FreqModalType>('daily')
   const [draftNDays,     setDraftNDays]     = useState(2)
-  const [draftWeekday,   setDraftWeekday]   = useState('mon')
+  const [draftWeekdays,  setDraftWeekdays]  = useState<string[]>(['mon'])
   const [draftNWeeks,    setDraftNWeeks]    = useState(2)
-  const [draftMonthDay,  setDraftMonthDay]  = useState(1)
+  const [draftMonthDays, setDraftMonthDays] = useState<number[]>([1])
 
   function openFreqModal() {
     // Init drafts from current frequency
@@ -141,21 +153,26 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, defa
       setDraftType('daily')
     } else if (frequency === 'custom_daily') {
       setDraftType('every_n_days'); setDraftNDays(customInterval)
+    } else if (frequency.startsWith('weekly_days:')) {
+      setDraftType('weekly_day'); setDraftWeekdays(frequency.replace('weekly_days:', '').split(','))
     } else if (frequency.startsWith('weekly_')) {
-      setDraftType('weekly_day'); setDraftWeekday(frequency.replace('weekly_', ''))
+      setDraftType('weekly_day'); setDraftWeekdays([frequency.replace('weekly_', '')])
     } else if (frequency === 'bi_weekly') {
       setDraftType('every_n_weeks'); setDraftNWeeks(2)
     } else {
       const evM = frequency.match(/^every_(\d+)_days$/)
       const moM = frequency.match(/^monthly_(\d+)$/)
+      const mdM = frequency.match(/^monthly_days:(.+)$/)
       if (evM) {
         const d = parseInt(evM[1])
         if (d % 7 === 0 && d >= 14 && d <= 28) { setDraftType('every_n_weeks'); setDraftNWeeks(d / 7) }
         else { setDraftType('every_n_days'); setDraftNDays(Math.min(7, d)) }
+      } else if (mdM) {
+        setDraftType('monthly_day'); setDraftMonthDays(mdM[1].split(',').map(Number))
       } else if (moM) {
-        setDraftType('monthly_day'); setDraftMonthDay(parseInt(moM[1]))
+        setDraftType('monthly_day'); setDraftMonthDays([parseInt(moM[1])])
       } else if (frequency === 'monthly_custom') {
-        setDraftType('monthly_day'); setDraftMonthDay(customDay)
+        setDraftType('monthly_day'); setDraftMonthDays([customDay])
       } else {
         setDraftType('daily')
       }
@@ -164,14 +181,22 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, defa
   }
 
   function confirmFreqModal() {
-    if (draftType === 'daily')       setFrequency('daily')
-    else if (draftType === 'every_n_days')  { setFrequency('custom_daily'); setCustomInterval(draftNDays) }
-    else if (draftType === 'weekly_day')    setFrequency(`weekly_${draftWeekday}`)
-    else if (draftType === 'every_n_weeks') {
+    if (draftType === 'daily') {
+      setFrequency('daily')
+    } else if (draftType === 'every_n_days') {
+      setFrequency('custom_daily'); setCustomInterval(draftNDays)
+    } else if (draftType === 'weekly_day') {
+      const sorted = [...draftWeekdays].sort((a, b) => WEEKDAY_ORDER.indexOf(a) - WEEKDAY_ORDER.indexOf(b))
+      if (sorted.length === 1) setFrequency(`weekly_${sorted[0]}`)
+      else setFrequency(`weekly_days:${sorted.join(',')}`)
+    } else if (draftType === 'every_n_weeks') {
       if (draftNWeeks === 2) setFrequency('bi_weekly')
       else setFrequency(`every_${draftNWeeks * 7}_days`)
+    } else if (draftType === 'monthly_day') {
+      const sorted = [...draftMonthDays].sort((a, b) => a - b)
+      if (sorted.length === 1) { setFrequency('monthly_custom'); setCustomDay(sorted[0]) }
+      else setFrequency(`monthly_days:${sorted.join(',')}`)
     }
-    else if (draftType === 'monthly_day')  { setFrequency('monthly_custom'); setCustomDay(draftMonthDay) }
     setFreqModalOpen(false)
   }
 
@@ -608,26 +633,40 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, defa
               <span style={{ fontSize:11, color:'var(--text-muted)', marginLeft:'auto' }}>(1–7)</span>
             </label>
 
-            {/* 3 — Every [weekday] */}
-            <label style={{ display:'flex', alignItems:'center', gap:8, padding:'12px 14px', borderRadius:10, cursor:'pointer',
+            {/* 3 — Every [weekday checkboxes] */}
+            <div style={{ display:'flex', alignItems:'flex-start', gap:8, padding:'12px 14px', borderRadius:10, cursor:'pointer',
               border:`1.5px solid ${draftType==='weekly_day' ? 'var(--brand)' : 'var(--border)'}`,
               background: draftType==='weekly_day' ? 'var(--brand-light)' : 'var(--surface-subtle)' }}
               onClick={() => setDraftType('weekly_day')}>
               <input type="radio" name="freq" checked={draftType==='weekly_day'} onChange={() => setDraftType('weekly_day')}
-                style={{ accentColor:'var(--brand)', width:15, height:15, flexShrink:0 }}/>
-              <span style={{ fontSize:13, fontWeight:500, color:'var(--text-primary)', whiteSpace:'nowrap' }}>Every</span>
-              <select value={draftWeekday}
-                onClick={e => { e.stopPropagation(); setDraftType('weekly_day') }}
-                onChange={e => { setDraftWeekday(e.target.value); setDraftType('weekly_day') }}
-                style={{ padding:'3px 8px', borderRadius:6, fontSize:13, fontWeight:500,
-                  border:`1px solid ${draftType==='weekly_day' ? 'var(--brand-border)' : 'var(--border)'}`,
-                  background:'var(--surface)', color:'var(--text-primary)', outline:'none',
-                  cursor:'pointer', fontFamily:'inherit' }}>
-                {[['mon','Mon'],['tue','Tue'],['wed','Wed'],['thu','Thu'],['fri','Fri'],['sat','Sat'],['sun','Sun']].map(([v,l]) => (
-                  <option key={v} value={v}>{l}</option>
-                ))}
-              </select>
-            </label>
+                style={{ accentColor:'var(--brand)', width:15, height:15, flexShrink:0, marginTop:2 }}/>
+              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                <span style={{ fontSize:13, fontWeight:500, color:'var(--text-primary)' }}>Every</span>
+                <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
+                  {[['mon','Mon'],['tue','Tue'],['wed','Wed'],['thu','Thu'],['fri','Fri'],['sat','Sat'],['sun','Sun']].map(([v, l]) => {
+                    const checked = draftWeekdays.includes(v)
+                    return (
+                      <button key={v} type="button"
+                        onClick={e => {
+                          e.stopPropagation(); setDraftType('weekly_day')
+                          setDraftWeekdays(prev =>
+                            prev.includes(v)
+                              ? prev.length > 1 ? prev.filter(d => d !== v) : prev
+                              : [...prev, v]
+                          )
+                        }}
+                        style={{ padding:'3px 9px', borderRadius:6, fontSize:12, fontWeight:600,
+                          border:`1.5px solid ${checked ? 'var(--brand)' : 'var(--border)'}`,
+                          background: checked ? 'var(--brand)' : 'var(--surface)',
+                          color: checked ? '#fff' : 'var(--text-secondary)',
+                          cursor:'pointer', fontFamily:'inherit' }}>
+                        {l}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
 
             {/* 4 — Every N weeks */}
             <label style={{ display:'flex', alignItems:'center', gap:8, padding:'12px 14px', borderRadius:10, cursor:'pointer',
@@ -647,23 +686,40 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, defa
               <span style={{ fontSize:11, color:'var(--text-muted)', marginLeft:'auto' }}>(2–4)</span>
             </label>
 
-            {/* 5 — On the N of every month */}
-            <label style={{ display:'flex', alignItems:'center', gap:8, padding:'12px 14px', borderRadius:10, cursor:'pointer',
+            {/* 5 — On the [day grid] of every month */}
+            <div style={{ display:'flex', alignItems:'flex-start', gap:8, padding:'12px 14px', borderRadius:10, cursor:'pointer',
               border:`1.5px solid ${draftType==='monthly_day' ? 'var(--brand)' : 'var(--border)'}`,
               background: draftType==='monthly_day' ? 'var(--brand-light)' : 'var(--surface-subtle)' }}
               onClick={() => setDraftType('monthly_day')}>
               <input type="radio" name="freq" checked={draftType==='monthly_day'} onChange={() => setDraftType('monthly_day')}
-                style={{ accentColor:'var(--brand)', width:15, height:15, flexShrink:0 }}/>
-              <span style={{ fontSize:13, fontWeight:500, color:'var(--text-primary)', whiteSpace:'nowrap' }}>On the</span>
-              <input type="number" min={1} max={30} value={draftMonthDay}
-                onClick={e => { e.stopPropagation(); setDraftType('monthly_day') }}
-                onChange={e => setDraftMonthDay(Math.max(1, Math.min(30, parseInt(e.target.value) || 1)))}
-                style={{ width:52, padding:'3px 6px', borderRadius:6, fontSize:13, fontWeight:600, textAlign:'center',
-                  border:`1px solid ${draftType==='monthly_day' ? 'var(--brand-border)' : 'var(--border)'}`,
-                  background:'var(--surface)', color:'var(--text-primary)', outline:'none', fontFamily:'inherit' }}/>
-              <span style={{ fontSize:13, fontWeight:500, color:'var(--text-primary)', whiteSpace:'nowrap' }}>of every month</span>
-              <span style={{ fontSize:11, color:'var(--text-muted)', marginLeft:'auto' }}>(1–30)</span>
-            </label>
+                style={{ accentColor:'var(--brand)', width:15, height:15, flexShrink:0, marginTop:2 }}/>
+              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                <span style={{ fontSize:13, fontWeight:500, color:'var(--text-primary)' }}>On the ___ of every month</span>
+                <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                  {Array.from({ length: 30 }, (_, i) => i + 1).map(day => {
+                    const checked = draftMonthDays.includes(day)
+                    return (
+                      <button key={day} type="button"
+                        onClick={e => {
+                          e.stopPropagation(); setDraftType('monthly_day')
+                          setDraftMonthDays(prev =>
+                            prev.includes(day)
+                              ? prev.length > 1 ? prev.filter(d => d !== day) : prev
+                              : [...prev, day]
+                          )
+                        }}
+                        style={{ width:28, height:28, borderRadius:5, fontSize:11, fontWeight:600,
+                          border:`1.5px solid ${checked ? 'var(--brand)' : 'var(--border)'}`,
+                          background: checked ? 'var(--brand)' : 'var(--surface)',
+                          color: checked ? '#fff' : 'var(--text-secondary)',
+                          cursor:'pointer', fontFamily:'inherit' }}>
+                        {day}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
 
           </div>
 
