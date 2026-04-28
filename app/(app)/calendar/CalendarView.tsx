@@ -69,6 +69,8 @@ function taskTypeDot(t: CalTask): string {
    point guaranteed to be before the viewed window start ── */
 function prevOccurrence(freq: string, dateStr: string): string {
   const d = new Date(dateStr + 'T00:00:00')
+  if (freq.startsWith('weekly_days:'))  { d.setDate(d.getDate() - 7);    return d.toISOString().split('T')[0] }
+  if (freq.startsWith('monthly_days:')) { d.setMonth(d.getMonth() - 1);  return d.toISOString().split('T')[0] }
   switch (freq) {
     case 'daily':     d.setDate(d.getDate() - 1);         break
     case 'weekly':    d.setDate(d.getDate() - 7);         break
@@ -139,7 +141,7 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
     if (filter==='compliance') return !!t.custom_fields?._ca_compliance
     if (filter==='project')    return !!t.project_id && !t.is_recurring
     if (filter==='one-time')   return !t.project_id && !t.is_recurring && !t.custom_fields?._ca_compliance
-    if (filter==='recurring')  return t.is_recurring
+    if (filter==='recurring')  return t.is_recurring && !t.custom_fields?._ca_compliance
     return true
   }).filter(t => {
     if (clientFilter && (t as any).client?.id !== clientFilter) return false

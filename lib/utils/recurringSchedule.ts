@@ -80,6 +80,33 @@ export function nextOccurrence(freq: string, from: string): string {
     }
   }
 
+  // ── Multi-day weekly: weekly_days:mon,wed,fri ────────────────────────────
+  if (freq.startsWith('weekly_days:')) {
+    const DAY_MAP: Record<string, number> = { sun:0, mon:1, tue:2, wed:3, thu:4, fri:5, sat:6 }
+    const targets = freq.replace('weekly_days:', '').split(',')
+      .map(d => DAY_MAP[d.trim()] ?? 1)
+      .sort((a, b) => a - b)
+    const refDay = ref.getDay()
+    const next = targets.find(d => d > refDay)
+    const diff  = next !== undefined ? next - refDay : targets[0] + 7 - refDay
+    return new Date(ref.getTime() + diff * 86_400_000).toISOString().split('T')[0]
+  }
+
+  // ── Multi-day monthly: monthly_days:1,15,25 ──────────────────────────────
+  if (freq.startsWith('monthly_days:')) {
+    const days = freq.replace('monthly_days:', '').split(',').map(Number).sort((a, b) => a - b)
+    const refDay = ref.getDate()
+    for (const day of days) {
+      const lastDay = new Date(ref.getFullYear(), ref.getMonth() + 1, 0).getDate()
+      const candidate = Math.min(day, lastDay)
+      if (candidate > refDay) return new Date(ref.getFullYear(), ref.getMonth(), candidate).toISOString().split('T')[0]
+    }
+    const yr = ref.getMonth() === 11 ? ref.getFullYear() + 1 : ref.getFullYear()
+    const mo = (ref.getMonth() + 1) % 12
+    const lastDay = new Date(yr, mo + 1, 0).getDate()
+    return new Date(yr, mo, Math.min(days[0], lastDay)).toISOString().split('T')[0]
+  }
+
   // ── Weekly with a fixed weekday ──────────────────────────────────────────
   if (freq.startsWith('weekly_')) {
     const DAY_MAP: Record<string, number> = {
