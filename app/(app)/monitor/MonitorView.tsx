@@ -95,16 +95,93 @@ function selectStyle(active: boolean) {
   } as React.CSSProperties
 }
 
+function MultiSelect({ values, onChange, placeholder, options }: {
+  values: string[]
+  onChange: (v: string[]) => void
+  placeholder: string
+  options: { value: string; label: string }[]
+}) {
+  const [open, setOpen] = useState(false)
+  const [align, setAlign] = useState<'left' | 'right'>('left')
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    function h(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [open])
+
+  const active = values.length > 0
+  const label = active
+    ? values.length === 1
+      ? (options.find(o => o.value === values[0])?.label ?? placeholder)
+      : `${values.length} selected`
+    : placeholder
+
+  function toggle(v: string) {
+    onChange(values.includes(v) ? values.filter(x => x !== v) : [...values, v])
+  }
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button
+        onClick={() => {
+          if (!open && ref.current) {
+            const r = ref.current.getBoundingClientRect()
+            setAlign(r.left + 180 > window.innerWidth - 8 ? 'right' : 'left')
+          }
+          setOpen(o => !o)
+        }}
+        style={{ ...selectStyle(active), display: 'flex', alignItems: 'center', gap: 5 }}>
+        {label}
+        {active && (
+          <span style={{ background: 'var(--brand)', color: '#fff', borderRadius: '50%',
+            width: 14, height: 14, display: 'inline-flex', alignItems: 'center',
+            justifyContent: 'center', fontSize: 9, fontWeight: 700, flexShrink: 0 }}>
+            {values.length}
+          </span>
+        )}
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+          style={{ flexShrink: 0, opacity: 0.6 }}>
+          <path d="m6 9 6 6 6-6"/>
+        </svg>
+      </button>
+      {open && (
+        <div style={{ position: 'absolute', top: 'calc(100% + 6px)',
+          ...(align === 'right' ? { right: 0 } : { left: 0 }),
+          zIndex: 1000, background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: 10, boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
+          padding: '4px 0', minWidth: 170, maxHeight: 260, overflowY: 'auto' as any }}>
+          {options.map(o => (
+            <label key={o.value}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px',
+                cursor: 'pointer', fontSize: 12, color: 'var(--text-primary)',
+                background: values.includes(o.value) ? 'rgba(13,148,136,0.06)' : 'transparent' }}>
+              <input type="checkbox" checked={values.includes(o.value)}
+                onChange={() => toggle(o.value)}
+                style={{ width: 13, height: 13, accentColor: 'var(--brand)', flexShrink: 0, cursor: 'pointer' }}/>
+              {o.label}
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function MonitorView({ tasks, members, clients, currentUserId, userRole }: Props) {
   const today = todayStr()
 
   // ── Filter state ──
   const [search,         setSearch]         = useState('')
-  const [filterStatus,   setFilterStatus]   = useState('')
-  const [filterPrio,     setFilterPrio]     = useState('')
-  const [filterClient,   setFilterClient]   = useState('')
-  const [filterMember,   setFilterMember]   = useState('')
-  const [filterType,     setFilterType]     = useState('')
+  const [filterStatus,   setFilterStatus]   = useState<string[]>([])
+  const [filterPrio,     setFilterPrio]     = useState<string[]>([])
+  const [filterClient,   setFilterClient]   = useState<string[]>([])
+  const [filterMember,   setFilterMember]   = useState<string[]>([])
+  const [filterType,     setFilterType]     = useState<string[]>([])
   // ── Date filter state ──
   const [dateOpen,          setDateOpen]          = useState(false)
   const [alignDateRight,    setAlignDateRight]     = useState(false)
@@ -192,15 +269,18 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
   // ── Filtering ──
   const visible = useMemo(() => {
     return tasks.filter(t => {
-      if (search        && !t.title.toLowerCase().includes(search.toLowerCase()))         return false
-      if (filterStatus  && t.status    !== filterStatus)                                  return false
-      if (filterPrio    && t.priority  !== filterPrio)                                    return false
-      if (filterClient  && t.client_id !== filterClient)                                  return false
-      if (filterMember  && t.assignee_id !== filterMember)                                return false
-      if (filterType === 'ca'        && !t.custom_fields?._ca_compliance)                return false
-      if (filterType === 'recurring' && !t.is_recurring)                                  return false
-      if (filterType === 'project'   && !t.project_id)                                   return false
-      if (filterType === 'quick'     && (t.project_id || t.is_recurring || t.custom_fields?._ca_compliance)) return false
+      if (search              && !t.title.toLowerCase().includes(search.toLowerCase()))    return false
+      if (filterStatus.length && !filterStatus.includes(t.status))                        return false
+      if (filterPrio.length   && !filterPrio.includes(t.priority))                        return false
+      if (filterClient.length && !filterClient.includes(t.client_id ?? ''))               return false
+      if (filterMember.length && !filterMember.includes(t.assignee_id ?? ''))             return false
+      if (filterType.length) {
+        const tType = t.custom_fields?._ca_compliance ? 'ca'
+          : t.is_recurring ? 'recurring'
+          : t.project_id   ? 'project'
+          : 'quick'
+        if (!filterType.includes(tType)) return false
+      }
       // Due date range
       if (dueDateFrom && (!t.due_date || t.due_date < dueDateFrom)) return false
       if (dueDateTo   && (!t.due_date || t.due_date > dueDateTo))   return false
@@ -283,13 +363,20 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
   }, [visible, groupBy])
 
   const activeFilters = [
-    search, filterStatus, filterPrio, filterClient, filterMember, filterType,
-    duePreset || dueDateFrom, createdPreset || createdFrom, updatedPreset || updatedFrom,
+    search,
+    filterStatus.length > 0,
+    filterPrio.length > 0,
+    filterClient.length > 0,
+    filterMember.length > 0,
+    filterType.length > 0,
+    !!(duePreset || dueDateFrom),
+    !!(createdPreset || createdFrom),
+    !!(updatedPreset || updatedFrom),
   ].filter(Boolean).length
 
   function clearFilters() {
-    setSearch(''); setFilterStatus(''); setFilterPrio(''); setFilterClient('')
-    setFilterMember(''); setFilterType('')
+    setSearch(''); setFilterStatus([]); setFilterPrio([]); setFilterClient([])
+    setFilterMember([]); setFilterType([])
     clearDateFilters()
   }
 
@@ -475,41 +562,38 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
         </div>
 
         {/* Status */}
-        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={selectStyle(!!filterStatus)}>
-          <option value=''>All statuses</option>
-          {Object.entries(STATUS_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-        </select>
+        <MultiSelect
+          values={filterStatus} onChange={setFilterStatus} placeholder="All statuses"
+          options={Object.entries(STATUS_CONFIG).map(([k, v]) => ({ value: k, label: v.label }))}/>
 
         {/* Priority */}
-        <select value={filterPrio} onChange={e => setFilterPrio(e.target.value)} style={selectStyle(!!filterPrio)}>
-          <option value=''>All priorities</option>
-          {['urgent', 'high', 'medium', 'low', 'none'].map(p => <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>)}
-        </select>
+        <MultiSelect
+          values={filterPrio} onChange={setFilterPrio} placeholder="All priorities"
+          options={['urgent', 'high', 'medium', 'low', 'none'].map(p => ({ value: p, label: p.charAt(0).toUpperCase() + p.slice(1) }))}/>
 
         {/* Assignee */}
         {members.length > 0 && (
-          <select value={filterMember} onChange={e => setFilterMember(e.target.value)} style={selectStyle(!!filterMember)}>
-            <option value=''>All members</option>
-            {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-          </select>
+          <MultiSelect
+            values={filterMember} onChange={setFilterMember} placeholder="All members"
+            options={members.map(m => ({ value: m.id, label: m.name }))}/>
         )}
 
         {/* Client */}
         {clients.length > 0 && (
-          <select value={filterClient} onChange={e => setFilterClient(e.target.value)} style={selectStyle(!!filterClient)}>
-            <option value=''>All clients</option>
-            {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+          <MultiSelect
+            values={filterClient} onChange={setFilterClient} placeholder="All clients"
+            options={clients.map(c => ({ value: c.id, label: c.name }))}/>
         )}
 
         {/* Type */}
-        <select value={filterType} onChange={e => setFilterType(e.target.value)} style={selectStyle(!!filterType)}>
-          <option value=''>All types</option>
-          <option value='ca'>CA Compliance</option>
-          <option value='recurring'>Repeat tasks</option>
-          <option value='project'>Project tasks</option>
-          <option value='quick'>Quick tasks</option>
-        </select>
+        <MultiSelect
+          values={filterType} onChange={setFilterType} placeholder="All types"
+          options={[
+            { value: 'ca',        label: 'CA Compliance' },
+            { value: 'recurring', label: 'Repeat tasks'  },
+            { value: 'project',   label: 'Project tasks' },
+            { value: 'quick',     label: 'Quick tasks'   },
+          ]}/>
 
         {/* Date filter — single button with dropdown panel */}
         <div ref={dateRef} style={{ position: 'relative' }}>

@@ -19,7 +19,10 @@ export default async function TeamPage() {
       .select('user_id, role, joined_at, is_active, users(id, name, email, avatar_url, phone_number)')
       .eq('org_id', mb.org_id).eq('is_active', true).order('joined_at'),
     supabase.from('tasks')
-      .select('assignee_id, status').eq('org_id', mb.org_id).gte('created_at', from30),
+      .select('assignee_id, status')
+      .eq('org_id', mb.org_id)
+      .gte('created_at', from30)
+      .is('parent_task_id', null),
   ])
 
   const countMap: Record<string, { total: number; completed: number; inProgress: number }> = {}
