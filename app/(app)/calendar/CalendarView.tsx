@@ -71,6 +71,12 @@ function prevOccurrence(freq: string, dateStr: string): string {
   const d = new Date(dateStr + 'T00:00:00')
   if (freq.startsWith('weekly_days:'))  { d.setDate(d.getDate() - 7);    return d.toISOString().split('T')[0] }
   if (freq.startsWith('monthly_days:')) { d.setMonth(d.getMonth() - 1);  return d.toISOString().split('T')[0] }
+  const everyNMatch = freq.match(/^every_(\d+)_days$/)
+  if (everyNMatch) {
+    const n = Math.max(1, parseInt(everyNMatch[1]))
+    d.setDate(d.getDate() - n)
+    return d.toISOString().split('T')[0]
+  }
   switch (freq) {
     case 'daily':     d.setDate(d.getDate() - 1);         break
     case 'weekly':    d.setDate(d.getDate() - 7);         break
