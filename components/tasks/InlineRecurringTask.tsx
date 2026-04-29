@@ -97,6 +97,7 @@ interface Props {
   clients?:       { id: string; name: string; color: string }[]
   currentUserId?: string
   defaultOpen?:   boolean
+  defaultFreqModalOpen?: boolean
   editTask?: {
     id: string; title: string; frequency: string; priority: string
     assignee_id: string | null; client_id?: string | null; approver_id?: string | null
@@ -106,7 +107,7 @@ interface Props {
   onCancelEdit?: () => void
 }
 
-export function InlineRecurringTask({ members, clients = [], currentUserId, defaultOpen = false, editTask, onCreated, onEdited, onCancelEdit }: Props) {
+export function InlineRecurringTask({ members, clients = [], currentUserId, defaultOpen = false, defaultFreqModalOpen = false, editTask, onCreated, onEdited, onCancelEdit }: Props) {
   const router   = useRouter()
   const inputRef = useRef<HTMLInputElement>(null)
   const rowRef   = useRef<HTMLDivElement>(null)
@@ -213,6 +214,12 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, defa
   useEffect(() => {
     if (open && !isEdit) setTimeout(() => inputRef.current?.focus(), 80)
   }, [open, isEdit])
+
+  // Auto-open frequency modal when instructed (e.g. clicking the frequency badge on an existing task)
+  useEffect(() => {
+    if (defaultFreqModalOpen) openFreqModal()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleClickOutside = useCallback((e: MouseEvent) => {
     if (freqModalOpen) return

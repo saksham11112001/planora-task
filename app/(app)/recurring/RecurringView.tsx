@@ -107,6 +107,7 @@ export function RecurringView({
   useEffect(() => { panelHasUpdates.current = false }, [selectedTask?.id])
   useEffect(() => { if (selectedTask?.id) panelTaskIdRef.current = selectedTask.id }, [selectedTask?.id])
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [freqEditId, setFreqEditId] = useState<string | null>(null)
 
   const [checked,     setChecked]     = useState<Set<string>>(new Set())
   const [subtaskMap, setSubtaskMap] = useState<Record<string, any[]>>({})
@@ -691,6 +692,7 @@ export function RecurringView({
                   members={members}
                   clients={clients}
                   currentUserId={currentUserId}
+                  defaultFreqModalOpen={freqEditId === task.id}
                   editTask={{
                     id: task.id,
                     title: task.title,
@@ -702,9 +704,10 @@ export function RecurringView({
                   }}
                   onEdited={() => {
                     setEditingId(null)
+                    setFreqEditId(null)
                     startT(() => router.refresh())
                   }}
-                  onCancelEdit={() => setEditingId(null)}
+                  onCancelEdit={() => { setEditingId(null); setFreqEditId(null) }}
                 />
               )
             }
@@ -817,6 +820,8 @@ export function RecurringView({
 
                   <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
                     <span
+                      onClick={canManage ? (e) => { e.stopPropagation(); setEditingId(task.id); setFreqEditId(task.id) } : undefined}
+                      title={canManage ? 'Click to change frequency' : undefined}
                       style={{
                         fontSize: 11,
                         fontWeight: 700,
@@ -825,6 +830,7 @@ export function RecurringView({
                         background: 'var(--brand-light)',
                         color: 'var(--brand)',
                         whiteSpace: 'nowrap',
+                        cursor: canManage ? 'pointer' : 'default',
                       }}
                     >
                       {FREQ_LABEL[task.frequency ?? ''] ?? task.frequency ?? '—'}
