@@ -105,7 +105,7 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
   const [filterPrio,     setFilterPrio]     = useState<string[]>([])
   const [filterClient,   setFilterClient]   = useState<string[]>([])
   const [filterMember,   setFilterMember]   = useState<string[]>([])
-  const [filterType,     setFilterType]     = useState('')
+  const [filterType,     setFilterType]     = useState<string[]>([])
   // ── Date filter state ──
   const [dateOpen,          setDateOpen]          = useState(false)
   const [alignDateRight,    setAlignDateRight]     = useState(false)
@@ -198,10 +198,17 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
       if (filterPrio.length > 0    && !filterPrio.includes(t.priority))      return false
       if (filterClient.length > 0  && !filterClient.includes(t.client_id ?? '')) return false
       if (filterMember.length > 0  && !filterMember.includes(t.assignee_id ?? '')) return false
-      if (filterType === 'ca'        && !t.custom_fields?._ca_compliance)                return false
-      if (filterType === 'recurring' && !t.is_recurring)                                  return false
-      if (filterType === 'project'   && !t.project_id)                                   return false
-      if (filterType === 'quick'     && (t.project_id || t.is_recurring || t.custom_fields?._ca_compliance)) return false
+      if (filterType.length > 0) {
+        const isCA        = !!t.custom_fields?._ca_compliance
+        const isRecurring = !!t.is_recurring && !isCA
+        const isProject   = !!t.project_id && !t.is_recurring && !isCA
+        const isQuick     = !t.project_id && !t.is_recurring && !isCA
+        const typeMatch   = filterType.some(type =>
+          (type === 'ca' && isCA) || (type === 'recurring' && isRecurring) ||
+          (type === 'project' && isProject) || (type === 'quick' && isQuick)
+        )
+        if (!typeMatch) return false
+      }
       // Due date range
       if (dueDateFrom && (!t.due_date || t.due_date < dueDateFrom)) return false
       if (dueDateTo   && (!t.due_date || t.due_date > dueDateTo))   return false
@@ -215,7 +222,7 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
       if (updatedTo   && updatedDate > updatedTo)   return false
       return true
     })
-  }, [tasks, search, filterStatus, filterPrio, filterClient, filterMember, filterType,
+  }, [tasks, search, filterStatus, filterPrio, filterClient, filterMember, filterType.join(','),
       dueDateFrom, dueDateTo, createdFrom, createdTo, updatedFrom, updatedTo])
 
   // ── Stats ──
@@ -285,13 +292,13 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
 
   const activeFilters = [
     search, filterStatus.length > 0, filterPrio.length > 0, filterClient.length > 0,
-    filterMember.length > 0, filterType,
+    filterMember.length > 0, filterType.length > 0,
     duePreset || dueDateFrom, createdPreset || createdFrom, updatedPreset || updatedFrom,
   ].filter(Boolean).length
 
   function clearFilters() {
     setSearch(''); setFilterStatus([]); setFilterPrio([]); setFilterClient([])
-    setFilterMember([]); setFilterType('')
+    setFilterMember([]); setFilterType([])
     clearDateFilters()
   }
 
@@ -497,13 +504,13 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
         )}
 
         {/* Type */}
-        <select value={filterType} onChange={e => setFilterType(e.target.value)} style={selectStyle(!!filterType)}>
-          <option value=''>All types</option>
-          <option value='ca'>CA Compliance</option>
-          <option value='recurring'>Repeat tasks</option>
-          <option value='project'>Project tasks</option>
-          <option value='quick'>Quick tasks</option>
-        </select>
+        <MultiPillSelect values={filterType} onChange={setFilterType} placeholder="All types"
+          options={[
+            { value: 'ca',        label: 'CA Compliance' },
+            { value: 'recurring', label: 'Repeat tasks'  },
+            { value: 'project',   label: 'Project tasks' },
+            { value: 'quick',     label: 'Quick tasks'   },
+          ]}/>
 
         {/* Date filter — single button with dropdown panel */}
         <div ref={dateRef} style={{ position: 'relative' }}>
