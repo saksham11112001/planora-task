@@ -215,8 +215,9 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, defa
   }, [open, isEdit])
 
   const handleClickOutside = useCallback((e: MouseEvent) => {
+    if (freqModalOpen) return
     if (rowRef.current && !rowRef.current.contains(e.target as Node) && !title.trim()) close()
-  }, [title])
+  }, [title, freqModalOpen])
 
   useEffect(() => {
     document.addEventListener('mousedown', handleClickOutside)
