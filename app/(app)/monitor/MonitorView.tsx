@@ -169,24 +169,110 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
   }
 
   // ── Export ──
-  function exportToExcel() {
-    const headers = ['Title', 'Status', 'Priority', 'Type', 'Assignee', 'Client', 'Due Date', 'Created', 'Updated']
-    const rows = visible.map(t => [
-      `"${(t.title ?? '').replace(/"/g, '""')}"`,
-      STATUS_CONFIG[t.status]?.label ?? t.status,
-      t.priority,
-      typeLabel(t),
-      t.assignee?.name ?? '',
-      t.client?.name ?? '',
-      t.due_date ?? '',
-      t.created_at?.slice(0, 10) ?? '',
-      (t.updated_at ?? t.created_at)?.slice(0, 10) ?? '',
-    ].join(','))
-    const csv  = [headers.join(','), ...rows].join('\n')
-    const blob = new Blob([csv], { type: 'application/vnd.ms-excel' })
-    const url  = URL.createObjectURL(blob)
-    const a    = document.createElement('a')
-    a.href = url; a.download = `monitor_export_${today}.xls`; a.click()
+  async function exportToExcel() {
+    const ExcelJS = (await import('exceljs')).default
+    const wb = new ExcelJS.Workbook()
+    wb.creator  = 'Planora'
+    wb.created  = new Date()
+
+    // ── Summary sheet ──
+    const summary = wb.addWorksheet('Summary')
+    summary.columns = [
+      { header: 'Field', key: 'field', width: 22 },
+      { header: 'Value', key: 'value', width: 34 },
+    ]
+    ;[
+      ['Exported by',   'Planora Monitor'],
+      ['Export date',   new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })],
+      ['Total tasks',   visible.length],
+      ['Filters active', [
+        filterStatus.length  ? `Status: ${filterStatus.map(s => STATUS_CONFIG[s]?.label ?? s).join(', ')}`   : '',
+        filterPrio.length    ? `Priority: ${filterPrio.join(', ')}`  : '',
+        filterClient.length  ? `Client: ${filterClient.length} selected` : '',
+        filterMember.length  ? `Member: ${filterMember.length} selected` : '',
+        filterType.length    ? `Type: ${filterType.join(', ')}`          : '',
+        search               ? `Search: "${search}"`                     : '',
+      ].filter(Boolean).join(' | ') || 'None'],
+    ].forEach(([f, v]) => summary.addRow({ field: f, value: v }))
+
+    // Style summary header
+    const sh = summary.getRow(1)
+    sh.font      = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 }
+    sh.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } }
+    sh.alignment = { vertical: 'middle', horizontal: 'left' }
+    sh.height    = 20
+
+    // ── Tasks sheet ──
+    const ws = wb.addWorksheet('Tasks')
+    ws.columns = [
+      { header: 'Title',    key: 'title',    width: 42 },
+      { header: 'Status',   key: 'status',   width: 18 },
+      { header: 'Priority', key: 'priority', width: 13 },
+      { header: 'Type',     key: 'type',     width: 14 },
+      { header: 'Assignee', key: 'assignee', width: 22 },
+      { header: 'Client',   key: 'client',   width: 22 },
+      { header: 'Project',  key: 'project',  width: 22 },
+      { header: 'Due Date', key: 'due',      width: 14 },
+      { header: 'Created',  key: 'created',  width: 14 },
+      { header: 'Updated',  key: 'updated',  width: 14 },
+    ]
+
+    const fmtD = (iso: string | null | undefined) => {
+      if (!iso) return ''
+      const d = new Date(iso)
+      return isNaN(d.getTime()) ? iso.slice(0, 10) : d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+    }
+    const capFirst = (s: string) => s ? s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, ' ') : ''
+
+    visible.forEach(t => {
+      ws.addRow({
+        title:    t.title ?? '',
+        status:   STATUS_CONFIG[t.status]?.label ?? capFirst(t.status),
+        priority: capFirst(t.priority),
+        type:     typeLabel(t),
+        assignee: t.assignee?.name ?? '—',
+        client:   t.client?.name   ?? '—',
+        project:  t.project?.name  ?? '—',
+        due:      fmtD(t.due_date),
+        created:  fmtD(t.created_at),
+        updated:  fmtD(t.updated_at ?? t.created_at),
+      })
+    })
+
+    // Style header row
+    const hdr = ws.getRow(1)
+    hdr.font      = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 }
+    hdr.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } }
+    hdr.alignment = { vertical: 'middle', horizontal: 'center' }
+    hdr.height    = 22
+    hdr.border    = {
+      bottom: { style: 'medium', color: { argb: 'FF2563EB' } },
+    }
+
+    // Alternating row colour + centre-align data columns
+    ws.eachRow((row, rn) => {
+      if (rn === 1) return
+      row.height = 18
+      row.eachCell(cell => {
+        cell.alignment = { vertical: 'middle', wrapText: false }
+        if (rn % 2 === 0) {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0F4FF' } }
+        }
+      })
+    })
+
+    // Freeze top row
+    ws.views = [{ state: 'frozen', ySplit: 1 }]
+
+    // Auto-filter on header row
+    ws.autoFilter = { from: 'A1', to: 'J1' }
+
+    // Download
+    const buffer = await wb.xlsx.writeBuffer()
+    const blob   = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url    = URL.createObjectURL(blob)
+    const a      = document.createElement('a')
+    a.href = url; a.download = `planora_monitor_${today}.xlsx`; a.click()
     URL.revokeObjectURL(url)
   }
 
