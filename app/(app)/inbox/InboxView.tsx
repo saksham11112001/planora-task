@@ -319,17 +319,17 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
   }
 
   const visibleTasks = localTasks.filter(t => {
-    if (clientFilter  && (t as any).client?.id !== clientFilter) return false
-    if (filterPriority && t.priority !== filterPriority) return false
-    if (filterStatus   && t.status   !== filterStatus)   return false
-    if (filterAssignee && (t.assignee_id ?? (t.assignee as any)?.id) !== filterAssignee) return false
+    if (clientFilter.length > 0   && !clientFilter.includes((t as any).client?.id))                              return false
+    if (filterPriority.length > 0 && !filterPriority.includes(t.priority))                                       return false
+    if (filterStatus.length > 0   && !filterStatus.includes(t.status))                                           return false
+    if (filterAssignee.length > 0 && !filterAssignee.includes(t.assignee_id ?? (t.assignee as any)?.id ?? ''))  return false
     if (dueDateFrom    && (!t.due_date   || t.due_date < dueDateFrom))     return false
     if (dueDateTo      && (!t.due_date   || t.due_date > dueDateTo))       return false
     if (createdFrom    && (!t.created_at || t.created_at.slice(0,10) < createdFrom)) return false
     if (createdTo      && (!t.created_at || t.created_at.slice(0,10) > createdTo))   return false
     if (updatedFrom    && (!(t as any).updated_at || (t as any).updated_at.slice(0,10) < updatedFrom)) return false
     if (updatedTo      && (!(t as any).updated_at || (t as any).updated_at.slice(0,10) > updatedTo))   return false
-    if (filterCreator  && (t as any).creator?.id !== filterCreator) return false
+    if (filterCreator.length > 0  && !filterCreator.includes((t as any).creator?.id ?? ''))                      return false
     return true
   })
   const overdue  = visibleTasks.filter(t => t.status!=='completed' && isOverdue(t.due_date, t.status))
@@ -394,10 +394,10 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                 : col.status==='in_review' ? localTasks.filter(t => t.approval_status==='pending'||t.status==='in_review')
                 : col.status==='todo' ? localTasks.filter(t => ['todo','in_progress'].includes(t.status) && t.approval_status!=='pending' && !(!!t.due_date && t.due_date<t2))
                 : localTasks.filter(t => t.status===col.status && t.approval_status!=='pending')
-              if (clientFilter)   colTasks = colTasks.filter(t => (t as any).client?.id===clientFilter)
-              if (filterPriority) colTasks = colTasks.filter(t => t.priority===filterPriority)
-              if (filterAssignee) colTasks = colTasks.filter(t => (t.assignee_id ?? (t.assignee as any)?.id)===filterAssignee)
-              if (filterCreator)  colTasks = colTasks.filter(t => (t as any).creator?.id===filterCreator)
+              if (clientFilter.length > 0)   colTasks = colTasks.filter(t => clientFilter.includes((t as any).client?.id))
+              if (filterPriority.length > 0) colTasks = colTasks.filter(t => filterPriority.includes(t.priority))
+              if (filterAssignee.length > 0) colTasks = colTasks.filter(t => filterAssignee.includes(t.assignee_id ?? (t.assignee as any)?.id ?? ''))
+              if (filterCreator.length > 0)  colTasks = colTasks.filter(t => filterCreator.includes((t as any).creator?.id ?? ''))
               if (searchQuery)    colTasks = colTasks.filter(t => t.title.toLowerCase().includes(searchQuery.toLowerCase()))
               if (dueDateFrom)    colTasks = colTasks.filter(t => t.due_date && t.due_date>=dueDateFrom)
               if (dueDateTo)      colTasks = colTasks.filter(t => t.due_date && t.due_date<=dueDateTo)

@@ -236,17 +236,17 @@ export function MyTasksView({
 
   // Apply filters
   const filteredTasks = tasks.filter(t => {
-    if (filterClient   && (t as any).client?.id !== filterClient) return false
-    if (filterPriority && t.priority !== filterPriority)          return false
-    if (filterStatus   && t.status   !== filterStatus)            return false
-    if (filterSearch   && !t.title.toLowerCase().includes(filterSearch.toLowerCase())) return false
-    if (dueDateFrom    && (!t.due_date   || t.due_date < dueDateFrom))     return false
-    if (dueDateTo      && (!t.due_date   || t.due_date > dueDateTo))       return false
-    if (createdFrom    && (!t.created_at || t.created_at.slice(0,10) < createdFrom)) return false
-    if (createdTo      && (!t.created_at || t.created_at.slice(0,10) > createdTo))   return false
+    if (filterClient.length > 0   && !filterClient.includes((t as any).client?.id ?? ''))   return false
+    if (filterPriority.length > 0 && !filterPriority.includes(t.priority))                 return false
+    if (filterStatus.length > 0   && !filterStatus.includes(t.status))                     return false
+    if (filterSearch   && !t.title.toLowerCase().includes(filterSearch.toLowerCase()))      return false
+    if (dueDateFrom    && (!t.due_date   || t.due_date < dueDateFrom))                      return false
+    if (dueDateTo      && (!t.due_date   || t.due_date > dueDateTo))                        return false
+    if (createdFrom    && (!t.created_at || t.created_at.slice(0,10) < createdFrom))        return false
+    if (createdTo      && (!t.created_at || t.created_at.slice(0,10) > createdTo))          return false
     if (updatedFrom    && (!(t as any).updated_at || (t as any).updated_at.slice(0,10) < updatedFrom)) return false
     if (updatedTo      && (!(t as any).updated_at || (t as any).updated_at.slice(0,10) > updatedTo))   return false
-    if (filterCreator  && (t as any).creator?.id !== filterCreator) return false
+    if (filterCreator.length > 0  && !filterCreator.includes((t as any).creator?.id ?? '')) return false
     return true
   })
 
@@ -1456,7 +1456,7 @@ export function MyTasksView({
           )}
 
           {/* Empty state — shown when all sections empty after filtering */}
-          {displayTasks.length === 0 && (filterCreator || filterClient || filterPriority || filterStatus || filterSearch || dueDateFrom || dueDateTo) && (
+          {displayTasks.length === 0 && (filterCreator.length > 0 || filterClient.length > 0 || filterPriority.length > 0 || filterStatus.length > 0 || filterSearch || dueDateFrom || dueDateTo) && (
             <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
               padding:'48px 24px', color:'var(--text-muted)', textAlign:'center' }}>
               <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"
@@ -1696,8 +1696,8 @@ export function MyTasksView({
                 && !(!!t.due_date && t.due_date < today2 && t.status !== 'completed'))
 
           // Apply global filters
-          if (filterClient)   colTasks = colTasks.filter(t => (t as any).client?.id === filterClient)
-          if (filterPriority) colTasks = colTasks.filter(t => t.priority === filterPriority)
+          if (filterClient.length > 0)   colTasks = colTasks.filter(t => filterClient.includes((t as any).client?.id ?? ''))
+          if (filterPriority.length > 0) colTasks = colTasks.filter(t => filterPriority.includes(t.priority))
           if (filterSearch)   colTasks = colTasks.filter(t => t.title.toLowerCase().includes(filterSearch.toLowerCase()))
           if (dueDateFrom)    colTasks = colTasks.filter(t => t.due_date && t.due_date >= dueDateFrom)
           if (dueDateTo)      colTasks = colTasks.filter(t => t.due_date && t.due_date <= dueDateTo)

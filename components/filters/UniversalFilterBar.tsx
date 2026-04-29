@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useFilterStore } from '@/store/appStore'
 import { PRIORITY_CONFIG, STATUS_CONFIG } from '@/types'
+import { MultiPillSelect } from './MultiPillSelect'
 
 function todayIso() { return new Date().toISOString().slice(0, 10) }
 function addDays(n: number) { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10) }
@@ -35,41 +36,6 @@ interface Props {
   className?:        string
 }
 
-const PILL: React.CSSProperties = {
-  display: 'flex', alignItems: 'center', gap: 5,
-  padding: '4px 10px', borderRadius: 20, fontSize: 12,
-  cursor: 'pointer', outline: 'none', border: '1px solid var(--border)',
-  background: 'var(--surface-subtle)', color: 'var(--text-secondary)',
-  fontFamily: 'inherit', appearance: 'none' as any, whiteSpace: 'nowrap' as any,
-}
-const PILL_ACTIVE: React.CSSProperties = {
-  ...PILL, border: '1px solid var(--brand)',
-  background: 'rgba(13,148,136,0.08)', color: 'var(--brand)', fontWeight: 600,
-}
-
-function PillSelect({ value, onChange, placeholder, options }: {
-  value: string; onChange: (v: string) => void; placeholder: string
-  options: { value: string; label: string }[]
-}) {
-  const active = !!value
-  return (
-    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-      <select value={value} onChange={e => onChange(e.target.value)}
-        style={{ ...(active ? PILL_ACTIVE : PILL), paddingRight: 24 }}>
-        <option value=''>{placeholder}</option>
-        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
-      {active && (
-        <button onClick={() => onChange('')}
-          style={{ position:'absolute', right:6, top:'50%', transform:'translateY(-50%)',
-            width:14, height:14, borderRadius:'50%', border:'none', background:'var(--brand)',
-            color:'#fff', fontSize:9, fontWeight:700, cursor:'pointer',
-            display:'flex', alignItems:'center', justifyContent:'center', lineHeight:1, padding:0 }}
-          title="Clear">×</button>
-      )}
-    </div>
-  )
-}
 
 export function UniversalFilterBar({
   clients = [], members = [],
@@ -103,7 +69,7 @@ export function UniversalFilterBar({
   }, [dateOpen])
 
   const hasDateFilter = !!(duePreset || dueDateFrom || createdPreset || createdFrom || updatedPreset || updatedFrom)
-  const showDate = showDueDate || showCreatedDate || showUpdatedDate
+  const showDate      = showDueDate || showCreatedDate || showUpdatedDate
 
   const activeDateLabel = duePreset
     ? DUE_PRESETS.find(p => p.value === duePreset)?.label ?? 'Due date'
@@ -121,8 +87,10 @@ export function UniversalFilterBar({
   }
 
   const activeCount = [
-    clientId, priority, status, assigneeId, creatorId,
-    duePreset || dueDateFrom, createdPreset || createdFrom, updatedPreset || updatedFrom, search,
+    clientId.length > 0, priority.length > 0, status.length > 0,
+    assigneeId.length > 0, creatorId.length > 0,
+    !!(duePreset || dueDateFrom), !!(createdPreset || createdFrom),
+    !!(updatedPreset || updatedFrom), !!search,
   ].filter(Boolean).length
 
   const priorityOpts = (Object.keys(PRIORITY_CONFIG) as string[])
@@ -155,24 +123,24 @@ export function UniversalFilterBar({
       )}
 
       {clients.length > 0 && (
-        <PillSelect value={clientId} onChange={v => setFilter('clientId',v)}
-          placeholder="All clients" options={clients.map(c => ({ value:c.id, label:c.name }))}/>
+        <MultiPillSelect values={clientId} onChange={v => setFilter('clientId', v)}
+          placeholder="All clients" options={clients.map(c => ({ value: c.id, label: c.name }))}/>
       )}
       {showPriority && (
-        <PillSelect value={priority} onChange={v => setFilter('priority',v)}
+        <MultiPillSelect values={priority} onChange={v => setFilter('priority', v)}
           placeholder="All priorities" options={priorityOpts}/>
       )}
       {showStatus && (
-        <PillSelect value={status} onChange={v => setFilter('status',v)}
+        <MultiPillSelect values={status} onChange={v => setFilter('status', v)}
           placeholder="All statuses" options={statusOpts}/>
       )}
       {showAssignee && members.length > 0 && (
-        <PillSelect value={assigneeId} onChange={v => setFilter('assigneeId',v)}
-          placeholder="All assignees" options={members.map(m => ({ value:m.id, label:m.name }))}/>
+        <MultiPillSelect values={assigneeId} onChange={v => setFilter('assigneeId', v)}
+          placeholder="All members" options={members.map(m => ({ value: m.id, label: m.name }))}/>
       )}
       {showAssignor && members.length > 0 && (
-        <PillSelect value={creatorId} onChange={v => setFilter('creatorId',v)}
-          placeholder="Assigned by" options={members.map(m => ({ value:m.id, label:m.name }))}/>
+        <MultiPillSelect values={creatorId} onChange={v => setFilter('creatorId', v)}
+          placeholder="Assigned by" options={members.map(m => ({ value: m.id, label: m.name }))}/>
       )}
 
       {/* Unified date filter */}

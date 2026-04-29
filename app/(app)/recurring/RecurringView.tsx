@@ -127,11 +127,11 @@ export function RecurringView({
 
   const visibleTasks = useMemo(() => {
     return localTasks.filter(t => {
-      if (clientFilter  && t.client_id !== clientFilter && t.client?.id !== clientFilter) return false
-      if (filterPriority && t.priority !== filterPriority) return false
-      if (filterAssignee && (t.assignee_id ?? t.assignee?.id) !== filterAssignee) return false
+      if (clientFilter.length > 0   && !clientFilter.includes(t.client_id ?? '') && !clientFilter.includes(t.client?.id ?? '')) return false
+      if (filterPriority.length > 0 && !filterPriority.includes(t.priority))                                                    return false
+      if (filterAssignee.length > 0 && !filterAssignee.includes(t.assignee_id ?? t.assignee?.id ?? ''))                        return false
       if (filterSearch   && !t.title.toLowerCase().includes(filterSearch.toLowerCase())) return false
-      if (filterCreator  && t.creator?.id !== filterCreator) return false
+      if (filterCreator.length > 0  && !filterCreator.includes(t.creator?.id ?? ''))  return false
       if (createdFrom    && (!t.created_at || t.created_at.slice(0,10) < createdFrom)) return false
       if (createdTo      && (!t.created_at || t.created_at.slice(0,10) > createdTo))   return false
       if (updatedFrom    && (!(t as any).updated_at || (t as any).updated_at.slice(0,10) < updatedFrom)) return false
@@ -406,11 +406,11 @@ export function RecurringView({
               const colTasks = localTasks.filter(
                 (t) =>
                   normalizeFrequency(t.frequency) === col.key &&
-                  (!clientFilter  || t.client_id === clientFilter  || t.client?.id === clientFilter) &&
-                  (!filterPriority || t.priority === filterPriority) &&
-                  (!filterAssignee || (t.assignee_id ?? t.assignee?.id) === filterAssignee) &&
+                  (clientFilter.length === 0  || clientFilter.includes(t.client_id ?? '') || clientFilter.includes(t.client?.id ?? '')) &&
+                  (filterPriority.length === 0 || filterPriority.includes(t.priority)) &&
+                  (filterAssignee.length === 0 || filterAssignee.includes(t.assignee_id ?? t.assignee?.id ?? '')) &&
                   (!filterSearch   || t.title.toLowerCase().includes(filterSearch.toLowerCase())) &&
-                  (!filterCreator  || t.creator?.id === filterCreator),
+                  (filterCreator.length === 0  || filterCreator.includes(t.creator?.id ?? '')),
               )
 
               return (
@@ -670,7 +670,7 @@ export function RecurringView({
               <p style={{ fontSize: 14, color: 'var(--text-muted)' }}>No repeat tasks yet</p>
             </div>
           )}
-          {visibleTasks.length === 0 && canManage && (clientFilter || filterPriority || filterSearch || filterAssignee || filterCreator) && (
+          {visibleTasks.length === 0 && canManage && (clientFilter.length > 0 || filterPriority.length > 0 || filterSearch || filterAssignee.length > 0 || filterCreator.length > 0) && (
             <div style={{ display:'flex', flexDirection:'column', alignItems:'center', padding:'48px 24px', color:'var(--text-muted)', textAlign:'center' }}>
               <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"
                 style={{ marginBottom:12, opacity:0.3 }}>

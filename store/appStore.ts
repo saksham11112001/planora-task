@@ -52,28 +52,29 @@ export const toast = {
 /* Universal Filter store */
 export interface FilterState {
   search:        string
-  clientId:      string
-  priority:      string
-  status:        string
-  assigneeId:    string
-  creatorId:     string
+  clientId:      string[]   // multi-select
+  priority:      string[]   // multi-select
+  status:        string[]   // multi-select
+  assigneeId:    string[]   // multi-select
+  creatorId:     string[]   // multi-select
   dueDateFrom:   string
   dueDateTo:     string
   createdFrom:   string
   createdTo:     string
   updatedFrom:   string
   updatedTo:     string
-  setFilter:     (key: keyof Omit<FilterState, 'setFilter' | 'resetFilters'>, value: string) => void
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  setFilter:     (key: keyof Omit<FilterState, 'setFilter' | 'resetFilters'>, value: any) => void
   resetFilters:  () => void
 }
 
 export const useFilterStore = create<FilterState>((set) => ({
   search:        '',
-  clientId:      '',
-  priority:      '',
-  status:        '',
-  assigneeId:    '',
-  creatorId:     '',
+  clientId:      [],
+  priority:      [],
+  status:        [],
+  assigneeId:    [],
+  creatorId:     [],
   dueDateFrom:   '',
   dueDateTo:     '',
   createdFrom:   '',
@@ -82,7 +83,7 @@ export const useFilterStore = create<FilterState>((set) => ({
   updatedTo:     '',
   setFilter:     (key, value) => set({ [key]: value }),
   resetFilters:  () => set({
-    search: '', clientId: '', priority: '', status: '', assigneeId: '', creatorId: '',
+    search: '', clientId: [], priority: [], status: [], assigneeId: [], creatorId: [],
     dueDateFrom: '', dueDateTo: '',
     createdFrom: '', createdTo: '',
     updatedFrom: '', updatedTo: '',

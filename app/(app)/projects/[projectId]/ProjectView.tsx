@@ -6,6 +6,7 @@ import { Filter, SortAsc, Plus, CheckCheck, Clock, DollarSign, Trash2, BookmarkP
 import { InlineTaskRow }   from '@/components/tasks/InlineTaskRow'
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
 import { PriorityBadge, Avatar }   from '@/components/ui/Badge'
+import { MultiPillSelect } from '@/components/filters/MultiPillSelect'
 import { cn }              from '@/lib/utils/cn'
 import { toast }           from '@/store/appStore'
 import { fmtDate, isOverdue, todayStr, fmtHours } from '@/lib/utils/format'
@@ -31,10 +32,10 @@ const BOARD_COLS = [
 export function ProjectView({ project, tasks: initialTasks, members, clients, defaultClientId, projectOwnerId, canManage, currentUserId, userRole, totalHours, billableHours }: Props) {
   const router = useRouter()
   const [tab,          setTab]          = useState<ViewTab>('list')
-  const [clientFilter, setClientFilter] = useState('')
+  const [clientFilter, setClientFilter] = useState<string[]>([])
   const [tasks,        setTasks]        = useState<Task[]>(initialTasks)
 
-  const visibleTasks = clientFilter ? tasks.filter(t => (t as any).client?.id === clientFilter || t.client_id === clientFilter) : tasks
+  const visibleTasks = clientFilter.length > 0 ? tasks.filter(t => clientFilter.includes((t as any).client?.id ?? '') || clientFilter.includes(t.client_id ?? '')) : tasks
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const panelHasUpdates = useRef(false)
   const panelTaskIdRef  = useRef<string | null>(null)
@@ -74,9 +75,9 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
     startT(() => router.refresh())
   }
 
-  const [filterAssignee, setFilterAssignee] = useState('')
-  const [filterPriority, setFilterPriority] = useState('')
-  const [filterStatus,   setFilterStatus]   = useState('')
+  const [filterAssignee, setFilterAssignee] = useState<string[]>([])
+  const [filterPriority, setFilterPriority] = useState<string[]>([])
+  const [filterStatus,   setFilterStatus]   = useState<string[]>([])
   const [sortBy,         setSortBy]         = useState<'due_date'|'priority'|'title'|'created_at'|'updated_at'>('due_date')
   const [sortDir,        setSortDir]        = useState<'asc'|'desc'>('asc')
   const [addSectionOpen, setAddSectionOpen] = useState(false)
@@ -125,9 +126,9 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
 
   // Apply filters
   const filteredTasks = tasks.filter(t => {
-    if (filterAssignee && t.assignee_id !== filterAssignee) return false
-    if (filterPriority && t.priority !== filterPriority) return false
-    if (filterStatus   && t.status   !== filterStatus)   return false
+    if (filterAssignee.length > 0 && !filterAssignee.includes(t.assignee_id ?? '')) return false
+    if (filterPriority.length > 0 && !filterPriority.includes(t.priority))          return false
+    if (filterStatus.length > 0   && !filterStatus.includes(t.status))              return false
     return true
   })
 
@@ -150,7 +151,7 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
     return sortDir === 'asc' ? cmp : -cmp
   })
 
-  const activeFilters = [filterAssignee, filterPriority, filterStatus].filter(Boolean).length
+  const activeFilters = [filterAssignee.length > 0, filterPriority.length > 0, filterStatus.length > 0].filter(Boolean).length
 
   const SECTIONS = [
     { key: 'overdue',    label: 'Overdue',    color: '#dc2626', creator: false, tasks: sortedTasks.filter(t => t.status !== 'completed' && isOverdue(t.due_date, t.status)) },
@@ -904,33 +905,21 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
                       <div style={{display:'flex',flexDirection:'column',gap:8}}>
                         <div>
                           <label style={{fontSize:11,color:'var(--text-muted)',display:'block',marginBottom:3}}>Assignee</label>
-                          <select value={filterAssignee} onChange={e=>setFilterAssignee(e.target.value)}
-                            style={{width:'100%',padding:'5px 8px',borderRadius:6,border:'1px solid var(--border)',
-                              background:'var(--surface)',color:'var(--text-primary)',fontSize:12}}>
-                            <option value="">All members</option>
-                            {members.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
-                          </select>
+                          <MultiPillSelect values={filterAssignee} onChange={setFilterAssignee} placeholder="All members"
+                            options={members.map(m => ({ value: m.id, label: m.name }))}/>
                         </div>
                         <div>
                           <label style={{fontSize:11,color:'var(--text-muted)',display:'block',marginBottom:3}}>Priority</label>
-                          <select value={filterPriority} onChange={e=>setFilterPriority(e.target.value)}
-                            style={{width:'100%',padding:'5px 8px',borderRadius:6,border:'1px solid var(--border)',
-                              background:'var(--surface)',color:'var(--text-primary)',fontSize:12}}>
-                            <option value="">All priorities</option>
-                            {['urgent','high','medium','low','none'].map(p=><option key={p} value={p}>{p.charAt(0).toUpperCase()+p.slice(1)}</option>)}
-                          </select>
+                          <MultiPillSelect values={filterPriority} onChange={setFilterPriority} placeholder="All priorities"
+                            options={['urgent','high','medium','low','none'].map(p => ({ value: p, label: p.charAt(0).toUpperCase()+p.slice(1) }))}/>
                         </div>
                         <div>
                           <label style={{fontSize:11,color:'var(--text-muted)',display:'block',marginBottom:3}}>Status</label>
-                          <select value={filterStatus} onChange={e=>setFilterStatus(e.target.value)}
-                            style={{width:'100%',padding:'5px 8px',borderRadius:6,border:'1px solid var(--border)',
-                              background:'var(--surface)',color:'var(--text-primary)',fontSize:12}}>
-                            <option value="">All statuses</option>
-                            {['todo','in_progress','in_review','completed'].map(s=><option key={s} value={s}>{s.replace('_',' ')}</option>)}
-                          </select>
+                          <MultiPillSelect values={filterStatus} onChange={setFilterStatus} placeholder="All statuses"
+                            options={['todo','in_progress','in_review','completed'].map(s => ({ value: s, label: s.replace('_',' ') }))}/>
                         </div>
                         {activeFilters > 0 && (
-                          <button onClick={()=>{ setFilterAssignee(''); setFilterPriority(''); setFilterStatus(''); setFilterOpen(false) }}
+                          <button onClick={()=>{ setFilterAssignee([]); setFilterPriority([]); setFilterStatus([]); setFilterOpen(false) }}
                             style={{padding:'5px 0',borderRadius:6,border:'none',background:'var(--border-light)',
                               color:'var(--text-secondary)',fontSize:11,fontWeight:600,cursor:'pointer'}}>
                             Clear all filters

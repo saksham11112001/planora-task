@@ -5,6 +5,7 @@ import { Search, RefreshCw, Trash2, SortAsc, MessageCircle } from 'lucide-react'
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
 import { fmtDate, isOverdue } from '@/lib/utils/format'
 import { toast } from '@/store/appStore'
+import { MultiPillSelect } from '@/components/filters/MultiPillSelect'
 
 /* ── Types ─────────────────────────────────────────────────────── */
 interface CATask {
@@ -78,10 +79,10 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
   const [sortBy,      setSortBy]      = useState<'due_date' | 'created_at'>('due_date')
   const [sortDir,     setSortDir]     = useState<'asc' | 'desc'>('asc')
   const [sortOpen,    setSortOpen]    = useState(false)
-  const [filterPrio,     setFilterPrio]     = useState('')
-  const [filterClient,   setFilterClient]   = useState('')
-  const [filterStatus,   setFilterStatus]   = useState('')
-  const [filterAssignee, setFilterAssignee] = useState('')   // '' | 'unassigned' | memberId
+  const [filterPrio,     setFilterPrio]     = useState<string[]>([])
+  const [filterClient,   setFilterClient]   = useState<string[]>([])
+  const [filterStatus,   setFilterStatus]   = useState<string[]>([])
+  const [filterAssignee, setFilterAssignee] = useState<string[]>([])  // may include 'unassigned'
 
   const [masterUpdatePrompt, setMasterUpdatePrompt] = useState<{
     assignmentClientId: string
@@ -298,11 +299,15 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
 
   const visible = tasks
     .filter(t => {
-      if (filterPrio   && t.priority  !== filterPrio)   return false
-      if (filterClient && t.client_id !== filterClient) return false
-      if (filterStatus && t.status    !== filterStatus) return false
-      if (filterAssignee === 'unassigned' && t.assignee_id !== null) return false
-      if (filterAssignee && filterAssignee !== 'unassigned' && t.assignee_id !== filterAssignee) return false
+      if (filterPrio.length > 0   && !filterPrio.includes(t.priority))     return false
+      if (filterClient.length > 0 && !filterClient.includes(t.client_id ?? '')) return false
+      if (filterStatus.length > 0 && !filterStatus.includes(t.status))    return false
+      if (filterAssignee.length > 0) {
+        const wantsUnassigned = filterAssignee.includes('unassigned')
+        const memberIds = filterAssignee.filter(x => x !== 'unassigned')
+        const matches = (wantsUnassigned && t.assignee_id === null) || memberIds.includes(t.assignee_id ?? '')
+        if (!matches) return false
+      }
       // Quick health filters from stat tiles
       if (filterQuick === 'overdue'  && !(t.due_date && t.due_date < today && !['completed','cancelled'].includes(t.status))) return false
       if (filterQuick === 'week'     && !(t.due_date && t.due_date >= today && t.due_date <= weekFromNow && t.status !== 'completed')) return false
@@ -316,7 +321,7 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
       return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av)
     })
 
-  const activeFilters = [filterPrio, filterClient, filterStatus, filterAssignee, search, filterQuick].filter(Boolean).length
+  const activeFilters = [filterPrio.length > 0, filterClient.length > 0, filterStatus.length > 0, filterAssignee.length > 0, search, filterQuick].filter(Boolean).length
 
   /* ── Render ────────────────────────────────────────────────── */
   return (
@@ -458,35 +463,26 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
         </div>
 
         {/* Priority filter */}
-        <select value={filterPrio} onChange={e => setFilterPrio(e.target.value)}
-          style={{ fontSize: 12, padding: '4px 10px', borderRadius: 20, border: filterPrio ? '1px solid var(--brand)' : '1px solid var(--border)', background: filterPrio ? 'rgba(13,148,136,0.08)' : 'var(--surface-subtle)', color: filterPrio ? 'var(--brand)' : 'var(--text-secondary)', fontFamily: 'inherit', cursor: 'pointer', fontWeight: filterPrio ? 600 : 400 }}>
-          <option value=''>All priorities</option>
-          {['urgent','high','medium','low','none'].map(p => <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>)}
-        </select>
+        <MultiPillSelect values={filterPrio} onChange={setFilterPrio} placeholder="All priorities"
+          options={['urgent','high','medium','low','none'].map(p => ({ value: p, label: p.charAt(0).toUpperCase() + p.slice(1) }))}/>
 
         {/* Client filter */}
         {clients.length > 0 && (
-          <select value={filterClient} onChange={e => setFilterClient(e.target.value)}
-            style={{ fontSize: 12, padding: '4px 10px', borderRadius: 20, border: filterClient ? '1px solid var(--brand)' : '1px solid var(--border)', background: filterClient ? 'rgba(13,148,136,0.08)' : 'var(--surface-subtle)', color: filterClient ? 'var(--brand)' : 'var(--text-secondary)', fontFamily: 'inherit', cursor: 'pointer', fontWeight: filterClient ? 600 : 400 }}>
-            <option value=''>All clients</option>
-            {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+          <MultiPillSelect values={filterClient} onChange={setFilterClient} placeholder="All clients"
+            options={clients.map(c => ({ value: c.id, label: c.name }))}/>
         )}
 
         {/* Status filter */}
-        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-          style={{ fontSize: 12, padding: '4px 10px', borderRadius: 20, border: filterStatus ? '1px solid var(--brand)' : '1px solid var(--border)', background: filterStatus ? 'rgba(13,148,136,0.08)' : 'var(--surface-subtle)', color: filterStatus ? 'var(--brand)' : 'var(--text-secondary)', fontFamily: 'inherit', cursor: 'pointer', fontWeight: filterStatus ? 600 : 400 }}>
-          <option value=''>All statuses</option>
-          {Object.entries(STATUS_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-        </select>
+        <MultiPillSelect values={filterStatus} onChange={setFilterStatus} placeholder="All statuses"
+          options={Object.entries(STATUS_CONFIG).map(([k, v]) => ({ value: k, label: v.label }))}/>
 
         {/* Assignee filter */}
-        <select value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)}
-          style={{ fontSize: 12, padding: '4px 10px', borderRadius: 20, border: filterAssignee ? '1px solid var(--brand)' : '1px solid var(--border)', background: filterAssignee ? 'rgba(13,148,136,0.08)' : 'var(--surface-subtle)', color: filterAssignee ? 'var(--brand)' : 'var(--text-secondary)', fontFamily: 'inherit', cursor: 'pointer', fontWeight: filterAssignee ? 600 : 400 }}>
-          <option value=''>All assignees</option>
-          <option value='unassigned'>⊘ Unassigned</option>
-          {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-        </select>
+        <MultiPillSelect values={filterAssignee} onChange={setFilterAssignee} placeholder="All assignees"
+          options={[{ value: 'unassigned', label: '⊘ Unassigned' }, ...members.map(m => ({ value: m.id, label: m.name }))]}/>
+        {/* legacy select removed — kept as placeholder for closing brace below */}
+        {false && <select>
+          <option value=''>legacy</option>
+        </select>}
 
         {/* Sort */}
         <div style={{ position: 'relative' }}>
@@ -511,7 +507,7 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
 
         {/* Clear filters */}
         {activeFilters > 0 && (
-          <button onClick={() => { setFilterPrio(''); setFilterClient(''); setFilterStatus(''); setFilterAssignee(''); setSearch(''); setFilterQuick('') }}
+          <button onClick={() => { setFilterPrio([]); setFilterClient([]); setFilterStatus([]); setFilterAssignee([]); setSearch(''); setFilterQuick('') }}
             style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 20, border: '1px solid #dc2626', background: 'rgba(220,38,38,0.06)', color: '#dc2626', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
             ✕ Clear ({activeFilters})
           </button>

@@ -1,6 +1,7 @@
 'use client'
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { Search, Filter, BarChart2, Download, Calendar } from 'lucide-react'
+import { MultiPillSelect } from '@/components/filters/MultiPillSelect'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LineChart, Line, Legend } from 'recharts'
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
 import { isOverdue, fmtDate } from '@/lib/utils/format'
@@ -100,10 +101,10 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
 
   // ── Filter state ──
   const [search,         setSearch]         = useState('')
-  const [filterStatus,   setFilterStatus]   = useState('')
-  const [filterPrio,     setFilterPrio]     = useState('')
-  const [filterClient,   setFilterClient]   = useState('')
-  const [filterMember,   setFilterMember]   = useState('')
+  const [filterStatus,   setFilterStatus]   = useState<string[]>([])
+  const [filterPrio,     setFilterPrio]     = useState<string[]>([])
+  const [filterClient,   setFilterClient]   = useState<string[]>([])
+  const [filterMember,   setFilterMember]   = useState<string[]>([])
   const [filterType,     setFilterType]     = useState('')
   // ── Date filter state ──
   const [dateOpen,          setDateOpen]          = useState(false)
@@ -193,10 +194,10 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
   const visible = useMemo(() => {
     return tasks.filter(t => {
       if (search        && !t.title.toLowerCase().includes(search.toLowerCase()))         return false
-      if (filterStatus  && t.status    !== filterStatus)                                  return false
-      if (filterPrio    && t.priority  !== filterPrio)                                    return false
-      if (filterClient  && t.client_id !== filterClient)                                  return false
-      if (filterMember  && t.assignee_id !== filterMember)                                return false
+      if (filterStatus.length > 0  && !filterStatus.includes(t.status))       return false
+      if (filterPrio.length > 0    && !filterPrio.includes(t.priority))      return false
+      if (filterClient.length > 0  && !filterClient.includes(t.client_id ?? '')) return false
+      if (filterMember.length > 0  && !filterMember.includes(t.assignee_id ?? '')) return false
       if (filterType === 'ca'        && !t.custom_fields?._ca_compliance)                return false
       if (filterType === 'recurring' && !t.is_recurring)                                  return false
       if (filterType === 'project'   && !t.project_id)                                   return false
@@ -283,13 +284,14 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
   }, [visible, groupBy])
 
   const activeFilters = [
-    search, filterStatus, filterPrio, filterClient, filterMember, filterType,
+    search, filterStatus.length > 0, filterPrio.length > 0, filterClient.length > 0,
+    filterMember.length > 0, filterType,
     duePreset || dueDateFrom, createdPreset || createdFrom, updatedPreset || updatedFrom,
   ].filter(Boolean).length
 
   function clearFilters() {
-    setSearch(''); setFilterStatus(''); setFilterPrio(''); setFilterClient('')
-    setFilterMember(''); setFilterType('')
+    setSearch(''); setFilterStatus([]); setFilterPrio([]); setFilterClient([])
+    setFilterMember([]); setFilterType('')
     clearDateFilters()
   }
 
@@ -475,31 +477,23 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
         </div>
 
         {/* Status */}
-        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={selectStyle(!!filterStatus)}>
-          <option value=''>All statuses</option>
-          {Object.entries(STATUS_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-        </select>
+        <MultiPillSelect values={filterStatus} onChange={setFilterStatus} placeholder="All statuses"
+          options={Object.entries(STATUS_CONFIG).map(([k, v]) => ({ value: k, label: v.label }))}/>
 
         {/* Priority */}
-        <select value={filterPrio} onChange={e => setFilterPrio(e.target.value)} style={selectStyle(!!filterPrio)}>
-          <option value=''>All priorities</option>
-          {['urgent', 'high', 'medium', 'low', 'none'].map(p => <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>)}
-        </select>
+        <MultiPillSelect values={filterPrio} onChange={setFilterPrio} placeholder="All priorities"
+          options={['urgent','high','medium','low','none'].map(p => ({ value: p, label: p.charAt(0).toUpperCase() + p.slice(1) }))}/>
 
         {/* Assignee */}
         {members.length > 0 && (
-          <select value={filterMember} onChange={e => setFilterMember(e.target.value)} style={selectStyle(!!filterMember)}>
-            <option value=''>All members</option>
-            {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-          </select>
+          <MultiPillSelect values={filterMember} onChange={setFilterMember} placeholder="All members"
+            options={members.map(m => ({ value: m.id, label: m.name }))}/>
         )}
 
         {/* Client */}
         {clients.length > 0 && (
-          <select value={filterClient} onChange={e => setFilterClient(e.target.value)} style={selectStyle(!!filterClient)}>
-            <option value=''>All clients</option>
-            {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+          <MultiPillSelect values={filterClient} onChange={setFilterClient} placeholder="All clients"
+            options={clients.map(c => ({ value: c.id, label: c.name }))}/>
         )}
 
         {/* Type */}

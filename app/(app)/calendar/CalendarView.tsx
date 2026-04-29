@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { ChevronLeft, ChevronRight, RefreshCw, FolderOpen, CheckSquare, Clock, AlertTriangle, LayoutGrid, AlignJustify } from 'lucide-react'
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
 import { nextOccurrence } from '@/lib/utils/recurringSchedule'
+import { MultiPillSelect } from '@/components/filters/MultiPillSelect'
 import type { Task } from '@/types'
 
 interface CalTask {
@@ -97,8 +98,8 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
   const [viewMode, setViewMode] = useState<ViewMode>('timeline')
   const [selected, setSelected] = useState<string|null>(null)
   const [hovered,       setHovered]       = useState<string|null>(null)
-  const [clientFilter,  setClientFilter]  = useState('')
-  const [memberFilter,  setMemberFilter]  = useState('')
+  const [clientFilter,  setClientFilter]  = useState<string[]>([])
+  const [memberFilter,  setMemberFilter]  = useState<string[]>([])
   const [panelTask, setPanelTask] = useState<Task | null>(null)
   const timelineScrollRef = useRef<HTMLDivElement>(null)
 
@@ -150,8 +151,8 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
     if (filter==='recurring')  return t.is_recurring && !t.custom_fields?._ca_compliance
     return true
   }).filter(t => {
-    if (clientFilter && (t as any).client?.id !== clientFilter) return false
-    if (memberFilter && t.assignee_id !== memberFilter) return false
+    if (clientFilter.length > 0 && !clientFilter.includes((t as any).client?.id ?? '')) return false
+    if (memberFilter.length > 0 && !memberFilter.includes(t.assignee_id ?? ''))         return false
     return true
   })
 
@@ -242,47 +243,15 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
           {clients.length > 0 && (
             <div style={{ display:'flex', alignItems:'center', gap:6 }}>
               <span style={{ fontSize:11, color:'var(--text-muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em' }}>Client</span>
-              <select value={clientFilter} onChange={e => setClientFilter(e.target.value)}
-                style={{ padding:'4px 10px', borderRadius:20, fontSize:12, cursor:'pointer', outline:'none',
-                  border: clientFilter ? '1px solid var(--brand)' : '1px solid var(--border)',
-                  background: clientFilter ? 'rgba(13,148,136,0.08)' : 'var(--surface-subtle)',
-                  color: clientFilter ? 'var(--brand)' : 'var(--text-secondary)',
-                  fontWeight: clientFilter ? 600 : 400, fontFamily:'inherit', appearance:'none', paddingRight:20 }}>
-                <option value=''>All clients</option>
-                {clients.map(cl => <option key={cl.id} value={cl.id}>{cl.name}</option>)}
-              </select>
-              {clientFilter && <button onClick={() => setClientFilter('')} style={{ fontSize:11, color:'var(--text-muted)', background:'none', border:'none', cursor:'pointer' }}>✕</button>}
+              <MultiPillSelect values={clientFilter} onChange={setClientFilter} placeholder="All clients"
+                options={clients.map(cl => ({ value: cl.id, label: cl.name }))}/>
             </div>
           )}
           {canViewAll && members.length > 0 && (
             <div style={{ display:'flex', alignItems:'center', gap:6 }}>
               <span style={{ fontSize:11, color:'var(--text-muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em' }}>Member</span>
-              <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
-                <button onClick={() => setMemberFilter('')}
-                  style={{ padding:'4px 10px', borderRadius:20, fontSize:12, cursor:'pointer', border:'none',
-                    background: !memberFilter ? 'var(--brand)' : 'var(--surface-subtle)',
-                    color: !memberFilter ? '#fff' : 'var(--text-secondary)',
-                    fontWeight: !memberFilter ? 600 : 400, fontFamily:'inherit', transition:'all 0.12s' }}>
-                  All
-                </button>
-                {members.map(m => (
-                  <button key={m.id} onClick={() => setMemberFilter(memberFilter === m.id ? '' : m.id)}
-                    style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px',
-                      borderRadius:20, fontSize:12, cursor:'pointer', border:'none',
-                      background: memberFilter === m.id ? 'var(--brand)' : 'var(--surface-subtle)',
-                      color: memberFilter === m.id ? '#fff' : 'var(--text-secondary)',
-                      fontWeight: memberFilter === m.id ? 600 : 400, fontFamily:'inherit', transition:'all 0.12s' }}>
-                    <div style={{ width:18, height:18, borderRadius:'50%', flexShrink:0,
-                      background: memberFilter === m.id ? 'rgba(255,255,255,0.3)' : 'var(--border)',
-                      display:'flex', alignItems:'center', justifyContent:'center',
-                      fontSize:9, fontWeight:700,
-                      color: memberFilter === m.id ? '#fff' : 'var(--text-muted)' }}>
-                      {m.name[0]?.toUpperCase()}
-                    </div>
-                    {m.name.split(' ')[0]}
-                  </button>
-                ))}
-              </div>
+              <MultiPillSelect values={memberFilter} onChange={setMemberFilter} placeholder="All members"
+                options={members.map(m => ({ value: m.id, label: m.name }))}/>
             </div>
           )}
         </div>
