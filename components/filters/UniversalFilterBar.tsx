@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useFilterStore } from '@/store/appStore'
 import { PRIORITY_CONFIG, STATUS_CONFIG } from '@/types'
-import { MultiPillSelect } from './MultiPillSelect'
+import { MultiPillSelect, PILL, PILL_ACTIVE } from './MultiPillSelect'
 
 function todayIso() { return new Date().toISOString().slice(0, 10) }
 function addDays(n: number) { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10) }

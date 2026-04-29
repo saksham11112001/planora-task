@@ -1,14 +1,14 @@
 'use client'
-import { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 
-const PILL: React.CSSProperties = {
+export const PILL: React.CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 5,
   padding: '4px 10px', borderRadius: 20, fontSize: 12,
   cursor: 'pointer', outline: 'none', border: '1px solid var(--border)',
   background: 'var(--surface-subtle)', color: 'var(--text-secondary)',
   fontFamily: 'inherit', whiteSpace: 'nowrap' as const,
 }
-const PILL_ACTIVE: React.CSSProperties = {
+export const PILL_ACTIVE: React.CSSProperties = {
   ...PILL, border: '1px solid var(--brand)',
   background: 'rgba(13,148,136,0.08)', color: 'var(--brand)', fontWeight: 600,
 }
