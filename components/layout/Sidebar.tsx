@@ -52,17 +52,29 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
 
   const fetchProjects = useCallback(async (force = false) => {
     const now = Date.now()
+    // Use cache for background loads — skip if cache is fresh and we have data
     if (!force && now - _cacheTime < CACHE_TTL && _projectCache.length > 0) {
       setProjects(_projectCache); return
     }
-    if (fetchRef.current) return
+    // For background loads only (not forced), skip if a fetch is already in flight
+    if (!force && fetchRef.current) return
+    // Mark in-flight
     fetchRef.current = true
     setProjectsLoading(true)
+    // Abort after 10 s so the spinner never hangs forever
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 10000)
     try {
-      const r = await fetch('/api/projects?limit=100')
-      const d = await r.json()
+      const r = await fetch('/api/projects?limit=100', { signal: controller.signal })
+      const d = await r.json().catch(() => ({}))
       if (Array.isArray(d.data)) { _projectCache = d.data; _cacheTime = Date.now(); setProjects(d.data) }
-    } catch {} finally { fetchRef.current = false; setProjectsLoading(false) }
+    } catch {
+      // AbortError or network error — spinner clears, list stays empty
+    } finally {
+      clearTimeout(timer)
+      fetchRef.current = false
+      setProjectsLoading(false)
+    }
   }, [])
 
   useEffect(() => { fetchProjects() }, [fetchProjects])
@@ -245,8 +257,8 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
           <button onClick={() => {
               const next = !projectsOpen
               setProjectsOpen(next)
-              // If opening and no data yet, fetch immediately
-              if (next && projects.length === 0) fetchProjects(true)
+              // When opening: always try to fetch so projects are fresh
+              if (next) fetchProjects(true)
             }}
             style={{ display: 'flex', alignItems: 'center', gap: 5, flex: 1, background: 'none',
               border: 'none', cursor: 'pointer', fontSize: 10, fontWeight: 700, letterSpacing: '0.07em',
