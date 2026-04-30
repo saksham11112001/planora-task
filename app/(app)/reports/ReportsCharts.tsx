@@ -15,17 +15,23 @@ interface EmployeeStat {
   weeklyTrend: { week: string; completed: number; assigned: number }[]
 }
 
+interface ClientProfit {
+  id: string; name: string; color: string
+  tasks: number; completed: number
+  billableHours: number; totalHours: number
+}
+
 interface Props {
-  clients?:       { id: string; name: string; color: string }[]
-  currentUserId?: string
-  userRole?:      string
-  clients?:       { id: string; name: string; color: string }[]
-  dailyData:       { date: string; created: number; completed: number }[]
-  memberData:      { name: string; completed: number; inProgress: number }[]
-  priorityData:    { name: string; value: number; color: string }[]
-  projectData:     { name: string; done: number; total: number; pct: number }[]
-  timeByProject:   { name: string; hours: number; color: string }[]
-  employeeStats:   EmployeeStat[]
+  clients?:             { id: string; name: string; color: string }[]
+  currentUserId?:       string
+  userRole?:            string
+  dailyData:            { date: string; created: number; completed: number }[]
+  memberData:           { name: string; completed: number; inProgress: number }[]
+  priorityData:         { name: string; value: number; color: string }[]
+  projectData:          { name: string; done: number; total: number; pct: number }[]
+  timeByProject:        { name: string; hours: number; color: string }[]
+  employeeStats:        EmployeeStat[]
+  clientProfitability?: ClientProfit[]
 }
 
 const COLORS = ['#0d9488','#7c3aed','#dc2626','#ca8a04','#0891b2','#16a34a']
@@ -219,7 +225,7 @@ function MetricRow({ label, value, color, bar, barColor }: {
   )
 }
 
-export function ReportsCharts({ dailyData, memberData, priorityData, projectData, timeByProject, employeeStats, currentUserId, userRole, clients = [] }: Props) {
+export function ReportsCharts({ dailyData, memberData, priorityData, projectData, timeByProject, employeeStats, currentUserId, userRole, clients = [], clientProfitability = [] }: Props) {
   const [activeTab,    setActiveTab]    = useState<'overview' | 'team'>('overview')
   const [clientFilter, setClientFilter] = useState('')
   const [timeline,     setTimeline]     = useState<'30' | '60' | '90' | '365'>('90')
@@ -455,6 +461,64 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── Client Profitability ── */}
+      {clientProfitability.length > 0 && (
+        <div style={{ background: 'var(--surface)', borderRadius: 14, border: '1px solid var(--border)', padding: '18px 20px', marginTop: 20 }}>
+          <div style={{ marginBottom: 16 }}>
+            <h2 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 4px' }}>Client Profitability</h2>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>Billable hours and task load per client — last 90 days</p>
+          </div>
+
+          {/* Bar chart: billable hours per client */}
+          <ResponsiveContainer width="100%" height={180}>
+            <BarChart data={clientProfitability} margin={{ top: 4, right: 4, bottom: 4, left: -16 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false}/>
+              <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false}
+                tickFormatter={v => v.length > 12 ? v.slice(0,12) + '…' : v}/>
+              <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false}/>
+              <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}
+                formatter={(v: any) => [`${v}h`, '']}/>
+              <Bar dataKey="totalHours"    name="Total hours"    fill="#e2e8f0" radius={[4,4,0,0]}/>
+              <Bar dataKey="billableHours" name="Billable hours" fill="#0891b2" radius={[4,4,0,0]}/>
+            </BarChart>
+          </ResponsiveContainer>
+
+          {/* Table */}
+          <div style={{ marginTop: 16, border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 80px 80px 90px', gap: 8,
+              padding: '8px 14px', background: 'var(--surface-subtle)', borderBottom: '1px solid var(--border)',
+              fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <span>Client</span>
+              <span style={{ textAlign: 'right' }}>Tasks</span>
+              <span style={{ textAlign: 'right' }}>Done</span>
+              <span style={{ textAlign: 'right' }}>Billable h</span>
+              <span style={{ textAlign: 'right' }}>Total h</span>
+            </div>
+            {clientProfitability.map((c, i) => {
+              const rate = c.tasks > 0 ? Math.round((c.completed / c.tasks) * 100) : 0
+              return (
+                <div key={c.id} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 80px 80px 90px', gap: 8,
+                  padding: '10px 14px', alignItems: 'center',
+                  borderBottom: i < clientProfitability.length - 1 ? '1px solid var(--border-light)' : 'none',
+                  background: 'var(--surface)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: c.color, flexShrink: 0 }}/>
+                    <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
+                  </div>
+                  <span style={{ textAlign: 'right', fontSize: 13, color: 'var(--text-secondary)' }}>{c.tasks}</span>
+                  <div style={{ textAlign: 'right' }}>
+                    <span style={{ fontSize: 13, color: '#16a34a', fontWeight: 600 }}>{c.completed}</span>
+                    <span style={{ fontSize: 10, color: 'var(--text-muted)', marginLeft: 3 }}>{rate}%</span>
+                  </div>
+                  <span style={{ textAlign: 'right', fontSize: 13, fontWeight: 600, color: '#0891b2' }}>{c.billableHours}h</span>
+                  <span style={{ textAlign: 'right', fontSize: 13, color: 'var(--text-secondary)' }}>{c.totalHours}h</span>
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
     </div>

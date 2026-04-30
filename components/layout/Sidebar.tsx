@@ -7,7 +7,7 @@ import {
   Home, ListTodo, Users2, FolderOpen,
   RefreshCw, Users, BarChart2, Settings, Plus,
   ChevronDown, ChevronRight, Clock, Zap, X, Upload,
-  Calendar, Shield, LogOut, FileCheck, ArrowRight, ClipboardList, Eye,
+  Calendar, Shield, LogOut, FileCheck, ArrowRight, ClipboardList, Eye, Receipt,
 } from 'lucide-react'
 import { cn }            from '@/lib/utils/cn'
 import { createClient }  from '@/lib/supabase/client'
@@ -261,6 +261,7 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
           </div>
         )}
         {nav.clients && <SI href="/clients"    active={isActive('/clients')}    icon={<Users2    className="h-4 w-4"/>} label="Clients"/>}
+        {canManage && <SI href="/invoices" active={isActive('/invoices')} icon={<Receipt className="h-4 w-4"/>} label="Invoices"/>}
         {nav.ca_compliance_mode && <SI href="/compliance" active={isActive('/compliance')} icon={<FileCheck className="h-4 w-4"/>} label="CA Compliance"/>}
         {nav.ca_compliance_mode && (
           <Link href="/compliance?tab=catasks"
