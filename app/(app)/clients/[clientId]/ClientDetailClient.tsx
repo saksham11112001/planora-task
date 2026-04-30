@@ -48,6 +48,7 @@ export function ClientDetailClient({ clientId, canManage, currentUserId }: Props
   const [tasks,    setTasks]    = useState<Task[]>([])
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [loading,  setLoading]  = useState(false)
+  const [tabError, setTabError] = useState<string | null>(null)
   const loaded = useRef<Set<string>>(new Set())
 
   // Draft new note state
@@ -59,25 +60,40 @@ export function ClientDetailClient({ clientId, canManage, currentUserId }: Props
     if (loaded.current.has(tab)) return
     loaded.current.add(tab)
     setLoading(true)
+    setTabError(null)
 
-    const fetchMap: Record<string, () => Promise<void>> = {
-      notes: async () => {
-        const r = await fetch(`/api/clients/${clientId}/notes`)
-        const d = await r.json()
-        if (d.data) setNotes(d.data)
-      },
-      tasks: async () => {
-        const r = await fetch(`/api/tasks?client_id=${clientId}&limit=100`)
-        const d = await r.json()
-        if (d.data) setTasks(d.data)
-      },
-      invoices: async () => {
-        const r = await fetch(`/api/invoices?client_id=${clientId}`)
-        const d = await r.json()
-        if (d.data) setInvoices(d.data)
-      },
+    // Fetch with a 12-second timeout so we never hang forever
+    async function doFetch() {
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), 12000)
+      try {
+        if (tab === 'tasks') {
+          const r = await fetch(`/api/tasks?client_id=${clientId}&limit=100`, { signal: controller.signal })
+          const d = await r.json()
+          if (Array.isArray(d.data)) setTasks(d.data)
+          else if (d.error) setTabError(d.error)
+        } else if (tab === 'notes') {
+          const r = await fetch(`/api/clients/${clientId}/notes`, { signal: controller.signal })
+          const d = await r.json()
+          if (Array.isArray(d.data)) setNotes(d.data)
+          else if (d.error) setTabError(d.error)
+        } else if (tab === 'invoices') {
+          const r = await fetch(`/api/invoices?client_id=${clientId}`, { signal: controller.signal })
+          const d = await r.json()
+          if (Array.isArray(d.data)) setInvoices(d.data)
+          else if (d.error) setTabError(d.error)
+        }
+      } catch (e: any) {
+        if (e?.name === 'AbortError') setTabError('Request timed out. Please try again.')
+        else setTabError('Failed to load. Please refresh.')
+        // Remove from loaded set so retry is possible
+        loaded.current.delete(tab)
+      } finally {
+        clearTimeout(timer)
+        setLoading(false)
+      }
     }
-    fetchMap[tab]?.().catch(() => {}).finally(() => setLoading(false))
+    doFetch()
   }, [tab, clientId])
 
   async function addNote() {
@@ -88,11 +104,18 @@ export function ClientDetailClient({ clientId, canManage, currentUserId }: Props
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: noteText.trim(), type: noteType }),
       })
-      const d = await res.json()
-      if (!res.ok) { toast.error(d.error ?? 'Failed'); return }
-      setNotes(prev => [d.data, ...prev])
+      let d: any = {}
+      try { d = await res.json() } catch { /* non-JSON response */ }
+      if (!res.ok) { toast.error(d.error ?? `Server error (${res.status})`); return }
+      if (d.data) {
+        setNotes(prev => [d.data, ...prev])
+        // Mark notes as loaded so switching tabs re-shows updated list
+        loaded.current.add('notes')
+      }
       setNoteText('')
       toast.success('Note added')
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Network error')
     } finally { setSubmitting(false) }
   }
 
@@ -108,7 +131,7 @@ export function ClientDetailClient({ clientId, canManage, currentUserId }: Props
   const overdueTasks = tasks.filter(t => t.status !== 'completed' && t.status !== 'cancelled' && t.due_date && t.due_date < new Date().toISOString().slice(0,10))
 
   const TAB_BTN = (key: typeof tab, label: string, count?: number) => (
-    <button onClick={() => setTab(key)}
+    <button onClick={() => { setTab(key); setTabError(null) }}
       style={{
         padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
         fontSize: 13, fontWeight: tab === key ? 600 : 400,
@@ -141,7 +164,18 @@ export function ClientDetailClient({ clientId, canManage, currentUserId }: Props
       {tab === 'tasks' && (
         <div>
           {loading ? (
-            <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>Loading…</div>
+            <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <div style={{ width: 14, height: 14, border: '2px solid var(--border)', borderTopColor: 'var(--brand)', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }}/>
+              Loading…
+            </div>
+          ) : tabError ? (
+            <div style={{ padding: '24px 20px', textAlign: 'center', background: '#fef2f2', borderRadius: 12, border: '1px solid #fecaca' }}>
+              <p style={{ color: '#dc2626', fontSize: 13, margin: '0 0 10px' }}>⚠ {tabError}</p>
+              <button onClick={() => { loaded.current.delete('tasks'); setTabError(null); setTab('notes'); setTimeout(() => setTab('tasks'), 0) }}
+                style={{ fontSize: 12, color: 'var(--brand)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
+                Retry
+              </button>
+            </div>
           ) : tasks.length === 0 ? (
             <div style={{ padding: '40px 20px', textAlign: 'center', background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)' }}>
               <p style={{ color: 'var(--text-muted)', fontSize: 13, margin: 0 }}>No tasks linked to this client yet</p>
@@ -216,7 +250,18 @@ export function ClientDetailClient({ clientId, canManage, currentUserId }: Props
 
           {/* Notes list */}
           {loading ? (
-            <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>Loading…</div>
+            <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <div style={{ width: 14, height: 14, border: '2px solid var(--border)', borderTopColor: 'var(--brand)', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }}/>
+              Loading…
+            </div>
+          ) : tabError ? (
+            <div style={{ padding: '24px 20px', textAlign: 'center', background: '#fef2f2', borderRadius: 12, border: '1px solid #fecaca' }}>
+              <p style={{ color: '#dc2626', fontSize: 13, margin: '0 0 10px' }}>⚠ {tabError}</p>
+              <button onClick={() => { loaded.current.delete('notes'); setTabError(null); setTab('tasks'); setTimeout(() => setTab('notes'), 0) }}
+                style={{ fontSize: 12, color: 'var(--brand)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
+                Retry
+              </button>
+            </div>
           ) : notes.length === 0 ? (
             <div style={{ padding: '40px 20px', textAlign: 'center', background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)' }}>
               <MessageSquare style={{ width: 32, height: 32, color: 'var(--border)', margin: '0 auto 10px' }}/>
@@ -268,7 +313,18 @@ export function ClientDetailClient({ clientId, canManage, currentUserId }: Props
       {tab === 'invoices' && (
         <div>
           {loading ? (
-            <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>Loading…</div>
+            <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <div style={{ width: 14, height: 14, border: '2px solid var(--border)', borderTopColor: 'var(--brand)', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }}/>
+              Loading…
+            </div>
+          ) : tabError ? (
+            <div style={{ padding: '24px 20px', textAlign: 'center', background: '#fef2f2', borderRadius: 12, border: '1px solid #fecaca' }}>
+              <p style={{ color: '#dc2626', fontSize: 13, margin: '0 0 10px' }}>⚠ {tabError}</p>
+              <button onClick={() => { loaded.current.delete('invoices'); setTabError(null); setTab('tasks'); setTimeout(() => setTab('invoices'), 0) }}
+                style={{ fontSize: 12, color: 'var(--brand)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
+                Retry
+              </button>
+            </div>
           ) : invoices.length === 0 ? (
             <div style={{ padding: '40px 20px', textAlign: 'center', background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)' }}>
               <p style={{ color: 'var(--text-muted)', fontSize: 13, margin: 0 }}>No invoices for this client</p>

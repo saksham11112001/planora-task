@@ -32,6 +32,7 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
   const { session } = useAppStore()
   const [projectsOpen, setProjectsOpen] = useState(false)
   const [projects, setProjects]         = useState<Project[]>(_projectCache)
+  const [projectsLoading, setProjectsLoading] = useState(false)
   const [flyoutOpen,    setFlyoutOpen]    = useState(false)
   const [allProjects,   setAllProjects]   = useState<Project[]>([])
   const [flyoutLoading, setFlyoutLoading] = useState(false)
@@ -49,20 +50,30 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
   const userInit  = userName[0]?.toUpperCase() ?? 'U'
   const canManage = ['owner','admin','manager'].includes(role)
 
-  useEffect(() => {
+  const fetchProjects = useCallback(async (force = false) => {
     const now = Date.now()
-    if (now - _cacheTime < CACHE_TTL && _projectCache.length > 0) {
+    if (!force && now - _cacheTime < CACHE_TTL && _projectCache.length > 0) {
       setProjects(_projectCache); return
     }
     if (fetchRef.current) return
     fetchRef.current = true
-    fetch('/api/projects?limit=100')
-      .then(r => r.json()).then(d => {
-        if (Array.isArray(d.data)) { _projectCache = d.data; _cacheTime = Date.now(); setProjects(d.data) }
-      }).catch(() => {}).finally(() => { fetchRef.current = false })
+    setProjectsLoading(true)
+    try {
+      const r = await fetch('/api/projects?limit=100')
+      const d = await r.json()
+      if (Array.isArray(d.data)) { _projectCache = d.data; _cacheTime = Date.now(); setProjects(d.data) }
+    } catch {} finally { fetchRef.current = false; setProjectsLoading(false) }
   }, [])
 
-  useEffect(() => { if (pathname === '/projects') _cacheTime = 0 }, [pathname])
+  useEffect(() => { fetchProjects() }, [fetchProjects])
+
+  useEffect(() => {
+    if (pathname === '/projects' || pathname.startsWith('/projects/')) {
+      _cacheTime = 0
+      fetchProjects(true)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname])
 
   // Fetch overdue + pending-approval counts for nav badges
   useEffect(() => {
@@ -231,7 +242,12 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
         {/* WORK */}
         <GL>Work</GL>
         <div style={{ display: 'flex', alignItems: 'center', padding: '5px 10px 2px' }}>
-          <button onClick={() => setProjectsOpen(p => !p)}
+          <button onClick={() => {
+              const next = !projectsOpen
+              setProjectsOpen(next)
+              // If opening and no data yet, fetch immediately
+              if (next && projects.length === 0) fetchProjects(true)
+            }}
             style={{ display: 'flex', alignItems: 'center', gap: 5, flex: 1, background: 'none',
               border: 'none', cursor: 'pointer', fontSize: 10, fontWeight: 700, letterSpacing: '0.07em',
               textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)' }}>
@@ -248,6 +264,18 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
         </div>
         {projectsOpen && (
           <div style={{ maxHeight: 240, overflowY: 'auto' }}>
+            {projectsLoading && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 14px' }}>
+                <div style={{ width: 12, height: 12, border: '2px solid rgba(255,255,255,0.12)',
+                  borderTopColor: '#14b8a6', borderRadius: '50%', animation: 'spin 0.7s linear infinite', flexShrink: 0 }}/>
+                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>Loading…</span>
+              </div>
+            )}
+            {!projectsLoading && projects.length === 0 && (
+              <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', padding: '8px 14px', margin: 0 }}>
+                No projects yet
+              </p>
+            )}
             {projects.map(p => (
               <Link key={p.id} href={`/projects/${p.id}`}
                 className={cn('flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm transition-colors',
