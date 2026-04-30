@@ -33,6 +33,7 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
   const [projectsOpen, setProjectsOpen] = useState(false)
   const [projects, setProjects]         = useState<Project[]>(_projectCache)
   const [projectsLoading, setProjectsLoading] = useState(false)
+  const [projectsError, setProjectsError] = useState<string | null>(null)
   const [flyoutOpen,    setFlyoutOpen]    = useState(false)
   const [allProjects,   setAllProjects]   = useState<Project[]>([])
   const [flyoutLoading, setFlyoutLoading] = useState(false)
@@ -51,28 +52,32 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
   const canManage = ['owner','admin','manager'].includes(role)
 
   const fetchProjects = useCallback(async (force = false) => {
-    const now = Date.now()
-    // Use cache for background loads — skip if cache is fresh and we have data
-    if (!force && now - _cacheTime < CACHE_TTL && _projectCache.length > 0) {
-      setProjects(_projectCache); return
+    // Serve from cache if fresh and not a forced reload
+    if (!force && Date.now() - _cacheTime < CACHE_TTL && _projectCache.length > 0) {
+      setProjects(_projectCache)
+      return
     }
-    // For background loads only (not forced), skip if a fetch is already in flight
-    if (!force && fetchRef.current) return
-    // Mark in-flight
-    fetchRef.current = true
     setProjectsLoading(true)
-    // Abort after 10 s so the spinner never hangs forever
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 10000)
+    setProjectsError(null)
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), 12000)
     try {
-      const r = await fetch('/api/projects?limit=100', { signal: controller.signal })
-      const d = await r.json().catch(() => ({}))
-      if (Array.isArray(d.data)) { _projectCache = d.data; _cacheTime = Date.now(); setProjects(d.data) }
-    } catch {
-      // AbortError or network error — spinner clears, list stays empty
+      const r = await fetch('/api/projects?limit=100', { cache: 'no-store', signal: ctrl.signal })
+      let d: any = {}
+      try { d = await r.json() } catch { /* non-JSON response */ }
+      if (Array.isArray(d.data)) {
+        _projectCache = d.data
+        _cacheTime = Date.now()
+        setProjects(d.data)
+      } else {
+        const msg = d.error ?? (r.ok ? 'Unexpected response' : `HTTP ${r.status}`)
+        setProjectsError(msg)
+      }
+    } catch (e: any) {
+      if ((e as any)?.name !== 'AbortError') setProjectsError(e?.message ?? 'Network error')
+      // AbortError = timeout — just clear spinner silently
     } finally {
       clearTimeout(timer)
-      fetchRef.current = false
       setProjectsLoading(false)
     }
   }, [])
@@ -283,10 +288,25 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
                 <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>Loading…</span>
               </div>
             )}
-            {!projectsLoading && projects.length === 0 && (
-              <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', padding: '8px 14px', margin: 0 }}>
-                No projects yet
-              </p>
+            {!projectsLoading && projectsError && (
+              <div style={{ padding: '6px 14px' }}>
+                <p style={{ fontSize: 10, color: 'rgba(239,68,68,0.8)', margin: '0 0 4px', lineHeight: 1.4 }}>
+                  {projectsError}
+                </p>
+                <button onClick={() => fetchProjects(true)}
+                  style={{ fontSize: 10, color: '#14b8a6', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
+                  Retry ↺
+                </button>
+              </div>
+            )}
+            {!projectsLoading && !projectsError && projects.length === 0 && (
+              <div style={{ padding: '6px 14px' }}>
+                <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', margin: '0 0 2px' }}>No projects yet</p>
+                <button onClick={() => fetchProjects(true)}
+                  style={{ fontSize: 10, color: '#14b8a6', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
+                  Refresh ↺
+                </button>
+              </div>
             )}
             {projects.map(p => (
               <Link key={p.id} href={`/projects/${p.id}`}

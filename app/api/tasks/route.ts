@@ -9,8 +9,8 @@ export async function GET(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-  const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).single()
-  if (!mb) return NextResponse.json({ data: [] })
+  const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).maybeSingle()
+  if (!mb) return NextResponse.json({ error: 'No active membership' }, { status: 403 })
 
   const sp  = request.nextUrl.searchParams
   let q = supabase.from('tasks')
@@ -59,8 +59,8 @@ export async function POST(request: NextRequest) {
 
   const { data: mb } = await supabase.from('org_members')
     .select('org_id, role, organisations(name), users(name)')
-    .eq('user_id', user.id).eq('is_active', true).single()
-  if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
+    .eq('user_id', user.id).eq('is_active', true).maybeSingle()
+  if (!mb) return NextResponse.json({ error: 'No active membership' }, { status: 403 })
 
   const body = await request.json()
 

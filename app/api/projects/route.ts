@@ -9,13 +9,13 @@ export async function GET(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-  const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).single()
-  if (!mb) return NextResponse.json({ data: [] })
+  const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).maybeSingle()
+  if (!mb) return NextResponse.json({ error: 'No active membership' }, { status: 403 })
   const sp  = request.nextUrl.searchParams
   const parsedLim = parseInt(sp.get('limit') ?? '100', 10)
   const lim = Math.min(isNaN(parsedLim) ? 100 : parsedLim, 500)
-  // Owners and admins see all projects; everyone else only sees org-wide or member projects
-  const canSeeAll = mb.role === 'owner' || mb.role === 'admin'
+  // Owners, admins and managers see all projects; members/viewers only see org-wide or assigned projects
+  const canSeeAll = ['owner', 'admin', 'manager'].includes(mb.role)
   let projectQuery = supabase.from('projects')
     .select('id, name, color, status, due_date, client_id, member_ids')
     .eq('org_id', mb.org_id).neq('is_archived', true)
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-  const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).single()
+  const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).maybeSingle()
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
   const projectCreateDenied = await assertCan(supabase, mb.org_id, mb.role, 'projects.create')
   if (projectCreateDenied) return NextResponse.json({ error: projectCreateDenied.error }, { status: projectCreateDenied.status })
