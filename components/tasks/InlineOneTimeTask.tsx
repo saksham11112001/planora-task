@@ -208,7 +208,7 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated, 
         }}
       />
     )}
-    <form ref={rowRef as any} onSubmit={e => { e.preventDefault(); save() }} style={{
+    <div ref={rowRef} style={{
       margin: '6px 12px 10px', borderRadius: 10,
       border: '1.5px solid var(--brand-border)',
       background: 'var(--surface)',
@@ -233,7 +233,7 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated, 
           className="iot-title-input"
           style={{ flex: 1, fontSize: 15, fontWeight: 600, border: 'none', outline: 'none',
             background: 'transparent', color: 'var(--text-primary)', fontFamily: 'inherit' }}/>
-        <button type="button" onClick={reset} style={{ background: 'none', border: 'none', cursor: 'pointer',
+        <button onClick={reset} style={{ background: 'none', border: 'none', cursor: 'pointer',
           color: 'var(--text-muted)', display: 'flex', padding: 2, borderRadius: 4 }}>
           <X style={{ width: 13, height: 13 }} />
         </button>
@@ -372,7 +372,7 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated, 
 
         {/* Attachment */}
         {show('attachment') && (
-          <button type="button" onClick={() => fileRef.current?.click()}
+          <button onClick={() => fileRef.current?.click()}
             style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 20,
               border: errors.attachment ? '1px solid #fca5a5' : files.length > 0 ? '1px solid var(--brand-border)' : '1px solid var(--border)',
               background: errors.attachment ? '#fef2f2' : files.length > 0 ? 'var(--brand-light)' : 'var(--surface-subtle)',
@@ -482,7 +482,7 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated, 
                       style={{ fontSize:11, padding:'4px 6px', borderRadius:6, border:'1px solid var(--border)',
                         outline:'none', background:'var(--surface)', color:'var(--text-secondary)',
                         colorScheme:'light dark', fontFamily:'inherit' }}/>
-                    <button type="button" onClick={() => setCompSubtasks(p => p.filter((_,xi) => xi!==i))}
+                    <button onClick={() => setCompSubtasks(p => p.filter((_,xi) => xi!==i))}
                       style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text-muted)', padding:3, display:'flex' }}>
                       <Trash2 style={{ width:12, height:12 }}/>
                     </button>
@@ -501,7 +501,7 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated, 
         </div>
 
         {/* Save */}
-        <button type="submit" disabled={saving || !title.trim()}
+        <button onClick={save} disabled={saving || !title.trim()}
           style={{ marginLeft: 'auto', padding: '5px 16px', borderRadius: 20, border: 'none',
             background: title.trim() ? 'var(--brand)' : 'var(--border)',
             color: title.trim() ? '#fff' : 'var(--text-muted)',
@@ -523,7 +523,7 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated, 
           ))}
         </div>
       )}
-    </form>
+    </div>
     </>
   )
 }

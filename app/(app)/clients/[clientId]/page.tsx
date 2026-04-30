@@ -7,7 +7,6 @@ import { ArrowLeft, FolderOpen, ExternalLink, Pencil, Clock, CheckSquare, AlertC
 import { ProjectStatusBadge }   from '@/components/ui/Badge'
 import { fmtDate, fmtHours }    from '@/lib/utils/format'
 import { ClientPortalSection }  from './ClientPortalSection'
-import { ClientDetailClient }   from './ClientDetailClient'
 import { createAdminClient }    from '@/lib/supabase/admin'
 import type { Metadata }        from 'next'
 export const metadata: Metadata = { title: 'Client' }
@@ -204,13 +203,6 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
             })}
           </div>
         )}
-
-        {/* ── Client 360°: Tasks / Activity Log / Invoices ── */}
-        <ClientDetailClient
-          clientId={client.id}
-          canManage={canManage}
-          currentUserId={user.id}
-        />
       </div>
     </div>
   )

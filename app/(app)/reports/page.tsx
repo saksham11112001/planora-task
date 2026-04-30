@@ -52,7 +52,7 @@ export default async function ReportsPage() {
     // non-completed fetch that could run into tens of thousands for long-running orgs.
     // Employee performance stats already use a 90-day window, so this is accurate.
     supabase.from('tasks')
-      .select('id, title, status, priority, due_date, assignee_id, created_at, completed_at, project_id, client_id')
+      .select('id, title, status, priority, due_date, assignee_id, created_at, completed_at, project_id')
       .eq('org_id', orgId).eq('is_recurring', false).neq('is_archived', true).is('parent_task_id', null)
       .or(`status.neq.completed,completed_at.gte.${from90}`)
       .gte('created_at', from90)
@@ -67,7 +67,7 @@ export default async function ReportsPage() {
       .select('hours, is_billable, project_id, logged_date, user_id')
       .eq('org_id', orgId).gte('logged_date', from30.split('T')[0]),
     supabase.from('projects')
-      .select('id, name, color, client_id').eq('org_id', orgId).eq('status', 'active').neq('is_archived', true),
+      .select('id, name, color').eq('org_id', orgId).eq('status', 'active').neq('is_archived', true),
     supabase.from('org_members')
       .select('user_id, role, users(id, name, email)').eq('org_id', orgId).eq('is_active', true),
     supabase.from('clients').select('id, name, color').eq('org_id', orgId).eq('status','active').order('name'),
@@ -201,35 +201,6 @@ export default async function ReportsPage() {
     }
   }).sort((a, b) => b.completed - a.completed)
 
-  // ── Client Profitability (last 90 days) ───────────────────────
-  // Build project→client mapping from projects list
-  const projClientMap: Record<string, string> = {}
-  ;(projects ?? []).forEach((p: any) => { if (p.client_id) projClientMap[p.id] = p.client_id })
-
-  const clientMap = Object.fromEntries((clients ?? []).map(c => [c.id, c]))
-  const clientProfMap: Record<string, { id:string; name:string; color:string; tasks:number; completed:number; billableHours:number; totalHours:number }> = {}
-
-  tasks.forEach(t => {
-    // Resolve client_id: direct on task OR via project
-    const cid = (t as any).client_id || (t.project_id ? projClientMap[t.project_id] : null)
-    if (!cid || !clientMap[cid]) return
-    if (!clientProfMap[cid]) clientProfMap[cid] = { id: cid, name: clientMap[cid].name, color: clientMap[cid].color, tasks: 0, completed: 0, billableHours: 0, totalHours: 0 }
-    clientProfMap[cid].tasks++
-    if (t.status === 'completed') clientProfMap[cid].completed++
-  })
-
-  logs.forEach(l => {
-    const cid = l.project_id ? projClientMap[l.project_id] : null
-    if (!cid || !clientProfMap[cid]) return
-    clientProfMap[cid].totalHours    += l.hours ?? 0
-    if (l.is_billable) clientProfMap[cid].billableHours += l.hours ?? 0
-  })
-
-  const clientProfitability = Object.values(clientProfMap)
-    .map(c => ({ ...c, billableHours: Math.round(c.billableHours * 10) / 10, totalHours: Math.round(c.totalHours * 10) / 10 }))
-    .sort((a, b) => b.billableHours - a.billableHours)
-    .slice(0, 10)
-
   const kpis = [
     { label: 'Tasks created',    value: totalTasks,           sub: 'last 30 days',           color: '#0d9488', bg: '#f0fdfa' },
     { label: 'Completed',        value: completed,            sub: `${completionRate}% rate`, color: '#16a34a', bg: '#f0fdf4' },
@@ -269,7 +240,6 @@ export default async function ReportsPage() {
           currentUserId={user.id}
           clients={clients ?? []}
           userRole={mb.role}
-          clientProfitability={clientProfitability}
         />
       </div>
     </div>

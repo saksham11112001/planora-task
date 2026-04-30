@@ -7,7 +7,7 @@ import {
   Home, ListTodo, Users2, FolderOpen,
   RefreshCw, Users, BarChart2, Settings, Plus,
   ChevronDown, ChevronRight, Clock, Zap, X, Upload,
-  Calendar, Shield, LogOut, FileCheck, ArrowRight, ClipboardList, Eye, Receipt,
+  Calendar, Shield, LogOut, FileCheck, ArrowRight, ClipboardList, Eye,
 } from 'lucide-react'
 import { cn }            from '@/lib/utils/cn'
 import { createClient }  from '@/lib/supabase/client'
@@ -32,8 +32,6 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
   const { session } = useAppStore()
   const [projectsOpen, setProjectsOpen] = useState(false)
   const [projects, setProjects]         = useState<Project[]>(_projectCache)
-  const [projectsLoading, setProjectsLoading] = useState(false)
-  const [projectsError, setProjectsError] = useState<string | null>(null)
   const [flyoutOpen,    setFlyoutOpen]    = useState(false)
   const [allProjects,   setAllProjects]   = useState<Project[]>([])
   const [flyoutLoading, setFlyoutLoading] = useState(false)
@@ -51,46 +49,20 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
   const userInit  = userName[0]?.toUpperCase() ?? 'U'
   const canManage = ['owner','admin','manager'].includes(role)
 
-  const fetchProjects = useCallback(async (force = false) => {
-    // Serve from cache if fresh and not a forced reload
-    if (!force && Date.now() - _cacheTime < CACHE_TTL && _projectCache.length > 0) {
-      setProjects(_projectCache)
-      return
+  useEffect(() => {
+    const now = Date.now()
+    if (now - _cacheTime < CACHE_TTL && _projectCache.length > 0) {
+      setProjects(_projectCache); return
     }
-    setProjectsLoading(true)
-    setProjectsError(null)
-    const ctrl = new AbortController()
-    const timer = setTimeout(() => ctrl.abort(), 12000)
-    try {
-      const r = await fetch('/api/projects?limit=100', { cache: 'no-store', signal: ctrl.signal })
-      let d: any = {}
-      try { d = await r.json() } catch { /* non-JSON response */ }
-      if (Array.isArray(d.data)) {
-        _projectCache = d.data
-        _cacheTime = Date.now()
-        setProjects(d.data)
-      } else {
-        const msg = d.error ?? (r.ok ? 'Unexpected response' : `HTTP ${r.status}`)
-        setProjectsError(msg)
-      }
-    } catch (e: any) {
-      if ((e as any)?.name !== 'AbortError') setProjectsError(e?.message ?? 'Network error')
-      // AbortError = timeout — just clear spinner silently
-    } finally {
-      clearTimeout(timer)
-      setProjectsLoading(false)
-    }
+    if (fetchRef.current) return
+    fetchRef.current = true
+    fetch('/api/projects?limit=100')
+      .then(r => r.json()).then(d => {
+        if (Array.isArray(d.data)) { _projectCache = d.data; _cacheTime = Date.now(); setProjects(d.data) }
+      }).catch(() => {}).finally(() => { fetchRef.current = false })
   }, [])
 
-  useEffect(() => { fetchProjects() }, [fetchProjects])
-
-  useEffect(() => {
-    if (pathname === '/projects' || pathname.startsWith('/projects/')) {
-      _cacheTime = 0
-      fetchProjects(true)
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname])
+  useEffect(() => { if (pathname === '/projects') _cacheTime = 0 }, [pathname])
 
   // Fetch overdue + pending-approval counts for nav badges
   useEffect(() => {
@@ -259,12 +231,7 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
         {/* WORK */}
         <GL>Work</GL>
         <div style={{ display: 'flex', alignItems: 'center', padding: '5px 10px 2px' }}>
-          <button onClick={() => {
-              const next = !projectsOpen
-              setProjectsOpen(next)
-              // When opening: always try to fetch so projects are fresh
-              if (next) fetchProjects(true)
-            }}
+          <button onClick={() => setProjectsOpen(p => !p)}
             style={{ display: 'flex', alignItems: 'center', gap: 5, flex: 1, background: 'none',
               border: 'none', cursor: 'pointer', fontSize: 10, fontWeight: 700, letterSpacing: '0.07em',
               textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)' }}>
@@ -281,33 +248,6 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
         </div>
         {projectsOpen && (
           <div style={{ maxHeight: 240, overflowY: 'auto' }}>
-            {projectsLoading && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 14px' }}>
-                <div style={{ width: 12, height: 12, border: '2px solid rgba(255,255,255,0.12)',
-                  borderTopColor: '#14b8a6', borderRadius: '50%', animation: 'spin 0.7s linear infinite', flexShrink: 0 }}/>
-                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>Loading…</span>
-              </div>
-            )}
-            {!projectsLoading && projectsError && (
-              <div style={{ padding: '6px 14px' }}>
-                <p style={{ fontSize: 10, color: 'rgba(239,68,68,0.8)', margin: '0 0 4px', lineHeight: 1.4 }}>
-                  {projectsError}
-                </p>
-                <button onClick={() => fetchProjects(true)}
-                  style={{ fontSize: 10, color: '#14b8a6', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
-                  Retry ↺
-                </button>
-              </div>
-            )}
-            {!projectsLoading && !projectsError && projects.length === 0 && (
-              <div style={{ padding: '6px 14px' }}>
-                <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', margin: '0 0 2px' }}>No projects yet</p>
-                <button onClick={() => fetchProjects(true)}
-                  style={{ fontSize: 10, color: '#14b8a6', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
-                  Refresh ↺
-                </button>
-              </div>
-            )}
             {projects.map(p => (
               <Link key={p.id} href={`/projects/${p.id}`}
                 className={cn('flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm transition-colors',
@@ -321,7 +261,6 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
           </div>
         )}
         {nav.clients && <SI href="/clients"    active={isActive('/clients')}    icon={<Users2    className="h-4 w-4"/>} label="Clients"/>}
-        {canManage && <SI href="/invoices" active={isActive('/invoices')} icon={<Receipt className="h-4 w-4"/>} label="Invoices"/>}
         {nav.ca_compliance_mode && <SI href="/compliance" active={isActive('/compliance')} icon={<FileCheck className="h-4 w-4"/>} label="CA Compliance"/>}
         {nav.ca_compliance_mode && (
           <Link href="/compliance?tab=catasks"
