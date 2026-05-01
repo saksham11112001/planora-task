@@ -19,9 +19,15 @@ export interface Workspace {
   id: string; org_id: string; name: string; color: string; is_default: boolean
 }
 
+export interface ClientGroup {
+  id: string; org_id: string; name: string; color: string
+  notes?: string | null; created_at: string; updated_at: string
+}
+
 export interface Client {
   id: string; org_id: string; name: string; email?: string | null
   color: string; status: ClientStatus; company?: string | null
+  group_id?: string | null
 }
 
 export interface Project {
@@ -50,7 +56,7 @@ export interface Task {
 export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'cancelled'
 
 export interface Invoice {
-  id: string; org_id: string; client_id?: string | null
+  id: string; org_id: string; client_id?: string | null; group_id?: string | null
   invoice_number: string; title: string
   issue_date: string; due_date?: string | null
   status: InvoiceStatus; notes?: string | null

@@ -41,7 +41,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'Only managers can edit invoices' }, { status: 403 })
 
   const body = await req.json()
-  const ALLOWED = ['client_id','title','issue_date','due_date','status','notes','gstin','gst_rate','discount_amount','subtotal','gst_amount','total']
+  const ALLOWED = ['client_id','group_id','title','issue_date','due_date','status','notes','gstin','gst_rate','discount_amount','subtotal','gst_amount','total']
   const updates: Record<string, unknown> = {}
   for (const k of ALLOWED) { if (k in body) updates[k] = body[k] }
 

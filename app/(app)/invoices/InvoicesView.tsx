@@ -6,6 +6,7 @@ import type { Invoice, InvoiceStatus } from '@/types'
 import { INVOICE_STATUS_CONFIG as STATUS_CFG } from '@/types'
 
 interface Client { id: string; name: string; color: string }
+interface ClientGroupOption { id: string; name: string; color: string }
 interface CompanyCode {
   id:         string
   label:      string
@@ -23,6 +24,7 @@ interface Props {
   userRole:      string
   orgId:         string
   companyCodes:  CompanyCode[]
+  groups?:       ClientGroupOption[]
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -49,14 +51,20 @@ interface LineItem {
 
 // ── Create / Edit modal ───────────────────────────────────────────────────────
 
-function InvoiceModal({ clients, companyCodes, invoice, onClose, onSaved }: {
+function InvoiceModal({ clients, companyCodes, groups = [], invoice, onClose, onSaved }: {
   clients:       Client[]
   companyCodes:  CompanyCode[]
+  groups?:       ClientGroupOption[]
   invoice?:      any
   onClose:       () => void
   onSaved:       (inv: any) => void
 }) {
   const isEdit = !!invoice
+  // recipientType: 'client' = link to individual client, 'group' = link to a client group
+  const [recipientType, setRecipientType] = useState<'client' | 'group'>(
+    invoice?.group_id ? 'group' : 'client'
+  )
+  const [groupId,         setGroupId]         = useState(invoice?.group_id ?? '')
   const [clientId,        setClientId]        = useState(invoice?.client_id ?? '')
   const [title,           setTitle]           = useState(invoice?.title ?? '')
   const [issueDate,       setIssueDate]       = useState(invoice?.issue_date ?? new Date().toISOString().slice(0,10))
@@ -130,7 +138,8 @@ function InvoiceModal({ clients, companyCodes, invoice, onClose, onSaved }: {
     setSaving(true)
     try {
       const payload = {
-        client_id: clientId || null,
+        client_id: recipientType === 'client' ? (clientId || null) : null,
+        group_id:  recipientType === 'group'  ? (groupId  || null) : null,
         title: title.trim(),
         issue_date: issueDate,
         due_date: dueDate || null,
@@ -206,13 +215,33 @@ function InvoiceModal({ clients, companyCodes, invoice, onClose, onSaved }: {
                 style={{ width: '100%', ...inputStyle }}/>
             </div>
 
-            {/* Client */}
+            {/* Recipient — client or group */}
             <div>
-              <Label>Client</Label>
-              <select value={clientId} onChange={e => setClientId(e.target.value)} style={{ width:'100%', ...inputStyle }}>
-                <option value="">No client</option>
-                {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+              <Label>Bill to</Label>
+              {/* toggle */}
+              <div style={{ display: 'flex', gap: 0, marginBottom: 8, borderRadius: 7, overflow: 'hidden', border: '1.5px solid var(--border)', width: 'fit-content' }}>
+                {(['client', 'group'] as const).map(t => (
+                  <button key={t} onClick={() => setRecipientType(t)} style={{
+                    padding: '5px 14px', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                    background: recipientType === t ? 'var(--brand)' : 'var(--surface)',
+                    color: recipientType === t ? '#fff' : 'var(--text-secondary)',
+                    textTransform: 'capitalize', transition: 'background 0.15s',
+                  }}>
+                    {t === 'group' ? 'Client Group' : 'Client'}
+                  </button>
+                ))}
+              </div>
+              {recipientType === 'client' ? (
+                <select value={clientId} onChange={e => setClientId(e.target.value)} style={{ width: '100%', ...inputStyle }}>
+                  <option value="">No client</option>
+                  {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              ) : (
+                <select value={groupId} onChange={e => setGroupId(e.target.value)} style={{ width: '100%', ...inputStyle }}>
+                  <option value="">No group</option>
+                  {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                </select>
+              )}
             </div>
 
             {/* Issue date */}
@@ -399,10 +428,11 @@ function InvoiceModal({ clients, companyCodes, invoice, onClose, onSaved }: {
 
 // ── Invoice detail drawer ─────────────────────────────────────────────────────
 
-function InvoiceDrawer({ invoiceId, clients, companyCodes, canManage, onClose, onUpdated }: {
+function InvoiceDrawer({ invoiceId, clients, companyCodes, groups = [], canManage, onClose, onUpdated }: {
   invoiceId:    string
   clients:      Client[]
   companyCodes: CompanyCode[]
+  groups?:      ClientGroupOption[]
   canManage:    boolean
   onClose:      () => void
   onUpdated:    (inv: any) => void
@@ -555,6 +585,7 @@ function InvoiceDrawer({ invoiceId, clients, companyCodes, canManage, onClose, o
       <InvoiceModal
         clients={clients}
         companyCodes={companyCodes}
+        groups={groups}
         invoice={{ ...invoice, items: invoice.items }}
         onClose={() => setEditing(false)}
         onSaved={updated => { setInvoice({ ...invoice, ...updated }); onUpdated({ ...invoice, ...updated }); setEditing(false) }}
@@ -594,7 +625,7 @@ function DrawerShell({ children, onClose }: { children: React.ReactNode; onClose
 
 // ── Main view ───────────────────────────────────────────────────────────────���─
 
-export function InvoicesView({ invoices: initialInvoices, clients, canManage, userRole, companyCodes: initialCodes }: Props) {
+export function InvoicesView({ invoices: initialInvoices, clients, canManage, userRole, companyCodes: initialCodes, groups = [] }: Props) {
   const [invoices,    setInvoices]    = useState<any[]>(initialInvoices)
   const [showCreate,  setShowCreate]  = useState(false)
   const [viewId,      setViewId]      = useState<string | null>(null)
@@ -808,7 +839,7 @@ export function InvoicesView({ invoices: initialInvoices, clients, canManage, us
 
       {/* Create modal */}
       {showCreate && (
-        <InvoiceModal clients={clients} companyCodes={codes} onClose={() => setShowCreate(false)} onSaved={onSaved}/>
+        <InvoiceModal clients={clients} companyCodes={codes} groups={groups} onClose={() => setShowCreate(false)} onSaved={onSaved}/>
       )}
 
       {/* Detail drawer */}
@@ -817,6 +848,7 @@ export function InvoicesView({ invoices: initialInvoices, clients, canManage, us
           invoiceId={viewId}
           clients={clients}
           companyCodes={codes}
+          groups={groups}
           canManage={canManage}
           onClose={() => setViewId(null)}
           onUpdated={onUpdated}

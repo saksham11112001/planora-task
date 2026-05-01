@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Only managers can create invoices' }, { status: 403 })
 
     const body = await req.json()
-    const { client_id, title, issue_date, due_date, notes, gstin, gst_rate = 0, discount_amount = 0, items = [] } = body
+    const { client_id, group_id, title, issue_date, due_date, notes, gstin, gst_rate = 0, discount_amount = 0, items = [] } = body
 
     if (!title?.trim()) return NextResponse.json({ error: 'Title required' }, { status: 400 })
 
@@ -70,6 +70,7 @@ export async function POST(req: NextRequest) {
     const { data: invoice, error } = await admin.from('invoices').insert({
       org_id:          mb.org_id,
       client_id:       client_id || null,
+      group_id:        group_id  || null,
       invoice_number,
       title:           title.trim(),
       issue_date:      issue_date || new Date().toISOString().slice(0, 10),

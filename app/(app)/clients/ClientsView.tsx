@@ -4,6 +4,7 @@ import { useRouter }         from 'next/navigation'
 import Link                  from 'next/link'
 import { Plus, Users2, Pencil, Trash2, CheckSquare } from 'lucide-react'
 import { toast }             from '@/store/appStore'
+import { ClientGroupsSection } from './ClientGroupsSection'
 
 type Client = {
   id: string
@@ -13,16 +14,20 @@ type Client = {
   email?: string | null
   company?: string | null
   industry?: string | null
+  group_id?: string | null
 }
+
+type Group = { id: string; name: string; color: string; notes: string | null }
 
 interface Props {
   initialClients: Client[]
+  initialGroups:  Group[]
   canManage: boolean
 }
 
 const CLIENTS_PER_PAGE = 50
 
-export function ClientsView({ initialClients, canManage }: Props) {
+export function ClientsView({ initialClients, initialGroups, canManage }: Props) {
   const router          = useRouter()
   const [clients, setClients]   = useState<Client[]>(initialClients)
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -317,6 +322,12 @@ export function ClientsView({ initialClients, canManage }: Props) {
         )}
         </>
       )}
+      {/* ── Client Groups ── */}
+      <ClientGroupsSection
+        initialGroups={initialGroups}
+        allClients={clients.map(c => ({ id: c.id, name: c.name, color: c.color, status: c.status, group_id: c.group_id ?? null }))}
+        canManage={canManage}
+      />
     </div>
   )
 }
