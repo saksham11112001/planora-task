@@ -22,6 +22,8 @@ interface CATask {
   custom_fields?: Record<string, any> | null
   created_at: string
   updated_at?: string | null
+  is_billable?: boolean
+  billable_amount?: number | null
   assignee: { id: string; name: string } | null
   client: { id: string; name: string; color: string } | null
   creator?: { id: string; name: string } | null
@@ -131,6 +133,8 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
         custom_fields:    t.custom_fields ?? null,
         created_at:       t.created_at ?? '',
         updated_at:       t.updated_at ?? null,
+        is_billable:      t.is_billable ?? false,
+        billable_amount:  t.billable_amount ?? null,
         assignee:         t.assignee ?? (t.assignee_id ? (memberMap[t.assignee_id] ?? null) : null),
         client:           t.client ?? (t.client_id ? (clientMap[t.client_id] ?? null) : null),
         creator:          t.creator ?? null,

@@ -26,7 +26,7 @@ export default async function CalendarPage() {
   const from = new Date(); from.setMonth(from.getMonth() - 6)
   const to   = new Date(); to.setMonth(to.getMonth() + 6)
 
-  const TASK_SELECT = 'id, title, status, priority, due_date, is_recurring, project_id, assignee_id, approver_id, approval_status, approval_required, client_id, frequency, custom_fields, projects(id,name,color), assignee:users!tasks_assignee_id_fkey(id,name), approver:users!tasks_approver_id_fkey(id,name)'
+  const TASK_SELECT = 'id, title, status, priority, due_date, is_recurring, project_id, assignee_id, approver_id, approval_status, approval_required, client_id, frequency, custom_fields, is_billable, billable_amount, projects(id,name,color), assignee:users!tasks_assignee_id_fkey(id,name), approver:users!tasks_approver_id_fkey(id,name)'
   const dateFrom = from.toISOString().split('T')[0]
   const dateTo   = to.toISOString().split('T')[0]
 

@@ -519,23 +519,26 @@ export function WalkthroughOverlay({ userId, userCreatedAt, tourCompletedAt }: P
 
             {/* ── Primary action CTA (e.g. "Create your first task") ──────── */}
             {cur.action && (
-              <a
-                href={cur.action.href}
+              <button
                 className="wt-action-btn"
-                onClick={dismiss}
+                onClick={(e) => {
+                  e.preventDefault()
+                  // Navigate to the action page but keep the walkthrough alive
+                  router.push(cur.action!.href)
+                }}
                 style={{
                   display:'flex', alignItems:'center', justifyContent:'center', gap:8,
-                  padding:'11px 18px', borderRadius:12, marginBottom:16,
+                  padding:'11px 18px', borderRadius:12, marginBottom:16, width:'100%',
                   background:`linear-gradient(135deg, ${cur.color}, ${cur.color}dd)`,
                   color:'#fff', fontSize:13.5, fontWeight:700,
-                  textDecoration:'none',
+                  border:'none', cursor:'pointer',
                   boxShadow:`0 4px 16px ${cur.color}40`,
                   transition:'all 0.15s ease',
                   ['--wt-color-shadow' as any]: `${cur.color}55`,
                 }}
               >
                 <ExternalLink size={14}/> {cur.action.label}
-              </a>
+              </button>
             )}
 
             {/* Feature chips */}

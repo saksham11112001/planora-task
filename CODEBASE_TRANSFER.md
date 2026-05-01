@@ -1,5 +1,5 @@
 # Planora Task — Codebase Transfer Document
-> Use this at the start of a new chat to give the AI full context. Last updated: 2026-04-25 (Session 12)
+> Use this at the start of a new chat to give the AI full context. Last updated: 2026-05-01 (Session 13)
 
 ---
 
@@ -27,7 +27,7 @@
 | `users` | `id, name, email, avatar_url, phone_number` |
 | `organisations` | `id, name, plan, trial_ends_at` |
 | `org_members` | `user_id, org_id, role (owner/admin/manager/member/viewer), is_active` |
-| `tasks` | `id, org_id, title, description, status (todo/in_progress/in_review/completed), priority, due_date, assignee_id, approver_id, approval_status (pending/approved/rejected), approval_required, is_recurring, is_archived, parent_task_id, project_id, client_id, custom_fields (jsonb), estimated_hours, completed_at, approved_by, approved_at, created_by, sort_order` |
+| `tasks` | `id, org_id, title, description, status (todo/in_progress/in_review/completed), priority, due_date, assignee_id, approver_id, approval_status (pending/approved/rejected), approval_required, is_recurring, is_archived, parent_task_id, project_id, client_id, custom_fields (jsonb), estimated_hours, completed_at, approved_by, approved_at, created_by, sort_order, is_billable (bool default false), billable_amount (numeric)` |
 | `projects` | `id, org_id, name, color, status, due_date, client_id, owner_id, is_archived` |
 | `clients` | `id, org_id, name, color, status (active/inactive), email, phone, company, website, industry, notes, custom_fields (jsonb)` — custom_fields used for: DSC data (`_dsc_expiry`, `_dsc_holder`), GST data (`gstin`, `pan`, `gst_status`, `gst_state`, `gst_reg_date`) |
 | `time_logs` | `id, org_id, task_id, project_id, user_id, hours, is_billable` |
@@ -38,6 +38,10 @@
 | `ca_task_instances` | `id, org_id, assignment_id (→ ca_client_assignments), due_date` — keyed as `${assignment_id}__${due_date}` to prevent re-spawn |
 | `notifications` | `id, org_id, user_id, type, read, data (jsonb)` |
 | `recurring_tasks` | `id, org_id, title, frequency, next_run, assignee_id, project_id, client_id` |
+| `invoices` | `id, org_id, client_id, invoice_number, title, status (draft/sent/paid/cancelled), issue_date, due_date, gstin, gst_rate, discount_amount, subtotal, gst_amount, total, notes, created_by` — **requires add_billable_invoices.sql migration** |
+| `invoice_items` | `id, invoice_id, org_id, task_id, description, quantity, unit_price, amount` |
+| `referral_redemptions` | `id, referrer_org_id, redeemer_org_id, extension_days, created_at` — UNIQUE(redeemer_org_id) |
+| `organisations` (extended) | added: `trial_started_at, trial_extension_days (int default 0), referral_code (text unique), join_code (text unique)` — **requires add_org_codes_trial.sql migration** |
 
 **Important FK join syntax** (must be explicit in `.select()`):
 ```
@@ -1449,6 +1453,50 @@ window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
 - **Trigger**: Vercel build warning: "Vulnerable version of inngest detected (3.52.7). Please update to version 3.54.0 or later."
 - **Fix**: `package.json` `inngest` range changed from `^3.25.0` → `^3.54.0`; `npm install` resolved to `inngest@3.54.0`.
 - **File**: `package.json`
+
+---
+
+### SESSION 13 — Billable tasks, Invoices, Trial/Referral/Join system
+
+#### 45. PageLoader fix — sidebar stays visible during page loads
+- `components/ui/PageLoader.tsx`: changed `position: 'fixed'` → `position: 'absolute'`, `zIndex: 9999` → `zIndex: 10`
+- `app/globals.css`: added `position: relative` to `.app-content` so the absolute loader anchors inside the content pane only
+
+#### 46. Billable tasks + Invoice page
+- **DB migration**: `supabase/migrations/add_billable_invoices.sql` — adds `is_billable bool default false`, `billable_amount numeric(12,2)` to `tasks`; creates `invoices` and `invoice_items` tables with full RLS, indexes, auto `updated_at` trigger. **Must be applied in Supabase dashboard before invoices work.**
+- **types/index.ts**: added `is_billable?`, `billable_amount?` to Task; added `InvoiceStatus`, `Invoice`, `InvoiceItem` types and `INVOICE_STATUS_CONFIG` constant
+- **app/api/tasks/route.ts** GET: added `is_billable, billable_amount` to select — required so task list has billable data before detail panel opens
+- **app/api/tasks/[id]/route.ts** PATCH: added `'is_billable','billable_amount'` to both manager and member ALLOWED lists
+- **components/tasks/InlineTaskRow.tsx** + **InlineOneTimeTask.tsx**: billable pill toggle + optional amount field in creation form; amount uses ₹ prefix
+- **components/tasks/TaskDetailPanel.tsx**: billable FieldRow between Project and Dependencies; `useEffect` deps include `task.is_billable` and `task.billable_amount` to re-sync when full task data loads
+- **InlineOneTimeTask.tsx** overflow fix: removed `overflow: 'hidden'` from outer card div — was clipping the co-assignee absolute dropdown
+- **app/api/invoices/route.ts** (GET + POST), **app/api/invoices/[id]/route.ts** (GET/PATCH/DELETE), **app/api/invoices/[id]/items/route.ts** (GET/POST/DELETE), **app/api/invoices/unbilled-tasks/route.ts** (GET): all write routes use admin client to bypass RLS; items route exposes `status` field and no longer forces `status=completed` filter
+- **app/(app)/invoices/page.tsx**: server component fetching invoices + clients, passes to InvoicesView
+- **app/(app)/invoices/loading.tsx**: PageLoader fallback
+- **app/(app)/invoices/InvoicesView.tsx**: full client component — summary cards, search/filter, InvoiceModal (create/edit with GST rate picker, line items, "add from billable tasks"), InvoiceDrawer (status actions)
+- **Sidebar**: Invoices nav item guarded by `canManage` (owner/admin/manager only)
+
+#### 47. Trial progress, Referral codes, Join codes
+- **DB migration**: `supabase/migrations/add_org_codes_trial.sql` — adds `trial_started_at`, `trial_extension_days`, `referral_code` (unique), `join_code` (unique) to `organisations`; creates `referral_redemptions` table with `UNIQUE(redeemer_org_id)`. **Must be applied in Supabase dashboard.**
+- **lib/utils/codeGen.ts**: cryptographically random 8-char codes from 32-char alphabet (no I/O/L/0/1) using Web Crypto; `generateCode()`, `formatCode()`, `normaliseCode()`
+- **app/api/onboarding/route.ts**: generates `referral_code` + `join_code` + sets `trial_started_at` on org creation; optionally applies a provided referral code (checks different org, no member overlap, trialing status, max 42-day cap)
+- **app/api/referral/apply/route.ts**: POST — apply referral code post-signup; same security checks; rate-limited (5/5min via middleware)
+- **app/api/org/join/route.ts**: POST — join org via 8-char join code; rate-limited (10/5min)
+- **app/api/org/rotate-join-code/route.ts**: POST — owner/admin only; generates new join code
+- **middleware.ts**: added `referral` (5/5min) and `join` (10/5min) rate-limit buckets
+- **lib/supabase/cached.ts**: `getOrgMembership` select now includes `trial_started_at, trial_extension_days, referral_code, join_code`
+- **store/appStore.ts**: Org interface extended with `trial_started_at`, `trial_extension_days`, `referral_code`, `join_code`
+- **app/(app)/layout.tsx**: passes new fields from org to AppShell
+- **app/(app)/AppShell.tsx**: org prop type extended
+- **components/layout/Sidebar.tsx**: `TrialBanner` component — shows "Day X / Y" progress bar (not just "N days left") + referral code copy button with check-icon feedback; `Copy` + `Check` icons added
+- **app/onboarding/page.tsx**: new `entry` phase with two-card screen (Create org / Join via code); `join-code` phase with monospace code input; referral code optional field added to Step 1 org setup
+- **app/(app)/settings/members/page.tsx** + **MembersView.tsx**: "Organisation codes" section showing join code (copy + rotate) and referral code (copy + earned-days counter); `Share2`, `Gift`, `Copy`, `Check`, `RefreshCw` icons added
+
+#### 48. Dashboard stats made user-specific
+- `app/(app)/dashboard/page.tsx`: `completedThisMonth` and `totalThisMonth` queries now filter by `assignee_id = user.id` — the "You've completed X of Y tasks" stat is now personal, not org-wide
+
+#### 49. Walkthrough CTA fix — tour stays alive when clicking action button
+- `components/walkthrough/WalkthroughOverlay.tsx`: CTA action button changed from `<a onClick={dismiss}>` to `<button onClick={() => router.push(href)}>` — navigates to the target page without dismissing the walkthrough, so the overlay persists across the navigation
 
 ---
 

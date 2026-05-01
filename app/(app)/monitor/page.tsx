@@ -25,7 +25,7 @@ export default async function MonitorPage() {
       redirect('/dashboard?error=monitor_access_denied')
     }
 
-    const TASK_COLS = 'id, title, status, priority, due_date, completed_at, assignee_id, approver_id, client_id, project_id, approval_status, approval_required, is_recurring, custom_fields, created_at, updated_at, assignee:users!tasks_assignee_id_fkey(id, name), approver:users!tasks_approver_id_fkey(id, name), creator:users!tasks_created_by_fkey(id, name), projects(id, name, color)'
+    const TASK_COLS = 'id, title, status, priority, due_date, completed_at, assignee_id, approver_id, client_id, project_id, approval_status, approval_required, is_recurring, custom_fields, created_at, updated_at, is_billable, billable_amount, assignee:users!tasks_assignee_id_fkey(id, name), approver:users!tasks_approver_id_fkey(id, name), creator:users!tasks_created_by_fkey(id, name), projects(id, name, color)'
 
     // Monitor shows all non-completed tasks (any age) + completed tasks from the last
     // 90 days. This replaces the previous unlimited non-completed fetch which could
@@ -70,6 +70,8 @@ export default async function MonitorPage() {
       is_recurring:    t.is_recurring ?? false,
       created_at:      t.created_at ?? '',
       updated_at:      t.updated_at ?? null,
+      is_billable:     t.is_billable ?? false,
+      billable_amount: t.billable_amount ?? null,
       assignee:        (t.assignee as any) ?? null,
       approver:        (t.approver as any) ?? null,
       creator:         (t.creator as any) ?? null,

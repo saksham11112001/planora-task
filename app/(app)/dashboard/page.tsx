@@ -44,9 +44,9 @@ export default async function DashboardPage() {
       .eq('org_id', orgId).eq('status', 'active').neq('is_archived', true)
       .order('updated_at', { ascending: false }).limit(4),
     supabase.from('tasks').select('*', { count: 'exact', head: true })
-      .eq('org_id', orgId).eq('status', 'completed').gte('completed_at', from30),
+      .eq('org_id', orgId).eq('assignee_id', user.id).eq('status', 'completed').gte('completed_at', from30),
     supabase.from('tasks').select('*', { count: 'exact', head: true })
-      .eq('org_id', orgId).gte('created_at', from30),
+      .eq('org_id', orgId).eq('assignee_id', user.id).gte('created_at', from30),
     supabase.from('clients').select('id, name, color').eq('org_id', orgId).eq('status', 'active')
       .order('created_at', { ascending: false }).limit(5),
   ])

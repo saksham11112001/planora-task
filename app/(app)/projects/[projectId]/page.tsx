@@ -31,7 +31,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
     (() => {
       const isAdminOwner = ['owner', 'admin'].includes(mb.role)
       const tq = supabase.from('tasks')
-        .select('id, title, description, status, priority, due_date, assignee_id, approver_id, client_id, project_id, approval_status, approval_required, estimated_hours, is_recurring, created_at, updated_at, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), approver:users!tasks_approver_id_fkey(id, name)')
+        .select('id, title, description, status, priority, due_date, assignee_id, approver_id, client_id, project_id, approval_status, approval_required, estimated_hours, is_recurring, created_at, updated_at, is_billable, billable_amount, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), approver:users!tasks_approver_id_fkey(id, name)')
         .eq('project_id', projectId).neq('is_archived', true)
         .is('parent_task_id', null)
         .order('sort_order').order('created_at', { ascending: true })

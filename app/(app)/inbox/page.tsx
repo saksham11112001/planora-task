@@ -20,7 +20,7 @@ export default async function InboxPage() {
     // canViewAll: owner/admin always; others only if explicitly granted via Members settings
     const canViewAll = ['owner', 'admin'].includes(mb.role) || (mb as any).can_view_all_tasks === true
 
-    const TASK_SELECT = 'id, title, status, priority, due_date, approval_status, approval_required, approver_id, client_id, assignee_id, created_by, is_recurring, estimated_hours, custom_fields, created_at, updated_at, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), approver:users!tasks_approver_id_fkey(id, name), creator:users!tasks_created_by_fkey(id, name)'
+    const TASK_SELECT = 'id, title, status, priority, due_date, approval_status, approval_required, approver_id, client_id, assignee_id, created_by, is_recurring, estimated_hours, custom_fields, created_at, updated_at, is_billable, billable_amount, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), approver:users!tasks_approver_id_fkey(id, name), creator:users!tasks_created_by_fkey(id, name)'
 
     // ── All fetches in parallel ───────────────────────────────────
     const [tasksResult, membersResult, clientsResult, allClientsResult] = await Promise.all([
@@ -79,6 +79,8 @@ export default async function InboxPage() {
         approver_id: (t as any).approver_id ?? null, approval_status: t.approval_status ?? null,
         assignee: (t.assignee as any) ?? null, approver: (t as any).approver ?? null,
         creator: (t as any).creator ?? null,
+        is_billable: (t as any).is_billable ?? false,
+        billable_amount: (t as any).billable_amount ?? null,
         client: t.client_id ? (clientMap[t.client_id] ? { id: t.client_id, ...clientMap[t.client_id] } : null) : null,
       }))
 
