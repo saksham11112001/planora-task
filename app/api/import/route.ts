@@ -6,7 +6,7 @@ import { COMPLIANCE_TASKS }   from '@/lib/data/complianceTasks'
 import { CA_DEFAULT_TASKS }   from '@/lib/data/caDefaultTasks'
 import { effectivePlan, canUseFeature } from '@/lib/utils/planGate'
 
-export const maxDuration = 300 // seconds — bulk import can process hundreds of rows
+export const maxDuration = 59 // seconds — bulk import can process hundreds of rows
 export const dynamic = 'force-dynamic'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXT_PUBLIC_PLANORA_URL ?? 'https://planora.in'
