@@ -1,16 +1,28 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, X, DollarSign, Receipt, ChevronDown, Trash2, Edit3, Eye, Check, Send, AlertCircle, Search, Filter } from 'lucide-react'
+import { Plus, X, DollarSign, Receipt, ChevronDown, Trash2, Edit3, Eye, Check, Send, AlertCircle, Search, Filter, Building2, Star } from 'lucide-react'
 import { toast } from '@/store/appStore'
 import type { Invoice, InvoiceStatus } from '@/types'
 import { INVOICE_STATUS_CONFIG as STATUS_CFG } from '@/types'
 
 interface Client { id: string; name: string; color: string }
+interface CompanyCode {
+  id:         string
+  label:      string
+  group_name: string | null
+  gstin:      string | null
+  pan:        string | null
+  cin:        string | null
+  address:    string | null
+  is_default: boolean
+}
 interface Props {
-  invoices:   any[]
-  clients:    Client[]
-  canManage:  boolean
-  orgId:      string
+  invoices:      any[]
+  clients:       Client[]
+  canManage:     boolean
+  userRole:      string
+  orgId:         string
+  companyCodes:  CompanyCode[]
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -37,11 +49,12 @@ interface LineItem {
 
 // ── Create / Edit modal ───────────────────────────────────────────────────────
 
-function InvoiceModal({ clients, invoice, onClose, onSaved }: {
-  clients:   Client[]
-  invoice?:  any
-  onClose:   () => void
-  onSaved:   (inv: any) => void
+function InvoiceModal({ clients, companyCodes, invoice, onClose, onSaved }: {
+  clients:       Client[]
+  companyCodes:  CompanyCode[]
+  invoice?:      any
+  onClose:       () => void
+  onSaved:       (inv: any) => void
 }) {
   const isEdit = !!invoice
   const [clientId,        setClientId]        = useState(invoice?.client_id ?? '')
@@ -52,6 +65,19 @@ function InvoiceModal({ clients, invoice, onClose, onSaved }: {
   const [gstin,           setGstin]           = useState(invoice?.gstin ?? '')
   const [gstRate,         setGstRate]         = useState<number>(invoice?.gst_rate ?? 18)
   const [discountAmount,  setDiscountAmount]  = useState<number>(invoice?.discount_amount ?? 0)
+
+  // Pre-select default company code
+  const defaultCode = companyCodes.find(c => c.is_default) ?? null
+  const [selectedCodeId, setSelectedCodeId] = useState<string>(
+    invoice?.company_code_id ?? defaultCode?.id ?? ''
+  )
+
+  // Auto-fill GSTIN when a company code is selected
+  useEffect(() => {
+    if (!selectedCodeId) return
+    const code = companyCodes.find(c => c.id === selectedCodeId)
+    if (code?.gstin) setGstin(code.gstin)
+  }, [selectedCodeId, companyCodes])
   const [items,           setItems]           = useState<LineItem[]>(
     invoice?.items?.map((it: any) => ({
       id: it.id, task_id: it.task_id, desc: it.description,
@@ -202,6 +228,23 @@ function InvoiceModal({ clients, invoice, onClose, onSaved }: {
               <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)}
                 style={{ width: '100%', ...inputStyle, colorScheme: 'light dark' }}/>
             </div>
+
+            {/* Company code selector */}
+            {companyCodes.length > 0 && (
+              <div>
+                <Label>Billed from <span style={{ fontWeight: 400, opacity: 0.5 }}>(company code)</span></Label>
+                <select value={selectedCodeId}
+                  onChange={e => setSelectedCodeId(e.target.value)}
+                  style={{ width: '100%', ...inputStyle }}>
+                  <option value="">— None —</option>
+                  {companyCodes.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.group_name ? `[${c.group_name}] ` : ''}{c.label}{c.gstin ? ` · ${c.gstin}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* GSTIN */}
             <div>
@@ -356,12 +399,13 @@ function InvoiceModal({ clients, invoice, onClose, onSaved }: {
 
 // ── Invoice detail drawer ─────────────────────────────────────────────────────
 
-function InvoiceDrawer({ invoiceId, clients, canManage, onClose, onUpdated }: {
-  invoiceId: string
-  clients:   Client[]
-  canManage: boolean
-  onClose:   () => void
-  onUpdated: (inv: any) => void
+function InvoiceDrawer({ invoiceId, clients, companyCodes, canManage, onClose, onUpdated }: {
+  invoiceId:    string
+  clients:      Client[]
+  companyCodes: CompanyCode[]
+  canManage:    boolean
+  onClose:      () => void
+  onUpdated:    (inv: any) => void
 }) {
   const [invoice, setInvoice] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -510,6 +554,7 @@ function InvoiceDrawer({ invoiceId, clients, canManage, onClose, onUpdated }: {
     {editing && (
       <InvoiceModal
         clients={clients}
+        companyCodes={companyCodes}
         invoice={{ ...invoice, items: invoice.items }}
         onClose={() => setEditing(false)}
         onSaved={updated => { setInvoice({ ...invoice, ...updated }); onUpdated({ ...invoice, ...updated }); setEditing(false) }}
@@ -549,13 +594,17 @@ function DrawerShell({ children, onClose }: { children: React.ReactNode; onClose
 
 // ── Main view ───────────────────────────────────────────────────────────────���─
 
-export function InvoicesView({ invoices: initialInvoices, clients, canManage }: Props) {
+export function InvoicesView({ invoices: initialInvoices, clients, canManage, userRole, companyCodes: initialCodes }: Props) {
   const [invoices,    setInvoices]    = useState<any[]>(initialInvoices)
   const [showCreate,  setShowCreate]  = useState(false)
   const [viewId,      setViewId]      = useState<string | null>(null)
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [filterClient, setFilterClient] = useState<string>('all')
   const [search,      setSearch]      = useState('')
+  const [codes,       setCodes]       = useState<CompanyCode[]>(initialCodes)
+  const [showCodes,   setShowCodes]   = useState(false)
+
+  const isOwnerAdmin = ['owner', 'admin'].includes(userRole)
 
   // Summary stats
   const totalAll      = invoices.reduce((s, inv) => s + Number(inv.total ?? 0), 0)
@@ -599,14 +648,24 @@ export function InvoicesView({ invoices: initialInvoices, clients, canManage }: 
           <Receipt style={{ width:22, height:22, color:'var(--brand)' }}/>
           <h1 style={{ fontSize:20, fontWeight:800, color:'var(--text-primary)' }}>Invoices</h1>
         </div>
-        {canManage && (
-          <button onClick={() => setShowCreate(true)}
-            style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 16px', borderRadius:8,
-              background:'var(--brand)', color:'#fff', border:'none', fontSize:13, fontWeight:600,
-              cursor:'pointer' }}>
-            <Plus style={{ width:14, height:14 }}/> New invoice
-          </button>
-        )}
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          {isOwnerAdmin && (
+            <button onClick={() => setShowCodes(true)}
+              style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 14px', borderRadius:8,
+                border:'1px solid var(--border)', background:'var(--surface-subtle)',
+                color:'var(--text-secondary)', fontSize:13, fontWeight:500, cursor:'pointer' }}>
+              <Building2 style={{ width:13, height:13 }}/> Company codes
+            </button>
+          )}
+          {canManage && (
+            <button onClick={() => setShowCreate(true)}
+              style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 16px', borderRadius:8,
+                background:'var(--brand)', color:'#fff', border:'none', fontSize:13, fontWeight:600,
+                cursor:'pointer' }}>
+              <Plus style={{ width:14, height:14 }}/> New invoice
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Summary cards */}
@@ -749,7 +808,7 @@ export function InvoicesView({ invoices: initialInvoices, clients, canManage }: 
 
       {/* Create modal */}
       {showCreate && (
-        <InvoiceModal clients={clients} onClose={() => setShowCreate(false)} onSaved={onSaved}/>
+        <InvoiceModal clients={clients} companyCodes={codes} onClose={() => setShowCreate(false)} onSaved={onSaved}/>
       )}
 
       {/* Detail drawer */}
@@ -757,11 +816,278 @@ export function InvoicesView({ invoices: initialInvoices, clients, canManage }: 
         <InvoiceDrawer
           invoiceId={viewId}
           clients={clients}
+          companyCodes={codes}
           canManage={canManage}
           onClose={() => setViewId(null)}
           onUpdated={onUpdated}
         />
       )}
+
+      {/* Company codes modal */}
+      {showCodes && (
+        <CompanyCodesModal
+          codes={codes}
+          onClose={() => setShowCodes(false)}
+          onChanged={setCodes}
+        />
+      )}
+    </div>
+  )
+}
+
+// ── Company codes modal ───────────────────────────────────────────────────────
+
+function CompanyCodesModal({ codes, onClose, onChanged }: {
+  codes:     CompanyCode[]
+  onClose:   () => void
+  onChanged: (codes: CompanyCode[]) => void
+}) {
+  const [list,    setList]    = useState<CompanyCode[]>(codes)
+  const [editing, setEditing] = useState<CompanyCode | null>(null)
+  const [adding,  setAdding]  = useState(false)
+  const [saving,  setSaving]  = useState(false)
+
+  // Form state (shared for add + edit)
+  const empty = { label: '', group_name: '', gstin: '', pan: '', cin: '', address: '', is_default: false }
+  const [form, setForm] = useState<typeof empty>(empty)
+
+  function openAdd() {
+    setForm(empty)
+    setEditing(null)
+    setAdding(true)
+  }
+
+  function openEdit(c: CompanyCode) {
+    setForm({
+      label:      c.label,
+      group_name: c.group_name ?? '',
+      gstin:      c.gstin ?? '',
+      pan:        c.pan ?? '',
+      cin:        c.cin ?? '',
+      address:    c.address ?? '',
+      is_default: c.is_default,
+    })
+    setEditing(c)
+    setAdding(false)
+  }
+
+  function cancelForm() { setAdding(false); setEditing(null) }
+
+  async function saveForm() {
+    if (!form.label.trim()) { toast.error('Label is required'); return }
+    setSaving(true)
+    try {
+      if (editing) {
+        // PATCH
+        const res  = await fetch(`/api/invoices/company-codes/${editing.id}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(form),
+        })
+        const d = await res.json()
+        if (!res.ok) { toast.error(d.error ?? 'Failed'); return }
+        const updated = list.map(c => {
+          if (form.is_default) return { ...c, is_default: c.id === editing.id }
+          return c.id === editing.id ? { ...c, ...d.data } : c
+        })
+        setList(updated); onChanged(updated)
+        toast.success('Company code updated')
+      } else {
+        // POST
+        const res  = await fetch('/api/invoices/company-codes', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(form),
+        })
+        const d = await res.json()
+        if (!res.ok) { toast.error(d.error ?? 'Failed'); return }
+        const added = form.is_default
+          ? [...list.map(c => ({ ...c, is_default: false })), d.data]
+          : [...list, d.data]
+        setList(added); onChanged(added)
+        toast.success('Company code added')
+      }
+      cancelForm()
+    } finally { setSaving(false) }
+  }
+
+  async function deleteCode(c: CompanyCode) {
+    if (!confirm(`Delete "${c.label}"?`)) return
+    const res = await fetch(`/api/invoices/company-codes/${c.id}`, { method: 'DELETE' })
+    if (!res.ok) { toast.error('Failed to delete'); return }
+    const updated = list.filter(x => x.id !== c.id)
+    setList(updated); onChanged(updated)
+    toast.success('Deleted')
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 200,
+      background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div style={{ background: 'var(--surface)', borderRadius: 14,
+        boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+        width: '100%', maxWidth: 640, maxHeight: '88vh',
+        display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+
+        {/* Header */}
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)',
+          display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+          <Building2 style={{ width: 17, height: 17, color: 'var(--brand)' }}/>
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', flex: 1 }}>
+            Company codes
+          </h2>
+          <button onClick={onClose}
+            style={{ background: 'none', border: 'none', cursor: 'pointer',
+              color: 'var(--text-muted)', display: 'flex', padding: 4, borderRadius: 6 }}>
+            <X style={{ width: 16, height: 16 }}/>
+          </button>
+        </div>
+
+        {/* Scrollable body */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
+
+          {/* Existing codes list */}
+          {list.length === 0 && !adding && (
+            <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)' }}>
+              <Building2 style={{ width: 36, height: 36, opacity: 0.15, margin: '0 auto 10px' }}/>
+              <p style={{ fontSize: 13 }}>No company codes yet. Add your first one.</p>
+            </div>
+          )}
+
+          {list.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: adding || editing ? 16 : 0 }}>
+              {list.map(c => (
+                <div key={c.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10,
+                  padding: '12px 14px', borderRadius: 10,
+                  background: 'var(--surface-subtle)', border: '1px solid var(--border)' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{c.label}</span>
+                      {c.is_default && (
+                        <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 99,
+                          background: 'rgba(13,148,136,0.12)', color: 'var(--brand)',
+                          border: '1px solid rgba(13,148,136,0.25)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          Default
+                        </span>
+                      )}
+                      {c.group_name && (
+                        <span style={{ fontSize: 10, color: 'var(--text-muted)', fontStyle: 'italic' }}>{c.group_name}</span>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                      {c.gstin   && <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>GSTIN: {c.gstin}</span>}
+                      {c.pan     && <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>PAN: {c.pan}</span>}
+                      {c.cin     && <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>CIN: {c.cin}</span>}
+                      {c.address && <span style={{ fontSize: 11, color: 'var(--text-muted)',
+                        overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', maxWidth: 240 }}>
+                        {c.address}
+                      </span>}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                    <button onClick={() => openEdit(c)} title="Edit"
+                      style={{ padding: 5, borderRadius: 6, border: 'none', background: 'transparent',
+                        color: 'var(--text-muted)', cursor: 'pointer' }}
+                      onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--surface)'}
+                      onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}>
+                      <Edit3 style={{ width: 13, height: 13 }}/>
+                    </button>
+                    <button onClick={() => deleteCode(c)} title="Delete"
+                      style={{ padding: 5, borderRadius: 6, border: 'none', background: 'transparent',
+                        color: 'var(--text-muted)', cursor: 'pointer' }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.08)'; (e.currentTarget as HTMLElement).style.color = '#ef4444' }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)' }}>
+                      <Trash2 style={{ width: 13, height: 13 }}/>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Add / Edit form */}
+          {(adding || editing) && (
+            <div style={{ padding: '16px', borderRadius: 10, border: '1px solid var(--brand-border)',
+              background: 'var(--surface-subtle)', marginTop: list.length > 0 ? 0 : 0 }}>
+              <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--brand)', marginBottom: 12,
+                textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                {editing ? 'Edit company code' : 'New company code'}
+              </p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div style={{ gridColumn: '1/-1' }}>
+                  <Label>Label *</Label>
+                  <input value={form.label} onChange={e => setForm(p => ({ ...p, label: e.target.value }))}
+                    placeholder="e.g. Main entity" style={{ width: '100%', ...inputStyle }}/>
+                </div>
+                <div>
+                  <Label>Group name <span style={{ fontWeight: 400, opacity: 0.5 }}>(optional)</span></Label>
+                  <input value={form.group_name} onChange={e => setForm(p => ({ ...p, group_name: e.target.value }))}
+                    placeholder="e.g. ABC Group" style={{ width: '100%', ...inputStyle }}/>
+                </div>
+                <div>
+                  <Label>GSTIN <span style={{ fontWeight: 400, opacity: 0.5 }}>(optional)</span></Label>
+                  <input value={form.gstin} onChange={e => setForm(p => ({ ...p, gstin: e.target.value.toUpperCase() }))}
+                    placeholder="22AAAAA0000A1Z5" maxLength={15} style={{ width: '100%', ...inputStyle }}/>
+                </div>
+                <div>
+                  <Label>PAN <span style={{ fontWeight: 400, opacity: 0.5 }}>(optional)</span></Label>
+                  <input value={form.pan} onChange={e => setForm(p => ({ ...p, pan: e.target.value.toUpperCase() }))}
+                    placeholder="AAAAA0000A" maxLength={10} style={{ width: '100%', ...inputStyle }}/>
+                </div>
+                <div>
+                  <Label>CIN <span style={{ fontWeight: 400, opacity: 0.5 }}>(optional)</span></Label>
+                  <input value={form.cin} onChange={e => setForm(p => ({ ...p, cin: e.target.value.toUpperCase() }))}
+                    placeholder="U12345AB1234ABC123456" maxLength={21} style={{ width: '100%', ...inputStyle }}/>
+                </div>
+                <div style={{ gridColumn: '1/-1' }}>
+                  <Label>Address <span style={{ fontWeight: 400, opacity: 0.5 }}>(optional)</span></Label>
+                  <textarea value={form.address} onChange={e => setForm(p => ({ ...p, address: e.target.value }))}
+                    rows={2} placeholder="Registered address…"
+                    style={{ width: '100%', ...inputStyle, resize: 'vertical', lineHeight: 1.5 }}/>
+                </div>
+                <div style={{ gridColumn: '1/-1', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input type="checkbox" id="is_default" checked={form.is_default}
+                    onChange={e => setForm(p => ({ ...p, is_default: e.target.checked }))}
+                    style={{ cursor: 'pointer' }}/>
+                  <label htmlFor="is_default" style={{ fontSize: 12, color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                    Set as default (auto-selected in new invoices)
+                  </label>
+                </div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
+                <button onClick={cancelForm}
+                  style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid var(--border)',
+                    background: 'transparent', color: 'var(--text-secondary)', fontSize: 12, cursor: 'pointer' }}>
+                  Cancel
+                </button>
+                <button onClick={saveForm} disabled={saving}
+                  style={{ padding: '6px 16px', borderRadius: 8, border: 'none',
+                    background: 'var(--brand)', color: '#fff', fontSize: 12, fontWeight: 600,
+                    cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
+                  {saving ? 'Saving…' : editing ? 'Save changes' : 'Add code'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+          {!adding && !editing
+            ? <button onClick={openAdd}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8,
+                  border: 'none', background: 'var(--brand)', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                <Plus style={{ width: 13, height: 13 }}/> Add company code
+              </button>
+            : <div/>
+          }
+          <button onClick={onClose}
+            style={{ padding: '7px 16px', borderRadius: 8, border: '1px solid var(--border)',
+              background: 'transparent', color: 'var(--text-secondary)', fontSize: 13, cursor: 'pointer' }}>
+            Done
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

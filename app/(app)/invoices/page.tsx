@@ -18,7 +18,7 @@ export default async function InvoicesPage() {
   const supabase = await createClient()
   const admin = createAdminClient()
 
-  const [{ data: invoices }, { data: clients }] = await Promise.all([
+  const [{ data: invoices }, { data: clients }, { data: companyCodes }] = await Promise.all([
     admin.from('invoices')
       .select('*, client:clients(id, name, color)')
       .eq('org_id', mb.org_id)
@@ -28,6 +28,11 @@ export default async function InvoicesPage() {
       .select('id, name, color, status')
       .eq('org_id', mb.org_id)
       .order('name'),
+    admin.from('invoice_company_codes')
+      .select('*')
+      .eq('org_id', mb.org_id)
+      .order('group_name', { nullsFirst: true })
+      .order('label'),
   ])
 
   const clientList = (clients ?? []).map(c => ({ id: c.id, name: c.name, color: c.color }))
@@ -37,7 +42,9 @@ export default async function InvoicesPage() {
       invoices={(invoices ?? []) as any[]}
       clients={clientList}
       canManage={['owner', 'admin', 'manager'].includes(mb.role)}
+      userRole={mb.role}
       orgId={mb.org_id}
+      companyCodes={(companyCodes ?? []) as any[]}
     />
   )
 }

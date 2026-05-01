@@ -90,6 +90,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(dbError(error, 'invoices/POST'), { status: 500 })
     }
 
+    // ── Activity log (non-blocking) ─────────────────────────────────────────
+    try {
+      const { data: actor } = await supabase.from('users').select('name').eq('id', user.id).maybeSingle()
+      await admin.from('activity_log').insert({
+        org_id:      mb.org_id,
+        user_id:     user.id,
+        user_name:   (actor as any)?.name ?? null,
+        action:      'invoice.created',
+        entity_type: 'invoice',
+        entity_id:   invoice!.id,
+        entity_name: invoice!.title,
+        meta:        { invoice_number: invoice_number, total },
+      })
+    } catch {}
+
     // Insert line items if provided
     if ((items as any[]).length > 0 && invoice?.id) {
       const itemRows = (items as any[]).map((it: any) => {

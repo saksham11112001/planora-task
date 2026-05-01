@@ -49,12 +49,35 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
 
   const admin = createAdminClient()
+
+  // Fetch current invoice (for before-state + entity_name)
+  const { data: existing } = await admin.from('invoices')
+    .select('title, status').eq('id', id).eq('org_id', mb.org_id).maybeSingle()
+
   const { data, error } = await admin.from('invoices')
     .update(updates).eq('id', id).eq('org_id', mb.org_id).select('*').maybeSingle()
   if (error) {
     console.error('[invoices/[id] PATCH]', JSON.stringify({ message: error.message, code: error.code }))
     return NextResponse.json(dbError(error, 'invoices/[id]'), { status: 500 })
   }
+
+  // ── Activity log (non-blocking) ──────────────────────────────────────────
+  if (updates.status && existing) {
+    try {
+      const { data: actor } = await supabase.from('users').select('name').eq('id', user.id).maybeSingle()
+      await admin.from('activity_log').insert({
+        org_id:      mb.org_id,
+        user_id:     user.id,
+        user_name:   (actor as any)?.name ?? null,
+        action:      'invoice.status_changed',
+        entity_type: 'invoice',
+        entity_id:   id,
+        entity_name: existing.title,
+        meta:        { from: existing.status, to: updates.status },
+      })
+    } catch {}
+  }
+
   return NextResponse.json({ data: data ?? { id } })
 }
 

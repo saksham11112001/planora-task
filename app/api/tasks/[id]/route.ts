@@ -251,6 +251,26 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     } catch (e) { console.error('[tasks PATCH] inngest send failed:', e) }
   }
 
+  // ── Activity log (non-blocking) ────────────────────────────────────────────
+  if (updates.status) {
+    try {
+      const isCompleted = updates.status === 'completed'
+      const action = isCompleted ? 'task.completed' : 'task.status_changed'
+      const { data: actor } = await supabase.from('users').select('name').eq('id', user.id).maybeSingle()
+      const adminLog = createAdminClient()
+      await adminLog.from('activity_log').insert({
+        org_id:      mb.org_id,
+        user_id:     user.id,
+        user_name:   (actor as any)?.name ?? null,
+        action,
+        entity_type: 'task',
+        entity_id:   id,
+        entity_name: data.title,
+        meta:        { from: task.status, to: updates.status },
+      })
+    } catch {}
+  }
+
   return NextResponse.json({ data })
 }
 

@@ -1,9 +1,10 @@
-import { createClient }  from '@/lib/supabase/server'
-import { NextResponse }   from 'next/server'
-import type { NextRequest } from 'next/server'
-import { inngest }        from '@/lib/inngest/client'
-import { assertCan }      from '@/lib/utils/permissionGate'
-import { dbError } from '@/lib/api-error'
+import { createClient }      from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { NextResponse }      from 'next/server'
+import type { NextRequest }  from 'next/server'
+import { inngest }           from '@/lib/inngest/client'
+import { assertCan }         from '@/lib/utils/permissionGate'
+import { dbError }           from '@/lib/api-error'
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
@@ -96,6 +97,21 @@ export async function POST(request: NextRequest) {
   }).select('*').single()
 
   if (error) return NextResponse.json(dbError(error, 'tasks'), { status: 500 })
+
+  // ── Activity log (non-blocking) ────────────────────────────────────────────
+  try {
+    const admin = createAdminClient()
+    await admin.from('activity_log').insert({
+      org_id:      mb.org_id,
+      user_id:     user.id,
+      user_name:   (mb.users as any)?.name ?? null,
+      action:      'task.created',
+      entity_type: 'task',
+      entity_id:   task!.id,
+      entity_name: task!.title,
+      meta:        { status: task!.status },
+    })
+  } catch {}
 
   if (assignee_id && assignee_id !== user.id) {
     try {
