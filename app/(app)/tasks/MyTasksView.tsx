@@ -1,6 +1,6 @@
 'use client'
 import React from 'react'
-import { useState, useTransition, useRef, useEffect } from 'react'
+import { useState, useTransition, useRef, useEffect, useMemo } from 'react'
 import { useRouter }    from 'next/navigation'
 import { RefreshCw, CheckCheck, CheckCircle2, Clock, FolderOpen, Trash2, User, SortAsc, Copy } from 'lucide-react'
 import { PriorityBadge, Avatar } from '@/components/ui/Badge'
@@ -234,8 +234,9 @@ export function MyTasksView({
   // Global filters (My Tasks never filters by assignee — already scoped to current user)
   const { clientId: filterClient, priority: filterPriority, status: filterStatus, search: filterSearch, dueDateFrom, dueDateTo, creatorId: filterCreator, createdFrom, createdTo, updatedFrom, updatedTo } = useFilterStore()
 
-  // Apply filters
-  const filteredTasks = tasks.filter(t => {
+  // Apply filters — memoized so 500-task array isn't re-scanned on every unrelated state change
+  // (drag, inline edit, panel open, etc.)
+  const filteredTasks = useMemo(() => tasks.filter(t => {
     if (filterClient.length > 0   && !filterClient.includes((t as any).client?.id ?? ''))   return false
     if (filterPriority.length > 0 && !filterPriority.includes(t.priority))                 return false
     if (filterStatus.length > 0   && !filterStatus.includes(t.status))                     return false
@@ -248,9 +249,12 @@ export function MyTasksView({
     if (updatedTo      && (!(t as any).updated_at || (t as any).updated_at.slice(0,10) > updatedTo))   return false
     if (filterCreator.length > 0  && !filterCreator.includes((t as any).creator?.id ?? '')) return false
     return true
-  })
+  }), [tasks, filterClient, filterPriority, filterStatus, filterSearch, dueDateFrom, dueDateTo, createdFrom, createdTo, updatedFrom, updatedTo, filterCreator])
 
-  const displayTasks = showAssignedByMe ? assignedByMeList : filteredTasks
+  const displayTasks = useMemo(
+    () => showAssignedByMe ? assignedByMeList : filteredTasks,
+    [showAssignedByMe, assignedByMeList, filteredTasks]
+  )
 
   // Subtasks load lazily on user click only
 

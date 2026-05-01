@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
   const { data, error } = await q
   if (error) return NextResponse.json(dbError(error, 'tasks'), { status: 500 })
   return NextResponse.json({ data }, {
-    headers: { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' },
+    headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=300' },
   })
 }
 

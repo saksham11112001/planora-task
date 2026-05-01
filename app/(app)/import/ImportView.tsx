@@ -79,10 +79,14 @@ export function ImportView() {
       }
     }, 800)
 
+    const abort = new AbortController()
+    const timeoutId = setTimeout(() => abort.abort(), 58_000)
+
     try {
       const fd = new FormData()
       fd.append('file', file)
-      const res = await fetch('/api/import', { method: 'POST', body: fd })
+      const res = await fetch('/api/import', { method: 'POST', body: fd, signal: abort.signal })
+      clearTimeout(timeoutId)
       let d: any
       try {
         d = await res.json()
@@ -116,8 +120,13 @@ export function ImportView() {
         router.refresh()
       }
     } catch (err: any) {
+      clearTimeout(timeoutId)
       clearInterval(interval)
-      setErrMsg(err?.message ?? 'Network error — please try again')
+      if (err?.name === 'AbortError') {
+        setErrMsg('Import timed out — your file may be too large. Try splitting it into smaller batches (under 200 rows per sheet) and import again.')
+      } else {
+        setErrMsg(err?.message ?? 'Network error — please try again')
+      }
       setState('error')
       setProgress([])
     }
@@ -318,7 +327,7 @@ export function ImportView() {
 
               {/* Footer note */}
               <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 14, marginBottom: 0 }}>
-                ⚡ Large files may take 15–30 seconds. Do not close or refresh this page.
+                ⚡ Large files may take up to 55 seconds. Do not close or refresh this page.
               </p>
             </div>
           )}
