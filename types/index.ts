@@ -44,6 +44,36 @@ export interface Task {
   assignee?: { id: string; name: string } | null
   project?: { id: string; name: string; color: string } | null
   client?: { id: string; name: string; color: string } | null
+  is_billable?: boolean; billable_amount?: number | null
+}
+
+export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'cancelled'
+
+export interface Invoice {
+  id: string; org_id: string; client_id?: string | null
+  invoice_number: string; title: string
+  issue_date: string; due_date?: string | null
+  status: InvoiceStatus; notes?: string | null
+  gstin?: string | null; gst_rate: number; discount_amount: number
+  subtotal: number; gst_amount: number; total: number
+  created_by?: string | null; created_at: string; updated_at: string
+  client?: { id: string; name: string; color: string } | null
+  items?: InvoiceItem[]
+}
+
+export interface InvoiceItem {
+  id: string; invoice_id: string; org_id: string
+  task_id?: string | null; description: string
+  quantity: number; unit_price: number; amount: number
+  created_at: string
+  task?: { id: string; title: string } | null
+}
+
+export const INVOICE_STATUS_CONFIG: Record<InvoiceStatus, { label: string; color: string; bg: string }> = {
+  draft:     { label: 'Draft',     color: '#64748b', bg: '#f8fafc' },
+  sent:      { label: 'Sent',      color: '#0d9488', bg: '#f0fdfa' },
+  paid:      { label: 'Paid',      color: '#16a34a', bg: '#f0fdf4' },
+  cancelled: { label: 'Cancelled', color: '#94a3b8', bg: '#f8fafc' },
 }
 
 export interface TaskComment {

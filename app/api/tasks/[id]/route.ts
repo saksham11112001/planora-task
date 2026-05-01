@@ -164,9 +164,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     'approval_required','approved_by','approved_at',
     'estimated_hours','sort_order','custom_fields',
     'frequency','next_occurrence_date','is_recurring',
+    'is_billable','billable_amount',
   ] : [
     // Members: only status + completed_at (to submit/complete their own tasks)
-    'status','completed_at','custom_fields',
+    // + billable fields so assignees can mark their own tasks billable
+    'status','completed_at','custom_fields','is_billable','billable_amount',
   ]
   const updates: Record<string, unknown> = {}
   for (const k of ALLOWED) { if (k in body) updates[k] = body[k] }

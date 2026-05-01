@@ -435,6 +435,7 @@ button:focus:not(:focus-visible), a:focus:not(:focus-visible) { outline: none; }
     flex-direction: column;
     background: var(--surface-subtle);
     min-height: 0;
+    position: relative;
   }
 
   /* Mobile sidebar backdrop */

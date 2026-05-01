@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
   const { title, description, status = 'todo', priority = 'medium', assignee_id, approver_id,
           client_id, project_id, due_date, estimated_hours, approval_required = false,
           parent_task_id, is_recurring = false, frequency, next_occurrence_date,
-          custom_fields } = body
+          custom_fields, is_billable = false, billable_amount } = body
   if (!title?.trim()) return NextResponse.json({ error: 'Title required' }, { status: 400 })
   if (title.trim().length > 500) return NextResponse.json({ error: 'Title too long (max 500 chars)' }, { status: 400 })
 
@@ -91,6 +91,8 @@ export async function POST(request: NextRequest) {
     frequency: (is_recurring && frequency) ? frequency : null,
     next_occurrence_date: (is_recurring && next_occurrence_date) ? next_occurrence_date : null,
     parent_task_id: parent_task_id || null,
+    is_billable: !!is_billable,
+    billable_amount: (is_billable && billable_amount != null) ? Number(billable_amount) : null,
   }).select('*').single()
 
   if (error) return NextResponse.json(dbError(error, 'tasks'), { status: 500 })

@@ -3,7 +3,7 @@
 import { CustomFieldsPanel } from '@/components/tasks/CustomFieldsPanel'
 import type { CustomFieldDef } from '@/components/tasks/CustomFieldsPanel'
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { X, ThumbsUp, ThumbsDown, Flag, Calendar, User, Briefcase, Send, Clock, Sparkles, ShieldCheck, RefreshCw, FolderPlus, ArrowRightLeft, ExternalLink, Link2, Repeat2 } from 'lucide-react'
+import { X, ThumbsUp, ThumbsDown, Flag, Calendar, User, Briefcase, Send, Clock, Sparkles, ShieldCheck, RefreshCw, FolderPlus, ArrowRightLeft, ExternalLink, Link2, Repeat2, DollarSign } from 'lucide-react'
 import { FREQUENCIES, FREQ_LABEL } from '@/components/tasks/InlineRecurringTask'
 import { cn }             from '@/lib/utils/cn'
 import { PRIORITY_CONFIG, STATUS_CONFIG } from '@/types'
@@ -96,6 +96,8 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
   const [isSaved,   setIsSaved]   = useState(false)
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [converting, setConverting] = useState(false)
+  const [isBillable,     setIsBillable]     = useState(false)
+  const [billableAmount, setBillableAmount] = useState('')
   const [showProjectPicker, setShowProjectPicker] = useState(false)
   const [availableProjects, setAvailableProjects] = useState<{id:string;name:string;color:string}[]>([])
   const [loadingProjects, setLoadingProjects] = useState(false)
@@ -131,6 +133,8 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     setAssigneeId(task.assignee_id ?? '')
     setClientId(task.client_id ?? '')
     setDueDate(task.due_date ?? '')
+    setIsBillable((task as any).is_billable ?? false)
+    setBillableAmount((task as any).billable_amount != null ? String((task as any).billable_amount) : '')
     // Sync recurring fields
     const rawFreq = (task as any).frequency ?? ''
     setRecurFreq(rawFreq)
@@ -1434,6 +1438,50 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                     <span className="text-sm" style={{ color: 'var(--text-primary)' }}>{(task.project as any).name}</span>
                   </FieldRow>
                 )}
+
+                {/* Billable */}
+                <FieldRow label="Billable">
+                  <DollarSign className="h-3.5 w-3.5" style={{ color: isBillable ? '#16a34a' : 'var(--text-muted)', flexShrink: 0 }} />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!canEdit) return
+                      const next = !isBillable
+                      setIsBillable(next)
+                      patch({ is_billable: next, billable_amount: next && billableAmount ? Number(billableAmount) : null })
+                    }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 5,
+                      padding: '3px 10px', borderRadius: 20, cursor: canEdit ? 'pointer' : 'default',
+                      border: isBillable ? '1.5px solid #16a34a' : '1px solid var(--border)',
+                      background: isBillable ? '#f0fdf4' : 'var(--surface-subtle)',
+                      color: isBillable ? '#16a34a' : 'var(--text-secondary)',
+                      fontSize: 12, fontWeight: isBillable ? 600 : 400,
+                    }}
+                  >
+                    {isBillable ? 'Yes — billable' : 'No'}
+                  </button>
+                  {isBillable && (
+                    <input
+                      type="number" min="0" step="0.01"
+                      value={billableAmount}
+                      placeholder="Amount (optional)"
+                      onChange={e => {
+                        if (!canEdit) return
+                        setBillableAmount(e.target.value)
+                      }}
+                      onBlur={() => {
+                        if (!canEdit) return
+                        patch({ is_billable: true, billable_amount: billableAmount ? Number(billableAmount) : null })
+                      }}
+                      style={{
+                        width: 120, fontSize: 12, padding: '3px 8px', borderRadius: 20,
+                        border: '1.5px solid #16a34a', outline: 'none',
+                        background: '#f0fdf4', color: '#16a34a',
+                      }}
+                    />
+                  )}
+                </FieldRow>
 
                 {/* Dependencies: Blocked by */}
                 <FieldRow label="Blocked by">

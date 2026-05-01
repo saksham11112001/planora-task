@@ -1,7 +1,7 @@
 'use client'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, X, User, Flag, Calendar, Shield } from 'lucide-react'
+import { Plus, X, User, Flag, Calendar, Shield, DollarSign } from 'lucide-react'
 import { toast } from '@/store/appStore'
 
 interface Member { id: string; name: string; role?: string }
@@ -34,13 +34,15 @@ export function InlineTaskRow({
   const inputRef = useRef<HTMLInputElement>(null)
   const rowRef   = useRef<HTMLDivElement>(null)
 
-  const [open,     setOpen]     = useState(false)
-  const [saving,   setSaving]   = useState(false)
-  const [title,    setTitle]    = useState('')
-  const [assignee, setAssignee] = useState(currentUserId ?? '')
-  const [priority, setPriority] = useState('medium')
-  const [dueDate,  setDueDate]  = useState('')
-  const [approverId, setApproverId] = useState(projectOwnerId ?? '')
+  const [open,          setOpen]          = useState(false)
+  const [saving,        setSaving]        = useState(false)
+  const [title,         setTitle]         = useState('')
+  const [assignee,      setAssignee]      = useState(currentUserId ?? '')
+  const [priority,      setPriority]      = useState('medium')
+  const [dueDate,       setDueDate]       = useState('')
+  const [approverId,    setApproverId]    = useState(projectOwnerId ?? '')
+  const [isBillable,    setIsBillable]    = useState(false)
+  const [billableAmount, setBillableAmount] = useState('')
 
   const priConf = PRIORITY_OPTIONS.find(p => p.value === priority) ?? PRIORITY_OPTIONS[2]
   const approvers = members.filter(m => m.role && ['owner','admin','manager'].includes(m.role))
@@ -48,6 +50,7 @@ export function InlineTaskRow({
   function reset() {
     setOpen(false); setTitle(''); setAssignee(currentUserId ?? '')
     setPriority('medium'); setDueDate(''); setApproverId(projectOwnerId ?? '')
+    setIsBillable(false); setBillableAmount('')
   }
 
   const handleClickOutside = useCallback((e: MouseEvent) => {
@@ -82,6 +85,8 @@ export function InlineTaskRow({
           project_id:        projectId    || null,
           approver_id:       approverId   || null,
           approval_required: !!approverId,
+          is_billable:       isBillable,
+          billable_amount:   isBillable && billableAmount ? Number(billableAmount) : null,
         }),
       })
       const d = await res.json()
@@ -273,6 +278,36 @@ export function InlineTaskRow({
               {approvers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
           </label>
+        )}
+
+        {/* Billable pill */}
+        <button
+          type="button"
+          onClick={() => setIsBillable(p => !p)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 5,
+            padding: '3px 10px', borderRadius: 20, cursor: 'pointer',
+            border: isBillable ? '1.5px solid #16a34a' : '1px solid var(--border)',
+            background: isBillable ? '#f0fdf4' : 'var(--surface-subtle)',
+            color: isBillable ? '#16a34a' : 'var(--text-secondary)',
+            fontSize: 12, fontWeight: isBillable ? 600 : 400, fontFamily: 'inherit',
+          }}
+        >
+          <DollarSign style={{ width: 11, height: 11 }}/>
+          Billable
+        </button>
+        {isBillable && (
+          <input
+            type="number" min="0" step="0.01"
+            value={billableAmount}
+            onChange={e => setBillableAmount(e.target.value)}
+            placeholder="Amount"
+            style={{
+              width: 90, fontSize: 12, padding: '3px 8px', borderRadius: 20,
+              border: '1.5px solid #16a34a', outline: 'none',
+              background: '#f0fdf4', color: '#16a34a', fontFamily: 'inherit',
+            }}
+          />
         )}
 
         {/* Save button */}

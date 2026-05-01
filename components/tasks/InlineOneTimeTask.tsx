@@ -1,7 +1,7 @@
 'use client'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, X, User, Flag, Calendar, Shield, Briefcase, Paperclip, AlertCircle, ToggleLeft, ToggleRight, ListPlus, Trash2 } from 'lucide-react'
+import { Plus, X, User, Flag, Calendar, Shield, Briefcase, Paperclip, AlertCircle, ToggleLeft, ToggleRight, ListPlus, Trash2, DollarSign } from 'lucide-react'
 import { toast } from '@/store/appStore'
 import { useOrgSettings } from '@/lib/hooks/useOrgSettings'
 import { InlineCustomFields }    from '@/components/tasks/InlineCustomFields'
@@ -59,6 +59,8 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated, 
   const [compSubtasks, setCompSubtasks] = useState<{title:string;required:boolean;due_date?:string;assignee_id?:string}[]>([])
   const [projectsList, setProjectsList] = useState<{id: string; name: string; color: string}[]>([])
   const [moreOpen, setMoreOpen] = useState(false)
+  const [isBillable, setIsBillable] = useState(false)
+  const [billableAmount, setBillableAmount] = useState('')
 
   const approvers = members.filter(m => m.role && ['owner','admin','manager'].includes(m.role))
   const priConf   = PRIORITY_OPTIONS.find(p => p.value === priority) ?? PRIORITY_OPTIONS[2]
@@ -69,7 +71,7 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated, 
     setApproverId(''); setFiles([]); setErrors({})
     setCoAssignees([]); setMakeRecurring(false); setRecurringFreq('weekly'); setAddToProjectId('')
     setRequireAttachment(false); setCompSubtasks([])
-    setShowAddClient(false)
+    setShowAddClient(false); setIsBillable(false); setBillableAmount('')
   }
 
   const handleClickOutside = useCallback((e: MouseEvent) => {
@@ -133,6 +135,8 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated, 
           is_recurring:      makeRecurring || undefined,
           frequency:         makeRecurring ? recurringFreq : undefined,
           project_id:        addToProjectId || undefined,
+          is_billable:       isBillable,
+          billable_amount:   isBillable && billableAmount ? Number(billableAmount) : null,
           custom_fields:     {
             ...(Object.keys(customValues).length > 0 ? customValues : {}),
             ...(coAssignees.length > 0 ? { _co_assignees: coAssignees } : {}),
@@ -396,6 +400,28 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated, 
 
         {moreOpen && (
           <>
+            {/* Billable */}
+            <button type="button" onClick={() => setIsBillable(p => !p)}
+              style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px', borderRadius:20,
+                border: isBillable ? '1.5px solid #16a34a' : '1px solid var(--border)',
+                background: isBillable ? '#f0fdf4' : 'var(--surface-subtle)',
+                color: isBillable ? '#16a34a' : 'var(--text-secondary)',
+                fontSize:12, cursor:'pointer', fontFamily:'inherit', fontWeight: isBillable ? 700 : 400 }}>
+              <DollarSign style={{ width:13, height:13 }}/>
+              {isBillable ? 'Billable ✓' : 'Mark billable'}
+            </button>
+            {isBillable && (
+              <label style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px', borderRadius:20,
+                border:'1.5px solid #16a34a', background:'#f0fdf4', cursor:'pointer' }}>
+                <span style={{ fontSize:11, color:'#16a34a', fontWeight:600 }}>₹</span>
+                <input type="number" min="0" step="0.01" value={billableAmount}
+                  onChange={e => setBillableAmount(e.target.value)}
+                  placeholder="Amount (optional)"
+                  style={{ fontSize:12, border:'none', outline:'none', background:'transparent',
+                    color:'#16a34a', fontFamily:'inherit', width:130, fontWeight:500 }}/>
+              </label>
+            )}
+
             {/* Require attachment */}
             <button type="button" onClick={() => setRequireAttachment(p => !p)}
               style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px', borderRadius:20,

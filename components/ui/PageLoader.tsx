@@ -20,13 +20,13 @@ export function PageLoader() {
         aria-label="Loading…"
         role="status"
         style={{
-          position: 'fixed',
+          position: 'absolute',
           inset: 0,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          background: 'var(--bg, #ffffff)',
-          zIndex: 9999,
+          background: 'var(--surface-subtle, var(--bg, #ffffff))',
+          zIndex: 10,
           /* Invisible for the first 250 ms — only shows on genuinely slow loads */
           animation: 'pldr-fadein 0.2s ease 0.25s both',
         }}
