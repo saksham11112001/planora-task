@@ -6,7 +6,7 @@ import { COMPLIANCE_TASKS }   from '@/lib/data/complianceTasks'
 import { CA_DEFAULT_TASKS }   from '@/lib/data/caDefaultTasks'
 import { effectivePlan, canUseFeature } from '@/lib/utils/planGate'
 
-export const maxDuration = 59 // seconds — bulk import can process hundreds of rows
+export const maxDuration = 60 // seconds — Vercel Hobby plan cap
 export const dynamic = 'force-dynamic'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXT_PUBLIC_PLANORA_URL ?? 'https://planora.in'
@@ -284,7 +284,7 @@ export async function POST(request: NextRequest) {
       .eq('id', mb.org_id)
       .single()
     const plan = effectivePlan(orgData ?? { plan_tier: 'free', status: 'active' })
-    if (!canUseFeature(plan, 'import_export')) {
+    if (!canUseFeature(plan, 'exports')) {
       return NextResponse.json(
         { error: 'Bulk import is available on the Pro plan and above. Upgrade to use this feature.' },
         { status: 402 }

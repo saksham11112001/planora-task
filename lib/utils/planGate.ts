@@ -36,6 +36,9 @@ export function effectivePlan(org: {
   // Subscription cancelled / past due → free
   if (status === 'cancelled' || status === 'past_due') return 'free'
 
+  // New-user trial: active status but trial_ends_at is still in the future
+  if (org.trial_ends_at && new Date() <= new Date(org.trial_ends_at)) return 'pro'
+
   return PLAN_LIMITS[plan] ? plan : 'free'
 }
 
