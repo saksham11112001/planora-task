@@ -14,11 +14,16 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     .select('org_id').eq('user_id', user.id).eq('is_active', true).single()
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
 
-  const { data, error } = await supabase.from('invoices')
+  // Use admin client so invoice_items join works regardless of RLS/grant state
+  const admin = createAdminClient()
+  const { data, error } = await admin.from('invoices')
     .select('*, client:clients(id, name, color), items:invoice_items(*, task:tasks(id, title))')
     .eq('id', id).eq('org_id', mb.org_id).single()
 
-  if (error || !data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (error || !data) {
+    console.error('[invoices/GET id]', error?.message)
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
   return NextResponse.json({ data })
 }
 

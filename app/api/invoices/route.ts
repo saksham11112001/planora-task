@@ -14,7 +14,8 @@ export async function GET(req: NextRequest) {
   if (!mb) return NextResponse.json({ data: [] })
 
   const sp = req.nextUrl.searchParams
-  let q = supabase.from('invoices')
+  const admin = createAdminClient()
+  let q = admin.from('invoices')
     .select('*, client:clients(id, name, color)')
     .eq('org_id', mb.org_id)
     .order('created_at', { ascending: false })
@@ -86,11 +87,7 @@ export async function POST(req: NextRequest) {
 
     if (error) {
       console.error('[invoices/POST] insert error:', JSON.stringify({ message: error.message, details: error.details, hint: error.hint, code: error.code }))
-      // Temporarily return raw error for debugging
-      return NextResponse.json({
-        error: `[${error.code}] ${error.message}${error.details ? ' | ' + error.details : ''}${error.hint ? ' | hint: ' + error.hint : ''}`,
-        _raw: { message: error.message, details: error.details, hint: error.hint, code: error.code }
-      }, { status: 500 })
+      return NextResponse.json(dbError(error, 'invoices/POST'), { status: 500 })
     }
 
     // Insert line items if provided
@@ -114,8 +111,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ data: invoice }, { status: 201 })
   } catch (err: any) {
-    const msg = err?.message ?? String(err)
-    console.error('[invoices/POST] unexpected error:', msg)
-    return NextResponse.json({ error: `[EXCEPTION] ${msg}` }, { status: 500 })
+    console.error('[invoices/POST] unexpected error:', err?.message ?? err)
+    return NextResponse.json(dbError(err, 'invoices/POST'), { status: 500 })
   }
 }

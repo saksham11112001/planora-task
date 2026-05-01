@@ -1,3 +1,4 @@
+import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient }       from '@/lib/supabase/server'
 import { getSessionUser, getOrgMembership } from '@/lib/supabase/cached'
 import { redirect }           from 'next/navigation'
@@ -15,9 +16,10 @@ export default async function InvoicesPage() {
   if (!mb) redirect('/onboarding')
 
   const supabase = await createClient()
+  const admin = createAdminClient()
 
   const [{ data: invoices }, { data: clients }] = await Promise.all([
-    supabase.from('invoices')
+    admin.from('invoices')
       .select('*, client:clients(id, name, color)')
       .eq('org_id', mb.org_id)
       .order('created_at', { ascending: false })

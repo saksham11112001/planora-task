@@ -14,7 +14,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     .select('org_id').eq('user_id', user.id).eq('is_active', true).single()
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
 
-  const { data, error } = await supabase.from('invoice_items')
+  const admin = createAdminClient()
+  const { data, error } = await admin.from('invoice_items')
     .select('*, task:tasks(id, title)')
     .eq('invoice_id', id).eq('org_id', mb.org_id)
     .order('created_at', { ascending: true })
