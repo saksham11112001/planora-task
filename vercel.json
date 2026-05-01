@@ -3,10 +3,10 @@
   "fluid": false,
   "functions": {
     "app/api/import/route.ts": {
-      "maxDuration": 59
+      "maxDuration": 50
     },
     "app/api/inngest/route.ts": {
-      "maxDuration": 59
+      "maxDuration": 50
     }
   }
 }
