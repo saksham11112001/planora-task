@@ -1,16 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
-import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse }  from 'next/server'
 import type { NextRequest } from 'next/server'
 import { dbError } from '@/lib/api-error'
-
-function adminClient() {
-  return createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
-}
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -44,7 +36,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!['owner', 'admin', 'manager'].includes(mb.role))
     return NextResponse.json({ error: 'Only managers can add invoice items' }, { status: 403 })
 
-  const admin = adminClient()
+  const admin = createAdminClient()
 
   // Verify invoice belongs to org
   const { data: invoice } = await admin.from('invoices')
@@ -93,7 +85,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const { item_id } = body
   if (!item_id) return NextResponse.json({ error: 'item_id required' }, { status: 400 })
 
-  const admin = adminClient()
+  const admin = createAdminClient()
   const { error } = await admin.from('invoice_items')
     .delete().eq('id', item_id).eq('invoice_id', id).eq('org_id', mb.org_id)
   if (error) return NextResponse.json(dbError(error, 'invoice_items delete'), { status: 500 })

@@ -39,8 +39,11 @@ export function friendlyError(err: AnyError, context = 'api'): string {
   if (msg.includes('pgrst116') || msg.includes('json object requested') || msg.includes('coerce the result'))
     return 'Something went wrong while loading data. Please refresh and try again.'
 
-  if (msg.includes('relation') && msg.includes('does not exist'))
-    return 'An unexpected database error occurred. Please contact support.'
+  if ((msg.includes('relation') || msg.includes('table') || msg.includes('schema')) && msg.includes('does not exist'))
+    return 'A required database table is missing. Please contact support to run the latest migration.'
+
+  if (msg.includes('schema cache') || msg.includes('could not find'))
+    return 'A required database table is missing. Please contact support to run the latest migration.'
 
   if (msg.includes('connection') || msg.includes('timeout') || msg.includes('econnrefused'))
     return 'A connection error occurred. Please check your internet connection and try again.'

@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse }  from 'next/server'
 import type { NextRequest } from 'next/server'
 import { dbError } from '@/lib/api-error'
@@ -31,7 +32,6 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js')
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
@@ -49,11 +49,7 @@ export async function POST(req: NextRequest) {
     if (!title?.trim()) return NextResponse.json({ error: 'Title required' }, { status: 400 })
 
     // Use admin client to bypass RLS — role check already done above
-    const admin = createSupabaseClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { autoRefreshToken: false, persistSession: false } }
-    )
+    const admin = createAdminClient()
 
     // Auto-generate invoice number: INV-{year}-{4-digit sequence}
     const { count } = await admin.from('invoices')
@@ -89,8 +85,8 @@ export async function POST(req: NextRequest) {
     }).select('*').single()
 
     if (error) {
-      console.error('[invoices/POST] insert error:', error.message, error.details, error.hint)
-      return NextResponse.json(dbError(error, 'invoices/POST'), { status: 500 })
+      console.error('[invoices/POST] insert error:', JSON.stringify({ message: error.message, details: error.details, hint: error.hint, code: error.code }))
+      return NextResponse.json({ ...dbError(error, 'invoices/POST'), _code: error.code }, { status: 500 })
     }
 
     // Insert line items if provided

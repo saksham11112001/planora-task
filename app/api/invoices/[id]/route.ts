@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse }  from 'next/server'
 import type { NextRequest } from 'next/server'
 import { dbError } from '@/lib/api-error'
@@ -23,7 +24,6 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const { createClient: createSupabaseClient } = await import('@supabase/supabase-js')
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
@@ -43,15 +43,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!Object.keys(updates).length)
     return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
 
-  const admin = createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
+  const admin = createAdminClient()
   const { data, error } = await admin.from('invoices')
     .update(updates).eq('id', id).eq('org_id', mb.org_id).select('*').maybeSingle()
   if (error) {
-    console.error('[invoices/[id] PATCH]', error.message)
+    console.error('[invoices/[id] PATCH]', JSON.stringify({ message: error.message, code: error.code }))
     return NextResponse.json(dbError(error, 'invoices/[id]'), { status: 500 })
   }
   return NextResponse.json({ data: data ?? { id } })
@@ -59,7 +55,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const { createClient: createSupabaseClient } = await import('@supabase/supabase-js')
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
@@ -71,15 +66,11 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   if (!['owner', 'admin'].includes(mb.role))
     return NextResponse.json({ error: 'Only owners/admins can delete invoices' }, { status: 403 })
 
-  const admin = createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
+  const admin = createAdminClient()
   const { error } = await admin.from('invoices')
     .delete().eq('id', id).eq('org_id', mb.org_id)
   if (error) {
-    console.error('[invoices/[id] DELETE]', error.message)
+    console.error('[invoices/[id] DELETE]', JSON.stringify({ message: error.message, code: error.code }))
     return NextResponse.json(dbError(error, 'invoices/[id] delete'), { status: 500 })
   }
   return NextResponse.json({ success: true })
