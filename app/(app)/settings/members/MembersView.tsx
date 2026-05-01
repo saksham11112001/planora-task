@@ -1,21 +1,25 @@
 'use client'
 import { useState, useTransition } from 'react'
 import { useRouter }  from 'next/navigation'
-import { UserPlus, X } from 'lucide-react'
+import { UserPlus, X, Copy, Check, RefreshCw, Share2, Gift } from 'lucide-react'
 import { Avatar, RoleBadge } from '@/components/ui/Badge'
 import { toast }      from '@/store/appStore'
 
 interface Member { id: string; role: string; joined_at: string; user_id: string; can_view_all_tasks: boolean; can_view_monitor: boolean; users: { id: string; name: string; email: string; avatar_url: string | null } | null }
-interface Props { members: Member[]; currentUserId: string; isAdmin: boolean }
+interface Props { members: Member[]; currentUserId: string; isAdmin: boolean; joinCode?: string | null; referralCode?: string | null; referralExtensionDays?: number }
 
 const ROLES = ['admin','manager','member','viewer']
 
-export function MembersView({ members, currentUserId, isAdmin }: Props) {
+export function MembersView({ members, currentUserId, isAdmin, joinCode: initialJoinCode, referralCode, referralExtensionDays = 0 }: Props) {
   const router = useRouter()
   const [isPending, startT] = useTransition()
   const [email,   setEmail]   = useState('')
   const [role,    setRole]    = useState('member')
   const [sending, setSending] = useState(false)
+  const [joinCode, setJoinCode] = useState(initialJoinCode ?? null)
+  const [copiedJoin, setCopiedJoin]       = useState(false)
+  const [copiedReferral, setCopiedReferral] = useState(false)
+  const [rotating, setRotating] = useState(false)
 
   async function invite(e: React.FormEvent) {
     e.preventDefault()
@@ -60,13 +64,38 @@ export function MembersView({ members, currentUserId, isAdmin }: Props) {
 
   async function removeMember(memberId: string) {
     if (!confirm('Remove this member?')) return
-    // Soft remove via PATCH is_active = false
     const res = await fetch(`/api/team`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ member_id: memberId, is_active: false }),
     })
     if (res.ok) { toast.success('Member removed'); startT(() => router.refresh()) }
     else toast.error('Failed to remove member')
+  }
+
+  function fmtCode(code: string | null) {
+    if (!code) return ''
+    const c = code.replace(/-/g, '')
+    return c.length === 8 ? `${c.slice(0,4)}-${c.slice(4)}` : code
+  }
+
+  function copyJoinCode() {
+    if (!joinCode) return
+    navigator.clipboard.writeText(joinCode).then(() => { setCopiedJoin(true); setTimeout(() => setCopiedJoin(false), 2000) })
+  }
+
+  function copyReferralCode() {
+    if (!referralCode) return
+    navigator.clipboard.writeText(referralCode).then(() => { setCopiedReferral(true); setTimeout(() => setCopiedReferral(false), 2000) })
+  }
+
+  async function rotateJoinCode() {
+    if (!confirm('Rotate the join code? The old code will stop working immediately.')) return
+    setRotating(true)
+    const res = await fetch('/api/org/rotate-join-code', { method: 'POST' })
+    const data = await res.json()
+    setRotating(false)
+    if (res.ok) { setJoinCode(data.join_code); toast.success('Join code rotated') }
+    else toast.error(data.error ?? 'Failed to rotate code')
   }
 
   return (
@@ -89,6 +118,69 @@ export function MembersView({ members, currentUserId, isAdmin }: Props) {
           </div>
         </form>
       )}
+
+      {/* Join code + Referral code */}
+      <div className="card p-5 mb-6 space-y-5">
+        <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+          <Share2 className="h-4 w-4 text-teal-600"/> Organisation codes
+        </h2>
+
+        {/* Join code */}
+        <div>
+          <p className="text-xs font-medium text-gray-700 mb-1.5 flex items-center gap-1.5">
+            Join code
+            <span className="font-normal text-gray-400">— share this with anyone you want to invite</span>
+          </p>
+          <div className="flex items-center gap-2">
+            <div className="flex-1 font-mono text-sm tracking-widest bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-800 select-all">
+              {joinCode ? fmtCode(joinCode) : <span className="text-gray-400 tracking-normal">No code generated</span>}
+            </div>
+            <button onClick={copyJoinCode} disabled={!joinCode}
+              title={copiedJoin ? 'Copied!' : 'Copy join code'}
+              className="btn btn-outline px-3 py-2 flex items-center gap-1.5 text-xs">
+              {copiedJoin ? <Check className="h-3.5 w-3.5 text-teal-600"/> : <Copy className="h-3.5 w-3.5"/>}
+              {copiedJoin ? 'Copied' : 'Copy'}
+            </button>
+            {isAdmin && (
+              <button onClick={rotateJoinCode} disabled={rotating}
+                title="Generate a new join code (invalidates the current one)"
+                className="btn btn-outline px-3 py-2 flex items-center gap-1.5 text-xs text-gray-500">
+                <RefreshCw className={`h-3.5 w-3.5 ${rotating ? 'animate-spin' : ''}`}/>
+                Rotate
+              </button>
+            )}
+          </div>
+          <p className="mt-1.5 text-xs text-gray-400">
+            Members who join via this code get the &ldquo;member&rdquo; role. You can change their role afterwards.
+          </p>
+        </div>
+
+        {/* Referral code */}
+        {referralCode && (
+          <div>
+            <p className="text-xs font-medium text-gray-700 mb-1.5 flex items-center gap-1.5">
+              <Gift className="h-3.5 w-3.5 text-violet-500"/> Referral code
+              <span className="font-normal text-gray-400">— when a new org uses this at signup, your trial extends by 7 days</span>
+            </p>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 font-mono text-sm tracking-widest bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-800 select-all">
+                {fmtCode(referralCode)}
+              </div>
+              <button onClick={copyReferralCode}
+                title={copiedReferral ? 'Copied!' : 'Copy referral code'}
+                className="btn btn-outline px-3 py-2 flex items-center gap-1.5 text-xs">
+                {copiedReferral ? <Check className="h-3.5 w-3.5 text-teal-600"/> : <Copy className="h-3.5 w-3.5"/>}
+                {copiedReferral ? 'Copied' : 'Copy'}
+              </button>
+            </div>
+            {referralExtensionDays > 0 && (
+              <p className="mt-1.5 text-xs text-violet-600 font-medium">
+                +{referralExtensionDays} day{referralExtensionDays !== 1 ? 's' : ''} earned from referrals so far
+              </p>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Members list */}
       <div className="card-elevated overflow-hidden">

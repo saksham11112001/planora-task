@@ -20,11 +20,24 @@ export default async function MembersPage() {
     .select('id, role, joined_at, user_id, can_view_all_tasks, can_view_monitor, users(id, name, email, avatar_url)')
     .eq('org_id', mb.org_id).eq('is_active', true).order('joined_at')
 
+  const { data: org } = await supabase
+    .from('organisations')
+    .select('join_code, referral_code, trial_extension_days')
+    .eq('id', mb.org_id)
+    .single()
+
   const isAdmin = ['owner','admin'].includes(mb.role)
   return (
     <div className="page-container">
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Team members</h1>
-      <MembersView members={(members ?? []).map(m => ({ ...m, users: m.users as any }))} currentUserId={user.id} isAdmin={isAdmin}/>
+      <MembersView
+        members={(members ?? []).map(m => ({ ...m, users: m.users as any }))}
+        currentUserId={user.id}
+        isAdmin={isAdmin}
+        joinCode={org?.join_code ?? null}
+        referralCode={org?.referral_code ?? null}
+        referralExtensionDays={org?.trial_extension_days ?? 0}
+      />
     </div>
   )
 }

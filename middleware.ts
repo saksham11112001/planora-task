@@ -5,15 +5,19 @@ import { checkRateLimit, buildRateLimitResponse } from '@/lib/utils/rateLimit'
 // ── Rate-limit config ────────────────────────────────────────────────────────
 const RATE_LIMITS = {
   // General API: 120 requests per minute per IP
-  api:     { max: 120,  windowMs: 60_000 },
+  api:      { max: 120, windowMs: 60_000 },
   // Auth endpoints: 10 attempts per 5 minutes per IP (brute-force protection)
-  auth:    { max: 10,   windowMs: 300_000 },
+  auth:     { max: 10,  windowMs: 300_000 },
   // Upload endpoints: 20 uploads per minute per IP
-  upload:  { max: 20,   windowMs: 60_000 },
+  upload:   { max: 20,  windowMs: 60_000 },
   // Import endpoint: 5 per 5 minutes per IP (heavy workload)
-  import:  { max: 5,    windowMs: 300_000 },
+  import:   { max: 5,   windowMs: 300_000 },
   // Report issue: 10 per hour per IP (prevent spam)
-  report:  { max: 10,   windowMs: 3_600_000 },
+  report:   { max: 10,  windowMs: 3_600_000 },
+  // Referral code apply: 5 per 5 minutes per IP (prevent enumeration)
+  referral: { max: 5,   windowMs: 300_000 },
+  // Join org via code: 10 per 5 minutes per IP
+  join:     { max: 10,  windowMs: 300_000 },
 } as const
 
 function getClientIp(req: NextRequest): string {
@@ -33,10 +37,12 @@ export async function middleware(request: NextRequest) {
 
     // Pick the right bucket for this endpoint
     let bucket: keyof typeof RATE_LIMITS = 'api'
-    if (pathname.startsWith('/api/auth/'))          bucket = 'auth'
-    else if (pathname.includes('/upload'))           bucket = 'upload'
-    else if (pathname.startsWith('/api/import'))     bucket = 'import'
-    else if (pathname.startsWith('/api/report-issue')) bucket = 'report'
+    if (pathname.startsWith('/api/auth/'))                   bucket = 'auth'
+    else if (pathname.includes('/upload'))                   bucket = 'upload'
+    else if (pathname.startsWith('/api/import'))             bucket = 'import'
+    else if (pathname.startsWith('/api/report-issue'))       bucket = 'report'
+    else if (pathname.startsWith('/api/referral/'))          bucket = 'referral'
+    else if (pathname.startsWith('/api/org/join'))           bucket = 'join'
 
     const cfg    = RATE_LIMITS[bucket]
     const result = checkRateLimit(ip, bucket, cfg.max, cfg.windowMs)

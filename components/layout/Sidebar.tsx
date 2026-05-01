@@ -7,7 +7,7 @@ import {
   Home, ListTodo, Users2, FolderOpen,
   RefreshCw, Users, BarChart2, Settings, Plus,
   ChevronDown, ChevronRight, Clock, Zap, X, Upload,
-  Calendar, Shield, LogOut, FileCheck, ArrowRight, ClipboardList, Eye, Receipt,
+  Calendar, Shield, LogOut, FileCheck, ArrowRight, ClipboardList, Eye, Receipt, Copy, Check,
 } from 'lucide-react'
 import { cn }            from '@/lib/utils/cn'
 import { createClient }  from '@/lib/supabase/client'
@@ -302,31 +302,7 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
       </nav>
 
       {/* ── Trial banner ── */}
-      {(() => {
-        const trialEnd   = session?.org.trial_ends_at
-        const isTrialing = session?.org.status === 'trialing' && trialEnd
-        if (!isTrialing) return null
-        const daysLeft = Math.max(0, Math.ceil((new Date(trialEnd!).getTime() - Date.now()) / 86_400_000))
-        const urgent = daysLeft <= 3
-        return (
-          <Link href="/settings/billing" style={{
-            display: 'block', margin: '0 8px 6px', padding: '10px 12px', borderRadius: 10,
-            background: urgent
-              ? 'linear-gradient(135deg,rgba(239,68,68,0.2),rgba(239,68,68,0.1))'
-              : 'linear-gradient(135deg,rgba(13,148,136,0.25),rgba(124,58,237,0.2))',
-            border: `1px solid ${urgent ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.1)'}`,
-            textDecoration: 'none',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-              <div style={{ width: 6, height: 6, borderRadius: '50%', background: urgent ? '#f87171' : '#14b8a6' }}/>
-              <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>
-                {daysLeft === 0 ? 'Trial ends today!' : `${daysLeft} day${daysLeft !== 1 ? 's' : ''} left`}
-              </span>
-            </div>
-            <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', lineHeight: 1.4 }}>Upgrade to keep all features →</p>
-          </Link>
-        )
-      })()}
+      <TrialBanner/>
 
       {/* ── Bottom fixed section — single line ── */}
       <div style={{ padding: '8px', borderTop: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
@@ -493,6 +469,92 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
       </div>
     )}
     </>
+  )
+}
+
+function TrialBanner() {
+  const { session } = useAppStore()
+  const [copied, setCopied] = useState(false)
+
+  const trialEnd     = session?.org.trial_ends_at
+  const trialStart   = session?.org.trial_started_at
+  const extDays      = session?.org.trial_extension_days ?? 0
+  const referralCode = session?.org.referral_code
+  const isTrialing   = session?.org.status === 'trialing' && trialEnd
+
+  if (!isTrialing) return null
+
+  const totalDays = 14 + extDays
+  const startMs   = trialStart
+    ? new Date(trialStart).getTime()
+    : new Date(trialEnd!).getTime() - totalDays * 86_400_000
+  const dayUsed   = Math.min(totalDays, Math.max(1, Math.ceil((Date.now() - startMs) / 86_400_000)))
+  const daysLeft  = Math.max(0, Math.ceil((new Date(trialEnd!).getTime() - Date.now()) / 86_400_000))
+  const progress  = Math.min(1, dayUsed / totalDays)
+  const urgent    = daysLeft <= 3
+
+  function copyCode() {
+    if (!referralCode) return
+    navigator.clipboard.writeText(referralCode).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
+  return (
+    <div style={{ margin: '0 8px 6px', borderRadius: 10,
+      background: urgent
+        ? 'linear-gradient(135deg,rgba(239,68,68,0.2),rgba(239,68,68,0.1))'
+        : 'linear-gradient(135deg,rgba(13,148,136,0.25),rgba(124,58,237,0.2))',
+      border: `1px solid ${urgent ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.1)'}`,
+      overflow: 'hidden',
+    }}>
+      {/* Top: day progress */}
+      <Link href="/settings/billing" style={{ display: 'block', padding: '10px 12px 8px', textDecoration: 'none' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ width: 6, height: 6, borderRadius: '50%', background: urgent ? '#f87171' : '#14b8a6' }}/>
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>
+              {daysLeft === 0 ? 'Trial ends today!' : `Day ${dayUsed} / ${totalDays}`}
+            </span>
+          </div>
+          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
+            {daysLeft > 0 ? `${daysLeft}d left` : 'Expired'}
+          </span>
+        </div>
+        {/* Progress bar */}
+        <div style={{ height: 3, borderRadius: 99, background: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
+          <div style={{
+            height: '100%', borderRadius: 99,
+            width: `${Math.round(progress * 100)}%`,
+            background: urgent ? '#f87171' : '#14b8a6',
+            transition: 'width 0.4s ease',
+          }}/>
+        </div>
+        <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 5, lineHeight: 1.4 }}>
+          Upgrade to keep all features →
+        </p>
+      </Link>
+
+      {/* Bottom: referral code copy row */}
+      {referralCode && (
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', padding: '7px 12px',
+          display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', flexShrink: 0 }}>Referral:</span>
+          <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.7)',
+            letterSpacing: '0.08em', flex: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+            {referralCode.slice(0,4)}-{referralCode.slice(4)}
+          </span>
+          <button onClick={copyCode}
+            title={copied ? 'Copied!' : 'Copy referral code'}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 3, display: 'flex',
+              alignItems: 'center', color: copied ? '#14b8a6' : 'rgba(255,255,255,0.35)',
+              transition: 'color 0.15s', flexShrink: 0 }}>
+            {copied ? <Check style={{ width: 12, height: 12 }}/> : <Copy style={{ width: 12, height: 12 }}/>}
+          </button>
+        </div>
+      )}
+    </div>
   )
 }
 

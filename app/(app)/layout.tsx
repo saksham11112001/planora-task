@@ -96,13 +96,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           tour_completed_at:  (profile as any)?.tour_completed_at ?? null,
         }}
         org={{
-          id:            org.id ?? '',
-          name:          org.name ?? '',
-          slug:          org.slug ?? '',
-          plan_tier:     org.plan_tier ?? 'free',
-          logo_color:    org.logo_color ?? '#0d9488',
-          status:        org.status ?? null,
-          trial_ends_at: org.trial_ends_at ?? null,
+          id:                   org.id ?? '',
+          name:                 org.name ?? '',
+          slug:                 org.slug ?? '',
+          plan_tier:            org.plan_tier ?? 'free',
+          logo_color:           org.logo_color ?? '#0d9488',
+          status:               org.status ?? null,
+          trial_ends_at:        org.trial_ends_at ?? null,
+          trial_started_at:     org.trial_started_at ?? null,
+          trial_extension_days: org.trial_extension_days ?? 0,
+          referral_code:        org.referral_code ?? null,
+          join_code:            org.join_code ?? null,
         }}
         role={membership.role ?? 'member'}
         workspaceId={null}

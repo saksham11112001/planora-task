@@ -1,13 +1,13 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Zap, Building2, Users, Phone, ChevronRight, CheckCircle, UserCircle2 } from 'lucide-react'
+import { Zap, Building2, Users, Phone, ChevronRight, CheckCircle, UserCircle2, KeyRound, PlusCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 const INDUSTRIES = ['Technology','Finance','Healthcare','Education','E-commerce','Marketing','Consulting','Real Estate','Manufacturing','Legal','Non-profit','Other']
 const TEAM_SIZES = ['Just me','2–5','6–15','16–50','51–200','200+']
 
-type Phase = 'checking' | 'form' | 'joining' | 'joined'
+type Phase = 'checking' | 'entry' | 'join-code' | 'form' | 'joining' | 'joined'
 
 interface InviteData { orgId: string; role: string }
 
@@ -15,19 +15,21 @@ export default function OnboardingPage() {
   const router = useRouter()
 
   const [phase,      setPhase]      = useState<Phase>('checking')
-  const [step,       setStep]       = useState(0)   // 0 = profile, 1 = org, 2 = team, 3 = phone
+  const [step,       setStep]       = useState(0)   // 0 = profile, 1 = org, 2 = team, 3 = summary
   const [saving,     setSaving]     = useState(false)
   const [error,      setError]      = useState('')
   const [inviteData, setInviteData] = useState<InviteData | null>(null)
   const [joinedOrg,  setJoinedOrg]  = useState('')
+  const [joinCode,   setJoinCode]   = useState('')
 
   const [form, setForm] = useState({
-    name:      '',
-    email:     '',
-    phone:     '',
-    org_name:  '',
-    industry:  '',
-    team_size: '',
+    name:          '',
+    email:         '',
+    phone:         '',
+    org_name:      '',
+    industry:      '',
+    team_size:     '',
+    referral_code: '',
   })
 
   function set(k: string, v: string) { setForm(f => ({ ...f, [k]: v })) }
@@ -62,7 +64,12 @@ export default function OnboardingPage() {
         setInviteData({ orgId: invitedOrgId, role: invitedRole })
       }
 
-      setPhase('form')
+      // No invite — show entry choice (create org or join via code)
+      if (!invitedOrgId) {
+        setPhase('entry')
+      } else {
+        setPhase('form')
+      }
     }
     init()
   }, [])
@@ -103,6 +110,23 @@ export default function OnboardingPage() {
     }
   }
 
+  // ── Join via code submit ─────────────────────────────────────────────────
+  async function handleJoinCode() {
+    if (!joinCode.trim()) { setError('Please enter a join code'); return }
+    setSaving(true); setError('')
+    try {
+      const res = await fetch('/api/org/join', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: joinCode.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setError(data.error ?? 'Invalid join code'); return }
+      setJoinedOrg(data.org_name ?? '')
+      setPhase('joined')
+      setTimeout(() => { router.push('/dashboard'); router.refresh() }, 1800)
+    } catch { setError('Network error — please try again') } finally { setSaving(false) }
+  }
+
   // ── Final submit (fresh signup, after step 3) ────────────────────────────
   async function handleSubmit() {
     if (!form.org_name.trim()) { setError('Organisation name is required'); return }
@@ -111,11 +135,12 @@ export default function OnboardingPage() {
       const res = await fetch('/api/onboarding', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name:      form.name.trim(),
-          org_name:  form.org_name,
-          industry:  form.industry,
-          team_size: form.team_size,
-          phone:     form.phone || null,
+          name:          form.name.trim(),
+          org_name:      form.org_name,
+          industry:      form.industry,
+          team_size:     form.team_size,
+          phone:         form.phone || null,
+          referral_code: form.referral_code.trim() || null,
         }),
       })
       const data = await res.json()
@@ -168,6 +193,103 @@ export default function OnboardingPage() {
             You&apos;ve joined <strong>{joinedOrg}</strong>.<br/>Taking you to your dashboard…
           </p>
           <Dots color="#0d9488" style={{ marginTop: 20 }}/>
+        </div>
+      </div>
+    )
+  }
+
+  /* ── Entry: create org or join via code ─────────────────────────── */
+  if (phase === 'entry') {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4"
+        style={{ background: 'linear-gradient(135deg,#134e4a 0%,#0f766e 50%,#0d9488 100%)' }}>
+        <div className="w-full max-w-md">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center gap-2.5 mb-3">
+              <div className="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center">
+                <Zap className="h-6 w-6 text-white"/>
+              </div>
+              <span className="text-2xl font-bold text-white">Taska</span>
+            </div>
+            <p className="text-teal-200 text-sm">Welcome! How would you like to get started?</p>
+          </div>
+          <div className="bg-white rounded-2xl p-8 shadow-2xl space-y-4">
+            <button onClick={() => setPhase('form')}
+              className="w-full flex items-center gap-4 p-5 rounded-xl border-2 border-teal-500 bg-teal-50 hover:bg-teal-100 transition-colors text-left group">
+              <div className="h-11 w-11 rounded-xl bg-teal-100 flex items-center justify-center flex-shrink-0 group-hover:bg-teal-200 transition-colors">
+                <PlusCircle className="h-6 w-6 text-teal-600"/>
+              </div>
+              <div>
+                <p className="font-bold text-gray-900 text-sm">Create a new organisation</p>
+                <p className="text-xs text-gray-500 mt-0.5">Set up your workspace from scratch with a 14-day free trial</p>
+              </div>
+              <ChevronRight className="h-5 w-5 text-teal-500 ml-auto flex-shrink-0"/>
+            </button>
+            <button onClick={() => { setError(''); setPhase('join-code') }}
+              className="w-full flex items-center gap-4 p-5 rounded-xl border-2 border-gray-200 hover:border-teal-300 hover:bg-gray-50 transition-colors text-left group">
+              <div className="h-11 w-11 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0 group-hover:bg-teal-50 transition-colors">
+                <KeyRound className="h-6 w-6 text-gray-500 group-hover:text-teal-600 transition-colors"/>
+              </div>
+              <div>
+                <p className="font-bold text-gray-900 text-sm">Join an existing organisation</p>
+                <p className="text-xs text-gray-500 mt-0.5">Enter the join code shared by your team admin</p>
+              </div>
+              <ChevronRight className="h-5 w-5 text-gray-400 ml-auto flex-shrink-0 group-hover:text-teal-500 transition-colors"/>
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  /* ── Join via code ───────────────────────────────────────────────── */
+  if (phase === 'join-code') {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4"
+        style={{ background: 'linear-gradient(135deg,#134e4a 0%,#0f766e 50%,#0d9488 100%)' }}>
+        <div className="w-full max-w-md">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center gap-2.5 mb-3">
+              <div className="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center">
+                <Zap className="h-6 w-6 text-white"/>
+              </div>
+              <span className="text-2xl font-bold text-white">Taska</span>
+            </div>
+          </div>
+          <div className="bg-white rounded-2xl p-8 shadow-2xl">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="h-10 w-10 rounded-xl bg-teal-50 flex items-center justify-center">
+                <KeyRound className="h-5 w-5 text-teal-600"/>
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Join organisation</h2>
+                <p className="text-sm text-gray-500">Enter the 8-character join code</p>
+              </div>
+            </div>
+            {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>}
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Join code</label>
+                <input
+                  value={joinCode}
+                  onChange={e => setJoinCode(e.target.value.toUpperCase())}
+                  className="input font-mono tracking-widest text-center text-lg"
+                  placeholder="XXXX-XXXX"
+                  maxLength={9}
+                  autoFocus
+                  onKeyDown={e => e.key === 'Enter' && handleJoinCode()}
+                />
+                <p className="mt-1.5 text-xs text-gray-400">Ask your team admin for the join code from Settings → Members.</p>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button onClick={() => { setError(''); setPhase('entry') }} className="btn btn-outline flex-1">Back</button>
+              <button onClick={handleJoinCode} disabled={saving}
+                className="btn btn-brand flex-1 flex items-center justify-center gap-2">
+                {saving ? 'Joining…' : 'Join'} {!saving && <ChevronRight className="h-4 w-4"/>}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -298,6 +420,19 @@ export default function OnboardingPage() {
                     <option value="">Select industry</option>
                     {INDUSTRIES.map(i => <option key={i} value={i}>{i}</option>)}
                   </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Referral code
+                    <span className="ml-2 text-xs text-gray-400 font-normal">optional — extends your referrer's trial</span>
+                  </label>
+                  <input
+                    value={form.referral_code}
+                    onChange={e => set('referral_code', e.target.value.toUpperCase())}
+                    className="input font-mono tracking-widest"
+                    placeholder="XXXX-XXXX"
+                    maxLength={9}
+                  />
                 </div>
               </div>
               <div className="flex gap-3 mt-6">

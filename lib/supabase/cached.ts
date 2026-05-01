@@ -18,7 +18,7 @@ export const getOrgMembership = cache(async (userId: string) => {
   const supabase = await createClient()
   const { data } = await supabase
     .from('org_members')
-    .select('org_id, role, can_view_all_tasks, can_view_monitor, organisations(id, name, slug, plan_tier, logo_color, status, trial_ends_at, subscription_id)')
+    .select('org_id, role, can_view_all_tasks, can_view_monitor, organisations(id, name, slug, plan_tier, logo_color, status, trial_ends_at, trial_started_at, trial_extension_days, referral_code, join_code, subscription_id)')
     .eq('user_id', userId)
     .eq('is_active', true)
     .maybeSingle()

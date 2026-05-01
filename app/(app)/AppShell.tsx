@@ -12,7 +12,7 @@ import { WalkthroughOverlay } from '@/components/walkthrough/WalkthroughOverlay'
 
 interface Props {
   user:        { id: string; name: string; email: string; avatar_url: string | null; created_at: string; tour_completed_at?: string | null }
-  org:         { id: string; name: string; slug: string; plan_tier: any; logo_color: string; status: string | null; trial_ends_at: string | null }
+  org:         { id: string; name: string; slug: string; plan_tier: any; logo_color: string; status: string | null; trial_ends_at: string | null; trial_started_at?: string | null; trial_extension_days?: number; referral_code?: string | null; join_code?: string | null }
   role:        string
   workspaceId: string | null
   children:    React.ReactNode

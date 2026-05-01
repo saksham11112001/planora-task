@@ -1,6 +1,7 @@
 import { NextResponse }  from 'next/server'
 import type { NextRequest } from 'next/server'
 import { dbError } from '@/lib/api-error'
+import { generateCode, normaliseCode } from '@/lib/utils/codeGen'
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,7 +13,7 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
     const body = await request.json()
-    const { name, org_name, industry, team_size, phone } = body
+    const { name, org_name, industry, team_size, phone, referral_code: rawReferralCode } = body
     if (!org_name?.trim()) return NextResponse.json({ error: 'Organisation name required' }, { status: 400 })
 
     const admin = createSupabaseClient(
@@ -45,14 +46,71 @@ export async function POST(request: NextRequest) {
     const base = org_name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
     const slug = `${base}-${Date.now().toString(36)}`
 
+    // Generate org codes
+    const orgReferralCode = generateCode(8)
+    const orgJoinCode     = generateCode(8)
+
     // Create org with 14-day pro trial
-    const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
+    const now         = new Date()
+    const trialEndsAt = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000).toISOString()
     const { data: org, error: orgErr } = await admin.from('organisations').insert({
       name: org_name.trim(), slug, plan_tier: 'pro', status: 'trialing',
+      trial_started_at: now.toISOString(),
       trial_ends_at: trialEndsAt,
+      trial_extension_days: 0,
+      referral_code: orgReferralCode,
+      join_code: orgJoinCode,
       industry: industry || null, team_size: team_size || null,
     }).select('id').single()
     if (orgErr) return NextResponse.json(dbError(orgErr, 'onboarding'), { status: 500 })
+
+    // Apply referral code if provided — extend referrer's trial by 7 days
+    if (rawReferralCode) {
+      const inputCode = normaliseCode(rawReferralCode)
+      const { data: referrerOrg } = await admin
+        .from('organisations')
+        .select('id, trial_ends_at, trial_extension_days, status')
+        .eq('referral_code', inputCode)
+        .single()
+
+      const MAX_EXTENSION_DAYS = 42
+      const alreadyExtended    = referrerOrg?.trial_extension_days ?? 0
+      const canExtend =
+        referrerOrg &&
+        referrerOrg.id !== org.id &&
+        referrerOrg.status === 'trialing' &&
+        alreadyExtended < MAX_EXTENSION_DAYS
+
+      if (canExtend) {
+        // Check no self-referral via shared members (same user is not in referrer org as member)
+        const { data: overlap } = await admin
+          .from('org_members')
+          .select('id')
+          .eq('org_id', referrerOrg.id)
+          .eq('user_id', user.id)
+          .maybeSingle()
+
+        if (!overlap) {
+          const extensionDays      = Math.min(7, MAX_EXTENSION_DAYS - alreadyExtended)
+          const newTrialEnds       = new Date(
+            Math.max(new Date(referrerOrg.trial_ends_at).getTime(), Date.now()) +
+            extensionDays * 24 * 60 * 60 * 1000
+          ).toISOString()
+
+          await Promise.all([
+            admin.from('organisations').update({
+              trial_ends_at:        newTrialEnds,
+              trial_extension_days: alreadyExtended + extensionDays,
+            }).eq('id', referrerOrg.id),
+            admin.from('referral_redemptions').insert({
+              referrer_org_id: referrerOrg.id,
+              redeemer_org_id: org.id,
+              extension_days:  extensionDays,
+            }),
+          ])
+        }
+      }
+    }
 
     // Add owner member
     await admin.from('org_members').insert({ org_id: org.id, user_id: user.id, role: 'owner', is_active: true })

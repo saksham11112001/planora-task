@@ -4,6 +4,8 @@ interface User    { id: string; name: string; email: string; avatar_url: string 
 interface Org     {
   id: string; name: string; slug: string; plan_tier: string; logo_color: string
   status: string | null; trial_ends_at: string | null
+  trial_started_at?: string | null; trial_extension_days?: number
+  referral_code?: string | null; join_code?: string | null
 }
 interface Session { user: User; org: Org; role: string; workspaceId: string | null }
 
