@@ -86,7 +86,11 @@ export async function POST(req: NextRequest) {
 
     if (error) {
       console.error('[invoices/POST] insert error:', JSON.stringify({ message: error.message, details: error.details, hint: error.hint, code: error.code }))
-      return NextResponse.json({ ...dbError(error, 'invoices/POST'), _code: error.code }, { status: 500 })
+      // Temporarily return raw error for debugging
+      return NextResponse.json({
+        error: `[${error.code}] ${error.message}${error.details ? ' | ' + error.details : ''}${error.hint ? ' | hint: ' + error.hint : ''}`,
+        _raw: { message: error.message, details: error.details, hint: error.hint, code: error.code }
+      }, { status: 500 })
     }
 
     // Insert line items if provided
@@ -110,7 +114,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ data: invoice }, { status: 201 })
   } catch (err: any) {
-    console.error('[invoices/POST] unexpected error:', err?.message ?? err)
-    return NextResponse.json(dbError(err, 'invoices/POST'), { status: 500 })
+    const msg = err?.message ?? String(err)
+    console.error('[invoices/POST] unexpected error:', msg)
+    return NextResponse.json({ error: `[EXCEPTION] ${msg}` }, { status: 500 })
   }
 }
