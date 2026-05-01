@@ -203,7 +203,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
         })
         .catch(() => {})
     }
-  }, [task?.id])
+  }, [task?.id, (task as any)?.is_billable, (task as any)?.billable_amount])
 
   /* auto-grow textarea */
   useEffect(() => {

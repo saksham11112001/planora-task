@@ -216,7 +216,7 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated, 
       margin: '6px 12px 10px', borderRadius: 10,
       border: '1.5px solid var(--brand-border)',
       background: 'var(--surface)',
-      boxShadow: '0 2px 12px rgba(13,148,136,0.08)', overflow: 'hidden',
+      boxShadow: '0 2px 12px rgba(13,148,136,0.08)',
     }}>
       {/* Title — glorified: accent left-border + tinted bg fade away as user types */}
       <div style={{

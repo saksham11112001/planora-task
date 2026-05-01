@@ -15,15 +15,17 @@ export async function GET(req: NextRequest) {
   const client_id = sp.get('client_id')
 
   let q = supabase.from('tasks')
-    .select('id, title, billable_amount, due_date, client_id, client:clients(id, name, color)')
+    .select('id, title, billable_amount, due_date, client_id, status, client:clients(id, name, color)')
     .eq('org_id', mb.org_id)
     .eq('is_billable', true)
-    .eq('status', 'completed')
     .neq('is_archived', true)
     .order('due_date', { ascending: false })
     .limit(200)
 
   if (client_id) q = q.eq('client_id', client_id)
+  // Only filter by status if explicitly requested
+  const status = sp.get('status')
+  if (status) q = q.eq('status', status)
 
   const { data, error } = await q
   if (error) return NextResponse.json({ data: [] })
