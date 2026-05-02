@@ -1,32 +1,27 @@
-import { createClient }  from '@/lib/supabase/server'
-import { redirect }      from 'next/navigation'
+import { Suspense }        from 'react'
+import { getSessionUser, getOrgMembership } from '@/lib/supabase/cached'
 import { effectivePlan, canUseFeature } from '@/lib/utils/planGate'
-import { TimeView }      from './TimeView'
-import { UpgradeWall }   from '@/components/ui/UpgradeWall'
-import type { Metadata } from 'next'
+import { redirect }        from 'next/navigation'
+import { TimeFetcher }     from './TimeFetcher'
+import { TimeSkeleton }    from './TimeSkeleton'
+import { UpgradeWall }     from '@/components/ui/UpgradeWall'
+import type { Metadata }   from 'next'
 
 export const dynamic = 'force-dynamic'
 export const metadata: Metadata = { title: 'Time tracking' }
-
 
 export default async function TimePage({
   searchParams,
 }: {
   searchParams: Promise<{ from?: string; to?: string }>
 }) {
-  const sp       = await searchParams
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const sp   = await searchParams
+  const user = await getSessionUser()
   if (!user) redirect('/login')
-
-  const { data: mb } = await supabase.from('org_members')
-    .select('org_id, role').eq('user_id', user.id).eq('is_active', true).maybeSingle()
+  const mb = await getOrgMembership(user.id)
   if (!mb) redirect('/onboarding')
 
-  // Time tracking is a paid feature (Starter+)
-  const { data: orgData } = await supabase.from('organisations')
-    .select('plan_tier, status, trial_ends_at').eq('id', mb.org_id).maybeSingle()
-  const plan = effectivePlan(orgData ?? { plan_tier: 'free', status: 'active' })
+  const plan = effectivePlan((mb.organisations as any) ?? { plan_tier: 'free', status: 'active' })
   if (!canUseFeature(plan, 'time_tracking')) {
     return <UpgradeWall
       feature="Time Tracking"
@@ -36,44 +31,13 @@ export default async function TimePage({
     />
   }
 
-  // Default: current month
-  const now       = new Date()
-  const fromDate  = sp.from ?? `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
-  const toDate    = sp.to   ?? `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()).padStart(2, '0')}`
-
-  const canSeeAll = ['owner', 'admin', 'manager'].includes(mb.role)
-
-  const [{ data: logs }, { data: projects }, { data: tasks }, { data: members }, { data: clients }] = await Promise.all([
-    supabase.from('time_logs')
-      .select('id, hours, is_billable, description, logged_date, task_id, project_id, user_id, user:users!time_logs_user_id_fkey(name), projects(name,color), tasks(title)')
-      .eq('org_id', mb.org_id)
-      .gte('logged_date', fromDate)
-      .lte('logged_date', toDate)
-      .match(canSeeAll ? {} : { user_id: user.id })
-      .order('logged_date', { ascending: false }),
-    supabase.from('projects').select('id, name, color, client_id').eq('org_id', mb.org_id).neq('is_archived', true).order('name'),
-    supabase.from('tasks').select('id, title, project_id').eq('org_id', mb.org_id).neq('is_archived', true).in('status', ['todo','in_progress','in_review']).limit(500),
-    canSeeAll
-      ? supabase.from('org_members').select('user_id, users(id, name)').eq('org_id', mb.org_id).eq('is_active', true)
-      : { data: null },
-    supabase.from('clients').select('id, name, color').eq('org_id', mb.org_id).eq('status', 'active').order('name'),
-  ])
-
-  const memberList = canSeeAll
-    ? (members ?? []).map(m => ({ id: (m.users as any)?.id ?? m.user_id, name: (m.users as any)?.name ?? 'Unknown' }))
-    : [{ id: user.id, name: 'Me' }]
+  const now      = new Date()
+  const fromDate = sp.from ?? `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+  const toDate   = sp.to   ?? `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()).padStart(2, '0')}`
 
   return (
-    <TimeView
-      logs={(logs ?? []) as any}
-      projects={projects ?? []}
-      tasks={tasks ?? []}
-      clients={clients ?? []}
-      members={memberList}
-      currentUserId={user.id}
-      canSeeAll={canSeeAll}
-      fromDate={fromDate}
-      toDate={toDate}
-    />
+    <Suspense fallback={<TimeSkeleton />}>
+      <TimeFetcher fromDate={fromDate} toDate={toDate} />
+    </Suspense>
   )
 }
