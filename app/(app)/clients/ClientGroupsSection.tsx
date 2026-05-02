@@ -1,6 +1,6 @@
 'use client'
-import { useState } from 'react'
-import { Plus, X, Pencil, Trash2, Users2, Building2, Check, ChevronRight } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { Plus, X, Pencil, Trash2, Users2, Building2, Check, ChevronRight, Search } from 'lucide-react'
 import { toast } from '@/store/appStore'
 
 type Group = { id: string; name: string; color: string; notes: string | null }
@@ -19,22 +19,27 @@ interface Props {
 }
 
 export function ClientGroupsSection({ initialGroups, allClients, canManage }: Props) {
-  const [groups,      setGroups]      = useState<Group[]>(initialGroups)
-  const [clients,     setClients]     = useState<Client[]>(allClients)
-  const [panelGroup,  setPanelGroup]  = useState<Group | null>(null)
-  const [showCreate,  setShowCreate]  = useState(false)
-  const [editingId,   setEditingId]   = useState<string | null>(null)
+  const [groups,     setGroups]     = useState<Group[]>(initialGroups)
+  const [clients,    setClients]    = useState<Client[]>(allClients)
+  const [panelGroup, setPanelGroup] = useState<Group | null>(null)
+  const [showCreate, setShowCreate] = useState(false)
+  const [editingId,  setEditingId]  = useState<string | null>(null)
 
-  // ── create form state ────────────────────────────────────────────────────
-  const [cName,  setCName]  = useState('')
-  const [cColor, setCColor] = useState(GROUP_COLORS[0])
-  const [cNotes, setCNotes] = useState('')
-  const [saving, setSaving] = useState(false)
+  // ── create form state ──────────────────────────────────────────────────
+  const [cName,    setCName]    = useState('')
+  const [cNotes,   setCNotes]   = useState('')
+  const [cColor,   setCColor]   = useState(GROUP_COLORS[0])
+  const [cSearch,  setCSearch]  = useState('')
+  const [cClients, setCClients] = useState<string[]>([])
+  const [saving,   setSaving]   = useState(false)
 
-  // ── edit form state (inline in panel) ───────────────────────────────────
+  // ── edit form state (inline in panel) ─────────────────────────────────
   const [eName,  setEName]  = useState('')
   const [eColor, setEColor] = useState('')
   const [eNotes, setENotes] = useState('')
+
+  // ── panel add-clients search ───────────────────────────────────────────
+  const [panelSearch, setPanelSearch] = useState('')
 
   function openPanel(g: Group) {
     setPanelGroup(g)
@@ -42,13 +47,19 @@ export function ClientGroupsSection({ initialGroups, allClients, canManage }: Pr
     setEColor(g.color)
     setENotes(g.notes ?? '')
     setEditingId(null)
+    setPanelSearch('')
   }
 
-  // ── helpers ──────────────────────────────────────────────────────────────
+  function openCreate() {
+    setCName(''); setCNotes(''); setCColor(GROUP_COLORS[0]); setCSearch(''); setCClients([])
+    setShowCreate(true)
+  }
+
+  // ── helpers ───────────────────────────────────────────────────────────
   function groupClients(gid: string) { return clients.filter(c => c.group_id === gid) }
   function ungroupedClients()        { return clients.filter(c => !c.group_id) }
 
-  // ── create group ─────────────────────────────────────────────────────────
+  // ── create group ──────────────────────────────────────────────────────
   async function createGroup() {
     if (!cName.trim()) { toast.error('Name is required'); return }
     setSaving(true)
@@ -60,14 +71,27 @@ export function ClientGroupsSection({ initialGroups, allClients, canManage }: Pr
       })
       const d = await res.json()
       if (!res.ok) { toast.error(d.error ?? 'Failed to create group'); return }
-      setGroups(prev => [...prev, d.data].sort((a, b) => a.name.localeCompare(b.name)))
-      setCName(''); setCColor(GROUP_COLORS[0]); setCNotes('')
+      const newGroup: Group = d.data
+      setGroups(prev => [...prev, newGroup].sort((a, b) => a.name.localeCompare(b.name)))
+
+      // Assign selected clients to the new group
+      if (cClients.length > 0) {
+        await Promise.all(cClients.map(clientId =>
+          fetch(`/api/clients/${clientId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ group_id: newGroup.id }),
+          })
+        ))
+        setClients(prev => prev.map(c => cClients.includes(c.id) ? { ...c, group_id: newGroup.id } : c))
+      }
+
       setShowCreate(false)
       toast.success('Group created')
     } finally { setSaving(false) }
   }
 
-  // ── save group edits ──────────────────────────────────────────────────────
+  // ── save group edits ──────────────────────────────────────────────────
   async function saveGroupEdit(id: string) {
     if (!eName.trim()) { toast.error('Name is required'); return }
     const res = await fetch(`/api/client-groups/${id}`, {
@@ -84,7 +108,7 @@ export function ClientGroupsSection({ initialGroups, allClients, canManage }: Pr
     toast.success('Group updated')
   }
 
-  // ── delete group ──────────────────────────────────────────────────────────
+  // ── delete group ──────────────────────────────────────────────────────
   async function deleteGroup(g: Group) {
     if (!confirm(`Delete group "${g.name}"? All clients in it will become ungrouped.`)) return
     const res = await fetch(`/api/client-groups/${g.id}`, { method: 'DELETE' })
@@ -95,7 +119,7 @@ export function ClientGroupsSection({ initialGroups, allClients, canManage }: Pr
     toast.success('Group deleted')
   }
 
-  // ── assign / remove client ────────────────────────────────────────────────
+  // ── assign / remove client (1 client = 1 group enforced by group_id) ──
   async function assignClient(clientId: string, groupId: string | null) {
     const res = await fetch(`/api/clients/${clientId}`, {
       method: 'PATCH',
@@ -106,7 +130,19 @@ export function ClientGroupsSection({ initialGroups, allClients, canManage }: Pr
     setClients(prev => prev.map(c => c.id === clientId ? { ...c, group_id: groupId } : c))
   }
 
-  // ── render ────────────────────────────────────────────────────────────────
+  // ── filtered lists for panel ──────────────────────────────────────────
+  const filteredUngrouped = useMemo(() => {
+    const q = panelSearch.trim().toLowerCase()
+    return ungroupedClients().filter(c => !q || c.name.toLowerCase().includes(q))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clients, panelSearch])
+
+  const filteredCreateClients = useMemo(() => {
+    const q = cSearch.trim().toLowerCase()
+    return clients.filter(c => !q || c.name.toLowerCase().includes(q))
+  }, [clients, cSearch])
+
+  // ── render ────────────────────────────────────────────────────────────
   return (
     <div style={{ marginTop: 48 }}>
       {/* ── section header ── */}
@@ -121,7 +157,7 @@ export function ClientGroupsSection({ initialGroups, allClients, canManage }: Pr
         </div>
         {canManage && (
           <button
-            onClick={() => setShowCreate(true)}
+            onClick={openCreate}
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
               padding: '8px 16px', borderRadius: 8, border: 'none',
@@ -145,6 +181,8 @@ export function ClientGroupsSection({ initialGroups, allClients, canManage }: Pr
               <X style={{ width: 16, height: 16 }} />
             </button>
           </div>
+
+          {/* Name + Notes */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div>
               <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 5 }}>
@@ -168,6 +206,8 @@ export function ClientGroupsSection({ initialGroups, allClients, canManage }: Pr
               />
             </div>
           </div>
+
+          {/* Colour */}
           <div style={{ marginBottom: 16 }}>
             <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>Colour</label>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -182,6 +222,62 @@ export function ClientGroupsSection({ initialGroups, allClients, canManage }: Pr
               ))}
             </div>
           </div>
+
+          {/* Add clients during creation */}
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>
+              Add clients{cClients.length > 0 ? ` (${cClients.length} selected)` : ''}
+            </label>
+            {/* Search */}
+            <div style={{ position: 'relative', marginBottom: 8 }}>
+              <Search style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', width: 13, height: 13, color: 'var(--text-muted)', pointerEvents: 'none' }} />
+              <input
+                value={cSearch} onChange={e => setCSearch(e.target.value)}
+                placeholder="Search clients…"
+                style={{ width: '100%', paddingLeft: 30, paddingRight: 10, height: 32, fontSize: 12, border: '1.5px solid var(--border)', borderRadius: 7, background: 'var(--surface)', color: 'var(--text-primary)', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+              />
+            </div>
+            <div style={{ maxHeight: 160, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4, border: '1px solid var(--border)', borderRadius: 8, padding: 6 }}>
+              {filteredCreateClients.length === 0 ? (
+                <p style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', padding: '12px 0' }}>
+                  {cSearch ? 'No clients match' : 'No clients yet'}
+                </p>
+              ) : filteredCreateClients.map(c => {
+                const sel = cClients.includes(c.id)
+                const inOtherGroup = !!c.group_id
+                return (
+                  <label key={c.id} style={{
+                    display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px',
+                    borderRadius: 7, cursor: inOtherGroup ? 'not-allowed' : 'pointer',
+                    background: sel ? 'rgba(13,148,136,0.08)' : 'transparent',
+                    border: sel ? '1px solid rgba(13,148,136,0.25)' : '1px solid transparent',
+                    opacity: inOtherGroup ? 0.5 : 1,
+                  }}>
+                    <input
+                      type="checkbox"
+                      checked={sel}
+                      disabled={inOtherGroup}
+                      onChange={() => {
+                        if (inOtherGroup) return
+                        setCClients(prev => sel ? prev.filter(id => id !== c.id) : [...prev, c.id])
+                      }}
+                      style={{ width: 14, height: 14, accentColor: '#0d9488', cursor: inOtherGroup ? 'not-allowed' : 'pointer' }}
+                    />
+                    <div style={{ width: 24, height: 24, borderRadius: 6, background: c.color, color: '#fff', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      {c.name[0]?.toUpperCase()}
+                    </div>
+                    <span style={{ fontSize: 13, color: 'var(--text-primary)', flex: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{c.name}</span>
+                    {inOtherGroup && (
+                      <span style={{ fontSize: 10, color: 'var(--text-muted)', flexShrink: 0 }}>
+                        in {groups.find(g => g.id === c.group_id)?.name ?? 'a group'}
+                      </span>
+                    )}
+                  </label>
+                )
+              })}
+            </div>
+          </div>
+
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={createGroup} disabled={saving} style={{
               padding: '8px 18px', borderRadius: 7, border: 'none',
@@ -213,7 +309,7 @@ export function ClientGroupsSection({ initialGroups, allClients, canManage }: Pr
             Group related clients under a parent company or family business
           </p>
           {canManage && (
-            <button onClick={() => setShowCreate(true)} style={{
+            <button onClick={openCreate} style={{
               padding: '8px 18px', borderRadius: 8, border: 'none',
               background: 'var(--brand)', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer',
             }}>
@@ -411,31 +507,52 @@ export function ClientGroupsSection({ initialGroups, allClients, canManage }: Pr
                 )}
               </div>
 
-              {/* ── add clients ── */}
-              {canManage && ungroupedClients().length > 0 && (
+              {/* ── add clients (only ungrouped, with search) ── */}
+              {canManage && (
                 <div>
-                  <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 10px' }}>
-                    Add clients ({ungroupedClients().length} ungrouped)
+                  <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 8px' }}>
+                    Add clients
                   </p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {ungroupedClients().map(c => (
-                      <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 9, border: '1px solid var(--border)', background: 'var(--surface-subtle)' }}>
-                        <div style={{ width: 32, height: 32, borderRadius: 8, background: c.color, color: '#fff', fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          {c.name[0]?.toUpperCase()}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</p>
-                          <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0, textTransform: 'capitalize' }}>{c.status}</p>
-                        </div>
-                        <button
-                          onClick={() => assignClient(c.id, panelGroup.id)}
-                          title="Add to group"
-                          style={{ padding: '5px 10px', borderRadius: 6, border: 'none', background: 'var(--brand)', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <Plus style={{ width: 12, height: 12 }} /> Add
-                        </button>
-                      </div>
-                    ))}
+                  {/* Search */}
+                  <div style={{ position: 'relative', marginBottom: 8 }}>
+                    <Search style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', width: 13, height: 13, color: 'var(--text-muted)', pointerEvents: 'none' }} />
+                    <input
+                      value={panelSearch}
+                      onChange={e => setPanelSearch(e.target.value)}
+                      placeholder="Search ungrouped clients…"
+                      style={{ width: '100%', paddingLeft: 30, paddingRight: panelSearch ? 28 : 10, height: 34, fontSize: 12, border: '1.5px solid var(--border)', borderRadius: 7, background: 'var(--surface)', color: 'var(--text-primary)', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                    />
+                    {panelSearch && (
+                      <button onClick={() => setPanelSearch('')} style={{ position: 'absolute', right: 7, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 2, display: 'flex' }}>
+                        <X style={{ width: 12, height: 12 }} />
+                      </button>
+                    )}
                   </div>
+                  {filteredUngrouped.length === 0 ? (
+                    <p style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic', margin: 0 }}>
+                      {panelSearch ? `No ungrouped clients matching "${panelSearch}"` : 'All clients are already in a group.'}
+                    </p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {filteredUngrouped.map(c => (
+                        <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 9, border: '1px solid var(--border)', background: 'var(--surface-subtle)' }}>
+                          <div style={{ width: 32, height: 32, borderRadius: 8, background: c.color, color: '#fff', fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            {c.name[0]?.toUpperCase()}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</p>
+                            <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0, textTransform: 'capitalize' }}>{c.status}</p>
+                          </div>
+                          <button
+                            onClick={() => assignClient(c.id, panelGroup.id)}
+                            title="Add to group"
+                            style={{ padding: '5px 10px', borderRadius: 6, border: 'none', background: 'var(--brand)', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <Plus style={{ width: 12, height: 12 }} /> Add
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 

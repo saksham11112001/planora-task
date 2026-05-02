@@ -101,6 +101,9 @@ function CAKanbanView({ userRole, currentUserId }: { userRole: string; currentUs
   const [allBoards,     setAllBoards]     = useState<Record<string, Record<string, 'active' | 'paused'>>>({})
   const [selTask,       setSelTask]       = useState<Task | null>(null)
   const [selUpcoming,   setSelUpcoming]   = useState<KanbanTask | null>(null)
+  const [selUpcomingClientId, setSelUpcomingClientId] = useState<string | null>(null)
+  // raw CA tasks per client — used for history lookup
+  const [rawTasksByClient, setRawTasksByClient] = useState<Record<string, any[]>>({})
   const pausedDatesRef = useRef<Record<string, string | null>>({})
 
   // Propagate assignee/approver changes to all pending/todo instances
@@ -202,6 +205,13 @@ function CAKanbanView({ userRole, currentUserId }: { userRole: string; currentUs
 
       setClientTasks(newClientTasks)
       setAllBoards(newBoards)
+
+      // Store raw tasks per client for history lookup
+      const rawMap: Record<string, any[]> = {}
+      for (const client of clientList) {
+        rawMap[client.id] = tasksByClient.get(client.id) ?? []
+      }
+      setRawTasksByClient(rawMap)
     } catch {
       // silent — columns remain empty, user can refresh
     } finally {
@@ -250,7 +260,7 @@ function CAKanbanView({ userRole, currentUserId }: { userRole: string; currentUs
     const statusStyle = STATUS_STYLE[task.status] ?? STATUS_STYLE.upcoming
     return (
       <div
-        onClick={() => { if (task._raw) setSelTask(task._raw as Task); else setSelUpcoming(task) }}
+        onClick={() => { if (task._raw) setSelTask(task._raw as Task); else { setSelUpcoming(task); setSelUpcomingClientId(clientId) } }}
         style={{
           background: 'var(--surface)', border: '1px solid var(--border)',
           borderLeft: '3px solid rgba(234,179,8,0.6)',  // amber — all CA compliance cards
@@ -506,6 +516,38 @@ function CAKanbanView({ userRole, currentUserId }: { userRole: string; currentUs
                   </span>
                 </div>
               )}
+              {/* Past triggered instances */}
+              {(() => {
+                const cid = selUpcomingClientId
+                const allRaw = cid ? (rawTasksByClient[cid] ?? []) : []
+                const hist = allRaw
+                  .filter(t => (t.title ?? '').toLowerCase().trim() === (selUpcoming.name ?? '').toLowerCase().trim())
+                  .sort((a: any, b: any) => (b.created_at ?? '') > (a.created_at ?? '') ? 1 : -1)
+                if (!hist.length) return null
+                return (
+                  <div style={{ marginTop: 14, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+                    <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 8px' }}>
+                      Past instances ({hist.length})
+                    </p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 160, overflowY: 'auto' }}>
+                      {hist.map((t: any) => {
+                        const sc = t.status === 'completed' ? '#16a34a' : t.status === 'in_review' ? '#7c3aed' : t.status === 'in_progress' ? '#2563eb' : '#64748b'
+                        const sb = t.status === 'completed' ? 'rgba(22,163,74,0.1)' : t.status === 'in_review' ? 'rgba(124,58,237,0.1)' : t.status === 'in_progress' ? 'rgba(37,99,235,0.1)' : 'rgba(100,116,139,0.1)'
+                        return (
+                          <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', borderRadius: 7, border: '1px solid var(--border)', background: 'var(--surface-subtle)', fontSize: 11 }}>
+                            <span style={{ flex: 1, color: 'var(--text-secondary)' }}>
+                              {t.due_date ? new Date(t.due_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : new Date(t.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                            </span>
+                            <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 99, fontWeight: 600, background: sb, color: sc, flexShrink: 0 }}>
+                              {t.status.replace('_', ' ')}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })()}
             </div>
           </div>
         </div>
