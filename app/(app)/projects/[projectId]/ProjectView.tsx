@@ -1011,7 +1011,7 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
               return (
                 <div key={section.key}>
                   <button onClick={() => setCollapsed(p => ({ ...p, [section.key]: !p[section.key] }))}
-                    className="section-header w-full text-left hover:opacity-80 transition-opacity" style={{ color: section.color }}>
+                    className="section-header w-full text-left hover:opacity-80 transition-opacity" style={{ color: (section as any).color ?? 'var(--text-secondary)' }}>
                     <span className="transition-transform inline-block" style={{ transform: isCollapsed ? 'rotate(-90deg)' : 'none' }}>▾</span>
                     {section.label} <span className="opacity-40 font-normal normal-case text-xs">({section.tasks.length})</span>
                   </button>

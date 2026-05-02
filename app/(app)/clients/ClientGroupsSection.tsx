@@ -288,7 +288,7 @@ export function ClientGroupsSection({ initialGroups, allClients, canManage }: Pr
                         fontSize: 10, fontWeight: 700,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         border: '2px solid var(--surface)',
-                        marginLeft: -6, first: { marginLeft: 0 } as any,
+                        marginLeft: -6,
                       }}>
                         {c.name[0]?.toUpperCase()}
                       </div>

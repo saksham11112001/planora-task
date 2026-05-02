@@ -1157,7 +1157,7 @@ export function RecurringView({
           </p>
 
           <TaskDetailPanel
-            task={selectedTask}
+            task={selectedTask as any}
             members={members}
             clients={clients}
             currentUserId={currentUserId}

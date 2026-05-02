@@ -19,7 +19,6 @@ interface Props {
   clients?:       { id: string; name: string; color: string }[]
   currentUserId?: string
   userRole?:      string
-  clients?:       { id: string; name: string; color: string }[]
   dailyData:       { date: string; created: number; completed: number }[]
   memberData:      { name: string; completed: number; inProgress: number }[]
   priorityData:    { name: string; value: number; color: string }[]

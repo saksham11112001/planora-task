@@ -264,7 +264,7 @@ wsRM.views = [
     // ── Write buffer ───────────────────────────────────────────────────────
     const buf = await wb.xlsx.writeBuffer()
 
-    return new NextResponse(buf as Buffer, {
+    return new NextResponse(Buffer.from(buf as ArrayBuffer), {
       headers: {
         'Content-Type'        : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition' : 'attachment; filename="taska_import_template.xlsx"',

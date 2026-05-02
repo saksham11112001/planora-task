@@ -45,7 +45,7 @@ export default async function TimePage({
 
   const [{ data: logs }, { data: projects }, { data: tasks }, { data: members }, { data: clients }] = await Promise.all([
     supabase.from('time_logs')
-      .select('id, hours, is_billable, description, logged_date, task_id, project_id, user_id, user:users!time_logs_user_id_fkey(name)')
+      .select('id, hours, is_billable, description, logged_date, task_id, project_id, user_id, user:users!time_logs_user_id_fkey(name), projects(name,color), tasks(title)')
       .eq('org_id', mb.org_id)
       .gte('logged_date', fromDate)
       .lte('logged_date', toDate)
@@ -65,7 +65,7 @@ export default async function TimePage({
 
   return (
     <TimeView
-      logs={logs ?? []}
+      logs={(logs ?? []) as any}
       projects={projects ?? []}
       tasks={tasks ?? []}
       clients={clients ?? []}

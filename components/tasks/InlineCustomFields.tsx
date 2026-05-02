@@ -28,7 +28,7 @@ export function InlineCustomFields({ defs, values, onChange }: Props) {
             }
             {field.type === 'textarea' || field.type === 'text' || field.type === 'number' ? (
               <input
-                type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : 'text'}
+                type={field.type === 'number' ? 'number' : 'text'}
                 value={val}
                 onChange={e => onChange(field.key, e.target.value)}
                 placeholder={field.placeholder ?? field.label}

@@ -21,10 +21,10 @@ export function createApiClient(request: NextRequest) {
     {
       cookies: {
         getAll: () => request.cookies.getAll(),
-        setAll: (cs) => {
+        setAll: (cs: { name: string; value: string; options?: Record<string, unknown> }[]) => {
           cs.forEach(({ name, value }) => request.cookies.set(name, value))
           response = NextResponse.next({ request })
-          cs.forEach(({ name, value, options }) => response.cookies.set(name, value, options))
+          cs.forEach(({ name, value, options }) => response.cookies.set(name, value, options as any))
         },
       },
     }

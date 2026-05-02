@@ -107,7 +107,7 @@ export async function POST(
 
   const { data: { publicUrl } } = admin.storage
     .from('task-attachments')
-    .getPublicUrl(storageData.path)
+    .getPublicUrl(storageData!.path)
 
   // 5a. FALLBACK PATH: no doc type configured — attach directly to the specific task
   if (!docType && taskIdFallback) {
@@ -314,7 +314,7 @@ async function autoLinkToTasks({
       }, { onConflict: 'upload_id,task_id', ignoreDuplicates: true })
 
     // Check if all attachment_headers for this task now have uploads
-    const attachmentHeaders: string[] = inst.assignment?.master_task?.attachment_headers ?? []
+    const attachmentHeaders: string[] = (inst.assignment as any)?.master_task?.attachment_headers ?? []
     if (attachmentHeaders.length > 0) {
       await checkAndMarkDocsComplete({ admin, taskId, org_id, client_id, attachmentHeaders, year: year ?? '', monthKey })
     }

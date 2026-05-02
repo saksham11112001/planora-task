@@ -20,7 +20,7 @@ export function SearchModal() {
   const [results,  setResults]  = useState<Result[]>([])
   const [loading,  setLoading]  = useState(false)
   const [selIdx,   setSelIdx]   = useState(0)
-  const debounce   = useRef<ReturnType<typeof setTimeout>>()
+  const debounce   = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   // Task detail panel state
   const [panelTask,    setPanelTask]    = useState<Task | null>(null)

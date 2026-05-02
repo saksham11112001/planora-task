@@ -111,7 +111,7 @@ export async function sendProjectUpdatedEmail(p: {
   return resend.emails.send({
     from: FROM, to: p.to,
     subject: `📁 Project updated: ${p.projectName} is now ${p.newStatus.replace('_',' ')}`,
-    html: projectUpdatedHtml({ ...p, projectUrl: url }),
+    html: projectUpdatedHtml({ ...p, projectUrl: url, memberName: p.recipientName }),
   })
 }
 

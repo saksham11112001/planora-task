@@ -11,8 +11,8 @@ export function RouteLoader() {
   const searchParams  = useSearchParams()
   const [progress,    setProgress]  = useState(0)
   const [visible,     setVisible]   = useState(false)
-  const timerRef      = useRef<ReturnType<typeof setTimeout>>()
-  const rafRef        = useRef<number>()
+  const timerRef      = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const rafRef        = useRef<number>(undefined)
   const prevPath      = useRef(pathname + searchParams.toString())
 
   useEffect(() => {

@@ -1,5 +1,4 @@
 import { createAdminClient } from '@/lib/supabase/admin'
-import { cookies }           from 'next/headers'
 import { createClient }      from '@/lib/supabase/server'
 import { NextResponse }      from 'next/server'
 
@@ -13,8 +12,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Attachments exceed 10 MB limit' }, { status: 400 })
     }
 
-    const cookieStore = await cookies()
-    const sb  = createClient(cookieStore)
+    const sb  = await createClient()
     const { data: { user } } = await sb.auth.getUser()
 
     const form    = await req.formData()

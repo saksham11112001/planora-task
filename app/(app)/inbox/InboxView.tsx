@@ -442,7 +442,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                             </div>
                           )}
                           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:4 }}>
-                            <span style={{ display:'inline-flex', alignItems:'center', gap:3, padding:'2px 7px', borderRadius:5, fontSize:10, fontWeight:600, background:pri?.bg??'#f8fafc', color:pri?.color??'#94a3b8' }}>{pri?.icon} {task.priority}</span>
+                            <span style={{ display:'inline-flex', alignItems:'center', gap:3, padding:'2px 7px', borderRadius:5, fontSize:10, fontWeight:600, background:pri?.bg??'#f8fafc', color:pri?.color??'#94a3b8' }}>{task.priority}</span>
                             {((task as any).custom_fields?._blocked_by?.length > 0) && (
                               <span style={{ display:'inline-flex', alignItems:'center', gap:2, padding:'1px 5px', borderRadius:4, fontSize:9, fontWeight:700, background:'rgba(220,38,38,0.1)', color:'#dc2626', letterSpacing:'0.02em' }}>
                                 ⊘ Blocked

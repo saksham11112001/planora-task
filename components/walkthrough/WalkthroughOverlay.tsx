@@ -171,7 +171,7 @@ export function WalkthroughOverlay({ userId, userCreatedAt, tourCompletedAt }: P
   const [spotlight,      setSpot]         = useState<Rect | null>(null)
   const [animKey,        setAnimKey]      = useState(0)
   const [confettiActive, setConfetti]     = useState(false)
-  const resizeTimer                       = useRef<ReturnType<typeof setTimeout>>()
+  const resizeTimer                       = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   // Stable confetti pieces (random values computed once)
   const confettiPieces = useMemo(() =>

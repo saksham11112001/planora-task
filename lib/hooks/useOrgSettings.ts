@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react'
 
 export interface CustomFieldDef {
-  key: string; label: string; type: string; placeholder?: string; options?: string[]
+  key: string; label: string; type: 'text' | 'date' | 'number' | 'textarea' | 'select'; placeholder?: string; options?: string[]
 }
 export interface TaskFields {
   [key: string]: { visible: boolean; mandatory: boolean }
