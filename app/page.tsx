@@ -740,6 +740,110 @@ export default async function LandingPage() {
           <p style={{ textAlign: 'center', fontSize: 13, color: '#94a3b8', marginTop: 22 }}>
             All plans include 14-day free trial · No credit card required · Cancel anytime · Billed in INR
           </p>
+
+          {/* ── One-time Setup & Onboarding ── */}
+          <div style={{
+            marginTop: 36,
+            borderRadius: 16, padding: '28px 32px',
+            background: '#fff',
+            border: '1px solid #e2e8f0',
+            boxShadow: '0 2px 12px rgba(0,0,0,0.05)',
+            display: 'flex', alignItems: 'center', gap: 28, flexWrap: 'wrap',
+          }}>
+            <div style={{
+              width: 56, height: 56, borderRadius: 16, flexShrink: 0,
+              background: '#fff7ed', border: '1px solid #fed7aa',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26,
+            }}>🚀</div>
+            <div style={{ flex: 1, minWidth: 220 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', letterSpacing: '-0.3px' }}>
+                  Professional Setup &amp; Onboarding
+                </span>
+                <span style={{
+                  fontSize: 10, fontWeight: 700, padding: '2px 9px', borderRadius: 99,
+                  background: '#fff7ed', color: '#f97316', border: '1px solid #fed7aa',
+                  textTransform: 'uppercase', letterSpacing: '0.06em',
+                }}>One-time</span>
+              </div>
+              <p style={{ fontSize: 13, color: '#64748b', lineHeight: 1.7, margin: 0, maxWidth: 560 }}>
+                Get a dedicated onboarding expert who migrates your existing data, configures workflows for your team, and trains everyone to hit the ground running — so you go live without any disruption.
+              </p>
+              <div style={{ display: 'flex', gap: 16, marginTop: 12, flexWrap: 'wrap' }}>
+                {['Existing data migration','Custom workflow setup','Team training session','Priority go-live support'].map(f => (
+                  <span key={f} style={{ fontSize: 12, color: '#0d9488', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ fontWeight: 700 }}>✓</span> {f}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 2, justifyContent: 'flex-end' }}>
+                <span style={{ fontSize: 13, color: '#94a3b8' }}>₹</span>
+                <span style={{ fontSize: 36, fontWeight: 900, color: '#0f172a', letterSpacing: '-1.5px' }}>5,000</span>
+              </div>
+              <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 14 }}>one-time · any plan</div>
+              <Link href="/login" style={{
+                display: 'inline-block', padding: '10px 22px', borderRadius: 10,
+                background: '#f97316', color: '#fff',
+                fontSize: 13, fontWeight: 700, textDecoration: 'none',
+                boxShadow: '0 3px 14px rgba(249,115,22,0.35)',
+              }}>
+                Get started →
+              </Link>
+            </div>
+          </div>
+
+          {/* ── Enterprise / Self-Hosted ── */}
+          <div style={{
+            marginTop: 16,
+            borderRadius: 16, padding: '28px 32px',
+            background: 'linear-gradient(135deg, #0a0f1e 0%, #0c1a32 100%)',
+            border: '1px solid rgba(13,148,136,0.22)',
+            boxShadow: '0 4px 24px rgba(0,0,0,0.1)',
+            display: 'flex', alignItems: 'center', gap: 28, flexWrap: 'wrap',
+          }}>
+            <div style={{
+              width: 56, height: 56, borderRadius: 16, flexShrink: 0,
+              background: 'rgba(13,148,136,0.15)', border: '1px solid rgba(13,148,136,0.3)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26,
+            }}>🔐</div>
+            <div style={{ flex: 1, minWidth: 220 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 16, fontWeight: 800, color: '#fff', letterSpacing: '-0.3px' }}>
+                  Private Cloud / Self-Hosted
+                </span>
+                <span style={{
+                  fontSize: 10, fontWeight: 700, padding: '2px 9px', borderRadius: 99,
+                  background: 'rgba(13,148,136,0.2)', color: '#2dd4bf',
+                  border: '1px solid rgba(13,148,136,0.35)',
+                  textTransform: 'uppercase', letterSpacing: '0.06em',
+                }}>Enterprise</span>
+              </div>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', lineHeight: 1.7, margin: 0, maxWidth: 560 }}>
+                For data-sensitive organisations — banks, legal firms, healthcare, and regulated industries — that need all data to live exclusively on their own servers. You get the full Taska platform deployed inside your infrastructure with zero data ever leaving your network.
+              </p>
+              <div style={{ display: 'flex', gap: 16, marginTop: 12, flexWrap: 'wrap' }}>
+                {['Your servers · your DB','Zero cloud dependency','DPDP & compliance-ready','Dedicated deployment support'].map(f => (
+                  <span key={f} style={{ fontSize: 12, color: '#2dd4bf', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ fontWeight: 700 }}>✓</span> {f}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', marginBottom: 4 }}>Custom pricing</div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.22)', marginBottom: 14 }}>based on team size &amp; infra</div>
+              <a href="mailto:hello@taska.in?subject=Self-Hosted%20Inquiry" style={{
+                display: 'inline-block', padding: '10px 22px', borderRadius: 10,
+                background: '#0d9488', color: '#fff',
+                fontSize: 13, fontWeight: 700, textDecoration: 'none',
+                boxShadow: '0 3px 14px rgba(13,148,136,0.4)',
+              }}>
+                Talk to us →
+              </a>
+            </div>
+          </div>
         </div>
       </section>
 

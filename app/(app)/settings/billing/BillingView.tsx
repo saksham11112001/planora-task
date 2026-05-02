@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { Check, Zap, Clock } from 'lucide-react'
+import { Check, Zap, Clock, Server, Package } from 'lucide-react'
 import { toast } from '@/store/appStore'
 
 const PLANS = [
@@ -32,14 +32,25 @@ interface Props {
   status:         string
   subscriptionId: string | null
   trialEndsAt?:   string | null
+  setupFeePaid?:  boolean
 }
 
-export function BillingView({ orgName, currentPlan, status, subscriptionId, trialEndsAt }: Props) {
+export function BillingView({ orgName, currentPlan, status, subscriptionId, trialEndsAt, setupFeePaid = false }: Props) {
   const [loading,  setLoading]  = useState<string | null>(null)
   const [annual,    setAnnual]    = useState(false)
   const [couponCode, setCouponCode] = useState('')
   const [couponMsg,  setCouponMsg]  = useState<{ok:boolean;text:string}|null>(null)
   const [applyingCoupon, setApplyingCoupon] = useState(false)
+
+  // Setup fee state
+  const [setupPaid,       setSetupPaid]       = useState(setupFeePaid)
+  const [setupLoading,    setSetupLoading]    = useState(false)
+
+  // Self-hosted inquiry state
+  const [showSHForm,      setShowSHForm]      = useState(false)
+  const [shSubmitted,     setShSubmitted]     = useState(false)
+  const [shSubmitting,    setShSubmitting]    = useState(false)
+  const [shForm, setShForm] = useState({ contact_name: '', contact_email: '', company_size: '', infrastructure: '', notes: '' })
 
   // Trial countdown
   const trialDaysLeft = trialEndsAt
@@ -101,6 +112,62 @@ export function BillingView({ orgName, currentPlan, status, subscriptionId, tria
         setLoading(null)
       }
     } catch { toast.error('Network error'); setLoading(null) }
+  }
+
+  async function handleSetupFee() {
+    if (setupPaid) return
+    setSetupLoading(true)
+    try {
+      const res  = await fetch('/api/settings/billing/setup-fee', { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) { toast.error(data.error ?? 'Failed to initiate payment'); setSetupLoading(false); return }
+
+      const { order_id, key_id } = data
+      const script = document.createElement('script')
+      script.src   = 'https://checkout.razorpay.com/v1/checkout.js'
+      document.body.appendChild(script)
+      script.onload = () => {
+        const options = {
+          key: key_id, order_id,
+          name: 'Taska', description: 'Professional Setup & Onboarding',
+          image: '/favicon.svg', prefill: { name: orgName },
+          theme: { color: '#f97316' },
+          handler: async (response: any) => {
+            const verifyRes = await fetch('/api/settings/billing/setup-fee/verify', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(response),
+            })
+            if (verifyRes.ok) {
+              toast.success('Setup fee paid! Our team will reach out within 24 hours.')
+              setSetupPaid(true)
+            } else {
+              const d = await verifyRes.json()
+              toast.error(d.error ?? 'Payment verification failed. Contact support.')
+            }
+            setSetupLoading(false)
+          },
+          modal: { ondismiss: () => setSetupLoading(false) },
+        }
+        const rzp = new (window as any).Razorpay(options)
+        rzp.open()
+      }
+    } catch { toast.error('Network error'); setSetupLoading(false) }
+  }
+
+  async function handleSHSubmit() {
+    if (!shForm.contact_name.trim() || !shForm.contact_email.trim()) {
+      toast.error('Name and email are required'); return
+    }
+    setShSubmitting(true)
+    try {
+      const res = await fetch('/api/settings/self-hosted', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(shForm),
+      })
+      const d = await res.json()
+      if (res.ok) { setShSubmitted(true); setShowSHForm(false) }
+      else toast.error(d.error ?? 'Submission failed')
+    } finally { setShSubmitting(false) }
   }
 
   return (
@@ -347,6 +414,195 @@ export function BillingView({ orgName, currentPlan, status, subscriptionId, tria
             color:couponMsg.ok?'#16a34a':'#dc2626' }}>
             {couponMsg.text}
           </p>
+        )}
+      </div>
+
+      {/* ── One-time Setup & Onboarding ── */}
+      <div style={{
+        marginTop: 24, padding: '20px 22px', borderRadius: 14,
+        border: setupPaid ? '1.5px solid #bbf7d0' : '1px solid var(--border)',
+        background: setupPaid ? '#f0fdf4' : 'var(--surface)',
+        display: 'flex', alignItems: 'flex-start', gap: 16,
+      }}>
+        <div style={{
+          width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+          background: setupPaid ? '#dcfce7' : '#fff7ed',
+          border: `1px solid ${setupPaid ? '#bbf7d0' : '#fed7aa'}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Package style={{ width: 20, height: 20, color: setupPaid ? '#16a34a' : '#f97316' }}/>
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, flexWrap: 'wrap' }}>
+            <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+              Professional Setup &amp; Onboarding
+            </p>
+            {setupPaid ? (
+              <span style={{
+                fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 99,
+                background: '#dcfce7', color: '#16a34a', border: '1px solid #bbf7d0',
+              }}>Paid ✓</span>
+            ) : (
+              <span style={{
+                fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 99,
+                background: '#fff7ed', color: '#f97316', border: '1px solid #fed7aa',
+              }}>One-time · ₹5,000</span>
+            )}
+          </div>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.65, margin: '0 0 10px' }}>
+            {setupPaid
+              ? 'Our onboarding team will contact you within 24 hours to schedule your data migration and training sessions.'
+              : 'Get a dedicated expert to migrate your existing data, configure your workflows, and train your team — available for any plan.'}
+          </p>
+          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: setupPaid ? 0 : 14 }}>
+            {['Existing data migration','Custom workflow config','Team training','Priority go-live support'].map(f => (
+              <span key={f} style={{ fontSize: 11, color: setupPaid ? '#16a34a' : 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <Check style={{ width: 11, height: 11, flexShrink: 0 }}/> {f}
+              </span>
+            ))}
+          </div>
+          {!setupPaid && (
+            <button
+              onClick={handleSetupFee}
+              disabled={setupLoading}
+              style={{
+                padding: '8px 18px', borderRadius: 8, border: 'none',
+                background: '#f97316', color: '#fff',
+                fontSize: 12, fontWeight: 700, cursor: setupLoading ? 'not-allowed' : 'pointer',
+                opacity: setupLoading ? 0.7 : 1, fontFamily: 'inherit',
+              }}>
+              {setupLoading ? 'Opening checkout…' : 'Pay ₹5,000 →'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ── Private Cloud / Self-Hosted ── */}
+      <div style={{
+        marginTop: 16, padding: '20px 22px', borderRadius: 14,
+        border: shSubmitted ? '1.5px solid rgba(13,148,136,0.4)' : '1px solid var(--border)',
+        background: shSubmitted ? 'rgba(13,148,136,0.05)' : 'var(--surface)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
+          <div style={{
+            width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+            background: '#f0fdfa', border: '1px solid #5eead4',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Server style={{ width: 20, height: 20, color: '#0d9488' }}/>
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, flexWrap: 'wrap' }}>
+              <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+                Private Cloud / Self-Hosted
+              </p>
+              {shSubmitted ? (
+                <span style={{
+                  fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 99,
+                  background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0',
+                }}>Inquiry sent ✓</span>
+              ) : (
+                <span style={{
+                  fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 99,
+                  background: '#f0fdfa', color: '#0d9488', border: '1px solid #5eead4',
+                }}>Enterprise</span>
+              )}
+            </div>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.65, margin: '0 0 10px' }}>
+              {shSubmitted
+                ? "We've received your inquiry. Our enterprise team will reach out within 1–2 business days to discuss your infrastructure requirements and pricing."
+                : 'For banks, legal firms, healthcare providers, and regulated industries that need all data to stay exclusively on their own servers. Full Taska platform, zero cloud dependency.'}
+            </p>
+            {!shSubmitted && (
+              <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 12 }}>
+                {['Your servers & DB','No cloud dependency','DPDP-ready','Dedicated deployment'].map(f => (
+                  <span key={f} style={{ fontSize: 11, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <Check style={{ width: 11, height: 11, flexShrink: 0 }}/> {f}
+                  </span>
+                ))}
+              </div>
+            )}
+            {!shSubmitted && (
+              <button
+                onClick={() => setShowSHForm(v => !v)}
+                style={{
+                  padding: '8px 18px', borderRadius: 8,
+                  border: '1.5px solid #0d9488', background: 'transparent',
+                  color: '#0d9488', fontSize: 12, fontWeight: 700,
+                  cursor: 'pointer', fontFamily: 'inherit',
+                }}>
+                {showSHForm ? 'Cancel' : 'Express interest →'}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Inquiry form */}
+        {showSHForm && !shSubmitted && (
+          <div style={{
+            marginTop: 18, paddingTop: 18,
+            borderTop: '1px solid var(--border)',
+            display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12,
+          }}>
+            {([
+              { key: 'contact_name',   label: 'Your name *',          placeholder: 'Rahul Mehta',          type: 'text', col: 1 },
+              { key: 'contact_email',  label: 'Email address *',       placeholder: 'rahul@example.com',    type: 'email', col: 1 },
+              { key: 'company_size',   label: 'Team size',             placeholder: 'e.g. 50–200 people',   type: 'text', col: 1 },
+              { key: 'infrastructure', label: 'Preferred infra',       placeholder: 'AWS / Azure / On-prem / Docker', type: 'text', col: 1 },
+            ] as const).map(f => (
+              <div key={f.key}>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 5 }}>
+                  {f.label}
+                </label>
+                <input
+                  type={f.type}
+                  value={shForm[f.key]}
+                  onChange={e => setShForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                  placeholder={f.placeholder}
+                  style={{
+                    width: '100%', padding: '8px 10px', borderRadius: 8,
+                    border: '1.5px solid var(--border)', outline: 'none',
+                    fontSize: 12, background: 'var(--surface)',
+                    color: 'var(--text-primary)', fontFamily: 'inherit',
+                  }}
+                  onFocus={e => (e.target.style.borderColor = '#0d9488')}
+                  onBlur={e  => (e.target.style.borderColor = 'var(--border)')}
+                />
+              </div>
+            ))}
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 5 }}>
+                Additional notes
+              </label>
+              <textarea
+                value={shForm.notes}
+                onChange={e => setShForm(prev => ({ ...prev, notes: e.target.value }))}
+                placeholder="E.g. reasons for self-hosting, compliance requirements, timeline…"
+                rows={3}
+                style={{
+                  width: '100%', padding: '8px 10px', borderRadius: 8,
+                  border: '1.5px solid var(--border)', outline: 'none', resize: 'vertical',
+                  fontSize: 12, background: 'var(--surface)',
+                  color: 'var(--text-primary)', fontFamily: 'inherit',
+                }}
+                onFocus={e => (e.target.style.borderColor = '#0d9488')}
+                onBlur={e  => (e.target.style.borderColor = 'var(--border)')}
+              />
+            </div>
+            <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                onClick={handleSHSubmit}
+                disabled={shSubmitting}
+                style={{
+                  padding: '9px 22px', borderRadius: 8, border: 'none',
+                  background: '#0d9488', color: '#fff',
+                  fontSize: 13, fontWeight: 700, cursor: shSubmitting ? 'not-allowed' : 'pointer',
+                  opacity: shSubmitting ? 0.7 : 1, fontFamily: 'inherit',
+                }}>
+                {shSubmitting ? 'Sending…' : 'Send inquiry →'}
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </div>

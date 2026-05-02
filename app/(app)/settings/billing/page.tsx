@@ -17,7 +17,7 @@ export default async function BillingPage() {
   return (
     <div className="p-6 max-w-2xl mx-auto">
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Billing & Plan</h1>
-      <BillingView orgName={org?.name} currentPlan={org?.plan_tier ?? 'free'} status={org?.status ?? 'active'} subscriptionId={org?.subscription_id ?? null}/>
+      <BillingView orgName={org?.name} currentPlan={org?.plan_tier ?? 'free'} status={org?.status ?? 'active'} subscriptionId={org?.subscription_id ?? null} trialEndsAt={org?.trial_ends_at ?? null} setupFeePaid={org?.setup_fee_paid ?? false}/>
     </div>
   )
 }
