@@ -96,6 +96,9 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
   const [isSaved,   setIsSaved]   = useState(false)
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [converting, setConverting] = useState(false)
+  const [recurHistory,       setRecurHistory]       = useState<any[]>([])
+  const [recurHistoryLoaded, setRecurHistoryLoaded] = useState(false)
+  const [recurHistoryOpen,   setRecurHistoryOpen]   = useState(false)
   const [isBillable,     setIsBillable]     = useState(false)
   const [billableAmount, setBillableAmount] = useState('')
   const [showProjectPicker, setShowProjectPicker] = useState(false)
@@ -157,6 +160,9 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     setTab('details')
     setActivityLog([])
     setActivityLoaded(false)
+    setRecurHistory([])
+    setRecurHistoryLoaded(false)
+    setRecurHistoryOpen(false)
     setBlockingTasks([])
     setBlockingSearch('')
     setBlockingResults([])
@@ -943,7 +949,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
               <textarea
                 value={description}
                 onChange={e => { if (!canEdit) return; setDescription(e.target.value); patchDebounced({ description: e.target.value || null }, 800) }}
-                onBlur={() => { if (!canEdit) return; if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; if (task && description !== (task.description ?? '')) patch({ description: description || null }) } }}
+                onBlur={() => { if (!canEdit) return; if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; } if (task && description !== (task.description ?? '')) patch({ description: description || null }) }}
                 placeholder={canEdit ? 'Add a description...' : ''}
                 rows={3}
                 readOnly={!canEdit}
@@ -1614,6 +1620,68 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                   </FieldRow>
                 )}
               </div>
+
+              {/* ── Recurring: triggered instances history ── */}
+              {(task as any).is_recurring && (
+                <div style={{ borderTop: '1px solid var(--border)', marginTop: 4 }}>
+                  <button
+                    onClick={async () => {
+                      const nowOpen = !recurHistoryOpen
+                      setRecurHistoryOpen(nowOpen)
+                      if (nowOpen && !recurHistoryLoaded) {
+                        const res = await fetch(`/api/tasks?parent_recurring_id=${task.id}&limit=50`).catch(() => null)
+                        const d = res ? await res.json().catch(() => ({})) : {}
+                        setRecurHistory((d.data ?? []).sort((a: any, b: any) =>
+                          (b.created_at ?? '') > (a.created_at ?? '') ? 1 : -1
+                        ))
+                        setRecurHistoryLoaded(true)
+                      }
+                    }}
+                    style={{
+                      width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+                      padding: '10px 20px', background: 'none', border: 'none', cursor: 'pointer',
+                      textAlign: 'left', fontFamily: 'inherit',
+                    }}>
+                    <Repeat2 style={{ width: 13, height: 13, color: '#0d9488', flexShrink: 0 }} />
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#0d9488', flex: 1 }}>
+                      Triggered instances {recurHistoryLoaded ? `(${recurHistory.length})` : ''}
+                    </span>
+                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{recurHistoryOpen ? '▾' : '▸'}</span>
+                  </button>
+                  {recurHistoryOpen && (
+                    <div style={{ padding: '0 20px 14px' }}>
+                      {!recurHistoryLoaded ? (
+                        <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Loading…</p>
+                      ) : recurHistory.length === 0 ? (
+                        <p style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>No instances triggered yet.</p>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          {recurHistory.map((inst: any) => {
+                            const statusColor = inst.status === 'completed' ? '#16a34a' : inst.status === 'in_review' ? '#7c3aed' : inst.status === 'in_progress' ? '#2563eb' : '#64748b'
+                            const statusBg = inst.status === 'completed' ? 'rgba(22,163,74,0.1)' : inst.status === 'in_review' ? 'rgba(124,58,237,0.1)' : inst.status === 'in_progress' ? 'rgba(37,99,235,0.1)' : 'rgba(100,116,139,0.1)'
+                            return (
+                              <div key={inst.id} style={{
+                                display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px',
+                                borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-subtle)',
+                                fontSize: 12,
+                              }}>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <p style={{ margin: 0, color: 'var(--text-secondary)', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+                                    {inst.due_date ? new Date(inst.due_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : new Date(inst.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                  </p>
+                                </div>
+                                <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 99, fontWeight: 600, background: statusBg, color: statusColor, flexShrink: 0 }}>
+                                  {inst.status.replace('_', ' ')}
+                                </span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* ── Custom fields ── */}
               {customFieldDefs.length > 0 && task && (

@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
 
   const sp  = request.nextUrl.searchParams
   let q = supabase.from('tasks')
-    .select('id, title, status, priority, due_date, assignee_id, project_id, client_id, is_recurring, frequency, next_occurrence_date, parent_task_id, custom_fields, created_at, updated_at, is_billable, billable_amount')
+    .select('id, title, status, priority, due_date, assignee_id, project_id, client_id, is_recurring, frequency, next_occurrence_date, parent_task_id, parent_recurring_id, custom_fields, created_at, updated_at, is_billable, billable_amount')
     .eq('org_id', mb.org_id).neq('is_archived', true)
 
   // Non-manager/admin/owner users only see tasks they are involved in
@@ -29,6 +29,7 @@ export async function GET(request: NextRequest) {
   if (sp.get('mine') === 'true') q = q.eq('assignee_id', user.id)
   if (sp.get('parent_id'))    q = q.eq('parent_task_id', sp.get('parent_id')!)
   if (sp.get('top_level') === 'true') q = q.is('parent_task_id', null)
+  if (sp.get('parent_recurring_id')) q = q.eq('parent_recurring_id', sp.get('parent_recurring_id')!)
   // Filter to CA compliance tasks only (custom_fields @> '{"_ca_compliance":true}')
   if (sp.get('ca_compliance') === 'true') q = (q as any).contains('custom_fields', { _ca_compliance: true })
   // Find all tasks that are blocking a given task id (reverse lookup via JSONB @> contains)
