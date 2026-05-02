@@ -28,6 +28,7 @@ interface CAMasterTask {
   priority: string
   sort_order: number
   is_active: boolean
+  is_user_saved: boolean
 }
 
 interface Props {
@@ -1595,28 +1596,7 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
     saveTaskSel(next)
   }
 
-  // Track which task IDs have been explicitly saved by the user (persisted per FY)
-  const [savedIds, setSavedIds] = useState<Set<string>>(() => {
-    try {
-      const stored = localStorage.getItem(`ca_saved_ids_${initFY}`)
-      return stored ? new Set(JSON.parse(stored)) : new Set()
-    } catch { return new Set() }
-  })
-
-  // Persist savedIds to localStorage whenever it changes
-  useEffect(() => {
-    try {
-      localStorage.setItem(`ca_saved_ids_${fy}`, JSON.stringify([...savedIds]))
-    } catch {}
-  }, [savedIds, fy])
-
-  // Reload savedIds when FY changes
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(`ca_saved_ids_${fy}`)
-      setSavedIds(stored ? new Set(JSON.parse(stored)) : new Set())
-    } catch { setSavedIds(new Set()) }
-  }, [fy])
+  // is_user_saved is now stored in the DB column — read from task.is_user_saved
 
   const canEdit = isAdmin(userRole)
 
@@ -1746,7 +1726,8 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
   }
 
   async function handleSaveRow(id: string) {
-    let patch = { ...(pendingChanges[id] ?? {}) }
+    // Always include is_user_saved: true so the DB tracks this (not localStorage)
+    let patch: Record<string, unknown> = { ...(pendingChanges[id] ?? {}), is_user_saved: true }
     const original = originalValuesRef.current[id]
 
     // Re-compute attachment_headers from current template selections so that
@@ -1762,7 +1743,6 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
       }
     }
 
-    if (Object.keys(patch).length === 0) return
     const prev = tasks.find(t => t.id === id)
     try {
       const res = await fetch(`/api/ca/master/${id}`, {
@@ -1773,7 +1753,7 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
       const json = (await res.json()) as { data?: CAMasterTask; error?: string }
       if (!res.ok) throw new Error(json.error ?? 'Update failed')
       setPendingChanges(p => { const n = { ...p }; delete n[id]; return n })
-      setSavedIds(prev => new Set([...prev, id]))
+      setTasks(ts => ts.map(t => t.id === id ? { ...t, is_user_saved: true } : t))
       // Update our baseline so next save compares against fresh values
       if (original) originalValuesRef.current[id] = { ...original, ...patch }
       toast.success('Task saved')
@@ -1781,11 +1761,11 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
       // Check if any propagation-relevant fields changed
       if (original) {
         const propFields: { title?: string; priority?: string; attachment_headers?: { old: string[]; new: string[] } } = {}
-        if (patch.name && patch.name !== original.name) propFields.title = patch.name
-        if (patch.priority && patch.priority !== original.priority) propFields.priority = patch.priority
+        if (patch.name && patch.name !== original.name) propFields.title = patch.name as string
+        if (patch.priority && patch.priority !== original.priority) propFields.priority = patch.priority as string
         if (patch.attachment_headers) {
           const oldH = original.attachment_headers ?? []
-          const newH = patch.attachment_headers
+          const newH = patch.attachment_headers as string[]
           if (JSON.stringify(oldH) !== JSON.stringify(newH)) {
             propFields.attachment_headers = { old: oldH, new: newH }
           }
@@ -1814,7 +1794,8 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
     const propagationQueue: PropEntry[] = []
 
     for (const id of ids) {
-      let patch: Record<string, unknown> = { ...(pendingChanges[id] ?? {}) }
+      // Always include is_user_saved: true so DB tracks it (not localStorage)
+      let patch: Record<string, unknown> = { ...(pendingChanges[id] ?? {}), is_user_saved: true }
       const original = originalValuesRef.current[id]
 
       // Re-compute attachment_headers from current template selections
@@ -1828,7 +1809,6 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
         }
       }
 
-      if (Object.keys(patch).length === 0) continue
       rows.push({ id, ...patch })
 
       // Collect propagation-relevant changes
@@ -1863,13 +1843,14 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
       const failedIdSet = new Set((json.errors ?? []).map(e => e.id))
       const savedRowIds = rows.filter(r => !failedIdSet.has(r.id as string)).map(r => r.id as string)
 
-      // Clear pending changes for saved rows and mark them saved
+      // Clear pending changes for saved rows and mark them saved in state
       setPendingChanges(prev => {
         const next = { ...prev }
         savedRowIds.forEach(id => delete next[id])
         return next
       })
-      setSavedIds(prev => new Set([...prev, ...savedRowIds]))
+      const savedSet = new Set(savedRowIds)
+      setTasks(ts => ts.map(t => savedSet.has(t.id) ? { ...t, is_user_saved: true } : t))
 
       // Advance baselines so the next save compares against fresh values
       savedRowIds.forEach(id => {
@@ -1948,13 +1929,13 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
       if (!q) return true
       return t.name.toLowerCase().includes(q) || t.group_name.toLowerCase().includes(q) || t.code.toLowerCase().includes(q)
     })
-    const searchedSavedCount   = searchFiltered.filter(t => savedIds.has(t.id)).length
-    const searchedUnsavedCount = searchFiltered.filter(t => !savedIds.has(t.id)).length
+    const searchedSavedCount   = searchFiltered.filter(t => t.is_user_saved).length
+    const searchedUnsavedCount = searchFiltered.filter(t => !t.is_user_saved).length
 
     // Then apply tab filter
     const filtered = searchFiltered.filter(t => {
-      if (savedTab === 'saved'   && !savedIds.has(t.id)) return false
-      if (savedTab === 'unsaved' &&  savedIds.has(t.id)) return false
+      if (savedTab === 'saved'   && !t.is_user_saved) return false
+      if (savedTab === 'unsaved' &&  t.is_user_saved) return false
       return true
     })
     const map = new Map<string, CAMasterTask[]>()
@@ -1963,7 +1944,7 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
       map.get(t.group_name)!.push(t)
     }
     return { grouped: map, searchedUnsavedCount, searchedSavedCount }
-  }, [tasks, groupFilter, search, savedTab, savedIds])
+  }, [tasks, groupFilter, search, savedTab])
 
   /* ─── Render ────────────────────────────────────────────────── */
 
