@@ -677,27 +677,29 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
   }
 
   async function viewAttachment(storagePath: string, mimeType: string, fileName: string) {
-    const { createClient } = await import('@/lib/supabase/client')
-    const sb = createClient()
-    const { data } = await sb.storage.from('attachments').createSignedUrl(storagePath, 300)
-    if (!data?.signedUrl) return
+    const res = await fetch(
+      `/api/storage/signed-url?key=${encodeURIComponent(storagePath)}&expires=300`
+    )
+    const { url } = await res.json()
+    if (!url) return
     const isImage = mimeType?.startsWith('image/')
     const isPdf   = mimeType?.includes('pdf')
     const isVideo = mimeType?.startsWith('video/')
     if (isImage || isPdf || isVideo) {
-      setPreviewAtt({ url: data.signedUrl, mimeType, name: fileName, storagePath })
+      setPreviewAtt({ url, mimeType, name: fileName, storagePath })
     } else {
-      window.open(data.signedUrl, '_blank', 'noopener,noreferrer')
+      window.open(url, '_blank', 'noopener,noreferrer')
     }
   }
 
   async function downloadAttachment(storagePath: string, fileName: string) {
-    const { createClient } = await import('@/lib/supabase/client')
-    const sb = createClient()
-    const { data } = await sb.storage.from('attachments').createSignedUrl(storagePath, 60, { download: fileName })
-    if (data?.signedUrl) {
+    const res = await fetch(
+      `/api/storage/signed-url?key=${encodeURIComponent(storagePath)}&expires=60&download=${encodeURIComponent(fileName)}`
+    )
+    const { url } = await res.json()
+    if (url) {
       const a = document.createElement('a')
-      a.href = data.signedUrl; a.click()
+      a.href = url; a.click()
     }
   }
 

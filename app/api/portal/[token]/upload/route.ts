@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient }         from '@/lib/supabase/admin'
-import crypto                        from 'crypto'
+import { NextRequest, NextResponse }             from 'next/server'
+import { createAdminClient }                     from '@/lib/supabase/admin'
+import crypto                                    from 'crypto'
+import { uploadToR2, r2SignedUrl, R2_CONFIGURED } from '@/lib/storage/r2'
 
 export const maxDuration = 60 // seconds — file upload to storage can be slow
 
@@ -75,7 +76,7 @@ export async function POST(
     return NextResponse.json({ error: 'document_type_id or task_id is required' }, { status: 400 })
   }
 
-  // 4. Upload file to Supabase Storage
+  // 4. Upload file to R2
   const fileBuffer  = Buffer.from(await file.arrayBuffer())
   const safeName    = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
   const typeSegment = documentTypeId ?? 'direct'
@@ -89,25 +90,30 @@ export async function POST(
   }
 
   const uploadContentType = normaliseContentType(file.type || 'application/octet-stream')
-  let { data: storageData, error: storageError } = await admin.storage
-    .from('task-attachments')
-    .upload(storagePath, fileBuffer, { contentType: uploadContentType, upsert: false })
 
-  // Retry with generic binary if Supabase Storage rejects the specific MIME type
-  if (storageError && storageError.message?.toLowerCase().includes('mime type')) {
-    ;({ data: storageData, error: storageError } = await admin.storage
+  let publicUrl: string
+  if (R2_CONFIGURED) {
+    // ── R2 path ────────────────────────────────────────────────────────────────
+    try {
+      await uploadToR2(storagePath, fileBuffer, uploadContentType)
+    } catch (err: any) {
+      console.error('[portal-upload] R2 upload error:', err?.message)
+      return NextResponse.json({ error: 'Storage upload failed' }, { status: 500 })
+    }
+    // 7-day presigned URL stored in file_url — long enough for any active portal session
+    publicUrl = await r2SignedUrl(storagePath, 604800)
+  } else {
+    // ── Supabase Storage fallback ──────────────────────────────────────────────
+    const { error: storageErr } = await admin.storage
       .from('task-attachments')
-      .upload(storagePath, fileBuffer, { contentType: 'application/octet-stream', upsert: true }))
+      .upload(storagePath, fileBuffer, { contentType: uploadContentType, upsert: false })
+    if (storageErr) {
+      console.error('[portal-upload] Supabase storage error:', storageErr.message)
+      return NextResponse.json({ error: 'Storage upload failed' }, { status: 500 })
+    }
+    const { data: urlData } = admin.storage.from('task-attachments').getPublicUrl(storagePath)
+    publicUrl = urlData.publicUrl
   }
-
-  if (storageError) {
-    console.error('[portal-upload] storage error:', storageError.message)
-    return NextResponse.json({ error: 'Storage upload failed' }, { status: 500 })
-  }
-
-  const { data: { publicUrl } } = admin.storage
-    .from('task-attachments')
-    .getPublicUrl(storageData!.path)
 
   // 5a. FALLBACK PATH: no doc type configured — attach directly to the specific task
   if (!docType && taskIdFallback) {

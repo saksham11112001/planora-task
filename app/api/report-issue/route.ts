@@ -1,6 +1,7 @@
-import { createAdminClient } from '@/lib/supabase/admin'
-import { createClient }      from '@/lib/supabase/server'
-import { NextResponse }      from 'next/server'
+import { createAdminClient }       from '@/lib/supabase/admin'
+import { createClient }            from '@/lib/supabase/server'
+import { NextResponse }            from 'next/server'
+import { uploadToR2, r2SignedUrl, R2_CONFIGURED } from '@/lib/storage/r2'
 
 const MAX_REPORT_SIZE = 10 * 1024 * 1024 // 10 MB total for issue reports
 
@@ -46,15 +47,19 @@ export async function POST(req: Request) {
       const path  = `issue-reports/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
       const bytes = Buffer.from(await file.arrayBuffer())
       const uploadContentType = normaliseContentType(file.type || 'application/octet-stream')
-      let { error } = await admin.storage.from('attachments').upload(path, bytes, { contentType: uploadContentType })
-      // Retry with a generic binary type if storage rejects the specific MIME type
-      if (error && error.message?.toLowerCase().includes('mime type')) {
-        ;({ error } = await admin.storage.from('attachments').upload(path, bytes, { contentType: 'application/octet-stream', upsert: true }))
-      }
-      if (!error) {
-        const { data: urlData } = admin.storage.from('attachments').getPublicUrl(path)
-        attachmentUrls.push(urlData.publicUrl)
-      }
+      try {
+        if (R2_CONFIGURED) {
+          await uploadToR2(path, bytes, uploadContentType)
+          // 7-day link — only accessed internally by the team reviewing the report
+          const signedUrl = await r2SignedUrl(path, 604800)
+          attachmentUrls.push(signedUrl)
+        } else {
+          // Supabase Storage fallback
+          const { data: urlData } = admin.storage.from('issue-reports').getPublicUrl(path)
+          await admin.storage.from('issue-reports').upload(path, bytes, { contentType: uploadContentType, upsert: false })
+          attachmentUrls.push(urlData.publicUrl)
+        }
+      } catch { /* Non-fatal — report still saved without attachment */ }
     }
 
     // Insert into issue_reports table (table must exist; graceful fail if not)

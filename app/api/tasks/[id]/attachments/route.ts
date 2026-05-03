@@ -1,10 +1,11 @@
-import { createClient }    from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
-import { NextResponse }    from 'next/server'
-import type { NextRequest } from 'next/server'
-import { dbError } from '@/lib/api-error'
+import { createClient }      from '@/lib/supabase/server'
+import { createAdminClient }  from '@/lib/supabase/admin'
+import { NextResponse }       from 'next/server'
+import type { NextRequest }   from 'next/server'
+import { dbError }            from '@/lib/api-error'
+import { uploadToR2, deleteFromR2, R2_CONFIGURED } from '@/lib/storage/r2'
 
-// Allow up to 60s for large file uploads to Supabase storage
+// Allow up to 60s for large file uploads
 export const maxDuration = 60
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -101,7 +102,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       { status: 400 }
     )
   }
-  const storagePath = `${mb.org_id}/${id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
 
   // Normalise MIME types — ZIP has many variants across OS/browser combinations
   function normaliseContentType(mime: string): string {
@@ -114,18 +114,28 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return mime
   }
 
-  // Pass the File (Blob) directly — avoids loading the entire file into an
-  // ArrayBuffer in memory first, which is especially slow for large ZIPs.
-  const adminSb = createAdminClient()
   const uploadContentType = normaliseContentType(file.type || 'application/octet-stream')
-  let { error: upErr } = await adminSb.storage.from('attachments')
-    .upload(storagePath, file, { contentType: uploadContentType, upsert: false })
-  // Always retry as generic binary if the specific MIME type is rejected
-  if (upErr) {
-    ;({ error: upErr } = await adminSb.storage.from('attachments')
-      .upload(storagePath, file, { contentType: 'application/octet-stream', upsert: true }))
+  const buffer = Buffer.from(await file.arrayBuffer())
+
+  let storagePath: string
+
+  if (R2_CONFIGURED) {
+    // ── R2 path ───────────────────────────────────────────────────────────────
+    storagePath = `${mb.org_id}/${id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+    try {
+      await uploadToR2(storagePath, buffer, uploadContentType)
+    } catch (upErr: any) {
+      return NextResponse.json(dbError(upErr, 'tasks/[id]/attachments'), { status: 500 })
+    }
+  } else {
+    // ── Supabase Storage fallback (used until R2 env vars are set) ────────────
+    const admin = createAdminClient()
+    storagePath = `${mb.org_id}/${id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+    const { error: storageErr } = await admin.storage
+      .from('attachments')
+      .upload(storagePath, buffer, { contentType: uploadContentType, upsert: false })
+    if (storageErr) return NextResponse.json(dbError(storageErr, 'tasks/[id]/attachments'), { status: 500 })
   }
-  if (upErr) return NextResponse.json(dbError(upErr, 'tasks/[id]/attachments'), { status: 500 })
 
   const { data: row, error: dbErr } = await supabase.from('task_attachments').insert({
     task_id: id, org_id: mb.org_id, uploaded_by: user.id,
@@ -151,7 +161,13 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   // Only remove from storage for real file uploads (drive links have no storage_path)
   const isFileUpload = !att.drive_url && !att.attachment_type?.includes('link') && att.storage_path
   if (isFileUpload) {
-    await createAdminClient().storage.from('attachments').remove([att.storage_path])
+    if (R2_CONFIGURED) {
+      await deleteFromR2(att.storage_path)
+    } else {
+      // Supabase Storage fallback
+      const admin = createAdminClient()
+      await admin.storage.from('attachments').remove([att.storage_path])
+    }
   }
   await supabase.from('task_attachments').delete().eq('id', attId)
   return NextResponse.json({ ok: true })
