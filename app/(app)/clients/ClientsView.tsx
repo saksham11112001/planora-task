@@ -97,13 +97,6 @@ export function ClientsView({ initialClients, initialGroups, canManage }: Props)
         </div>
       </div>
 
-      {/* ── Client Groups ── */}
-      <ClientGroupsSection
-        initialGroups={initialGroups}
-        allClients={clients.map(c => ({ id: c.id, name: c.name, color: c.color, status: c.status, group_id: c.group_id ?? null }))}
-        canManage={canManage}
-      />
-
       {/* ── search bar ── */}
       {clients.length > 0 && (
         <div style={{ position: 'relative', maxWidth: 400, marginBottom: 24 }}>
@@ -128,6 +121,13 @@ export function ClientsView({ initialClients, initialGroups, canManage }: Props)
           )}
         </div>
       )}
+
+      {/* ── Client Groups ── */}
+      <ClientGroupsSection
+        initialGroups={initialGroups}
+        allClients={clients.map(c => ({ id: c.id, name: c.name, color: c.color, status: c.status, group_id: c.group_id ?? null }))}
+        canManage={canManage}
+      />
 
       {/* ── empty state ── */}
       {clients.length === 0 ? (
