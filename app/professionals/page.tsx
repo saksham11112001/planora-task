@@ -199,10 +199,10 @@ export default async function ProfessionalsPage() {
 
         <div style={{ maxWidth: 860, margin: '0 auto', textAlign: 'center', position: 'relative', zIndex: 1 }} className="fade-up">
           {/* Badge */}
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(124,58,237,0.15)', border: '1px solid rgba(124,58,237,0.35)', borderRadius: 99, padding: '6px 16px', marginBottom: 32 }}>
-            <span style={{ fontSize: 16 }}>🏛️</span>
-            <span style={{ color: '#c4b5fd', fontSize: 13, fontWeight: 700, letterSpacing: '0.02em' }}>
-              For CPA & CA Professionals · US · UK · Canada · Australia · Europe
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 9, marginBottom: 32 }}>
+            <div style={{ width: 10, height: 10, borderRadius: 3, background: '#a78bfa', flexShrink: 0, transform: 'rotate(45deg)' }} />
+            <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: 13, fontWeight: 500, letterSpacing: '0.01em' }}>
+              For CPA &amp; CA professionals · US · UK · Canada · Australia · Europe
             </span>
           </div>
 
@@ -259,8 +259,10 @@ export default async function ProfessionalsPage() {
       <section id="compliance" style={{ padding: '92px 6%', background: '#fff' }}>
         <div style={{ maxWidth: 1120, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 56 }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#faf5ff', border: '1px solid #ddd6fe', borderRadius: 99, padding: '4px 14px', marginBottom: 16 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Compliance Module</span>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+              <div style={{ width: 22, height: 2, background: '#7c3aed', borderRadius: 2, flexShrink: 0 }} />
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#7c3aed', letterSpacing: '0.01em' }}>Compliance module</span>
+              <div style={{ width: 22, height: 2, background: '#7c3aed', borderRadius: 2, flexShrink: 0 }} />
             </div>
             <h2 style={{ fontSize: 'clamp(28px, 4vw, 44px)', fontWeight: 800, letterSpacing: '-1.5px', lineHeight: 1.1, margin: '0 0 14px' }}>
               Everything your practice needs<br/>to never miss a deadline
@@ -336,8 +338,9 @@ export default async function ProfessionalsPage() {
             display: 'flex', alignItems: 'center', gap: 36, flexWrap: 'wrap',
           }}>
             <div style={{ flex: 1, minWidth: 260 }}>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(124,58,237,0.2)', border: '1px solid rgba(124,58,237,0.4)', borderRadius: 99, padding: '3px 12px', marginBottom: 14 }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#c4b5fd', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Multi-country practices</span>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+                <div style={{ width: 8, height: 8, borderRadius: 2, background: '#a78bfa', flexShrink: 0, transform: 'rotate(45deg)' }} />
+                <span style={{ fontSize: 13, fontWeight: 600, color: '#c4b5fd', letterSpacing: '0.01em' }}>Multi-country practices</span>
               </div>
               <h3 style={{ fontSize: 22, fontWeight: 800, color: '#fff', letterSpacing: '-0.5px', marginBottom: 10 }}>
                 Serve clients in multiple jurisdictions?
@@ -369,8 +372,10 @@ export default async function ProfessionalsPage() {
       <section id="countries" style={{ padding: '92px 6%', background: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>
         <div style={{ maxWidth: 1120, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 52 }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 99, padding: '4px 14px', marginBottom: 16 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#f97316', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Compliance by country</span>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+              <div style={{ width: 22, height: 2, background: '#f97316', borderRadius: 2, flexShrink: 0 }} />
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#f97316', letterSpacing: '0.01em' }}>Compliance by jurisdiction</span>
+              <div style={{ width: 22, height: 2, background: '#f97316', borderRadius: 2, flexShrink: 0 }} />
             </div>
             <h2 style={{ fontSize: 'clamp(26px, 3.5vw, 40px)', fontWeight: 800, letterSpacing: '-1.2px', margin: '0 0 12px' }}>
               Pre-built templates for every jurisdiction
@@ -446,8 +451,10 @@ export default async function ProfessionalsPage() {
       <section id="how" style={{ padding: '92px 6%', background: '#fff', borderTop: '1px solid #f1f5f9' }}>
         <div style={{ maxWidth: 960, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 52 }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#f0fdfa', border: '1px solid #5eead4', borderRadius: 99, padding: '4px 14px', marginBottom: 16 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#0d9488', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Professional workflow</span>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+              <div style={{ width: 22, height: 2, background: '#0d9488', borderRadius: 2, flexShrink: 0 }} />
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#0d9488', letterSpacing: '0.01em' }}>How it works in practice</span>
+              <div style={{ width: 22, height: 2, background: '#0d9488', borderRadius: 2, flexShrink: 0 }} />
             </div>
             <h2 style={{ fontSize: 'clamp(26px, 3.5vw, 40px)', fontWeight: 800, letterSpacing: '-1.2px', margin: '0 0 12px' }}>
               From setup to client delivery in minutes
@@ -509,8 +516,10 @@ export default async function ProfessionalsPage() {
       <section id="pricing" style={{ padding: '92px 6%', background: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>
         <div style={{ maxWidth: 860, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 44 }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#faf5ff', border: '1px solid #ddd6fe', borderRadius: 99, padding: '4px 14px', marginBottom: 16 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Pricing</span>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+              <div style={{ width: 22, height: 2, background: '#7c3aed', borderRadius: 2, flexShrink: 0 }} />
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#7c3aed', letterSpacing: '0.01em' }}>Simple, flat pricing</span>
+              <div style={{ width: 22, height: 2, background: '#7c3aed', borderRadius: 2, flexShrink: 0 }} />
             </div>
             <h2 style={{ fontSize: 'clamp(26px, 3.5vw, 36px)', fontWeight: 800, letterSpacing: '-1.2px', margin: '0 0 10px' }}>
               Flat team pricing, billed in USD

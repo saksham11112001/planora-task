@@ -400,7 +400,11 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
           </div>
           <div style={{ flex: 1 }}>
             <h1 style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>Monitor</h1>
-            <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>Read-only view of all tasks across the organisation</p>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>
+              {['owner', 'admin'].includes(userRole)
+                ? 'Full view of all tasks — click any task to edit or complete it'
+                : 'Read-only view of all tasks across the organisation'}
+            </p>
           </div>
           {/* Chart toggle */}
           <button onClick={() => setShowChart(v => !v)}
@@ -873,15 +877,17 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
         ))}
       </div>
 
-      {/* Task detail panel */}
+      {/* Task detail panel — admin/owner can edit; everyone else is read-only */}
       <TaskDetailPanel
         task={panelTask}
         members={members}
         clients={clients}
         currentUserId={currentUserId}
-        userRole="viewer"
+        userRole={['owner', 'admin'].includes(userRole) ? userRole : 'viewer'}
         onClose={() => setPanelTask(null)}
-        onUpdated={() => setPanelTask(null)}
+        onUpdated={() => {
+          setPanelTask(null)
+        }}
       />
     </div>
   )

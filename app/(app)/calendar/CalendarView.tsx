@@ -464,8 +464,8 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
                         </button>
                       )
                     })}
-                    {/* Upcoming CA trigger ghost cards */}
-                    {(byTriggerDate[dateStr] ?? []).map(ct => (
+                    {/* Upcoming CA trigger ghost cards — only in All / Compliance views */}
+                    {(filter === 'all' || filter === 'compliance') && (byTriggerDate[dateStr] ?? []).map(ct => (
                       <div key={ct.id} style={{ padding:'5px 7px', borderRadius:6,
                         background:'rgba(234,179,8,0.05)',
                         border:'1px dashed rgba(217,119,6,0.4)',
@@ -643,8 +643,8 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
                     +{dayTasks.length-3} more
                   </div>
                 )}
-                {/* Upcoming CA trigger ghost pills */}
-                {(byTriggerDate[dateStr] ?? []).slice(0,2).map(ct => (
+                {/* Upcoming CA trigger ghost pills — only in All / Compliance views */}
+                {(filter === 'all' || filter === 'compliance') && (byTriggerDate[dateStr] ?? []).slice(0,2).map(ct => (
                   <div key={ct.id} style={{ display:'flex', alignItems:'center', gap:3,
                     padding:'2px 4px', borderRadius:4, marginBottom:1,
                     background:'rgba(234,179,8,0.05)',

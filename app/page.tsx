@@ -169,13 +169,11 @@ export default async function LandingPage() {
           {/* Left: copy */}
           <div style={{ flex: '1 1 480px', paddingBottom: 88 }} className="fade-up">
             <div style={{
-              display: 'inline-flex', alignItems: 'center', gap: 7,
-              background: 'rgba(13,148,136,0.1)', border: '1px solid rgba(13,148,136,0.22)',
-              borderRadius: 99, padding: '5px 14px', marginBottom: 28,
+              display: 'inline-flex', alignItems: 'center', gap: 9, marginBottom: 28,
             }}>
-              <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#2dd4bf', flexShrink: 0 }}/>
-              <span style={{ color: '#5eead4', fontSize: 12, fontWeight: 600 }}>
-                Built for professional teams · USD billing · Compliance module included
+              <div style={{ width: 10, height: 10, borderRadius: 3, background: '#2dd4bf', flexShrink: 0, transform: 'rotate(45deg)' }}/>
+              <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: 13, fontWeight: 500, letterSpacing: '0.01em' }}>
+                Professional teams · USD billing · Compliance included
               </span>
             </div>
 
@@ -368,8 +366,10 @@ export default async function LandingPage() {
       <section style={{ padding: '92px 6%', background: '#fff' }}>
         <div style={{ maxWidth: 1120, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 56 }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#f0fdfa', border: '1px solid #5eead4', borderRadius: 99, padding: '4px 14px', marginBottom: 16 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#0d9488', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Why teams choose Floatup</span>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+              <div style={{ width: 22, height: 2, background: '#0d9488', borderRadius: 2, flexShrink: 0 }} />
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#0d9488', letterSpacing: '0.01em' }}>Why practices choose Floatup</span>
+              <div style={{ width: 22, height: 2, background: '#0d9488', borderRadius: 2, flexShrink: 0 }} />
             </div>
             <h2 style={{ fontSize: 'clamp(28px, 4vw, 44px)', fontWeight: 800, letterSpacing: '-1.5px', lineHeight: 1.1, marginBottom: 14, margin: '0 0 14px' }}>
               Everything generic tools miss<br/>for professional practices
@@ -431,8 +431,10 @@ export default async function LandingPage() {
       <section id="features" style={{ padding: '92px 6%', background: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>
         <div style={{ maxWidth: 1120, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 56 }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 99, padding: '4px 14px', marginBottom: 16 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#f97316', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Everything you need</span>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+              <div style={{ width: 22, height: 2, background: '#f97316', borderRadius: 2, flexShrink: 0 }} />
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#f97316', letterSpacing: '0.01em' }}>Core capabilities</span>
+              <div style={{ width: 22, height: 2, background: '#f97316', borderRadius: 2, flexShrink: 0 }} />
             </div>
             <h2 style={{ fontSize: 'clamp(28px, 4vw, 44px)', fontWeight: 800, letterSpacing: '-1.5px', lineHeight: 1.1, margin: '0 0 14px' }}>
               Six features your team uses<br/>every single day
@@ -504,8 +506,10 @@ export default async function LandingPage() {
       <section style={{ padding: '92px 6%', background: '#fff', borderTop: '1px solid #f1f5f9' }}>
         <div style={{ maxWidth: 1120, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 60 }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#f0fdfa', border: '1px solid #5eead4', borderRadius: 99, padding: '4px 14px', marginBottom: 16 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#0d9488', textTransform: 'uppercase', letterSpacing: '0.07em' }}>How it works</span>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+              <div style={{ width: 22, height: 2, background: '#0d9488', borderRadius: 2, flexShrink: 0 }} />
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#0d9488', letterSpacing: '0.01em' }}>Three steps to get started</span>
+              <div style={{ width: 22, height: 2, background: '#0d9488', borderRadius: 2, flexShrink: 0 }} />
             </div>
             <h2 style={{ fontSize: 'clamp(26px, 3.5vw, 40px)', fontWeight: 800, letterSpacing: '-1.2px', margin: '0 0 12px' }}>
               Up and running in 15 minutes
@@ -555,8 +559,10 @@ export default async function LandingPage() {
       <section id="solutions" style={{ padding: '92px 6%', background: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>
         <div style={{ maxWidth: 1120, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 52 }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 99, padding: '4px 14px', marginBottom: 16 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#f97316', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Who it&apos;s for</span>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+              <div style={{ width: 22, height: 2, background: '#f97316', borderRadius: 2, flexShrink: 0 }} />
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#f97316', letterSpacing: '0.01em' }}>Works for your practice type</span>
+              <div style={{ width: 22, height: 2, background: '#f97316', borderRadius: 2, flexShrink: 0 }} />
             </div>
             <h2 style={{ fontSize: 'clamp(26px, 3.5vw, 40px)', fontWeight: 800, letterSpacing: '-1.2px', margin: '0 0 12px' }}>
               Built for every professional team type
@@ -617,8 +623,10 @@ export default async function LandingPage() {
       <section id="compare" style={{ padding: '92px 6%', background: '#fff', borderTop: '1px solid #f1f5f9' }}>
         <div style={{ maxWidth: 1060, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 52 }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 99, padding: '4px 14px', marginBottom: 16 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Compare</span>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+              <div style={{ width: 22, height: 2, background: '#475569', borderRadius: 2, flexShrink: 0 }} />
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#475569', letterSpacing: '0.01em' }}>Side by side</span>
+              <div style={{ width: 22, height: 2, background: '#475569', borderRadius: 2, flexShrink: 0 }} />
             </div>
             <h2 style={{ fontSize: 'clamp(26px, 3.5vw, 40px)', fontWeight: 800, letterSpacing: '-1.2px', margin: '0 0 12px' }}>
               Why professional teams switch to Floatup
@@ -696,8 +704,10 @@ export default async function LandingPage() {
       <section id="pricing" style={{ padding: '92px 6%', background: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>
         <div style={{ maxWidth: 960, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 52 }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#faf5ff', border: '1px solid #ddd6fe', borderRadius: 99, padding: '4px 14px', marginBottom: 16 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Pricing</span>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+              <div style={{ width: 22, height: 2, background: '#7c3aed', borderRadius: 2, flexShrink: 0 }} />
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#7c3aed', letterSpacing: '0.01em' }}>Simple, flat pricing</span>
+              <div style={{ width: 22, height: 2, background: '#7c3aed', borderRadius: 2, flexShrink: 0 }} />
             </div>
             <h2 style={{ fontSize: 'clamp(26px, 3.5vw, 40px)', fontWeight: 800, letterSpacing: '-1.2px', margin: '0 0 12px' }}>
               Simple pricing, billed in USD
@@ -888,8 +898,10 @@ export default async function LandingPage() {
       <section style={{ padding: '72px 6%', background: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>
         <div style={{ maxWidth: 1000, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 44 }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 99, padding: '4px 14px', marginBottom: 14 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Security &amp; trust</span>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+              <div style={{ width: 22, height: 2, background: '#16a34a', borderRadius: 2, flexShrink: 0 }} />
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#16a34a', letterSpacing: '0.01em' }}>Security &amp; trust</span>
+              <div style={{ width: 22, height: 2, background: '#16a34a', borderRadius: 2, flexShrink: 0 }} />
             </div>
             <h2 style={{ fontSize: 'clamp(22px, 3vw, 32px)', fontWeight: 800, letterSpacing: '-0.8px', margin: '0 0 10px' }}>Your data is safe with us</h2>
             <p style={{ fontSize: 15, color: '#64748b', maxWidth: 340, margin: '0 auto', lineHeight: 1.7 }}>Enterprise-grade security without the enterprise overhead.</p>
