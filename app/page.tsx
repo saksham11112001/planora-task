@@ -21,7 +21,6 @@ export default async function LandingPage() {
       <style>{`
         *, *::before, *::after { box-sizing: border-box; }
 
-        /* ── Animations: minimal — only what earns its weight ── */
         @keyframes shimmer {
           0%   { background-position: 200% center }
           100% { background-position: -200% center }
@@ -35,7 +34,6 @@ export default async function LandingPage() {
         .fade-up-2 { animation: fade-up 0.55s 0.1s ease both }
         .fade-up-3 { animation: fade-up 0.55s 0.2s ease both }
 
-        /* ── Interactive states ── */
         .btn-primary { transition: transform 0.18s ease, box-shadow 0.18s ease !important }
         .btn-primary:hover {
           transform: translateY(-2px) !important;
@@ -46,6 +44,13 @@ export default async function LandingPage() {
 
         .nav-link { transition: color 0.14s }
         .nav-link:hover { color: #0d9488 !important }
+
+        .btn-pro { transition: all 0.15s ease !important }
+        .btn-pro:hover {
+          background: #7c3aed !important;
+          color: #fff !important;
+          box-shadow: 0 4px 16px rgba(124,58,237,0.35) !important;
+        }
 
         .card-lift { transition: transform 0.2s ease, box-shadow 0.2s ease }
         .card-lift:hover {
@@ -61,7 +66,6 @@ export default async function LandingPage() {
         .faq-details[open] summary .faq-icon { transform: rotate(45deg) }
         .faq-icon { transition: transform 0.2s ease; display: inline-block }
 
-        /* ── Responsive ── */
         @media (max-width: 960px) {
           .hero-cols { flex-direction: column !important }
           .hero-visual { display: none !important }
@@ -73,6 +77,7 @@ export default async function LandingPage() {
         }
         @media (max-width: 640px) {
           .nav-mid { display: none !important }
+          .nav-pro-btn { display: none !important }
           .grid-4 { grid-template-columns: 1fr !important }
           .footer-grid { grid-template-columns: 1fr !important }
           .stats-row { flex-wrap: wrap !important; gap: 20px !important }
@@ -109,7 +114,18 @@ export default async function LandingPage() {
           ))}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+          {/* For Professionals CTA */}
+          <Link href="/professionals" className="btn-pro"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              color: '#7c3aed', fontSize: 13, fontWeight: 700, textDecoration: 'none',
+              border: '1.5px solid #ddd6fe', borderRadius: 8, padding: '7px 14px',
+              background: '#faf5ff',
+            }}>
+            <span style={{ fontSize: 14 }}>🏛️</span>
+            <span className="nav-pro-btn">For Professionals</span>
+          </Link>
           <Link href="/login" className="nav-link"
             style={{ color: '#64748b', fontSize: 14, textDecoration: 'none', fontWeight: 500 }}>
             Sign in
@@ -130,7 +146,6 @@ export default async function LandingPage() {
         background: 'linear-gradient(170deg, #0a0f1e 0%, #0c1a32 55%, #0a1224 100%)',
         padding: '88px 6% 0', position: 'relative', overflow: 'hidden',
       }}>
-        {/* Subtle grid overlay */}
         <div style={{
           position: 'absolute', inset: 0,
           backgroundImage: 'linear-gradient(rgba(13,148,136,0.07) 1px,transparent 1px),linear-gradient(90deg,rgba(13,148,136,0.07) 1px,transparent 1px)',
@@ -139,7 +154,6 @@ export default async function LandingPage() {
           WebkitMaskImage: 'radial-gradient(ellipse 90% 70% at 50% 0%, black 30%, transparent 100%)',
           pointerEvents: 'none',
         }}/>
-        {/* Ambient glow */}
         <div style={{
           position: 'absolute', top: -100, left: '22%', width: 640, height: 480,
           borderRadius: '50%',
@@ -147,17 +161,13 @@ export default async function LandingPage() {
           pointerEvents: 'none',
         }}/>
 
-        <div
-          className="hero-cols"
-          style={{
-            maxWidth: 1120, margin: '0 auto',
-            display: 'flex', alignItems: 'flex-start', gap: 60,
-            position: 'relative', zIndex: 1,
-          }}
-        >
-          {/* ── Left: copy ── */}
+        <div className="hero-cols" style={{
+          maxWidth: 1120, margin: '0 auto',
+          display: 'flex', alignItems: 'flex-start', gap: 60,
+          position: 'relative', zIndex: 1,
+        }}>
+          {/* Left: copy */}
           <div style={{ flex: '1 1 480px', paddingBottom: 88 }} className="fade-up">
-            {/* Announcement badge */}
             <div style={{
               display: 'inline-flex', alignItems: 'center', gap: 7,
               background: 'rgba(13,148,136,0.1)', border: '1px solid rgba(13,148,136,0.22)',
@@ -165,11 +175,10 @@ export default async function LandingPage() {
             }}>
               <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#2dd4bf', flexShrink: 0 }}/>
               <span style={{ color: '#5eead4', fontSize: 12, fontWeight: 600 }}>
-                WhatsApp alerts · INR billing · CA compliance built-in
+                Built for professional teams · USD billing · Compliance module included
               </span>
             </div>
 
-            {/* Headline */}
             <h1 style={{
               fontSize: 'clamp(38px, 5.2vw, 64px)',
               fontWeight: 800, lineHeight: 1.04,
@@ -181,18 +190,16 @@ export default async function LandingPage() {
                 backgroundSize: '200% auto',
                 WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
                 animation: 'shimmer 6s linear infinite',
-              }}>built for India.</span>
+              }}>built for professionals.</span>
             </h1>
 
-            {/* Subheadline */}
             <p style={{
               fontSize: 18, color: 'rgba(255,255,255,0.52)',
               lineHeight: 1.78, marginBottom: 36, maxWidth: 480,
             }}>
-              Tasks, approvals, recurring checklists, WhatsApp reminders, and compliance tools — in one platform priced in rupees and designed for how Indian teams actually work.
+              Tasks, approvals, recurring checklists, smart reminders, and professional compliance tools — in one platform designed for how accounting and advisory teams actually work.
             </p>
 
-            {/* CTA row */}
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 22 }}>
               <Link href="/login" className="btn-primary"
                 style={{
@@ -203,15 +210,14 @@ export default async function LandingPage() {
                 }}>
                 Start free — no card needed
               </Link>
-              <a href="#features" className="btn-ghost"
-                style={{
-                  background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.8)',
-                  padding: '14px 22px', borderRadius: 10,
-                  fontSize: 15, fontWeight: 500, textDecoration: 'none',
-                  border: '1px solid rgba(255,255,255,0.12)', display: 'inline-block',
-                }}>
-                See how it works
-              </a>
+              <Link href="/professionals" style={{
+                background: 'rgba(124,58,237,0.15)', color: '#c4b5fd',
+                padding: '14px 22px', borderRadius: 10,
+                fontSize: 15, fontWeight: 600, textDecoration: 'none',
+                border: '1px solid rgba(124,58,237,0.3)', display: 'inline-block',
+              }}>
+                🏛️ CPA / CA professionals →
+              </Link>
             </div>
 
             <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.26)', letterSpacing: '0.02em' }}>
@@ -219,7 +225,7 @@ export default async function LandingPage() {
             </p>
           </div>
 
-          {/* ── Right: product preview ── */}
+          {/* Right: product preview */}
           <div className="hero-visual" style={{
             flex: '1 1 460px', display: 'flex',
             alignItems: 'flex-end', alignSelf: 'stretch',
@@ -242,7 +248,7 @@ export default async function LandingPage() {
                   display: 'flex', alignItems: 'center', padding: '0 10px', gap: 6,
                 }}>
                   <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'rgba(255,255,255,0.18)' }}/>
-                  <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>app.taska.in/tasks</span>
+                  <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>app.taska.io/tasks</span>
                 </div>
               </div>
 
@@ -265,17 +271,16 @@ export default async function LandingPage() {
               {/* Task list */}
               <div style={{ background: '#fff' }}>
                 {[
-                  { title:'GSTR-3B filing — October', status:'Overdue', sc:'#dc2626', sb:'#fef2f2', av:'RS', avBg:'#fee2e2', avC:'#dc2626', due:'Oct 20', overdue:true },
-                  { title:'Client invoice review',    status:'Needs approval', sc:'#f97316', sb:'#fff7ed', av:'AM', avBg:'#ffedd5', avC:'#ea580c', due:'Today', overdue:false },
-                  { title:'TDS return Q2',             status:'🔁 Recurring',  sc:'#7c3aed', sb:'#faf5ff', av:'KP', avBg:'#ede9fe', avC:'#7c3aed', due:'Oct 25', overdue:false },
-                  { title:'Payroll reconciliation',   status:'Done ✓',       sc:'#16a34a', sb:'#dcfce7', av:'RS', avBg:'#dcfce7', avC:'#16a34a', due:'Oct 18', done:true },
+                  { title:'Q3 Corporation Tax Return',   status:'Overdue',        sc:'#dc2626', sb:'#fef2f2', av:'JR', avBg:'#fee2e2', avC:'#dc2626', due:'Oct 20', overdue:true },
+                  { title:'Client invoice review — Nov', status:'Needs approval', sc:'#f97316', sb:'#fff7ed', av:'AM', avBg:'#ffedd5', avC:'#ea580c', due:'Today', overdue:false },
+                  { title:'VAT Return Q4 (MTD)',          status:'🔁 Recurring',  sc:'#7c3aed', sb:'#faf5ff', av:'KP', avBg:'#ede9fe', avC:'#7c3aed', due:'Nov 7', overdue:false },
+                  { title:'Payroll reconciliation',       status:'Done ✓',        sc:'#16a34a', sb:'#dcfce7', av:'JR', avBg:'#dcfce7', avC:'#16a34a', due:'Oct 18', done:true },
                 ].map((task, i) => (
                   <div key={i} style={{
                     display: 'flex', alignItems: 'center', gap: 10, padding: '10px 18px',
                     borderBottom: '1px solid #f8fafc',
                     background: task.overdue ? '#fffbfb' : '#fff',
                   }}>
-                    {/* Checkbox */}
                     <div style={{
                       width: 14, height: 14, borderRadius: '50%', flexShrink: 0,
                       background: task.done ? '#0d9488' : 'transparent',
@@ -284,34 +289,30 @@ export default async function LandingPage() {
                     }}>
                       {task.done && <span style={{ color: '#fff', fontSize: 7, fontWeight: 800 }}>✓</span>}
                     </div>
-                    {/* Title */}
                     <span style={{
                       flex: 1, fontSize: 12, fontWeight: 500, minWidth: 0,
                       overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
                       color: task.done ? '#94a3b8' : '#0f172a',
                       textDecoration: task.done ? 'line-through' : 'none',
                     }}>{task.title}</span>
-                    {/* Avatar */}
                     <div style={{ width: 20, height: 20, borderRadius: '50%', background: task.avBg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 7, fontWeight: 800, color: task.avC, flexShrink: 0 }}>{task.av}</div>
-                    {/* Due */}
                     <span style={{ fontSize: 10, color: task.overdue ? '#dc2626' : '#94a3b8', fontWeight: task.overdue ? 600 : 400, flexShrink: 0 }}>{task.due}</span>
-                    {/* Status badge */}
                     <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 99, background: task.sb, color: task.sc, flexShrink: 0, whiteSpace: 'nowrap' }}>{task.status}</span>
                   </div>
                 ))}
               </div>
 
-              {/* WhatsApp notification */}
+              {/* Notification banner */}
               <div style={{
-                background: '#f0fdf4', borderTop: '1px solid #bbf7d0',
+                background: '#f5f3ff', borderTop: '1px solid #ddd6fe',
                 padding: '10px 18px', display: 'flex', alignItems: 'center', gap: 10,
               }}>
-                <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#25D366', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 12 }}>💬</div>
+                <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#7c3aed', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 11 }}>🔔</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: '#15803d' }}>WhatsApp sent to RS</div>
-                  <div style={{ fontSize: 10, color: '#4ade80', marginTop: 1 }}>GSTR-3B was due today — task escalated to manager</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#6d28d9' }}>Reminder sent to JR</div>
+                  <div style={{ fontSize: 10, color: '#8b5cf6', marginTop: 1 }}>Corp Tax was due today — escalated to manager</div>
                 </div>
-                <span style={{ fontSize: 9, color: '#86efac', flexShrink: 0 }}>Just now</span>
+                <span style={{ fontSize: 9, color: '#a78bfa', flexShrink: 0 }}>Just now</span>
               </div>
             </div>
           </div>
@@ -323,8 +324,8 @@ export default async function LandingPage() {
         <div style={{ maxWidth: 1120, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24, flexWrap: 'wrap' }}>
           <div className="stats-row" style={{ display: 'flex', gap: 44 }}>
             {[
-              { v: '200+',  l: 'teams on Taska' },
-              { v: '₹999',  l: 'from per month' },
+              { v: '1,000+', l: 'teams on Taska' },
+              { v: '$29',    l: 'from per month' },
               { v: '4.9★',  l: 'average rating' },
               { v: '99.9%', l: 'uptime SLA' },
             ].map(({ v, l }) => (
@@ -336,13 +337,30 @@ export default async function LandingPage() {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 11, color: '#cbd5e1', fontWeight: 500 }}>Trusted by</span>
-            {['CA firms','Agencies','Operations','Legal teams','Startups'].map(t => (
+            {['CA / CPA firms','Agencies','Operations','Legal teams','Startups'].map(t => (
               <span key={t} style={{
                 fontSize: 11, fontWeight: 600, color: '#475569',
                 background: '#f8fafc', border: '1px solid #e2e8f0', padding: '3px 10px', borderRadius: 99,
               }}>{t}</span>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* ━━━ COUNTRY BADGES ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <section style={{ background: '#fff', padding: '20px 6%' }}>
+        <div style={{ maxWidth: 1120, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
+          <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 500, marginRight: 4 }}>Serving professionals in</span>
+          {[['🇺🇸','United States'],['🇬🇧','United Kingdom'],['🇨🇦','Canada'],['🇦🇺','Australia'],['🇪🇺','Europe']].map(([flag, name]) => (
+            <span key={name} style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              fontSize: 12, fontWeight: 600, color: '#334155',
+              background: '#f8fafc', border: '1px solid #e2e8f0',
+              padding: '4px 12px', borderRadius: 99,
+            }}>
+              {flag} {name}
+            </span>
+          ))}
         </div>
       </section>
 
@@ -354,35 +372,35 @@ export default async function LandingPage() {
               <span style={{ fontSize: 11, fontWeight: 700, color: '#0d9488', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Why teams choose Taska</span>
             </div>
             <h2 style={{ fontSize: 'clamp(28px, 4vw, 44px)', fontWeight: 800, letterSpacing: '-1.5px', lineHeight: 1.1, marginBottom: 14, margin: '0 0 14px' }}>
-              Everything global tools miss<br/>for the Indian market
+              Everything generic tools miss<br/>for professional practices
             </h2>
             <p style={{ fontSize: 16, color: '#64748b', maxWidth: 480, margin: '16px auto 0', lineHeight: 1.7 }}>
-              Most task tools were designed for US teams. Taska was built for how Indian businesses actually operate.
+              Most task tools were designed for tech teams. Taska was built for how accounting and advisory businesses actually operate.
             </p>
           </div>
 
           <div className="grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20 }}>
             {[
               {
-                icon: '💬',
+                icon: '📋',
                 color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0',
-                title: 'WhatsApp-first reminders',
-                body: 'Tasks due, approvals blocked, deadlines missed — alerts land in WhatsApp where your team already is. No app to install. No ignored email.',
-                tag: 'No app required',
+                title: 'Approval workflows',
+                body: 'Staff submit work for manager sign-off. One-click approve or return with note. Every decision logged with timestamp — full audit trail for compliance.',
+                tag: 'Full audit trail',
               },
               {
-                icon: '🇮🇳',
+                icon: '💰',
                 color: '#f97316', bg: '#fff7ed', border: '#fed7aa',
-                title: 'Flat INR pricing',
-                body: 'From ₹999/month for your whole team — not ₹900 per person like foreign tools. One bill. No USD conversion. No per-user upsell traps.',
+                title: 'Flat USD pricing',
+                body: 'From $29/month for your whole team — not $30 per person like typical project tools. One predictable bill. No per-user upsell traps. Cancel anytime.',
                 tag: 'No per-user fees',
               },
               {
                 icon: '🏛️',
                 color: '#7c3aed', bg: '#faf5ff', border: '#ddd6fe',
-                title: 'CA & compliance built-in',
-                body: '69 pre-built compliance tasks for GSTR, TDS, ITR, and ROC. Auto-creates document subtasks and sends alerts before every statutory deadline.',
-                tag: '69 compliance tasks ready',
+                title: 'Professional compliance built-in',
+                body: 'Pre-built compliance task templates for US, UK, Canada, Australia and Europe. Auto-creates document subtasks and tracks deadlines by country.',
+                tag: 'US · UK · CA · AU · EU',
               },
             ].map((d, i) => (
               <div key={i} className="card-lift" style={{
@@ -498,13 +516,11 @@ export default async function LandingPage() {
           </div>
 
           <div className="steps-row" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 0, position: 'relative' }}>
-            {/* Connector */}
             <div className="step-connector" style={{ position: 'absolute', top: 39, left: '18%', right: '18%', height: 1, background: 'linear-gradient(90deg, transparent, #e2e8f0 15%, #e2e8f0 85%, transparent)', zIndex: 0 }}/>
-
             {[
               { n: '01', title: 'Invite your team',  body: 'Add members, assign roles — owner, manager, member, viewer. Done in under 2 minutes.' },
-              { n: '02', title: 'Create & assign tasks', body: 'Add tasks manually, use templates, or let Taska generate compliance tasks automatically for your CA firm.' },
-              { n: '03', title: 'Stay accountable automatically', body: 'Taska sends WhatsApp reminders, tracks completion, escalates blockers — without anyone manually chasing anyone.' },
+              { n: '02', title: 'Create & assign tasks', body: 'Add tasks manually, use templates, or let Taska auto-generate compliance tasks for your practice from pre-built country templates.' },
+              { n: '03', title: 'Stay accountable automatically', body: 'Taska sends smart reminders, tracks completion, escalates blockers — without anyone manually chasing anyone.' },
             ].map((step, i) => (
               <div key={i} style={{ textAlign: 'center', padding: '0 28px', position: 'relative', zIndex: 1 }}>
                 <div style={{
@@ -543,7 +559,7 @@ export default async function LandingPage() {
               <span style={{ fontSize: 11, fontWeight: 700, color: '#f97316', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Who it&apos;s for</span>
             </div>
             <h2 style={{ fontSize: 'clamp(26px, 3.5vw, 40px)', fontWeight: 800, letterSpacing: '-1.2px', margin: '0 0 12px' }}>
-              Built for every Indian team type
+              Built for every professional team type
             </h2>
             <p style={{ fontSize: 15, color: '#64748b', maxWidth: 380, margin: '0 auto', lineHeight: 1.7 }}>
               Taska adapts to your workflow — not the other way around.
@@ -554,8 +570,10 @@ export default async function LandingPage() {
             {[
               {
                 icon:'🏛️', color:'#f97316', bg:'#fff7ed', border:'#fed7aa',
-                title:'CA & Accounting',
-                features:['69 compliance tasks', 'GSTR · TDS · ITR · ROC', 'Document upload enforcement', 'Statutory deadline alerts'],
+                title:'CPA & Accounting',
+                features:['Country compliance templates', 'US · UK · CA · AU · EU tasks', 'Document upload enforcement', 'Statutory deadline tracking'],
+                link: '/professionals',
+                linkLabel: 'See compliance module →',
               },
               {
                 icon:'🏢', color:'#7c3aed', bg:'#faf5ff', border:'#ddd6fe',
@@ -579,13 +597,16 @@ export default async function LandingPage() {
               }}>
                 <div style={{ width: 44, height: 44, borderRadius: 12, background: u.bg, border: `1px solid ${u.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, marginBottom: 14 }}>{u.icon}</div>
                 <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12, color: '#0f172a', letterSpacing: '-0.2px' }}>{u.title}</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 12 }}>
                   {u.features.map(f => (
                     <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 7, fontSize: 12, color: '#64748b' }}>
                       <span style={{ color: u.color, fontWeight: 700, flexShrink: 0, marginTop: 1 }}>✓</span> {f}
                     </div>
                   ))}
                 </div>
+                {u.link && (
+                  <Link href={u.link} style={{ fontSize: 12, fontWeight: 700, color: u.color, textDecoration: 'none' }}>{u.linkLabel}</Link>
+                )}
               </div>
             ))}
           </div>
@@ -600,10 +621,10 @@ export default async function LandingPage() {
               <span style={{ fontSize: 11, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Compare</span>
             </div>
             <h2 style={{ fontSize: 'clamp(26px, 3.5vw, 40px)', fontWeight: 800, letterSpacing: '-1.2px', margin: '0 0 12px' }}>
-              Why teams switch to Taska
+              Why professional teams switch to Taska
             </h2>
             <p style={{ fontSize: 15, color: '#64748b', maxWidth: 460, margin: '0 auto', lineHeight: 1.7 }}>
-              Priced for India. Features that foreign tools don&apos;t offer — at any price point.
+              Compliance-aware, flat-priced, with features professional practices actually need.
             </p>
           </div>
 
@@ -616,10 +637,10 @@ export default async function LandingPage() {
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
                       <div style={{ width: 26, height: 26, borderRadius: 8, background: '#0d9488', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: '#fff' }}>T</div>
                       <span style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>Taska</span>
-                      <span style={{ fontSize: 10, color: '#2dd4bf', fontWeight: 600 }}>₹999/mo</span>
+                      <span style={{ fontSize: 10, color: '#2dd4bf', fontWeight: 600 }}>$29/mo</span>
                     </div>
                   </th>
-                  {[['Asana','$10.99/user'],['Worklenz','Free / Open'],['Plane','$8/user']].map(([name, price]) => (
+                  {[['Asana','$13.49/user'],['Monday','$12/user'],['ClickUp','$10/user']].map(([name, price]) => (
                     <th key={name} style={{ padding: '18px 14px', textAlign: 'center', background: '#fafaf9', borderBottom: '1px solid #e2e8f0', minWidth: 100 }}>
                       <div style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>{name}</div>
                       <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 3 }}>{price}</div>
@@ -629,16 +650,16 @@ export default async function LandingPage() {
               </thead>
               <tbody>
                 {[
-                  { feature:'INR billing (no USD)',        taska:true,  asana:false, wl:false,       plane:false, usp:true  },
-                  { feature:'WhatsApp notifications',      taska:true,  asana:false, wl:false,       plane:false, usp:true  },
-                  { feature:'CA & compliance workflows',   taska:true,  asana:false, wl:false,       plane:false, usp:true  },
-                  { feature:'India data residency',        taska:true,  asana:false, wl:false,       plane:false, usp:true  },
-                  { feature:'Flat team pricing',           taska:true,  asana:false, wl:'partial',   plane:false, usp:true  },
-                  { feature:'Recurring tasks',             taska:true,  asana:true,  wl:'partial',   plane:'partial', usp:false },
-                  { feature:'Approval workflows',          taska:true,  asana:true,  wl:false,       plane:false, usp:false },
-                  { feature:'Time tracking',               taska:true,  asana:true,  wl:true,        plane:true,  usp:false },
-                  { feature:'Reports & exports',           taska:true,  asana:true,  wl:'partial',   plane:true,  usp:false },
-                  { feature:'API access',                  taska:true,  asana:true,  wl:false,       plane:true,  usp:false },
+                  { feature:'Flat team pricing (not per-user)',    taska:true,  asana:false, mon:false, cu:false, usp:true  },
+                  { feature:'Country compliance templates',        taska:true,  asana:false, mon:false, cu:false, usp:true  },
+                  { feature:'Multi-country task libraries',        taska:true,  asana:false, mon:false, cu:false, usp:true  },
+                  { feature:'Approval workflows + audit trail',    taska:true,  asana:true,  mon:true,  cu:true,  usp:false },
+                  { feature:'Recurring task automation',           taska:true,  asana:true,  mon:'partial', cu:true, usp:false },
+                  { feature:'Time tracking',                       taska:true,  asana:true,  mon:true,  cu:true,  usp:false },
+                  { feature:'Client management',                   taska:true,  asana:false, mon:false, cu:false, usp:true  },
+                  { feature:'Document upload enforcement',         taska:true,  asana:false, mon:false, cu:false, usp:true  },
+                  { feature:'Reports & CSV export',                taska:true,  asana:true,  mon:true,  cu:true,  usp:false },
+                  { feature:'Role-based permissions',              taska:true,  asana:true,  mon:true,  cu:true,  usp:false },
                 ].map((row, i) => {
                   const bg = i % 2 === 0 ? '#fff' : '#fafafa'
                   function Cell({ val, hl }: { val: boolean | string; hl?: boolean }) {
@@ -655,13 +676,13 @@ export default async function LandingPage() {
                       <td style={{ padding: '12px 22px', fontSize: 13, fontWeight: row.usp ? 600 : 400, color: '#374151', background: bg, borderBottom: '1px solid #f1f5f9' }}>
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                           {row.feature}
-                          {row.usp && <span style={{ fontSize: 9, fontWeight: 700, background: '#fff7ed', color: '#f97316', border: '1px solid #fed7aa', padding: '1px 6px', borderRadius: 99, textTransform: 'uppercase', flexShrink: 0 }}>India-first</span>}
+                          {row.usp && <span style={{ fontSize: 9, fontWeight: 700, background: '#fff7ed', color: '#f97316', border: '1px solid #fed7aa', padding: '1px 6px', borderRadius: 99, textTransform: 'uppercase', flexShrink: 0 }}>Pro-first</span>}
                         </span>
                       </td>
                       <Cell val={row.taska} hl />
                       <Cell val={row.asana} />
-                      <Cell val={row.wl} />
-                      <Cell val={row.plane} />
+                      <Cell val={row.mon} />
+                      <Cell val={row.cu} />
                     </tr>
                   )
                 })}
@@ -679,7 +700,7 @@ export default async function LandingPage() {
               <span style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Pricing</span>
             </div>
             <h2 style={{ fontSize: 'clamp(26px, 3.5vw, 40px)', fontWeight: 800, letterSpacing: '-1.2px', margin: '0 0 12px' }}>
-              Simple pricing, billed in INR
+              Simple pricing, billed in USD
             </h2>
             <p style={{ fontSize: 15, color: '#64748b', maxWidth: 380, margin: '0 auto', lineHeight: 1.7 }}>
               Flat team pricing — not per user. Start free and upgrade when you grow.
@@ -691,17 +712,17 @@ export default async function LandingPage() {
               {
                 name:'Free', price:'0', period:'', color:'#64748b', bg:'#fff', border:'#e2e8f0',
                 badge:'', primary:false, cta:'Start free',
-                features:['Up to 5 members','3 active projects','Unlimited tasks','WhatsApp alerts (basic)','Task comments & activity'],
+                features:['Up to 5 members','3 active projects','Unlimited tasks','Smart reminders (basic)','Task comments & activity'],
               },
               {
-                name:'Starter', price:'999', period:'/mo', color:'#0d9488', bg:'#fff', border:'#0d9488',
+                name:'Starter', price:'29', period:'/mo', color:'#0d9488', bg:'#fff', border:'#0d9488',
                 badge:'Most popular', primary:true, cta:'Start free trial',
                 features:['Up to 15 members','15 projects','Recurring task automation','Approval workflows','Time tracking','Reports & CSV export'],
               },
               {
-                name:'Pro', price:'2,999', period:'/mo', color:'#7c3aed', bg:'#fff', border:'#ddd6fe',
+                name:'Pro', price:'79', period:'/mo', color:'#7c3aed', bg:'#fff', border:'#ddd6fe',
                 badge:'', primary:false, cta:'Start free trial',
-                features:['Up to 50 members','Unlimited projects','CA compliance module','Custom fields & templates','API access','Priority support'],
+                features:['Up to 50 members','Unlimited projects','Compliance module (all countries)','Custom fields & templates','API access','Priority support'],
               },
             ].map((plan) => (
               <div key={plan.name} style={{
@@ -715,7 +736,7 @@ export default async function LandingPage() {
                 )}
                 <div style={{ fontSize: 12, fontWeight: 700, color: plan.primary ? plan.color : '#64748b', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>{plan.name}</div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 2, marginBottom: 22 }}>
-                  {plan.price !== '0' && <span style={{ fontSize: 12, color: '#94a3b8' }}>₹</span>}
+                  {plan.price !== '0' && <span style={{ fontSize: 12, color: '#94a3b8' }}>$</span>}
                   <span style={{ fontSize: 36, fontWeight: 900, color: '#0f172a', letterSpacing: '-1.5px' }}>{plan.price === '0' ? 'Free' : plan.price}</span>
                   {plan.period && <span style={{ fontSize: 12, color: '#94a3b8' }}>{plan.period}</span>}
                 </div>
@@ -738,15 +759,13 @@ export default async function LandingPage() {
             ))}
           </div>
           <p style={{ textAlign: 'center', fontSize: 13, color: '#94a3b8', marginTop: 22 }}>
-            All plans include 14-day free trial · No credit card required · Cancel anytime · Billed in INR
+            All plans include 14-day free trial · No credit card required · Cancel anytime · Billed in USD
           </p>
 
-          {/* ── One-time Setup & Onboarding ── */}
+          {/* Professional Setup */}
           <div style={{
-            marginTop: 36,
-            borderRadius: 16, padding: '28px 32px',
-            background: '#fff',
-            border: '1px solid #e2e8f0',
+            marginTop: 36, borderRadius: 16, padding: '28px 32px',
+            background: '#fff', border: '1px solid #e2e8f0',
             boxShadow: '0 2px 12px rgba(0,0,0,0.05)',
             display: 'flex', alignItems: 'center', gap: 28, flexWrap: 'wrap',
           }}>
@@ -760,17 +779,13 @@ export default async function LandingPage() {
                 <span style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', letterSpacing: '-0.3px' }}>
                   Professional Setup &amp; Onboarding
                 </span>
-                <span style={{
-                  fontSize: 10, fontWeight: 700, padding: '2px 9px', borderRadius: 99,
-                  background: '#fff7ed', color: '#f97316', border: '1px solid #fed7aa',
-                  textTransform: 'uppercase', letterSpacing: '0.06em',
-                }}>One-time</span>
+                <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 9px', borderRadius: 99, background: '#fff7ed', color: '#f97316', border: '1px solid #fed7aa', textTransform: 'uppercase', letterSpacing: '0.06em' }}>One-time</span>
               </div>
               <p style={{ fontSize: 13, color: '#64748b', lineHeight: 1.7, margin: 0, maxWidth: 560 }}>
-                Get a dedicated onboarding expert who migrates your existing data, configures workflows for your team, and trains everyone to hit the ground running — so you go live without any disruption.
+                A dedicated onboarding expert migrates your data, configures country-specific compliance templates, trains your team, and ensures you go live without disruption.
               </p>
               <div style={{ display: 'flex', gap: 16, marginTop: 12, flexWrap: 'wrap' }}>
-                {['Existing data migration','Custom workflow setup','Team training session','Priority go-live support'].map(f => (
+                {['Data migration','Compliance template setup','Team training session','Priority go-live support'].map(f => (
                   <span key={f} style={{ fontSize: 12, color: '#0d9488', display: 'flex', alignItems: 'center', gap: 4 }}>
                     <span style={{ fontWeight: 700 }}>✓</span> {f}
                   </span>
@@ -779,8 +794,8 @@ export default async function LandingPage() {
             </div>
             <div style={{ textAlign: 'right', flexShrink: 0 }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 2, justifyContent: 'flex-end' }}>
-                <span style={{ fontSize: 13, color: '#94a3b8' }}>₹</span>
-                <span style={{ fontSize: 36, fontWeight: 900, color: '#0f172a', letterSpacing: '-1.5px' }}>5,000</span>
+                <span style={{ fontSize: 13, color: '#94a3b8' }}>$</span>
+                <span style={{ fontSize: 36, fontWeight: 900, color: '#0f172a', letterSpacing: '-1.5px' }}>499</span>
               </div>
               <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 14 }}>one-time · any plan</div>
               <Link href="/login" style={{
@@ -794,37 +809,25 @@ export default async function LandingPage() {
             </div>
           </div>
 
-          {/* ── Enterprise / Self-Hosted ── */}
+          {/* Enterprise */}
           <div style={{
-            marginTop: 16,
-            borderRadius: 16, padding: '28px 32px',
+            marginTop: 16, borderRadius: 16, padding: '28px 32px',
             background: 'linear-gradient(135deg, #0a0f1e 0%, #0c1a32 100%)',
             border: '1px solid rgba(13,148,136,0.22)',
             boxShadow: '0 4px 24px rgba(0,0,0,0.1)',
             display: 'flex', alignItems: 'center', gap: 28, flexWrap: 'wrap',
           }}>
-            <div style={{
-              width: 56, height: 56, borderRadius: 16, flexShrink: 0,
-              background: 'rgba(13,148,136,0.15)', border: '1px solid rgba(13,148,136,0.3)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26,
-            }}>🔐</div>
+            <div style={{ width: 56, height: 56, borderRadius: 16, flexShrink: 0, background: 'rgba(13,148,136,0.15)', border: '1px solid rgba(13,148,136,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26 }}>🔐</div>
             <div style={{ flex: 1, minWidth: 220 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 16, fontWeight: 800, color: '#fff', letterSpacing: '-0.3px' }}>
-                  Private Cloud / Self-Hosted
-                </span>
-                <span style={{
-                  fontSize: 10, fontWeight: 700, padding: '2px 9px', borderRadius: 99,
-                  background: 'rgba(13,148,136,0.2)', color: '#2dd4bf',
-                  border: '1px solid rgba(13,148,136,0.35)',
-                  textTransform: 'uppercase', letterSpacing: '0.06em',
-                }}>Enterprise</span>
+                <span style={{ fontSize: 16, fontWeight: 800, color: '#fff', letterSpacing: '-0.3px' }}>Private Cloud / Self-Hosted</span>
+                <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 9px', borderRadius: 99, background: 'rgba(13,148,136,0.2)', color: '#2dd4bf', border: '1px solid rgba(13,148,136,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Enterprise</span>
               </div>
               <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', lineHeight: 1.7, margin: 0, maxWidth: 560 }}>
-                For data-sensitive organisations — banks, legal firms, healthcare, and regulated industries — that need all data to live exclusively on their own servers. You get the full Taska platform deployed inside your infrastructure with zero data ever leaving your network.
+                For data-sensitive organisations — banks, regulated advisories, and enterprises — that need all data to stay exclusively on their own infrastructure with zero cloud dependency.
               </p>
               <div style={{ display: 'flex', gap: 16, marginTop: 12, flexWrap: 'wrap' }}>
-                {['Your servers · your DB','Zero cloud dependency','DPDP & compliance-ready','Dedicated deployment support'].map(f => (
+                {['Your servers · your DB','Zero cloud dependency','Compliance-ready','Dedicated deployment support'].map(f => (
                   <span key={f} style={{ fontSize: 12, color: '#2dd4bf', display: 'flex', alignItems: 'center', gap: 4 }}>
                     <span style={{ fontWeight: 700 }}>✓</span> {f}
                   </span>
@@ -834,7 +837,7 @@ export default async function LandingPage() {
             <div style={{ textAlign: 'right', flexShrink: 0 }}>
               <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', marginBottom: 4 }}>Custom pricing</div>
               <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.22)', marginBottom: 14 }}>based on team size &amp; infra</div>
-              <a href="mailto:hello@taska.in?subject=Self-Hosted%20Inquiry" style={{
+              <a href="mailto:hello@taska.io?subject=Enterprise%20Inquiry" style={{
                 display: 'inline-block', padding: '10px 22px', borderRadius: 10,
                 background: '#0d9488', color: '#fff',
                 fontSize: 13, fontWeight: 700, textDecoration: 'none',
@@ -858,9 +861,9 @@ export default async function LandingPage() {
           </div>
           <div className="grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20 }}>
             {[
-              { init:'PS', color:'#f97316', name:'Priya S.', role:'Managing Partner', co:'Mid-size CA firm', quote:'We replaced three separate tools with Taska. The recurring task engine saves us 4+ hours every single month-end. The WhatsApp reminders changed how our team operates.', metric:'4+ hrs/month saved' },
-              { init:'RM', color:'#0d9488', name:'Rahul M.', role:'Founder', co:'Digital agency, Pune', quote:'Task completion jumped from 67% to 94% in six weeks. Our managers spend less time chasing and more time reviewing actual work. The approval flow is exactly what we needed.', metric:'67% → 94% completion' },
-              { init:'AN', color:'#7c3aed', name:'Anjali N.', role:'Head of Ops', co:'Creative studio', quote:'Setup took 20 minutes. INR pricing was a no-brainer versus Asana. Client management, approvals, and time tracking are finally in one place. ROI was visible in week one.', metric:'ROI in week 1' },
+              { init:'JM', color:'#f97316', name:'James M.', role:'Managing Partner', co:'CPA firm, Chicago', quote:'We replaced three separate tools with Taska. The compliance templates for US federal and state returns saved us hours of setup. The approval flow is exactly what our practice needed.', metric:'3 tools → 1 platform' },
+              { init:'SR', color:'#0d9488', name:'Sophie R.', role:'Director', co:'Accounting firm, London', quote:'Task completion jumped from 65% to 93% in six weeks. The VAT MTD templates were ready out of the box. Our managers finally have visibility without chasing everyone manually.', metric:'65% → 93% completion' },
+              { init:'LK', color:'#7c3aed', name:'Liam K.', role:'Head of Ops', co:'Agency, Toronto', quote:'Setup took 20 minutes. Flat USD pricing was a no-brainer versus Monday.com at $12 per person. Client management, approvals, and time tracking finally in one place.', metric:'ROI in week 1' },
             ].map(t => (
               <div key={t.name} className="card-lift" style={{ background: '#f8fafc', border: '1px solid #f1f5f9', borderRadius: 16, padding: '28px 24px' }}>
                 <div style={{ display: 'flex', gap: 3, marginBottom: 14 }}>
@@ -893,12 +896,12 @@ export default async function LandingPage() {
           </div>
           <div className="grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
             {[
-              { icon:'🔐', title:'End-to-end encryption',  desc:'TLS 1.3 in transit and AES-256 at rest. All data encrypted at every layer.' },
-              { icon:'🇮🇳', title:'India data residency',   desc:'Your data stays in Indian data centres — not subject to US CLOUD Act.' },
+              { icon:'🔐', title:'End-to-end encryption',   desc:'TLS 1.3 in transit and AES-256 at rest. All data encrypted at every layer.' },
+              { icon:'🌍', title:'Global data compliance',  desc:'Hosted on enterprise-grade infrastructure with regional data options available for enterprise plans.' },
               { icon:'👥', title:'Role-based access',       desc:'Granular permissions per role. Members only see what they need.' },
-              { icon:'📋', title:'Full audit trail',         desc:'Every action logged with timestamp. Know who did what and when.' },
+              { icon:'📋', title:'Full audit trail',        desc:'Every action logged with timestamp. Know who did what and when.' },
               { icon:'🗑️', title:'Your data, your control', desc:'Export or delete everything, anytime. No hostage data, no lock-in.' },
-              { icon:'🛡️', title:'DPDP Act aligned',        desc:"Designed to align with India's Digital Personal Data Protection Act." },
+              { icon:'🛡️', title:'GDPR aligned',            desc:'Designed to align with GDPR and global privacy regulations.' },
             ].map(s => (
               <div key={s.title} style={{ display: 'flex', gap: 14, padding: '18px 20px', background: '#fff', borderRadius: 12, border: '1px solid #f1f5f9' }}>
                 <span style={{ fontSize: 20, flexShrink: 0 }}>{s.icon}</span>
@@ -923,15 +926,15 @@ export default async function LandingPage() {
             {[
               {
                 q: 'Does my team need to install anything?',
-                a: 'Nothing. Taska is fully web-based — any browser, any device. WhatsApp alerts work natively through WhatsApp without any installation on your server or device.',
+                a: 'Nothing. Taska is fully web-based — any browser, any device. Smart reminders work via email and in-app notifications with no installation required.',
               },
               {
-                q: 'How does the WhatsApp integration work?',
-                a: 'When a task is due, overdue, stuck in approval, or needs escalation, Taska sends a WhatsApp message to the assigned team member. No login needed for the recipient — the message lands directly in their WhatsApp.',
+                q: 'How are compliance templates organised by country?',
+                a: 'In the Compliance module, you load task templates for your service countries — US, UK, Canada, Australia, or Europe. Each country has pre-built tasks (e.g. Form 941 for US, VAT MTD returns for UK, BAS for Australia) that you can load, customise, and assign to clients in bulk.',
               },
               {
-                q: 'How is Taska different from Asana or ClickUp?',
-                a: 'Those tools are designed for US or global teams. Taska is built specifically for India: INR billing with no per-user USD fees, WhatsApp-first notifications (not email-first), Indian data residency, and a built-in CA/compliance module that no global tool offers at any price.',
+                q: 'How is Taska different from Asana or Monday.com?',
+                a: "Those tools are designed for general teams. Taska is built specifically for accounting and advisory practices: flat USD team pricing (not $12–$14 per person), built-in compliance templates per country, client management, document upload enforcement, and approval workflows with full audit trails.",
               },
               {
                 q: 'Can I try before paying?',
@@ -939,11 +942,11 @@ export default async function LandingPage() {
               },
               {
                 q: 'What happens if I cancel?',
-                a: "Cancel any time from your billing settings. You keep access until the end of your billing period. You can export all your data at any time — we'll assist if needed. No lock-in.",
+                a: "Cancel any time from your billing settings. You keep access until the end of your billing period. You can export all your data at any time. No lock-in.",
               },
               {
-                q: 'Is my data stored in India?',
-                a: "Yes. All data is stored in Indian data centres and does not leave India. This is designed to align with the requirements of the Digital Personal Data Protection (DPDP) Act.",
+                q: 'Do you support multiple countries for the same practice?',
+                a: 'Yes. If your practice serves clients in multiple jurisdictions, you can load compliance templates from several countries simultaneously — tasks are prefixed by country code so they stay clearly organised.',
               },
             ].map((faq, i) => (
               <details key={i} className="faq-details" style={{ borderBottom: '1px solid #f1f5f9' }}>
@@ -978,7 +981,7 @@ export default async function LandingPage() {
             Stop chasing your team.<br/>Start closing tasks.
           </h2>
           <p style={{ fontSize: 17, color: 'rgba(255,255,255,0.46)', marginBottom: 36, lineHeight: 1.75 }}>
-            Join 200+ Indian teams running their work on Taska.<br/>Free to start — no credit card needed.
+            Join 1,000+ professional teams running their work on Taska.<br/>Free to start — no credit card needed.
           </p>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
             <Link href="/login" className="btn-primary"
@@ -989,17 +992,17 @@ export default async function LandingPage() {
               }}>
               Start free trial
             </Link>
-            <Link href="/login" className="btn-ghost"
+            <Link href="/professionals"
               style={{
-                background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.82)',
-                padding: '15px 24px', borderRadius: 11, fontSize: 15, fontWeight: 500,
-                textDecoration: 'none', border: '1px solid rgba(255,255,255,0.12)', display: 'inline-block',
+                background: 'rgba(124,58,237,0.15)', color: '#c4b5fd',
+                padding: '15px 24px', borderRadius: 11, fontSize: 15, fontWeight: 600,
+                textDecoration: 'none', border: '1px solid rgba(124,58,237,0.3)', display: 'inline-block',
               }}>
-              Sign in instead
+              🏛️ CPA / CA professionals →
             </Link>
           </div>
           <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.22)', marginTop: 20, letterSpacing: '0.02em' }}>
-            14-day free trial&nbsp;&nbsp;·&nbsp;&nbsp;No credit card&nbsp;&nbsp;·&nbsp;&nbsp;Cancel anytime&nbsp;&nbsp;·&nbsp;&nbsp;Billed in INR
+            14-day free trial&nbsp;&nbsp;·&nbsp;&nbsp;No credit card&nbsp;&nbsp;·&nbsp;&nbsp;Cancel anytime&nbsp;&nbsp;·&nbsp;&nbsp;Billed in USD
           </p>
         </div>
       </section>
@@ -1008,7 +1011,6 @@ export default async function LandingPage() {
       <footer style={{ background: '#0a0f1e', padding: '52px 6% 28px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
         <div style={{ maxWidth: 1120, margin: '0 auto' }}>
           <div className="footer-grid" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 40, marginBottom: 44 }}>
-            {/* Brand column */}
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 18 }}>
                 <div style={{ width: 28, height: 28, borderRadius: 8, background: '#0d9488', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1019,28 +1021,26 @@ export default async function LandingPage() {
                 <span style={{ fontWeight: 800, fontSize: 15, color: '#fff' }}>Taska</span>
               </div>
               <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', lineHeight: 1.72, maxWidth: 240, margin: '0 0 18px' }}>
-                Task management built for Indian teams. WhatsApp-first, INR-priced, compliance-ready.
+                Task management built for professional teams. Compliance-ready, flat-priced, globally available.
               </p>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.18)' }}>Made with ♥ in India 🇮🇳</div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {['🇺🇸','🇬🇧','🇨🇦','🇦🇺','🇪🇺'].map(f => (
+                  <span key={f} style={{ fontSize: 16 }}>{f}</span>
+                ))}
+              </div>
             </div>
-
-            {/* Product */}
             <div>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 18 }}>Product</div>
-              {['Features','Solutions','Pricing','Changelog','Roadmap'].map(l => (
-                <a key={l} href="#" className="footer-link" style={{ display: 'block', fontSize: 13, color: 'rgba(255,255,255,0.4)', textDecoration: 'none', marginBottom: 10 }}>{l}</a>
+              {['Features','Solutions','Pricing','For Professionals','Changelog'].map(l => (
+                <a key={l} href={l === 'For Professionals' ? '/professionals' : '#'} className="footer-link" style={{ display: 'block', fontSize: 13, color: 'rgba(255,255,255,0.4)', textDecoration: 'none', marginBottom: 10 }}>{l}</a>
               ))}
             </div>
-
-            {/* Company */}
             <div>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 18 }}>Company</div>
               {['About','Blog','Careers','Contact','Status'].map(l => (
                 <a key={l} href="#" className="footer-link" style={{ display: 'block', fontSize: 13, color: 'rgba(255,255,255,0.4)', textDecoration: 'none', marginBottom: 10 }}>{l}</a>
               ))}
             </div>
-
-            {/* Legal */}
             <div>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 18 }}>Legal</div>
               {['Privacy policy','Terms of service','Data processing','Security','Cookie policy'].map(l => (
@@ -1050,7 +1050,7 @@ export default async function LandingPage() {
           </div>
 
           <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: 22, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.18)' }}>© 2025 Taska Technology Pvt. Ltd. All rights reserved.</div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.18)' }}>© 2025 Taska Technology. All rights reserved.</div>
             <div style={{ display: 'flex', gap: 22 }}>
               {['Privacy','Terms','Security','Status'].map(l => (
                 <a key={l} href="#" className="footer-link" style={{ fontSize: 12, color: 'rgba(255,255,255,0.22)', textDecoration: 'none' }}>{l}</a>

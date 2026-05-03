@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { MONTH_KEYS, MONTH_LABELS, CA_GROUP_NAMES } from '@/lib/data/caDefaultTasks'
 import type { MonthKey } from '@/lib/data/caDefaultTasks'
+import { COUNTRY_TASK_SETS } from '@/lib/data/caDefaultTasksByCountry'
 import { toast } from '@/store/appStore'
 
 /* ─── Types ───────────────────────────────────────────────────── */
@@ -1549,6 +1550,9 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
   const [tasks, setTasks] = useState<CAMasterTask[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingDefaults, setLoadingDefaults] = useState(false)
+  const [showCountryPicker, setShowCountryPicker] = useState(false)
+  const [selectedCountries, setSelectedCountries] = useState<string[]>(['IN'])
+  const countryPickerRef = useRef<HTMLDivElement>(null)
   const [triggering,      setTriggering]      = useState(false)
   const [groupFilter, setGroupFilter] = useState<GroupFilter>(GROUP_FILTER_ALL)
   const [search, setSearch] = useState('')
@@ -1620,6 +1624,18 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
 
   useEffect(() => { fetchTasks(fy) }, [fy, fetchTasks])
 
+  /* ── Close country picker on outside click ── */
+  useEffect(() => {
+    if (!showCountryPicker) return
+    function handler(e: MouseEvent) {
+      if (countryPickerRef.current && !countryPickerRef.current.contains(e.target as Node)) {
+        setShowCountryPicker(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showCountryPicker])
+
   /* ── Manually trigger compliance task spawn ── */
   async function handleTriggerSpawn() {
     setTriggering(true)
@@ -1639,18 +1655,21 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
     }
   }
 
-  /* ── Load defaults ── */
-  async function handleLoadDefaults() {
+  /* ── Load defaults (with country selection) ── */
+  async function handleLoadDefaults(countries: string[]) {
+    if (countries.length === 0) { toast.error('Select at least one country'); return }
     setLoadingDefaults(true)
+    setShowCountryPicker(false)
     try {
       const res = await fetch('/api/ca/master', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'load_defaults', financial_year: fy }),
+        body: JSON.stringify({ action: 'load_defaults', financial_year: fy, countries }),
       })
       const json = (await res.json()) as { success?: boolean; count?: number; error?: string }
       if (!res.ok) throw new Error(json.error ?? 'Failed')
-      toast.success(`Loaded ${json.count ?? 0} default tasks`)
+      const countryLabels = countries.join(', ')
+      toast.success(`Loaded ${json.count ?? 0} default tasks (${countryLabels})`)
       await fetchTasks(fy)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error loading defaults')
@@ -1973,18 +1992,79 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
         </div>
 
         {canEdit && (
-          <button
-            onClick={handleLoadDefaults}
-            disabled={loadingDefaults}
-            style={{
-              ...btnGhost,
-              display: 'flex', alignItems: 'center', gap: 6,
-              opacity: loadingDefaults ? 0.7 : 1,
-            }}
-          >
-            <RefreshCw size={14} style={{ animation: loadingDefaults ? 'spin 1s linear infinite' : 'none' }} />
-            {loadingDefaults ? 'Loading…' : 'Load defaults'}
-          </button>
+          <div ref={countryPickerRef} style={{ position: 'relative' }}>
+            <button
+              onClick={() => setShowCountryPicker(o => !o)}
+              disabled={loadingDefaults}
+              style={{
+                ...btnGhost,
+                display: 'flex', alignItems: 'center', gap: 6,
+                opacity: loadingDefaults ? 0.7 : 1,
+              }}
+            >
+              <RefreshCw size={14} style={{ animation: loadingDefaults ? 'spin 1s linear infinite' : 'none' }} />
+              {loadingDefaults ? 'Loading…' : 'Load defaults'}
+              <ChevronDown size={12} />
+            </button>
+            {showCountryPicker && (
+              <div style={{
+                position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 200,
+                background: 'var(--surface)', border: '1px solid var(--border)',
+                borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.14)',
+                padding: '12px 14px', minWidth: 280,
+              }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>
+                  Select service countries
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+                  {COUNTRY_TASK_SETS.map(c => {
+                    const checked = selectedCountries.includes(c.code)
+                    return (
+                      <label key={c.code} style={{ display: 'flex', alignItems: 'flex-start', gap: 9, cursor: 'pointer', padding: '5px 6px', borderRadius: 7, background: checked ? 'rgba(13,148,136,0.06)' : 'transparent', border: `1px solid ${checked ? 'rgba(13,148,136,0.25)' : 'transparent'}` }}>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => {
+                            setSelectedCountries(prev =>
+                              prev.includes(c.code)
+                                ? prev.filter(x => x !== c.code)
+                                : [...prev, c.code]
+                            )
+                          }}
+                          style={{ marginTop: 2, accentColor: '#0d9488', flexShrink: 0 }}
+                        />
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{c.flag} {c.name}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4, marginTop: 1 }}>{c.tasks.length} tasks · {c.description.split(',')[0]}&hellip;</div>
+                        </div>
+                      </label>
+                    )
+                  })}
+                </div>
+                <div style={{ display: 'flex', gap: 8, borderTop: '1px solid var(--border-light)', paddingTop: 10 }}>
+                  <button
+                    onClick={() => handleLoadDefaults(selectedCountries)}
+                    disabled={selectedCountries.length === 0}
+                    style={{
+                      flex: 1, padding: '7px 0', borderRadius: 7, border: 'none',
+                      background: selectedCountries.length > 0 ? '#0d9488' : 'var(--border)',
+                      color: selectedCountries.length > 0 ? '#fff' : 'var(--text-muted)',
+                      fontSize: 12, fontWeight: 700, cursor: selectedCountries.length > 0 ? 'pointer' : 'not-allowed',
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    Load {selectedCountries.length > 0 ? `(${selectedCountries.length} selected)` : ''}
+                  </button>
+                  <button
+                    onClick={() => setShowCountryPicker(false)}
+                    style={{ padding: '7px 12px', borderRadius: 7, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-secondary)', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         )}
 
         {canEdit && (
@@ -2144,7 +2224,7 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
               </div>
               {canEdit && (
                 <button
-                  onClick={handleLoadDefaults}
+                  onClick={() => setShowCountryPicker(o => !o)}
                   disabled={loadingDefaults}
                   style={{ ...btnPrimary, display: 'inline-flex', alignItems: 'center', gap: 8 }}
                 >

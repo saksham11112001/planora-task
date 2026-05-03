@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { CA_DEFAULT_TASKS } from '@/lib/data/caDefaultTasks'
+import { getTasksForCountries } from '@/lib/data/caDefaultTasksByCountry'
 import type { NextRequest } from 'next/server'
 import { dbError } from '@/lib/api-error'
 
@@ -46,11 +47,17 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json()
 
-  // Special action: load defaults
+  // Special action: load defaults (supports optional countries[] for multi-country)
   if (body.action === 'load_defaults') {
     const fy = body.financial_year ?? '2026-27'
+    const countries: string[] = Array.isArray(body.countries) && body.countries.length > 0
+      ? body.countries
+      : ['IN']  // default to India for backward compat
     const admin = createAdminClient()
-    const rows = CA_DEFAULT_TASKS.map(t => ({
+    const sourceTasks = countries.includes('IN') && countries.length === 1
+      ? CA_DEFAULT_TASKS
+      : getTasksForCountries(countries)
+    const rows = sourceTasks.map(t => ({
       org_id: mb.org_id, financial_year: fy,
       code: t.code, name: t.name, group_name: t.group_name,
       task_type: t.task_type, dates: t.dates,
