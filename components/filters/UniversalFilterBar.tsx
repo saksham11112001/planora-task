@@ -1,5 +1,6 @@
 'use client'
 import React, { useState, useRef, useEffect } from 'react'
+import { DateInput } from '@/components/ui/DateInput'
 import { useFilterStore } from '@/store/appStore'
 import { PRIORITY_CONFIG, STATUS_CONFIG } from '@/types'
 import { MultiPillSelect, PILL, PILL_ACTIVE } from './MultiPillSelect'
@@ -214,13 +215,13 @@ export function UniversalFilterBar({
                   </div>
                   {showCustomDue && (
                     <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:6 }}>
-                      <input type="date" value={dueDateFrom} onChange={e => setFilter('dueDateFrom',e.target.value)}
+                      <DateInput value={dueDateFrom} onChange={v => setFilter('dueDateFrom',v)}
                         style={{ fontSize:11, padding:'3px 8px', borderRadius:6, border:'1px solid var(--border)',
-                          background:'var(--surface-subtle)', color:'var(--text-primary)', fontFamily:'inherit', colorScheme:'light dark' }}/>
+                          background:'var(--surface-subtle)', color:'var(--text-primary)', fontFamily:'inherit', width:108 }}/>
                       <span style={{ fontSize:11, color:'var(--text-muted)' }}>–</span>
-                      <input type="date" value={dueDateTo} onChange={e => setFilter('dueDateTo',e.target.value)}
+                      <DateInput value={dueDateTo} onChange={v => setFilter('dueDateTo',v)}
                         style={{ fontSize:11, padding:'3px 8px', borderRadius:6, border:'1px solid var(--border)',
-                          background:'var(--surface-subtle)', color:'var(--text-primary)', fontFamily:'inherit', colorScheme:'light dark' }}/>
+                          background:'var(--surface-subtle)', color:'var(--text-primary)', fontFamily:'inherit', width:108 }}/>
                     </div>
                   )}
                 </div>
@@ -254,13 +255,13 @@ export function UniversalFilterBar({
                   </div>
                   {showCustomCreated && (
                     <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:6 }}>
-                      <input type="date" value={createdFrom} onChange={e => setFilter('createdFrom',e.target.value)}
+                      <DateInput value={createdFrom} onChange={v => setFilter('createdFrom',v)}
                         style={{ fontSize:11, padding:'3px 8px', borderRadius:6, border:'1px solid var(--border)',
-                          background:'var(--surface-subtle)', color:'var(--text-primary)', fontFamily:'inherit', colorScheme:'light dark' }}/>
+                          background:'var(--surface-subtle)', color:'var(--text-primary)', fontFamily:'inherit', width:108 }}/>
                       <span style={{ fontSize:11, color:'var(--text-muted)' }}>–</span>
-                      <input type="date" value={createdTo} onChange={e => setFilter('createdTo',e.target.value)}
+                      <DateInput value={createdTo} onChange={v => setFilter('createdTo',v)}
                         style={{ fontSize:11, padding:'3px 8px', borderRadius:6, border:'1px solid var(--border)',
-                          background:'var(--surface-subtle)', color:'var(--text-primary)', fontFamily:'inherit', colorScheme:'light dark' }}/>
+                          background:'var(--surface-subtle)', color:'var(--text-primary)', fontFamily:'inherit', width:108 }}/>
                     </div>
                   )}
                 </div>
@@ -294,13 +295,13 @@ export function UniversalFilterBar({
                   </div>
                   {showCustomUpdated && (
                     <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:6 }}>
-                      <input type="date" value={updatedFrom} onChange={e => setFilter('updatedFrom',e.target.value)}
+                      <DateInput value={updatedFrom} onChange={v => setFilter('updatedFrom',v)}
                         style={{ fontSize:11, padding:'3px 8px', borderRadius:6, border:'1px solid var(--border)',
-                          background:'var(--surface-subtle)', color:'var(--text-primary)', fontFamily:'inherit', colorScheme:'light dark' }}/>
+                          background:'var(--surface-subtle)', color:'var(--text-primary)', fontFamily:'inherit', width:108 }}/>
                       <span style={{ fontSize:11, color:'var(--text-muted)' }}>–</span>
-                      <input type="date" value={updatedTo} onChange={e => setFilter('updatedTo',e.target.value)}
+                      <DateInput value={updatedTo} onChange={v => setFilter('updatedTo',v)}
                         style={{ fontSize:11, padding:'3px 8px', borderRadius:6, border:'1px solid var(--border)',
-                          background:'var(--surface-subtle)', color:'var(--text-primary)', fontFamily:'inherit', colorScheme:'light dark' }}/>
+                          background:'var(--surface-subtle)', color:'var(--text-primary)', fontFamily:'inherit', width:108 }}/>
                     </div>
                   )}
                 </div>

@@ -2,6 +2,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, X, RefreshCw, User, Flag, Briefcase, Paperclip, Shield, ToggleLeft, ToggleRight, ListPlus, Trash2 } from 'lucide-react'
+import { DateInput } from '@/components/ui/DateInput'
 import { toast } from '@/store/appStore'
 import { useOrgSettings }         from '@/lib/hooks/useOrgSettings'
 import { QuickAddClientModal }   from '@/components/clients/QuickAddClientModal'
@@ -533,11 +534,11 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, defa
                     <option value="">Assignee (task default)</option>
                     {members.map(m => <option key={m.id} value={m.id}>{m.name}{m.id===currentUserId?' (me)':''}</option>)}
                   </select>
-                  <input type="date" value={s.due_date ?? ''}
-                    onChange={e => setCompSubtasks(p => p.map((x,xi) => xi===i ? {...x, due_date:e.target.value||undefined} : x))}
+                  <DateInput value={s.due_date ?? ''}
+                    onChange={v => setCompSubtasks(p => p.map((x,xi) => xi===i ? {...x, due_date: v||undefined} : x))}
                     style={{ fontSize:11, border:'1px solid var(--border)', borderRadius:6,
                       padding:'4px 6px', background:'var(--surface)',
-                      color:'var(--text-secondary)', outline:'none', fontFamily:'inherit' }}/>
+                      color:'var(--text-secondary)', outline:'none', fontFamily:'inherit', width:108 }}/>
                   <button type="button" onClick={() => setCompSubtasks(p => p.filter((_,xi) => xi!==i))}
                     style={{ background:'none', border:'none', cursor:'pointer', padding:4,
                       color:'#94a3b8', display:'flex', alignItems:'center', borderRadius:4 }}>

@@ -5,6 +5,7 @@ import { MultiPillSelect } from '@/components/filters/MultiPillSelect'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LineChart, Line, Legend } from 'recharts'
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
 import { isOverdue, fmtDate } from '@/lib/utils/format'
+import { DateInput } from '@/components/ui/DateInput'
 import type { Task } from '@/types'
 
 interface MonTask {
@@ -654,13 +655,13 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
                 </div>
                 {showCustomDue && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
-                    <input type="date" value={dueDateFrom} onChange={e => setDueDateFrom(e.target.value)}
+                    <DateInput value={dueDateFrom} onChange={v => setDueDateFrom(v)}
                       style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--border)',
-                        background: 'var(--surface-subtle)', color: 'var(--text-primary)', fontFamily: 'inherit', colorScheme: 'light dark' as any }}/>
+                        background: 'var(--surface-subtle)', color: 'var(--text-primary)', fontFamily: 'inherit', width: 108 }}/>
                     <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>–</span>
-                    <input type="date" value={dueDateTo} onChange={e => setDueDateTo(e.target.value)}
+                    <DateInput value={dueDateTo} onChange={v => setDueDateTo(v)}
                       style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--border)',
-                        background: 'var(--surface-subtle)', color: 'var(--text-primary)', fontFamily: 'inherit', colorScheme: 'light dark' as any }}/>
+                        background: 'var(--surface-subtle)', color: 'var(--text-primary)', fontFamily: 'inherit', width: 108 }}/>
                   </div>
                 )}
               </div>
@@ -691,13 +692,13 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
                 </div>
                 {showCustomCreated && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
-                    <input type="date" value={createdFrom} onChange={e => setCreatedFrom(e.target.value)}
+                    <DateInput value={createdFrom} onChange={v => setCreatedFrom(v)}
                       style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--border)',
-                        background: 'var(--surface-subtle)', color: 'var(--text-primary)', fontFamily: 'inherit', colorScheme: 'light dark' as any }}/>
+                        background: 'var(--surface-subtle)', color: 'var(--text-primary)', fontFamily: 'inherit', width: 108 }}/>
                     <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>–</span>
-                    <input type="date" value={createdTo} onChange={e => setCreatedTo(e.target.value)}
+                    <DateInput value={createdTo} onChange={v => setCreatedTo(v)}
                       style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--border)',
-                        background: 'var(--surface-subtle)', color: 'var(--text-primary)', fontFamily: 'inherit', colorScheme: 'light dark' as any }}/>
+                        background: 'var(--surface-subtle)', color: 'var(--text-primary)', fontFamily: 'inherit', width: 108 }}/>
                   </div>
                 )}
               </div>
@@ -728,13 +729,13 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
                 </div>
                 {showCustomUpdated && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
-                    <input type="date" value={updatedFrom} onChange={e => setUpdatedFrom(e.target.value)}
+                    <DateInput value={updatedFrom} onChange={v => setUpdatedFrom(v)}
                       style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--border)',
-                        background: 'var(--surface-subtle)', color: 'var(--text-primary)', fontFamily: 'inherit', colorScheme: 'light dark' as any }}/>
+                        background: 'var(--surface-subtle)', color: 'var(--text-primary)', fontFamily: 'inherit', width: 108 }}/>
                     <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>–</span>
-                    <input type="date" value={updatedTo} onChange={e => setUpdatedTo(e.target.value)}
+                    <DateInput value={updatedTo} onChange={v => setUpdatedTo(v)}
                       style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--border)',
-                        background: 'var(--surface-subtle)', color: 'var(--text-primary)', fontFamily: 'inherit', colorScheme: 'light dark' as any }}/>
+                        background: 'var(--surface-subtle)', color: 'var(--text-primary)', fontFamily: 'inherit', width: 108 }}/>
                   </div>
                 )}
               </div>

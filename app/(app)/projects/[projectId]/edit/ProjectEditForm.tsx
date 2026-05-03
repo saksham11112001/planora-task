@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useRef }  from 'react'
+import { DateInput } from '@/components/ui/DateInput'
 import { useRouter } from 'next/navigation'
 import Link          from 'next/link'
 import { ArrowLeft } from 'lucide-react'
@@ -138,8 +139,14 @@ export function ProjectEditForm({ project, clients, members }: { project: any; c
                   {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                 </select>
               </div>
-              <div><Label>Start date</Label><Input k="start_date" type="date"/></div>
-              <div><Label>Due date</Label><Input k="due_date" type="date"/></div>
+              <div><Label>Start date</Label>
+                <DateInput value={form.start_date} onChange={v => set('start_date', v)}
+                  style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}/>
+              </div>
+              <div><Label>Due date</Label>
+                <DateInput value={form.due_date} onChange={v => set('due_date', v)}
+                  style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}/>
+              </div>
               <div><Label>Budget (₹)</Label><Input k="budget" type="number" placeholder="e.g. 50000"/></div>
               <div><Label>Hours budget</Label><Input k="hours_budget" type="number" placeholder="e.g. 120"/></div>
             </div>

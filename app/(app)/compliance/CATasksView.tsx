@@ -1,9 +1,10 @@
 'use client'
-import { useState, useEffect, useTransition, useCallback } from 'react'
+import React, { useState, useEffect, useTransition, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Search, RefreshCw, Trash2, SortAsc, MessageCircle } from 'lucide-react'
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
 import { fmtDate, isOverdue } from '@/lib/utils/format'
+import { DateInput } from '@/components/ui/DateInput'
 import { toast } from '@/store/appStore'
 import { MultiPillSelect } from '@/components/filters/MultiPillSelect'
 
@@ -763,12 +764,12 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
                   <div style={{ textAlign: 'center', fontSize: 11, fontWeight: 500, color: ov ? '#dc2626' : 'var(--text-muted)', cursor: canManage ? 'pointer' : 'default' }}
                     onClick={e => { e.stopPropagation(); if (canManage) setInlineEdit({ taskId: task.id, field: 'due_date' }) }}>
                     {inlineEdit?.taskId === task.id && inlineEdit.field === 'due_date' ? (
-                      <input autoFocus type="date" defaultValue={task.due_date ?? ''}
-                        onChange={e => patchField(task.id, 'due_date', e.target.value || null)}
+                      <DateInput value={task.due_date ?? ''}
+                        onChange={v => patchField(task.id, 'due_date', v || null)}
                         onBlur={() => setInlineEdit(null)}
-                        onClick={e => e.stopPropagation()}
+                        onClick={(e: React.MouseEvent) => e.stopPropagation()}
                         style={{ fontSize: 11, padding: '1px 4px', borderRadius: 5, border: '1px solid var(--brand)',
-                          background: 'var(--surface)', outline: 'none', colorScheme: 'light dark', fontFamily: 'inherit' }}/>
+                          background: 'var(--surface)', outline: 'none', fontFamily: 'inherit', width: 108 }}/>
                     ) : task.due_date ? (
                       <span title={canManage ? 'Click to change due date' : undefined}
                         style={{ padding: '2px 6px', borderRadius: 6, background: ov ? '#fef2f2' : 'transparent' }}>

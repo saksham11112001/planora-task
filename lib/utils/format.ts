@@ -1,9 +1,12 @@
 export function fmtDate(date: string | null | undefined, opts?: Intl.DateTimeFormatOptions) {
   if (!date) return '—'
-  // Date-only strings (YYYY-MM-DD) must be parsed as local midnight — new Date('2026-04-15')
-  // treats them as UTC, which shifts the displayed day by -1 in UTC+ timezones.
   const d = date.length === 10 ? new Date(date + 'T00:00:00') : new Date(date)
-  return d.toLocaleDateString('en-IN', opts ?? { day: '2-digit', month: 'short', year: 'numeric' })
+  if (opts) return d.toLocaleDateString('en-IN', opts)
+  // Standard format: DD/MM/YYYY
+  const dd = String(d.getDate()).padStart(2, '0')
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const yyyy = d.getFullYear()
+  return `${dd}/${mm}/${yyyy}`
 }
 
 export function fmtDateTime(date: string | null | undefined) {

@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
+import { DateInput } from '@/components/ui/DateInput'
 import { Plus, X, DollarSign, Receipt, ChevronDown, Trash2, Edit3, Eye, Check, Send, AlertCircle, Search, Filter, Building2, Star } from 'lucide-react'
 import { toast } from '@/store/appStore'
 import type { Invoice, InvoiceStatus } from '@/types'
@@ -247,15 +248,15 @@ function InvoiceModal({ clients, companyCodes, groups = [], invoice, onClose, on
             {/* Issue date */}
             <div>
               <Label>Issue date</Label>
-              <input type="date" value={issueDate} onChange={e => setIssueDate(e.target.value)}
-                style={{ width: '100%', ...inputStyle, colorScheme: 'light dark' }}/>
+              <DateInput value={issueDate} onChange={v => setIssueDate(v)}
+                style={{ width: '100%', ...inputStyle, fontFamily: 'inherit' }}/>
             </div>
 
             {/* Due date */}
             <div>
               <Label>Due date</Label>
-              <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)}
-                style={{ width: '100%', ...inputStyle, colorScheme: 'light dark' }}/>
+              <DateInput value={dueDate} onChange={v => setDueDate(v)}
+                style={{ width: '100%', ...inputStyle, fontFamily: 'inherit' }}/>
             </div>
 
             {/* Company code selector */}

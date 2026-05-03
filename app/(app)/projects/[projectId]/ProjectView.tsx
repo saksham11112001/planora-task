@@ -10,6 +10,7 @@ import { MultiPillSelect } from '@/components/filters/MultiPillSelect'
 import { cn }              from '@/lib/utils/cn'
 import { toast }           from '@/store/appStore'
 import { fmtDate, isOverdue, todayStr, fmtHours } from '@/lib/utils/format'
+import { DateInput } from '@/components/ui/DateInput'
 import { STATUS_CONFIG, PRIORITY_CONFIG }  from '@/types'
 import type { Task }       from '@/types'
 
@@ -557,17 +558,15 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
             <>
               <div style={{ position:'fixed', inset:0, zIndex:49 }}
                 onClick={e => { e.stopPropagation(); setTaskDueDateEdit(null) }}/>
-              <input
-                autoFocus
-                type="date"
-                defaultValue={task.due_date ?? ''}
-                onClick={e => e.stopPropagation()}
-                onChange={e => { patchTaskInline(task.id, 'due_date', e.target.value || null); setTaskDueDateEdit(null) }}
+              <DateInput
+                value={task.due_date ?? ''}
+                onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                onChange={v => { patchTaskInline(task.id, 'due_date', v || null); setTaskDueDateEdit(null) }}
                 onBlur={() => setTaskDueDateEdit(null)}
                 style={{ fontSize:11, padding:'2px 5px', borderRadius:6, border:'1px solid var(--brand)',
-                  background:'var(--surface)', outline:'none', colorScheme:'light dark',
+                  background:'var(--surface)', outline:'none',
                   fontFamily:'inherit', position:'absolute', right:0, top:'50%', transform:'translateY(-50%)',
-                  zIndex:50, width:130 }}
+                  zIndex:50, width:108 }}
               />
             </>
           ) : (
@@ -699,16 +698,14 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
                   <>
                     <div style={{ position:'fixed', inset:0, zIndex:49 }}
                       onClick={() => setSubDueDateEdit(null)}/>
-                    <input
-                      autoFocus
-                      type="date"
-                      defaultValue={sub.due_date ?? ''}
-                      onClick={e => e.stopPropagation()}
-                      onChange={e => { patchTaskInline(sub.id, 'due_date', e.target.value||null, task.id); setSubDueDateEdit(null) }}
+                    <DateInput
+                      value={sub.due_date ?? ''}
+                      onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                      onChange={v => { patchTaskInline(sub.id, 'due_date', v||null, task.id); setSubDueDateEdit(null) }}
                       onBlur={() => setSubDueDateEdit(null)}
                       style={{ fontSize:11, padding:'2px 5px', borderRadius:6, border:'1px solid var(--brand)',
-                        background:'var(--surface)', outline:'none', colorScheme:'light dark',
-                        fontFamily:'inherit', zIndex:50, position:'relative', width:120 }}
+                        background:'var(--surface)', outline:'none',
+                        fontFamily:'inherit', zIndex:50, position:'relative', width:108 }}
                     />
                   </>
                 ) : (

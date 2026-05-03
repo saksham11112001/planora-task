@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import { DateInput } from '@/components/ui/DateInput'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from '@/store/appStore'
@@ -319,7 +320,7 @@ export function NewProjectForm({ clients: initialClients, members, orgTemplates 
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5">Due date</label>
-          <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="input"/>
+          <DateInput value={dueDate} onChange={v => setDueDate(v)} className="input" style={{ fontFamily: 'inherit' }}/>
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5">Budget (₹)</label>
