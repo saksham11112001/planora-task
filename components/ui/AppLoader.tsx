@@ -53,7 +53,7 @@ export function AppLoader() {
         letterSpacing: '-0.5px', marginBottom: 8,
         fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
       }}>
-        Taska
+        Floatup
       </div>
       <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', marginBottom: 40 }}>
         Project management for modern teams

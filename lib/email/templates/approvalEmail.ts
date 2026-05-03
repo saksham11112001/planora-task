@@ -5,7 +5,7 @@ export function approvalRequestedHtml(p: {
 <body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
   <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 16px"><tr><td align="center">
   <table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden">
-    <tr><td style="background:#0f172a;padding:20px 32px"><span style="color:#fff;font-size:16px;font-weight:700">⚡ Taska</span></td></tr>
+    <tr><td style="background:#0f172a;padding:20px 32px"><span style="color:#fff;font-size:16px;font-weight:700">⚡ Floatup</span></td></tr>
     <tr><td style="padding:32px">
       <div style="display:inline-block;background:#fffbeb;color:#ca8a04;padding:4px 12px;border-radius:20px;font-size:13px;font-weight:600;margin-bottom:16px">🔔 Approval needed</div>
       <h1 style="margin:0 0 8px;color:#0f172a;font-size:20px;font-weight:700">Task submitted for review</h1>
@@ -43,7 +43,7 @@ export function approvalResultHtml(p: {
 <body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
   <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 16px"><tr><td align="center">
   <table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden">
-    <tr><td style="background:#0f172a;padding:20px 32px"><span style="color:#fff;font-size:16px;font-weight:700">⚡ Taska</span></td></tr>
+    <tr><td style="background:#0f172a;padding:20px 32px"><span style="color:#fff;font-size:16px;font-weight:700">⚡ Floatup</span></td></tr>
     <tr><td style="padding:32px">
       <div style="display:inline-block;background:${bg};color:${color};padding:4px 12px;border-radius:20px;font-size:13px;font-weight:600;margin-bottom:16px">${icon} Task ${label}</div>
       <h1 style="margin:0 0 8px;color:#0f172a;font-size:20px;font-weight:700">Your task was ${label.toLowerCase()}</h1>

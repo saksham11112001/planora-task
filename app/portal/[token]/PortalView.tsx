@@ -86,8 +86,8 @@ export function PortalView({ rawToken }: Props) {
 
   useEffect(() => { fetchData() }, [])
 
-  if (loading) return <PortalShell orgName="Taska" clientName=""><LoadingState /></PortalShell>
-  if (error)   return <PortalShell orgName="Taska" clientName=""><ErrorState message={error} /></PortalShell>
+  if (loading) return <PortalShell orgName="Floatup" clientName=""><LoadingState /></PortalShell>
+  if (error)   return <PortalShell orgName="Floatup" clientName=""><ErrorState message={error} /></PortalShell>
   if (!data)   return null
 
   return (
@@ -418,7 +418,7 @@ function PortalShell({ orgName, clientName, children }: { orgName: string; clien
 
       {/* Footer */}
       <div style={{ borderTop: '1px solid #e2e8f0', padding: '16px 20px', textAlign: 'center' }}>
-        <span style={{ fontSize: '12px', color: '#94a3b8' }}>Powered by <strong>Taska</strong></span>
+        <span style={{ fontSize: '12px', color: '#94a3b8' }}>Powered by <strong>Floatup</strong></span>
       </div>
     </div>
   )

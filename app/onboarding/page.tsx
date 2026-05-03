@@ -209,7 +209,7 @@ export default function OnboardingPage() {
               <div className="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center">
                 <Zap className="h-6 w-6 text-white"/>
               </div>
-              <span className="text-2xl font-bold text-white">Taska</span>
+              <span className="text-2xl font-bold text-white">Floatup</span>
             </div>
             <p className="text-teal-200 text-sm">Welcome! How would you like to get started?</p>
           </div>
@@ -253,7 +253,7 @@ export default function OnboardingPage() {
               <div className="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center">
                 <Zap className="h-6 w-6 text-white"/>
               </div>
-              <span className="text-2xl font-bold text-white">Taska</span>
+              <span className="text-2xl font-bold text-white">Floatup</span>
             </div>
           </div>
           <div className="bg-white rounded-2xl p-8 shadow-2xl">
@@ -311,7 +311,7 @@ export default function OnboardingPage() {
             <div className="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center">
               <Zap className="h-6 w-6 text-white"/>
             </div>
-            <span className="text-2xl font-bold text-white">Taska</span>
+            <span className="text-2xl font-bold text-white">Floatup</span>
           </div>
           <p className="text-teal-200 text-sm">
             {inviteData ? 'Complete your profile to get started' : 'Set up your workspace in a few quick steps'}
@@ -502,7 +502,7 @@ export default function OnboardingPage() {
               <div className="flex gap-3 mt-2">
                 <button onClick={() => setStep(2)} className="btn btn-outline flex-1">Back</button>
                 <button onClick={handleSubmit} disabled={saving} className="btn btn-brand flex-1">
-                  {saving ? 'Setting up…' : 'Launch Taska 🚀'}
+                  {saving ? 'Setting up…' : 'Launch Floatup 🚀'}
                 </button>
               </div>
             </>

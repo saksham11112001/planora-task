@@ -6,7 +6,7 @@ import { assertCan }         from '@/lib/utils/permissionGate'
 import { effectivePlan, isAtMemberLimit, memberLimit } from '@/lib/utils/planGate'
 import { dbError } from '@/lib/api-error'
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXT_PUBLIC_PLANORA_URL ?? 'https://planora.in'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://floatup.app'
 
 export async function GET() {
   const supabase = await createClient()

@@ -322,7 +322,7 @@ export function NewProjectForm({ clients: initialClients, members, orgTemplates 
           <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="input"/>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">Budget (₹)</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">Budget ($)</label>
           <input type="number" value={budget} onChange={e => setBudget(e.target.value)} className="input" placeholder="0"/>
         </div>
       </div>

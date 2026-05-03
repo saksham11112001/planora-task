@@ -17,7 +17,7 @@ export function clientUploadNotifyHtml(p: Props): string {
   <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 16px"><tr><td align="center">
   <table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden">
     <tr><td style="background:#0f172a;padding:20px 32px">
-      <span style="color:#fff;font-size:16px;font-weight:700">⚡ Taska</span>
+      <span style="color:#fff;font-size:16px;font-weight:700">⚡ Floatup</span>
     </td></tr>
     <tr><td style="padding:32px">
       <div style="display:inline-block;background:rgba(13,148,136,0.1);color:#0d9488;padding:4px 12px;border-radius:20px;font-size:13px;font-weight:600;margin-bottom:16px">
@@ -54,7 +54,7 @@ export function clientUploadNotifyHtml(p: Props): string {
       </a>
     </td></tr>
     <tr><td style="padding:16px 32px;border-top:1px solid #f1f5f9">
-      <p style="color:#94a3b8;font-size:12px;margin:0">Taska · ${p.orgName}</p>
+      <p style="color:#94a3b8;font-size:12px;margin:0">Floatup · ${p.orgName}</p>
     </td></tr>
   </table>
   </td></tr></table>

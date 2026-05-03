@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 
-export const metadata: Metadata = { title: 'Terms & Conditions — Taska' }
+export const metadata: Metadata = { title: 'Terms & Conditions — Floatup' }
 
 export default function TermsPage() {
   const updated = '27 March 2026'
@@ -12,7 +12,7 @@ export default function TermsPage() {
           <div style={{ width:30, height:30, borderRadius:8, background:'#0d9488', display:'flex', alignItems:'center', justifyContent:'center' }}>
             <svg viewBox="0 0 20 20" fill="none" style={{ width:16, height:16 }}><path d="M3 5h14M3 10h10M3 15h7" stroke="#fff" strokeWidth="2" strokeLinecap="round"/></svg>
           </div>
-          <span style={{ fontWeight:700, fontSize:17, color:'#111827' }}>Taska</span>
+          <span style={{ fontWeight:700, fontSize:17, color:'#111827' }}>Floatup</span>
         </Link>
         <div style={{ display:'flex', gap:20, fontSize:13 }}>
           <Link href="/privacy" style={{ color:'#6b7280', textDecoration:'none' }}>Privacy</Link>
@@ -29,17 +29,17 @@ export default function TermsPage() {
         </div>
 
         <div style={{ background:'#fffbeb', border:'1px solid #fde68a', borderRadius:10, padding:'16px 20px', marginBottom:40, fontSize:14, color:'#92400e', lineHeight:1.7 }}>
-          <strong>Plain-language summary:</strong> Use Taska for legitimate work purposes, don't misuse it, pay for your plan, and we will keep the service running reliably. Your data is yours — we are just the platform.
+          <strong>Plain-language summary:</strong> Use Floatup for legitimate work purposes, don't misuse it, pay for your plan, and we will keep the service running reliably. Your data is yours — we are just the platform.
         </div>
 
         {([
           {
             n:'1', title:'Acceptance of Terms',
-            body:'By accessing or using Taska ("the Service"), you agree to be bound by these Terms & Conditions. If you are using Taska on behalf of an organisation, you represent that you have authority to bind that organisation. If you do not agree, you must not use the Service.',
+            body:'By accessing or using Floatup ("the Service"), you agree to be bound by these Terms & Conditions. If you are using Floatup on behalf of an organisation, you represent that you have authority to bind that organisation. If you do not agree, you must not use the Service.',
           },
           {
             n:'2', title:'Description of Service',
-            body:'Taska is a task, project, and workflow management platform for professional teams. The Service includes web and mobile interfaces, a REST API, automated recurring tasks, time tracking, compliance workflow tools, and data import/export features. Features may vary by plan.',
+            body:'Floatup is a task, project, and workflow management platform for professional teams. The Service includes web and mobile interfaces, a REST API, automated recurring tasks, time tracking, compliance workflow tools, and data import/export features. Features may vary by plan.',
           },
           {
             n:'3', title:'Account Registration',
@@ -58,11 +58,11 @@ Violation of this section may result in immediate account suspension without ref
           },
           {
             n:'5', title:'Ownership of Data',
-            body:'All data you upload to Taska — including tasks, projects, client information, attachments, and time logs — remains your property. We claim no ownership rights over your content. You grant us a limited licence to store and process your data solely to provide the Service.',
+            body:'All data you upload to Floatup — including tasks, projects, client information, attachments, and time logs — remains your property. We claim no ownership rights over your content. You grant us a limited licence to store and process your data solely to provide the Service.',
           },
           {
             n:'6', title:'Plans, Billing & Payments',
-            body:`Taska offers a free tier and paid subscription plans billed monthly or annually. Paid plans are processed by Razorpay.<br/><br/><strong>Free plan:</strong> Available indefinitely with usage limits. No credit card required.<br/><strong>Paid plans:</strong> Billed in advance. Prices are shown in INR and are inclusive of applicable taxes.<br/><strong>Cancellation:</strong> You may cancel at any time. Access continues until the end of the billing period. No refunds are issued for partial periods except where required by law.<br/><strong>Price changes:</strong> We will give 30 days notice of any price changes via email.`,
+            body:`Floatup offers a free tier and paid subscription plans billed monthly or annually. Paid plans are processed by Razorpay.<br/><br/><strong>Free plan:</strong> Available indefinitely with usage limits. No credit card required.<br/><strong>Paid plans:</strong> Billed in advance. Prices are shown in USD and are inclusive of applicable taxes.<br/><strong>Cancellation:</strong> You may cancel at any time. Access continues until the end of the billing period. No refunds are issued for partial periods except where required by law.<br/><strong>Price changes:</strong> We will give 30 days notice of any price changes via email.`,
           },
           {
             n:'7', title:'Service Availability & SLA',
@@ -70,7 +70,7 @@ Violation of this section may result in immediate account suspension without ref
           },
           {
             n:'8', title:'Intellectual Property',
-            body:'The Taska name, logo, product design, and code are the intellectual property of SNG Advisers and are protected by copyright and trademark law. You may not copy, modify, or distribute any part of the Service without our written consent.',
+            body:'The Floatup name, logo, product design, and code are the intellectual property of SNG Advisers and are protected by copyright and trademark law. You may not copy, modify, or distribute any part of the Service without our written consent.',
           },
           {
             n:'9', title:'Limitation of Liability',
@@ -82,7 +82,7 @@ Violation of this section may result in immediate account suspension without ref
           },
           {
             n:'11', title:'Governing Law & Disputes',
-            body:'These Terms are governed by the laws of India. Any dispute shall first be attempted to be resolved through good-faith negotiation. If unresolved within 30 days, disputes shall be subject to the exclusive jurisdiction of the courts of New Delhi, India.',
+            body:'These Terms are governed by the laws of the jurisdiction in which SNG Advisers is incorporated. Any dispute shall first be attempted to be resolved through good-faith negotiation. If unresolved within 30 days, disputes shall be subject to binding arbitration under mutually agreed rules.',
           },
           {
             n:'12', title:'Changes to These Terms',

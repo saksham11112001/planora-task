@@ -120,7 +120,7 @@ export function TrashView({ canManage, isPaid, planTier }: Props) {
           </div>
           <p style={{ fontSize:13, color:'#5b21b6', marginBottom:14, lineHeight:1.6 }}>
             You can see deleted tasks below, but restoring them requires an active paid plan.
-            Upgrade now — plans start at ₹999/month.
+            Upgrade now — plans start at $29/month.
           </p>
           <Link href="/settings/billing" style={{ display:'inline-flex', alignItems:'center', gap:6,
             padding:'8px 18px', borderRadius:8, background:'#7c3aed', color:'#fff',

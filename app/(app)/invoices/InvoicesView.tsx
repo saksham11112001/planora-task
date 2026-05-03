@@ -30,7 +30,7 @@ interface Props {
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 function fmt(n: number) {
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 2 }).format(n)
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(n)
 }
 
 function calcTotals(items: LineItem[], gstRate: number, discountAmount: number) {
@@ -303,7 +303,7 @@ function InvoiceModal({ clients, companyCodes, groups = [], invoice, onClose, on
                       <option value="" disabled>＋ Add from billable tasks ({unbilledTasks.length})</option>
                       {unbilledTasks.map((t: any) => (
                         <option key={t.id} value={t.id}>
-                          {t.title}{t.billable_amount ? ` — ₹${t.billable_amount}` : ''}
+                          {t.title}{t.billable_amount ? ` — $${t.billable_amount}` : ''}
                         </option>
                       ))}
                     </select>
@@ -376,7 +376,7 @@ function InvoiceModal({ clients, companyCodes, groups = [], invoice, onClose, on
               </div>
             </div>
             <div>
-              <Label>Discount (₹)</Label>
+              <Label>Discount ($)</Label>
               <input type="number" min="0" step="0.01" value={discountAmount}
                 onChange={e => setDiscountAmount(Number(e.target.value) || 0)}
                 style={{ width: '100%', ...inputStyle }}/>

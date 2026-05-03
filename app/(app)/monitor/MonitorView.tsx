@@ -172,7 +172,7 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
   async function exportToExcel() {
     const ExcelJS = (await import('exceljs')).default
     const wb = new ExcelJS.Workbook()
-    wb.creator  = 'Planora'
+    wb.creator  = 'Floatup'
     wb.created  = new Date()
 
     // ── Summary sheet ──
@@ -182,8 +182,8 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
       { header: 'Value', key: 'value', width: 34 },
     ]
     ;[
-      ['Exported by',   'Planora Monitor'],
-      ['Export date',   new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })],
+      ['Exported by',   'Floatup Monitor'],
+      ['Export date',   new Date().toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })],
       ['Total tasks',   visible.length],
       ['Filters active', [
         filterStatus.length  ? `Status: ${filterStatus.map(s => STATUS_CONFIG[s]?.label ?? s).join(', ')}`   : '',
@@ -272,7 +272,7 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
     const blob   = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
     const url    = URL.createObjectURL(blob)
     const a      = document.createElement('a')
-    a.href = url; a.download = `planora_monitor_${today}.xlsx`; a.click()
+    a.href = url; a.download = `floatup_monitor_${today}.xlsx`; a.click()
     URL.revokeObjectURL(url)
   }
 

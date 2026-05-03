@@ -22,7 +22,7 @@ const TEMPLATES: FieldDef[] = [
   { key:'last_inspection',  label:'Last Inspection Date', type:'date',  placeholder:'' },
   { key:'hearing_dates',    label:'Hearing Dates',     type:'textarea', placeholder:'e.g. 2024-03-15, 2024-04-20' },
   { key:'officer_details',  label:'Officer Details',   type:'textarea', placeholder:'Name, Designation, Contact' },
-  { key:'amount',           label:'Amount (₹)',        type:'number',   placeholder:'0' },
+  { key:'amount',           label:'Amount ($)',        type:'number',   placeholder:'0' },
   { key:'assessment_year',  label:'Assessment Year',   type:'text',     placeholder:'2023-24' },
   { key:'remarks',          label:'Remarks',           type:'textarea', placeholder:'Additional notes…' },
 ]
@@ -159,7 +159,7 @@ export function CustomFieldsSettingsForm({ orgId, initial }: { orgId: string; in
             { type:'Short text',  example:'Case Number → "ITO/123/2024", PAN → "ABCDE1234F"' },
             { type:'Long text',   example:'Officer Details → "Name, Designation, Room No."' },
             { type:'Date',        example:'Filing Date → date picker; Hearing Date → date picker' },
-            { type:'Number',      example:'Amount (₹) → "150000"; Tax Rate → "18"' },
+            { type:'Number',      example:'Amount ($) → "150000"; Tax Rate → "18"' },
             { type:'Dropdown',    example:'Stage → "Draft / Review / Filed"; Quarter → "Q1 / Q2 / Q3 / Q4"' },
           ].map(({ type, example }) => (
             <div key={type} style={{ display:'flex',gap:8,alignItems:'flex-start' }}>

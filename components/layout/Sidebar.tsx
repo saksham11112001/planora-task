@@ -144,7 +144,7 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
         </div>
         <span style={{ color: '#fff', fontWeight: 600, fontSize: 13, flex: 1, overflow: 'hidden',
           whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
-          {session?.org.name ?? 'Taska'}
+          {session?.org.name ?? 'Floatup'}
         </span>
         <PlanBadge plan={plan}/>
         {onClose && (
@@ -234,13 +234,13 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
           <button onClick={() => setProjectsOpen(p => !p)}
             style={{ display: 'flex', alignItems: 'center', gap: 5, flex: 1, background: 'none',
               border: 'none', cursor: 'pointer', fontSize: 10, fontWeight: 700, letterSpacing: '0.07em',
-              textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)' }}>
+              textTransform: 'uppercase', color: 'rgba(255,255,255,0.65)' }}>
             {projectsOpen ? <ChevronDown className="h-3 w-3"/> : <ChevronRight className="h-3 w-3"/>}
             Projects
           </button>
           <Link href="/projects/new" onClick={() => { _cacheTime = 0 }}
             style={{ display: 'flex', alignItems: 'center', justifyContent: 'center',
-              width: 20, height: 20, borderRadius: 4, color: 'rgba(255,255,255,0.3)', textDecoration: 'none' }}
+              width: 20, height: 20, borderRadius: 4, color: 'rgba(255,255,255,0.65)', textDecoration: 'none' }}
             className="hover:bg-white/10 hover:text-white transition-colors"
             title="New project">
             <Plus className="h-3 w-3"/>

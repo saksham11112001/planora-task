@@ -43,7 +43,7 @@ type DiscountType = 'free_plan' | 'percent' | 'fixed_inr'
 const TYPE_META: Record<DiscountType, { label: string; icon: React.ElementType; bg: string; color: string }> = {
   free_plan:  { label: 'Free plan',  icon: Gift,    bg: '#f0fdf4', color: '#16a34a' },
   percent:    { label: '% Discount', icon: Percent,  bg: '#fff7ed', color: '#ea580c' },
-  fixed_inr:  { label: '₹ Off',      icon: Tag,      bg: '#fdf2f8', color: '#db2777' },
+  fixed_inr:  { label: '$ Off',      icon: Tag,      bg: '#fdf2f8', color: '#db2777' },
 }
 
 function fmt(iso: string | null): string {
@@ -256,7 +256,7 @@ export function CouponsView({ initialCoupons }: Props) {
             onClick={() => setFilterType(t)}
             style={{ padding: '7px 14px', borderRadius: 8, border: `1.5px solid ${filterType === t ? 'var(--brand)' : 'var(--border)'}`, background: filterType === t ? 'var(--brand-light)' : 'var(--surface)', color: filterType === t ? 'var(--brand)' : 'var(--text-secondary)', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
           >
-            {t === 'all' ? 'All' : t === 'free_plan' ? 'Free plan' : t === 'percent' ? '% Discount' : '₹ Discount'}
+            {t === 'all' ? 'All' : t === 'free_plan' ? 'Free plan' : t === 'percent' ? '% Discount' : '$ Discount'}
           </button>
         ))}
       </div>
@@ -323,7 +323,7 @@ export function CouponsView({ initialCoupons }: Props) {
                     ? `${c.duration_months} month${c.duration_months !== 1 ? 's' : ''} free`
                     : c.discount_type === 'percent'
                     ? `${c.discount_percent}% off`
-                    : `₹${c.discount_inr} off`}
+                    : `$${c.discount_inr} off`}
                 </p>
               </div>
 

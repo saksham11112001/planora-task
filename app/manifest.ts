@@ -2,8 +2,8 @@ import type { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name:             'Taska — Project Management',
-    short_name:       'Taska',
+    name:             'Floatup — Project Management',
+    short_name:       'Floatup',
     description:      'Project management for modern teams',
     start_url:        '/dashboard',
     display:          'standalone',

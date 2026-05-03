@@ -33,7 +33,12 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
   const router = useRouter()
   const [tab,          setTab]          = useState<ViewTab>('list')
   const [clientFilter, setClientFilter] = useState<string[]>([])
-  const [tasks,        setTasks]        = useState<Task[]>(initialTasks)
+  const [tasks,        setTasks]        = useState<Task[]>(initialTasks.filter((t: any) => !t.parent_task_id))
+
+  // Sync when server re-renders after router.refresh(), filtering out any subtasks that may have leaked
+  useEffect(() => {
+    setTasks(initialTasks.filter((t: any) => !t.parent_task_id))
+  }, [initialTasks])
 
   const visibleTasks = clientFilter.length > 0 ? tasks.filter(t => clientFilter.includes((t as any).client?.id ?? '') || clientFilter.includes(t.client_id ?? '')) : tasks
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
@@ -189,25 +194,19 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
         }
       }
     }
-    // Optimistic update on subtask
-    setSubtaskData(p => ({
-      ...p,
-      [parentId]: (p[parentId] ?? []).map(s =>
-        s.id === subId ? { ...s, status: newStatus } : s
-      ),
-    }))
+    // Optimistic update on subtask — compute updated list first so we can use it for auto-complete
+    const updatedSubs = (subtaskData[parentId] ?? []).map(s =>
+      s.id === subId ? { ...s, status: newStatus } : s
+    )
+    setSubtaskData(p => ({ ...p, [parentId]: updatedSubs }))
+
     await fetch(`/api/tasks/${subId}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: newStatus, completed_at: newStatus === 'completed' ? new Date().toISOString() : null }),
     })
-    // Re-fetch fresh subtask list
-    const r = await fetch(`/api/tasks?parent_id=${parentId}&limit=50`)
-    const d = await r.json()
-    const freshSubs: any[] = d.data ?? []
-    setSubtaskData(p => ({ ...p, [parentId]: freshSubs }))
 
-    // Auto-complete parent only when ALL subtasks are done
-    if (freshSubs.length > 0 && freshSubs.every(s => s.status === 'completed')) {
+    // Auto-complete parent only when ALL subtasks are done (use optimistic state — no extra round-trip)
+    if (updatedSubs.length > 0 && updatedSubs.every(s => s.status === 'completed')) {
       await fetch(`/api/tasks/${parentId}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'completed', completed_at: new Date().toISOString() }),

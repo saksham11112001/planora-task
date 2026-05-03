@@ -30,7 +30,7 @@ export async function GET() {
     const exceljs = await import('exceljs')
     const ExcelJS  = (exceljs as any).default ?? exceljs
     const wb       = new ExcelJS.Workbook()
-    wb.creator     = 'Taska'
+    wb.creator     = 'Floatup'
     wb.created     = new Date()
 
     // ── Palette ────────────────────────────────────────────────────────────
@@ -109,7 +109,7 @@ wsRM.views = [
 ]
 
     const instructions: [string, any][] = [
-      ['Taska Bulk Import Template',
+      ['Floatup Bulk Import Template',
         { bold: true, size: 15, color: { argb: C.teal }, name: 'Arial' }],
       ['', {}],
       ['📋 How to use this template',

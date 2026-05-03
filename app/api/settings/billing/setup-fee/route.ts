@@ -3,7 +3,7 @@ import { NextResponse }    from 'next/server'
 import type { NextRequest } from 'next/server'
 import { dbError }         from '@/lib/api-error'
 
-const SETUP_FEE_PAISE = 500000 // ₹5,000 in paise
+const SETUP_FEE_PAISE = 49900 // $499 in cents
 
 export async function POST(_req: NextRequest) {
   const supabase = await createClient()

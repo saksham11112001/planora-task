@@ -73,7 +73,7 @@ async function runDigest(slot: 'morning' | 'evening') {
         await resend.emails.send({
           from:    FROM,
           to:      userEmail,
-          subject: `📬 Taska digest (${slotLabel} IST) — ${items.length} update${items.length === 1 ? '' : 's'}`,
+          subject: `📬 Floatup digest (${slotLabel} IST) — ${items.length} update${items.length === 1 ? '' : 's'}`,
           html,
         })
         sentIds.push(...items.map(i => i.id))

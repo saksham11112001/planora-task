@@ -9,7 +9,7 @@ import { effectivePlan, canUseFeature } from '@/lib/utils/planGate'
 export const maxDuration = 60 // seconds — Vercel Hobby plan cap
 export const dynamic = 'force-dynamic'
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXT_PUBLIC_PLANORA_URL ?? 'https://planora.in'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://floatup.app'
 
 const COMPLIANCE_MAP = new Map(
   COMPLIANCE_TASKS.map(t => [t.title.toLowerCase().trim(), t])

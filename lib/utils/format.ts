@@ -3,12 +3,12 @@ export function fmtDate(date: string | null | undefined, opts?: Intl.DateTimeFor
   // Date-only strings (YYYY-MM-DD) must be parsed as local midnight — new Date('2026-04-15')
   // treats them as UTC, which shifts the displayed day by -1 in UTC+ timezones.
   const d = date.length === 10 ? new Date(date + 'T00:00:00') : new Date(date)
-  return d.toLocaleDateString('en-IN', opts ?? { day: '2-digit', month: 'short', year: 'numeric' })
+  return d.toLocaleDateString('en-US', opts ?? { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
 export function fmtDateTime(date: string | null | undefined) {
   if (!date) return '—'
-  return new Date(date).toLocaleString('en-IN', {
+  return new Date(date).toLocaleString('en-US', {
     day: '2-digit', month: 'short', year: 'numeric',
     hour: '2-digit', minute: '2-digit', hour12: true,
   })
@@ -20,8 +20,8 @@ export function fmtHours(h: number | null | undefined) {
   return mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`
 }
 
-export function fmtCurrency(amount: number, currency = 'INR') {
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency, maximumFractionDigits: 0 }).format(amount)
+export function fmtCurrency(amount: number, currency = 'USD') {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 0 }).format(amount)
 }
 
 export function isOverdue(dueDate: string | null | undefined, status: string) {

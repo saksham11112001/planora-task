@@ -29,7 +29,7 @@ export function taskAssignedHtml(p: Props): string {
             <td style="background:#0d9488;border-radius:8px;width:32px;height:32px;text-align:center;vertical-align:middle">
               <span style="color:#fff;font-size:16px;font-weight:700">P</span>
             </td>
-            <td style="padding-left:10px;color:#ffffff;font-size:18px;font-weight:700">Taska</td>
+            <td style="padding-left:10px;color:#ffffff;font-size:18px;font-weight:700">Floatup</td>
           </tr></table>
         </td></tr>
         <!-- Body -->
@@ -45,7 +45,7 @@ export function taskAssignedHtml(p: Props): string {
         </td></tr>
         <!-- Footer -->
         <tr><td style="padding:16px 32px;border-top:1px solid #f1f5f9">
-          <p style="color:#94a3b8;font-size:12px;margin:0">You're receiving this because you're a member of ${p.orgName} on Taska.</p>
+          <p style="color:#94a3b8;font-size:12px;margin:0">You're receiving this because you're a member of ${p.orgName} on Floatup.</p>
         </td></tr>
       </table>
     </td></tr>
@@ -65,5 +65,5 @@ ${p.dueDate ? `Due: ${p.dueDate}` : ''}
 
 View task: ${p.taskUrl}
 
-— Taska`
+— Floatup`
 }

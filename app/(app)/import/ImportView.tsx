@@ -520,7 +520,7 @@ export function ImportView() {
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <InfoRow icon={<Users style={{ width: 16, height: 16, color: 'var(--brand)' }} />}
-                label="Team Members" desc="Existing Taska users are added instantly. New emails get an invite." />
+                label="Team Members" desc="Existing Floatup users are added instantly. New emails get an invite." />
               <InfoRow icon={<Building2 style={{ width: 16, height: 16, color: '#0891b2' }} />}
                 label="Clients" desc="Created with name, email, phone, company, website, industry and color." />
               <InfoRow icon={<FolderOpen style={{ width: 16, height: 16, color: '#16a34a' }} />}

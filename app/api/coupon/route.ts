@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
       description:      coupon.description,
       message:          coupon.discount_type === 'percent'
         ? `${coupon.discount_percent}% discount will be applied at checkout`
-        : `₹${coupon.discount_inr} discount will be applied at checkout`,
+        : `$${coupon.discount_inr} discount will be applied at checkout`,
     })
   }
 

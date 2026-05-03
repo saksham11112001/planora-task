@@ -169,7 +169,7 @@ export const clientDocReminders = inngest.createFunction(
       if (![7, 2, 0, -1].includes(daysLeft)) continue
 
       const client  = clients[clientId]
-      const orgName = orgs[inst.org_id] ?? 'Taska'
+      const orgName = orgs[inst.org_id] ?? 'Floatup'
       if (!client) continue
 
       // Determine missing docs

@@ -140,7 +140,7 @@ export function ProjectEditForm({ project, clients, members }: { project: any; c
               </div>
               <div><Label>Start date</Label><Input k="start_date" type="date"/></div>
               <div><Label>Due date</Label><Input k="due_date" type="date"/></div>
-              <div><Label>Budget (₹)</Label><Input k="budget" type="number" placeholder="e.g. 50000"/></div>
+              <div><Label>Budget ($)</Label><Input k="budget" type="number" placeholder="e.g. 50000"/></div>
               <div><Label>Hours budget</Label><Input k="hours_budget" type="number" placeholder="e.g. 120"/></div>
             </div>
 

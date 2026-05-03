@@ -5,14 +5,14 @@ import { NavigationProgress }  from '@/components/ui/NavigationProgress'
 import { KeyboardShortcuts }    from '@/components/ui/KeyboardShortcuts'
 
 export const metadata: Metadata = {
-  title:       { default: 'Taska', template: '%s | Taska' },
+  title:       { default: 'Floatup', template: '%s | Floatup' },
   description: 'Project management for modern teams',
   icons: {
     icon:  [{ url: '/favicon.svg', type: 'image/svg+xml' }],
     apple: [{ url: '/favicon.svg' }],
   },
   manifest: '/manifest',
-  appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: 'Taska' },
+  appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: 'Floatup' },
 }
 
 export const viewport: Viewport = {

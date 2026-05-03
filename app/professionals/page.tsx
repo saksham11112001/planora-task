@@ -153,7 +153,7 @@ export default async function ProfessionalsPage() {
               <path d="M3 8l3 3 7-7" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </div>
-          <span style={{ fontWeight: 800, fontSize: 17, letterSpacing: '-0.5px', color: '#0f172a' }}>Taska</span>
+          <span style={{ fontWeight: 800, fontSize: 17, letterSpacing: '-0.5px', color: '#0f172a' }}>Floatup</span>
         </Link>
 
         <div className="nav-mid" style={{ flex: 1, display: 'flex', justifyContent: 'center', gap: 28 }}>
@@ -164,7 +164,7 @@ export default async function ProfessionalsPage() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-          <Link href="/" style={{ color: '#64748b', fontSize: 13, textDecoration: 'none', fontWeight: 500 }}>← Back to Taska</Link>
+          <Link href="/" style={{ color: '#64748b', fontSize: 13, textDecoration: 'none', fontWeight: 500 }}>← Back to Floatup</Link>
           <Link href="/login" className="nav-link" style={{ color: '#64748b', fontSize: 14, textDecoration: 'none', fontWeight: 500 }}>Sign in</Link>
           <Link href="/login" className="btn-primary"
             style={{
@@ -292,7 +292,7 @@ export default async function ProfessionalsPage() {
                 icon: '👥',
                 color: '#f97316', bg: '#fff7ed', border: '#fed7aa',
                 title: 'Assign to clients in bulk',
-                body: 'Select which master tasks apply to each client during onboarding. Taska auto-generates individual recurring compliance tasks with the exact attachment checklist you defined — ready for the whole financial year.',
+                body: 'Select which master tasks apply to each client during onboarding. Floatup auto-generates individual recurring compliance tasks with the exact attachment checklist you defined — ready for the whole financial year.',
               },
               {
                 step: '04',
@@ -459,7 +459,7 @@ export default async function ProfessionalsPage() {
               {
                 n: '01', color: '#7c3aed', bg: '#faf5ff', border: '#ddd6fe',
                 title: 'Load your country templates',
-                body: 'Go to Compliance → Master Tasks → Load Defaults. Select the countries you serve (US, UK, Canada, Australia, EU, India). Taska loads all relevant task templates instantly — deadlines, frequencies, and document requirements pre-filled.',
+                body: 'Go to Compliance → Master Tasks → Load Defaults. Select the countries you serve (US, UK, Canada, Australia, EU, India). Floatup loads all relevant task templates instantly — deadlines, frequencies, and document requirements pre-filled.',
                 tag: '< 60 seconds',
               },
               {
@@ -471,7 +471,7 @@ export default async function ProfessionalsPage() {
               {
                 n: '03', color: '#f97316', bg: '#fff7ed', border: '#fed7aa',
                 title: 'Onboard clients in bulk',
-                body: 'In Client Setup (Step 2), select a client and check off which master tasks apply to them. Assign a staff member and approver. Taska auto-generates their full compliance schedule — task by task, month by month — for the entire financial year.',
+                body: 'In Client Setup (Step 2), select a client and check off which master tasks apply to them. Assign a staff member and approver. Floatup auto-generates their full compliance schedule — task by task, month by month — for the entire financial year.',
                 tag: '2 min per client',
               },
               {
@@ -613,7 +613,7 @@ export default async function ProfessionalsPage() {
                 padding: '15px 24px', borderRadius: 11, fontSize: 15, fontWeight: 500,
                 textDecoration: 'none', border: '1px solid rgba(255,255,255,0.12)', display: 'inline-block',
               }}>
-              ← Back to Taska
+              ← Back to Floatup
             </Link>
           </div>
           <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.22)', marginTop: 20 }}>

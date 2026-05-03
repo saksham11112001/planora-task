@@ -5,22 +5,22 @@ import { toast } from '@/store/appStore'
 
 const PLANS = [
   {
-    key: 'free', name: 'Free', monthlyINR: 0, annualINR: 0,
+    key: 'free', name: 'Free', monthly: 0, annual: 0,
     features: ['Up to 5 members','3 projects','Unlimited tasks','Basic reports','5 GB storage'],
     color: '#64748b',
   },
   {
-    key: 'starter', name: 'Starter', monthlyINR: 1499, annualINR: 1199,
+    key: 'starter', name: 'Starter', monthly: 29, annual: 23,
     features: ['Up to 15 members','15 projects','Time tracking','Recurring tasks','Approval workflow','20 GB storage','Priority support'],
     color: '#0d9488', popular: false,
   },
   {
-    key: 'pro', name: 'Pro', monthlyINR: 4499, annualINR: 3599,
+    key: 'pro', name: 'Pro', monthly: 79, annual: 63,
     features: ['Up to 50 members','Unlimited projects','Advanced reports','API access','CSV/PDF exports','File attachments (unlimited)','100 GB storage'],
     color: '#7c3aed', popular: true,
   },
   {
-    key: 'business', name: 'Business', monthlyINR: 11999, annualINR: 9599,
+    key: 'business', name: 'Business', monthly: 149, annual: 119,
     features: ['Unlimited members','All Pro features','White-label branding','SSO / SAML','Dedicated support','SLA guarantee','Unlimited storage'],
     color: '#0891b2',
   },
@@ -101,7 +101,7 @@ export function BillingView({ orgName, currentPlan, status, subscriptionId, tria
       script.onload = () => {
         const options = {
           key: key_id, subscription_id,
-          name: 'Taska', description: `${plan.charAt(0).toUpperCase() + plan.slice(1)} Plan — ${annual ? 'Annual' : 'Monthly'}`,
+          name: 'Floatup', description: `${plan.charAt(0).toUpperCase() + plan.slice(1)} Plan — ${annual ? 'Annual' : 'Monthly'}`,
           image: '/favicon.svg', prefill: { name: orgName },
           theme: { color: '#0d9488' },
           handler: () => { toast.success('Payment successful! Plan upgraded.'); setTimeout(() => window.location.reload(), 1500) },
@@ -129,7 +129,7 @@ export function BillingView({ orgName, currentPlan, status, subscriptionId, tria
       script.onload = () => {
         const options = {
           key: key_id, order_id,
-          name: 'Taska', description: 'Professional Setup & Onboarding',
+          name: 'Floatup', description: 'Professional Setup & Onboarding',
           image: '/favicon.svg', prefill: { name: orgName },
           theme: { color: '#f97316' },
           handler: async (response: any) => {
@@ -273,7 +273,7 @@ export function BillingView({ orgName, currentPlan, status, subscriptionId, tria
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
           {PLANS.map(plan => {
             const isCurrent = plan.key === currentPlan
-            const price     = annual && plan.annualINR > 0 ? plan.annualINR : plan.monthlyINR
+            const price     = annual && plan.annual > 0 ? plan.annual : plan.monthly
             const isLoading = loading === plan.key
 
             return (
@@ -309,17 +309,17 @@ export function BillingView({ orgName, currentPlan, status, subscriptionId, tria
                     ) : (
                       <>
                         <span style={{ fontSize: 28, fontWeight: 800, color: 'var(--text-primary)' }}>
-                          ₹{price.toLocaleString('en-IN')}
+                          ${price}
                         </span>
                         <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>/mo</span>
                         {annual && (
                           <div style={{ fontSize: 11, color: '#16a34a', fontWeight: 600, marginTop: 2 }}>
-                            Billed ₹{(price * 12).toLocaleString('en-IN')}/yr · Save ₹{((plan.monthlyINR - plan.annualINR) * 12).toLocaleString('en-IN')}
+                            Billed ${price * 12}/yr · Save ${(plan.monthly - plan.annual) * 12}
                           </div>
                         )}
                         {!annual && (
                           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                            or ₹{plan.annualINR.toLocaleString('en-IN')}/mo billed annually
+                            or ${plan.annual}/mo billed annually
                           </div>
                         )}
                       </>
@@ -367,7 +367,7 @@ export function BillingView({ orgName, currentPlan, status, subscriptionId, tria
           }}>
             <span style={{ fontSize: 20 }}>💡</span>
             <p style={{ fontSize: 13, color: 'var(--brand-dark)' }}>
-              <strong>Save 20%</strong> by switching to annual billing. Starter saves ₹{(1499-1199)*12} · Pro saves ₹{(4499-3599)*12} · Business saves ₹{(11999-9599)*12} per year.
+              <strong>Save 20%</strong> by switching to annual billing. Starter saves ${(29-23)*12} · Pro saves ${(79-63)*12} · Business saves ${(149-119)*12} per year.
             </p>
             <button onClick={() => setAnnual(true)} style={{
               flexShrink: 0, padding: '6px 14px', borderRadius: 8, border: 'none',
@@ -379,7 +379,7 @@ export function BillingView({ orgName, currentPlan, status, subscriptionId, tria
         )}
 
         <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 16, textAlign: 'center' }}>
-          All payments processed securely via Razorpay · Cancel anytime · No hidden fees
+          All payments processed securely · Cancel anytime · No hidden fees
         </p>
       </div>
 
@@ -446,7 +446,7 @@ export function BillingView({ orgName, currentPlan, status, subscriptionId, tria
               <span style={{
                 fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 99,
                 background: '#fff7ed', color: '#f97316', border: '1px solid #fed7aa',
-              }}>One-time · ₹5,000</span>
+              }}>One-time · $499</span>
             )}
           </div>
           <p style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.65, margin: '0 0 10px' }}>
@@ -471,7 +471,7 @@ export function BillingView({ orgName, currentPlan, status, subscriptionId, tria
                 fontSize: 12, fontWeight: 700, cursor: setupLoading ? 'not-allowed' : 'pointer',
                 opacity: setupLoading ? 0.7 : 1, fontFamily: 'inherit',
               }}>
-              {setupLoading ? 'Opening checkout…' : 'Pay ₹5,000 →'}
+              {setupLoading ? 'Opening checkout…' : 'Pay $499 →'}
             </button>
           )}
         </div>
@@ -511,7 +511,7 @@ export function BillingView({ orgName, currentPlan, status, subscriptionId, tria
             <p style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.65, margin: '0 0 10px' }}>
               {shSubmitted
                 ? "We've received your inquiry. Our enterprise team will reach out within 1–2 business days to discuss your infrastructure requirements and pricing."
-                : 'For banks, legal firms, healthcare providers, and regulated industries that need all data to stay exclusively on their own servers. Full Taska platform, zero cloud dependency.'}
+                : 'For banks, legal firms, healthcare providers, and regulated industries that need all data to stay exclusively on their own servers. Full Floatup platform, zero cloud dependency.'}
             </p>
             {!shSubmitted && (
               <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 12 }}>

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 
-export const metadata: Metadata = { title: 'Privacy Policy — Taska' }
+export const metadata: Metadata = { title: 'Privacy Policy — Floatup' }
 
 export default function PrivacyPage() {
   const updated = '27 March 2026'
@@ -12,7 +12,7 @@ export default function PrivacyPage() {
           <div style={{ width:30, height:30, borderRadius:8, background:'#0d9488', display:'flex', alignItems:'center', justifyContent:'center' }}>
             <svg viewBox="0 0 20 20" fill="none" style={{ width:16, height:16 }}><path d="M3 5h14M3 10h10M3 15h7" stroke="#fff" strokeWidth="2" strokeLinecap="round"/></svg>
           </div>
-          <span style={{ fontWeight:700, fontSize:17, color:'#111827' }}>Taska</span>
+          <span style={{ fontWeight:700, fontSize:17, color:'#111827' }}>Floatup</span>
         </Link>
         <div style={{ display:'flex', gap:20, fontSize:13 }}>
           <Link href="/privacy" style={{ color:'#0d9488', fontWeight:600, textDecoration:'none' }}>Privacy</Link>
@@ -29,25 +29,25 @@ export default function PrivacyPage() {
         </div>
 
         <div style={{ background:'#fffbeb', border:'1px solid #fde68a', borderRadius:10, padding:'16px 20px', marginBottom:40, fontSize:14, color:'#92400e', lineHeight:1.7 }}>
-          <strong>Plain-language summary:</strong> Taska collects only what it needs to run the service, never sells your data, stores everything encrypted on enterprise-grade infrastructure in India, and you can export or delete your data at any time.
+          <strong>Plain-language summary:</strong> Floatup collects only what it needs to run the service, never sells your data, stores everything encrypted on enterprise-grade global infrastructure, and you can export or delete your data at any time.
         </div>
 
         {([
           {
             n:'1', title:'Who We Are',
-            body:'Taska is a project and task management platform operated by SNG Advisers. Our data controller contact is: <strong>legal@sngadvisers.com</strong>.',
+            body:'Floatup is a project and task management platform operated by SNG Advisers. Our data controller contact is: <strong>legal@sngadvisers.com</strong>.',
           },
           {
             n:'2', title:'What Data We Collect',
-            body:`<strong>Account data:</strong> Your name, email address, and password (bcrypt-hashed — never stored in plaintext).<br/><br/><strong>Organisation data:</strong> Tasks, projects, clients, time logs, comments, and file attachments you create. This data belongs to you.<br/><br/><strong>Usage data:</strong> Aggregated, anonymised page views and error logs used to improve the product.<br/><br/><strong>Payment data:</strong> Processed by Razorpay. We receive only a transaction confirmation and last-four-digit reference — never full card numbers.`,
+            body:`<strong>Account data:</strong> Your name, email address, and password (bcrypt-hashed — never stored in plaintext).<br/><br/><strong>Organisation data:</strong> Tasks, projects, clients, time logs, comments, and file attachments you create. This data belongs to you.<br/><br/><strong>Usage data:</strong> Aggregated, anonymised page views and error logs used to improve the product.<br/><br/><strong>Payment data:</strong> Processed by our payment processor. We receive only a transaction confirmation and last-four-digit reference — never full card numbers.`,
           },
           {
             n:'3', title:'How We Use Your Data',
-            body:`We use your data solely to provide, maintain, and improve Taska — including sending transactional notifications, processing payments, and preventing abuse.<br/><br/>We do <strong>not</strong> use your data to train AI models, serve advertisements, or sell to third parties under any circumstances.`,
+            body:`We use your data solely to provide, maintain, and improve Floatup — including sending transactional notifications, processing payments, and preventing abuse.<br/><br/>We do <strong>not</strong> use your data to train AI models, serve advertisements, or sell to third parties under any circumstances.`,
           },
           {
             n:'4', title:'Data Storage & Security',
-            body:`All data is stored on <strong>Supabase</strong> infrastructure hosted on AWS in the <strong>ap-south-1 (Mumbai)</strong> region — your data stays in India.<br/><br/><strong>Encryption at rest:</strong> AES-256 on all database volumes.<br/><strong>Encryption in transit:</strong> TLS 1.2+ enforced on all connections. HTTP redirects to HTTPS automatically.<br/><strong>Authentication:</strong> Passwords hashed with bcrypt. Sessions use signed JWTs with short expiry.<br/><strong>Row-level security:</strong> Every query is filtered by organisation ID at the database level — one org can never access another's data even if an application bug were to occur.<br/><strong>File attachments:</strong> Stored in private storage buckets, never publicly accessible — served only via signed, time-limited URLs.`,
+            body:`All data is stored on <strong>Supabase</strong> infrastructure hosted on AWS. Storage region depends on your plan — US/EU regions available on paid plans.<br/><br/><strong>Encryption at rest:</strong> AES-256 on all database volumes.<br/><strong>Encryption in transit:</strong> TLS 1.2+ enforced on all connections. HTTP redirects to HTTPS automatically.<br/><strong>Authentication:</strong> Passwords hashed with bcrypt. Sessions use signed JWTs with short expiry.<br/><strong>Row-level security:</strong> Every query is filtered by organisation ID at the database level — one org can never access another's data even if an application bug were to occur.<br/><strong>File attachments:</strong> Stored in private storage buckets, never publicly accessible — served only via signed, time-limited URLs.`,
           },
           {
             n:'5', title:'Data Backup & Retention',
@@ -55,7 +55,7 @@ export default function PrivacyPage() {
           },
           {
             n:'6', title:'Data Sharing & Sub-processors',
-            body:`We share data only with these sub-processors, as necessary to provide the service:<br/><br/><strong>Supabase Inc.</strong> — database & file storage (AWS Mumbai)<br/><strong>Vercel Inc.</strong> — application hosting (USA)<br/><strong>Resend Inc.</strong> — transactional email (USA)<br/><strong>Razorpay Software Pvt. Ltd.</strong> — payment processing (India)<br/><strong>Inngest Inc.</strong> — background job processing (USA)<br/><br/>Each sub-processor is bound by data processing agreements. We share no data with any other third party.`,
+            body:`We share data only with these sub-processors, as necessary to provide the service:<br/><br/><strong>Supabase Inc.</strong> — database & file storage (AWS)<br/><strong>Vercel Inc.</strong> — application hosting (USA)<br/><strong>Resend Inc.</strong> — transactional email (USA)<br/><strong>Payment processor</strong> — payment processing<br/><strong>Inngest Inc.</strong> — background job processing (USA)<br/><br/>Each sub-processor is bound by data processing agreements. We share no data with any other third party.`,
           },
           {
             n:'7', title:'Your Rights',
@@ -63,7 +63,7 @@ export default function PrivacyPage() {
           },
           {
             n:'8', title:'Cookies',
-            body:'Taska uses only a technically-necessary authentication session cookie. No advertising, tracking, or analytics cookies are set. No cookie banner is shown.',
+            body:'Floatup uses only a technically-necessary authentication session cookie. No advertising, tracking, or analytics cookies are set. No cookie banner is shown.',
           },
           {
             n:'9', title:'Changes to This Policy',

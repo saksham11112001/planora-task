@@ -413,7 +413,7 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated, 
             {isBillable && (
               <label style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px', borderRadius:20,
                 border:'1.5px solid #16a34a', background:'#f0fdf4', cursor:'pointer' }}>
-                <span style={{ fontSize:11, color:'#16a34a', fontWeight:600 }}>₹</span>
+                <span style={{ fontSize:11, color:'#16a34a', fontWeight:600 }}>$</span>
                 <input type="number" min="0" step="0.01" value={billableAmount}
                   onChange={e => setBillableAmount(e.target.value)}
                   placeholder="Amount (optional)"

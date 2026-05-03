@@ -104,7 +104,7 @@ export default async function LandingPage() {
               <path d="M3 8l3 3 7-7" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </div>
-          <span style={{ fontWeight: 800, fontSize: 17, letterSpacing: '-0.5px', color: '#0f172a' }}>Taska</span>
+          <span style={{ fontWeight: 800, fontSize: 17, letterSpacing: '-0.5px', color: '#0f172a' }}>Floatup</span>
         </Link>
 
         <div className="nav-mid" style={{ flex: 1, display: 'flex', justifyContent: 'center', gap: 28 }}>
@@ -324,7 +324,7 @@ export default async function LandingPage() {
         <div style={{ maxWidth: 1120, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24, flexWrap: 'wrap' }}>
           <div className="stats-row" style={{ display: 'flex', gap: 44 }}>
             {[
-              { v: '1,000+', l: 'teams on Taska' },
+              { v: '1,000+', l: 'teams on Floatup' },
               { v: '$29',    l: 'from per month' },
               { v: '4.9★',  l: 'average rating' },
               { v: '99.9%', l: 'uptime SLA' },
@@ -369,13 +369,13 @@ export default async function LandingPage() {
         <div style={{ maxWidth: 1120, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 56 }}>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#f0fdfa', border: '1px solid #5eead4', borderRadius: 99, padding: '4px 14px', marginBottom: 16 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#0d9488', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Why teams choose Taska</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#0d9488', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Why teams choose Floatup</span>
             </div>
             <h2 style={{ fontSize: 'clamp(28px, 4vw, 44px)', fontWeight: 800, letterSpacing: '-1.5px', lineHeight: 1.1, marginBottom: 14, margin: '0 0 14px' }}>
               Everything generic tools miss<br/>for professional practices
             </h2>
             <p style={{ fontSize: 16, color: '#64748b', maxWidth: 480, margin: '16px auto 0', lineHeight: 1.7 }}>
-              Most task tools were designed for tech teams. Taska was built for how accounting and advisory businesses actually operate.
+              Most task tools were designed for tech teams. Floatup was built for how accounting and advisory businesses actually operate.
             </p>
           </div>
 
@@ -452,7 +452,7 @@ export default async function LandingPage() {
               <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.55)', marginBottom: 12 }}>Automation</div>
               <h3 style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-0.5px', marginBottom: 12, lineHeight: 1.2 }}>Recurring tasks,<br/>zero effort</h3>
               <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.72)', lineHeight: 1.72, marginBottom: 24, maxWidth: 320 }}>
-                Set any task to repeat daily, weekly, monthly, or quarterly. Taska creates it, assigns it, and starts the clock automatically.
+                Set any task to repeat daily, weekly, monthly, or quarterly. Floatup creates it, assigns it, and starts the clock automatically.
               </p>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 {['Daily','Weekly','Monthly','Quarterly','Annual'].map(f => (
@@ -519,8 +519,8 @@ export default async function LandingPage() {
             <div className="step-connector" style={{ position: 'absolute', top: 39, left: '18%', right: '18%', height: 1, background: 'linear-gradient(90deg, transparent, #e2e8f0 15%, #e2e8f0 85%, transparent)', zIndex: 0 }}/>
             {[
               { n: '01', title: 'Invite your team',  body: 'Add members, assign roles — owner, manager, member, viewer. Done in under 2 minutes.' },
-              { n: '02', title: 'Create & assign tasks', body: 'Add tasks manually, use templates, or let Taska auto-generate compliance tasks for your practice from pre-built country templates.' },
-              { n: '03', title: 'Stay accountable automatically', body: 'Taska sends smart reminders, tracks completion, escalates blockers — without anyone manually chasing anyone.' },
+              { n: '02', title: 'Create & assign tasks', body: 'Add tasks manually, use templates, or let Floatup auto-generate compliance tasks for your practice from pre-built country templates.' },
+              { n: '03', title: 'Stay accountable automatically', body: 'Floatup sends smart reminders, tracks completion, escalates blockers — without anyone manually chasing anyone.' },
             ].map((step, i) => (
               <div key={i} style={{ textAlign: 'center', padding: '0 28px', position: 'relative', zIndex: 1 }}>
                 <div style={{
@@ -562,7 +562,7 @@ export default async function LandingPage() {
               Built for every professional team type
             </h2>
             <p style={{ fontSize: 15, color: '#64748b', maxWidth: 380, margin: '0 auto', lineHeight: 1.7 }}>
-              Taska adapts to your workflow — not the other way around.
+              Floatup adapts to your workflow — not the other way around.
             </p>
           </div>
 
@@ -621,7 +621,7 @@ export default async function LandingPage() {
               <span style={{ fontSize: 11, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Compare</span>
             </div>
             <h2 style={{ fontSize: 'clamp(26px, 3.5vw, 40px)', fontWeight: 800, letterSpacing: '-1.2px', margin: '0 0 12px' }}>
-              Why professional teams switch to Taska
+              Why professional teams switch to Floatup
             </h2>
             <p style={{ fontSize: 15, color: '#64748b', maxWidth: 460, margin: '0 auto', lineHeight: 1.7 }}>
               Compliance-aware, flat-priced, with features professional practices actually need.
@@ -636,7 +636,7 @@ export default async function LandingPage() {
                   <th style={{ padding: '18px 14px', textAlign: 'center', background: '#0a0f1e', borderBottom: '2px solid #0d9488', minWidth: 110 }}>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
                       <div style={{ width: 26, height: 26, borderRadius: 8, background: '#0d9488', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: '#fff' }}>T</div>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>Taska</span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>Floatup</span>
                       <span style={{ fontSize: 10, color: '#2dd4bf', fontWeight: 600 }}>$29/mo</span>
                     </div>
                   </th>
@@ -857,11 +857,11 @@ export default async function LandingPage() {
             <h2 style={{ fontSize: 'clamp(24px, 3.5vw, 36px)', fontWeight: 800, letterSpacing: '-1px', margin: '0 0 10px' }}>
               Teams who made the switch
             </h2>
-            <p style={{ fontSize: 15, color: '#64748b' }}>What early users say after one month on Taska.</p>
+            <p style={{ fontSize: 15, color: '#64748b' }}>What early users say after one month on Floatup.</p>
           </div>
           <div className="grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20 }}>
             {[
-              { init:'JM', color:'#f97316', name:'James M.', role:'Managing Partner', co:'CPA firm, Chicago', quote:'We replaced three separate tools with Taska. The compliance templates for US federal and state returns saved us hours of setup. The approval flow is exactly what our practice needed.', metric:'3 tools → 1 platform' },
+              { init:'JM', color:'#f97316', name:'James M.', role:'Managing Partner', co:'CPA firm, Chicago', quote:'We replaced three separate tools with Floatup. The compliance templates for US federal and state returns saved us hours of setup. The approval flow is exactly what our practice needed.', metric:'3 tools → 1 platform' },
               { init:'SR', color:'#0d9488', name:'Sophie R.', role:'Director', co:'Accounting firm, London', quote:'Task completion jumped from 65% to 93% in six weeks. The VAT MTD templates were ready out of the box. Our managers finally have visibility without chasing everyone manually.', metric:'65% → 93% completion' },
               { init:'LK', color:'#7c3aed', name:'Liam K.', role:'Head of Ops', co:'Agency, Toronto', quote:'Setup took 20 minutes. Flat USD pricing was a no-brainer versus Monday.com at $12 per person. Client management, approvals, and time tracking finally in one place.', metric:'ROI in week 1' },
             ].map(t => (
@@ -926,15 +926,15 @@ export default async function LandingPage() {
             {[
               {
                 q: 'Does my team need to install anything?',
-                a: 'Nothing. Taska is fully web-based — any browser, any device. Smart reminders work via email and in-app notifications with no installation required.',
+                a: 'Nothing. Floatup is fully web-based — any browser, any device. Smart reminders work via email and in-app notifications with no installation required.',
               },
               {
                 q: 'How are compliance templates organised by country?',
                 a: 'In the Compliance module, you load task templates for your service countries — US, UK, Canada, Australia, or Europe. Each country has pre-built tasks (e.g. Form 941 for US, VAT MTD returns for UK, BAS for Australia) that you can load, customise, and assign to clients in bulk.',
               },
               {
-                q: 'How is Taska different from Asana or Monday.com?',
-                a: "Those tools are designed for general teams. Taska is built specifically for accounting and advisory practices: flat USD team pricing (not $12–$14 per person), built-in compliance templates per country, client management, document upload enforcement, and approval workflows with full audit trails.",
+                q: 'How is Floatup different from Asana or Monday.com?',
+                a: "Those tools are designed for general teams. Floatup is built specifically for accounting and advisory practices: flat USD team pricing (not $12–$14 per person), built-in compliance templates per country, client management, document upload enforcement, and approval workflows with full audit trails.",
               },
               {
                 q: 'Can I try before paying?',
@@ -981,7 +981,7 @@ export default async function LandingPage() {
             Stop chasing your team.<br/>Start closing tasks.
           </h2>
           <p style={{ fontSize: 17, color: 'rgba(255,255,255,0.46)', marginBottom: 36, lineHeight: 1.75 }}>
-            Join 1,000+ professional teams running their work on Taska.<br/>Free to start — no credit card needed.
+            Join 1,000+ professional teams running their work on Floatup.<br/>Free to start — no credit card needed.
           </p>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
             <Link href="/login" className="btn-primary"
@@ -1018,7 +1018,7 @@ export default async function LandingPage() {
                     <path d="M3 8l3 3 7-7" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                 </div>
-                <span style={{ fontWeight: 800, fontSize: 15, color: '#fff' }}>Taska</span>
+                <span style={{ fontWeight: 800, fontSize: 15, color: '#fff' }}>Floatup</span>
               </div>
               <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', lineHeight: 1.72, maxWidth: 240, margin: '0 0 18px' }}>
                 Task management built for professional teams. Compliance-ready, flat-priced, globally available.
@@ -1050,7 +1050,7 @@ export default async function LandingPage() {
           </div>
 
           <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: 22, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.18)' }}>© 2025 Taska Technology. All rights reserved.</div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.18)' }}>© 2025 Floatup Technology. All rights reserved.</div>
             <div style={{ display: 'flex', gap: 22 }}>
               {['Privacy','Terms','Security','Status'].map(l => (
                 <a key={l} href="#" className="footer-link" style={{ fontSize: 12, color: 'rgba(255,255,255,0.22)', textDecoration: 'none' }}>{l}</a>
