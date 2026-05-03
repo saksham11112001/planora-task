@@ -1,7 +1,8 @@
 'use client'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, X, User, Flag, Calendar, Shield, Briefcase, Paperclip, AlertCircle, ToggleLeft, ToggleRight, ListPlus, Trash2, DollarSign } from 'lucide-react'
+import { Plus, X, User, Flag, Calendar, Shield, Briefcase, Paperclip, AlertCircle, ToggleLeft, ToggleRight, ListPlus, Trash2, DollarSign, Search, ChevronDown } from 'lucide-react'
+import { DateInput } from '@/components/ui/DateInput'
 import { toast } from '@/store/appStore'
 import { useOrgSettings } from '@/lib/hooks/useOrgSettings'
 import { InlineCustomFields }    from '@/components/tasks/InlineCustomFields'
@@ -58,6 +59,9 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated, 
   const [requireAttachment, setRequireAttachment] = useState(false)
   const [compSubtasks, setCompSubtasks] = useState<{title:string;required:boolean;due_date?:string;assignee_id?:string}[]>([])
   const [projectsList, setProjectsList] = useState<{id: string; name: string; color: string}[]>([])
+  const [projectPickerOpen, setProjectPickerOpen] = useState(false)
+  const [projectSearch, setProjectSearch] = useState('')
+  const [projectShowAll, setProjectShowAll] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
   const [isBillable, setIsBillable] = useState(false)
   const [billableAmount, setBillableAmount] = useState('')
@@ -320,16 +324,16 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated, 
 
         {/* Due date */}
         {show('due_date') && (
-          <label style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 20,
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 20,
             border: `1px solid ${errors.due_date ? '#fca5a5' : 'var(--border)'}`,
-            background: errors.due_date ? '#fef2f2' : 'var(--surface-subtle)', cursor: 'pointer' }}>
+            background: errors.due_date ? '#fef2f2' : 'var(--surface-subtle)' }}>
             <Calendar style={{ width: 11, height: 11, color: errors.due_date ? '#dc2626' : 'var(--text-muted)', flexShrink: 0 }} />
-            <input type="date" value={dueDate} onChange={e => { setDueDate(e.target.value); setErrors(p => ({ ...p, due_date: '' })) }}
+            <DateInput value={dueDate} onChange={v => { setDueDate(v); setErrors(p => ({ ...p, due_date: '' })) }}
               style={{ fontSize: 12, border: 'none', outline: 'none', background: 'transparent',
-                color: dueDate ? 'var(--text-primary)' : 'var(--text-muted)', cursor: 'pointer',
-                colorScheme: 'light dark', width: dueDate ? 'auto' : 80, fontFamily: 'inherit' }}
-              placeholder={required('due_date') ? 'Due date *' : 'Due date'}/>
-          </label>
+                color: dueDate ? 'var(--text-primary)' : 'var(--text-muted)',
+                width: 108, fontFamily: 'inherit' }}
+              placeholder={required('due_date') ? 'dd-mm-yyyy *' : 'dd-mm-yyyy'}/>
+          </div>
         )}
 
         {/* Client — always visible */}
@@ -462,19 +466,80 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated, 
               </select>
             )}
             {!makeRecurring && (
-              <label style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px',
-                borderRadius:20, border: addToProjectId ? '1.5px solid #7c3aed' : '1px solid var(--border)',
-                background: addToProjectId ? '#faf5ff' : 'var(--surface-subtle)', cursor:'pointer' }}>
-                <span style={{ fontSize:11 }}>📁</span>
-                <select value={addToProjectId} onChange={e => setAddToProjectId(e.target.value)}
-                  style={{ fontSize:12, border:'none', outline:'none', background:'transparent',
-                    color: addToProjectId ? '#7c3aed' : 'var(--text-secondary)',
-                    cursor:'pointer', appearance:'none', fontWeight: addToProjectId ? 600 : 400,
-                    fontFamily:'inherit', maxWidth:130 }}>
-                  <option value="">Project…</option>
-                  {projectsList.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-              </label>
+              <div style={{ position: 'relative' }}>
+                <button type="button"
+                  onClick={() => { setProjectPickerOpen(p => !p); setProjectSearch(''); setProjectShowAll(false) }}
+                  style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px',
+                    borderRadius:20, border: addToProjectId ? '1.5px solid #7c3aed' : '1px solid var(--border)',
+                    background: addToProjectId ? '#faf5ff' : 'var(--surface-subtle)', cursor:'pointer',
+                    fontSize:12, color: addToProjectId ? '#7c3aed' : 'var(--text-secondary)',
+                    fontWeight: addToProjectId ? 600 : 400, fontFamily:'inherit' }}>
+                  <span style={{ fontSize:11 }}>📁</span>
+                  {addToProjectId ? (projectsList.find(p => p.id === addToProjectId)?.name ?? 'Project') : 'Project…'}
+                  <ChevronDown style={{ width:11, height:11, flexShrink:0 }}/>
+                </button>
+                {projectPickerOpen && (() => {
+                  const q = projectSearch.trim().toLowerCase()
+                  const filtered = projectsList.filter(p => !q || p.name.toLowerCase().includes(q))
+                  const visible = projectShowAll ? filtered : filtered.slice(0, 3)
+                  const hiddenCount = filtered.length - 3
+                  return (
+                    <>
+                      <div style={{ position:'fixed', inset:0, zIndex:9998 }} onClick={() => setProjectPickerOpen(false)}/>
+                      <div style={{
+                        position:'absolute', top:'calc(100% + 6px)', left:0, zIndex:9999,
+                        background:'var(--surface)', border:'1px solid var(--border)',
+                        borderRadius:12, boxShadow:'0 8px 24px rgba(0,0,0,0.15)',
+                        minWidth:220, padding:8,
+                      }} onClick={e => e.stopPropagation()}>
+                        <div style={{ position:'relative', marginBottom:6 }}>
+                          <Search style={{ position:'absolute', left:8, top:'50%', transform:'translateY(-50%)', width:11, height:11, color:'var(--text-muted)', pointerEvents:'none' }}/>
+                          <input value={projectSearch}
+                            onChange={e => { setProjectSearch(e.target.value); setProjectShowAll(false) }}
+                            placeholder="Search…" autoFocus
+                            style={{ width:'100%', paddingLeft:26, paddingRight:8, height:30, fontSize:12,
+                              border:'1px solid var(--border)', borderRadius:7, background:'var(--surface-subtle)',
+                              color:'var(--text-primary)', outline:'none', fontFamily:'inherit', boxSizing:'border-box' }}/>
+                        </div>
+                        {filtered.length === 0 ? (
+                          <p style={{ fontSize:12, color:'var(--text-muted)', textAlign:'center', padding:'8px 0', margin:0 }}>No projects</p>
+                        ) : (
+                          <>
+                            {addToProjectId && (
+                              <button type="button" onClick={() => { setAddToProjectId(''); setProjectPickerOpen(false) }}
+                                style={{ width:'100%', display:'flex', alignItems:'center', gap:8, padding:'7px 8px',
+                                  borderRadius:7, border:'none', cursor:'pointer', background:'transparent',
+                                  fontSize:12, color:'var(--text-muted)', fontFamily:'inherit', marginBottom:2 }}>
+                                <X style={{ width:10, height:10 }}/> Clear
+                              </button>
+                            )}
+                            {visible.map(p => (
+                              <button type="button" key={p.id}
+                                onClick={() => { setAddToProjectId(p.id); setProjectPickerOpen(false) }}
+                                style={{ width:'100%', display:'flex', alignItems:'center', gap:8, padding:'7px 8px',
+                                  borderRadius:7, border:'none', cursor:'pointer', textAlign:'left',
+                                  background: addToProjectId === p.id ? 'rgba(124,58,237,0.1)' : 'transparent',
+                                  fontSize:12, color:'var(--text-primary)', fontFamily:'inherit', fontWeight: addToProjectId === p.id ? 600 : 400, marginBottom:1 }}>
+                                <div style={{ width:8, height:8, borderRadius:2, background:p.color, flexShrink:0 }}/>
+                                {p.name}
+                              </button>
+                            ))}
+                            {!projectShowAll && hiddenCount > 0 && (
+                              <button type="button" onClick={() => setProjectShowAll(true)}
+                                style={{ width:'100%', display:'flex', alignItems:'center', gap:5, padding:'6px 8px',
+                                  borderRadius:7, border:'none', cursor:'pointer', background:'transparent',
+                                  fontSize:11, color:'var(--brand)', fontWeight:600, fontFamily:'inherit', marginTop:2 }}>
+                                <ChevronDown style={{ width:11, height:11 }}/>
+                                {hiddenCount} more project{hiddenCount !== 1 ? 's' : ''}
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </>
+                  )
+                })()}
+              </div>
             )}
           </>
         )}
@@ -503,11 +568,11 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated, 
                       <option value="">Assignee (same as task)</option>
                       {members.map(m => <option key={m.id} value={m.id}>{m.name}{m.id===currentUserId?' (me)':''}</option>)}
                     </select>
-                    <input type="date" value={s.due_date ?? ''}
-                      onChange={e => setCompSubtasks(p => p.map((x, xi) => xi===i ? { ...x, due_date:e.target.value||undefined } : x))}
+                    <DateInput value={s.due_date ?? ''}
+                      onChange={v => setCompSubtasks(p => p.map((x, xi) => xi===i ? { ...x, due_date: v||undefined } : x))}
                       style={{ fontSize:11, padding:'4px 6px', borderRadius:6, border:'1px solid var(--border)',
                         outline:'none', background:'var(--surface)', color:'var(--text-secondary)',
-                        colorScheme:'light dark', fontFamily:'inherit' }}/>
+                        fontFamily:'inherit', width:108 }}/>
                     <button onClick={() => setCompSubtasks(p => p.filter((_,xi) => xi!==i))}
                       style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text-muted)', padding:3, display:'flex' }}>
                       <Trash2 style={{ width:12, height:12 }}/>

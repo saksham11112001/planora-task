@@ -8,6 +8,7 @@ import { TaskDetailPanel }       from '@/components/tasks/TaskDetailPanel'
 import { InlineOneTimeTask }     from '@/components/tasks/InlineOneTimeTask'
 import { CompletionAttachModal }  from '@/components/tasks/CompletionAttachModal'
 import { fmtDate, isOverdue, todayStr } from '@/lib/utils/format'
+import { DateInput } from '@/components/ui/DateInput'
 import { PRIORITY_CONFIG } from '@/types'
 import type { Task } from '@/types'
 import { toast, useFilterStore } from '@/store/appStore'
@@ -1255,12 +1256,12 @@ export function MyTasksView({
                         cursor: canManage ? 'pointer' : 'default' }}
                         onClick={e => { e.stopPropagation(); if (canManage) setInlineEdit({taskId:task.id,field:'due_date'}) }}>
                         {inlineEdit?.taskId===task.id && inlineEdit.field==='due_date' ? (
-                          <input autoFocus type="date" defaultValue={task.due_date ?? ''}
-                            onChange={e => patchTaskField(task.id,'due_date',e.target.value||null)}
+                          <DateInput value={task.due_date ?? ''}
+                            onChange={v => { patchTaskField(task.id,'due_date',v||null); setInlineEdit(null) }}
+                            onClick={(e: React.MouseEvent) => e.stopPropagation()}
                             onBlur={() => setInlineEdit(null)}
-                            onClick={e => e.stopPropagation()}
                             style={{ fontSize:11, padding:'1px 4px', borderRadius:5, border:'1px solid var(--brand)',
-                              background:'var(--surface)', outline:'none', colorScheme:'light dark', fontFamily:'inherit' }}/>
+                              background:'var(--surface)', outline:'none', fontFamily:'inherit', width:108 }}/>
                         ) : (
                           <span title={canManage ? 'Click to change due date' : undefined}>
                             {task.due_date ? fmtDate(task.due_date) : '—'}
@@ -1339,14 +1340,14 @@ export function MyTasksView({
                                 <>
                                   <div style={{ position:'fixed', inset:0, zIndex:49 }}
                                     onClick={e => { e.stopPropagation(); setSubInlineEdit(null) }}/>
-                                  <input
-                                    autoFocus type="date" defaultValue={sub.due_date ?? ''}
-                                    onClick={e => e.stopPropagation()}
-                                    onChange={e => patchSubtaskField(task.id, sub.id, 'due_date', e.target.value||null)}
+                                  <DateInput
+                                    value={sub.due_date ?? ''}
+                                    onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                                    onChange={v => { patchSubtaskField(task.id, sub.id, 'due_date', v||null); setSubInlineEdit(null) }}
                                     onBlur={() => setSubInlineEdit(null)}
                                     style={{ fontSize:11, padding:'2px 4px', borderRadius:5, border:'1px solid var(--brand)',
-                                      background:'var(--surface)', outline:'none', colorScheme:'light dark',
-                                      fontFamily:'inherit', zIndex:50, position:'relative', width:118 }}/>
+                                      background:'var(--surface)', outline:'none',
+                                      fontFamily:'inherit', zIndex:50, position:'relative', width:108 }}/>
                                 </>
                               ) : (
                                 <button

@@ -3,7 +3,7 @@
 import { CustomFieldsPanel } from '@/components/tasks/CustomFieldsPanel'
 import type { CustomFieldDef } from '@/components/tasks/CustomFieldsPanel'
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { X, ThumbsUp, ThumbsDown, Flag, Calendar, User, Briefcase, Send, Clock, Sparkles, ShieldCheck, RefreshCw, FolderPlus, ArrowRightLeft, ExternalLink, Link2, Repeat2, DollarSign } from 'lucide-react'
+import { X, ThumbsUp, ThumbsDown, Flag, Calendar, User, Briefcase, Send, Clock, Sparkles, ShieldCheck, RefreshCw, FolderPlus, ArrowRightLeft, ExternalLink, Link2, Repeat2, DollarSign, Search, ChevronDown } from 'lucide-react'
 import { FREQUENCIES, FREQ_LABEL } from '@/components/tasks/InlineRecurringTask'
 import { cn }             from '@/lib/utils/cn'
 import { PRIORITY_CONFIG, STATUS_CONFIG } from '@/types'
@@ -12,6 +12,7 @@ import { toast }          from '@/store/appStore'
 import { MentionTextarea, CommentText } from '@/components/tasks/MentionTextarea'
 import { isOverdue }      from '@/lib/utils/format'
 import { Avatar }         from '@/components/ui/Badge'
+import { DateInput }      from '@/components/ui/DateInput'
 
 interface Props {
   task:           Task | null
@@ -34,8 +35,10 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     : canManage
   const approverInfo = (task as any)?.approver as unknown as { id: string; name: string } | null
   const isAssignee = task?.assignee_id === currentUserId
-  // canEdit: only managers or the main task assignee can edit the parent task
-  const canEdit = canManage || isAssignee
+  const coAssigneeIds: string[] = (task as any)?.custom_fields?._co_assignees ?? []
+  const isCoAssignee = !!currentUserId && coAssigneeIds.includes(currentUserId)
+  // canEdit: managers, main assignee, or any co-assignee can edit
+  const canEdit = canManage || isAssignee || isCoAssignee
   // isContextTask: this parent task was surfaced because the current user is assigned
   // to one of its subtasks, not to the task itself — show read-only with a banner.
   const isContextTask = !!(task as any)?.custom_fields?._context_task
@@ -105,6 +108,8 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
   const [availableProjects, setAvailableProjects] = useState<{id:string;name:string;color:string}[]>([])
   const [loadingProjects, setLoadingProjects] = useState(false)
   const [selectedProjectId, setSelectedProjectId] = useState('')
+  const [projectSearch, setProjectSearch] = useState('')
+  const [projectShowAll, setProjectShowAll] = useState(false)
   const titleRef = useRef<HTMLTextAreaElement>(null)
 
   // Fallback: if pre-fetch didn't load yet, load on tab switch or on open
@@ -314,6 +319,8 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
   async function addToProject() {
     if (!task || converting) return
     setSelectedProjectId('')
+    setProjectSearch('')
+    setProjectShowAll(false)
     setShowProjectPicker(true)
     setLoadingProjects(true)
     try {
@@ -328,16 +335,17 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     }
   }
 
-  async function confirmAddToProject() {
-    if (!task || !selectedProjectId || converting) return
+  async function confirmAddToProject(projectId?: string) {
+    const pid = projectId ?? selectedProjectId
+    if (!task || !pid || converting) return
     setConverting(true)
     try {
       const patchRes = await fetch(`/api/tasks/${task.id}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ project_id: selectedProjectId }),
+        body: JSON.stringify({ project_id: pid }),
       })
       if (patchRes.ok) {
-        const proj = availableProjects.find(p => p.id === selectedProjectId)
+        const proj = availableProjects.find(p => p.id === pid)
         toast.success(`Added to "${proj?.name}" ✓`)
         setShowProjectPicker(false)
         onUpdated?.()
@@ -1124,15 +1132,14 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                           <option value="">Assignee…</option>
                           {members.map(m => <option key={m.id} value={m.id}>{m.name.split(' ')[0]}</option>)}
                         </select>
-                        <input
-                          type="date"
+                        <DateInput
                           value={newSubDueDate}
-                          onChange={e => setNewSubDueDate(e.target.value)}
+                          onChange={v => setNewSubDueDate(v)}
                           style={{
                             fontSize: 11, padding: '3px 6px', borderRadius: 6, flexShrink: 0,
                             border: '1px solid var(--border)', background: 'var(--surface-subtle)',
                             color: newSubDueDate ? 'var(--text-primary)' : 'var(--text-muted)',
-                            outline: 'none', colorScheme: 'light dark', fontFamily: 'inherit', width: 100,
+                            outline: 'none', fontFamily: 'inherit', width: 108,
                           }}
                         />
                         {newSubtitle.trim() && (
@@ -1240,7 +1247,6 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                     const prev = assigneeId
                     const newId = e.target.value || null
                     setAssigneeId(e.target.value)
-                    // If subtasks share the old assignee, update them too
                     if (prev && newId !== prev) {
                       const matching = subtasks.filter(s => s.assignee_id === prev)
                       if (matching.length > 0) {
@@ -1254,13 +1260,23 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                     patch({ assignee_id: newId }, () => setAssigneeId(prev))
                   }}
                     disabled={!canEdit}
-                    className="text-sm bg-transparent outline-none flex-1"
+                    className="text-sm bg-transparent outline-none"
                     style={{ color: 'var(--text-primary)', cursor: canEdit ? 'pointer' : 'default' }}>
                     <option value="">Unassigned</option>
                     {members.map(m => (
                       <option key={m.id} value={m.id}>{m.name}{m.id === currentUserId ? ' (me)' : ''}</option>
                     ))}
                   </select>
+                  {/* Co-assignee names shown inline after the main assignee */}
+                  {coAssigneeIds.length > 0 && (() => {
+                    const coNames = coAssigneeIds.map((id: string) => members.find(m => m.id === id)?.name).filter(Boolean)
+                    if (!coNames.length) return null
+                    return (
+                      <span className="text-sm flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
+                        , {coNames.join(', ')}
+                      </span>
+                    )
+                  })()}
                 </FieldRow>
 
                 {/* Assigned by */}
@@ -1302,8 +1318,8 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
 
                 <FieldRow label="Due date">
                   <Calendar className="h-3.5 w-3.5" style={{ color: 'var(--text-muted)' }} />
-                  <input type="date" value={dueDate}
-                    onChange={e => { if (!canEdit) return; const prev = dueDate; setDueDate(e.target.value); patch({ due_date: e.target.value || null }, () => setDueDate(prev)) }}
+                  <DateInput value={dueDate}
+                    onChange={v => { if (!canEdit) return; const prev = dueDate; setDueDate(v); patch({ due_date: v || null }, () => setDueDate(prev)) }}
                     readOnly={!canEdit}
                     disabled={!canEdit}
                     className="text-sm outline-none flex-1 rounded-md px-2 py-1"
@@ -1311,8 +1327,8 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                       color: overdue ? '#dc2626' : dueDate ? 'var(--text-primary)' : 'var(--text-muted)',
                       background: 'var(--surface-subtle)',
                       border: '1px solid var(--border)',
-                      colorScheme: 'light dark',
-                      cursor: canEdit ? 'pointer' : 'default',
+                      cursor: canEdit ? 'text' : 'default',
+                      fontFamily: 'inherit',
                     }}
                   />
                   {overdue && <span className="text-xs text-red-500 font-medium flex-shrink-0">Overdue</span>}
@@ -1402,12 +1418,12 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
 
                     <FieldRow label="Next recurrence">
                       <Calendar className="h-3.5 w-3.5" style={{ color: 'var(--brand)', flexShrink: 0 }} />
-                      <input type="date" value={recurNextDate}
-                        onChange={e => {
+                      <DateInput value={recurNextDate}
+                        onChange={v => {
                           if (!canManage) return
                           const prev = recurNextDate
-                          setRecurNextDate(e.target.value)
-                          patch({ next_occurrence_date: e.target.value || null }, () => setRecurNextDate(prev))
+                          setRecurNextDate(v)
+                          patch({ next_occurrence_date: v || null }, () => setRecurNextDate(prev))
                         }}
                         readOnly={!canManage}
                         disabled={!canManage}
@@ -1416,8 +1432,8 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                           color: recurNextDate ? 'var(--brand)' : 'var(--text-muted)',
                           background: 'rgba(13,148,136,0.07)',
                           border: '1px solid rgba(13,148,136,0.25)',
-                          colorScheme: 'light dark',
-                          cursor: canManage ? 'pointer' : 'default',
+                          cursor: canManage ? 'text' : 'default',
+                          fontFamily: 'inherit',
                           fontWeight: 600,
                         }}
                       />
@@ -1440,8 +1456,8 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
 
                 {task.project && (
                   <FieldRow label="Project">
-                    <div className="h-2.5 w-2.5 rounded-sm flex-shrink-0" style={{ background: (task.project as any).color }} />
-                    <span className="text-sm" style={{ color: 'var(--text-primary)' }}>{(task.project as any).name}</span>
+                    <div className="h-3 w-3 rounded-sm flex-shrink-0" style={{ background: (task.project as any).color }} />
+                    <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{(task.project as any).name}</span>
                   </FieldRow>
                 )}
 
@@ -2042,68 +2058,87 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
         )}
       </div>
 
-      {/* ── Project picker modal ── */}
-      {showProjectPicker && (
-        <div
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 10000,
-            display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          onClick={() => setShowProjectPicker(false)}
-        >
-          <div
-            style={{ background: 'var(--surface)', borderRadius: 14, padding: 24, width: 380,
-              boxShadow: '0 24px 64px rgba(0,0,0,0.35)', border: '1px solid var(--border)' }}
-            onClick={e => e.stopPropagation()}
-          >
-            <h3 style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>
-              Add to Project
-            </h3>
-            <p style={{ margin: '0 0 16px', fontSize: 12, color: 'var(--text-muted)' }}>
-              Select a project to move this task into.
-            </p>
-            {loadingProjects ? (
-              <p style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', padding: '12px 0' }}>
-                Loading projects…
-              </p>
-            ) : availableProjects.length === 0 ? (
-              <p style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', padding: '12px 0' }}>
-                No projects found.
-              </p>
-            ) : (
-              <select
-                value={selectedProjectId}
-                onChange={e => setSelectedProjectId(e.target.value)}
-                style={{ width: '100%', padding: '9px 12px', borderRadius: 8,
-                  border: '1px solid var(--border)', background: 'var(--surface)',
-                  color: 'var(--text-primary)', fontSize: 13, marginBottom: 16, outline: 'none' }}
-              >
-                <option value="">Select a project…</option>
-                {availableProjects.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-            )}
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button
-                onClick={() => setShowProjectPicker(false)}
-                style={{ padding: '7px 16px', borderRadius: 8, border: '1px solid var(--border)',
-                  background: 'transparent', color: 'var(--text-primary)', fontSize: 13, cursor: 'pointer' }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmAddToProject}
-                disabled={!selectedProjectId || converting || loadingProjects}
-                style={{ padding: '7px 18px', borderRadius: 8, border: 'none',
-                  background: 'var(--brand)', color: '#fff', fontSize: 13, fontWeight: 600,
-                  cursor: !selectedProjectId || converting || loadingProjects ? 'not-allowed' : 'pointer',
-                  opacity: !selectedProjectId || converting || loadingProjects ? 0.6 : 1 }}
-              >
-                {converting ? 'Moving…' : 'Add to Project'}
-              </button>
+      {/* ── Project picker side panel ── */}
+      {showProjectPicker && (() => {
+        const q = projectSearch.trim().toLowerCase()
+        const filtered = availableProjects.filter(p => !q || p.name.toLowerCase().includes(q))
+        const visible = projectShowAll ? filtered : filtered.slice(0, 3)
+        const hiddenCount = filtered.length - 3
+        return (
+          <>
+            <div style={{ position: 'fixed', inset: 0, zIndex: 10001 }} onClick={() => setShowProjectPicker(false)} />
+            <div style={{
+              position: 'fixed', top: 0, right: 0, bottom: 0, width: 340,
+              background: 'var(--surface)', borderLeft: '1px solid var(--border)',
+              boxShadow: '-8px 0 32px rgba(0,0,0,0.18)', zIndex: 10002,
+              display: 'flex', flexDirection: 'column',
+            }} onClick={e => e.stopPropagation()}>
+              {/* Header */}
+              <div style={{ padding: '20px 20px 0', borderBottom: '1px solid var(--border)', paddingBottom: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>Add to Project</h3>
+                  <button onClick={() => setShowProjectPicker(false)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4, display: 'flex' }}>
+                    <X style={{ width: 16, height: 16 }} />
+                  </button>
+                </div>
+                <div style={{ position: 'relative' }}>
+                  <Search style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 13, height: 13, color: 'var(--text-muted)', pointerEvents: 'none' }} />
+                  <input
+                    value={projectSearch}
+                    onChange={e => { setProjectSearch(e.target.value); setProjectShowAll(false) }}
+                    placeholder="Search projects…"
+                    autoFocus
+                    style={{
+                      width: '100%', paddingLeft: 32, paddingRight: 10, height: 34, fontSize: 13,
+                      border: '1.5px solid var(--border)', borderRadius: 8, background: 'var(--surface-subtle)',
+                      color: 'var(--text-primary)', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+              </div>
+              {/* Project list */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: '10px 12px' }}>
+                {loadingProjects ? (
+                  <p style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', padding: '24px 0' }}>Loading…</p>
+                ) : filtered.length === 0 ? (
+                  <p style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', padding: '24px 0' }}>No projects found.</p>
+                ) : (
+                  <>
+                    {visible.map(p => (
+                      <button key={p.id} onClick={() => confirmAddToProject(p.id)}
+                        style={{
+                          width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                          padding: '10px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', textAlign: 'left',
+                          background: selectedProjectId === p.id ? 'rgba(13,148,136,0.1)' : 'transparent',
+                          marginBottom: 2,
+                        }}
+                        onMouseEnter={e => { if (selectedProjectId !== p.id) (e.currentTarget as HTMLElement).style.background = 'var(--surface-subtle)' }}
+                        onMouseLeave={e => { if (selectedProjectId !== p.id) (e.currentTarget as HTMLElement).style.background = 'transparent' }}
+                      >
+                        <div style={{ width: 10, height: 10, borderRadius: 3, background: p.color, flexShrink: 0 }} />
+                        <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{p.name}</span>
+                      </button>
+                    ))}
+                    {!projectShowAll && hiddenCount > 0 && (
+                      <button onClick={() => setProjectShowAll(true)}
+                        style={{
+                          width: '100%', display: 'flex', alignItems: 'center', gap: 6,
+                          padding: '8px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                          background: 'transparent', color: 'var(--brand)', fontSize: 12, fontWeight: 600,
+                          marginTop: 4,
+                        }}>
+                        <ChevronDown style={{ width: 13, height: 13 }} />
+                        Show {hiddenCount} more project{hiddenCount !== 1 ? 's' : ''}
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          </>
+        )
+      })()}
 
       {/* ── Attachment preview overlay ── */}
       {previewAtt && (

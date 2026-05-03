@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, X, User, Flag, Calendar, Shield, DollarSign } from 'lucide-react'
+import { DateInput } from '@/components/ui/DateInput'
 import { toast } from '@/store/appStore'
 
 interface Member { id: string; name: string; role?: string }
@@ -232,26 +233,23 @@ export function InlineTaskRow({
         </label>
 
         {/* Due date pill */}
-        <label style={{
+        <div style={{
           display: 'flex', alignItems: 'center', gap: 5,
           padding: '3px 10px', borderRadius: 20,
           border: '1px solid var(--border)', background: 'var(--surface-subtle)',
-          cursor: 'pointer',
         }}>
           <Calendar style={{ width: 11, height: 11, color: 'var(--text-muted)', flexShrink: 0 }} />
-          <input
-            type="date"
+          <DateInput
             value={dueDate}
-            onChange={e => setDueDate(e.target.value)}
+            onChange={v => setDueDate(v)}
             style={{
               fontSize: 12, border: 'none', outline: 'none',
               background: 'transparent',
               color: dueDate ? 'var(--text-primary)' : 'var(--text-muted)',
-              cursor: 'pointer', colorScheme: 'light dark',
-              width: dueDate ? 'auto' : 76,
+              width: 108, fontFamily: 'inherit',
             }}
           />
-        </label>
+        </div>
 
         {/* Approver pill */}
         {approvers.length > 0 && (
