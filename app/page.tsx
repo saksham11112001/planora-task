@@ -108,7 +108,7 @@ export default async function LandingPage() {
         </Link>
 
         <div className="nav-mid" style={{ flex: 1, display: 'flex', justifyContent: 'center', gap: 28 }}>
-          {[['Features','#features'],['Solutions','#solutions'],['Pricing','#pricing'],['Compare','#compare']].map(([l,h]) => (
+          {[['Features','#features'],['Solutions','#solutions'],['Security','#security'],['Pricing','#pricing'],['Compare','#compare']].map(([l,h]) => (
             <a key={l} href={h} className="nav-link"
               style={{ color: '#64748b', fontSize: 14, textDecoration: 'none', fontWeight: 500 }}>{l}</a>
           ))}
@@ -246,7 +246,7 @@ export default async function LandingPage() {
                   display: 'flex', alignItems: 'center', padding: '0 10px', gap: 6,
                 }}>
                   <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'rgba(255,255,255,0.18)' }}/>
-                  <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>app.taska.io/tasks</span>
+                  <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>app.floatup.app/tasks</span>
                 </div>
               </div>
 
@@ -322,9 +322,9 @@ export default async function LandingPage() {
         <div style={{ maxWidth: 1120, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24, flexWrap: 'wrap' }}>
           <div className="stats-row" style={{ display: 'flex', gap: 44 }}>
             {[
-              { v: '1,000+', l: 'teams on Floatup' },
-              { v: '$29',    l: 'from per month' },
-              { v: '4.9★',  l: 'average rating' },
+              { v: '500+',  l: 'professional teams' },
+              { v: '$29',   l: 'flat team pricing from' },
+              { v: '5',     l: 'countries supported' },
               { v: '99.9%', l: 'uptime SLA' },
             ].map(({ v, l }) => (
               <div key={l}>
@@ -847,7 +847,7 @@ export default async function LandingPage() {
             <div style={{ textAlign: 'right', flexShrink: 0 }}>
               <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', marginBottom: 4 }}>Custom pricing</div>
               <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.22)', marginBottom: 14 }}>based on team size &amp; infra</div>
-              <a href="mailto:hello@taska.io?subject=Enterprise%20Inquiry" style={{
+              <a href="mailto:hello@floatup.app?subject=Enterprise%20Inquiry" style={{
                 display: 'inline-block', padding: '10px 22px', borderRadius: 10,
                 background: '#0d9488', color: '#fff',
                 fontSize: 13, fontWeight: 700, textDecoration: 'none',
@@ -894,35 +894,121 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* ━━━ SECURITY ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <section style={{ padding: '72px 6%', background: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>
-        <div style={{ maxWidth: 1000, margin: '0 auto' }}>
-          <div style={{ textAlign: 'center', marginBottom: 44 }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-              <div style={{ width: 22, height: 2, background: '#16a34a', borderRadius: 2, flexShrink: 0 }} />
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#16a34a', letterSpacing: '0.01em' }}>Security &amp; trust</span>
-              <div style={{ width: 22, height: 2, background: '#16a34a', borderRadius: 2, flexShrink: 0 }} />
+      {/* ━━━ SECURITY & INTERNATIONAL DATA TRUST ━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <section id="security" style={{ padding: '100px 6% 0', background: '#0a0f1e', position: 'relative', overflow: 'hidden' }}>
+        {/* Background grid */}
+        <div style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(16,185,129,0.05) 1px,transparent 1px),linear-gradient(90deg,rgba(16,185,129,0.05) 1px,transparent 1px)', backgroundSize: '60px 60px', pointerEvents: 'none' }}/>
+        <div style={{ position: 'absolute', top: -120, right: '10%', width: 500, height: 500, borderRadius: '50%', background: 'radial-gradient(circle, rgba(16,185,129,0.07) 0%, transparent 65%)', pointerEvents: 'none' }}/>
+
+        <div style={{ maxWidth: 1120, margin: '0 auto', position: 'relative', zIndex: 1 }}>
+          {/* Section header */}
+          <div style={{ textAlign: 'center', marginBottom: 64 }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+              <div style={{ width: 22, height: 2, background: '#10b981', borderRadius: 2, flexShrink: 0 }} />
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#10b981', letterSpacing: '0.01em' }}>Data privacy &amp; international trust</span>
+              <div style={{ width: 22, height: 2, background: '#10b981', borderRadius: 2, flexShrink: 0 }} />
             </div>
-            <h2 style={{ fontSize: 'clamp(22px, 3vw, 32px)', fontWeight: 800, letterSpacing: '-0.8px', margin: '0 0 10px' }}>Your data is safe with us</h2>
-            <p style={{ fontSize: 15, color: '#64748b', maxWidth: 340, margin: '0 auto', lineHeight: 1.7 }}>Enterprise-grade security without the enterprise overhead.</p>
+            <h2 style={{ fontSize: 'clamp(28px, 4vw, 46px)', fontWeight: 800, color: '#fff', letterSpacing: '-1.5px', lineHeight: 1.1, margin: '0 0 16px' }}>
+              Your clients trust you<br/>with their financials.<br/>
+              <span style={{ color: '#10b981' }}>We protect that trust.</span>
+            </h2>
+            <p style={{ fontSize: 16, color: 'rgba(255,255,255,0.45)', maxWidth: 520, margin: '0 auto', lineHeight: 1.8 }}>
+              Floatup is built for accounting and advisory firms that handle sensitive client data across multiple jurisdictions. Security is not a checkbox — it is the foundation.
+            </p>
           </div>
-          <div className="grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
-            {[
-              { icon:'🔐', title:'End-to-end encryption',   desc:'TLS 1.3 in transit and AES-256 at rest. All data encrypted at every layer.' },
-              { icon:'🌍', title:'Global data compliance',  desc:'Hosted on enterprise-grade infrastructure with regional data options available for enterprise plans.' },
-              { icon:'👥', title:'Role-based access',       desc:'Granular permissions per role. Members only see what they need.' },
-              { icon:'📋', title:'Full audit trail',        desc:'Every action logged with timestamp. Know who did what and when.' },
-              { icon:'🗑️', title:'Your data, your control', desc:'Export or delete everything, anytime. No hostage data, no lock-in.' },
-              { icon:'🛡️', title:'GDPR aligned',            desc:'Designed to align with GDPR and global privacy regulations.' },
-            ].map(s => (
-              <div key={s.title} style={{ display: 'flex', gap: 14, padding: '18px 20px', background: '#fff', borderRadius: 12, border: '1px solid #f1f5f9' }}>
-                <span style={{ fontSize: 20, flexShrink: 0 }}>{s.icon}</span>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 3 }}>{s.title}</div>
-                  <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.6 }}>{s.desc}</div>
+
+          {/* Core commitments — 2-col */}
+          <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+            {/* Left: isolation & encryption */}
+            <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20, padding: '36px 32px' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 20 }}>Architecture</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+                {[
+                  { icon: '🔒', title: 'Complete org isolation', body: 'Every organisation is a completely separate data silo. There is no data commingling — your client records, tasks, and documents are inaccessible to any other account on the platform.' },
+                  { icon: '🔐', title: 'AES-256 + TLS 1.3 encryption', body: 'All data is encrypted at rest with AES-256 and in transit with TLS 1.3. Encryption is enforced at every layer — database, storage, and API.' },
+                  { icon: '🕵️', title: 'Zero data mining, ever', body: 'We do not analyse, profile, sell, or share your client data with any third party. Your data is used exclusively to run your Floatup account — nothing else.' },
+                ].map(item => (
+                  <div key={item.title} style={{ display: 'flex', gap: 14 }}>
+                    <span style={{ fontSize: 20, flexShrink: 0, marginTop: 2 }}>{item.icon}</span>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 5 }}>{item.title}</div>
+                      <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', lineHeight: 1.7 }}>{item.body}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Right: accountability & control */}
+            <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20, padding: '36px 32px' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 20 }}>Accountability</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+                {[
+                  { icon: '📋', title: 'Immutable audit trail', body: 'Every action — task update, approval, login, permission change — is logged with timestamp, user identity, and IP address. Suitable for compliance reviews and client-side audits.' },
+                  { icon: '🎛️', title: 'Granular role-based access', body: 'Owner, admin, manager, member, viewer. Each role has precise permissions. Staff see only what they need. No accidental data exposure across clients or teams.' },
+                  { icon: '📤', title: 'Your data, always yours', body: 'Export everything in standard formats at any time. Request complete deletion at any time — including all backups. No lock-in, no hostage data, no delay.' },
+                ].map(item => (
+                  <div key={item.title} style={{ display: 'flex', gap: 14 }}>
+                    <span style={{ fontSize: 20, flexShrink: 0, marginTop: 2 }}>{item.icon}</span>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 5 }}>{item.title}</div>
+                      <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', lineHeight: 1.7 }}>{item.body}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Compliance standards strip */}
+          <div style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.18)', borderRadius: 20, padding: '32px 36px', marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 40, flexWrap: 'wrap' }}>
+              <div style={{ flex: '0 0 auto' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>International standards</div>
+                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', lineHeight: 1.7, maxWidth: 260 }}>
+                  Floatup is designed to operate in compliance with privacy regulations across every jurisdiction we serve.
                 </div>
               </div>
-            ))}
+              <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, minWidth: 300 }}>
+                {[
+                  { label: 'GDPR', sub: 'EU / EEA', color: '#60a5fa' },
+                  { label: 'CCPA', sub: 'California, USA', color: '#f97316' },
+                  { label: 'PIPEDA', sub: 'Canada', color: '#dc2626' },
+                  { label: 'Privacy Act', sub: 'Australia', color: '#16a34a' },
+                  { label: 'UK GDPR', sub: 'United Kingdom', color: '#7c3aed' },
+                  { label: 'SOC 2', sub: 'In progress', color: '#94a3b8' },
+                ].map(s => (
+                  <div key={s.label} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '12px 14px' }}>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: s.color, letterSpacing: '-0.3px' }}>{s.label}</div>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>{s.sub}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Infrastructure + self-hosted row */}
+          <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, paddingBottom: 100 }}>
+            <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: '26px 28px' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 8 }}>🌍 &nbsp;Global infrastructure</div>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', lineHeight: 1.75, margin: '0 0 14px' }}>
+                Hosted on AWS enterprise infrastructure. Data can be regionally isolated for enterprise plans — EU-only, US-only, or APAC-only hosting available on request.
+              </p>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {['AWS infrastructure','99.9% uptime SLA','Automated backups','Disaster recovery'].map(t => (
+                  <span key={t} style={{ fontSize: 11, fontWeight: 600, color: '#10b981', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', padding: '3px 10px', borderRadius: 99 }}>{t}</span>
+                ))}
+              </div>
+            </div>
+            <div style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.15) 0%, rgba(13,148,136,0.08) 100%)', border: '1px solid rgba(124,58,237,0.25)', borderRadius: 16, padding: '26px 28px' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 8 }}>🔐 &nbsp;Private cloud / self-hosted</div>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', lineHeight: 1.75, margin: '0 0 14px' }}>
+                For banks, regulated advisories, and data-sensitive enterprises that require all data to remain on their own infrastructure — with zero third-party cloud dependency.
+              </p>
+              <a href="mailto:hello@floatup.app?subject=Private+Cloud+Inquiry" style={{ fontSize: 13, fontWeight: 700, color: '#c4b5fd', textDecoration: 'none' }}>
+                Enquire about private deployment →
+              </a>
+            </div>
           </div>
         </div>
       </section>
@@ -947,6 +1033,14 @@ export default async function LandingPage() {
               {
                 q: 'How is Floatup different from Asana or Monday.com?',
                 a: "Those tools are designed for general teams. Floatup is built specifically for accounting and advisory practices: flat USD team pricing (not $12–$14 per person), built-in compliance templates per country, client management, document upload enforcement, and approval workflows with full audit trails.",
+              },
+              {
+                q: 'Where is our data stored, and who can access it?',
+                a: 'Your data is hosted on AWS enterprise infrastructure. Each organisation is a fully isolated silo — no other Floatup account can access your data under any circumstances. Our team can only access infrastructure-level metrics (no task or client content) and only for incident resolution, with a logged access request. For EU practices, EU-region hosting is available on Pro and Enterprise plans.',
+              },
+              {
+                q: 'Is Floatup GDPR compliant? What about CCPA and PIPEDA?',
+                a: 'Floatup is designed to align with GDPR (EU/EEA), UK GDPR, CCPA (California), and PIPEDA (Canada). We offer a Data Processing Agreement (DPA) for business customers. You can request deletion of all your data at any time, and we will action it within 30 days including all backup copies.',
               },
               {
                 q: 'Can I try before paying?',
@@ -993,7 +1087,7 @@ export default async function LandingPage() {
             Stop chasing your team.<br/>Start closing tasks.
           </h2>
           <p style={{ fontSize: 17, color: 'rgba(255,255,255,0.46)', marginBottom: 36, lineHeight: 1.75 }}>
-            Join 1,000+ professional teams running their work on Floatup.<br/>Free to start — no credit card needed.
+            Join hundreds of professional teams running their work on Floatup.<br/>Free to start — no credit card needed.
           </p>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
             <Link href="/login" className="btn-primary"
@@ -1055,17 +1149,23 @@ export default async function LandingPage() {
             </div>
             <div>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 18 }}>Legal</div>
-              {['Privacy policy','Terms of service','Data processing','Security','Cookie policy'].map(l => (
-                <a key={l} href="#" className="footer-link" style={{ display: 'block', fontSize: 13, color: 'rgba(255,255,255,0.4)', textDecoration: 'none', marginBottom: 10 }}>{l}</a>
+              {[
+                { l: 'Privacy policy', h: '/privacy' },
+                { l: 'Terms of service', h: '/terms' },
+                { l: 'Data processing (DPA)', h: 'mailto:hello@floatup.app?subject=DPA+Request' },
+                { l: 'Security', h: '#security' },
+                { l: 'Cookie policy', h: '/privacy#cookies' },
+              ].map(({ l, h }) => (
+                <a key={l} href={h} className="footer-link" style={{ display: 'block', fontSize: 13, color: 'rgba(255,255,255,0.4)', textDecoration: 'none', marginBottom: 10 }}>{l}</a>
               ))}
             </div>
           </div>
 
           <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: 22, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.18)' }}>© 2025 Floatup Technology. All rights reserved.</div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.18)' }}>© 2026 Floatup Technology. All rights reserved.</div>
             <div style={{ display: 'flex', gap: 22 }}>
-              {['Privacy','Terms','Security','Status'].map(l => (
-                <a key={l} href="#" className="footer-link" style={{ fontSize: 12, color: 'rgba(255,255,255,0.22)', textDecoration: 'none' }}>{l}</a>
+              {[['Privacy','/privacy'],['Terms','/terms'],['Security','#security'],['DPA','mailto:hello@floatup.app?subject=DPA+Request']].map(([l,h]) => (
+                <a key={l} href={h} className="footer-link" style={{ fontSize: 12, color: 'rgba(255,255,255,0.22)', textDecoration: 'none' }}>{l}</a>
               ))}
             </div>
           </div>
