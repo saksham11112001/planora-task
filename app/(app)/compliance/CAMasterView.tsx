@@ -1551,7 +1551,9 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
   const [loading, setLoading] = useState(true)
   const [loadingDefaults, setLoadingDefaults] = useState(false)
   const [showCountryPicker, setShowCountryPicker] = useState(false)
+  const [pickerStep, setPickerStep] = useState<'countries' | 'tasks'>('countries')
   const [selectedCountries, setSelectedCountries] = useState<string[]>(['IN'])
+  const [selectedTaskCodes, setSelectedTaskCodes] = useState<string[]>([])
   const countryPickerRef = useRef<HTMLDivElement>(null)
   const [triggering,      setTriggering]      = useState(false)
   const [groupFilter, setGroupFilter] = useState<GroupFilter>(GROUP_FILTER_ALL)
@@ -1604,6 +1606,32 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
 
   const canEdit = isAdmin(userRole)
 
+  /* ── Default-task picker helpers ── */
+  // Flat deduplicated task list for the currently selected countries
+  const pickerAvailableTasks = useMemo(() => {
+    if (selectedCountries.length === 0) return []
+    const seen = new Set<string>()
+    const out: Array<{ code: string; name: string; group_name: string; task_type: string }> = []
+    for (const cs of COUNTRY_TASK_SETS) {
+      if (!selectedCountries.includes(cs.code)) continue
+      for (const t of cs.tasks) {
+        if (!seen.has(t.code)) { seen.add(t.code); out.push(t) }
+      }
+    }
+    return out
+  }, [selectedCountries])
+
+  // Grouped by group_name for the task picker UI
+  const pickerTasksByGroup = useMemo(() => {
+    const map = new Map<string, typeof pickerAvailableTasks>()
+    for (const t of pickerAvailableTasks) {
+      const g = t.group_name || 'Other'
+      if (!map.has(g)) map.set(g, [])
+      map.get(g)!.push(t)
+    }
+    return Array.from(map.entries())
+  }, [pickerAvailableTasks])
+
   /* ── Fetch ── */
   const fetchTasks = useCallback(async (year: string) => {
     setLoading(true)
@@ -1624,12 +1652,13 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
 
   useEffect(() => { fetchTasks(fy) }, [fy, fetchTasks])
 
-  /* ── Close country picker on outside click ── */
+  /* ── Close country picker on outside click (and reset step) ── */
   useEffect(() => {
     if (!showCountryPicker) return
     function handler(e: MouseEvent) {
       if (countryPickerRef.current && !countryPickerRef.current.contains(e.target as Node)) {
         setShowCountryPicker(false)
+        setPickerStep('countries')
       }
     }
     document.addEventListener('mousedown', handler)
@@ -1655,21 +1684,23 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
     }
   }
 
-  /* ── Load defaults (with country selection) ── */
-  async function handleLoadDefaults(countries: string[]) {
+  /* ── Load defaults (with country + selective task import) ── */
+  async function handleLoadDefaults(countries: string[], task_codes: string[]) {
     if (countries.length === 0) { toast.error('Select at least one country'); return }
+    if (task_codes.length === 0) { toast.error('Select at least one task to import'); return }
     setLoadingDefaults(true)
     setShowCountryPicker(false)
+    setPickerStep('countries')
     try {
       const res = await fetch('/api/ca/master', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'load_defaults', financial_year: fy, countries }),
+        body: JSON.stringify({ action: 'load_defaults', financial_year: fy, countries, task_codes }),
       })
-      const json = (await res.json()) as { success?: boolean; count?: number; error?: string }
+      const json = (await res.json()) as { success?: boolean; count?: number; skipped?: number; error?: string }
       if (!res.ok) throw new Error(json.error ?? 'Failed')
-      const countryLabels = countries.join(', ')
-      toast.success(`Loaded ${json.count ?? 0} default tasks (${countryLabels})`)
+      const skippedMsg = json.skipped ? ` (${json.skipped} already existed — kept your customisations)` : ''
+      toast.success(`Imported ${json.count ?? 0} new task${json.count === 1 ? '' : 's'}${skippedMsg}`)
       await fetchTasks(fy)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error loading defaults')
@@ -2011,57 +2042,195 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
                 position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 200,
                 background: 'var(--surface)', border: '1px solid var(--border)',
                 borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.14)',
-                padding: '12px 14px', minWidth: 280,
+                padding: '12px 14px',
+                minWidth: pickerStep === 'tasks' ? 360 : 280,
+                maxWidth: pickerStep === 'tasks' ? 400 : 310,
               }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>
-                  Select service countries
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
-                  {COUNTRY_TASK_SETS.map(c => {
-                    const checked = selectedCountries.includes(c.code)
-                    return (
-                      <label key={c.code} style={{ display: 'flex', alignItems: 'flex-start', gap: 9, cursor: 'pointer', padding: '5px 6px', borderRadius: 7, background: checked ? 'rgba(13,148,136,0.06)' : 'transparent', border: `1px solid ${checked ? 'rgba(13,148,136,0.25)' : 'transparent'}` }}>
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => {
-                            setSelectedCountries(prev =>
-                              prev.includes(c.code)
-                                ? prev.filter(x => x !== c.code)
-                                : [...prev, c.code]
+
+                {/* ── Step 1: Country selection ── */}
+                {pickerStep === 'countries' && (<>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>
+                    Step 1 · Select countries
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+                    {COUNTRY_TASK_SETS.map(c => {
+                      const checked = selectedCountries.includes(c.code)
+                      return (
+                        <label key={c.code} style={{ display: 'flex', alignItems: 'flex-start', gap: 9, cursor: 'pointer', padding: '5px 6px', borderRadius: 7, background: checked ? 'rgba(13,148,136,0.06)' : 'transparent', border: `1px solid ${checked ? 'rgba(13,148,136,0.25)' : 'transparent'}` }}>
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => {
+                              setSelectedCountries(prev =>
+                                prev.includes(c.code)
+                                  ? prev.filter(x => x !== c.code)
+                                  : [...prev, c.code]
+                              )
+                            }}
+                            style={{ marginTop: 2, accentColor: '#0d9488', flexShrink: 0 }}
+                          />
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{c.flag} {c.name}</div>
+                            <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4, marginTop: 1 }}>{c.tasks.length} tasks · {c.description.split(',')[0]}&hellip;</div>
+                          </div>
+                        </label>
+                      )
+                    })}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+                    <button
+                      onClick={() => {
+                        // Pre-select all tasks for chosen countries
+                        setSelectedTaskCodes(pickerAvailableTasks.map(t => t.code))
+                        setPickerStep('tasks')
+                      }}
+                      disabled={selectedCountries.length === 0}
+                      style={{
+                        flex: 1, padding: '7px 0', borderRadius: 7, border: 'none',
+                        background: selectedCountries.length > 0 ? '#0d9488' : 'var(--border)',
+                        color: selectedCountries.length > 0 ? '#fff' : 'var(--text-muted)',
+                        fontSize: 12, fontWeight: 700,
+                        cursor: selectedCountries.length > 0 ? 'pointer' : 'not-allowed',
+                        fontFamily: 'inherit',
+                      }}
+                    >
+                      Next: Pick tasks →
+                    </button>
+                    <button
+                      onClick={() => setShowCountryPicker(false)}
+                      style={{ padding: '7px 12px', borderRadius: 7, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-secondary)', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </>)}
+
+                {/* ── Step 2: Task multi-select ── */}
+                {pickerStep === 'tasks' && (<>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                      Step 2 · Pick tasks to import
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                      {selectedTaskCodes.length} / {pickerAvailableTasks.length} selected
+                    </div>
+                  </div>
+
+                  {/* Global select all / none */}
+                  <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                    <button
+                      onClick={() => setSelectedTaskCodes(pickerAvailableTasks.map(t => t.code))}
+                      style={{ fontSize: 11, padding: '3px 8px', borderRadius: 5, border: '1px solid var(--border)', background: 'var(--surface-alt)', color: 'var(--text-secondary)', cursor: 'pointer', fontFamily: 'inherit' }}
+                    >All</button>
+                    <button
+                      onClick={() => setSelectedTaskCodes([])}
+                      style={{ fontSize: 11, padding: '3px 8px', borderRadius: 5, border: '1px solid var(--border)', background: 'var(--surface-alt)', color: 'var(--text-secondary)', cursor: 'pointer', fontFamily: 'inherit' }}
+                    >None</button>
+                  </div>
+
+                  {/* Scrollable task list grouped by group_name */}
+                  <div style={{ maxHeight: 320, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8, marginBottom: 10 }}>
+                    {pickerTasksByGroup.map(([group, groupTasks], gi) => {
+                      const allChecked = groupTasks.every(t => selectedTaskCodes.includes(t.code))
+                      const someChecked = groupTasks.some(t => selectedTaskCodes.includes(t.code))
+                      return (
+                        <div key={group}>
+                          {/* Group header */}
+                          <div style={{
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                            padding: '6px 10px',
+                            background: gi % 2 === 0 ? 'rgba(13,148,136,0.04)' : 'rgba(0,0,0,0.02)',
+                            borderBottom: '1px solid var(--border)',
+                            position: 'sticky', top: 0, zIndex: 1,
+                          }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer', flex: 1 }}>
+                              <input
+                                type="checkbox"
+                                checked={allChecked}
+                                ref={el => { if (el) el.indeterminate = !allChecked && someChecked }}
+                                onChange={() => {
+                                  const codes = groupTasks.map(t => t.code)
+                                  if (allChecked) {
+                                    setSelectedTaskCodes(prev => prev.filter(c => !codes.includes(c)))
+                                  } else {
+                                    setSelectedTaskCodes(prev => [...new Set([...prev, ...codes])])
+                                  }
+                                }}
+                                style={{ accentColor: '#0d9488', flexShrink: 0 }}
+                              />
+                              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>{group}</span>
+                              <span style={{ fontSize: 10, color: 'var(--text-muted)', background: 'var(--border)', borderRadius: 99, padding: '1px 6px' }}>
+                                {groupTasks.filter(t => selectedTaskCodes.includes(t.code)).length}/{groupTasks.length}
+                              </span>
+                            </label>
+                          </div>
+                          {/* Task rows */}
+                          {groupTasks.map(t => {
+                            const checked = selectedTaskCodes.includes(t.code)
+                            return (
+                              <label key={t.code} style={{
+                                display: 'flex', alignItems: 'flex-start', gap: 8,
+                                padding: '5px 10px 5px 24px',
+                                borderBottom: '1px solid var(--border-light, rgba(0,0,0,0.05))',
+                                cursor: 'pointer',
+                                background: checked ? 'rgba(13,148,136,0.04)' : 'transparent',
+                              }}>
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => {
+                                    setSelectedTaskCodes(prev =>
+                                      prev.includes(t.code)
+                                        ? prev.filter(c => c !== t.code)
+                                        : [...prev, t.code]
+                                    )
+                                  }}
+                                  style={{ marginTop: 2, accentColor: '#0d9488', flexShrink: 0 }}
+                                />
+                                <div style={{ minWidth: 0 }}>
+                                  <div style={{ fontSize: 12, color: 'var(--text-primary)', lineHeight: 1.35, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</div>
+                                  {t.task_type && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1 }}>{t.task_type}</div>}
+                                </div>
+                              </label>
                             )
-                          }}
-                          style={{ marginTop: 2, accentColor: '#0d9488', flexShrink: 0 }}
-                        />
-                        <div>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{c.flag} {c.name}</div>
-                          <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4, marginTop: 1 }}>{c.tasks.length} tasks · {c.description.split(',')[0]}&hellip;</div>
+                          })}
                         </div>
-                      </label>
-                    )
-                  })}
-                </div>
-                <div style={{ display: 'flex', gap: 8, borderTop: '1px solid var(--border-light)', paddingTop: 10 }}>
-                  <button
-                    onClick={() => handleLoadDefaults(selectedCountries)}
-                    disabled={selectedCountries.length === 0}
-                    style={{
-                      flex: 1, padding: '7px 0', borderRadius: 7, border: 'none',
-                      background: selectedCountries.length > 0 ? '#0d9488' : 'var(--border)',
-                      color: selectedCountries.length > 0 ? '#fff' : 'var(--text-muted)',
-                      fontSize: 12, fontWeight: 700, cursor: selectedCountries.length > 0 ? 'pointer' : 'not-allowed',
-                      fontFamily: 'inherit',
-                    }}
-                  >
-                    Load {selectedCountries.length > 0 ? `(${selectedCountries.length} selected)` : ''}
-                  </button>
-                  <button
-                    onClick={() => setShowCountryPicker(false)}
-                    style={{ padding: '7px 12px', borderRadius: 7, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-secondary)', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}
-                  >
-                    Cancel
-                  </button>
-                </div>
+                      )
+                    })}
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 8, borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+                    <button
+                      onClick={() => setPickerStep('countries')}
+                      style={{ padding: '7px 12px', borderRadius: 7, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-secondary)', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}
+                    >
+                      ← Back
+                    </button>
+                    <button
+                      onClick={() => handleLoadDefaults(selectedCountries, selectedTaskCodes)}
+                      disabled={selectedTaskCodes.length === 0}
+                      style={{
+                        flex: 1, padding: '7px 0', borderRadius: 7, border: 'none',
+                        background: selectedTaskCodes.length > 0 ? '#0d9488' : 'var(--border)',
+                        color: selectedTaskCodes.length > 0 ? '#fff' : 'var(--text-muted)',
+                        fontSize: 12, fontWeight: 700,
+                        cursor: selectedTaskCodes.length > 0 ? 'pointer' : 'not-allowed',
+                        fontFamily: 'inherit',
+                      }}
+                    >
+                      {selectedTaskCodes.length > 0
+                        ? `Import ${selectedTaskCodes.length} task${selectedTaskCodes.length === 1 ? '' : 's'}`
+                        : 'Select tasks to import'}
+                    </button>
+                    <button
+                      onClick={() => { setShowCountryPicker(false); setPickerStep('countries') }}
+                      style={{ padding: '7px 12px', borderRadius: 7, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-secondary)', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </>)}
+
               </div>
             )}
           </div>

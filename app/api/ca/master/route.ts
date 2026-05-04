@@ -47,17 +47,52 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json()
 
-  // Special action: load defaults (supports optional countries[] for multi-country)
+  // Special action: load defaults (supports optional countries[] and task_codes[] for selective import)
   if (body.action === 'load_defaults') {
     const fy = body.financial_year ?? '2026-27'
     const countries: string[] = Array.isArray(body.countries) && body.countries.length > 0
       ? body.countries
       : ['IN']  // default to India for backward compat
+    const task_codes: string[] | null = Array.isArray(body.task_codes) && body.task_codes.length > 0
+      ? body.task_codes
+      : null  // null means import all (legacy / CSV path)
+
     const admin = createAdminClient()
-    const sourceTasks = countries.includes('IN') && countries.length === 1
+
+    // Build full source task list for the requested countries
+    let sourceTasks = countries.includes('IN') && countries.length === 1
       ? CA_DEFAULT_TASKS
       : getTasksForCountries(countries)
-    const rows = sourceTasks.map(t => ({
+
+    // If the caller specified particular task codes, restrict to those only
+    if (task_codes) {
+      const codeSet = new Set(task_codes)
+      sourceTasks = sourceTasks.filter(t => codeSet.has(t.code))
+    }
+
+    if (sourceTasks.length === 0) {
+      return NextResponse.json({ success: true, count: 0, skipped: 0 })
+    }
+
+    // Fetch codes that already exist for this org + fy — we NEVER overwrite
+    // existing rows so that any customisations the org made are preserved.
+    const { data: existing, error: fetchErr } = await admin
+      .from('ca_master_tasks')
+      .select('code')
+      .eq('org_id', mb.org_id)
+      .eq('financial_year', fy)
+      .eq('is_active', true)
+    if (fetchErr) return NextResponse.json(dbError(fetchErr, 'ca/master'), { status: 500 })
+
+    const existingCodes = new Set((existing ?? []).map((r: { code: string }) => r.code))
+    const newTasks = sourceTasks.filter(t => !existingCodes.has(t.code))
+    const skipped  = sourceTasks.length - newTasks.length
+
+    if (newTasks.length === 0) {
+      return NextResponse.json({ success: true, count: 0, skipped })
+    }
+
+    const rows = newTasks.map(t => ({
       org_id: mb.org_id, financial_year: fy,
       code: t.code, name: t.name, group_name: t.group_name,
       task_type: t.task_type, dates: t.dates,
@@ -67,11 +102,12 @@ export async function POST(req: NextRequest) {
       attachment_headers: t.attachment_headers ?? [],
       priority: 'medium', is_active: true,
     }))
-    // Upsert — always refresh defaults (attachment_count, attachment_headers, dates, sort_order)
+
+    // Insert only — never update existing rows, preserving all org customisations
     const { error } = await admin.from('ca_master_tasks')
-      .upsert(rows, { onConflict: 'org_id,code,financial_year', ignoreDuplicates: false })
+      .upsert(rows, { onConflict: 'org_id,code,financial_year', ignoreDuplicates: true })
     if (error) return NextResponse.json(dbError(error, 'ca/master'), { status: 500 })
-    return NextResponse.json({ success: true, count: rows.length })
+    return NextResponse.json({ success: true, count: newTasks.length, skipped })
   }
 
   // Create single task
