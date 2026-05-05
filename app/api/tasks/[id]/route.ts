@@ -160,7 +160,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   // Managers can update all fields on any task in their org
   const ALLOWED = isManager ? [
     'title','description','status','priority','due_date','start_date',
-    'completed_at','assignee_id','client_id','approval_status',
+    'completed_at','assignee_id','approver_id','client_id','approval_status',
     'approval_required','approved_by','approved_at',
     'estimated_hours','sort_order','custom_fields',
     'frequency','next_occurrence_date','is_recurring',

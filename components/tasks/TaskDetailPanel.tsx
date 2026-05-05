@@ -46,6 +46,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
   const [status,      setStatus]      = useState('todo')
   const [priority,    setPriority]    = useState('medium')
   const [assigneeId,  setAssigneeId]  = useState('')
+  const [approverId,  setApproverId]  = useState('')
   const [clientId,    setClientId]    = useState('')
   const [dueDate,     setDueDate]     = useState('')
   // Recurring-specific fields
@@ -134,6 +135,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     setStatus(task.status)
     setPriority(task.priority)
     setAssigneeId(task.assignee_id ?? '')
+    setApproverId(task.approver_id ?? '')
     setClientId(task.client_id ?? '')
     setDueDate(task.due_date ?? '')
     setIsBillable((task as any).is_billable ?? false)
@@ -804,7 +806,8 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
   const isPending   = task?.approval_status === 'pending' || isInReview
   const overdue     = isOverdue(task?.due_date, status)
   const priConf     = PRIORITY_CONFIG[priority as keyof typeof PRIORITY_CONFIG] ?? PRIORITY_CONFIG.medium
-  const assignee    = members.find(m => m.id === assigneeId)
+  const assignee       = members.find(m => m.id === assigneeId)
+  const approverMember = members.find(m => m.id === approverId)
   const client      = clients.find(c => c.id === clientId)
   const myName      = members.find(m => m.id === currentUserId)?.name ?? 'U'
 
@@ -894,14 +897,14 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
               </div>
             )}
 
-            {/* Designated approver info */}
-            {task.approval_required && (
+            {/* Designated approver info (read-only banner for non-managers when approval is required) */}
+            {task.approval_required && !canManage && (
               <div className="mb-3 flex items-center gap-2 px-3 py-2 rounded-lg text-xs"
                 style={{ background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.25)' }}>
                 <ShieldCheck className="h-3.5 w-3.5 text-violet-500 flex-shrink-0"/>
                 <span className="text-violet-700">
-                  {approverInfo
-                    ? <>Approver: <strong>{approverInfo.name}</strong></>
+                  {approverMember
+                    ? <>Approver: <strong>{approverMember.name}</strong></>
                     : task.approver_id
                     ? 'Approver assigned (pending registration)'
                     : 'Any manager can approve this task'}
@@ -1264,6 +1267,31 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                     ))}
                   </select>
                 </FieldRow>
+
+                {/* Approver — editable by managers/admins/owners */}
+                {canManage && (
+                  <FieldRow label="Approver">
+                    <ShieldCheck className="h-3.5 w-3.5" style={{ color: approverId ? '#7c3aed' : 'var(--text-muted)' }} />
+                    <select
+                      value={approverId}
+                      onChange={e => {
+                        const prev = approverId
+                        const newId = e.target.value || null
+                        setApproverId(e.target.value)
+                        patch({ approver_id: newId }, () => setApproverId(prev))
+                      }}
+                      className="text-sm bg-transparent outline-none flex-1"
+                      style={{ color: 'var(--text-primary)', cursor: 'pointer' }}
+                    >
+                      <option value="">Any manager can approve</option>
+                      {members.map(m => (
+                        <option key={m.id} value={m.id}>
+                          {m.name}{m.id === currentUserId ? ' (me)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </FieldRow>
+                )}
 
                 {/* Assigned by */}
                 {(() => {
