@@ -260,7 +260,7 @@ function CAKanbanView({ userRole, currentUserId }: { userRole: string; currentUs
     const statusStyle = STATUS_STYLE[task.status] ?? STATUS_STYLE.upcoming
     return (
       <div
-        onClick={() => { if (task._raw) setSelTask(task._raw as Task); else { setSelUpcoming(task); setSelUpcomingClientId(clientId) } }}
+        onClick={() => { setSelUpcoming(task); setSelUpcomingClientId(clientId) }}
         style={{
           background: 'var(--surface)', border: '1px solid var(--border)',
           borderLeft: '3px solid rgba(234,179,8,0.6)',  // amber — all CA compliance cards
@@ -463,7 +463,11 @@ function CAKanbanView({ userRole, currentUserId }: { userRole: string; currentUs
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <span style={{ fontSize: 12, color: 'var(--text-muted)', width: 110 }}>Status</span>
-                <span style={{ fontSize: 12, fontWeight: 600, padding: '2px 10px', borderRadius: 99, background: '#fff7ed', color: '#ea580c' }}>⏰ Upcoming</span>
+                <span style={{ fontSize: 12, fontWeight: 600, padding: '2px 10px', borderRadius: 99,
+                  background: (STATUS_STYLE[selUpcoming.status] ?? STATUS_STYLE.upcoming).bg,
+                  color: (STATUS_STYLE[selUpcoming.status] ?? STATUS_STYLE.upcoming).color }}>
+                  {(STATUS_STYLE[selUpcoming.status] ?? STATUS_STYLE.upcoming).label}
+                </span>
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <span style={{ fontSize: 12, color: 'var(--text-muted)', width: 110 }}>Priority</span>
@@ -471,18 +475,20 @@ function CAKanbanView({ userRole, currentUserId }: { userRole: string; currentUs
               </div>
               {selUpcoming._nextDueDate && (
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <span style={{ fontSize: 12, color: 'var(--text-muted)', width: 110 }}>Next due date</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)', width: 110 }}>{selUpcoming._raw ? 'Due date' : 'Next due date'}</span>
                   <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>
                     {new Date(selUpcoming._nextDueDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                   </span>
                 </div>
               )}
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <span style={{ fontSize: 12, color: 'var(--text-muted)', width: 110 }}>Trigger window</span>
-                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>
-                  {selUpcoming._daysBeforeDue ?? 7} days before due date
-                </span>
-              </div>
+              {!selUpcoming._raw && (
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)', width: 110 }}>Trigger window</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>
+                    {selUpcoming._daysBeforeDue ?? 7} days before due date
+                  </span>
+                </div>
+              )}
               {selUpcoming.assignee && (
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <span style={{ fontSize: 12, color: 'var(--text-muted)', width: 110 }}>Assignee</span>
@@ -505,7 +511,7 @@ function CAKanbanView({ userRole, currentUserId }: { userRole: string; currentUs
                   </span>
                 </div>
               )}
-              {selUpcoming._nextDueDate && selUpcoming._daysBeforeDue && (
+              {!selUpcoming._raw && selUpcoming._nextDueDate && selUpcoming._daysBeforeDue && (
                 <div style={{ marginTop: 6, padding: '10px 14px', borderRadius: 8, background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
                   <span style={{ fontSize: 12, color: '#15803d' }}>
                     ✓ This task will appear on{' '}
