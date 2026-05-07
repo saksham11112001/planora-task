@@ -27,17 +27,17 @@ export default async function DashboardPage() {
   const results = await Promise.allSettled([
     supabase.from('tasks').select('*', { count: 'exact', head: true })
       .eq('org_id', orgId).neq('is_archived', true)
-      .in('status', ['todo','in_progress','in_review'])
+      .in('status', ['todo','in_review'])
       .not('due_date', 'is', null).lt('due_date', today),
     supabase.from('tasks').select('*', { count: 'exact', head: true })
       .eq('org_id', orgId).neq('is_archived', true)
-      .in('status', ['todo','in_progress','in_review'])
+      .in('status', ['todo','in_review'])
       .eq('due_date', today),
     supabase.from('tasks').select('*', { count: 'exact', head: true })
       .eq('org_id', orgId).eq('assignee_id', user.id).eq('approval_status', 'pending'),
     supabase.from('tasks')
       .select('id, title, status, due_date, project_id, projects(id, name, color)')
-      .eq('org_id', orgId).eq('assignee_id', user.id).in('status', ['todo','in_progress'])
+      .eq('org_id', orgId).eq('assignee_id', user.id).in('status', ['todo'])
       .order('due_date', { ascending: true, nullsFirst: false }).limit(7),
     supabase.from('projects')
       .select('id, name, color, status, due_date, client_id, clients(id, name, color)')

@@ -46,18 +46,16 @@ const PRIORITY_COLOR: Record<string, { bg: string; color: string }> = {
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  todo:        { label: 'To do',           color: '#64748b', bg: '#f1f5f9' },
-  in_progress: { label: 'In progress',     color: '#2563eb', bg: '#eff6ff' },
-  in_review:   { label: 'Pending approval',color: '#7c3aed', bg: '#fdf4ff' },
-  completed:   { label: 'Completed',       color: '#16a34a', bg: '#f0fdf4' },
-  cancelled:   { label: 'Cancelled',       color: '#94a3b8', bg: '#f8fafc' },
+  todo:      { label: 'To do',           color: '#64748b', bg: '#f1f5f9' },
+  in_review: { label: 'Pending approval',color: '#7c3aed', bg: '#fdf4ff' },
+  completed: { label: 'Completed',       color: '#16a34a', bg: '#f0fdf4' },
+  cancelled: { label: 'Cancelled',       color: '#94a3b8', bg: '#f8fafc' },
 }
 
 const BOARD_COLS = [
-  { key: 'todo',        label: 'To do',            color: '#64748b' },
-  { key: 'in_progress', label: 'In progress',      color: '#2563eb' },
-  { key: 'in_review',   label: 'Pending approval', color: '#7c3aed' },
-  { key: 'completed',   label: 'Completed',        color: '#16a34a' },
+  { key: 'todo',      label: 'To do',            color: '#64748b' },
+  { key: 'in_review', label: 'Pending approval', color: '#7c3aed' },
+  { key: 'completed', label: 'Completed',        color: '#16a34a' },
 ]
 
 /* ── Helper ────────────────────────────────────────────────────── */

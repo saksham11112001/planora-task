@@ -22,13 +22,12 @@ export default async function TeamPage() {
       .select('assignee_id, status').eq('org_id', mb.org_id).gte('created_at', from30),
   ])
 
-  const countMap: Record<string, { total: number; completed: number; inProgress: number }> = {}
+  const countMap: Record<string, { total: number; completed: number }> = {}
   ;(taskCounts ?? []).forEach(t => {
     if (!t.assignee_id) return
-    if (!countMap[t.assignee_id]) countMap[t.assignee_id] = { total: 0, completed: 0, inProgress: 0 }
+    if (!countMap[t.assignee_id]) countMap[t.assignee_id] = { total: 0, completed: 0 }
     countMap[t.assignee_id].total++
     if (t.status === 'completed') countMap[t.assignee_id].completed++
-    if (t.status === 'in_progress') countMap[t.assignee_id].inProgress++
   })
 
   const memberList = (members ?? []).map(m => ({
@@ -39,9 +38,9 @@ export default async function TeamPage() {
     phone_number: (m.users as any)?.phone_number ?? null,
     role:         m.role,
     joined_at:    m.joined_at,
-    tasks_30d:    countMap[(m.users as any)?.id]?.total     ?? 0,
-    done_30d:     countMap[(m.users as any)?.id]?.completed  ?? 0,
-    inprog_30d:   countMap[(m.users as any)?.id]?.inProgress ?? 0,
+    tasks_30d:    countMap[(m.users as any)?.id]?.total    ?? 0,
+    done_30d:     countMap[(m.users as any)?.id]?.completed ?? 0,
+    inprog_30d:   0,
   }))
 
   const canManage = ['owner','admin','manager'].includes(mb.role)

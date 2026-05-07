@@ -45,10 +45,10 @@ const LIST_SECS = [
     filter:(t:Task,today:string)=>{ const end=new Date(today); end.setDate(end.getDate()+7); return (t.due_date===null || (!!t.due_date && new Date(t.due_date)>end)) && !['completed','cancelled','in_review'].includes(t.status) && t.approval_status !== 'pending' } },
 ]
 const BOARD_COLS = [
-  { status:'overdue',     label:'Overdue',          color:'#dc2626' },
-  { status:'in_progress', label:'In progress',       color:'#0d9488' },
-  { status:'in_review',   label:'Pending approval',  color:'#7c3aed' },
-  { status:'completed',   label:'Done',              color:'#16a34a' },
+  { status:'overdue',   label:'Overdue',          color:'#dc2626' },
+  { status:'todo',      label:'To do',            color:'var(--text-muted)' },
+  { status:'in_review', label:'Pending approval', color:'#7c3aed' },
+  { status:'completed', label:'Done',             color:'#16a34a' },
 ]
 
 // ── Board grouping helpers ──────────────────────────────────────────────────
@@ -416,7 +416,7 @@ export function MyTasksView({
     
     // Map board column status to actual task status
     const statusMap: Record<string, string> = {
-      'todo': 'todo', 'in_progress': 'in_progress',
+      'todo': 'todo',
       'in_review': 'in_review', 'completed': 'completed',
     }
     const newStatus = statusMap[targetStatus] ?? targetStatus
@@ -465,8 +465,6 @@ export function MyTasksView({
     setDragOverCol(null)
 
     const patchBody: any = { status: newStatus }
-    if (newStatus === 'in_progress') patchBody.completed_at = null
-
     const res = await fetch(`/api/tasks/${dragTaskId}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(patchBody),
@@ -1695,7 +1693,7 @@ export function MyTasksView({
             : col.status === 'in_review'
             ? [...displayTasks.filter(t => t.status === 'in_review' || t.approval_status === 'pending'), ...extraPendingForBoard]
             : displayTasks.filter(t =>
-                (t.status === col.status || (col.status === 'in_progress' && t.status === 'todo'))
+                t.status === col.status
                 && t.approval_status !== 'pending'
                 && !(!!t.due_date && t.due_date < today2 && t.status !== 'completed'))
 

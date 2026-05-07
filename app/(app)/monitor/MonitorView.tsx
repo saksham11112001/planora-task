@@ -39,11 +39,10 @@ interface Props {
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  todo:        { label: 'To do',            color: '#64748b', bg: '#f1f5f9' },
-  in_progress: { label: 'In progress',      color: '#2563eb', bg: '#eff6ff' },
-  in_review:   { label: 'Pending approval', color: '#7c3aed', bg: '#fdf4ff' },
-  completed:   { label: 'Completed',        color: '#16a34a', bg: '#f0fdf4' },
-  cancelled:   { label: 'Cancelled',        color: '#94a3b8', bg: '#f8fafc' },
+  todo:      { label: 'To do',            color: '#64748b', bg: '#f1f5f9' },
+  in_review: { label: 'Pending approval', color: '#7c3aed', bg: '#fdf4ff' },
+  completed: { label: 'Completed',        color: '#16a34a', bg: '#f0fdf4' },
+  cancelled: { label: 'Cancelled',        color: '#94a3b8', bg: '#f8fafc' },
 }
 const PRIORITY_DOT: Record<string, string> = {
   urgent: '#dc2626', high: '#ea580c', medium: '#ca8a04', low: '#16a34a', none: '#94a3b8',
@@ -317,7 +316,6 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
     return {
       total:      all.length,
       todo:       all.filter(t => t.status === 'todo').length,
-      inProgress: all.filter(t => t.status === 'in_progress').length,
       inReview:   all.filter(t => t.status === 'in_review').length,
       completed:  all.filter(t => t.status === 'completed').length,
       overdue:    all.filter(t => !!t.due_date && t.due_date < today && !['completed', 'cancelled'].includes(t.status)).length,
@@ -349,7 +347,7 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
   const groups = useMemo<{ key: string; label: string; color: string; tasks: MonTask[] }[]>(() => {
     if (groupBy === 'none') return [{ key: 'all', label: 'All tasks', color: 'var(--brand)', tasks: visible }]
     if (groupBy === 'status') {
-      return ['todo', 'in_progress', 'in_review', 'completed', 'cancelled']
+      return ['todo', 'in_review', 'completed', 'cancelled']
         .map(s => ({ key: s, label: STATUS_CONFIG[s]?.label ?? s, color: STATUS_CONFIG[s]?.color ?? '#94a3b8', tasks: visible.filter(t => t.status === s) }))
         .filter(g => g.tasks.length > 0)
     }
@@ -430,7 +428,6 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
           {[
             { label: 'Total',       value: stats.total,      color: '#0d9488', bg: 'rgba(13,148,136,0.1)',  border: 'rgba(13,148,136,0.25)' },
             { label: 'To do',       value: stats.todo,       color: '#64748b', bg: 'var(--surface-subtle)', border: 'var(--border)'         },
-            { label: 'In progress', value: stats.inProgress, color: '#2563eb', bg: 'rgba(37,99,235,0.08)',  border: 'rgba(37,99,235,0.25)'  },
             { label: 'In review',   value: stats.inReview,   color: '#7c3aed', bg: 'rgba(124,58,237,0.08)', border: 'rgba(124,58,237,0.25)' },
             { label: 'Completed',   value: stats.completed,  color: '#16a34a', bg: 'rgba(22,163,74,0.08)',  border: 'rgba(22,163,74,0.25)'  },
             { label: 'Overdue',     value: stats.overdue,    color: stats.overdue > 0 ? '#dc2626' : '#94a3b8', bg: stats.overdue > 0 ? 'rgba(220,38,38,0.08)' : 'var(--surface-subtle)', border: stats.overdue > 0 ? 'rgba(220,38,38,0.25)' : 'var(--border)' },
@@ -455,10 +452,9 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
                 <p style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>By status</p>
                 <ResponsiveContainer width="100%" height={140}>
                   <BarChart data={[
-                    { name: 'To do',       value: stats.todo,       fill: '#64748b' },
-                    { name: 'In progress', value: stats.inProgress, fill: '#2563eb' },
-                    { name: 'In review',   value: stats.inReview,   fill: '#7c3aed' },
-                    { name: 'Completed',   value: stats.completed,  fill: '#16a34a' },
+                    { name: 'To do',     value: stats.todo,      fill: '#64748b' },
+                    { name: 'In review', value: stats.inReview,  fill: '#7c3aed' },
+                    { name: 'Completed', value: stats.completed, fill: '#16a34a' },
                   ]} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                     <XAxis dataKey="name" tick={{ fontSize: 9 }} interval={0} angle={-20} textAnchor="end" height={32}/>
                     <YAxis tick={{ fontSize: 9 }} allowDecimals={false}/>
