@@ -1,6 +1,6 @@
 export type OrgRole = 'owner' | 'admin' | 'manager' | 'member' | 'viewer'
 export type PlanTier = 'free' | 'starter' | 'pro' | 'business'
-export type TaskStatus = 'todo' | 'in_progress' | 'in_review' | 'completed' | 'cancelled'
+export type TaskStatus = 'todo' | 'in_review' | 'completed' | 'cancelled'
 export type TaskPriority = 'none' | 'low' | 'medium' | 'high' | 'urgent'
 export type ProjectStatus = 'active' | 'on_hold' | 'completed' | 'cancelled'
 export type ClientStatus = 'active' | 'inactive' | 'prospect'
@@ -105,11 +105,10 @@ export const PRIORITY_CONFIG: Record<TaskPriority, { label: string; color: strin
 }
 
 export const STATUS_CONFIG: Record<TaskStatus, { label: string; color: string; bg: string; dot: string }> = {
-  todo:        { label: 'To do',      color: '#64748b', bg: '#f8fafc', dot: '#94a3b8' },
-  in_progress: { label: 'In progress',color: '#0d9488', bg: '#f0fdfa', dot: '#0d9488' },
-  in_review:   { label: 'In review',  color: '#7c3aed', bg: '#f5f3ff', dot: '#7c3aed' },
-  completed:   { label: 'Completed',  color: '#16a34a', bg: '#f0fdf4', dot: '#16a34a' },
-  cancelled:   { label: 'Cancelled',  color: '#94a3b8', bg: '#f8fafc', dot: '#94a3b8' },
+  todo:      { label: 'To do',      color: '#64748b', bg: '#f8fafc', dot: '#94a3b8' },
+  in_review: { label: 'In review',  color: '#7c3aed', bg: '#f5f3ff', dot: '#7c3aed' },
+  completed: { label: 'Completed',  color: '#16a34a', bg: '#f0fdf4', dot: '#16a34a' },
+  cancelled: { label: 'Cancelled',  color: '#94a3b8', bg: '#f8fafc', dot: '#94a3b8' },
 }
 
 export const PROJECT_STATUS_CONFIG: Record<ProjectStatus, { label: string; color: string; bg: string }> = {

@@ -81,7 +81,6 @@ export async function ReportsFetcher() {
     return {
       name,
       completed:  tasks30.filter(t => t.assignee_id === uid && t.status === 'completed').length,
-      inProgress: tasks30.filter(t => t.assignee_id === uid && t.status === 'in_progress').length,
     }
   }).sort((a, b) => b.completed - a.completed).slice(0, 10)
 
@@ -110,7 +109,6 @@ export async function ReportsFetcher() {
     const assigned = tasks.filter(t => t.assignee_id === uid)
     const done     = assigned.filter(t => t.status === 'completed')
     const overdueT = assigned.filter(t => t.due_date && t.due_date < today && t.status !== 'completed')
-    const inProg   = assigned.filter(t => t.status === 'in_progress')
     const inReview = assigned.filter(t => t.status === 'in_review')
     const withDue       = done.filter(t => t.due_date)
     const onTime        = withDue.filter(t => t.completed_at && t.due_date && t.completed_at.split('T')[0] <= t.due_date)
@@ -137,7 +135,7 @@ export async function ReportsFetcher() {
     return {
       uid, name, email, role,
       total: assigned.length, completed: done.length, overdue: overdueT.length,
-      inProgress: inProg.length, inReview: inReview.length,
+      inReview: inReview.length,
       onTimeRate, avgDays,
       hoursLogged: Math.round(hoursLogged * 10) / 10,
       urgentHigh, weeklyTrend,

@@ -40,7 +40,7 @@ export const dailyReminders = inngest.createFunction(
           project:projects(name),
           org:organisations!inner(name)
         `)
-        .in('status', ['todo', 'in_progress'])
+        .in('status', ['todo'])
         .gte('due_date', in1day)
         .lte('due_date', in3day)
         .not('assignee_id', 'is', null)
@@ -121,7 +121,7 @@ export const dailyReminders = inngest.createFunction(
           org:organisations!inner(name),
           org_id
         `)
-        .in('status', ['todo', 'in_progress'])
+        .in('status', ['todo'])
         .eq('due_date', yesterday)
         .not('assignee_id', 'is', null)
         .eq('is_archived', false)
@@ -217,7 +217,7 @@ export const dailyReminders = inngest.createFunction(
           project:projects(name),
           org:organisations!inner(name)
         `)
-        .in('status', ['todo', 'in_progress'])
+        .in('status', ['todo'])
         .lt('due_date', today)
         .not('assignee_id', 'is', null)
         .eq('is_archived', false)

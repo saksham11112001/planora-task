@@ -898,7 +898,7 @@ export async function POST(request: NextRequest) {
             }
 
             const status = cell(row, iStatus) || 'todo'
-            const validStatus = ['todo', 'in_progress', 'completed', 'blocked'].includes(status) ? status : 'todo'
+            const validStatus = ['todo', 'completed', 'blocked'].includes(status) ? status : 'todo'
 
             const [assigneeData, approverId, projectId, clientId] = await Promise.all([
               resolveAssignees(cell(row, iAssignee)),

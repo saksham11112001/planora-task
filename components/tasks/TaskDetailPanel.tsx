@@ -1581,7 +1581,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                           background:'rgba(234,179,8,0.08)', border:'1px solid rgba(234,179,8,0.25)', fontSize:11 }}>
                           <span style={{
                             width:6, height:6, borderRadius:'50%', flexShrink:0,
-                            background: t.status === 'completed' ? '#16a34a' : t.status === 'in_progress' ? '#2563eb' : '#94a3b8',
+                            background: t.status === 'completed' ? '#16a34a' : '#94a3b8',
                           }}/>
                           <span style={{ flex:1, color:'var(--text-secondary)', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
                             {t.title}
@@ -1687,8 +1687,8 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                       ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                           {recurHistory.map((inst: any) => {
-                            const statusColor = inst.status === 'completed' ? '#16a34a' : inst.status === 'in_review' ? '#7c3aed' : inst.status === 'in_progress' ? '#2563eb' : '#64748b'
-                            const statusBg = inst.status === 'completed' ? 'rgba(22,163,74,0.1)' : inst.status === 'in_review' ? 'rgba(124,58,237,0.1)' : inst.status === 'in_progress' ? 'rgba(37,99,235,0.1)' : 'rgba(100,116,139,0.1)'
+                            const statusColor = inst.status === 'completed' ? '#16a34a' : inst.status === 'in_review' ? '#7c3aed' : '#64748b'
+                            const statusBg = inst.status === 'completed' ? 'rgba(22,163,74,0.1)' : inst.status === 'in_review' ? 'rgba(124,58,237,0.1)' : 'rgba(100,116,139,0.1)'
                             return (
                               <div key={inst.id} style={{
                                 display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px',

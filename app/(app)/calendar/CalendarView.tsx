@@ -40,7 +40,7 @@ const PRIORITY_BG: Record<string,string> = {
   low:'rgba(22,163,74,0.12)', none:'var(--surface-subtle)',
 }
 const STATUS_DOT: Record<string,string> = {
-  todo:'#94a3b8', in_progress:'#0d9488', in_review:'#7c3aed', completed:'#16a34a',
+  todo:'#94a3b8', in_review:'#7c3aed', completed:'#16a34a',
 }
 const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December']
@@ -725,7 +725,7 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
                           )}
                           <span style={{ display:'inline-flex',alignItems:'center',gap:3,fontSize:10,
                             padding:'1px 6px',borderRadius:4,
-                            background:t.status==='completed'?'rgba(22,163,74,0.1)':t.status==='in_progress'?'rgba(13,148,136,0.1)':t.status==='in_review'?'rgba(124,58,237,0.1)':'var(--surface-subtle)',
+                            background:t.status==='completed'?'rgba(22,163,74,0.1)':t.status==='in_review'?'rgba(124,58,237,0.1)':'var(--surface-subtle)',
                             color:STATUS_DOT[t.status]??'#94a3b8',fontWeight:500 }}>
                             <span style={{ width:5,height:5,borderRadius:'50%',background:STATUS_DOT[t.status]??'#94a3b8',display:'inline-block' }}/>
                             {t.status.replace('_',' ')}

@@ -395,8 +395,6 @@ async function checkAndMarkDocsComplete({
       .from('tasks')
       .update({
         custom_fields: { _ca_compliance: true, _triggered: true, _docs_complete: true },
-        // Optionally move to in_progress if still todo
-        status: 'in_progress',
       })
       .eq('id', taskId)
       .eq('status', 'todo') // only advance if still at todo

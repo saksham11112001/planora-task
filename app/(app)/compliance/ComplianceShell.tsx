@@ -36,11 +36,10 @@ interface KanbanTask {
 interface KanbanClient { id: string; name: string; color: string }
 
 const STATUS_STYLE: Record<string, { bg: string; color: string; label: string }> = {
-  todo:       { bg: '#f1f5f9', color: '#64748b', label: 'To do' },
-  in_progress:{ bg: '#eff6ff', color: '#2563eb', label: 'In progress' },
-  in_review:  { bg: '#fdf4ff', color: '#9333ea', label: 'In review' },
-  completed:  { bg: '#f0fdf4', color: '#16a34a', label: 'Completed' },
-  upcoming:   { bg: '#fff7ed', color: '#ea580c', label: '⏰ Upcoming' },
+  todo:      { bg: '#f1f5f9', color: '#64748b', label: 'To do' },
+  in_review: { bg: '#fdf4ff', color: '#9333ea', label: 'In review' },
+  completed: { bg: '#f0fdf4', color: '#16a34a', label: 'Completed' },
+  upcoming:  { bg: '#fff7ed', color: '#ea580c', label: '⏰ Upcoming' },
 }
 
 function nextDueDateFromDates(dates: Record<string, string>): string | null {
@@ -537,8 +536,8 @@ function CAKanbanView({ userRole, currentUserId }: { userRole: string; currentUs
                     </p>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 160, overflowY: 'auto' }}>
                       {hist.map((t: any) => {
-                        const sc = t.status === 'completed' ? '#16a34a' : t.status === 'in_review' ? '#7c3aed' : t.status === 'in_progress' ? '#2563eb' : '#64748b'
-                        const sb = t.status === 'completed' ? 'rgba(22,163,74,0.1)' : t.status === 'in_review' ? 'rgba(124,58,237,0.1)' : t.status === 'in_progress' ? 'rgba(37,99,235,0.1)' : 'rgba(100,116,139,0.1)'
+                        const sc = t.status === 'completed' ? '#16a34a' : t.status === 'in_review' ? '#7c3aed' : '#64748b'
+                        const sb = t.status === 'completed' ? 'rgba(22,163,74,0.1)' : t.status === 'in_review' ? 'rgba(124,58,237,0.1)' : 'rgba(100,116,139,0.1)'
                         return (
                           <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', borderRadius: 7, border: '1px solid var(--border)', background: 'var(--surface-subtle)', fontSize: 11 }}>
                             <span style={{ flex: 1, color: 'var(--text-secondary)' }}>

@@ -8,7 +8,7 @@ import {
 interface EmployeeStat {
   uid: string; name: string; email: string; role: string
   total: number; completed: number; overdue: number
-  inProgress: number; inReview: number
+  inReview: number
   onTimeRate: number | null; avgDays: number | null
   hoursLogged: number; urgentHigh: number
   completionRate: number
@@ -20,7 +20,7 @@ interface Props {
   currentUserId?: string
   userRole?:      string
   dailyData:       { date: string; created: number; completed: number }[]
-  memberData:      { name: string; completed: number; inProgress: number }[]
+  memberData:      { name: string; completed: number }[]
   priorityData:    { name: string; value: number; color: string }[]
   projectData:     { name: string; done: number; total: number; pct: number }[]
   timeByProject:   { name: string; hours: number; color: string }[]
@@ -130,7 +130,6 @@ function EmployeeCard({ emp, rank }: { emp: EmployeeStat; rank: number }) {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8, marginBottom: 16 }}>
             <StatBox label="Total assigned" value={emp.total} />
             <StatBox label="Completed" value={emp.completed} color="#16a34a" bg="#f0fdf4" />
-            <StatBox label="In progress" value={emp.inProgress} color="#0d9488" bg="#f0fdfa" />
             <StatBox label="Overdue" value={emp.overdue}
               color={emp.overdue > 0 ? '#dc2626' : 'var(--text-muted)'}
               bg={emp.overdue > 0 ? '#fef2f2' : 'var(--surface-subtle)'} />
@@ -336,7 +335,6 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
                   <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid var(--border)' }}/>
                   <Legend wrapperStyle={{ fontSize: 11 }}/>
                   <Bar dataKey="completed" name="Completed" fill="#0d9488" radius={[0,4,4,0]}/>
-                  <Bar dataKey="inProgress" name="In progress" fill="#7c3aed" radius={[0,4,4,0]}/>
                 </BarChart>
               </ResponsiveContainer>
             </div>

@@ -23,10 +23,9 @@ interface Props {
 type ViewTab = 'list' | 'board' | 'overview'
 
 const BOARD_COLS = [
-  { status: 'todo',        label: 'To do',       color:'var(--text-muted)' },
-  { status: 'in_progress', label: 'In progress',  color: '#0d9488' },
-  { status: 'in_review',   label: 'In review',    color: '#7c3aed' },
-  { status: 'completed',   label: 'Done',         color: '#16a34a' },
+  { status: 'todo',      label: 'To do',          color:'var(--text-muted)' },
+  { status: 'in_review', label: 'Pending approval', color: '#7c3aed' },
+  { status: 'completed', label: 'Done',            color: '#16a34a' },
 ]
 
 export function ProjectView({ project, tasks: initialTasks, members, clients, defaultClientId, projectOwnerId, canManage, currentUserId, userRole, totalHours, billableHours }: Props) {
@@ -159,11 +158,10 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
   const activeFilters = [filterAssignee.length > 0, filterPriority.length > 0, filterStatus.length > 0].filter(Boolean).length
 
   const SECTIONS = [
-    { key: 'overdue',    label: 'Overdue',    color: '#dc2626', creator: false, tasks: sortedTasks.filter(t => t.status !== 'completed' && isOverdue(t.due_date, t.status)) },
-    { key: 'todo',       label: 'To do',      color:'var(--text-secondary)', creator: true,  tasks: sortedTasks.filter(t => t.status === 'todo' && !isOverdue(t.due_date, t.status)) },
-    { key: 'inprogress', label: 'In progress',color: '#0d9488', creator: false, tasks: sortedTasks.filter(t => t.status === 'in_progress') },
-    { key: 'inreview',   label: 'In review',  color: '#7c3aed', creator: false, tasks: sortedTasks.filter(t => t.status === 'in_review') },
-    { key: 'done',       label: 'Done',       color: '#16a34a', creator: false, tasks: sortedTasks.filter(t => t.status === 'completed') },
+    { key: 'overdue',  label: 'Overdue',          color: '#dc2626', creator: false, tasks: sortedTasks.filter(t => t.status !== 'completed' && isOverdue(t.due_date, t.status)) },
+    { key: 'todo',     label: 'To do',            color:'var(--text-secondary)', creator: true,  tasks: sortedTasks.filter(t => t.status === 'todo' && !isOverdue(t.due_date, t.status)) },
+    { key: 'inreview', label: 'Pending approval', color: '#7c3aed', creator: false, tasks: sortedTasks.filter(t => t.status === 'in_review') },
+    { key: 'done',     label: 'Done',             color: '#16a34a', creator: false, tasks: sortedTasks.filter(t => t.status === 'completed') },
     ...customSections.map(s => ({ ...s, creator: true, tasks: [] as Task[] })),
   ]
 
@@ -915,7 +913,7 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
                         <div>
                           <label style={{fontSize:11,color:'var(--text-muted)',display:'block',marginBottom:3}}>Status</label>
                           <MultiPillSelect values={filterStatus} onChange={setFilterStatus} placeholder="All statuses"
-                            options={['todo','in_progress','in_review','completed'].map(s => ({ value: s, label: s.replace('_',' ') }))}/>
+                            options={['todo','in_review','completed'].map(s => ({ value: s, label: s.replace('_',' ') }))}/>
                         </div>
                         {activeFilters > 0 && (
                           <button onClick={()=>{ setFilterAssignee([]); setFilterPriority([]); setFilterStatus([]); setFilterOpen(false) }}
@@ -1191,7 +1189,7 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
                 <div className="grid grid-cols-2 gap-4 flex-1">
                   <Stat label="Total tasks" value={total} color="#64748b"/>
                   <Stat label="Completed"   value={done}  color="#16a34a"/>
-                  <Stat label="In progress" value={tasks.filter(t => t.status === 'in_progress').length} color={project.color}/>
+                  <Stat label="To do" value={tasks.filter(t => t.status === 'todo').length} color={project.color}/>
                   <Stat label="Overdue"     value={tasks.filter(t => isOverdue(t.due_date, t.status)).length} color="#dc2626"/>
                 </div>
               </div>

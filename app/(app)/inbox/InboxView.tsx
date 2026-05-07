@@ -306,7 +306,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
     // All other transitions — plain PATCH
     const patchBody: any = { status: targetStatus }
     if (targetStatus === 'completed') patchBody.completed_at = new Date().toISOString()
-    if (targetStatus === 'todo' || targetStatus === 'in_progress') patchBody.completed_at = null
+    if (targetStatus === 'todo') patchBody.completed_at = null
 
     setLocalTasks(prev => prev.map(t => t.id===taskId ? { ...t, status:targetStatus as any } : t))
     const res = await fetch(`/api/tasks/${taskId}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(patchBody) })
@@ -392,7 +392,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
               let colTasks = col.status==='overdue'
                 ? localTasks.filter(t => !!t.due_date && t.due_date<t2 && !['completed','in_review','cancelled'].includes(t.status))
                 : col.status==='in_review' ? localTasks.filter(t => t.approval_status==='pending'||t.status==='in_review')
-                : col.status==='todo' ? localTasks.filter(t => ['todo','in_progress'].includes(t.status) && t.approval_status!=='pending' && !(!!t.due_date && t.due_date<t2))
+                : col.status==='todo' ? localTasks.filter(t => t.status==='todo' && t.approval_status!=='pending' && !(!!t.due_date && t.due_date<t2))
                 : localTasks.filter(t => t.status===col.status && t.approval_status!=='pending')
               if (clientFilter.length > 0)   colTasks = colTasks.filter(t => clientFilter.includes((t as any).client?.id))
               if (filterPriority.length > 0) colTasks = colTasks.filter(t => filterPriority.includes(t.priority))
