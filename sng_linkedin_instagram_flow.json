@@ -1,0 +1,508 @@
+{
+  "name": "SNG — LinkedIn + Instagram Combined Automation",
+  "nodes": [
+    {
+      "id": "01-trigger",
+      "name": "Daily 6AM Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 300],
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 6 * * *" }]
+        }
+      }
+    },
+    {
+      "id": "02-reddit",
+      "name": "Fetch Reddit Trends",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [220, 300],
+      "parameters": {
+        "method": "GET",
+        "url": "https://www.reddit.com/r/startups+MachineLearning+Entrepreneur+india+SaaS+accounting/hot.json?limit=10",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "User-Agent", "value": "Mozilla/5.0 (compatible; ContentBot/1.0)" }]
+        },
+        "options": { "timeout": 10000 }
+      }
+    },
+    {
+      "id": "03-sheets-read",
+      "name": "Read Content Queue",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [440, 300],
+      "parameters": {
+        "operation": "getAll",
+        "documentId": { "__rl": true, "value": "YOUR_GOOGLE_SHEET_ID_HERE", "mode": "id" },
+        "sheetName": { "__rl": true, "value": "Content Queue", "mode": "name" },
+        "returnAll": true,
+        "options": {}
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "google-sheets-cred", "name": "Google Sheets Account" }
+      }
+    },
+    {
+      "id": "04-filter",
+      "name": "Filter Pending & Add Trends",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 300],
+      "parameters": {
+        "jsCode": "// Extract Reddit trend headlines\nconst redditRaw = $('Fetch Reddit Trends').first().json;\nconst posts = redditRaw?.data?.children || [];\nconst trendLines = posts\n  .slice(0, 8)\n  .map(p => p?.data?.title || '')\n  .filter(t => t.length > 5);\nconst trendContext = trendLines.join('\\n• ') || 'No specific trends today';\n\n// Today's date YYYY-MM-DD\nconst today = new Date().toISOString().split('T')[0];\n\n// Filter rows: status=pending OR empty, scheduled_date <= today OR empty\nconst allRows = $input.all();\nconst pending = allRows.filter(row => {\n  const s = row.json;\n  const statusOk = !s.status || s.status.toLowerCase() === 'pending';\n  const dateOk = !s.scheduled_date || s.scheduled_date <= today;\n  const hasContent = s.topic && s.brand && s.platform;\n  return statusOk && dateOk && hasContent;\n});\n\nif (pending.length === 0) {\n  return [{ json: { _empty: true, trend_context: trendContext } }];\n}\n\nreturn pending.map(row => ({\n  json: {\n    ...row.json,\n    _row_number: row.json._rowNumber || row.json.row_number,\n    trend_context: trendContext\n  }\n}));"
+      }
+    },
+    {
+      "id": "05-empty-check",
+      "name": "Any Posts Today?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [880, 300],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [{
+            "id": "empty-check",
+            "leftValue": "={{ $json._empty }}",
+            "rightValue": true,
+            "operator": { "type": "boolean", "operation": "notEquals" }
+          }],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "06-split",
+      "name": "Process Each Row",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1100, 180],
+      "parameters": { "batchSize": 1, "options": {} }
+    },
+    {
+      "id": "07-build-prompt",
+      "name": "Build Platform Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, 180],
+      "parameters": {
+        "jsCode": "const row = $input.first().json;\nconst brand = (row.brand || 'floatup').toLowerCase().trim();\nconst platform = (row.platform || 'instagram').toLowerCase().trim();\n\nconst BRANDS = {\n  floatup: {\n    name: 'Floatup',\n    desc: 'task management, CA compliance, and client operations SaaS for professional teams in India',\n    tone: 'professional, confident, ROI-focused, direct — like a trusted advisor not a salesman',\n    audience: 'Chartered Accountants, startup founders, project managers, growing professional firms',\n    cta: 'floatup.app',\n    ig_hashtags: '#TaskManagement #CACompliance #StartupIndia #Floatup #CAsOfInstagram #FinanceTools #ProductivityHacks',\n    li_hashtags: '#CharteredAccountant #TaskManagement #StartupIndia #Floatup #CApractice'\n  },\n  ai_community: {\n    name: 'AI Community',\n    desc: 'a community and resource hub for developers and solopreneurs building with AI tools',\n    tone: 'casual, educational, insider-knowledge, slightly irreverent — like a smart friend who gets it',\n    audience: 'developers, solopreneurs, AI enthusiasts, indie hackers, tech founders',\n    cta: 'link in bio',\n    ig_hashtags: '#AITools #BuildWithAI #Solopreneur #IndieHackers #AICommunity #TechIndia #NoCode #AIAutomation',\n    li_hashtags: '#ArtificialIntelligence #AITools #Solopreneur #IndieHackers #BuildWithAI'\n  }\n};\n\nconst cfg = BRANDS[brand] || BRANDS.floatup;\nconst topic = row.topic || 'productivity';\nconst keyMsg = row.key_message || '';\nconst contentType = row.content_type || 'educational';\nconst targetEmotion = row.target_emotion || 'curiosity';\nconst trends = row.trend_context || 'no specific trends today';\n\nlet prompt = '';\n\nif (platform === 'instagram') {\n  prompt = `You are a top Instagram content strategist for B2B SaaS and creator brands.\n\nBRAND: ${cfg.name}\nDESCRIPTION: ${cfg.desc}\nTONE: ${cfg.tone}\nAUDIENCE: ${cfg.audience}\n\nTODAY'S TRENDING TOPICS (use for relevance and timing — DO NOT copy directly):\n• ${trends}\n\nCONTENT BRIEF:\n- Content Type: ${contentType}\n- Topic: ${topic}\n- Core Message: ${keyMsg}\n- Target Emotion to trigger: ${targetEmotion}\n\nINSTAGRAM RULES:\n- Caption max 220 characters (caption body, not including hashtags)\n- Hook must work in first 2 lines before the 'more' button — make it impossible to skip\n- Hashtags go at the very end, after 2-3 line breaks\n- Never start caption with the brand name\n- Feel native to Instagram — NOT like an ad\n\nGenerate a complete Instagram post. Output ONLY this JSON (no markdown, pure JSON):\n{\n  \"hook\": \"First 1-2 punchy lines — under 15 words, emotional or curiosity-driven\",\n  \"caption\": \"Rest of caption body under 180 chars — deliver value, conversational\",\n  \"hashtags\": \"${cfg.ig_hashtags} [add 3-4 more niche ones based on topic]\",\n  \"image_headline\": \"3-5 ALL CAPS words for visual card headline — punchy and bold\",\n  \"image_subtext\": \"One supporting line under headline — under 8 words\",\n  \"cta\": \"${cfg.cta}\",\n  \"predicted_score\": <number 1-10, be honest>\n}`;\n} else {\n  // LinkedIn (and Twitter defaults here too)\n  prompt = `You are an expert LinkedIn content strategist for B2B founders and practitioners.\n\nYOU ARE WRITING AS: A practicing Chartered Accountant who co-founded ${cfg.name}\nBRAND: ${cfg.name} — ${cfg.desc}\nTONE: ${cfg.tone} — but written as a real founder/practitioner, NOT as a marketer\nAUDIENCE: ${cfg.audience}\n\nTODAY'S TRENDING TOPICS (use for relevance — make the post feel timely):\n• ${trends}\n\nCONTENT BRIEF:\n- Content Type: ${contentType}\n- Topic: ${topic}\n- Core Message to deliver: ${keyMsg}\n- Target Emotion: ${targetEmotion}\n\nLINKEDIN RULES:\n- First 2 lines MUST work standalone as a hook (shown before '...see more')\n- Text posts perform BETTER than image posts on LinkedIn — this is text only\n- NO external links in the post body — link goes in the first comment\n- Max 3-5 hashtags at the very end\n- End with a genuine question to drive comments\n- Optimal length: 150-350 words\n- Write like a human who has a strong opinion, not a company announcement\n\nGenerate the complete LinkedIn post. Output ONLY this JSON (no markdown, pure JSON):\n{\n  \"hook\": \"First 2 lines shown before see-more — bold opener, under 25 words, makes them click\",\n  \"full_post\": \"Complete LinkedIn post: hook + body + closing question + hashtags. Include line breaks for readability.\",\n  \"hashtags\": \"${cfg.li_hashtags} [add 1-2 more relevant ones]\",\n  \"first_comment\": \"Short first comment to post with the link — e.g. 'Full details and free trial: ${cfg.cta}'\",\n  \"predicted_score\": <number 1-10, be honest>\n}`;\n}\n\nreturn [{ json: { ...row, brand_cfg: cfg, gemini_prompt: prompt, platform, brand } }];"
+      }
+    },
+    {
+      "id": "08-gemini-generate",
+      "name": "Gemini — Write Content",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1540, 180],
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=YOUR_GEMINI_API_KEY_HERE",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [{ \"parts\": [{ \"text\": {{ JSON.stringify($json.gemini_prompt) }} }] }],\n  \"generationConfig\": { \"temperature\": 0.88, \"topP\": 0.95, \"maxOutputTokens\": 1000 }\n}",
+        "options": { "timeout": 30000 }
+      }
+    },
+    {
+      "id": "09-parse-content",
+      "name": "Parse Content Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1760, 180],
+      "parameters": {
+        "jsCode": "const raw = $input.first().json;\nconst text = raw?.candidates?.[0]?.content?.parts?.[0]?.text || '';\nconst cleaned = text.replace(/```json\\s*/gi, '').replace(/```\\s*/g, '').trim();\n\nlet parsed = {};\ntry { parsed = JSON.parse(cleaned); }\ncatch(e) {\n  const match = cleaned.match(/\\{[\\s\\S]*\\}/);\n  if (match) { try { parsed = JSON.parse(match[0]); } catch(e2) {} }\n}\n\nconst ctx = $('Build Platform Prompt').first().json;\nconst platform = ctx.platform;\n\nlet result = { ...ctx, predicted_score: Number(parsed.predicted_score) || 5 };\n\nif (platform === 'instagram') {\n  result.hook = parsed.hook || '';\n  result.caption_body = parsed.caption || '';\n  result.hashtags = parsed.hashtags || ctx.brand_cfg?.ig_hashtags || '';\n  result.image_headline = parsed.image_headline || (ctx.topic || '').toUpperCase();\n  result.image_subtext = parsed.image_subtext || '';\n  result.cta = parsed.cta || 'floatup.app';\n  // Full caption for Buffer\n  result.full_post = `${parsed.hook}\\n\\n${parsed.caption}\\n\\n${parsed.hashtags}`.trim();\n} else {\n  // LinkedIn\n  result.hook = parsed.hook || '';\n  result.full_post = parsed.full_post || '';\n  result.hashtags = parsed.hashtags || ctx.brand_cfg?.li_hashtags || '';\n  result.first_comment = parsed.first_comment || '';\n  result.image_headline = '';\n  result.image_subtext = '';\n  result.cta = ctx.brand_cfg?.cta || '';\n}\n\nreturn [{ json: result }];"
+      }
+    },
+    {
+      "id": "10-gemini-audit",
+      "name": "Gemini — Audit Quality",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1980, 180],
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=YOUR_GEMINI_API_KEY_HERE",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [{ \"parts\": [{ \"text\": {{ JSON.stringify('Audit this ' + $json.platform + ' post for the brand ' + $json.brand + '.\\n\\nHOOK: ' + $json.hook + '\\n\\nFULL POST: ' + $json.full_post + '\\n\\nScore 1-10 on: hook strength (stops scroll), value delivered, brand voice match, CTA clarity.\\n\\nBe strict. 7 = publishable minimum. Output ONLY this JSON: {\"score\": <1-10>, \"issue\": \"main weakness in one line\", \"fix\": \"one specific improvement if score < 8\"}') }} }] }],\n  \"generationConfig\": { \"temperature\": 0.2, \"maxOutputTokens\": 200 }\n}",
+        "options": { "timeout": 20000 }
+      }
+    },
+    {
+      "id": "11-parse-audit",
+      "name": "Parse Audit Score",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2200, 180],
+      "parameters": {
+        "jsCode": "const raw = $input.first().json;\nconst text = raw?.candidates?.[0]?.content?.parts?.[0]?.text || '';\nconst cleaned = text.replace(/```json\\s*/gi, '').replace(/```\\s*/g, '').trim();\n\nlet audit = { score: 5, issue: '', fix: '' };\ntry { audit = JSON.parse(cleaned); }\ncatch(e) {\n  const match = cleaned.match(/\\{[\\s\\S]*\\}/);\n  if (match) { try { audit = JSON.parse(match[0]); } catch(e2) {} }\n}\n\nconst ctx = $('Parse Content Response').first().json;\n\nreturn [{ json: {\n  ...ctx,\n  audit_score: Number(audit.score) || 5,\n  audit_issue: audit.issue || '',\n  audit_fix: audit.fix || ''\n}}];"
+      }
+    },
+    {
+      "id": "12-quality-gate",
+      "name": "Quality Gate — Score >= 7",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2420, 180],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [{
+            "id": "score-check",
+            "leftValue": "={{ $json.audit_score }}",
+            "rightValue": 7,
+            "operator": { "type": "number", "operation": "gte" }
+          }],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "13-platform-check",
+      "name": "Platform — Instagram or LinkedIn?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2640, 60],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [{
+            "id": "platform-check",
+            "leftValue": "={{ $json.platform }}",
+            "rightValue": "instagram",
+            "operator": { "type": "string", "operation": "equals" }
+          }],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "14-bannerbear-create",
+      "name": "Bannerbear — Create Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2860, -60],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.bannerbear.com/v2/images",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer YOUR_BANNERBEAR_API_KEY_HERE" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "string",
+        "body": "={{ JSON.stringify({ template: $json.brand === 'floatup' ? 'YOUR_FLOATUP_BANNERBEAR_TEMPLATE_ID' : 'YOUR_AI_COMMUNITY_BANNERBEAR_TEMPLATE_ID', modifications: [{ name: 'headline', text: ($json.image_headline || 'FLOATUP').slice(0,40) }, { name: 'subtext', text: ($json.image_subtext || '').slice(0,60) }, { name: 'brand_tag', text: $json.cta || 'floatup.app' }] }) }}",
+        "options": { "timeout": 20000 }
+      }
+    },
+    {
+      "id": "15-wait",
+      "name": "Wait 25 Seconds",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [3080, -60],
+      "parameters": { "unit": "seconds", "amount": 25 },
+      "webhookId": "wait-render-bb"
+    },
+    {
+      "id": "16-bannerbear-get",
+      "name": "Bannerbear — Get Rendered Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3300, -60],
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.bannerbear.com/v2/images/{{ $('Bannerbear — Create Image').first().json.uid }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Authorization", "value": "Bearer YOUR_BANNERBEAR_API_KEY_HERE" }]
+        },
+        "options": { "timeout": 15000 }
+      }
+    },
+    {
+      "id": "17-prep-instagram",
+      "name": "Prepare Instagram Buffer Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3520, -60],
+      "parameters": {
+        "jsCode": "const bbResponse = $input.first().json;\nconst imageUrl = bbResponse.image_url_png || bbResponse.image_url || '';\n\nconst ctx = $('Parse Audit Score').first().json;\n\n// Schedule at noon today (IST)\nconst scheduledAt = (() => { const d = new Date(); d.setHours(12, 0, 0, 0); return Math.floor(d.getTime() / 1000); })();\n\nreturn [{ json: {\n  ...ctx,\n  image_url: imageUrl,\n  buffer_profile_id: ctx.brand === 'floatup' ? 'YOUR_FLOATUP_INSTAGRAM_BUFFER_PROFILE_ID' : 'YOUR_AI_COMMUNITY_INSTAGRAM_BUFFER_PROFILE_ID',\n  buffer_scheduled_at: scheduledAt\n}}];"
+      }
+    },
+    {
+      "id": "18-buffer-instagram",
+      "name": "Buffer — Post to Instagram",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3740, -60],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.bufferapp.com/1/updates/create.json",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Authorization", "value": "Bearer YOUR_BUFFER_ACCESS_TOKEN_HERE" }]
+        },
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "profile_ids[]", "value": "={{ $json.buffer_profile_id }}" },
+            { "name": "text", "value": "={{ $json.full_post }}" },
+            { "name": "scheduled_at", "value": "={{ $json.buffer_scheduled_at }}" },
+            { "name": "media[picture]", "value": "={{ $json.image_url }}" }
+          ]
+        },
+        "options": { "timeout": 15000 }
+      }
+    },
+    {
+      "id": "19-prep-linkedin",
+      "name": "Prepare LinkedIn Buffer Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2860, 180],
+      "parameters": {
+        "jsCode": "const ctx = $input.first().json;\n\n// Schedule LinkedIn at 8:30 AM (catches morning commute)\nconst scheduledAt = (() => { const d = new Date(); d.setHours(8, 30, 0, 0); return Math.floor(d.getTime() / 1000); })();\n\nreturn [{ json: {\n  ...ctx,\n  image_url: '',\n  buffer_profile_id: ctx.brand === 'floatup' ? 'YOUR_FLOATUP_LINKEDIN_BUFFER_PROFILE_ID' : 'YOUR_AI_COMMUNITY_LINKEDIN_BUFFER_PROFILE_ID',\n  buffer_scheduled_at: scheduledAt\n}}];"
+      }
+    },
+    {
+      "id": "20-buffer-linkedin",
+      "name": "Buffer — Post to LinkedIn",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3080, 180],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.bufferapp.com/1/updates/create.json",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Authorization", "value": "Bearer YOUR_BUFFER_ACCESS_TOKEN_HERE" }]
+        },
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "profile_ids[]", "value": "={{ $json.buffer_profile_id }}" },
+            { "name": "text", "value": "={{ $json.full_post }}" },
+            { "name": "scheduled_at", "value": "={{ $json.buffer_scheduled_at }}" }
+          ]
+        },
+        "options": { "timeout": 15000 }
+      }
+    },
+    {
+      "id": "21-sheets-done",
+      "name": "Sheets — Mark Done",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [3960, 60],
+      "parameters": {
+        "operation": "update",
+        "documentId": { "__rl": true, "value": "YOUR_GOOGLE_SHEET_ID_HERE", "mode": "id" },
+        "sheetName": { "__rl": true, "value": "Content Queue", "mode": "name" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "row_number": "={{ $json._row_number }}",
+            "status": "done",
+            "generated_post": "={{ $json.full_post?.slice(0, 500) }}",
+            "image_url": "={{ $json.image_url || '' }}",
+            "audit_score": "={{ $json.audit_score }}",
+            "posted_date": "={{ new Date().toISOString().split('T')[0] }}"
+          },
+          "matchingColumns": ["row_number"],
+          "schema": []
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "google-sheets-cred", "name": "Google Sheets Account" }
+      }
+    },
+    {
+      "id": "22-telegram-success",
+      "name": "Telegram — Scheduled Successfully",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [4180, 60],
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID_HERE",
+        "text": "=✅ <b>Post Scheduled!</b>\n\n📌 <b>Brand:</b> {{ $json.brand?.toUpperCase() }}\n📱 <b>Platform:</b> {{ $json.platform?.toUpperCase() }}\n🏷️ <b>Type:</b> {{ $json.content_type }}\n📝 <b>Topic:</b> {{ $json.topic }}\n⭐ <b>Score:</b> {{ $json.audit_score }}/10\n\n<b>Hook:</b>\n{{ $json.hook }}\n\n{{ $json.platform === 'instagram' ? '🖼️ Image: ' + $json.image_url : '💼 LinkedIn text post — link goes in first comment' }}\n\n<i>Scheduled for today ✓</i>",
+        "additionalFields": { "parse_mode": "HTML" }
+      },
+      "credentials": {
+        "telegramApi": { "id": "telegram-cred", "name": "Telegram Bot" }
+      }
+    },
+    {
+      "id": "23-sheets-review",
+      "name": "Sheets — Mark Review Needed",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [2640, 340],
+      "parameters": {
+        "operation": "update",
+        "documentId": { "__rl": true, "value": "YOUR_GOOGLE_SHEET_ID_HERE", "mode": "id" },
+        "sheetName": { "__rl": true, "value": "Content Queue", "mode": "name" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "row_number": "={{ $json._row_number }}",
+            "status": "review_needed",
+            "generated_post": "={{ $json.full_post?.slice(0, 500) }}",
+            "audit_score": "={{ $json.audit_score }}",
+            "audit_notes": "={{ $json.audit_issue + ' | Fix: ' + $json.audit_fix }}"
+          },
+          "matchingColumns": ["row_number"],
+          "schema": []
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "google-sheets-cred", "name": "Google Sheets Account" }
+      }
+    },
+    {
+      "id": "24-telegram-review",
+      "name": "Telegram — Needs Review",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [2860, 340],
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID_HERE",
+        "text": "=⚠️ <b>Post Needs Review</b>\n\n📌 <b>Brand:</b> {{ $json.brand?.toUpperCase() }}\n📱 <b>Platform:</b> {{ $json.platform }}\n📝 <b>Topic:</b> {{ $json.topic }}\n⭐ <b>Score:</b> {{ $json.audit_score }}/10 (min 7)\n\n<b>Issue:</b> {{ $json.audit_issue }}\n<b>Fix:</b> {{ $json.audit_fix }}\n\n<b>Draft:</b>\n{{ $json.full_post?.slice(0, 300) }}...\n\n👉 Edit in Google Sheets → reset <b>status</b> to <b>pending</b> to retry.",
+        "additionalFields": { "parse_mode": "HTML" }
+      },
+      "credentials": {
+        "telegramApi": { "id": "telegram-cred", "name": "Telegram Bot" }
+      }
+    },
+    {
+      "id": "25-telegram-empty",
+      "name": "Telegram — Nothing Today",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1100, 420],
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID_HERE",
+        "text": "📭 <b>Content OS:</b> No posts scheduled for today.\n\nAdd rows to your Google Sheet with <b>status = pending</b> and today's date to queue content.",
+        "additionalFields": { "parse_mode": "HTML" }
+      },
+      "credentials": {
+        "telegramApi": { "id": "telegram-cred", "name": "Telegram Bot" }
+      }
+    }
+  ],
+  "connections": {
+    "Daily 6AM Trigger": {
+      "main": [[{ "node": "Fetch Reddit Trends", "type": "main", "index": 0 }]]
+    },
+    "Fetch Reddit Trends": {
+      "main": [[{ "node": "Read Content Queue", "type": "main", "index": 0 }]]
+    },
+    "Read Content Queue": {
+      "main": [[{ "node": "Filter Pending & Add Trends", "type": "main", "index": 0 }]]
+    },
+    "Filter Pending & Add Trends": {
+      "main": [[{ "node": "Any Posts Today?", "type": "main", "index": 0 }]]
+    },
+    "Any Posts Today?": {
+      "main": [
+        [{ "node": "Process Each Row", "type": "main", "index": 0 }],
+        [{ "node": "Telegram — Nothing Today", "type": "main", "index": 0 }]
+      ]
+    },
+    "Process Each Row": {
+      "main": [
+        [{ "node": "Build Platform Prompt", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Build Platform Prompt": {
+      "main": [[{ "node": "Gemini — Write Content", "type": "main", "index": 0 }]]
+    },
+    "Gemini — Write Content": {
+      "main": [[{ "node": "Parse Content Response", "type": "main", "index": 0 }]]
+    },
+    "Parse Content Response": {
+      "main": [[{ "node": "Gemini — Audit Quality", "type": "main", "index": 0 }]]
+    },
+    "Gemini — Audit Quality": {
+      "main": [[{ "node": "Parse Audit Score", "type": "main", "index": 0 }]]
+    },
+    "Parse Audit Score": {
+      "main": [[{ "node": "Quality Gate — Score >= 7", "type": "main", "index": 0 }]]
+    },
+    "Quality Gate — Score >= 7": {
+      "main": [
+        [{ "node": "Platform — Instagram or LinkedIn?", "type": "main", "index": 0 }],
+        [{ "node": "Sheets — Mark Review Needed", "type": "main", "index": 0 }]
+      ]
+    },
+    "Platform — Instagram or LinkedIn?": {
+      "main": [
+        [{ "node": "Bannerbear — Create Image", "type": "main", "index": 0 }],
+        [{ "node": "Prepare LinkedIn Buffer Payload", "type": "main", "index": 0 }]
+      ]
+    },
+    "Bannerbear — Create Image": {
+      "main": [[{ "node": "Wait 25 Seconds", "type": "main", "index": 0 }]]
+    },
+    "Wait 25 Seconds": {
+      "main": [[{ "node": "Bannerbear — Get Rendered Image", "type": "main", "index": 0 }]]
+    },
+    "Bannerbear — Get Rendered Image": {
+      "main": [[{ "node": "Prepare Instagram Buffer Payload", "type": "main", "index": 0 }]]
+    },
+    "Prepare Instagram Buffer Payload": {
+      "main": [[{ "node": "Buffer — Post to Instagram", "type": "main", "index": 0 }]]
+    },
+    "Buffer — Post to Instagram": {
+      "main": [[{ "node": "Sheets — Mark Done", "type": "main", "index": 0 }]]
+    },
+    "Prepare LinkedIn Buffer Payload": {
+      "main": [[{ "node": "Buffer — Post to LinkedIn", "type": "main", "index": 0 }]]
+    },
+    "Buffer — Post to LinkedIn": {
+      "main": [[{ "node": "Sheets — Mark Done", "type": "main", "index": 0 }]]
+    },
+    "Sheets — Mark Done": {
+      "main": [[{ "node": "Telegram — Scheduled Successfully", "type": "main", "index": 0 }]]
+    },
+    "Telegram — Scheduled Successfully": {
+      "main": [[{ "node": "Process Each Row", "type": "main", "index": 0 }]]
+    },
+    "Sheets — Mark Review Needed": {
+      "main": [[{ "node": "Telegram — Needs Review", "type": "main", "index": 0 }]]
+    },
+    "Telegram — Needs Review": {
+      "main": [[{ "node": "Process Each Row", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1", "saveManualExecutions": true },
+  "versionId": "sng-li-ig-v1",
+  "meta": { "templateCredsSetupCompleted": false },
+  "id": "sng-li-ig-001",
+  "tags": [{ "id": "tag-002", "name": "sng-automation" }]
+}

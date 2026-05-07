@@ -1,0 +1,1681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Floatup — Partner Marketing Playbook</title>
+<style>
+  :root {
+    --navy: #1A1A2E;
+    --navy-light: #16213E;
+    --orange: #FF6B35;
+    --orange-light: #FF8C5A;
+    --white: #FFFFFF;
+    --gray: #94A3B8;
+    --gray-light: #F1F5F9;
+    --gray-border: #E2E8F0;
+    --green: #10B981;
+    --purple: #7C3AED;
+    --yellow: #F59E0B;
+    --card: #FFFFFF;
+    --text: #1E293B;
+    --text-muted: #64748B;
+    --success: #D1FAE5;
+    --success-text: #065F46;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #F8FAFC;
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* HEADER */
+  .header {
+    background: var(--navy);
+    padding: 20px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 20px rgba(0,0,0,0.3);
+  }
+  .header-brand { display: flex; align-items: center; gap: 12px; }
+  .header-logo {
+    width: 36px; height: 36px;
+    background: var(--orange);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; color: white; font-size: 16px;
+  }
+  .header-title { color: white; font-size: 18px; font-weight: 700; }
+  .header-subtitle { color: var(--gray); font-size: 12px; margin-top: 2px; }
+  .header-badge {
+    background: rgba(255,107,53,0.2);
+    color: var(--orange);
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid rgba(255,107,53,0.3);
+  }
+
+  /* TABS */
+  .tabs-bar {
+    background: white;
+    border-bottom: 1px solid var(--gray-border);
+    padding: 0 32px;
+    display: flex;
+    gap: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .tabs-bar::-webkit-scrollbar { display: none; }
+  .tab-btn {
+    padding: 16px 20px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    border-bottom: 3px solid transparent;
+    white-space: nowrap;
+    transition: all 0.2s;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .tab-btn:hover { color: var(--navy); }
+  .tab-btn.active {
+    color: var(--orange);
+    border-bottom-color: var(--orange);
+  }
+  .tab-icon { font-size: 16px; }
+
+  /* CONTENT */
+  .content { max-width: 960px; margin: 0 auto; padding: 32px 24px; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* CARDS */
+  .card {
+    background: white;
+    border-radius: 12px;
+    padding: 24px;
+    border: 1px solid var(--gray-border);
+    margin-bottom: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+  .card-title {
+    font-size: 16px; font-weight: 700;
+    color: var(--navy); margin-bottom: 16px;
+    display: flex; align-items: center; gap-10px;
+  }
+  .card-title span { margin-right: 8px; }
+
+  /* GRID */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+  @media(max-width: 640px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+
+  /* STAT CARDS */
+  .stat-card {
+    background: white;
+    border: 1px solid var(--gray-border);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+  }
+  .stat-number { font-size: 32px; font-weight: 800; color: var(--orange); }
+  .stat-label { font-size: 12px; color: var(--text-muted); margin-top: 4px; font-weight: 500; }
+
+  /* HIGHLIGHT BOX */
+  .highlight {
+    background: linear-gradient(135deg, #FFF7ED, #FFF3E0);
+    border: 1px solid #FDBA74;
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 16px;
+  }
+  .highlight-navy {
+    background: linear-gradient(135deg, #EEF2FF, #E0E7FF);
+    border: 1px solid #A5B4FC;
+  }
+  .highlight-green {
+    background: linear-gradient(135deg, #F0FDF4, #DCFCE7);
+    border: 1px solid #86EFAC;
+  }
+  .highlight-title { font-weight: 700; font-size: 13px; margin-bottom: 6px; color: var(--navy); }
+  .highlight p { font-size: 13px; color: var(--text-muted); line-height: 1.6; }
+
+  /* POST CARDS */
+  .post-card {
+    background: #F8FAFC;
+    border: 1px solid var(--gray-border);
+    border-radius: 10px;
+    padding: 18px;
+    margin-bottom: 14px;
+    position: relative;
+  }
+  .post-tag {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 10px;
+  }
+  .tag-pain { background: #FEE2E2; color: #991B1B; }
+  .tag-story { background: #EDE9FE; color: #5B21B6; }
+  .tag-insight { background: #DBEAFE; color: #1E40AF; }
+  .tag-engagement { background: #D1FAE5; color: #065F46; }
+  .tag-floatup { background: #FFF3E0; color: #C2410C; }
+  .tag-international { background: #F0FDF4; color: #166534; }
+  .tag-bni { background: #FEF3C7; color: #92400E; }
+
+  .post-text {
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--text);
+    white-space: pre-wrap;
+    font-family: inherit;
+  }
+  .copy-btn {
+    margin-top: 12px;
+    padding: 7px 14px;
+    background: var(--navy);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .copy-btn:hover { background: var(--orange); }
+  .copy-btn.copied { background: var(--green); }
+
+  /* CHECKLIST */
+  .checklist { list-style: none; }
+  .checklist li {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--gray-border);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .checklist li:last-child { border-bottom: none; }
+  .checklist input[type="checkbox"] {
+    width: 18px; height: 18px;
+    accent-color: var(--orange);
+    cursor: pointer;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .checklist label { cursor: pointer; }
+  .checklist input:checked + label { text-decoration: line-through; color: var(--text-muted); }
+
+  /* WEEKLY SCHEDULE */
+  .day-card {
+    border-left: 4px solid var(--orange);
+    padding: 14px 18px;
+    background: white;
+    border-radius: 0 10px 10px 0;
+    margin-bottom: 12px;
+    border-top: 1px solid var(--gray-border);
+    border-right: 1px solid var(--gray-border);
+    border-bottom: 1px solid var(--gray-border);
+  }
+  .day-name { font-weight: 700; font-size: 13px; color: var(--navy); margin-bottom: 6px; }
+  .day-task { font-size: 13px; color: var(--text-muted); line-height: 1.6; }
+  .day-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    margin-right: 6px;
+    text-transform: uppercase;
+  }
+  .badge-linkedin { background: #DBEAFE; color: #1E40AF; }
+  .badge-bni { background: #FEF3C7; color: #92400E; }
+  .badge-auto { background: #D1FAE5; color: #065F46; }
+  .badge-admin { background: #F3F4F6; color: #374151; }
+
+  /* PILLAR CARDS */
+  .pillar-card {
+    border-radius: 10px;
+    padding: 18px;
+    margin-bottom: 12px;
+  }
+  .pillar-num {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 13px;
+    margin-bottom: 10px;
+  }
+  .pillar-title { font-weight: 700; font-size: 14px; margin-bottom: 6px; }
+  .pillar-desc { font-size: 13px; line-height: 1.6; }
+
+  /* BNI SCRIPTS */
+  .script-box {
+    background: var(--navy);
+    color: white;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    line-height: 1.8;
+  }
+  .script-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--orange);
+    margin-bottom: 10px;
+  }
+
+  /* TABLE */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 10px 14px; background: var(--navy); color: white; font-weight: 600; font-size: 12px; }
+  th:first-child { border-radius: 8px 0 0 0; }
+  th:last-child { border-radius: 0 8px 0 0; }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--gray-border); vertical-align: top; }
+  tr:hover td { background: #F8FAFC; }
+  tr:last-child td { border-bottom: none; }
+
+  /* SECTION TITLE */
+  .section-title {
+    font-size: 20px; font-weight: 800;
+    color: var(--navy); margin-bottom: 6px;
+  }
+  .section-sub {
+    font-size: 13px; color: var(--text-muted);
+    margin-bottom: 24px; line-height: 1.5;
+  }
+
+  /* PROGRESS */
+  .progress-bar {
+    height: 6px;
+    background: #E2E8F0;
+    border-radius: 3px;
+    margin-top: 8px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--orange);
+    border-radius: 3px;
+    transition: width 0.5s;
+  }
+
+  /* TIMELINE */
+  .timeline { position: relative; padding-left: 24px; }
+  .timeline::before {
+    content: '';
+    position: absolute; left: 0; top: 0; bottom: 0;
+    width: 2px; background: var(--gray-border);
+  }
+  .timeline-item { position: relative; margin-bottom: 20px; }
+  .timeline-dot {
+    position: absolute; left: -29px; top: 2px;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--orange);
+    border: 2px solid white;
+    box-shadow: 0 0 0 2px var(--orange);
+  }
+  .timeline-month { font-weight: 700; font-size: 13px; color: var(--orange); margin-bottom: 4px; }
+  .timeline-content { font-size: 13px; line-height: 1.7; color: var(--text-muted); }
+
+  /* SUPERPOWER BANNER */
+  .superpower-banner {
+    background: linear-gradient(135deg, var(--navy), #2D3561);
+    color: white;
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+    position: relative;
+    overflow: hidden;
+  }
+  .superpower-banner::after {
+    content: '⚡';
+    position: absolute; right: 24px; top: 50%;
+    transform: translateY(-50%);
+    font-size: 64px;
+    opacity: 0.1;
+  }
+  .superpower-banner h3 { font-size: 18px; font-weight: 800; margin-bottom: 8px; }
+  .superpower-banner p { font-size: 13px; line-height: 1.7; color: rgba(255,255,255,0.75); max-width: 600px; }
+
+  /* TABS CONTENT FILTER */
+  .filter-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+  .filter-btn {
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid var(--gray-border);
+    background: white;
+    color: var(--text-muted);
+    transition: all 0.2s;
+  }
+  .filter-btn:hover, .filter-btn.active {
+    background: var(--navy);
+    color: white;
+    border-color: var(--navy);
+  }
+
+  .hidden { display: none; }
+
+  /* NOTIFICATION */
+  .toast {
+    position: fixed;
+    bottom: 24px; right: 24px;
+    background: var(--green);
+    color: white;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    transform: translateY(100px);
+    opacity: 0;
+    transition: all 0.3s;
+    z-index: 999;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+
+  hr { border: none; border-top: 1px solid var(--gray-border); margin: 20px 0; }
+  .emoji { margin-right: 6px; }
+  small { font-size: 11px; color: var(--text-muted); }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-brand">
+    <div class="header-logo">F</div>
+    <div>
+      <div class="header-title">Floatup Partner Playbook</div>
+      <div class="header-subtitle">Marketing guide for the CA co-founder</div>
+    </div>
+  </div>
+  <div class="header-badge">🗓️ Updated May 2026</div>
+</div>
+
+<!-- TABS BAR -->
+<div class="tabs-bar">
+  <button class="tab-btn active" onclick="switchTab('dashboard', this)">
+    <span class="tab-icon">🏠</span> Dashboard
+  </button>
+  <button class="tab-btn" onclick="switchTab('linkedin', this)">
+    <span class="tab-icon">💼</span> LinkedIn Playbook
+  </button>
+  <button class="tab-btn" onclick="switchTab('posts', this)">
+    <span class="tab-icon">📝</span> Post Bank
+  </button>
+  <button class="tab-btn" onclick="switchTab('bni', this)">
+    <span class="tab-icon">🤝</span> BNI Strategy
+  </button>
+  <button class="tab-btn" onclick="switchTab('weekly', this)">
+    <span class="tab-icon">📅</span> Weekly Routine
+  </button>
+  <button class="tab-btn" onclick="switchTab('international', this)">
+    <span class="tab-icon">🌍</span> International
+  </button>
+  <button class="tab-btn" onclick="switchTab('instagram', this)">
+    <span class="tab-icon">🤖</span> Instagram Auto
+  </button>
+  <button class="tab-btn" onclick="switchTab('video', this)">
+    <span class="tab-icon">🎬</span> Video & YouTube
+  </button>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast">✅ Copied to clipboard!</div>
+
+<!-- CONTENT -->
+<div class="content">
+
+  <!-- ===== DASHBOARD ===== -->
+  <div class="tab-panel active" id="tab-dashboard">
+
+    <div class="superpower-banner">
+      <h3>You are the biggest asset Floatup has right now.</h3>
+      <p>You're not just a co-founder posting on LinkedIn. You're a practicing CA who built a tool to solve his own problems. That's the most credible story in your entire target market. No ad budget can buy what you can say authentically.</p>
+    </div>
+
+    <div class="grid-3" style="margin-bottom:24px;">
+      <div class="stat-card">
+        <div class="stat-number">3×</div>
+        <div class="stat-label">LinkedIn posts per week</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">~20</div>
+        <div class="stat-label">min/week for Instagram sheet</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">60s</div>
+        <div class="stat-label">BNI commercial — every meeting</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span>✅</span> Phase 1 Checklist (First 30 Days)</div>
+      <ul class="checklist" id="phase1-checklist">
+        <li>
+          <input type="checkbox" id="c1" onchange="saveCheck(this)">
+          <label for="c1">Optimise your LinkedIn profile — headline should say "CA & Co-founder of Floatup | Helping professional firms manage compliance without the chaos"</label>
+        </li>
+        <li>
+          <input type="checkbox" id="c2" onchange="saveCheck(this)">
+          <label for="c2">Add Floatup to your LinkedIn Experience section with a short description and floatup.app link</label>
+        </li>
+        <li>
+          <input type="checkbox" id="c3" onchange="saveCheck(this)">
+          <label for="c3">Connect with 30 CAs / CPAs / accounting firm owners on LinkedIn this week (use search: "Chartered Accountant" + your city/country)</label>
+        </li>
+        <li>
+          <input type="checkbox" id="c4" onchange="saveCheck(this)">
+          <label for="c4">Post your first "founder story" LinkedIn post (template in Post Bank tab)</label>
+        </li>
+        <li>
+          <input type="checkbox" id="c5" onchange="saveCheck(this)">
+          <label for="c5">Do your first Floatup 60-second BNI commercial (script in BNI tab)</label>
+        </li>
+        <li>
+          <input type="checkbox" id="c6" onchange="saveCheck(this)">
+          <label for="c6">Fill Google Sheet with 15 Instagram content rows (20 min — topics in Instagram tab)</label>
+        </li>
+        <li>
+          <input type="checkbox" id="c7" onchange="saveCheck(this)">
+          <label for="c7">Join 2 LinkedIn groups for accounting professionals and introduce yourself</label>
+        </li>
+        <li>
+          <input type="checkbox" id="c8" onchange="saveCheck(this)">
+          <label for="c8">Ask 3 CAs in your network to try Floatup free and give honest feedback</label>
+        </li>
+      </ul>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title"><span>🎯</span> Your 90-Day Goal</div>
+        <div class="timeline">
+          <div class="timeline-item">
+            <div class="timeline-dot"></div>
+            <div class="timeline-month">Month 1 — Build presence</div>
+            <div class="timeline-content">3x/week LinkedIn posts. Zero pitching. Pure value. BNI 60-sec commercial every meeting. Target: 200 new connections who are CAs.</div>
+          </div>
+          <div class="timeline-item">
+            <div class="timeline-dot"></div>
+            <div class="timeline-month">Month 2 — Build proof</div>
+            <div class="timeline-content">Start sharing early user wins. Get 3 testimonials. Post 1 case study. Request your 10-min BNI feature presentation slot.</div>
+          </div>
+          <div class="timeline-item">
+            <div class="timeline-dot" style="background:var(--green)"></div>
+            <div class="timeline-month">Month 3 — Build pipeline</div>
+            <div class="timeline-content">Start targeted cold email to US CPAs (50/day). LinkedIn DMs to warm connections. First international demo calls.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span>💡</span> Your Unfair Advantages</div>
+        <ul style="list-style:none;font-size:13px;line-height:1.8;">
+          <li>🎓 <strong>CA credential</strong> — you speak their language without trying</li>
+          <li>🤝 <strong>BNI network</strong> — warm referral channel most SaaS founders don't have</li>
+          <li>😤 <strong>You've lived the pain</strong> — missed deadlines, WhatsApp chaos, Excel nightmares</li>
+          <li>🇮🇳 <strong>India credibility</strong> — for international CAs, "built by a practicing CA" is trust</li>
+          <li>📱 <strong>Instagram automation running</strong> — brand building happens without your time</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===== LINKEDIN PLAYBOOK ===== -->
+  <div class="tab-panel" id="tab-linkedin">
+
+    <div class="section-title">LinkedIn Playbook</div>
+    <div class="section-sub">Your personal LinkedIn, not the company page. Founder voice always outperforms brand voice at this stage.</div>
+
+    <div class="highlight">
+      <div class="highlight-title">⚡ The #1 Rule</div>
+      <p>For the first 30 days, <strong>never mention Floatup directly</strong> in posts. Build your audience as a CA who has strong opinions about practice management. The product mention comes naturally after trust is built. People buy from people, not from posts that read like ads.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span>📊</span> Post Frequency & Timing</div>
+      <div class="grid-2">
+        <div>
+          <strong style="font-size:13px;">Post 3 times per week:</strong>
+          <ul style="font-size:13px;line-height:2;margin-top:8px;padding-left:16px;">
+            <li>Tuesday — Pain point or insight post</li>
+            <li>Thursday — Story or behind-the-scenes</li>
+            <li>Saturday — Question or community engagement</li>
+          </ul>
+        </div>
+        <div>
+          <strong style="font-size:13px;">Best posting times (IST):</strong>
+          <ul style="font-size:13px;line-height:2;margin-top:8px;padding-left:16px;">
+            <li>7:30 AM – 9:00 AM (morning commute)</li>
+            <li>12:00 PM – 1:00 PM (lunch)</li>
+            <li>6:00 PM – 8:00 PM (evening)</li>
+          </ul>
+          <small>For international reach: 7:30 AM IST = 9 PM EST previous day — catches US morning scroll</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span>🏛️</span> The 5 Content Pillars</div>
+      <div class="pillar-card" style="background:#FFF7ED;border:1px solid #FED7AA;">
+        <div class="pillar-num" style="background:#FF6B35;color:white;">1</div>
+        <div class="pillar-title">Pain Point (40% of posts)</div>
+        <div class="pillar-desc">The struggles CAs face daily. GST deadlines, client document chasing, team coordination. You know these better than any marketer. Write like you're venting to a fellow CA. No solution needed — just the honest problem.</div>
+      </div>
+      <div class="pillar-card" style="background:#EDE9FE;border:1px solid #C4B5FD;">
+        <div class="pillar-num" style="background:#7C3AED;color:white;">2</div>
+        <div class="pillar-title">Insight / Opinion (25% of posts)</div>
+        <div class="pillar-desc">Strong takes on how CA practices should be run. "Most firms treat task management as an afterthought. Here's why that's killing their growth." Contrarian views generate comments. Comments generate reach.</div>
+      </div>
+      <div class="pillar-card" style="background:#DBEAFE;border:1px solid #BFDBFE;">
+        <div class="pillar-num" style="background:#1E40AF;color:white;">3</div>
+        <div class="pillar-title">Story (20% of posts)</div>
+        <div class="pillar-desc">Real stories — a client crisis, a deadline you nearly missed, the moment you decided to build Floatup. Stories get saved and shared more than any other content type. First-person, specific details, real emotion.</div>
+      </div>
+      <div class="pillar-card" style="background:#D1FAE5;border:1px solid #A7F3D0;">
+        <div class="pillar-num" style="background:#065F46;color:white;">4</div>
+        <div class="pillar-title">Community Question (10% of posts)</div>
+        <div class="pillar-desc">"What's your biggest challenge during ITR season?" Questions get 5x more comments than statements. Comments push your post to your connections' feeds. Pure reach multiplier.</div>
+      </div>
+      <div class="pillar-card" style="background:#FEF3C7;border:1px solid #FDE68A;">
+        <div class="pillar-num" style="background:#92400E;color:white;">5</div>
+        <div class="pillar-title">Floatup Mention (5% of posts)</div>
+        <div class="pillar-desc">After 4-6 weeks of the above, your audience trusts you. NOW you can say "We built a tool for exactly this — floatup.app". It doesn't read like an ad because they know you. Keep these posts rare — 1 per month max initially.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span>✍️</span> LinkedIn Post Format That Works</div>
+      <div class="highlight highlight-navy">
+        <div class="highlight-title">Hook (Line 1 — most important)</div>
+        <p>Must work standalone. LinkedIn shows only the first 2 lines before "...see more". If the hook doesn't create curiosity or make them feel something, they won't click. Start with a number, a bold claim, or a relatable situation. Never start with "I".</p>
+      </div>
+      <div class="highlight" style="margin-bottom:12px;">
+        <div class="highlight-title">❌ Bad hooks:</div>
+        <p>"I wanted to share something about my experience as a CA..."<br>"Today I'm going to talk about task management..."</p>
+      </div>
+      <div class="highlight highlight-green" style="margin-bottom:0">
+        <div class="highlight-title">✅ Good hooks:</div>
+        <p>"My client called me at 11:47 PM. GST was due at midnight."<br>"3 years as a CA. The hardest thing was never the accounting."<br>"Most CA firms will fail in the next 5 years. Here's why."</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span>💬</span> Engagement Rules (non-negotiable)</div>
+      <ul class="checklist">
+        <li>
+          <input type="checkbox" id="e1">
+          <label for="e1"><strong>Reply to every comment</strong> within 2 hours of posting — this is what triggers LinkedIn's algorithm to push your post further</label>
+        </li>
+        <li>
+          <input type="checkbox" id="e2">
+          <label for="e2"><strong>Spend 10 minutes before posting</strong> commenting genuinely on 3-4 other CAs' posts — this warms up the algorithm for your own post</label>
+        </li>
+        <li>
+          <input type="checkbox" id="e3">
+          <label for="e3"><strong>Never post a link in the post body</strong> — LinkedIn penalises external links. Put floatup.app in the comments, not the post</label>
+        </li>
+        <li>
+          <input type="checkbox" id="e4">
+          <label for="e4"><strong>Send connection requests only with a personal note</strong> — "Saw your comment on [X's] post about GST compliance — exactly what I deal with too. Connecting."</label>
+        </li>
+      </ul>
+    </div>
+
+  </div>
+
+  <!-- ===== POST BANK ===== -->
+  <div class="tab-panel" id="tab-posts">
+
+    <div class="section-title">Post Bank</div>
+    <div class="section-sub">Ready-to-use posts. Customise the details to make them yours — add your own client story, your city, your specific numbers. The more specific, the better it performs.</div>
+
+    <div class="filter-tabs">
+      <button class="filter-btn active" onclick="filterPosts('all', this)">All Posts</button>
+      <button class="filter-btn" onclick="filterPosts('pain', this)">Pain Points</button>
+      <button class="filter-btn" onclick="filterPosts('story', this)">Stories</button>
+      <button class="filter-btn" onclick="filterPosts('insight', this)">Insights</button>
+      <button class="filter-btn" onclick="filterPosts('engagement', this)">Questions</button>
+      <button class="filter-btn" onclick="filterPosts('floatup', this)">Floatup Mention</button>
+      <button class="filter-btn" onclick="filterPosts('bni', this)">BNI Posts</button>
+    </div>
+
+    <!-- POST 1 -->
+    <div class="post-card" data-type="story">
+      <span class="post-tag tag-story">Story</span>
+      <div class="post-text" id="post-1">My client called me at 11:47 PM.
+
+GST return was due at midnight.
+
+He hadn't sent the documents. I didn't have the figures. My junior was unreachable.
+
+We filed. Barely. But I sat there at 12:03 AM thinking — this shouldn't be this hard.
+
+I've been a CA for [X] years. This wasn't the first time. It won't be the last — unless something changes.
+
+That night is why I'm building what I'm building.
+
+If you've had that 11 PM call, you know exactly what I mean.
+
+What's your worst deadline story? Drop it in the comments 👇</div>
+      <button class="copy-btn" onclick="copyPost('post-1', this)">📋 Copy Post</button>
+    </div>
+
+    <!-- POST 2 -->
+    <div class="post-card" data-type="pain">
+      <span class="post-tag tag-pain">Pain Point</span>
+      <div class="post-text" id="post-2">The average CA in India manages 40-60 clients.
+
+They track compliance deadlines across:
+→ GST (monthly/quarterly)
+→ TDS (quarterly)
+→ Income Tax (multiple dates)
+→ ROC filings
+→ Audit deadlines
+→ Client-specific requirements
+
+On Excel. Or worse — WhatsApp notes to themselves.
+
+One missed cell. One notification ignored. One deadline gone.
+
+And the client gets a late filing fee. And they call you. And you have no good answer.
+
+This isn't a skill problem. It's a systems problem.
+
+The firms growing fastest in 2026 aren't working harder. They're working with better systems.</div>
+      <button class="copy-btn" onclick="copyPost('post-2', this)">📋 Copy Post</button>
+    </div>
+
+    <!-- POST 3 -->
+    <div class="post-card" data-type="insight">
+      <span class="post-tag tag-insight">Insight</span>
+      <div class="post-text" id="post-3">Most CA firms will hit a ceiling at 3-4 team members.
+
+Not because they lack clients. Not because they lack talent.
+
+Because their systems don't scale past the founder.
+
+When everything lives in your head:
+→ You become the bottleneck
+→ Juniors can't act without your input
+→ Deadlines get tracked by memory
+→ Clients get inconsistent service
+
+The best firms I've seen scale past 10 team members have one thing in common:
+
+Their workflows exist outside any one person's head.
+
+Tasks are visible. Deadlines are tracked. Accountability is built into the system.
+
+What system does your firm use to track team tasks?</div>
+      <button class="copy-btn" onclick="copyPost('post-3', this)">📋 Copy Post</button>
+    </div>
+
+    <!-- POST 4 -->
+    <div class="post-card" data-type="engagement">
+      <span class="post-tag tag-engagement">Question / Engagement</span>
+      <div class="post-text" id="post-4">Quick question for CAs and CPAs 👇
+
+What's the ONE thing about your practice you wish you could automate tomorrow?
+
+For me it was client document collection.
+
+Curious what's slowing everyone else down.
+
+(Genuinely asking — building something and want to understand the real problems before solving the wrong ones)</div>
+      <button class="copy-btn" onclick="copyPost('post-4', this)">📋 Copy Post</button>
+    </div>
+
+    <!-- POST 5 -->
+    <div class="post-card" data-type="pain">
+      <span class="post-tag tag-pain">Pain Point</span>
+      <div class="post-text" id="post-5">Nobody tells you this about running a CA practice:
+
+The accounting is the easy part.
+
+The hard part is:
+→ Knowing which of your 50 clients has what deadline this week
+→ Knowing which junior is overloaded and who has capacity
+→ Following up on documents without looking like you're pestering
+→ Remembering that one thing you told yourself you'd do on Monday
+→ Having a client ask for an update and actually having one
+
+They don't teach practice management in ICAI.
+
+We figure it out the hard way. Then we wonder why we're working 14-hour days.</div>
+      <button class="copy-btn" onclick="copyPost('post-5', this)">📋 Copy Post</button>
+    </div>
+
+    <!-- POST 6 -->
+    <div class="post-card" data-type="insight">
+      <span class="post-tag tag-insight">Insight</span>
+      <div class="post-text" id="post-6">UK CPAs call it "practice management."
+US CPAs call it "firm operations."
+Indian CAs call it "somehow managing."
+
+The tools our international counterparts use are purpose-built for their workflows. Their teams get onboarded in days. Deadlines are tracked automatically. Clients can upload documents through a portal.
+
+We're still on WhatsApp groups and shared Excel sheets.
+
+The gap isn't skill. Indian CAs are some of the most technically sharp professionals in the world.
+
+The gap is tooling. And that's a solvable problem.
+
+Curious — how are you managing your team's compliance workload right now?</div>
+      <button class="copy-btn" onclick="copyPost('post-6', this)">📋 Copy Post</button>
+    </div>
+
+    <!-- POST 7 -->
+    <div class="post-card" data-type="story">
+      <span class="post-tag tag-story">Story</span>
+      <div class="post-text" id="post-7">I gave a junior a task on Monday.
+
+On Friday, I asked for an update.
+
+He said he'd sent it to the client for review.
+
+The client said they'd never received it.
+
+My junior swore he'd sent it. The client swore they hadn't seen it.
+
+45 minutes of back-and-forth. One email found in the wrong folder.
+
+That was the day I started tracking everything — who did what, when, and what happened next.
+
+A paper trail isn't bureaucracy. It's protection for everyone involved.
+
+Your team, your clients, and you.</div>
+      <button class="copy-btn" onclick="copyPost('post-7', this)">📋 Copy Post</button>
+    </div>
+
+    <!-- POST 8 -->
+    <div class="post-card" data-type="floatup">
+      <span class="post-tag tag-floatup">Floatup Mention</span>
+      <div class="post-text" id="post-8">A few months ago I asked this community what their biggest practice pain point was.
+
+The top answers were almost identical:
+→ Tracking compliance deadlines across clients
+→ Knowing what your team is working on
+→ Client document collection
+
+I've been a CA for [X] years. These were my pain points too.
+
+So I built something about it.
+
+Floatup — task management, CA compliance tracking, and client portals for professional teams.
+
+It's live. It's free to try. No credit card.
+
+If any of the above resonates, floatup.app (link in comments).
+
+Happy to give any CA a personal walkthrough. Just DM me.</div>
+      <button class="copy-btn" onclick="copyPost('post-8', this)">📋 Copy Post</button>
+    </div>
+
+    <!-- POST 9 -->
+    <div class="post-card" data-type="engagement">
+      <span class="post-tag tag-engagement">Question / Engagement</span>
+      <div class="post-text" id="post-9">Poll: How does your CA firm currently track compliance deadlines?
+
+A) Shared Excel / Google Sheet
+B) A software tool (which one?)
+C) Calendar reminders
+D) Honestly, it's chaos
+
+No judgment — genuinely trying to understand how practices actually work vs how they're supposed to work.</div>
+      <button class="copy-btn" onclick="copyPost('post-9', this)">📋 Copy Post</button>
+    </div>
+
+    <!-- POST 10 -->
+    <div class="post-card" data-type="bni">
+      <span class="post-tag tag-bni">BNI Related</span>
+      <div class="post-text" id="post-10">BNI taught me something that changed how I think about my CA practice:
+
+"Givers gain."
+
+The practices that grow fastest aren't the ones chasing clients. They're the ones so systematically good at serving existing clients that referrals become automatic.
+
+But here's the thing — you can't give more than you can operationally handle.
+
+If your systems are broken, referrals become liabilities. Every new client is another thing to manually track, another WhatsApp message to send, another Excel row to update.
+
+Systematise first. Grow second.
+
+The CAs in my BNI chapter who get the most referrals aren't just technically great. They're the ones who never miss a deadline, always have an update ready, and make clients feel like they're the only client.
+
+That's a systems game, not a talent game.</div>
+      <button class="copy-btn" onclick="copyPost('post-10', this)">📋 Copy Post</button>
+    </div>
+
+    <!-- POST 11 -->
+    <div class="post-card" data-type="insight">
+      <span class="post-tag tag-insight">Insight</span>
+      <div class="post-text" id="post-11">Hot take:
+
+The next 3 years will separate CA practices into two categories.
+
+Category A: Firms that adopted systems, used technology, and scaled their capacity without scaling their stress.
+
+Category B: Firms that stayed on Excel, ran on WhatsApp, and hit a ceiling they couldn't break through.
+
+GST, IBC, FEMA — the compliance load isn't getting lighter. It's getting heavier.
+
+The firms that thrive won't be the ones with the most qualified CAs. They'll be the ones with the best infrastructure behind their qualified CAs.
+
+Which category is your firm building toward?</div>
+      <button class="copy-btn" onclick="copyPost('post-11', this)">📋 Copy Post</button>
+    </div>
+
+    <!-- POST 12 -->
+    <div class="post-card" data-type="story">
+      <span class="post-tag tag-story">Story — Founder Origin</span>
+      <div class="post-text" id="post-12">I became a CA to do accounting.
+
+Somewhere along the way I became a task manager, a WhatsApp responder, a deadline tracker, an email chaser, and a human calendar.
+
+The actual accounting became maybe 40% of my day.
+
+The other 60%? Coordination overhead. Following up. Tracking. Reminding. Worrying about what I might have forgotten.
+
+I don't think this is what any of us signed up for.
+
+I'm trying to fix that — for myself and for practices like mine.
+
+Still early days. But this is what I'm spending my weekends on.
+
+What percentage of your day is actual CA work vs. the overhead around it?</div>
+      <button class="copy-btn" onclick="copyPost('post-12', this)">📋 Copy Post</button>
+    </div>
+
+  </div>
+
+  <!-- ===== BNI STRATEGY ===== -->
+  <div class="tab-panel" id="tab-bni">
+
+    <div class="section-title">BNI Strategy</div>
+    <div class="section-sub">BNI is one of the most underutilised channels for SaaS founders who are BNI members. You have warm, trusted relationships in a room full of business owners — some of whom are prospects, all of whom know prospects.</div>
+
+    <div class="highlight highlight-green">
+      <div class="highlight-title">🎯 Who in your BNI chapter matters for Floatup</div>
+      <p><strong>Direct prospects:</strong> Other CAs, tax advisors, bookkeepers, financial consultants in the chapter<br>
+      <strong>Referral sources:</strong> Business coaches, lawyers, HR consultants — their clients often need a CA<br>
+      <strong>Validators:</strong> The most respected members — if they say "this guy's tool is legit," everyone listens</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span>🎙️</span> Weekly 60-Second Commercial — Rotation Scripts</div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">Change your commercial every 2-3 weeks. Each one targets a different pain point. Members hear you repeatedly — variety keeps it fresh and covers more problems.</p>
+
+      <div class="script-box">
+        <div class="script-label">Commercial Version 1 — The Deadline Problem</div>
+        "My name is [Name], I'm a Chartered Accountant and co-founder of Floatup.
+
+The best referral for me this week is any CA practice owner or accounting firm who is managing more than 15 clients and tracking their compliance deadlines on Excel or WhatsApp.
+
+We built a platform that automatically tracks every GST, TDS, and income tax deadline for every client — and assigns the work to the right team member automatically.
+
+One CA practice we worked with reduced their missed filing incidents from 6 a year to zero in the first quarter.
+
+The ideal referral: a CA or CPA running a team of 2 to 20 people who knows their systems are not keeping up with their growth.
+
+I am [Name], Floatup — task management built for CA practices."
+        <button class="copy-btn" onclick="copyScript('bni-script-1', this)" id="bni-script-1" style="margin-top:12px;">📋 Copy</button>
+      </div>
+
+      <div class="script-box">
+        <div class="script-label">Commercial Version 2 — The Client Portal</div>
+        "My name is [Name], CA and co-founder of Floatup.
+
+I want to ask you something. How many WhatsApp messages did you send to clients this week just asking for documents?
+
+For the average CA, it's between 20 and 40 messages a week. That's hours of follow-up that should not exist.
+
+We built a client portal into Floatup — every client gets their own private link where they can see what documents are pending, upload them directly, and track their own compliance status.
+
+The CA's team gets notified the moment a document arrives. No more chasing.
+
+Best referral: any CA who's tired of being a document chaser. They'll know exactly who they are.
+
+I am [Name], Floatup."
+        <button class="copy-btn" onclick="copyScript('bni-script-2', this)" id="bni-script-2" style="margin-top:12px;">📋 Copy</button>
+      </div>
+
+      <div class="script-box">
+        <div class="script-label">Commercial Version 3 — The Team Growth Problem</div>
+        "My name is [Name], CA and co-founder of Floatup.
+
+There's a specific moment every growing CA practice hits.
+
+You hire your second or third team member. Suddenly you spend more time explaining and following up than you did when you worked alone.
+
+That's the scale bottleneck. And most practices never break through it.
+
+Floatup gives every team member complete visibility into their tasks, deadlines, and priorities — without the partner being the bottleneck for every update.
+
+Best referral this week: a CA practice owner who has hired at least one team member in the last 12 months and is feeling the coordination overhead.
+
+I am [Name], Floatup."
+        <button class="copy-btn" onclick="copyScript('bni-script-3', this)" id="bni-script-3" style="margin-top:12px;">📋 Copy</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span>🎤</span> 10-Minute Feature Presentation (Request This Slot)</div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">Request your featured presentation slot from your chapter president. This is your best BNI opportunity — the whole room focuses on you for 10 minutes.</p>
+
+      <table>
+        <tr><th>Minute</th><th>Content</th></tr>
+        <tr><td><strong>0:00–1:30</strong></td><td>Your CA story — what it's actually like managing a practice. Make them feel the pain. "Show of hands — who in this room knows a CA or IS a CA who's sent a document request WhatsApp at 10 PM?"</td></tr>
+        <tr><td><strong>1:30–3:00</strong></td><td>The problem statement — CA practices manage 40-60 clients on Excel. Walk them through a typical "compliance deadline season." Make it vivid.</td></tr>
+        <tr><td><strong>3:00–5:00</strong></td><td>Demo — show Floatup on your laptop/screen. Kanban board, client portal, compliance tracker. Keep it to 3 features. Don't show everything.</td></tr>
+        <tr><td><strong>5:00–7:00</strong></td><td>Social proof — share 1-2 early user results. "A CA in [city] reduced client follow-ups by 60% in the first month." Specific > vague.</td></tr>
+        <tr><td><strong>7:00–9:00</strong></td><td>The ideal referral — be specific. "I'm looking for CA/CPA practice owners with 2-20 team members, managing 20+ clients, who know their current systems are not scaling."</td></tr>
+        <tr><td><strong>9:00–10:00</strong></td><td>The ask — "If you know someone like this, a 5-minute introduction is all I need. I'll take it from there. I'm also happy to give anyone in this room a free walkthrough — just grab me after the meeting."</td></tr>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span>☕</span> One-to-One Meeting Script</div>
+      <div class="highlight">
+        <div class="highlight-title">Who to prioritise for 1-2-1s</div>
+        <p>Other CAs and accountants (direct prospects) → Business coaches (their clients are entrepreneurs who need CAs) → Lawyers (corporate lawyers constantly refer CA work)</p>
+      </div>
+      <div class="script-box">
+        <div class="script-label">How to position Floatup in a 1-2-1</div>
+        "Don't lead with the product. Lead with the question:
+
+'Can I ask — how does your practice currently track what each team member is working on and what's due this week?'
+
+Then listen. Really listen. If they describe Excel, WhatsApp, or general chaos — that's your moment.
+
+'That's exactly what we built Floatup to replace. Would you be up for a 15-minute look? I can show you specifically how it would work for a practice like yours.'"
+        <button class="copy-btn" onclick="copyScript('bni-1to1', this)" id="bni-1to1" style="margin-top:12px;">📋 Copy</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===== WEEKLY ROUTINE ===== -->
+  <div class="tab-panel" id="tab-weekly">
+
+    <div class="section-title">Weekly Routine</div>
+    <div class="section-sub">Your total time commitment: approximately 90 minutes per week. Everything else runs automatically.</div>
+
+    <div class="highlight">
+      <div class="highlight-title">⏱️ Time Budget</div>
+      <p>LinkedIn posting: 20 min × 3 posts = <strong>60 min/week</strong><br>
+      BNI commercial prep: <strong>10 min/week</strong><br>
+      Google Sheet (Instagram): <strong>20 min every 2 weeks</strong><br>
+      Telegram review (what posted, any review alerts): <strong>5 min/day</strong></p>
+    </div>
+
+    <div class="day-card">
+      <div class="day-name">MONDAY</div>
+      <div class="day-task">
+        <span class="day-badge badge-admin">5 min</span>Check Telegram — see what Instagram auto-posted over the weekend. Note what got engagement.<br>
+        <span class="day-badge badge-linkedin">15 min</span>Write Tuesday's LinkedIn post tonight so it's ready. Use a pain point from this week's actual CA work.
+      </div>
+    </div>
+
+    <div class="day-card">
+      <div class="day-name">TUESDAY</div>
+      <div class="day-task">
+        <span class="day-badge badge-linkedin">5 min</span>Post on LinkedIn at 7:30 AM — Pain point or insight post<br>
+        <span class="day-badge badge-linkedin">10 min</span>Comment on 3-4 other CAs' posts before and after posting (triggers algorithm)<br>
+        <span class="day-badge badge-linkedin">10 min</span>Reply to all comments on your post within 2 hours
+      </div>
+    </div>
+
+    <div class="day-card">
+      <div class="day-name">WEDNESDAY — BNI Day</div>
+      <div class="day-task">
+        <span class="day-badge badge-bni">10 min</span>Prep your 60-second commercial before the meeting (rotate from the 3 scripts)<br>
+        <span class="day-badge badge-bni">During meeting</span>Deliver commercial. Note anyone who reacts or approaches you after.<br>
+        <span class="day-badge badge-bni">After meeting</span>Send LinkedIn connection requests to any new contacts from meeting — with a personal note
+      </div>
+    </div>
+
+    <div class="day-card">
+      <div class="day-name">THURSDAY</div>
+      <div class="day-task">
+        <span class="day-badge badge-linkedin">5 min</span>Post on LinkedIn at 7:30 AM — Story or behind-the-scenes post<br>
+        <span class="day-badge badge-linkedin">10 min</span>Reply to comments. Send a DM to anyone who comments something meaningful: "Glad this resonated — happy to show you what we're building if you're curious."
+      </div>
+    </div>
+
+    <div class="day-card">
+      <div class="day-name">FRIDAY</div>
+      <div class="day-task">
+        <span class="day-badge badge-linkedin">5 min</span>Post on LinkedIn at 12:00 PM — Community question or light engagement post<br>
+        <span class="day-badge badge-admin">10 min</span>Review the week — which post got most engagement? Note the topic for future posts.<br>
+        <span class="day-badge badge-auto">Auto</span>Instagram automation has been running all week — check Telegram summary
+      </div>
+    </div>
+
+    <div class="day-card" style="border-left-color: var(--green);">
+      <div class="day-name">EVERY 2 WEEKS — Saturday (20 min)</div>
+      <div class="day-task">
+        <span class="day-badge badge-auto">Sheet</span>Open Google Sheets → Add 15-20 new rows to the Instagram Content Queue<br>
+        <span class="day-badge badge-auto">Sheet</span>Set status = pending, add scheduled dates, write topics and key messages<br>
+        <span class="day-badge badge-auto">Auto</span>The automation picks these up every morning and posts — you're done until next fortnight
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===== INTERNATIONAL ===== -->
+  <div class="tab-panel" id="tab-international">
+
+    <div class="section-title">International Strategy</div>
+    <div class="section-sub">UK, US, Canada, Australia — your target international markets. Different approach per market.</div>
+
+    <div class="highlight">
+      <div class="highlight-title">🌍 The Core Message for International Markets</div>
+      <p>"Built by a practicing CA, for accounting professionals. We understand compliance requirements in India, UK, US, Canada, and Australia — because we built it from inside a practice, not a Silicon Valley office." This is your international credibility hook.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span>📋</span> Market-by-Market Approach</div>
+      <table>
+        <tr><th>Country</th><th>Title to Target</th><th>Best Channel</th><th>Cold Email Legal?</th><th>Month to Start</th></tr>
+        <tr>
+          <td><strong>🇺🇸 USA</strong></td>
+          <td>CPA, Tax Manager, Accounting Firm Owner</td>
+          <td>LinkedIn + AICPA communities</td>
+          <td>✅ Yes (CAN-SPAM)</td>
+          <td>Month 3</td>
+        </tr>
+        <tr>
+          <td><strong>🇬🇧 UK</strong></td>
+          <td>Chartered Accountant, Practice Owner</td>
+          <td>LinkedIn + ICAEW community</td>
+          <td>⚠️ Gray area (GDPR)</td>
+          <td>Month 3</td>
+        </tr>
+        <tr>
+          <td><strong>🇦🇺 Australia</strong></td>
+          <td>CPA, CA ANZ member</td>
+          <td>LinkedIn + CA ANZ forums</td>
+          <td>⚠️ Requires consent</td>
+          <td>Month 4</td>
+        </tr>
+        <tr>
+          <td><strong>🇨🇦 Canada</strong></td>
+          <td>CPA Canada member</td>
+          <td>LinkedIn ONLY</td>
+          <td>🚫 No — CASL Act</td>
+          <td>Month 4 (LinkedIn only)</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span>🏛️</span> Communities to Join Now (Free)</div>
+      <ul style="font-size:13px;line-height:2.2;padding-left:4px;">
+        <li>🔵 <strong>LinkedIn: "CPA Network"</strong> — 180k+ members. Comment on 3 posts/week.</li>
+        <li>🔵 <strong>LinkedIn: "Accounting & Finance Professionals"</strong> — 500k+ members</li>
+        <li>🔴 <strong>Reddit: r/Accounting</strong> — 300k members. Provide genuine answers. No promotion.</li>
+        <li>🔴 <strong>Reddit: r/taxpros</strong> — US tax professionals. Niche but high intent.</li>
+        <li>🟡 <strong>Facebook: "CPAs and Accountants Network"</strong> — 40k+ members</li>
+        <li>⚫ <strong>Karbon Community</strong> (karbon.com/community) — progressive accounting firms, tech-forward audience, very relevant</li>
+      </ul>
+      <div class="highlight" style="margin-top:16px;">
+        <div class="highlight-title">How to behave in these communities</div>
+        <p>Answer questions genuinely for 4 weeks before mentioning Floatup at all. Your goal is to be known as "that CA who actually understands practice management." When you eventually mention Floatup, it reads as a recommendation from a peer, not an ad.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span>📧</span> Cold Email Setup (Month 3 — US only first)</div>
+      <div class="grid-2">
+        <div>
+          <strong style="font-size:13px;display:block;margin-bottom:10px;">Before sending a single email:</strong>
+          <ul style="font-size:13px;line-height:2;padding-left:16px;">
+            <li>Buy <code>getfloatup.com</code> or <code>tryfloatup.io</code> — never use floatup.app</li>
+            <li>Set up SPF, DKIM, DMARC on that domain</li>
+            <li>Warm the domain for 4 weeks using Instantly.ai (free trial)</li>
+            <li>Find leads: Apollo.io free tier (50 exports/month)</li>
+            <li>Max 30 emails/day per inbox</li>
+          </ul>
+        </div>
+        <div>
+          <strong style="font-size:13px;display:block;margin-bottom:10px;">Cold email template that works:</strong>
+          <div class="script-box" style="padding:14px;font-size:12px;">
+            <div class="script-label">Subject: quick question about your practice workflow</div>
+            "Hi [First Name],
+
+Saw your post about [specific thing from their LinkedIn/profile].
+
+I'm a CA myself — built a tool specifically for accounting practices after dealing with the same compliance tracking nightmare you probably know well.
+
+Worth a 12-minute look? No deck, just a screen share.
+
+[Your name]
+CA, Co-founder — Floatup"
+            <button class="copy-btn" onclick="copyScript('cold-email', this)" id="cold-email" style="margin-top:10px;font-size:11px;">📋 Copy</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span>🔗</span> Marketplace Listings (Passive, High Intent)</div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px;">Get listed here and CPAs actively searching for tools will find you. These leads are warmer than any cold email.</p>
+      <ul style="font-size:13px;line-height:2.2;padding-left:4px;">
+        <li>📦 <strong>Xero App Marketplace</strong> — developer.xero.com — free to list</li>
+        <li>📦 <strong>QuickBooks App Store</strong> — developer.intuit.com — free to list</li>
+        <li>⭐ <strong>G2.com</strong> — claim your free listing, get category visibility</li>
+        <li>⭐ <strong>Capterra</strong> — free listing under "Accounting Practice Management"</li>
+        <li>⭐ <strong>Product Hunt</strong> — launch here when ready, massive global audience</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <!-- ===== INSTAGRAM AUTOMATION ===== -->
+  <div class="tab-panel" id="tab-instagram">
+
+    <div class="section-title">Instagram Automation</div>
+    <div class="section-sub">This is fully automated. Your only job is filling the Google Sheet every 2 weeks. The system handles the rest.</div>
+
+    <div class="highlight highlight-green">
+      <div class="highlight-title">✅ What happens automatically every day at 6 AM</div>
+      <p>The n8n workflow: reads your Google Sheet → picks today's scheduled row → Gemini AI writes a caption → Bannerbear generates a branded image → Buffer schedules the post → you get a Telegram preview. Zero manual work.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span>📊</span> Your Google Sheet — What to Fill</div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">Open the "SNG Content OS" Google Sheet → "Content Queue" tab → Add rows like this:</p>
+      <table>
+        <tr><th>Column</th><th>What to Write</th><th>Example</th></tr>
+        <tr><td>brand</td><td>floatup or ai_community</td><td>floatup</td></tr>
+        <tr><td>platform</td><td>instagram / linkedin / twitter</td><td>instagram</td></tr>
+        <tr><td>content_type</td><td>pain_point / meme / educational / feature / trend</td><td>pain_point</td></tr>
+        <tr><td>topic</td><td>3-5 words</td><td>GST deadline stress</td></tr>
+        <tr><td>key_message</td><td>1 sentence — what should the viewer feel or know</td><td>CAs waste 3 hours/week on document chasing</td></tr>
+        <tr><td>scheduled_date</td><td>YYYY-MM-DD</td><td>2026-05-10</td></tr>
+        <tr><td>status</td><td>Always write: pending</td><td>pending</td></tr>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span>💡</span> Topic Ideas for Next 2 Weeks — Copy These Into Sheet</div>
+      <div class="grid-2">
+        <div>
+          <strong style="font-size:13px;display:block;margin-bottom:8px;">🟠 Floatup Topics:</strong>
+          <ul style="font-size:12px;line-height:2.2;color:var(--text-muted);padding-left:16px;">
+            <li>GST deadline stress — pain_point</li>
+            <li>Client document chasing — pain_point</li>
+            <li>Kanban board for CAs — feature</li>
+            <li>WhatsApp chaos vs client portal — comparison</li>
+            <li>Recurring compliance tasks — feature</li>
+            <li>CA firm scaling problems — educational</li>
+            <li>Invoice tracking for CAs — feature</li>
+            <li>Before/after Floatup meme — meme</li>
+          </ul>
+        </div>
+        <div>
+          <strong style="font-size:13px;display:block;margin-bottom:8px;">🤖 AI Community Topics:</strong>
+          <ul style="font-size:12px;line-height:2.2;color:var(--text-muted);padding-left:16px;">
+            <li>Best free AI tools this week — trend</li>
+            <li>I automated my marketing with n8n — story</li>
+            <li>Gemini vs ChatGPT for business — comparison</li>
+            <li>How solopreneurs save 10 hours/week — educational</li>
+            <li>AI tools replacing manual tasks — pain_point</li>
+            <li>n8n tutorial for beginners — educational</li>
+            <li>Build in public — week update — story</li>
+            <li>Free AI tools you're missing — educational</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span>📱</span> Telegram Notifications You'll Get</div>
+      <table>
+        <tr><th>Message Type</th><th>What It Means</th><th>Action Required</th></tr>
+        <tr>
+          <td>✅ Post Scheduled</td>
+          <td>Post was generated, image created, queued in Buffer</td>
+          <td>None — just review the preview</td>
+        </tr>
+        <tr>
+          <td>⚠️ Needs Review</td>
+          <td>AI scored the post below 7/10 — needs editing</td>
+          <td>Edit the row in Sheets, reset status to "pending"</td>
+        </tr>
+        <tr>
+          <td>📭 Nothing Today</td>
+          <td>No pending rows for today in the Sheet</td>
+          <td>Add more rows to the Sheet</td>
+        </tr>
+      </table>
+    </div>
+
+  </div>
+
+  <!-- ===== VIDEO & YOUTUBE ===== -->
+  <div class="tab-panel" id="tab-video">
+
+    <div class="section-title">Video & YouTube Strategy</div>
+    <div class="section-sub">One 45-minute recording session → 4 months of video content across YouTube, Instagram Reels, YouTube Shorts, and LinkedIn. This is the highest-leverage thing you can do.</div>
+
+    <div class="superpower-banner">
+      <h3>Record once. Post for 4 months.</h3>
+      <p>Your 45-minute tutorial breaks into 12 YouTube videos + 12 Shorts + 12 Reels + 12 LinkedIn clips. That's 48 pieces of video content from a single afternoon. No other format gives you this return on time.</p>
+    </div>
+
+    <!-- REPURPOSING ENGINE -->
+    <div class="card">
+      <div class="card-title"><span>♻️</span> The Repurposing Engine — 1 Video → 48 Pieces</div>
+      <div class="grid-2" style="margin-bottom:16px;">
+        <div class="stat-card">
+          <div class="stat-number">12</div>
+          <div class="stat-label">YouTube long-form videos (3–8 min each)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number">12</div>
+          <div class="stat-label">YouTube Shorts (60 sec — best moment per chapter)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number">12</div>
+          <div class="stat-label">Instagram Reels (same clips, different caption)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number">12</div>
+          <div class="stat-label">LinkedIn video posts (30–90 sec highlights)</div>
+        </div>
+      </div>
+      <div class="highlight highlight-green">
+        <div class="highlight-title">How the math works for posting schedule</div>
+        <p>Upload 1 YouTube video/week → 12 weeks of content (3 months)<br>
+        Upload 2 Shorts/week → 6 weeks of content<br>
+        Post 2 Reels/week → 6 weeks of content<br>
+        Post 1 LinkedIn video/week → 12 weeks of content<br>
+        <strong>Total: one recording session covers your entire video calendar through August 2026.</strong></p>
+      </div>
+    </div>
+
+    <!-- CHAPTER BREAKDOWN -->
+    <div class="card">
+      <div class="card-title"><span>✂️</span> Your 45-Min Tutorial → Chapter Breakdown</div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">Each row below is one YouTube video upload. The Short/Reel clip to pull from each chapter is listed in the last column.</p>
+      <table>
+        <tr><th>#</th><th>Chapter / YouTube Title</th><th>Length</th><th>Short/Reel Clip to Pull</th></tr>
+        <tr><td>1</td><td>Floatup Full Overview — The Dashboard Explained</td><td>3–4 min</td><td>The 30-second dashboard scroll — first impression moment</td></tr>
+        <tr><td>2</td><td>Kanban Task Board for CA Firms — Complete Guide</td><td>5–6 min</td><td>The drag-task moment + filter demo (30–45 sec)</td></tr>
+        <tr><td>3</td><td>Inbox vs Tasks — How Floatup Organises Your Work</td><td>3 min</td><td>Creating a quick task in under 10 seconds</td></tr>
+        <tr><td>4</td><td>How to Set Up Recurring Tasks — Never Miss a Deadline</td><td>3–4 min</td><td>Setting frequency badge — the "set it once" moment</td></tr>
+        <tr><td>5</td><td>Project Management for CA Practices — Step by Step</td><td>4–5 min</td><td>Project progress view — satisfying visual</td></tr>
+        <tr><td>6</td><td>Client Database & Client Groups — Full Walkthrough</td><td>4–5 min</td><td>Instant search filtering — fast and visual</td></tr>
+        <tr><td>7</td><td>CA Compliance Module — Complete Demo (GST, TDS, ITR)</td><td>7–8 min</td><td>Load defaults → 2-step picker → spawn tasks (60 sec)</td></tr>
+        <tr><td>8</td><td>Built-in Invoicing for CA Firms — No More Switching Tools</td><td>4 min</td><td>GSTIN auto-fill moment + new invoice creation</td></tr>
+        <tr><td>9</td><td>Approvals & Monitor — How Team Leaders Use Floatup</td><td>3–4 min</td><td>Approve task in 2 clicks — instant status update</td></tr>
+        <tr><td>10</td><td>Calendar View — See Every Deadline at a Glance</td><td>3 min</td><td>Switching between compliance / project / all filters</td></tr>
+        <tr><td>11</td><td>Team Management & Roles — Settings Explained</td><td>3–4 min</td><td>Invite a team member in under 10 seconds</td></tr>
+        <tr><td>12</td><td>Floatup — Full Feature Summary & Free Trial</td><td>1 min</td><td>The entire chapter IS the Short — use as-is</td></tr>
+      </table>
+    </div>
+
+    <!-- YOUTUBE CHANNEL SETUP -->
+    <div class="card">
+      <div class="card-title"><span>📺</span> YouTube Channel Setup — Do This Before Uploading</div>
+      <ul class="checklist">
+        <li>
+          <input type="checkbox" id="yt1" onchange="saveCheck(this)">
+          <label for="yt1">Create a <strong>Brand Account</strong> on YouTube (not personal) — go to youtube.com → profile → Create a channel → Use a business or other name → "Floatup"</label>
+        </li>
+        <li>
+          <input type="checkbox" id="yt2" onchange="saveCheck(this)">
+          <label for="yt2">Channel art: 2560×1440px banner — use Canva free → search "YouTube banner" → use navy #1A1A2E + orange #FF6B35 + tagline "Task Management for CA Firms"</label>
+        </li>
+        <li>
+          <input type="checkbox" id="yt3" onchange="saveCheck(this)">
+          <label for="yt3">Profile picture: Floatup logo (square, 800×800px minimum)</label>
+        </li>
+        <li>
+          <input type="checkbox" id="yt4" onchange="saveCheck(this)">
+          <label for="yt4">Channel description (paste this and edit): "Floatup is a task management, CA compliance, and client operations platform built for accounting professionals. This channel covers product walkthroughs, CA practice management tips, and compliance guides for Indian and international firms. Try free at floatup.app"</label>
+        </li>
+        <li>
+          <input type="checkbox" id="yt5" onchange="saveCheck(this)">
+          <label for="yt5">Add floatup.app to channel links (shows on banner)</label>
+        </li>
+        <li>
+          <input type="checkbox" id="yt6" onchange="saveCheck(this)">
+          <label for="yt6">Create 3 playlists: "Floatup Full Demo Series" / "CA Compliance Guides" / "Practice Management Tips"</label>
+        </li>
+        <li>
+          <input type="checkbox" id="yt7" onchange="saveCheck(this)">
+          <label for="yt7">Enable channel monetisation settings (even before eligible — sets you up for later)</label>
+        </li>
+      </ul>
+    </div>
+
+    <!-- VIDEO PRODUCTION WORKFLOW -->
+    <div class="card">
+      <div class="card-title"><span>🎙️</span> Voiceover + Export Workflow (Per Chapter)</div>
+      <div class="highlight">
+        <div class="highlight-title">Reminder: your video is mute — voiceover is added after</div>
+        <p>You record the screen with no audio. Then generate AI voice from the script. Then merge in Clipchamp. This section is the exact per-chapter workflow.</p>
+      </div>
+      <table>
+        <tr><th>Step</th><th>Tool</th><th>Time</th><th>What to Do</th></tr>
+        <tr><td>1</td><td>ElevenLabs</td><td>2 min</td><td>Paste chapter narration → Voice: Daniel → Stability 65, Similarity 80, Speed 0.95 → Generate → Download MP3</td></tr>
+        <tr><td>2</td><td>Clipchamp (Windows built-in)</td><td>5 min</td><td>New project → import mute chapter video + MP3 → drag both to timeline → trim video to match audio length → export 1080p MP4</td></tr>
+        <tr><td>3</td><td>Clipchamp or CapCut</td><td>3 min</td><td>Pull your 30–60 sec Short/Reel clip from the exported video → export as vertical 9:16 (1080×1920) for Shorts/Reels</td></tr>
+        <tr><td>4</td><td>Canva free</td><td>5 min</td><td>Create thumbnail (1280×720) → screenshot from video + bold chapter title text + navy + orange brand colours</td></tr>
+        <tr><td>5</td><td>YouTube Studio</td><td>3 min</td><td>Upload video → paste title + description + tags → set thumbnail → add to playlist → schedule or publish</td></tr>
+      </table>
+      <p style="font-size:12px;color:var(--text-muted);margin-top:12px;"><strong>Total per chapter: ~18 minutes.</strong> Do all 12 in a single session = 3.5 hours and your entire YouTube channel is done for 3 months.</p>
+    </div>
+
+    <!-- YOUTUBE SEO -->
+    <div class="card">
+      <div class="card-title"><span>🔍</span> YouTube SEO — Title, Description & Tags Templates</div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">YouTube is the second largest search engine. CAs literally search "how to manage compliance deadlines" and "CA practice management software." Your videos need to show up for those searches.</p>
+
+      <div class="highlight highlight-navy" style="margin-bottom:16px;">
+        <div class="highlight-title">Title Formula</div>
+        <p><strong>[What it does] for [Who] — [Floatup] [Year]</strong><br>
+        Example: "GST Compliance Tracking for CA Firms — Floatup Full Demo 2026"<br>
+        Example: "How to Manage 50 Clients Without Missing a Deadline — Floatup"<br>
+        Keep under 60 characters so it doesn't get cut off in search results.</p>
+      </div>
+
+      <div class="post-card" data-type="insight" style="margin-bottom:14px;">
+        <span class="post-tag tag-insight">Description Template — Copy & Customise Per Video</span>
+        <div class="post-text" id="yt-desc">In this video, I walk through [CHAPTER TOPIC] inside Floatup — a task management and CA compliance platform built specifically for accounting professionals.
+
+🕐 TIMESTAMPS:
+0:00 — Introduction
+0:30 — [First section]
+2:00 — [Second section]
+4:00 — [Key feature demo]
+
+👉 Try Floatup free (no credit card): https://floatup.app
+
+WHAT IS FLOATUP?
+Floatup is a task management, compliance tracking, and client operations platform built for CA practices, CPA firms, and professional services teams. Manage compliance deadlines, team tasks, client portals, invoicing, and approvals — all in one place.
+
+PERFECT FOR:
+→ Chartered Accountants managing 10–100+ clients
+→ CPA firms tracking GST, TDS, Income Tax, ROC filings
+→ Professional teams needing structured task management
+
+🔔 Subscribe for weekly CA practice management tips and Floatup tutorials.
+
+📌 FULL DEMO PLAYLIST: [playlist link]
+
+#Floatup #CACompliance #TaskManagement #CharteredAccountant #CAPractice #GSTFiling #TDSCompliance #AccountingTools #PracticeManagement #CPASoftware</div>
+        <button class="copy-btn" onclick="copyPost('yt-desc', this)">📋 Copy Description Template</button>
+      </div>
+
+      <div class="highlight highlight-green">
+        <div class="highlight-title">🏷️ Tags to use on every video (copy these)</div>
+        <p>floatup, CA compliance software, task management for CA, GST compliance tracking, TDS deadline management, CA practice management, accounting firm software, CPA task management, chartered accountant tools, compliance software India, CA team management, client portal for CA, invoice management CA, practice management software, CA workflow automation</p>
+      </div>
+    </div>
+
+    <!-- SHORTS & REELS STRATEGY -->
+    <div class="card">
+      <div class="card-title"><span>📱</span> YouTube Shorts & Instagram Reels Strategy</div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">Shorts and Reels are your discovery engine. Long-form builds trust. Shorts/Reels bring new people in. You need both.</p>
+
+      <div class="grid-2" style="margin-bottom:20px;">
+        <div class="highlight" style="margin-bottom:0;">
+          <div class="highlight-title">📐 Format Specs</div>
+          <p><strong>YouTube Shorts:</strong> 9:16 vertical, 1080×1920px, under 60 sec, add #Shorts in title<br><br>
+          <strong>Instagram Reels:</strong> 9:16 vertical, 1080×1920px, under 90 sec, captions on-screen<br><br>
+          <strong>LinkedIn Video:</strong> landscape 16:9 or square 1:1, under 3 min works best</p>
+        </div>
+        <div class="highlight highlight-navy" style="margin-bottom:0;">
+          <div class="highlight-title">🎬 What makes a Short/Reel perform</div>
+          <p>• Hook in the <strong>first 2 seconds</strong> — text on screen or action<br>
+          • No slow intros — start mid-action<br>
+          • Captions always on (80% watch muted)<br>
+          • End with a CTA: "Full tutorial in description"<br>
+          • Keep energy up — cut dead air ruthlessly</p>
+        </div>
+      </div>
+
+      <strong style="font-size:13px;">Best Short/Reel formats for Floatup:</strong>
+      <div style="margin-top:12px;">
+
+        <div class="day-card" style="border-left-color:#7C3AED;">
+          <div class="day-name">Format 1 — "Watch Me Do X in Under 30 Seconds"</div>
+          <div class="day-task">Screen recording clip of a fast, satisfying action. Example: "Creating a full compliance task schedule for 10 clients in 28 seconds." No voiceover needed — just the screen recording with upbeat background music and captions. These perform extremely well because they're visual proof.</div>
+        </div>
+
+        <div class="day-card" style="border-left-color:#10B981;">
+          <div class="day-name">Format 2 — "Before vs After" (no speaking required)</div>
+          <div class="day-task">Split screen or sequential clips. Left: WhatsApp chaos, missed deadline on Excel. Right: Floatup compliance dashboard, everything tracked. Text overlays tell the story. 30–45 seconds. Pure visual storytelling — highest share rate of any format.</div>
+        </div>
+
+        <div class="day-card" style="border-left-color:#F59E0B;">
+          <div class="day-name">Format 3 — Feature Spotlight (extracted from tutorial chapters)</div>
+          <div class="day-task">Take the best 45–60 seconds from each tutorial chapter. Add AI voiceover from the narration script (same ElevenLabs audio, just the relevant section). Add a text hook at the top: "Did you know Floatup does this?" or "CAs are using this to eliminate deadline stress." Upload as Short + Reel.</div>
+        </div>
+
+        <div class="day-card" style="border-left-color:#FF6B35;">
+          <div class="day-name">Format 4 — "POV" format (trending, high reach)</div>
+          <div class="day-task">Text on black screen or over video: "POV: You're a CA and it's 3 days before the GST deadline." Then show the Floatup dashboard — everything tracked, nothing missed, team on top of it. The contrast between the "POV" tension and the calm organised dashboard is the punchline. 20–30 seconds.</div>
+        </div>
+
+        <div class="day-card" style="border-left-color:#3B82F6;">
+          <div class="day-name">Format 5 — "3 Things" quick tip (for CA community building)</div>
+          <div class="day-task">Does NOT need to mention Floatup. Example: "3 things CA firms do that kill their growth" or "3 signs your practice management system is broken." Pure value. Builds audience. End card: "We're building a solution — floatup.app." 45–60 seconds with AI voiceover from ElevenLabs.</div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- UPLOAD SCHEDULE -->
+    <div class="card">
+      <div class="card-title"><span>📅</span> Upload Schedule — Weeks 1–12</div>
+      <div class="highlight">
+        <div class="highlight-title">The rule: Long-form on Tuesday, Short on Friday</div>
+        <p>YouTube rewards consistency over volume. 1 video/week every Tuesday + 1 Short every Friday = YouTube treats you as an active channel and pushes your content in search results. Miss a week and the algorithm resets. Set a reminder and stick to the schedule.</p>
+      </div>
+      <table>
+        <tr><th>Week</th><th>Tuesday — YouTube Video</th><th>Friday — Short + Reel</th></tr>
+        <tr><td>1</td><td>Ch 1: Dashboard Overview</td><td>30-sec dashboard scroll (Format 1)</td></tr>
+        <tr><td>2</td><td>Ch 2: Kanban Board</td><td>Drag task + filter demo (Format 3)</td></tr>
+        <tr><td>3</td><td>Ch 7: CA Compliance Module ⭐</td><td>Load defaults → spawn tasks (Format 1)</td></tr>
+        <tr><td>4</td><td>Ch 6: Client Database</td><td>Before/After — WhatsApp vs Client Portal (Format 2)</td></tr>
+        <tr><td>5</td><td>Ch 8: Invoicing</td><td>GSTIN auto-fill in 5 seconds (Format 1)</td></tr>
+        <tr><td>6</td><td>Ch 5: Projects</td><td>POV: CA during GST month (Format 4)</td></tr>
+        <tr><td>7</td><td>Ch 4: Recurring Tasks</td><td>Set it once, runs forever (Format 3)</td></tr>
+        <tr><td>8</td><td>Ch 9: Approvals + Monitor</td><td>Approve a task in 2 clicks (Format 1)</td></tr>
+        <tr><td>9</td><td>Ch 10: Calendar View</td><td>3 signs your CA practice system is broken (Format 5)</td></tr>
+        <tr><td>10</td><td>Ch 3: Inbox Quick Tasks</td><td>Create a task in under 8 seconds (Format 1)</td></tr>
+        <tr><td>11</td><td>Ch 11: Team Management</td><td>Invite a team member in 10 seconds (Format 1)</td></tr>
+        <tr><td>12</td><td>Ch 12: Full Summary + CTA</td><td>Before/After — Excel chaos vs Floatup (Format 2)</td></tr>
+      </table>
+      <p style="font-size:12px;color:var(--text-muted);margin-top:10px;">⭐ Upload the Compliance Module video in Week 3 (not Week 7) — it's your flagship feature and will get the most search traffic. Lead with your strongest content.</p>
+    </div>
+
+    <!-- THUMBNAIL GUIDE -->
+    <div class="card">
+      <div class="card-title"><span>🖼️</span> Thumbnail Formula (Canva free — 15 min per thumbnail)</div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">Thumbnails determine whether anyone clicks. 70% of a video's performance is the thumbnail + title combo. Use this formula for every video.</p>
+      <div class="grid-2">
+        <div>
+          <strong style="font-size:13px;display:block;margin-bottom:10px;">Thumbnail elements:</strong>
+          <ul style="font-size:13px;line-height:2.2;padding-left:16px;">
+            <li>Background: navy #1A1A2E or dark screenshot from the video</li>
+            <li>Large bold text: 3–5 words, the core benefit or pain point</li>
+            <li>Orange accent: highlight or underline the key word in orange</li>
+            <li>Floatup logo: bottom right corner, small</li>
+            <li>Optional: a screenshot of the most visually impressive UI in that chapter</li>
+          </ul>
+        </div>
+        <div>
+          <strong style="font-size:13px;display:block;margin-bottom:10px;">Text examples per chapter:</strong>
+          <ul style="font-size:13px;line-height:2.2;padding-left:16px;">
+            <li>Ch 1: "EVERYTHING IN ONE DASHBOARD"</li>
+            <li>Ch 2: "ZERO MISSED TASKS"</li>
+            <li>Ch 7: "ALL COMPLIANCE. AUTOMATED."</li>
+            <li>Ch 6: "50 CLIENTS. ZERO CHAOS."</li>
+            <li>Ch 8: "INVOICE IN 30 SECONDS"</li>
+            <li>Ch 4: "SET ONCE. RUN FOREVER."</li>
+          </ul>
+        </div>
+      </div>
+      <div class="highlight highlight-green" style="margin-top:16px;">
+        <div class="highlight-title">Canva template shortcut</div>
+        <p>Go to Canva → search "YouTube thumbnail dark" → pick any dark template → replace colours with navy/orange → replace text with your chapter headline. Each thumbnail takes 10–12 minutes once you've done the first one.</p>
+      </div>
+    </div>
+
+    <!-- LINKEDIN VIDEO -->
+    <div class="card">
+      <div class="card-title"><span>💼</span> LinkedIn Video Strategy</div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">LinkedIn video gets 5x more reach than text posts right now — the algorithm is actively pushing native video. Use your existing clips here too.</p>
+      <table>
+        <tr><th>What to post</th><th>Length</th><th>Source clip</th><th>Caption style</th></tr>
+        <tr><td>Feature spotlight</td><td>60–90 sec</td><td>Best 90 sec from tutorial chapter</td><td>"Most CA firms don't know this exists in their task management tool..."</td></tr>
+        <tr><td>Before/After demo</td><td>45 sec</td><td>Edit the Format 2 Reel to landscape</td><td>"I used to manage 40 clients on a spreadsheet. Here's what changed."</td></tr>
+        <tr><td>Quick tip</td><td>30–45 sec</td><td>The Format 5 "3 things" clip</td><td>"3 things I wish I knew before growing my CA practice to [X] clients."</td></tr>
+        <tr><td>Behind the scenes</td><td>60 sec</td><td>Record a fresh 1-min clip of you narrating what you built</td><td>Raw, no edits. Authentic founder content performs best on LinkedIn.</td></tr>
+      </table>
+      <div class="highlight" style="margin-top:16px;">
+        <div class="highlight-title">⚠️ LinkedIn video rule</div>
+        <p>Upload video <strong>natively to LinkedIn</strong> — never post a YouTube link. LinkedIn suppresses posts with external links. Download the video file and upload directly. This alone doubles your reach.</p>
+      </div>
+    </div>
+
+    <!-- GROWTH STRATEGY -->
+    <div class="card">
+      <div class="card-title"><span>📈</span> YouTube Growth — First 90 Days Reality Check</div>
+      <div class="highlight">
+        <div class="highlight-title">Honest expectations</div>
+        <p>New YouTube channels grow slowly. Expect 50–200 views per video in the first month. That's normal and fine. You're not building a YouTube influencer channel — you're building a <strong>search-discoverable product library</strong>. A CPA in Toronto who searches "CA compliance tracking software" and finds your Chapter 7 video has high purchase intent. 200 views of the right audience is worth more than 20,000 random views.</p>
+      </div>
+      <div class="timeline">
+        <div class="timeline-item">
+          <div class="timeline-dot"></div>
+          <div class="timeline-month">Month 1 — Plant the seeds</div>
+          <div class="timeline-content">Upload Weeks 1–4 videos. Share each video on LinkedIn and in 2 CA communities. Goal: 200–500 total channel views. Don't check daily. Focus on quality uploads.</div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-dot"></div>
+          <div class="timeline-month">Month 2 — Algorithm starts noticing</div>
+          <div class="timeline-content">If watch time is decent (people watching 60%+ of each video), YouTube starts suggesting your videos to similar viewers. Compliance Module video (Ch 7) likely gets traction via search. Goal: 1,000+ total channel views.</div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-dot" style="background:var(--green)"></div>
+          <div class="timeline-month">Month 3 — Compounding begins</div>
+          <div class="timeline-content">Old videos start getting discovered via search. Shorts drive subscriptions. Playlist views increase. Goal: 100+ subscribers, consistent 50–100 views/video within 48 hours of upload. At this point your channel has real momentum.</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+// Tab switching
+function switchTab(tabId, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + tabId).classList.add('active');
+  btn.classList.add('active');
+}
+
+// Copy post
+function copyPost(id, btn) {
+  const text = document.getElementById(id).innerText;
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = '✅ Copied!';
+    btn.classList.add('copied');
+    showToast();
+    setTimeout(() => {
+      btn.textContent = '📋 Copy Post';
+      btn.classList.remove('copied');
+    }, 2500);
+  });
+}
+
+// Copy script
+function copyScript(id, btn) {
+  const el = document.getElementById(id);
+  const parent = el.closest('.script-box');
+  const allText = Array.from(parent.childNodes)
+    .filter(n => n.nodeType === 3 || (n.nodeType === 1 && n.tagName !== 'BUTTON' && n.className !== 'script-label'))
+    .map(n => n.textContent)
+    .join('')
+    .trim();
+  navigator.clipboard.writeText(allText).then(() => {
+    btn.textContent = '✅ Copied!';
+    showToast();
+    setTimeout(() => { btn.textContent = '📋 Copy'; }, 2500);
+  });
+}
+
+// Filter posts
+function filterPosts(type, btn) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.post-card').forEach(card => {
+    if (type === 'all' || card.dataset.type === type) {
+      card.classList.remove('hidden');
+    } else {
+      card.classList.add('hidden');
+    }
+  });
+}
+
+// Save checkboxes
+function saveCheck(checkbox) {
+  localStorage.setItem('check-' + checkbox.id, checkbox.checked);
+}
+
+// Load saved checkboxes
+function loadChecks() {
+  document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    const saved = localStorage.getItem('check-' + cb.id);
+    if (saved === 'true') cb.checked = true;
+  });
+}
+
+// Toast
+function showToast() {
+  const toast = document.getElementById('toast');
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2500);
+}
+
+// Init
+document.addEventListener('DOMContentLoaded', loadChecks);
+</script>
+
+</body>
+</html>
