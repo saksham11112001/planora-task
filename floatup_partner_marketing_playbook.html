@@ -413,7 +413,7 @@
       <div class="header-subtitle">Marketing guide for the CA co-founder</div>
     </div>
   </div>
-  <div class="header-badge">🗓️ Updated May 2026</div>
+  <div class="header-badge">🗓️ Updated May 2026 v2</div>
 </div>
 
 <!-- TABS BAR -->
@@ -442,6 +442,9 @@
   <button class="tab-btn" onclick="switchTab('video', this)">
     <span class="tab-icon">🎬</span> Video & YouTube
   </button>
+  <button class="tab-btn" onclick="switchTab('design', this)">
+    <span class="tab-icon">🎨</span> Claude Design
+  </button>
 </div>
 
 <!-- TOAST -->
@@ -465,7 +468,11 @@
       </div>
       <div class="stat-card">
         <div class="stat-number">~20</div>
-        <div class="stat-label">min/week for Instagram sheet</div>
+        <div class="stat-label">min/fortnight for Instagram sheet</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">1hr</div>
+        <div class="stat-label">weekly Claude design session for visuals</div>
       </div>
       <div class="stat-card">
         <div class="stat-number">60s</div>
@@ -498,7 +505,7 @@
         </li>
         <li>
           <input type="checkbox" id="c6" onchange="saveCheck(this)">
-          <label for="c6">Fill Google Sheet with 15 Instagram content rows (20 min — topics in Instagram tab)</label>
+          <label for="c6">Fill Google Sheet with 15 Instagram rows — only need brand, topic, content_type, date (20 min — topics in Instagram tab). n8n writes the post AND generates a Claude design prompt automatically.</label>
         </li>
         <li>
           <input type="checkbox" id="c7" onchange="saveCheck(this)">
@@ -541,6 +548,7 @@
           <li>😤 <strong>You've lived the pain</strong> — missed deadlines, WhatsApp chaos, Excel nightmares</li>
           <li>🇮🇳 <strong>India credibility</strong> — for international CAs, "built by a practicing CA" is trust</li>
           <li>📱 <strong>Instagram automation running</strong> — brand building happens without your time</li>
+          <li>🎨 <strong>Claude Design session</strong> — animated cards and motion video prompts auto-generated weekly; you just paste and export</li>
         </ul>
       </div>
     </div>
@@ -1032,6 +1040,7 @@ Then listen. Really listen. If they describe Excel, WhatsApp, or general chaos �
       <p>LinkedIn posting: 20 min × 3 posts = <strong>60 min/week</strong><br>
       BNI commercial prep: <strong>10 min/week</strong><br>
       Google Sheet (Instagram): <strong>20 min every 2 weeks</strong><br>
+      Claude Design session (visuals + motion): <strong>60 min once per week</strong><br>
       Telegram review (what posted, any review alerts): <strong>5 min/day</strong></p>
     </div>
 
@@ -1082,8 +1091,19 @@ Then listen. Really listen. If they describe Excel, WhatsApp, or general chaos �
       <div class="day-name">EVERY 2 WEEKS — Saturday (20 min)</div>
       <div class="day-task">
         <span class="day-badge badge-auto">Sheet</span>Open Google Sheets → Add 15-20 new rows to the Instagram Content Queue<br>
-        <span class="day-badge badge-auto">Sheet</span>Set status = pending, add scheduled dates, write topics and key messages<br>
-        <span class="day-badge badge-auto">Auto</span>The automation picks these up every morning and posts — you're done until next fortnight
+        <span class="day-badge badge-auto">Sheet</span>Only fill: <strong>brand, platform, content_type, topic, scheduled_date, status=pending</strong> — nothing else needed<br>
+        <span class="day-badge badge-auto">Auto</span>n8n writes the post caption AND generates a Claude design prompt for each row automatically
+      </div>
+    </div>
+
+    <div class="day-card" style="border-left-color: var(--purple);">
+      <div class="day-name">ONCE A WEEK — Sunday (60 min) — Claude Design Session</div>
+      <div class="day-task">
+        <span class="day-badge" style="background:#EDE9FE;color:#5B21B6;">Design</span>Open Google Sheet → filter <strong>design_status = pending_design</strong> → you'll see 5-7 rows with auto-generated design prompts<br>
+        <span class="day-badge" style="background:#EDE9FE;color:#5B21B6;">Design</span>Copy each <strong>claude_design_prompt</strong> → paste into <a href="https://claude.ai" target="_blank" style="color:var(--purple);">claude.ai</a> → Claude generates an animated HTML card<br>
+        <span class="day-badge" style="background:#EDE9FE;color:#5B21B6;">Design</span>Open the HTML in your browser → screenshot at 1080×1080 → save as PNG<br>
+        <span class="day-badge" style="background:#EDE9FE;color:#5B21B6;">Motion</span>Each prompt also includes a Reels/video adaptation line — ask Claude to make the vertical 1080×1920 version too<br>
+        <span class="day-badge badge-admin">10 min</span>Post the batch of designed visuals on Instagram manually for that week
       </div>
     </div>
 
@@ -1210,18 +1230,25 @@ CA, Co-founder — Floatup"
     </div>
 
     <div class="card">
-      <div class="card-title"><span>📊</span> Your Google Sheet — What to Fill</div>
-      <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">Open the "SNG Content OS" Google Sheet → "Content Queue" tab → Add rows like this:</p>
+      <div class="card-title"><span>📊</span> Your Google Sheet — What to Fill (Minimal Input)</div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">Open the "SNG Content OS" Google Sheet → "Content Queue" tab → You only need to fill <strong>5 columns</strong>. Everything else is auto-generated.</p>
       <table>
-        <tr><th>Column</th><th>What to Write</th><th>Example</th></tr>
-        <tr><td>brand</td><td>floatup or ai_community</td><td>floatup</td></tr>
-        <tr><td>platform</td><td>instagram / linkedin / twitter</td><td>instagram</td></tr>
-        <tr><td>content_type</td><td>pain_point / meme / educational / feature / trend</td><td>pain_point</td></tr>
-        <tr><td>topic</td><td>3-5 words</td><td>GST deadline stress</td></tr>
-        <tr><td>key_message</td><td>1 sentence — what should the viewer feel or know</td><td>CAs waste 3 hours/week on document chasing</td></tr>
-        <tr><td>scheduled_date</td><td>YYYY-MM-DD</td><td>2026-05-10</td></tr>
-        <tr><td>status</td><td>Always write: pending</td><td>pending</td></tr>
+        <tr><th>Column</th><th>What to Write</th><th>Example</th><th>Who fills it</th></tr>
+        <tr><td><strong>brand</strong></td><td>floatup or ai_community</td><td>floatup</td><td style="color:var(--orange);font-weight:600;">You</td></tr>
+        <tr><td><strong>platform</strong></td><td>instagram or linkedin</td><td>instagram</td><td style="color:var(--orange);font-weight:600;">You</td></tr>
+        <tr><td><strong>content_type</strong></td><td>pain_point / meme / educational / feature / story / insight / trend / testimonial / question</td><td>pain_point</td><td style="color:var(--orange);font-weight:600;">You</td></tr>
+        <tr><td><strong>topic</strong></td><td>3-5 words describing the theme</td><td>GST deadline stress</td><td style="color:var(--orange);font-weight:600;">You</td></tr>
+        <tr><td><strong>scheduled_date</strong></td><td>YYYY-MM-DD</td><td>2026-05-10</td><td style="color:var(--orange);font-weight:600;">You</td></tr>
+        <tr><td><strong>status</strong></td><td>Always write: pending</td><td>pending</td><td style="color:var(--orange);font-weight:600;">You</td></tr>
+        <tr><td style="color:var(--text-muted);">generated_post</td><td style="color:var(--text-muted);">Auto-filled by n8n</td><td style="color:var(--text-muted);">Full caption + hashtags</td><td style="color:var(--green);font-weight:600;">n8n</td></tr>
+        <tr><td style="color:var(--text-muted);">claude_design_prompt</td><td style="color:var(--text-muted);">Auto-filled by n8n</td><td style="color:var(--text-muted);">Ready-to-paste Claude prompt for animated card</td><td style="color:var(--green);font-weight:600;">n8n</td></tr>
+        <tr><td style="color:var(--text-muted);">audit_score</td><td style="color:var(--text-muted);">Auto-filled by n8n</td><td style="color:var(--text-muted);">1–10 quality score</td><td style="color:var(--green);font-weight:600;">n8n</td></tr>
+        <tr><td style="color:var(--text-muted);">image_url</td><td style="color:var(--text-muted);">Auto-filled by n8n</td><td style="color:var(--text-muted);">Bannerbear-generated image link</td><td style="color:var(--green);font-weight:600;">n8n</td></tr>
       </table>
+      <div class="highlight highlight-green" style="margin-top:16px;">
+        <div class="highlight-title">💡 Optional but helpful</div>
+        <p>You can also fill <strong>key_message</strong> (1 sentence on what the viewer should feel/know) and <strong>target_emotion</strong> — these make the AI output sharper. But if you leave them blank, n8n infers from the topic and content_type alone.</p>
+      </div>
     </div>
 
     <div class="card">
@@ -1262,13 +1289,18 @@ CA, Co-founder — Floatup"
         <tr><th>Message Type</th><th>What It Means</th><th>Action Required</th></tr>
         <tr>
           <td>✅ Post Scheduled</td>
-          <td>Post was generated, image created, queued in Buffer</td>
+          <td>Post was generated, image created, queued in Buffer for today</td>
           <td>None — just review the preview</td>
         </tr>
         <tr>
           <td>⚠️ Needs Review</td>
-          <td>AI scored the post below 7/10 — needs editing</td>
+          <td>AI scored the post below 7/10 — needs editing before it can post</td>
           <td>Edit the row in Sheets, reset status to "pending"</td>
+        </tr>
+        <tr>
+          <td>✏️ Design Ready</td>
+          <td>A claude_design_prompt has been written and saved to the Sheet for this row</td>
+          <td>Open Sheet → copy claude_design_prompt → paste into Claude → screenshot result</td>
         </tr>
         <tr>
           <td>📭 Nothing Today</td>
@@ -1276,6 +1308,36 @@ CA, Co-founder — Floatup"
           <td>Add more rows to the Sheet</td>
         </tr>
       </table>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span>🎨</span> The Claude Design Workflow — How It Connects</div>
+      <div class="highlight highlight-navy" style="margin-bottom:16px;">
+        <div class="highlight-title">What n8n generates alongside every post</div>
+        <p>For every row it processes, n8n asks Gemini to also write a <strong>claude_design_prompt</strong> — a detailed, ready-to-paste prompt describing an animated HTML card or motion graphic specific to that post's headline and brand colors. It also includes a one-line note on how to adapt it to a Reels vertical clip.</p>
+      </div>
+      <div class="grid-2">
+        <div>
+          <strong style="font-size:13px;display:block;margin-bottom:10px;">What Claude generates from the prompt:</strong>
+          <ul style="font-size:13px;line-height:2.2;padding-left:16px;">
+            <li>📱 <strong>Instagram card</strong> — 1080×1080px animated HTML with CSS keyframe animations</li>
+            <li>💼 <strong>LinkedIn banner</strong> — 1200×627px professional animated banner</li>
+            <li>🎬 <strong>Reels adaptation</strong> — instructions for 1080×1920 vertical motion clip version</li>
+            <li>🐶 <strong>Meme card</strong> — bold animated meme-style card with shake/bounce effects</li>
+          </ul>
+        </div>
+        <div>
+          <strong style="font-size:13px;display:block;margin-bottom:10px;">How to use it (Sunday session):</strong>
+          <ol style="font-size:13px;line-height:2.2;padding-left:16px;">
+            <li>Open Sheet → filter <code>design_status = pending_design</code></li>
+            <li>Copy the <strong>claude_design_prompt</strong> cell</li>
+            <li>Go to <a href="https://claude.ai" target="_blank" style="color:var(--purple);">claude.ai</a> → paste → ask for artifact</li>
+            <li>Claude renders animated HTML card</li>
+            <li>Open in browser → screenshot at correct size</li>
+            <li>Post to Instagram with the <strong>generated_post</strong> caption from same row</li>
+          </ol>
+        </div>
+      </div>
     </div>
 
   </div>
@@ -1571,11 +1633,27 @@ PERFECT FOR:
       </div>
     </div>
 
+    <!-- CLAUDE ANIMATED DESIGN FOR THUMBNAILS -->
+    <div class="card">
+      <div class="card-title"><span>🎨</span> Claude Design for YouTube Thumbnails & Promo Banners</div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">The same Claude design session that generates Instagram cards can also produce YouTube thumbnails, LinkedIn banners, and animated promo intros — all auto-prompted by n8n.</p>
+      <div class="grid-2">
+        <div class="highlight" style="margin-bottom:0;">
+          <div class="highlight-title">YouTube thumbnail (1280×720px)</div>
+          <p>Ask Claude: "Generate an animated HTML card 1280×720px. Navy background, bold white headline [chapter title in ALL CAPS], orange accent underline, Floatup logo bottom-right. Headline slides in from left 0.8s. No external CDN."<br><br>Screenshot in browser → upload as thumbnail in YouTube Studio.</p>
+        </div>
+        <div class="highlight highlight-navy" style="margin-bottom:0;">
+          <div class="highlight-title">LinkedIn banner / promo card (1200×627px)</div>
+          <p>n8n auto-generates the prompt for LinkedIn rows. Paste to Claude → animated professional banner → screenshot → upload natively to LinkedIn as video still or post image.<br><br>Also ask Claude for a <strong>20-second looping video intro</strong> version — it outputs HTML you can record with screen recorder.</p>
+        </div>
+      </div>
+    </div>
+
     <!-- GROWTH STRATEGY -->
     <div class="card">
       <div class="card-title"><span>📈</span> YouTube Growth — First 90 Days Reality Check</div>
       <div class="highlight">
-        <div class="highlight-title">Honest expectations</div>
+        <div class="highlight-title">Honest expectations — stay patient</div>
         <p>New YouTube channels grow slowly. Expect 50–200 views per video in the first month. That's normal and fine. You're not building a YouTube influencer channel — you're building a <strong>search-discoverable product library</strong>. A CPA in Toronto who searches "CA compliance tracking software" and finds your Chapter 7 video has high purchase intent. 200 views of the right audience is worth more than 20,000 random views.</p>
       </div>
       <div class="timeline">
@@ -1595,6 +1673,167 @@ PERFECT FOR:
           <div class="timeline-content">Old videos start getting discovered via search. Shorts drive subscriptions. Playlist views increase. Goal: 100+ subscribers, consistent 50–100 views/video within 48 hours of upload. At this point your channel has real momentum.</div>
         </div>
       </div>
+    </div>
+
+  </div>
+
+
+  <!-- ===== CLAUDE DESIGN TAB ===== -->
+  <div class="tab-panel" id="tab-design">
+
+    <div class="section-title">Claude Design — Weekly Visual Session</div>
+    <div class="section-sub">Every post n8n processes gets a ready-to-paste Claude design prompt automatically. Once a week you batch all of them — paste into Claude, get animated HTML cards and motion video concepts, screenshot and post.</div>
+
+    <div class="superpower-banner">
+      <h3>You write the topic. Claude writes the design brief. Claude designs the card.</h3>
+      <p>The entire visual pipeline is automated. n8n generates the design prompt tailored to each post's exact headline and brand. You paste it into Claude on Sunday. Claude renders an animated HTML card. You screenshot it. Done — no Canva subscription, no designer needed.</p>
+    </div>
+
+    <div class="grid-3" style="margin-bottom:24px;">
+      <div class="stat-card">
+        <div class="stat-number">5–7</div>
+        <div class="stat-label">design prompts waiting each Sunday</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">~8</div>
+        <div class="stat-label">min per card (paste → generate → screenshot)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">60</div>
+        <div class="stat-label">min total per week for all visuals</div>
+      </div>
+    </div>
+
+    <!-- HOW IT WORKS -->
+    <div class="card">
+      <div class="card-title"><span>⚙️</span> How the Pipeline Works End-to-End</div>
+      <div class="timeline">
+        <div class="timeline-item">
+          <div class="timeline-dot"></div>
+          <div class="timeline-month">Step 1 — You fill the Sheet (20 min every 2 weeks)</div>
+          <div class="timeline-content">Add rows with <strong>brand, platform, content_type, topic, scheduled_date, status=pending</strong>. Nothing else required. The rest is automatic.</div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-dot"></div>
+          <div class="timeline-month">Step 2 — n8n runs at 6 AM daily</div>
+          <div class="timeline-content">Picks up pending rows → Gemini writes the post caption → Gemini also writes a <strong>claude_design_prompt</strong> specific to that post's headline, colors, and animation style → saves both to the Sheet → posts caption to Instagram/LinkedIn via Buffer → sends you a Telegram notification.</div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-dot"></div>
+          <div class="timeline-month">Step 3 — Sunday: your 60-min design session</div>
+          <div class="timeline-content">Open Sheet → filter <strong>design_status = pending_design</strong> → batch-copy all the claude_design_prompt values → paste each into <a href="https://claude.ai" target="_blank" style="color:var(--purple);">claude.ai</a> → Claude renders the animated HTML card as an artifact → screenshot each one → post to Instagram with the generated caption from the same row.</div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-dot" style="background:var(--green)"></div>
+          <div class="timeline-month">Step 4 — Motion video (optional, same prompt)</div>
+          <div class="timeline-content">Every claude_design_prompt ends with a one-line Reels adaptation note. Ask Claude: <em>"Now make the vertical 1080×1920 version for Instagram Reels as a 10-second loop."</em> Claude generates the vertical animated version — record it with your screen recorder for a Reel.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- WHAT CLAUDE GENERATES -->
+    <div class="card">
+      <div class="card-title"><span>🖼️</span> What Claude Can Generate for Each Post Type</div>
+      <table>
+        <tr><th>Post Type</th><th>Card Size</th><th>Animation Style</th><th>Motion Video Option</th></tr>
+        <tr>
+          <td><strong>Instagram regular</strong><br><small>pain_point, educational, feature, story</small></td>
+          <td>1080×1080px</td>
+          <td>Floating dots background + headline slides up (0.7s) + subtext fades in + brand tag appears last</td>
+          <td>10-sec Reels clip (1080×1920 vertical)</td>
+        </tr>
+        <tr>
+          <td><strong>Instagram meme</strong><br><small>content_type = meme</small></td>
+          <td>1080×1080px</td>
+          <td>Bold banner at top with shake animation + massive punchline with bounce-in + italic subtext fades in</td>
+          <td>10-sec meme Reel with beat-drop timing</td>
+        </tr>
+        <tr>
+          <td><strong>LinkedIn post</strong><br><small>platform = linkedin</small></td>
+          <td>1200×627px</td>
+          <td>Headline slides from left (0.8s) + subtitle fades in + accent line sweeps across bottom + brand name top-left</td>
+          <td>20-sec looping LinkedIn video intro</td>
+        </tr>
+        <tr>
+          <td><strong>YouTube thumbnail</strong><br><small>ask Claude manually</small></td>
+          <td>1280×720px</td>
+          <td>Static bold card — navy bg, ALL CAPS headline, orange accent, Floatup logo. Screenshot = upload-ready thumbnail.</td>
+          <td>N/A</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- STEP BY STEP SESSION GUIDE -->
+    <div class="card">
+      <div class="card-title"><span>📋</span> Sunday Session — Step by Step (60 min)</div>
+      <ul class="checklist">
+        <li>
+          <input type="checkbox" id="d1" onchange="saveCheck(this)">
+          <label for="d1"><strong>[5 min]</strong> Open Google Sheet → filter column <code>design_status</code> = <code>pending_design</code> → you'll see this week's batch of rows with auto-written design prompts</label>
+        </li>
+        <li>
+          <input type="checkbox" id="d2" onchange="saveCheck(this)">
+          <label for="d2"><strong>[2 min/card]</strong> Copy the <code>claude_design_prompt</code> cell for row 1 → open <a href="https://claude.ai" target="_blank" style="color:var(--purple);">claude.ai</a> in a new tab → paste prompt → send → Claude generates an animated HTML artifact</label>
+        </li>
+        <li>
+          <input type="checkbox" id="d3" onchange="saveCheck(this)">
+          <label for="d3"><strong>[2 min/card]</strong> Click the artifact → it opens as a rendered card → right-click → "Open in new tab" → your browser shows the 1080×1080 animated card → take a screenshot at that size (Windows: Win+Shift+S)</label>
+        </li>
+        <li>
+          <input type="checkbox" id="d4" onchange="saveCheck(this)">
+          <label for="d4"><strong>[1 min/card]</strong> If you want a Reels version: in the same Claude chat, type "Now make the vertical 1080×1920 version for a 10-second Instagram Reels loop" → Claude adjusts the layout → screenshot/record the vertical version</label>
+        </li>
+        <li>
+          <input type="checkbox" id="d5" onchange="saveCheck(this)">
+          <label for="d5"><strong>[Repeat]</strong> Do the same for all 5–7 rows. Each takes ~8 minutes. 60 minutes covers a full week of visual content.</label>
+        </li>
+        <li>
+          <input type="checkbox" id="d6" onchange="saveCheck(this)">
+          <label for="d6"><strong>[10 min]</strong> Post the designed cards on Instagram manually — use the <code>generated_post</code> caption from the same Sheet row. Update <code>design_status</code> to <code>posted</code> for each row you've posted.</label>
+        </li>
+      </ul>
+    </div>
+
+    <!-- PROMPT TIPS -->
+    <div class="card">
+      <div class="card-title"><span>💡</span> Tips to Get Better Designs from Claude</div>
+      <div class="grid-2">
+        <div>
+          <strong style="font-size:13px;display:block;margin-bottom:10px;">If the card looks plain or static:</strong>
+          <div class="script-box" style="padding:14px;font-size:12px;line-height:1.8;">
+            <div class="script-label">Add to the prompt:</div>
+            "Make the animations more dramatic. The headline should have a glitch effect or neon glow pulse. Add a particle or floating orbs background. Make it feel like a premium motion graphic, not a static card."
+          </div>
+        </div>
+        <div>
+          <strong style="font-size:13px;display:block;margin-bottom:10px;">If you want a Lumen5-style video instead:</strong>
+          <div class="script-box" style="padding:14px;font-size:12px;line-height:1.8;">
+            <div class="script-label">Ask Claude:</div>
+            "Instead of a card, write me a script and scene-by-scene breakdown for a 15-second animated Lumen5 video based on this post. Include: scene 1 text, scene 2 text, background mood, music vibe, and CTA at the end."
+          </div>
+        </div>
+      </div>
+      <div class="highlight" style="margin-top:16px;">
+        <div class="highlight-title">📐 Screenshot size guide</div>
+        <p>
+          <strong>Instagram post:</strong> screenshot at 1080×1080px — use browser zoom (Ctrl+−) until the card fills exactly your screen, then crop<br>
+          <strong>Instagram Reels / Stories:</strong> 1080×1920px — ask Claude for vertical layout, record with screen recorder (Xbox Game Bar: Win+G)<br>
+          <strong>LinkedIn banner:</strong> 1200×627px — screenshot the wider Claude artifact at that ratio<br>
+          <strong>YouTube thumbnail:</strong> 1280×720px — screenshot and upload in YouTube Studio → Custom Thumbnail
+        </p>
+      </div>
+    </div>
+
+    <!-- CONTENT TYPE PROMPTS REFERENCE -->
+    <div class="card">
+      <div class="card-title"><span>📚</span> What the Auto-Generated Prompts Ask Claude to Build</div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">These are generated by n8n automatically — you don't write them. This table shows what Gemini asks Claude to create for each content type so you know what to expect.</p>
+      <table>
+        <tr><th>Content Type</th><th>Prompt Instructs Claude to:</th></tr>
+        <tr><td><strong>pain_point, feature, educational, story, insight</strong></td><td>Animated 1080×1080 card — floating dots bg, headline slides up, subtext fades in, brand tag last. Animated preferred over static. Also: one sentence on Reels adaptation.</td></tr>
+        <tr><td><strong>meme</strong></td><td>Animated meme card 1080×1080 — dark bg, top_label in shake-once banner, image_headline in bounce-in massive text, italic subtext, brand_tag fades in last. Also: Reels adaptation line.</td></tr>
+        <tr><td><strong>linkedin posts</strong></td><td>Professional animated banner 1200×627px — headline slides from left, subtitle fades in, accent line sweeps bottom, brand name top-left, tagline bottom-right. Also: 20-sec video intro adaptation line.</td></tr>
+      </table>
     </div>
 
   </div>

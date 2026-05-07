@@ -53,7 +53,7 @@
       "typeVersion": 2,
       "position": [660, 300],
       "parameters": {
-        "jsCode": "// Extract Reddit trend headlines\nconst redditRaw = $('Fetch Reddit Trends').first().json;\nconst posts = redditRaw?.data?.children || [];\nconst trendLines = posts\n  .slice(0, 8)\n  .map(p => p?.data?.title || '')\n  .filter(t => t.length > 5);\nconst trendContext = trendLines.join('\\n• ') || 'No specific trends today';\n\n// Today's date YYYY-MM-DD\nconst today = new Date().toISOString().split('T')[0];\n\n// Filter rows: status=pending OR empty, scheduled_date <= today OR empty\nconst allRows = $input.all();\nconst pending = allRows.filter(row => {\n  const s = row.json;\n  const statusOk = !s.status || s.status.toLowerCase() === 'pending';\n  const dateOk = !s.scheduled_date || s.scheduled_date <= today;\n  const hasContent = s.topic && s.brand && s.platform;\n  return statusOk && dateOk && hasContent;\n});\n\nif (pending.length === 0) {\n  return [{ json: { _empty: true, trend_context: trendContext } }];\n}\n\nreturn pending.map(row => ({\n  json: {\n    ...row.json,\n    _row_number: row.json._rowNumber || row.json.row_number,\n    trend_context: trendContext\n  }\n}));"
+        "jsCode": "const redditRaw = $('Fetch Reddit Trends').first().json;\nconst posts = redditRaw?.data?.children || [];\nconst trendLines = posts.slice(0, 8).map(p => p?.data?.title || '').filter(t => t.length > 5);\nconst trendContext = trendLines.join('\\n• ') || 'No specific trends today';\n\nconst today = new Date().toISOString().split('T')[0];\n\nconst allRows = $input.all();\nconst pending = allRows.filter(row => {\n  const s = row.json;\n  const statusOk = !s.status || s.status.toLowerCase() === 'pending';\n  const dateOk = !s.scheduled_date || s.scheduled_date <= today;\n  const hasContent = s.topic && s.brand && s.platform;\n  return statusOk && dateOk && hasContent;\n});\n\nif (pending.length === 0) {\n  return [{ json: { _empty: true, trend_context: trendContext } }];\n}\n\nreturn pending.map(row => ({\n  json: {\n    ...row.json,\n    _row_number: row.json._rowNumber || row.json.row_number,\n    trend_context: trendContext\n  }\n}));"
       }
     },
     {
@@ -65,12 +65,7 @@
       "parameters": {
         "conditions": {
           "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
-          "conditions": [{
-            "id": "empty-check",
-            "leftValue": "={{ $json._empty }}",
-            "rightValue": true,
-            "operator": { "type": "boolean", "operation": "notEquals" }
-          }],
+          "conditions": [{ "id": "empty-check", "leftValue": "={{ $json._empty }}", "rightValue": true, "operator": { "type": "boolean", "operation": "notEquals" } }],
           "combinator": "and"
         },
         "options": {}
@@ -91,7 +86,7 @@
       "typeVersion": 2,
       "position": [1320, 180],
       "parameters": {
-        "jsCode": "const row = $input.first().json;\nconst brand = (row.brand || 'floatup').toLowerCase().trim();\nconst platform = (row.platform || 'instagram').toLowerCase().trim();\n\nconst BRANDS = {\n  floatup: {\n    name: 'Floatup',\n    desc: 'task management, CA compliance, and client operations SaaS for professional teams in India',\n    tone: 'professional, confident, ROI-focused, direct — like a trusted advisor not a salesman',\n    audience: 'Chartered Accountants, startup founders, project managers, growing professional firms',\n    cta: 'floatup.app',\n    ig_hashtags: '#TaskManagement #CACompliance #StartupIndia #Floatup #CAsOfInstagram #FinanceTools #ProductivityHacks',\n    li_hashtags: '#CharteredAccountant #TaskManagement #StartupIndia #Floatup #CApractice'\n  },\n  ai_community: {\n    name: 'AI Community',\n    desc: 'a community and resource hub for developers and solopreneurs building with AI tools',\n    tone: 'casual, educational, insider-knowledge, slightly irreverent — like a smart friend who gets it',\n    audience: 'developers, solopreneurs, AI enthusiasts, indie hackers, tech founders',\n    cta: 'link in bio',\n    ig_hashtags: '#AITools #BuildWithAI #Solopreneur #IndieHackers #AICommunity #TechIndia #NoCode #AIAutomation',\n    li_hashtags: '#ArtificialIntelligence #AITools #Solopreneur #IndieHackers #BuildWithAI'\n  }\n};\n\nconst cfg = BRANDS[brand] || BRANDS.floatup;\nconst topic = row.topic || 'productivity';\nconst keyMsg = row.key_message || '';\nconst contentType = row.content_type || 'educational';\nconst targetEmotion = row.target_emotion || 'curiosity';\nconst trends = row.trend_context || 'no specific trends today';\n\nlet prompt = '';\n\nif (platform === 'instagram') {\n  prompt = `You are a top Instagram content strategist for B2B SaaS and creator brands.\n\nBRAND: ${cfg.name}\nDESCRIPTION: ${cfg.desc}\nTONE: ${cfg.tone}\nAUDIENCE: ${cfg.audience}\n\nTODAY'S TRENDING TOPICS (use for relevance and timing — DO NOT copy directly):\n• ${trends}\n\nCONTENT BRIEF:\n- Content Type: ${contentType}\n- Topic: ${topic}\n- Core Message: ${keyMsg}\n- Target Emotion to trigger: ${targetEmotion}\n\nINSTAGRAM RULES:\n- Caption max 220 characters (caption body, not including hashtags)\n- Hook must work in first 2 lines before the 'more' button — make it impossible to skip\n- Hashtags go at the very end, after 2-3 line breaks\n- Never start caption with the brand name\n- Feel native to Instagram — NOT like an ad\n\nGenerate a complete Instagram post. Output ONLY this JSON (no markdown, pure JSON):\n{\n  \"hook\": \"First 1-2 punchy lines — under 15 words, emotional or curiosity-driven\",\n  \"caption\": \"Rest of caption body under 180 chars — deliver value, conversational\",\n  \"hashtags\": \"${cfg.ig_hashtags} [add 3-4 more niche ones based on topic]\",\n  \"image_headline\": \"3-5 ALL CAPS words for visual card headline — punchy and bold\",\n  \"image_subtext\": \"One supporting line under headline — under 8 words\",\n  \"cta\": \"${cfg.cta}\",\n  \"predicted_score\": <number 1-10, be honest>\n}`;\n} else {\n  // LinkedIn (and Twitter defaults here too)\n  prompt = `You are an expert LinkedIn content strategist for B2B founders and practitioners.\n\nYOU ARE WRITING AS: A practicing Chartered Accountant who co-founded ${cfg.name}\nBRAND: ${cfg.name} — ${cfg.desc}\nTONE: ${cfg.tone} — but written as a real founder/practitioner, NOT as a marketer\nAUDIENCE: ${cfg.audience}\n\nTODAY'S TRENDING TOPICS (use for relevance — make the post feel timely):\n• ${trends}\n\nCONTENT BRIEF:\n- Content Type: ${contentType}\n- Topic: ${topic}\n- Core Message to deliver: ${keyMsg}\n- Target Emotion: ${targetEmotion}\n\nLINKEDIN RULES:\n- First 2 lines MUST work standalone as a hook (shown before '...see more')\n- Text posts perform BETTER than image posts on LinkedIn — this is text only\n- NO external links in the post body — link goes in the first comment\n- Max 3-5 hashtags at the very end\n- End with a genuine question to drive comments\n- Optimal length: 150-350 words\n- Write like a human who has a strong opinion, not a company announcement\n\nGenerate the complete LinkedIn post. Output ONLY this JSON (no markdown, pure JSON):\n{\n  \"hook\": \"First 2 lines shown before see-more — bold opener, under 25 words, makes them click\",\n  \"full_post\": \"Complete LinkedIn post: hook + body + closing question + hashtags. Include line breaks for readability.\",\n  \"hashtags\": \"${cfg.li_hashtags} [add 1-2 more relevant ones]\",\n  \"first_comment\": \"Short first comment to post with the link — e.g. 'Full details and free trial: ${cfg.cta}'\",\n  \"predicted_score\": <number 1-10, be honest>\n}`;\n}\n\nreturn [{ json: { ...row, brand_cfg: cfg, gemini_prompt: prompt, platform, brand } }];"
+        "jsCode": "const row = $input.first().json;\nconst brand = (row.brand || 'floatup').toLowerCase().trim();\nconst platform = (row.platform || 'instagram').toLowerCase().trim();\nconst contentType = (row.content_type || 'educational').toLowerCase().trim();\n\nconst BRANDS = {\n  floatup: {\n    name: 'Floatup',\n    desc: 'task management, CA compliance, and client operations SaaS for professional teams in India',\n    tone: 'professional, confident, ROI-focused, direct — like a trusted advisor not a salesman',\n    audience: 'Chartered Accountants, startup founders, project managers, growing professional firms',\n    cta: 'floatup.app',\n    colors: 'dark navy #1A1A2E and orange #FF6B35',\n    ig_hashtags: '#TaskManagement #CACompliance #StartupIndia #Floatup #CAsOfInstagram #FinanceTools #ProductivityHacks',\n    li_hashtags: '#CharteredAccountant #TaskManagement #StartupIndia #Floatup #CApractice'\n  },\n  ai_community: {\n    name: 'AI Community',\n    desc: 'a community and resource hub for developers and solopreneurs building with AI tools',\n    tone: 'casual, educational, insider-knowledge, slightly irreverent — like a smart friend who gets it',\n    audience: 'developers, solopreneurs, AI enthusiasts, indie hackers, tech founders',\n    cta: 'link in bio',\n    colors: 'dark theme with purple and blue accents',\n    ig_hashtags: '#AITools #BuildWithAI #Solopreneur #IndieHackers #AICommunity #TechIndia #NoCode #AIAutomation',\n    li_hashtags: '#ArtificialIntelligence #AITools #Solopreneur #IndieHackers #BuildWithAI'\n  }\n};\n\nconst cfg = BRANDS[brand] || BRANDS.floatup;\nconst topic = row.topic || 'productivity';\nconst keyMsg = row.key_message || '';\nconst targetEmotion = row.target_emotion || 'curiosity';\nconst trends = row.trend_context || 'no specific trends today';\nconst designPrompt = row.claude_design_prompt || '';\n\nlet prompt = '';\nconst isDesign = platform === 'instagram' && contentType === 'custom_design' && designPrompt.length > 5;\n\nif (isDesign) {\n  prompt = `You are an expert UI/visual designer specialising in Instagram content cards.\\n\\nGenerate a complete self-contained HTML+CSS card exactly 1080x1080 pixels for an Instagram post.\\n\\nDESIGN BRIEF:\\n${designPrompt}\\n\\nBRAND: ${cfg.name}\\nBRAND COLORS: ${cfg.colors}\\nBRAND TAG: ${cfg.cta}\\nAUDIENCE: ${cfg.audience}\\n\\nTECHNICAL REQUIREMENTS:\\n- Outer div must be exactly width:1080px height:1080px\\n- All CSS inline or in a <style> tag — NO external stylesheets or images\\n- Google Fonts via @import is allowed\\n- Bold typography, strong contrast, clear visual hierarchy\\n- Brand watermark small at bottom-right: ${cfg.cta}\\n- Must look stunning and professional\\n\\nOutput ONLY valid HTML. Start directly with <!DOCTYPE html> or <div>. No explanation, no markdown.`;\n\n} else if (platform === 'instagram' && contentType === 'meme') {\n  prompt = `You are a viral meme creator for B2B SaaS brands. Think HireZapp Instagram style — bold, funny, relatable.\\n\\nBRAND: ${cfg.name} — ${cfg.desc}\\nAUDIENCE: ${cfg.audience}\\nTOPIC/THEME: ${topic}\\nCORE MESSAGE: ${keyMsg}\\n\\nCreate a relatable, funny meme post. Think: stressed animal at laptop, before/after format, POV format, chaos scenario — the kind that makes a CA stop scrolling and say \\'same\\'.\\n\\nThe meme should make the audience laugh AND subtly show how ${cfg.name} solves their pain. Never be corporate.\\n\\nOutput ONLY this JSON (no markdown):\\n{\\n  \\"hook\\": \\"Instagram caption opener — funny, relatable, under 15 words\\",\\n  \\"caption\\": \\"Rest of caption — conversational, punchy, under 150 chars\\",\\n  \\"hashtags\\": \\"${cfg.ig_hashtags} #Memes #RelatablyCA #CALife [add 2-3 more]\\",\\n  \\"top_label\\": \\"Short top text on meme card — e.g. HOW I FEEL or ME BEFORE FLOATUP — max 5 words ALL CAPS\\",\\n  \\"image_headline\\": \\"Main punchline on image — max 8 words ALL CAPS, funny and bold\\",\\n  \\"image_subtext\\": \\"Optional twist second line — max 6 words\\",\\n  \\"image_search_query\\": \\"Specific Pexels search term for a funny relatable stock photo — e.g. stressed dog laptop, cat sunglasses relaxing, person drowning paperwork\\",\\n  \\"cta\\": \\"${cfg.cta}\\",\\n  \\"predicted_score\\": <1-10>,\\n  \\"claude_design_prompt\\": \\"Write a ready-to-paste Claude.ai artifacts prompt (120-150 words) to generate an animated meme HTML card exactly 1080x1080px. Use the top_label and image_headline you just wrote above. Brand colors: ${cfg.colors}. top_label: bold banner at top with shake-once CSS animation (0.3s ease). image_headline: massive white bold centered text with bounce-in keyframe (0.6s cubic-bezier). image_subtext: italic below fades in (0.4s delay 0.5s). brand_tag ${cfg.cta} bottom-right appears last. Energetic feel. No external CDN. Output only valid HTML starting with <!DOCTYPE html>. Append: one sentence on adapting this as a 10-second Instagram Reels clip (1080x1920 vertical).\\"\\n}`;\n\n} else if (platform === 'instagram') {\n  prompt = `You are a top Instagram content strategist for B2B SaaS and creator brands.\\n\\nBRAND: ${cfg.name}\\nDESCRIPTION: ${cfg.desc}\\nTONE: ${cfg.tone}\\nAUDIENCE: ${cfg.audience}\\n\\nTODAY'S TRENDING TOPICS (use for relevance — DO NOT copy directly):\\n• ${trends}\\n\\nCONTENT BRIEF:\\n- Content Type: ${contentType}\\n- Topic: ${topic}\\n- Core Message: ${keyMsg}\\n- Target Emotion: ${targetEmotion}\\n\\nINSTAGRAM RULES:\\n- Caption max 220 chars (not including hashtags)\\n- Hook must work in first 2 lines before the more button — impossible to skip\\n- Hashtags at the very end after 2-3 line breaks\\n- Never start with the brand name. Feel native, NOT like an ad\\n\\nOutput ONLY this JSON (no markdown):\\n{\\n  \\"hook\\": \\"First 1-2 punchy lines — under 15 words, emotional or curiosity-driven\\",\\n  \\"caption\\": \\"Caption body under 180 chars — value-driven, conversational\\",\\n  \\"hashtags\\": \\"${cfg.ig_hashtags} [add 3-4 more niche ones]\\",\\n  \\"top_label\\": \\"\\",\\n  \\"image_headline\\": \\"3-5 ALL CAPS words for visual card — punchy and bold\\",\\n  \\"image_subtext\\": \\"One supporting line under headline — under 8 words\\",\\n  \\"image_search_query\\": \\"\\",\\n  \\"cta\\": \\"${cfg.cta}\\",\\n  \\"predicted_score\\": <1-10>,\\n  \\"claude_design_prompt\\": \\"Write a ready-to-paste Claude.ai artifacts prompt (150-200 words) to generate an animated HTML card exactly 1080x1080px. Reference the image_headline and image_subtext you just wrote above. Brand colors: ${cfg.colors}. Design: animated gradient or floating dots background at 15% opacity, headline slides up (0.7s ease-out), subtext fades in (0.6s delay 0.5s), brand tag ${cfg.cta} bottom-right fades in last (0.5s delay 1s). Animated motion preferred over static. No external CDN. Output only valid HTML starting with <!DOCTYPE html>. Append: one sentence on adapting this as a 10-second Instagram Reels clip (1080x1920 vertical).\\"\\n}`;\n\n} else {\n  prompt = `You are an expert LinkedIn content strategist for B2B founders and practitioners.\\n\\nYOU ARE WRITING AS: A practicing Chartered Accountant who co-founded ${cfg.name}\\nBRAND: ${cfg.name} — ${cfg.desc}\\nTONE: ${cfg.tone} — written as a real founder, NOT a marketer\\nAUDIENCE: ${cfg.audience}\\n\\nTODAY'S TRENDING TOPICS:\\n• ${trends}\\n\\nCONTENT BRIEF:\\n- Content Type: ${contentType}\\n- Topic: ${topic}\\n- Core Message: ${keyMsg}\\n- Target Emotion: ${targetEmotion}\\n\\nLINKEDIN RULES:\\n- First 2 lines MUST work standalone as hook (shown before see more)\\n- Text posts get MORE reach — this is text only, no image\\n- NO external links in post body — link goes in first comment\\n- Max 3-5 hashtags at the very end\\n- End with a genuine question to drive comments\\n- 150-350 words optimal\\n- Write like a human with a strong opinion, not a company announcement\\n\\nOutput ONLY this JSON (no markdown):\\n{\\n  \\"hook\\": \\"First 2 lines before see-more — bold opener under 25 words\\",\\n  \\"full_post\\": \\"Complete LinkedIn post: hook + body + closing question + hashtags with line breaks\\",\\n  \\"hashtags\\": \\"${cfg.li_hashtags} [add 1-2 more]\\",\\n  \\"first_comment\\": \\"Short first comment with link — e.g. Full details and free trial: ${cfg.cta}\\",\\n  \\"predicted_score\\": <1-10>,\\n  \\"claude_design_prompt\\": \\"Write a ready-to-paste Claude.ai artifacts prompt (150-200 words) to generate an animated professional LinkedIn banner exactly 1200x627px. Reference the hook text you just wrote as the main headline. Brand colors: ${cfg.colors}. Design: headline slides in from left (0.8s ease-out), subtitle fades in (0.6s delay 0.4s), thin accent line sweeps across bottom (1s delay 0.8s), brand name ${cfg.name} top-left immediate, tagline ${cfg.cta} bottom-right fades in last. Professional minimal motion. No external CDN. Output only valid HTML starting with <!DOCTYPE html>. Append: one sentence on adapting as a 20-second looping LinkedIn video intro.\\"\\n}`;\n}\n\nreturn [{ json: { ...row, brand_cfg: cfg, gemini_prompt: prompt, platform, brand, content_type: contentType, is_design: isDesign } }];"
       }
     },
     {
@@ -109,8 +104,8 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"contents\": [{ \"parts\": [{ \"text\": {{ JSON.stringify($json.gemini_prompt) }} }] }],\n  \"generationConfig\": { \"temperature\": 0.88, \"topP\": 0.95, \"maxOutputTokens\": 1000 }\n}",
-        "options": { "timeout": 30000 }
+        "jsonBody": "={\n  \"contents\": [{ \"parts\": [{ \"text\": {{ JSON.stringify($json.gemini_prompt) }} }] }],\n  \"generationConfig\": { \"temperature\": 0.88, \"topP\": 0.95, \"maxOutputTokens\": 2000 }\n}",
+        "options": { "timeout": 40000 }
       }
     },
     {
@@ -120,7 +115,7 @@
       "typeVersion": 2,
       "position": [1760, 180],
       "parameters": {
-        "jsCode": "const raw = $input.first().json;\nconst text = raw?.candidates?.[0]?.content?.parts?.[0]?.text || '';\nconst cleaned = text.replace(/```json\\s*/gi, '').replace(/```\\s*/g, '').trim();\n\nlet parsed = {};\ntry { parsed = JSON.parse(cleaned); }\ncatch(e) {\n  const match = cleaned.match(/\\{[\\s\\S]*\\}/);\n  if (match) { try { parsed = JSON.parse(match[0]); } catch(e2) {} }\n}\n\nconst ctx = $('Build Platform Prompt').first().json;\nconst platform = ctx.platform;\n\nlet result = { ...ctx, predicted_score: Number(parsed.predicted_score) || 5 };\n\nif (platform === 'instagram') {\n  result.hook = parsed.hook || '';\n  result.caption_body = parsed.caption || '';\n  result.hashtags = parsed.hashtags || ctx.brand_cfg?.ig_hashtags || '';\n  result.image_headline = parsed.image_headline || (ctx.topic || '').toUpperCase();\n  result.image_subtext = parsed.image_subtext || '';\n  result.cta = parsed.cta || 'floatup.app';\n  // Full caption for Buffer\n  result.full_post = `${parsed.hook}\\n\\n${parsed.caption}\\n\\n${parsed.hashtags}`.trim();\n} else {\n  // LinkedIn\n  result.hook = parsed.hook || '';\n  result.full_post = parsed.full_post || '';\n  result.hashtags = parsed.hashtags || ctx.brand_cfg?.li_hashtags || '';\n  result.first_comment = parsed.first_comment || '';\n  result.image_headline = '';\n  result.image_subtext = '';\n  result.cta = ctx.brand_cfg?.cta || '';\n}\n\nreturn [{ json: result }];"
+        "jsCode": "const raw = $input.first().json;\nconst text = raw?.candidates?.[0]?.content?.parts?.[0]?.text || '';\nconst ctx = $('Build Platform Prompt').first().json;\nconst platform = ctx.platform;\nconst contentType = ctx.content_type || '';\nconst isDesign = ctx.is_design || false;\n\nlet result = { ...ctx };\n\nif (isDesign) {\n  // Response is raw HTML — strip markdown code fences if present\n  const html = text.replace(/```html\\s*/gi, '').replace(/```\\s*/g, '').trim();\n  result.design_html = html;\n  result.full_post = '';\n  result.hook = '';\n  result.predicted_score = 8;\n  result.is_meme = false;\n  result.image_search_query = '';\n  result.top_label = '';\n  result.image_headline = ctx.topic || '';\n  result.image_subtext = '';\n  result.image_headline = '';\n  return [{ json: result }];\n}\n\nconst cleaned = text.replace(/```json\\s*/gi, '').replace(/```\\s*/g, '').trim();\nlet parsed = {};\ntry { parsed = JSON.parse(cleaned); }\ncatch(e) {\n  const match = cleaned.match(/\\{[\\s\\S]*\\}/);\n  if (match) { try { parsed = JSON.parse(match[0]); } catch(e2) {} }\n}\n\nresult.predicted_score = Number(parsed.predicted_score) || 5;\n\nif (platform === 'instagram') {\n  result.hook               = parsed.hook || '';\n  result.caption_body       = parsed.caption || '';\n  result.hashtags           = parsed.hashtags || ctx.brand_cfg?.ig_hashtags || '';\n  result.top_label          = parsed.top_label || '';\n  result.image_headline     = parsed.image_headline || (ctx.topic || '').toUpperCase();\n  result.image_subtext      = parsed.image_subtext || '';\n  result.image_search_query = parsed.image_search_query || '';\n  result.cta                = parsed.cta || 'floatup.app';\n  result.is_meme            = contentType === 'meme';\n  result.full_post          = `${parsed.hook}\\n\\n${parsed.caption || ''}\\n\\n${parsed.hashtags}`.trim();\nresult.claude_design_prompt = parsed.claude_design_prompt || '';\n} else {\n  result.hook          = parsed.hook || '';\n  result.full_post     = parsed.full_post || '';\n  result.hashtags      = parsed.hashtags || ctx.brand_cfg?.li_hashtags || '';\n  result.first_comment = parsed.first_comment || '';\n  result.claude_design_prompt = parsed.claude_design_prompt || '';\n  result.image_headline = '';\n  result.image_subtext  = '';\n  result.is_meme        = false;\n  result.image_search_query = '';\n  result.cta            = ctx.brand_cfg?.cta || '';\n}\n\nreturn [{ json: result }];"
       }
     },
     {
@@ -138,7 +133,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"contents\": [{ \"parts\": [{ \"text\": {{ JSON.stringify('Audit this ' + $json.platform + ' post for the brand ' + $json.brand + '.\\n\\nHOOK: ' + $json.hook + '\\n\\nFULL POST: ' + $json.full_post + '\\n\\nScore 1-10 on: hook strength (stops scroll), value delivered, brand voice match, CTA clarity.\\n\\nBe strict. 7 = publishable minimum. Output ONLY this JSON: {\"score\": <1-10>, \"issue\": \"main weakness in one line\", \"fix\": \"one specific improvement if score < 8\"}') }} }] }],\n  \"generationConfig\": { \"temperature\": 0.2, \"maxOutputTokens\": 200 }\n}",
+        "jsonBody": "={\n  \"contents\": [{ \"parts\": [{ \"text\": {{ JSON.stringify('Audit this ' + $json.platform + ' post for ' + $json.brand + '.\\n\\nHOOK: ' + $json.hook + '\\n\\nFULL POST: ' + $json.full_post + '\\n\\nScore 1-10 on: hook strength, value delivered, brand voice, CTA clarity.\\nBe strict. 7 = publishable minimum.\\nOutput ONLY: {\"score\": <1-10>, \"issue\": \"main weakness\", \"fix\": \"one specific improvement if score < 8\"}') }} }] }],\n  \"generationConfig\": { \"temperature\": 0.2, \"maxOutputTokens\": 200 }\n}",
         "options": { "timeout": 20000 }
       }
     },
@@ -149,7 +144,7 @@
       "typeVersion": 2,
       "position": [2200, 180],
       "parameters": {
-        "jsCode": "const raw = $input.first().json;\nconst text = raw?.candidates?.[0]?.content?.parts?.[0]?.text || '';\nconst cleaned = text.replace(/```json\\s*/gi, '').replace(/```\\s*/g, '').trim();\n\nlet audit = { score: 5, issue: '', fix: '' };\ntry { audit = JSON.parse(cleaned); }\ncatch(e) {\n  const match = cleaned.match(/\\{[\\s\\S]*\\}/);\n  if (match) { try { audit = JSON.parse(match[0]); } catch(e2) {} }\n}\n\nconst ctx = $('Parse Content Response').first().json;\n\nreturn [{ json: {\n  ...ctx,\n  audit_score: Number(audit.score) || 5,\n  audit_issue: audit.issue || '',\n  audit_fix: audit.fix || ''\n}}];"
+        "jsCode": "const ctx = $('Parse Content Response').first().json;\n\n// Custom designs skip real audit — they always pass so user can review manually\nif (ctx.is_design) {\n  return [{ json: { ...ctx, audit_score: 8, audit_issue: '', audit_fix: '' } }];\n}\n\nconst raw = $input.first().json;\nconst text = raw?.candidates?.[0]?.content?.parts?.[0]?.text || '';\nconst cleaned = text.replace(/```json\\s*/gi, '').replace(/```\\s*/g, '').trim();\n\nlet audit = { score: 5, issue: '', fix: '' };\ntry { audit = JSON.parse(cleaned); }\ncatch(e) {\n  const match = cleaned.match(/\\{[\\s\\S]*\\}/);\n  if (match) { try { audit = JSON.parse(match[0]); } catch(e2) {} }\n}\n\nreturn [{ json: {\n  ...ctx,\n  audit_score: Number(audit.score) || 5,\n  audit_issue: audit.issue || '',\n  audit_fix: audit.fix || ''\n} }];"
       }
     },
     {
@@ -161,12 +156,7 @@
       "parameters": {
         "conditions": {
           "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
-          "conditions": [{
-            "id": "score-check",
-            "leftValue": "={{ $json.audit_score }}",
-            "rightValue": 7,
-            "operator": { "type": "number", "operation": "gte" }
-          }],
+          "conditions": [{ "id": "score-check", "leftValue": "={{ $json.audit_score }}", "rightValue": 7, "operator": { "type": "number", "operation": "gte" } }],
           "combinator": "and"
         },
         "options": {}
@@ -181,15 +171,110 @@
       "parameters": {
         "conditions": {
           "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
-          "conditions": [{
-            "id": "platform-check",
-            "leftValue": "={{ $json.platform }}",
-            "rightValue": "instagram",
-            "operator": { "type": "string", "operation": "equals" }
-          }],
+          "conditions": [{ "id": "platform-check", "leftValue": "={{ $json.platform }}", "rightValue": "instagram", "operator": { "type": "string", "operation": "equals" } }],
           "combinator": "and"
         },
         "options": {}
+      }
+    },
+    {
+      "id": "13b-design-check",
+      "name": "Custom Design or Content?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2860, -80],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [{ "id": "design-check", "leftValue": "={{ $json.is_design }}", "rightValue": true, "operator": { "type": "boolean", "operation": "equals" } }],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "13c-sheets-save-design",
+      "name": "Sheets — Save Design for Review",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [3100, -220],
+      "parameters": {
+        "operation": "update",
+        "documentId": { "__rl": true, "value": "YOUR_GOOGLE_SHEET_ID_HERE", "mode": "id" },
+        "sheetName": { "__rl": true, "value": "Content Queue", "mode": "name" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "row_number": "={{ $json._row_number }}",
+            "status": "design_ready",
+            "design_status": "design_ready",
+            "design_html": "={{ $json.design_html?.slice(0, 2000) }}",
+            "claude_design_prompt": "={{ $json.claude_design_prompt?.slice(0, 800) }}",
+            "posted_date": "={{ new Date().toISOString().split('T')[0] }}"
+          },
+          "matchingColumns": ["row_number"],
+          "schema": []
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "google-sheets-cred", "name": "Google Sheets Account" }
+      }
+    },
+    {
+      "id": "13d-telegram-design",
+      "name": "Telegram — Design Ready to Screenshot",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [3350, -220],
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID_HERE",
+        "text": "=✏️ <b>Design Card Ready for Review!</b>\n\n📌 <b>Brand:</b> {{ $json.brand?.toUpperCase() }}\n📝 <b>Topic:</b> {{ $json.topic }}\n💡 <b>Brief:</b> {{ $json.claude_design_prompt?.slice(0, 150) }}\n\n<b>Next steps:</b>\n1. Open Google Sheets → find this row\n2. Copy the <b>design_html</b> column content\n3. Paste into browser or codepen.io\n4. Screenshot at 1080×1080px\n5. Post manually to Instagram with caption below:\n\n<b>Suggested caption:</b>\n{{ $json.key_message }}\n\n{{ $json.brand_cfg?.ig_hashtags }}",
+        "additionalFields": { "parse_mode": "HTML" }
+      },
+      "credentials": {
+        "telegramApi": { "id": "telegram-cred", "name": "Telegram Bot" }
+      }
+    },
+    {
+      "id": "13f-meme-check",
+      "name": "Meme or Regular Card?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [3100, -80],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [{ "id": "meme-check", "leftValue": "={{ $json.is_meme }}", "rightValue": true, "operator": { "type": "boolean", "operation": "equals" } }],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "13g-pexels-fetch",
+      "name": "Fetch Meme Photo (Pexels)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3350, -200],
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.pexels.com/v1/search?query={{ encodeURIComponent($json.image_search_query || 'stressed person laptop office') }}&per_page=3&orientation=square&size=large",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Authorization", "value": "YOUR_PEXELS_API_KEY_HERE" }]
+        },
+        "options": { "timeout": 10000 }
+      }
+    },
+    {
+      "id": "13h-prep-meme",
+      "name": "Prepare Meme Bannerbear Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3600, -200],
+      "parameters": {
+        "jsCode": "const pexels = $input.first().json;\nconst ctx = $('Parse Audit Score').first().json;\n\nconst photos = pexels.photos || [];\nconst photoUrl = photos[0]?.src?.large2x || photos[0]?.src?.large || photos[0]?.src?.original || '';\n\nreturn [{ json: {\n  ...ctx,\n  pexels_photo_url: photoUrl,\n  bannerbear_template_id: ctx.brand === 'floatup'\n    ? 'YOUR_FLOATUP_MEME_BANNERBEAR_TEMPLATE_ID'\n    : 'YOUR_AI_COMMUNITY_MEME_BANNERBEAR_TEMPLATE_ID',\n  bannerbear_modifications: [\n    { name: 'background_image', image_url: photoUrl },\n    { name: 'top_label',   text: (ctx.top_label || '').slice(0, 30) },\n    { name: 'headline',    text: (ctx.image_headline || '').slice(0, 50) },\n    { name: 'image_subtext', text: (ctx.image_subtext || '').slice(0, 40) },\n    { name: 'brand_tag',   text: ctx.cta || 'floatup.app' }\n  ]\n} }];"
       }
     },
     {
@@ -197,7 +282,7 @@
       "name": "Bannerbear — Create Image",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2860, -60],
+      "position": [3850, -80],
       "parameters": {
         "method": "POST",
         "url": "https://api.bannerbear.com/v2/images",
@@ -210,7 +295,7 @@
         },
         "sendBody": true,
         "specifyBody": "string",
-        "body": "={{ JSON.stringify({ template: $json.brand === 'floatup' ? 'YOUR_FLOATUP_BANNERBEAR_TEMPLATE_ID' : 'YOUR_AI_COMMUNITY_BANNERBEAR_TEMPLATE_ID', modifications: [{ name: 'headline', text: ($json.image_headline || 'FLOATUP').slice(0,40) }, { name: 'subtext', text: ($json.image_subtext || '').slice(0,60) }, { name: 'brand_tag', text: $json.cta || 'floatup.app' }] }) }}",
+        "body": "={{ JSON.stringify({ template: $json.bannerbear_template_id || ($json.brand === 'floatup' ? 'YOUR_FLOATUP_REGULAR_TEMPLATE_ID' : 'YOUR_AI_COMMUNITY_REGULAR_TEMPLATE_ID'), modifications: $json.bannerbear_modifications || [{ name: 'headline', text: ($json.image_headline || 'FLOATUP').slice(0,40) }, { name: 'subtext', text: ($json.image_subtext || '').slice(0,60) }, { name: 'brand_tag', text: $json.cta || 'floatup.app' }] }) }}",
         "options": { "timeout": 20000 }
       }
     },
@@ -219,7 +304,7 @@
       "name": "Wait 25 Seconds",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
-      "position": [3080, -60],
+      "position": [4080, -80],
       "parameters": { "unit": "seconds", "amount": 25 },
       "webhookId": "wait-render-bb"
     },
@@ -228,7 +313,7 @@
       "name": "Bannerbear — Get Rendered Image",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [3300, -60],
+      "position": [4310, -80],
       "parameters": {
         "method": "GET",
         "url": "=https://api.bannerbear.com/v2/images/{{ $('Bannerbear — Create Image').first().json.uid }}",
@@ -244,9 +329,9 @@
       "name": "Prepare Instagram Buffer Payload",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [3520, -60],
+      "position": [4540, -80],
       "parameters": {
-        "jsCode": "const bbResponse = $input.first().json;\nconst imageUrl = bbResponse.image_url_png || bbResponse.image_url || '';\n\nconst ctx = $('Parse Audit Score').first().json;\n\n// Schedule at noon today (IST)\nconst scheduledAt = (() => { const d = new Date(); d.setHours(12, 0, 0, 0); return Math.floor(d.getTime() / 1000); })();\n\nreturn [{ json: {\n  ...ctx,\n  image_url: imageUrl,\n  buffer_profile_id: ctx.brand === 'floatup' ? 'YOUR_FLOATUP_INSTAGRAM_BUFFER_PROFILE_ID' : 'YOUR_AI_COMMUNITY_INSTAGRAM_BUFFER_PROFILE_ID',\n  buffer_scheduled_at: scheduledAt\n}}];"
+        "jsCode": "const bbResponse = $input.first().json;\nconst imageUrl = bbResponse.image_url_png || bbResponse.image_url || '';\nconst ctx = $('Parse Audit Score').first().json;\nconst scheduledAt = (() => { const d = new Date(); d.setHours(12, 0, 0, 0); return Math.floor(d.getTime() / 1000); })();\nreturn [{ json: {\n  ...ctx,\n  image_url: imageUrl,\n  buffer_profile_id: ctx.brand === 'floatup' ? 'YOUR_FLOATUP_INSTAGRAM_BUFFER_PROFILE_ID' : 'YOUR_AI_COMMUNITY_INSTAGRAM_BUFFER_PROFILE_ID',\n  buffer_scheduled_at: scheduledAt\n} }];"
       }
     },
     {
@@ -254,7 +339,7 @@
       "name": "Buffer — Post to Instagram",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [3740, -60],
+      "position": [4770, -80],
       "parameters": {
         "method": "POST",
         "url": "https://api.bufferapp.com/1/updates/create.json",
@@ -280,9 +365,9 @@
       "name": "Prepare LinkedIn Buffer Payload",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2860, 180],
+      "position": [2860, 200],
       "parameters": {
-        "jsCode": "const ctx = $input.first().json;\n\n// Schedule LinkedIn at 8:30 AM (catches morning commute)\nconst scheduledAt = (() => { const d = new Date(); d.setHours(8, 30, 0, 0); return Math.floor(d.getTime() / 1000); })();\n\nreturn [{ json: {\n  ...ctx,\n  image_url: '',\n  buffer_profile_id: ctx.brand === 'floatup' ? 'YOUR_FLOATUP_LINKEDIN_BUFFER_PROFILE_ID' : 'YOUR_AI_COMMUNITY_LINKEDIN_BUFFER_PROFILE_ID',\n  buffer_scheduled_at: scheduledAt\n}}];"
+        "jsCode": "const ctx = $input.first().json;\nconst scheduledAt = (() => { const d = new Date(); d.setHours(8, 30, 0, 0); return Math.floor(d.getTime() / 1000); })();\nreturn [{ json: {\n  ...ctx,\n  image_url: '',\n  buffer_profile_id: ctx.brand === 'floatup' ? 'YOUR_FLOATUP_LINKEDIN_BUFFER_PROFILE_ID' : 'YOUR_AI_COMMUNITY_LINKEDIN_BUFFER_PROFILE_ID',\n  buffer_scheduled_at: scheduledAt\n} }];"
       }
     },
     {
@@ -290,7 +375,7 @@
       "name": "Buffer — Post to LinkedIn",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [3080, 180],
+      "position": [3100, 200],
       "parameters": {
         "method": "POST",
         "url": "https://api.bufferapp.com/1/updates/create.json",
@@ -315,7 +400,7 @@
       "name": "Sheets — Mark Done",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.4,
-      "position": [3960, 60],
+      "position": [5000, 60],
       "parameters": {
         "operation": "update",
         "documentId": { "__rl": true, "value": "YOUR_GOOGLE_SHEET_ID_HERE", "mode": "id" },
@@ -328,6 +413,7 @@
             "generated_post": "={{ $json.full_post?.slice(0, 500) }}",
             "image_url": "={{ $json.image_url || '' }}",
             "audit_score": "={{ $json.audit_score }}",
+            "claude_design_prompt": "={{ $json.claude_design_prompt?.slice(0, 800) }}",
             "posted_date": "={{ new Date().toISOString().split('T')[0] }}"
           },
           "matchingColumns": ["row_number"],
@@ -344,10 +430,10 @@
       "name": "Telegram — Scheduled Successfully",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [4180, 60],
+      "position": [5220, 60],
       "parameters": {
         "chatId": "YOUR_TELEGRAM_CHAT_ID_HERE",
-        "text": "=✅ <b>Post Scheduled!</b>\n\n📌 <b>Brand:</b> {{ $json.brand?.toUpperCase() }}\n📱 <b>Platform:</b> {{ $json.platform?.toUpperCase() }}\n🏷️ <b>Type:</b> {{ $json.content_type }}\n📝 <b>Topic:</b> {{ $json.topic }}\n⭐ <b>Score:</b> {{ $json.audit_score }}/10\n\n<b>Hook:</b>\n{{ $json.hook }}\n\n{{ $json.platform === 'instagram' ? '🖼️ Image: ' + $json.image_url : '💼 LinkedIn text post — link goes in first comment' }}\n\n<i>Scheduled for today ✓</i>",
+        "text": "=✅ <b>Post Scheduled!</b>\n\n📌 <b>Brand:</b> {{ $json.brand?.toUpperCase() }}\n📱 <b>Platform:</b> {{ $json.platform?.toUpperCase() }}\n🏷️ <b>Type:</b> {{ $json.content_type }}{{ $json.is_meme ? ' 🐶 MEME' : '' }}\n📝 <b>Topic:</b> {{ $json.topic }}\n⭐ <b>Score:</b> {{ $json.audit_score }}/10\n\n<b>Hook:</b>\n{{ $json.hook }}\n\n{{ $json.platform === 'instagram' ? '🖼️ Image: ' + $json.image_url : '💼 LinkedIn — link goes in first comment:\\n' + $json.first_comment }}\n\n<i>Scheduled for today ✓</i>",
         "additionalFields": { "parse_mode": "HTML" }
       },
       "credentials": {
@@ -359,7 +445,7 @@
       "name": "Sheets — Mark Review Needed",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.4,
-      "position": [2640, 340],
+      "position": [2640, 360],
       "parameters": {
         "operation": "update",
         "documentId": { "__rl": true, "value": "YOUR_GOOGLE_SHEET_ID_HERE", "mode": "id" },
@@ -371,6 +457,7 @@
             "status": "review_needed",
             "generated_post": "={{ $json.full_post?.slice(0, 500) }}",
             "audit_score": "={{ $json.audit_score }}",
+            "claude_design_prompt": "={{ $json.claude_design_prompt?.slice(0, 800) }}",
             "audit_notes": "={{ $json.audit_issue + ' | Fix: ' + $json.audit_fix }}"
           },
           "matchingColumns": ["row_number"],
@@ -387,10 +474,10 @@
       "name": "Telegram — Needs Review",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [2860, 340],
+      "position": [2860, 360],
       "parameters": {
         "chatId": "YOUR_TELEGRAM_CHAT_ID_HERE",
-        "text": "=⚠️ <b>Post Needs Review</b>\n\n📌 <b>Brand:</b> {{ $json.brand?.toUpperCase() }}\n📱 <b>Platform:</b> {{ $json.platform }}\n📝 <b>Topic:</b> {{ $json.topic }}\n⭐ <b>Score:</b> {{ $json.audit_score }}/10 (min 7)\n\n<b>Issue:</b> {{ $json.audit_issue }}\n<b>Fix:</b> {{ $json.audit_fix }}\n\n<b>Draft:</b>\n{{ $json.full_post?.slice(0, 300) }}...\n\n👉 Edit in Google Sheets → reset <b>status</b> to <b>pending</b> to retry.",
+        "text": "=⚠️ <b>Post Needs Review</b>\n\n📌 <b>Brand:</b> {{ $json.brand?.toUpperCase() }}\n📱 <b>Platform:</b> {{ $json.platform }}\n📝 <b>Topic:</b> {{ $json.topic }}\n⭐ <b>Score:</b> {{ $json.audit_score }}/10 (min 7)\n\n<b>Issue:</b> {{ $json.audit_issue }}\n<b>Fix:</b> {{ $json.audit_fix }}\n\n<b>Draft:</b>\n{{ $json.full_post?.slice(0, 300) }}...\n\n👉 Edit row in Google Sheets → reset <b>status</b> to <b>pending</b> to retry.",
         "additionalFields": { "parse_mode": "HTML" }
       },
       "credentials": {
@@ -405,7 +492,7 @@
       "position": [1100, 420],
       "parameters": {
         "chatId": "YOUR_TELEGRAM_CHAT_ID_HERE",
-        "text": "📭 <b>Content OS:</b> No posts scheduled for today.\n\nAdd rows to your Google Sheet with <b>status = pending</b> and today's date to queue content.",
+        "text": "📭 <b>Content OS:</b> No posts scheduled for today.\n\nAdd rows to your Google Sheet with <b>status = pending</b> and today's date.",
         "additionalFields": { "parse_mode": "HTML" }
       },
       "credentials": {
@@ -461,9 +548,33 @@
     },
     "Platform — Instagram or LinkedIn?": {
       "main": [
-        [{ "node": "Bannerbear — Create Image", "type": "main", "index": 0 }],
+        [{ "node": "Custom Design or Content?", "type": "main", "index": 0 }],
         [{ "node": "Prepare LinkedIn Buffer Payload", "type": "main", "index": 0 }]
       ]
+    },
+    "Custom Design or Content?": {
+      "main": [
+        [{ "node": "Sheets — Save Design for Review", "type": "main", "index": 0 }],
+        [{ "node": "Meme or Regular Card?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Sheets — Save Design for Review": {
+      "main": [[{ "node": "Telegram — Design Ready to Screenshot", "type": "main", "index": 0 }]]
+    },
+    "Telegram — Design Ready to Screenshot": {
+      "main": [[{ "node": "Process Each Row", "type": "main", "index": 0 }]]
+    },
+    "Meme or Regular Card?": {
+      "main": [
+        [{ "node": "Fetch Meme Photo (Pexels)", "type": "main", "index": 0 }],
+        [{ "node": "Bannerbear — Create Image", "type": "main", "index": 0 }]
+      ]
+    },
+    "Fetch Meme Photo (Pexels)": {
+      "main": [[{ "node": "Prepare Meme Bannerbear Payload", "type": "main", "index": 0 }]]
+    },
+    "Prepare Meme Bannerbear Payload": {
+      "main": [[{ "node": "Bannerbear — Create Image", "type": "main", "index": 0 }]]
     },
     "Bannerbear — Create Image": {
       "main": [[{ "node": "Wait 25 Seconds", "type": "main", "index": 0 }]]
@@ -501,7 +612,7 @@
   },
   "active": false,
   "settings": { "executionOrder": "v1", "saveManualExecutions": true },
-  "versionId": "sng-li-ig-v1",
+  "versionId": "sng-li-ig-v2",
   "meta": { "templateCredsSetupCompleted": false },
   "id": "sng-li-ig-001",
   "tags": [{ "id": "tag-002", "name": "sng-automation" }]
