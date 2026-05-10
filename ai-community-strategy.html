@@ -1,0 +1,1409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Community Strategy — Saksham & Sachit</title>
+  <style>
+    :root {
+      --bg: #07070f;
+      --bg2: #0e0e1a;
+      --bg3: #13131f;
+      --border: #1f1f35;
+      --purple: #7c3aed;
+      --purple-light: #a78bfa;
+      --cyan: #06b6d4;
+      --cyan-light: #67e8f9;
+      --green: #10b981;
+      --orange: #f59e0b;
+      --pink: #ec4899;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --text-dim: #475569;
+      --radius: 12px;
+      --radius-lg: 20px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(7,7,15,0.85);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+      display: flex; align-items: center; justify-content: space-between;
+      height: 58px;
+    }
+    .nav-logo {
+      font-weight: 700; font-size: 1rem;
+      background: linear-gradient(135deg, var(--purple-light), var(--cyan));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .nav-links {
+      display: flex; gap: 0.25rem; list-style: none;
+    }
+    .nav-links a {
+      color: var(--text-muted); text-decoration: none; font-size: 0.8rem;
+      padding: 0.4rem 0.75rem; border-radius: 6px; transition: all 0.2s;
+    }
+    .nav-links a:hover { color: var(--text); background: var(--bg3); }
+    .nav-links a.active { color: var(--purple-light); background: rgba(124,58,237,0.12); }
+
+    /* ── SECTIONS ── */
+    section { padding: 6rem 2rem; max-width: 1100px; margin: 0 auto; }
+    section:first-of-type { padding-top: 9rem; }
+
+    h2.section-title {
+      font-size: 2rem; font-weight: 800; margin-bottom: 0.5rem;
+      background: linear-gradient(135deg, #fff 60%, var(--purple-light));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .section-sub {
+      color: var(--text-muted); margin-bottom: 3rem; font-size: 1rem;
+    }
+
+    /* ── HERO ── */
+    #hero {
+      min-height: 100vh; display: flex; flex-direction: column;
+      justify-content: center; align-items: center; text-align: center;
+      position: relative; padding-top: 58px;
+    }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      background: rgba(124,58,237,0.15); border: 1px solid rgba(124,58,237,0.3);
+      color: var(--purple-light); padding: 0.4rem 1rem; border-radius: 50px;
+      font-size: 0.8rem; font-weight: 600; margin-bottom: 2rem;
+      animation: fadeDown 0.6s ease both;
+    }
+    .hero-badge span { width: 6px; height: 6px; background: var(--purple-light); border-radius: 50%; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(1.4)} }
+
+    .hero-title {
+      font-size: clamp(2.5rem, 6vw, 4.5rem);
+      font-weight: 900; line-height: 1.1; margin-bottom: 1.5rem;
+      animation: fadeDown 0.6s 0.1s ease both;
+    }
+    .hero-title .grad {
+      background: linear-gradient(135deg, var(--purple-light), var(--cyan), var(--purple-light));
+      background-size: 200%;
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      animation: shimmer 4s linear infinite;
+    }
+    @keyframes shimmer { 0%{background-position:0%} 100%{background-position:200%} }
+
+    .hero-desc {
+      font-size: 1.15rem; color: var(--text-muted); max-width: 620px;
+      margin: 0 auto 3rem; animation: fadeDown 0.6s 0.2s ease both;
+    }
+
+    .hero-duo {
+      display: flex; gap: 1.5rem; justify-content: center; flex-wrap: wrap;
+      animation: fadeDown 0.6s 0.3s ease both;
+    }
+    .duo-card {
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 1.5rem 2rem;
+      display: flex; align-items: center; gap: 1rem; min-width: 240px;
+      transition: border-color 0.3s, transform 0.3s;
+    }
+    .duo-card:hover { border-color: var(--purple); transform: translateY(-3px); }
+    .duo-avatar {
+      width: 52px; height: 52px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.3rem; font-weight: 800; flex-shrink: 0;
+    }
+    .duo-card:nth-child(1) .duo-avatar { background: linear-gradient(135deg, var(--purple), #4f46e5); }
+    .duo-card:nth-child(2) .duo-avatar { background: linear-gradient(135deg, var(--cyan), #0891b2); }
+    .duo-info { text-align: left; }
+    .duo-name { font-weight: 700; font-size: 1rem; }
+    .duo-role { font-size: 0.78rem; color: var(--text-muted); margin-top: 0.2rem; }
+    .duo-tag {
+      font-size: 0.7rem; font-weight: 600; margin-top: 0.4rem;
+      display: inline-block; padding: 0.2rem 0.6rem; border-radius: 50px;
+    }
+    .duo-card:nth-child(1) .duo-tag { background: rgba(124,58,237,0.2); color: var(--purple-light); }
+    .duo-card:nth-child(2) .duo-tag { background: rgba(6,182,212,0.2); color: var(--cyan-light); }
+
+    .hero-inspo {
+      margin-top: 2.5rem; color: var(--text-dim); font-size: 0.8rem;
+      animation: fadeDown 0.6s 0.4s ease both;
+    }
+    .hero-inspo span { color: var(--text-muted); }
+
+    .orb {
+      position: absolute; border-radius: 50%; filter: blur(80px); pointer-events: none; z-index: -1;
+    }
+    .orb-1 { width: 400px; height: 400px; background: rgba(124,58,237,0.15); top: 10%; left: -10%; }
+    .orb-2 { width: 300px; height: 300px; background: rgba(6,182,212,0.1); bottom: 15%; right: -5%; }
+
+    @keyframes fadeDown { from{opacity:0;transform:translateY(-16px)} to{opacity:1;transform:translateY(0)} }
+
+    /* ── EDGE / ADVANTAGES ── */
+    .edge-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem;
+    }
+    .edge-card {
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 1.75rem;
+      transition: border-color 0.3s, transform 0.3s;
+      position: relative; overflow: hidden;
+    }
+    .edge-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: var(--grad); opacity: 0; transition: opacity 0.3s;
+    }
+    .edge-card:hover::before { opacity: 1; }
+    .edge-card:hover { border-color: rgba(124,58,237,0.4); transform: translateY(-4px); }
+    .edge-card:nth-child(1) { --grad: linear-gradient(90deg, var(--purple), #4f46e5); }
+    .edge-card:nth-child(2) { --grad: linear-gradient(90deg, var(--cyan), #0891b2); }
+    .edge-card:nth-child(3) { --grad: linear-gradient(90deg, var(--green), #059669); }
+    .edge-card:nth-child(4) { --grad: linear-gradient(90deg, var(--orange), #d97706); }
+    .edge-icon { font-size: 2rem; margin-bottom: 1rem; }
+    .edge-title { font-weight: 700; font-size: 1.05rem; margin-bottom: 0.5rem; }
+    .edge-desc { color: var(--text-muted); font-size: 0.9rem; line-height: 1.6; }
+    .edge-highlight {
+      margin-top: 0.75rem; font-size: 0.8rem; font-weight: 600;
+      padding: 0.3rem 0.75rem; border-radius: 50px; display: inline-block;
+    }
+    .edge-card:nth-child(1) .edge-highlight { background: rgba(124,58,237,0.2); color: var(--purple-light); }
+    .edge-card:nth-child(2) .edge-highlight { background: rgba(6,182,212,0.2); color: var(--cyan-light); }
+    .edge-card:nth-child(3) .edge-highlight { background: rgba(16,185,129,0.2); color: #6ee7b7; }
+    .edge-card:nth-child(4) .edge-highlight { background: rgba(245,158,11,0.2); color: #fcd34d; }
+
+    /* ── FLYWHEEL ── */
+    .flywheel {
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 2.5rem;
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0;
+      margin-top: 2rem;
+    }
+    .fw-step {
+      text-align: center; padding: 1rem 1.25rem;
+      display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
+    }
+    .fw-circle {
+      width: 72px; height: 72px; border-radius: 50%;
+      background: rgba(124,58,237,0.15); border: 2px solid rgba(124,58,237,0.3);
+      display: flex; align-items: center; justify-content: center; font-size: 1.5rem;
+      transition: all 0.3s;
+    }
+    .fw-step:hover .fw-circle { background: rgba(124,58,237,0.3); border-color: var(--purple-light); transform: scale(1.1); }
+    .fw-label { font-size: 0.75rem; color: var(--text-muted); font-weight: 600; max-width: 90px; }
+    .fw-arrow { color: var(--purple); font-size: 1.5rem; padding: 0 0.25rem; align-self: center; }
+
+    /* ── COMMUNITY TIERS ── */
+    .tier-tabs {
+      display: flex; gap: 0.5rem; margin-bottom: 2rem; flex-wrap: wrap;
+    }
+    .tier-tab {
+      padding: 0.5rem 1.25rem; border-radius: 50px; border: 1px solid var(--border);
+      background: transparent; color: var(--text-muted); cursor: pointer;
+      font-size: 0.85rem; font-weight: 600; transition: all 0.2s;
+    }
+    .tier-tab.active, .tier-tab:hover {
+      background: rgba(124,58,237,0.15); border-color: var(--purple);
+      color: var(--purple-light);
+    }
+    .tier-panel { display: none; }
+    .tier-panel.active { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.25rem; }
+
+    .tier-card {
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 1.75rem; position: relative;
+    }
+    .tier-card.featured { border-color: var(--purple); }
+    .featured-badge {
+      position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+      background: var(--purple); color: #fff; font-size: 0.7rem; font-weight: 700;
+      padding: 0.25rem 0.9rem; border-radius: 50px; white-space: nowrap;
+    }
+    .tier-name { font-weight: 800; font-size: 1.1rem; margin-bottom: 0.5rem; }
+    .tier-price { font-size: 1.8rem; font-weight: 900; margin-bottom: 0.25rem; }
+    .tier-price span { font-size: 0.9rem; font-weight: 400; color: var(--text-muted); }
+    .tier-desc { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.25rem; }
+    .tier-features { list-style: none; display: flex; flex-direction: column; gap: 0.5rem; }
+    .tier-features li { font-size: 0.85rem; display: flex; align-items: flex-start; gap: 0.6rem; }
+    .tier-features li::before { content: '✓'; color: var(--green); font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+
+    /* ── TOOLS ── */
+    .tool-filters {
+      display: flex; gap: 0.5rem; margin-bottom: 2rem; flex-wrap: wrap;
+    }
+    .tool-filter {
+      padding: 0.45rem 1rem; border-radius: 50px; border: 1px solid var(--border);
+      background: transparent; color: var(--text-muted); cursor: pointer;
+      font-size: 0.82rem; font-weight: 600; transition: all 0.2s;
+    }
+    .tool-filter.active { background: rgba(124,58,237,0.15); border-color: var(--purple); color: var(--purple-light); }
+    .tool-filter[data-cat="self"].active { background: rgba(245,158,11,0.15); border-color: var(--orange); color: #fcd34d; }
+    .tool-filter[data-cat="ca"].active { background: rgba(16,185,129,0.15); border-color: var(--green); color: #6ee7b7; }
+    .tool-filter[data-cat="community"].active { background: rgba(6,182,212,0.15); border-color: var(--cyan); color: var(--cyan-light); }
+
+    .tools-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.25rem;
+    }
+    .tool-card {
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 1.5rem;
+      transition: border-color 0.3s, transform 0.3s; cursor: default;
+    }
+    .tool-card:hover { transform: translateY(-3px); }
+    .tool-card[data-cat="self"]:hover { border-color: rgba(245,158,11,0.5); }
+    .tool-card[data-cat="ca"]:hover { border-color: rgba(16,185,129,0.5); }
+    .tool-card[data-cat="community"]:hover { border-color: rgba(6,182,212,0.5); }
+    .tool-card.hidden { display: none; }
+
+    .tool-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 0.75rem; gap: 0.5rem; }
+    .tool-icon { font-size: 1.6rem; }
+    .tool-cat-badge {
+      font-size: 0.68rem; font-weight: 700; padding: 0.2rem 0.6rem;
+      border-radius: 50px; white-space: nowrap; flex-shrink: 0;
+    }
+    [data-cat="self"] .tool-cat-badge { background: rgba(245,158,11,0.15); color: #fcd34d; }
+    [data-cat="ca"] .tool-cat-badge { background: rgba(16,185,129,0.15); color: #6ee7b7; }
+    [data-cat="community"] .tool-cat-badge { background: rgba(6,182,212,0.15); color: var(--cyan-light); }
+
+    .tool-name { font-weight: 700; font-size: 1rem; margin-bottom: 0.4rem; }
+    .tool-problem { color: var(--text-muted); font-size: 0.82rem; margin-bottom: 1rem; line-height: 1.5; }
+    .tool-meta { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .tool-pill {
+      font-size: 0.7rem; font-weight: 600; padding: 0.2rem 0.65rem;
+      border-radius: 50px; border: 1px solid var(--border);
+    }
+    .effort-low { border-color: rgba(16,185,129,0.4); color: #6ee7b7; }
+    .effort-medium { border-color: rgba(245,158,11,0.4); color: #fcd34d; }
+    .effort-high { border-color: rgba(236,72,153,0.4); color: #f9a8d4; }
+    .build-first { background: rgba(124,58,237,0.2); border-color: var(--purple); color: var(--purple-light); }
+
+    /* ── REVENUE ── */
+    .revenue-stack {
+      display: flex; flex-direction: column; gap: 1rem;
+    }
+    .rev-item {
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 1.5rem 1.75rem;
+      display: flex; align-items: center; gap: 1.5rem;
+      transition: border-color 0.3s; cursor: default;
+    }
+    .rev-item:hover { border-color: rgba(124,58,237,0.4); }
+    .rev-icon { font-size: 1.8rem; flex-shrink: 0; }
+    .rev-info { flex: 1; }
+    .rev-name { font-weight: 700; font-size: 1rem; margin-bottom: 0.25rem; }
+    .rev-desc { color: var(--text-muted); font-size: 0.83rem; }
+    .rev-amount {
+      font-weight: 800; font-size: 1.2rem; text-align: right; flex-shrink: 0;
+      color: var(--green);
+    }
+    .rev-amount small { display: block; font-size: 0.7rem; font-weight: 400; color: var(--text-dim); }
+
+    .rev-total {
+      background: linear-gradient(135deg, rgba(124,58,237,0.15), rgba(6,182,212,0.1));
+      border: 1px solid rgba(124,58,237,0.4); border-radius: var(--radius);
+      padding: 1.75rem; text-align: center; margin-top: 0.5rem;
+    }
+    .rev-total-label { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.25rem; }
+    .rev-total-num { font-size: 2.5rem; font-weight: 900; color: var(--purple-light); }
+    .rev-total-sub { color: var(--text-muted); font-size: 0.8rem; margin-top: 0.25rem; }
+
+    /* ── TIMELINE ── */
+    .timeline-phases {
+      display: flex; gap: 0.5rem; margin-bottom: 2rem; flex-wrap: wrap;
+    }
+    .phase-btn {
+      padding: 0.5rem 1.25rem; border-radius: 8px; border: 1px solid var(--border);
+      background: transparent; color: var(--text-muted); cursor: pointer;
+      font-size: 0.85rem; font-weight: 600; transition: all 0.2s;
+    }
+    .phase-btn:hover { background: var(--bg3); color: var(--text); }
+    .phase-btn.active { color: #fff; border-color: transparent; }
+    .phase-btn[data-phase="1"].active { background: linear-gradient(135deg, var(--purple), #4f46e5); }
+    .phase-btn[data-phase="2"].active { background: linear-gradient(135deg, var(--cyan), #0891b2); }
+    .phase-btn[data-phase="3"].active { background: linear-gradient(135deg, var(--green), #059669); }
+    .phase-btn[data-phase="4"].active { background: linear-gradient(135deg, var(--orange), #d97706); }
+
+    .phase-content { display: none; }
+    .phase-content.active {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem;
+      animation: fadeIn 0.3s ease;
+    }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+    .month-card {
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 1.5rem;
+    }
+    .month-label {
+      font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+      margin-bottom: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 50px;
+      display: inline-block;
+    }
+    [data-phase="1"] .month-label { background: rgba(124,58,237,0.2); color: var(--purple-light); }
+    [data-phase="2"] .month-label { background: rgba(6,182,212,0.2); color: var(--cyan-light); }
+    [data-phase="3"] .month-label { background: rgba(16,185,129,0.2); color: #6ee7b7; }
+    [data-phase="4"] .month-label { background: rgba(245,158,11,0.2); color: #fcd34d; }
+
+    .month-tasks { list-style: none; display: flex; flex-direction: column; gap: 0.6rem; margin-top: 0.5rem; }
+    .month-tasks li { font-size: 0.85rem; display: flex; gap: 0.6rem; align-items: flex-start; }
+    .month-tasks li::before { content: '→'; color: var(--text-dim); flex-shrink: 0; }
+    .month-kpi {
+      margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--border);
+      font-size: 0.8rem; color: var(--green); font-weight: 600;
+    }
+
+    /* ── BANDWIDTH ── */
+    .bw-bars { display: flex; flex-direction: column; gap: 1rem; }
+    .bw-row { display: flex; flex-direction: column; gap: 0.4rem; }
+    .bw-label { display: flex; justify-content: space-between; font-size: 0.85rem; }
+    .bw-label span:first-child { color: var(--text); font-weight: 500; }
+    .bw-label span:last-child { color: var(--text-muted); font-size: 0.78rem; }
+    .bw-track { height: 10px; background: var(--bg3); border-radius: 50px; overflow: hidden; }
+    .bw-fill {
+      height: 100%; border-radius: 50px;
+      width: 0; transition: width 1.2s cubic-bezier(0.16,1,0.3,1);
+    }
+    .bw-fill[data-pct="20"] { width: 20%; }
+    .bw-fill[data-pct="30"] { width: 30%; }
+    .bw-fill[data-pct="25"] { width: 25%; }
+    .bw-fill[data-pct="13"] { width: 13%; }
+    .bw-fill[data-pct="12"] { width: 12%; }
+
+    /* ── AUTOPILOT ── */
+    .autopilot-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.25rem;
+    }
+    .ap-card {
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 1.5rem;
+    }
+    .ap-card-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.25rem; }
+    .ap-icon { font-size: 1.4rem; }
+    .ap-title { font-weight: 700; font-size: 1rem; }
+    .ap-checklist { list-style: none; display: flex; flex-direction: column; gap: 0.6rem; }
+    .ap-checklist li {
+      display: flex; align-items: flex-start; gap: 0.75rem; font-size: 0.85rem;
+      cursor: pointer; user-select: none; transition: color 0.2s;
+    }
+    .ap-checklist li input[type="checkbox"] { display: none; }
+    .ap-check {
+      width: 18px; height: 18px; border: 2px solid var(--border); border-radius: 4px;
+      flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+      transition: all 0.2s; margin-top: 1px;
+    }
+    .ap-checklist li.done .ap-check { background: var(--green); border-color: var(--green); }
+    .ap-checklist li.done .ap-check::after { content: '✓'; color: #fff; font-size: 0.7rem; font-weight: 900; }
+    .ap-checklist li.done span { color: var(--text-dim); text-decoration: line-through; }
+    .ap-eta { margin-top: 1rem; font-size: 0.75rem; color: var(--text-dim); border-top: 1px solid var(--border); padding-top: 0.75rem; }
+
+    /* ── FIRST STEP ── */
+    #first-step {
+      text-align: center;
+    }
+    .first-step-card {
+      background: linear-gradient(135deg, rgba(124,58,237,0.12), rgba(6,182,212,0.08));
+      border: 1px solid rgba(124,58,237,0.3);
+      border-radius: var(--radius-lg); padding: 3rem 2rem; max-width: 680px; margin: 0 auto;
+    }
+    .fs-icon { font-size: 3.5rem; margin-bottom: 1rem; }
+    .fs-title { font-size: 1.6rem; font-weight: 800; margin-bottom: 0.75rem; }
+    .fs-desc { color: var(--text-muted); margin-bottom: 2rem; }
+    .fs-steps { display: flex; flex-direction: column; gap: 0.75rem; text-align: left; margin: 0 auto 2rem; max-width: 400px; }
+    .fs-step { display: flex; gap: 1rem; align-items: flex-start; }
+    .fs-num {
+      width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+      background: linear-gradient(135deg, var(--purple), #4f46e5);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.75rem; font-weight: 800;
+    }
+    .fs-step-text { font-size: 0.9rem; padding-top: 0.3rem; }
+    .fs-btn {
+      display: inline-block; padding: 0.85rem 2.5rem; border-radius: 50px;
+      background: linear-gradient(135deg, var(--purple), #4f46e5);
+      color: #fff; font-weight: 700; font-size: 1rem; text-decoration: none;
+      transition: opacity 0.2s, transform 0.2s; border: none; cursor: pointer;
+    }
+    .fs-btn:hover { opacity: 0.9; transform: scale(1.03); }
+
+    /* ── SCROLL PROGRESS ── */
+    #progress-bar {
+      position: fixed; top: 58px; left: 0; right: 0; height: 2px; z-index: 99;
+      background: linear-gradient(90deg, var(--purple), var(--cyan));
+      transform-origin: left; transform: scaleX(0); transition: transform 0.1s;
+    }
+
+    /* ── DIVIDER ── */
+    .divider { border: none; border-top: 1px solid var(--border); margin: 0; }
+
+    /* ── FOOTER ── */
+    footer {
+      text-align: center; padding: 2.5rem; color: var(--text-dim); font-size: 0.8rem;
+      border-top: 1px solid var(--border);
+    }
+    footer span { color: var(--purple-light); }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 640px) {
+      nav { padding: 0 1rem; }
+      .nav-links { display: none; }
+      section { padding: 4rem 1.25rem; }
+      .flywheel { gap: 0; }
+      .fw-arrow { font-size: 1rem; padding: 0; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- PROGRESS BAR -->
+<div id="progress-bar"></div>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">⚡ AI Community Strategy</div>
+  <ul class="nav-links">
+    <li><a href="#edge">Edge</a></li>
+    <li><a href="#community">Community</a></li>
+    <li><a href="#tools">Tools</a></li>
+    <li><a href="#revenue">Revenue</a></li>
+    <li><a href="#roadmap">Roadmap</a></li>
+    <li><a href="#autopilot">Autopilot</a></li>
+    <li><a href="#first-step">Start</a></li>
+  </ul>
+</nav>
+
+<!-- HERO -->
+<section id="hero">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+
+  <div class="hero-badge">
+    <span></span> Build · Automate · Sell · Community
+  </div>
+
+  <h1 class="hero-title">
+    The AI Community for<br/>
+    <span class="grad">India's Finance Professionals</span>
+  </h1>
+
+  <p class="hero-desc">
+    Build AI tools that automate your own work. Document the process. Sell the tools.
+    Grow a community. Put Planora on autopilot. That's the entire playbook.
+  </p>
+
+  <div class="hero-duo">
+    <div class="duo-card">
+      <div class="duo-avatar">S</div>
+      <div class="duo-info">
+        <div class="duo-name">Saksham</div>
+        <div class="duo-role">Builder · Planora SaaS · AI Dev</div>
+        <div class="duo-tag">⚙️ Tech + Product</div>
+      </div>
+    </div>
+    <div class="duo-card">
+      <div class="duo-avatar">S</div>
+      <div class="duo-info">
+        <div class="duo-name">Sachit</div>
+        <div class="duo-role">Reputed CA · Extensive Network</div>
+        <div class="duo-tag">🤝 Distribution + Credibility</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="hero-inspo">
+    Inspired by <span>Nate Hetz</span> &amp; <span>Sanjeev Jain (Ceoitbox)</span> — adapted for the Indian CA market
+  </div>
+</section>
+
+<hr class="divider" />
+
+<!-- EDGE -->
+<section id="edge">
+  <h2 class="section-title">Your Unfair Advantages</h2>
+  <p class="section-sub">Most AI community builders start from zero. You don't.</p>
+
+  <div class="edge-grid">
+    <div class="edge-card">
+      <div class="edge-icon">⚡</div>
+      <div class="edge-title">Planora — Live SaaS with Real Users</div>
+      <div class="edge-desc">
+        You have a working product used by CA firms. Every AI feature you add is
+        instant content. Every user is a potential community member.
+      </div>
+      <span class="edge-highlight">Built-in distribution channel</span>
+    </div>
+    <div class="edge-card">
+      <div class="edge-icon">🤝</div>
+      <div class="edge-title">Sachit — CA Network is Your Launchpad</div>
+      <div class="edge-desc">
+        Sachit's reputation and connections in the CA community give instant credibility.
+        No cold outreach needed — first 100 members come from his network alone.
+      </div>
+      <span class="edge-highlight">Skip the "audience from zero" phase</span>
+    </div>
+    <div class="edge-card">
+      <div class="edge-icon">🎯</div>
+      <div class="edge-title">Ultra-Specific Niche</div>
+      <div class="edge-desc">
+        CA + AI is wide open in India. Every generic AI community fights for the same
+        audience. You own a niche with 3.5 lakh practicing CAs and millions of SMBs.
+      </div>
+      <span class="edge-highlight">No direct competition</span>
+    </div>
+    <div class="edge-card">
+      <div class="edge-icon">🔄</div>
+      <div class="edge-title">Build for Yourself First</div>
+      <div class="edge-desc">
+        Tools you build to automate your own Planora ops and content creation become
+        products. The build process is the content. Ship → show → sell.
+      </div>
+      <span class="edge-highlight">Zero wasted effort</span>
+    </div>
+  </div>
+
+  <!-- FLYWHEEL -->
+  <div class="flywheel">
+    <div class="fw-step">
+      <div class="fw-circle">🔧</div>
+      <div class="fw-label">Build tool for yourself</div>
+    </div>
+    <div class="fw-arrow">→</div>
+    <div class="fw-step">
+      <div class="fw-circle">📢</div>
+      <div class="fw-label">Post the build process</div>
+    </div>
+    <div class="fw-arrow">→</div>
+    <div class="fw-step">
+      <div class="fw-circle">👥</div>
+      <div class="fw-label">Community wants it</div>
+    </div>
+    <div class="fw-arrow">→</div>
+    <div class="fw-step">
+      <div class="fw-circle">💰</div>
+      <div class="fw-label">Sell or upsell</div>
+    </div>
+    <div class="fw-arrow">→</div>
+    <div class="fw-step">
+      <div class="fw-circle">📈</div>
+      <div class="fw-label">Revenue funds next tool</div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider" />
+
+<!-- COMMUNITY -->
+<section id="community">
+  <h2 class="section-title">Community Structure</h2>
+  <p class="section-sub">WhatsApp-first (Sanjeev's playbook) + Discord for depth. Click to explore each layer.</p>
+
+  <div class="tier-tabs">
+    <button class="tier-tab active" onclick="switchTier('platform')">Platform</button>
+    <button class="tier-tab" onclick="switchTier('free')">Free Tier</button>
+    <button class="tier-tab" onclick="switchTier('paid')">Paid Tier</button>
+    <button class="tier-tab" onclick="switchTier('cohort')">Cohort</button>
+    <button class="tier-tab" onclick="switchTier('enterprise')">Enterprise</button>
+  </div>
+
+  <div id="tier-platform" class="tier-panel active">
+    <div class="tier-card">
+      <div class="tier-name">📱 WhatsApp Group</div>
+      <div class="tier-desc">Primary channel for the Indian market. Low friction, high reach.</div>
+      <ul class="tier-features">
+        <li>Daily AI tip or workflow drop</li>
+        <li>Quick Q&amp;A (Sachit + Saksham answer)</li>
+        <li>Tool launches and announcements</li>
+        <li>Peer wins and case studies</li>
+        <li>Links to deeper Discord content</li>
+      </ul>
+    </div>
+    <div class="tier-card">
+      <div class="tier-name">💬 Discord Server</div>
+      <div class="tier-desc">Structured channels for deeper engagement and tooling help.</div>
+      <ul class="tier-features">
+        <li>#tools-showcase — member tool builds</li>
+        <li>#ca-specific — GST, compliance, filing AI</li>
+        <li>#prompt-library — shared prompts</li>
+        <li>#planora-users — product-specific help</li>
+        <li>#weekly-wins — accountability</li>
+      </ul>
+    </div>
+    <div class="tier-card">
+      <div class="tier-name">📧 Newsletter</div>
+      <div class="tier-desc">Weekly drop — one tool, one prompt, one workflow. Build to 5k before monetizing.</div>
+      <ul class="tier-features">
+        <li>One AI workflow, step by step</li>
+        <li>Hours saved estimate</li>
+        <li>Prompt of the week (copy-paste ready)</li>
+        <li>Member spotlight</li>
+        <li>Planora feature update or tip</li>
+      </ul>
+    </div>
+  </div>
+
+  <div id="tier-free" class="tier-panel">
+    <div class="tier-card">
+      <div class="tier-name">Free</div>
+      <div class="tier-price">₹0 <span>forever</span></div>
+      <div class="tier-desc">Entry point. Builds trust and captures leads for paid.</div>
+      <ul class="tier-features">
+        <li>WhatsApp community access</li>
+        <li>Weekly newsletter</li>
+        <li>2 free web tools (limited uses)</li>
+        <li>Monthly open workshop (recording)</li>
+        <li>Basic prompt library (20 prompts)</li>
+      </ul>
+    </div>
+  </div>
+
+  <div id="tier-paid" class="tier-panel">
+    <div class="tier-card featured">
+      <div class="featured-badge">Most Popular</div>
+      <div class="tier-name">Pro Member</div>
+      <div class="tier-price">₹999 <span>/month</span></div>
+      <div class="tier-desc">Full access. The main revenue driver for the community.</div>
+      <ul class="tier-features">
+        <li>All free tier benefits</li>
+        <li>Full tool suite (unlimited)</li>
+        <li>200+ CA-specific prompt library</li>
+        <li>Monthly live workshop + Q&amp;A</li>
+        <li>Private Discord channels</li>
+        <li>Planora Pro discount (30%)</li>
+        <li>Priority support from Saksham + Sachit</li>
+      </ul>
+    </div>
+    <div class="tier-card">
+      <div class="tier-name">Annual Pro</div>
+      <div class="tier-price">₹8,999 <span>/year</span></div>
+      <div class="tier-desc">2 months free. Better for committed members.</div>
+      <ul class="tier-features">
+        <li>Everything in Pro monthly</li>
+        <li>2 months free (₹1,999 saved)</li>
+        <li>Early access to new tools</li>
+        <li>Name in community credits</li>
+      </ul>
+    </div>
+  </div>
+
+  <div id="tier-cohort" class="tier-panel">
+    <div class="tier-card">
+      <div class="tier-name">🎓 AI for CA Firms — Cohort</div>
+      <div class="tier-price">₹15,000–25,000 <span>/seat</span></div>
+      <div class="tier-desc">4-week live program. Max 20 seats. Sachit co-teaches the CA workflow module.</div>
+      <ul class="tier-features">
+        <li>Week 1: AI foundations + tools setup</li>
+        <li>Week 2: Automate client communication</li>
+        <li>Week 3: Compliance + filing workflows</li>
+        <li>Week 4: Build your own tool (guided)</li>
+        <li>Certificate + community alumni badge</li>
+        <li>Lifetime access to cohort recordings</li>
+        <li>Planora Business plan (3 months free)</li>
+      </ul>
+    </div>
+    <div class="tier-card">
+      <div class="tier-name">📅 Run Frequency</div>
+      <div class="tier-desc">How often to run cohorts based on bandwidth.</div>
+      <ul class="tier-features">
+        <li>Month 4–6: First cohort (pilot, ₹12k)</li>
+        <li>Month 7–9: Second cohort (₹18k)</li>
+        <li>Month 10–12: Quarterly runs (₹25k)</li>
+        <li>Year 2+: Evergreen (recorded + async)</li>
+      </ul>
+    </div>
+  </div>
+
+  <div id="tier-enterprise" class="tier-panel">
+    <div class="tier-card">
+      <div class="tier-name">🏢 CA Firm Package</div>
+      <div class="tier-price">₹50,000+ <span>/firm/year</span></div>
+      <div class="tier-desc">Done-for-you AI setup for the entire firm. Sachit's network = direct pipeline here.</div>
+      <ul class="tier-features">
+        <li>AI workflow audit (2-day engagement)</li>
+        <li>Custom tool setup for their processes</li>
+        <li>Team training (all staff)</li>
+        <li>Planora Business (full onboarding)</li>
+        <li>Monthly check-in + optimization call</li>
+        <li>Dedicated WhatsApp support channel</li>
+      </ul>
+    </div>
+    <div class="tier-card">
+      <div class="tier-name">🤝 Sachit's Role Here</div>
+      <div class="tier-desc">This is where Sachit's CA credibility and network become a real business moat.</div>
+      <ul class="tier-features">
+        <li>Warm intros to CA firm partners</li>
+        <li>Co-presenter on firm workshops</li>
+        <li>ICAI events + CPE credit opportunities</li>
+        <li>Case studies from his existing clients</li>
+        <li>Referral network with other CAs</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<hr class="divider" />
+
+<!-- TOOLS -->
+<section id="tools">
+  <h2 class="section-title">Tools Arsenal</h2>
+  <p class="section-sub">Build for yourself first. That's what makes the story real. Filter by category.</p>
+
+  <div class="tool-filters">
+    <button class="tool-filter active" data-cat="all" onclick="filterTools('all', this)">All Tools</button>
+    <button class="tool-filter" data-cat="self" onclick="filterTools('self', this)">🔧 For Yourself</button>
+    <button class="tool-filter" data-cat="ca" onclick="filterTools('ca', this)">📋 CA / Finance Niche</button>
+    <button class="tool-filter" data-cat="community" onclick="filterTools('community', this)">📢 Content &amp; Community</button>
+  </div>
+
+  <div class="tools-grid" id="tools-grid">
+
+    <!-- FOR YOURSELF -->
+    <div class="tool-card" data-cat="self">
+      <div class="tool-header">
+        <div class="tool-icon">♻️</div>
+        <span class="tool-cat-badge">For Yourself</span>
+      </div>
+      <div class="tool-name">Content Repurposer</div>
+      <div class="tool-problem">One LinkedIn post → Twitter thread + WhatsApp drop + newsletter section. Stop writing the same thing 3 times.</div>
+      <div class="tool-meta">
+        <span class="tool-pill effort-low">Low Effort</span>
+        <span class="tool-pill build-first">⭐ Build First</span>
+      </div>
+    </div>
+
+    <div class="tool-card" data-cat="self">
+      <div class="tool-header">
+        <div class="tool-icon">🤖</div>
+        <span class="tool-cat-badge">For Yourself</span>
+      </div>
+      <div class="tool-name">AI Support Responder</div>
+      <div class="tool-problem">Paste a Planora user complaint → get a calm, on-brand reply draft. Cuts support time by 70%.</div>
+      <div class="tool-meta">
+        <span class="tool-pill effort-low">Low Effort</span>
+        <span class="tool-pill build-first">⭐ Build First</span>
+      </div>
+    </div>
+
+    <div class="tool-card" data-cat="self">
+      <div class="tool-header">
+        <div class="tool-icon">💡</div>
+        <span class="tool-cat-badge">For Yourself</span>
+      </div>
+      <div class="tool-name">Idea → Post Generator</div>
+      <div class="tool-problem">Dump a raw idea in your voice → formatted LinkedIn post ready to copy-paste. No more staring at blank pages.</div>
+      <div class="tool-meta">
+        <span class="tool-pill effort-low">Low Effort</span>
+      </div>
+    </div>
+
+    <div class="tool-card" data-cat="self">
+      <div class="tool-header">
+        <div class="tool-icon">📊</div>
+        <span class="tool-cat-badge">For Yourself</span>
+      </div>
+      <div class="tool-name">MRR Metrics Dashboard</div>
+      <div class="tool-problem">Pulls Razorpay data → clean weekly snapshot. Know your MRR, churn, and new signups without opening 3 tabs.</div>
+      <div class="tool-meta">
+        <span class="tool-pill effort-medium">Medium Effort</span>
+      </div>
+    </div>
+
+    <div class="tool-card" data-cat="self">
+      <div class="tool-header">
+        <div class="tool-icon">🚨</div>
+        <span class="tool-cat-badge">For Yourself</span>
+      </div>
+      <div class="tool-name">Churn Predictor</div>
+      <div class="tool-problem">Flags Planora users going inactive before they cancel. Triggers an automated re-engagement email via Resend.</div>
+      <div class="tool-meta">
+        <span class="tool-pill effort-medium">Medium Effort</span>
+      </div>
+    </div>
+
+    <div class="tool-card" data-cat="self">
+      <div class="tool-header">
+        <div class="tool-icon">📝</div>
+        <span class="tool-cat-badge">For Yourself</span>
+      </div>
+      <div class="tool-name">Community Digest Builder</div>
+      <div class="tool-problem">Scrapes WhatsApp/Discord highlights from the week → auto-formats into the newsletter section. Saves 2 hrs/week.</div>
+      <div class="tool-meta">
+        <span class="tool-pill effort-medium">Medium Effort</span>
+      </div>
+    </div>
+
+    <!-- CA NICHE -->
+    <div class="tool-card" data-cat="ca">
+      <div class="tool-header">
+        <div class="tool-icon">📅</div>
+        <span class="tool-cat-badge">CA / Finance</span>
+      </div>
+      <div class="tool-name">GST Compliance Calendar Generator</div>
+      <div class="tool-problem">Input company type + state → full-year compliance deadline calendar. Every CA firm needs this, nobody has it automated.</div>
+      <div class="tool-meta">
+        <span class="tool-pill effort-medium">Medium Effort</span>
+        <span class="tool-pill build-first">⭐ High Demand</span>
+      </div>
+    </div>
+
+    <div class="tool-card" data-cat="ca">
+      <div class="tool-header">
+        <div class="tool-icon">📄</div>
+        <span class="tool-cat-badge">CA / Finance</span>
+      </div>
+      <div class="tool-name">Engagement Letter Generator</div>
+      <div class="tool-problem">Fill 5 fields → professional engagement letter ready to send. Sachit's firm alone saves hours every week on this.</div>
+      <div class="tool-meta">
+        <span class="tool-pill effort-low">Low Effort</span>
+        <span class="tool-pill build-first">⭐ Sachit Tests It</span>
+      </div>
+    </div>
+
+    <div class="tool-card" data-cat="ca">
+      <div class="tool-header">
+        <div class="tool-icon">✉️</div>
+        <span class="tool-cat-badge">CA / Finance</span>
+      </div>
+      <div class="tool-name">Client Email Drafter</div>
+      <div class="tool-problem">Describe what you need to tell a client → professional, GST-aware email ready. Handles late payments, status updates, document requests.</div>
+      <div class="tool-meta">
+        <span class="tool-pill effort-low">Low Effort</span>
+      </div>
+    </div>
+
+    <div class="tool-card" data-cat="ca">
+      <div class="tool-header">
+        <div class="tool-icon">🧾</div>
+        <span class="tool-cat-badge">CA / Finance</span>
+      </div>
+      <div class="tool-name">Invoice Draftor</div>
+      <div class="tool-problem">Describe work done → AI drafts GST invoice with correct HSN codes, IGST/CGST/SGST split, and billing amounts.</div>
+      <div class="tool-meta">
+        <span class="tool-pill effort-medium">Medium Effort</span>
+      </div>
+    </div>
+
+    <div class="tool-card" data-cat="ca">
+      <div class="tool-header">
+        <div class="tool-icon">🤖</div>
+        <span class="tool-cat-badge">CA / Finance</span>
+      </div>
+      <div class="tool-name">Compliance Deadline WhatsApp Bot</div>
+      <div class="tool-problem">"When is GST R1 due for quarterly filers?" → instant accurate answer. Runs on WhatsApp Business API. Uses your existing integration.</div>
+      <div class="tool-meta">
+        <span class="tool-pill effort-high">High Effort</span>
+        <span class="tool-pill build-first">⭐ Moat Builder</span>
+      </div>
+    </div>
+
+    <div class="tool-card" data-cat="ca">
+      <div class="tool-header">
+        <div class="tool-icon">📋</div>
+        <span class="tool-cat-badge">CA / Finance</span>
+      </div>
+      <div class="tool-name">Meeting Notes → Task List</div>
+      <div class="tool-problem">Paste client call notes → structured task list with assignees, due dates, priorities. Directly pushes to Planora via API.</div>
+      <div class="tool-meta">
+        <span class="tool-pill effort-medium">Medium Effort</span>
+      </div>
+    </div>
+
+    <div class="tool-card" data-cat="ca">
+      <div class="tool-header">
+        <div class="tool-icon">🏭</div>
+        <span class="tool-cat-badge">CA / Finance</span>
+      </div>
+      <div class="tool-name">AI SOP Generator</div>
+      <div class="tool-problem">Describe a firm process → get a clean Standard Operating Procedure document. Firms pay consultants ₹50k for this.</div>
+      <div class="tool-meta">
+        <span class="tool-pill effort-low">Low Effort</span>
+      </div>
+    </div>
+
+    <!-- COMMUNITY / CONTENT -->
+    <div class="tool-card" data-cat="community">
+      <div class="tool-header">
+        <div class="tool-icon">🎯</div>
+        <span class="tool-cat-badge">Content</span>
+      </div>
+      <div class="tool-name">Lead Magnet Generator</div>
+      <div class="tool-problem">Describe a topic → full PDF checklist/guide formatted and ready to publish. Builds your email list on autopilot.</div>
+      <div class="tool-meta">
+        <span class="tool-pill effort-low">Low Effort</span>
+      </div>
+    </div>
+
+    <div class="tool-card" data-cat="community">
+      <div class="tool-header">
+        <div class="tool-icon">🎪</div>
+        <span class="tool-cat-badge">Content</span>
+      </div>
+      <div class="tool-name">Workshop Slide Builder</div>
+      <div class="tool-problem">Bullet points + topic → structured workshop slide outline with talking points. Cuts workshop prep from 4 hrs to 45 mins.</div>
+      <div class="tool-meta">
+        <span class="tool-pill effort-low">Low Effort</span>
+      </div>
+    </div>
+
+    <div class="tool-card" data-cat="community">
+      <div class="tool-header">
+        <div class="tool-icon">🔍</div>
+        <span class="tool-cat-badge">Content</span>
+      </div>
+      <div class="tool-name">Prompt Library (Members-Only)</div>
+      <div class="tool-problem">200+ CA-specific prompts organized by use case. Searchable. One-click copy. The #1 reason people pay for the community.</div>
+      <div class="tool-meta">
+        <span class="tool-pill effort-medium">Medium Effort</span>
+        <span class="tool-pill build-first">⭐ Retention Driver</span>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<hr class="divider" />
+
+<!-- REVENUE -->
+<section id="revenue">
+  <h2 class="section-title">Revenue Stack</h2>
+  <p class="section-sub">Month 12 realistic target — conservative estimates, 200-member community.</p>
+
+  <div class="revenue-stack">
+    <div class="rev-item">
+      <div class="rev-icon">👥</div>
+      <div class="rev-info">
+        <div class="rev-name">Paid Community (Pro Members)</div>
+        <div class="rev-desc">200 members × ₹999/month — built through Sachit's network + content funnel</div>
+      </div>
+      <div class="rev-amount">₹1,99,800 <small>/month</small></div>
+    </div>
+    <div class="rev-item">
+      <div class="rev-icon">🎓</div>
+      <div class="rev-info">
+        <div class="rev-name">Cohorts (Quarterly)</div>
+        <div class="rev-desc">20 seats × ₹20,000 — Sachit co-teaches, fills easily from CA network</div>
+      </div>
+      <div class="rev-amount">₹4,00,000 <small>/quarter</small></div>
+    </div>
+    <div class="rev-item">
+      <div class="rev-icon">🔧</div>
+      <div class="rev-info">
+        <div class="rev-name">Tool Sales (Standalone)</div>
+        <div class="rev-desc">Gumroad / LemonSqueezy — one-time purchases, ₹2k–₹8k per tool</div>
+      </div>
+      <div class="rev-amount">₹50,000 <small>/month avg</small></div>
+    </div>
+    <div class="rev-item">
+      <div class="rev-icon">🏢</div>
+      <div class="rev-info">
+        <div class="rev-name">Enterprise Firm Packages</div>
+        <div class="rev-desc">2–3 firms/quarter via Sachit's referrals × ₹60,000</div>
+      </div>
+      <div class="rev-amount">₹1,80,000 <small>/quarter</small></div>
+    </div>
+    <div class="rev-item">
+      <div class="rev-icon">⚡</div>
+      <div class="rev-info">
+        <div class="rev-name">Planora (Autopilot)</div>
+        <div class="rev-desc">Community members convert to Planora users — cross-sell flywheel</div>
+      </div>
+      <div class="rev-amount">₹80,000+ <small>/month MRR</small></div>
+    </div>
+  </div>
+
+  <div class="rev-total">
+    <div class="rev-total-label">Combined Month 12 Potential</div>
+    <div class="rev-total-num">₹4–6 Lakhs / month</div>
+    <div class="rev-total-sub">Across community + tools + Planora + cohorts. Grows as community scales.</div>
+  </div>
+</section>
+
+<hr class="divider" />
+
+<!-- ROADMAP -->
+<section id="roadmap">
+  <h2 class="section-title">12-Month Roadmap</h2>
+  <p class="section-sub">Click a phase to explore the plan. 15–20 hrs/week throughout.</p>
+
+  <div class="timeline-phases">
+    <button class="phase-btn active" data-phase="1" onclick="switchPhase(1)">Phase 1 · M1–3 · Foundation</button>
+    <button class="phase-btn" data-phase="2" onclick="switchPhase(2)">Phase 2 · M4–6 · Launch</button>
+    <button class="phase-btn" data-phase="3" onclick="switchPhase(3)">Phase 3 · M7–9 · Scale</button>
+    <button class="phase-btn" data-phase="4" onclick="switchPhase(4)">Phase 4 · M10–12 · Leverage</button>
+  </div>
+
+  <div id="phase-1" class="phase-content active" data-phase="1">
+    <div class="month-card" data-phase="1">
+      <span class="month-label">Month 1</span>
+      <ul class="month-tasks">
+        <li>Start LinkedIn + X — 1 AI workflow post daily</li>
+        <li>Launch WhatsApp community (free, 0 friction)</li>
+        <li>Sachit invites his CA network — target 200 members</li>
+        <li>Build Content Repurposer (your first tool)</li>
+        <li>Build AI Support Responder (for Planora ops)</li>
+      </ul>
+      <div class="month-kpi">🎯 Goal: 200 WhatsApp members, 2 tools live</div>
+    </div>
+    <div class="month-card" data-phase="1">
+      <span class="month-label">Month 2</span>
+      <ul class="month-tasks">
+        <li>Launch newsletter — post the content repurposer build story</li>
+        <li>Ship GST Compliance Calendar Generator publicly</li>
+        <li>Run first free live workshop (Sachit + Saksham, 1hr Zoom)</li>
+        <li>Set up Discord — migrate power users from WhatsApp</li>
+        <li>Add Planora autopilot: support AI + onboarding sequences</li>
+      </ul>
+      <div class="month-kpi">🎯 Goal: 500 newsletter subs, 400 WhatsApp members</div>
+    </div>
+    <div class="month-card" data-phase="1">
+      <span class="month-label">Month 3</span>
+      <ul class="month-tasks">
+        <li>Build Engagement Letter Generator (Sachit tests it live)</li>
+        <li>Post every build step — this is the content strategy</li>
+        <li>Second free workshop (record + share)</li>
+        <li>Soft-announce paid community tier — waitlist</li>
+        <li>Sachit starts warm intros to CA firms for enterprise pipeline</li>
+      </ul>
+      <div class="month-kpi">🎯 Goal: 1k newsletter, 50-person paid waitlist</div>
+    </div>
+  </div>
+
+  <div id="phase-2" class="phase-content" data-phase="2">
+    <div class="month-card" data-phase="2">
+      <span class="month-label">Month 4</span>
+      <ul class="month-tasks">
+        <li>Launch paid community tier (₹999/month)</li>
+        <li>First cohort announced — 20 seats, ₹12,000 pilot price</li>
+        <li>Prompt library v1 goes live (members-only)</li>
+        <li>Tool: Client Email Drafter (CA niche, high demand)</li>
+        <li>First Planora + community bundle offer</li>
+      </ul>
+      <div class="month-kpi">🎯 Goal: 50 paying members, cohort sold out</div>
+    </div>
+    <div class="month-card" data-phase="2">
+      <span class="month-label">Month 5</span>
+      <ul class="month-tasks">
+        <li>Run first cohort (4 weeks, Sachit + Saksham co-teach)</li>
+        <li>First enterprise firm package (from Sachit's network)</li>
+        <li>Tool: Meeting Notes → Task List (with Planora push)</li>
+        <li>LinkedIn followers growing — double down on what works</li>
+        <li>Newsletter hits 2,000 subscribers</li>
+      </ul>
+      <div class="month-kpi">🎯 Goal: ₹3–4L revenue month, 100 paid members</div>
+    </div>
+    <div class="month-card" data-phase="2">
+      <span class="month-label">Month 6</span>
+      <ul class="month-tasks">
+        <li>Cohort 1 graduates → testimonials + case studies</li>
+        <li>Announce Cohort 2 (₹18,000 — price increase)</li>
+        <li>Hire part-time community manager (₹15–20k/month)</li>
+        <li>Planora autopilot: VA handling tier 1 support</li>
+        <li>ICAI event or webinar with Sachit — massive reach</li>
+      </ul>
+      <div class="month-kpi">🎯 Goal: 150 paid members, 2nd enterprise deal</div>
+    </div>
+  </div>
+
+  <div id="phase-3" class="phase-content" data-phase="3">
+    <div class="month-card" data-phase="3">
+      <span class="month-label">Month 7–8</span>
+      <ul class="month-tasks">
+        <li>Tool: WhatsApp Compliance Bot (the moat builder)</li>
+        <li>Standalone tool sales on Gumroad — passive income</li>
+        <li>Cohort 2 runs (sold out, waitlist forming)</li>
+        <li>Planora mostly on autopilot — 2–3 hrs/week from you</li>
+        <li>Content strategy: video demos of tools (YouTube/Reels)</li>
+      </ul>
+      <div class="month-kpi">🎯 Goal: 200 paid members, ₹5L+/month combined</div>
+    </div>
+    <div class="month-card" data-phase="3">
+      <span class="month-label">Month 9</span>
+      <ul class="month-tasks">
+        <li>Community manager fully onboarded — you step back from ops</li>
+        <li>Cohort becomes quarterly — evergreen pipeline</li>
+        <li>First affiliate program — members refer firms, earn commission</li>
+        <li>Tool: AI SOP Generator — sell to firms directly</li>
+        <li>Sachit drives 3rd enterprise deal independently</li>
+      </ul>
+      <div class="month-kpi">🎯 Goal: Systems run without daily input from you</div>
+    </div>
+  </div>
+
+  <div id="phase-4" class="phase-content" data-phase="4">
+    <div class="month-card" data-phase="4">
+      <span class="month-label">Month 10–11</span>
+      <ul class="month-tasks">
+        <li>Evaluate: community revenue vs Planora MRR</li>
+        <li>Cohort goes recorded/async — scales without your time</li>
+        <li>Prompt library grows to 500+ prompts (community-contributed)</li>
+        <li>Planora: consider raising prices or new pricing tiers</li>
+        <li>Explore sponsorships (CA software companies, banks)</li>
+      </ul>
+      <div class="month-kpi">🎯 Goal: ₹6L+/month, 5–8 hrs/week from you</div>
+    </div>
+    <div class="month-card" data-phase="4">
+      <span class="month-label">Month 12</span>
+      <ul class="month-tasks">
+        <li>Annual review — what worked, what to double down on</li>
+        <li>Consider a second hire (tool developer)</li>
+        <li>Planora on full autopilot — community is your primary job</li>
+        <li>You are now the "Sanjeev Jain for CA firms in India"</li>
+        <li>Plan Year 2: expand niche (CS, lawyers, finance teams)</li>
+      </ul>
+      <div class="month-kpi">🎯 Goal: Portfolio of revenue streams, location independence</div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider" />
+
+<!-- BANDWIDTH -->
+<section id="bandwidth">
+  <h2 class="section-title">Weekly Bandwidth Split</h2>
+  <p class="section-sub">15–20 hrs/week. Here's exactly where each hour goes.</p>
+
+  <div class="bw-bars" id="bw-bars">
+    <div class="bw-row">
+      <div class="bw-label"><span>🔧 Building Tools</span><span>6 hrs/week</span></div>
+      <div class="bw-track"><div class="bw-fill" data-pct="30" style="background: linear-gradient(90deg, #7c3aed, #4f46e5);"></div></div>
+    </div>
+    <div class="bw-row">
+      <div class="bw-label"><span>📢 Content + Community</span><span>5 hrs/week</span></div>
+      <div class="bw-track"><div class="bw-fill" data-pct="25" style="background: linear-gradient(90deg, #06b6d4, #0891b2);"></div></div>
+    </div>
+    <div class="bw-row">
+      <div class="bw-label"><span>⚡ Planora (Autopilot Setup)</span><span>4 hrs/week</span></div>
+      <div class="bw-track"><div class="bw-fill" data-pct="20" style="background: linear-gradient(90deg, #10b981, #059669);"></div></div>
+    </div>
+    <div class="bw-row">
+      <div class="bw-label"><span>🎓 Sales + Workshops + Cohort Prep</span><span>3 hrs/week</span></div>
+      <div class="bw-track"><div class="bw-fill" data-pct="13" style="background: linear-gradient(90deg, #f59e0b, #d97706);"></div></div>
+    </div>
+    <div class="bw-row">
+      <div class="bw-label"><span>🤝 Sachit Coordination</span><span>2 hrs/week</span></div>
+      <div class="bw-track"><div class="bw-fill" data-pct="12" style="background: linear-gradient(90deg, #ec4899, #db2777);"></div></div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider" />
+
+<!-- AUTOPILOT -->
+<section id="autopilot">
+  <h2 class="section-title">Planora Autopilot Plan</h2>
+  <p class="section-sub">Check off as you build. Target: fully running in 6 months.</p>
+
+  <div class="autopilot-grid">
+    <div class="ap-card">
+      <div class="ap-card-header">
+        <div class="ap-icon">🎧</div>
+        <div class="ap-title">Customer Support</div>
+      </div>
+      <ul class="ap-checklist">
+        <li onclick="toggleCheck(this)"><div class="ap-check"></div><span>Add AI first-response (Plain.com or Intercom + Claude)</span></li>
+        <li onclick="toggleCheck(this)"><div class="ap-check"></div><span>Build knowledge base from top 20 support questions</span></li>
+        <li onclick="toggleCheck(this)"><div class="ap-check"></div><span>Hire VA for tier 1 support (₹15–20k/month)</span></li>
+        <li onclick="toggleCheck(this)"><div class="ap-check"></div><span>Set up escalation rules — only edge cases reach you</span></li>
+      </ul>
+      <div class="ap-eta">⏱ Estimated: Month 2–3 to fully set up</div>
+    </div>
+
+    <div class="ap-card">
+      <div class="ap-card-header">
+        <div class="ap-icon">📧</div>
+        <div class="ap-title">Onboarding & Retention</div>
+      </div>
+      <ul class="ap-checklist">
+        <li onclick="toggleCheck(this)"><div class="ap-check"></div><span>Extend Inngest: 7-email onboarding sequence (already have Resend)</span></li>
+        <li onclick="toggleCheck(this)"><div class="ap-check"></div><span>Build churn predictor — flag inactive users at day 14</span></li>
+        <li onclick="toggleCheck(this)"><div class="ap-check"></div><span>Automated dunning emails for failed payments</span></li>
+        <li onclick="toggleCheck(this)"><div class="ap-check"></div><span>Trial expiry sequence already exists — extend to 5 emails</span></li>
+      </ul>
+      <div class="ap-eta">⏱ Estimated: Month 1–2, built on existing Inngest setup</div>
+    </div>
+
+    <div class="ap-card">
+      <div class="ap-card-header">
+        <div class="ap-icon">🐛</div>
+        <div class="ap-title">Bug Triage & Product</div>
+      </div>
+      <ul class="ap-checklist">
+        <li onclick="toggleCheck(this)"><div class="ap-check"></div><span>Set up Linear with auto-labeling (severity + area)</span></li>
+        <li onclick="toggleCheck(this)"><div class="ap-check"></div><span>Add Canny or Nolt for feature request voting board</span></li>
+        <li onclick="toggleCheck(this)"><div class="ap-check"></div><span>Monthly release cycle — batch fixes, quarterly features</span></li>
+        <li onclick="toggleCheck(this)"><div class="ap-check"></div><span>Document runbooks for common incidents</span></li>
+      </ul>
+      <div class="ap-eta">⏱ Estimated: Month 1, mostly tooling setup</div>
+    </div>
+
+    <div class="ap-card">
+      <div class="ap-card-header">
+        <div class="ap-icon">💳</div>
+        <div class="ap-title">Billing & Finance</div>
+      </div>
+      <ul class="ap-checklist">
+        <li onclick="toggleCheck(this)"><div class="ap-check"></div><span>Razorpay webhooks already exist — add Slack/email alert on failure</span></li>
+        <li onclick="toggleCheck(this)"><div class="ap-check"></div><span>Auto-generate MRR dashboard from Razorpay data</span></li>
+        <li onclick="toggleCheck(this)"><div class="ap-check"></div><span>Weekly metrics email to yourself (built with the MRR tool)</span></li>
+        <li onclick="toggleCheck(this)"><div class="ap-check"></div><span>Automated invoice + receipt emails on payment</span></li>
+      </ul>
+      <div class="ap-eta">⏱ Estimated: Month 2, leverages existing webhook infra</div>
+    </div>
+
+    <div class="ap-card">
+      <div class="ap-card-header">
+        <div class="ap-icon">📣</div>
+        <div class="ap-title">Marketing & Content</div>
+      </div>
+      <ul class="ap-checklist">
+        <li onclick="toggleCheck(this)"><div class="ap-check"></div><span>Content repurposer tool → batch-create a week of posts in 1 session</span></li>
+        <li onclick="toggleCheck(this)"><div class="ap-check"></div><span>Schedule posts via Buffer or Typefully (2 hrs/week → 30 mins)</span></li>
+        <li onclick="toggleCheck(this)"><div class="ap-check"></div><span>Newsletter template — fill in 3 fields, rest auto-generates</span></li>
+        <li onclick="toggleCheck(this)"><div class="ap-check"></div><span>Community digest builder → newsletter section auto-written</span></li>
+      </ul>
+      <div class="ap-eta">⏱ Estimated: Month 1–3 as tools get built</div>
+    </div>
+
+    <div class="ap-card">
+      <div class="ap-card-header">
+        <div class="ap-icon">🤝</div>
+        <div class="ap-title">Sachit's Autonomous Role</div>
+      </div>
+      <ul class="ap-checklist">
+        <li onclick="toggleCheck(this)"><div class="ap-check"></div><span>Sachit handles all enterprise CA firm outreach independently</span></li>
+        <li onclick="toggleCheck(this)"><div class="ap-check"></div><span>Sachit co-hosts workshops — reduces your prep time by 50%</span></li>
+        <li onclick="toggleCheck(this)"><div class="ap-check"></div><span>Sachit = community credibility anchor, you = tech lead</span></li>
+        <li onclick="toggleCheck(this)"><div class="ap-check"></div><span>Revenue split agreement documented and signed</span></li>
+      </ul>
+      <div class="ap-eta">⏱ Do this in Month 1 — align before building</div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider" />
+
+<!-- FIRST STEP -->
+<section id="first-step">
+  <h2 class="section-title" style="text-align:center;">Start This Week</h2>
+  <p class="section-sub" style="text-align:center;">The Content Repurposer is your first build. Here's exactly what to do.</p>
+
+  <div class="first-step-card">
+    <div class="fs-icon">🚀</div>
+    <div class="fs-title">Build the Content Repurposer</div>
+    <div class="fs-desc">
+      You'll use it every day. It takes 2–3 days to build. It's visually demonstrable.
+      It becomes your first post AND your first tool sale.
+    </div>
+
+    <div class="fs-steps">
+      <div class="fs-step">
+        <div class="fs-num">1</div>
+        <div class="fs-step-text">Align with Sachit — share this plan, agree on revenue split, set week 1 goals</div>
+      </div>
+      <div class="fs-step">
+        <div class="fs-num">2</div>
+        <div class="fs-step-text">Create WhatsApp group — Sachit invites his CA network, you invite Planora users</div>
+      </div>
+      <div class="fs-step">
+        <div class="fs-num">3</div>
+        <div class="fs-step-text">Build Content Repurposer (Claude API + simple UI) — say "let's build it" and we start coding</div>
+      </div>
+      <div class="fs-step">
+        <div class="fs-num">4</div>
+        <div class="fs-step-text">Post the build process on LinkedIn — "I built this tool for myself in 2 days"</div>
+      </div>
+      <div class="fs-step">
+        <div class="fs-num">5</div>
+        <div class="fs-step-text">Share it free in the WhatsApp group — watch the reaction, collect feedback</div>
+      </div>
+    </div>
+
+    <button class="fs-btn" onclick="alert('Tell me: start with the Content Repurposer or the GST Calendar Generator?')">
+      Let's Start Building →
+    </button>
+  </div>
+</section>
+
+<footer>
+  Built for <span>Saksham + Sachit</span> · AI Community Strategy · May 2026
+</footer>
+
+<script>
+  // ── SCROLL PROGRESS ──
+  window.addEventListener('scroll', () => {
+    const doc = document.documentElement;
+    const pct = doc.scrollTop / (doc.scrollHeight - doc.clientHeight);
+    document.getElementById('progress-bar').style.transform = `scaleX(${pct})`;
+  });
+
+  // ── NAV ACTIVE ──
+  const sections = document.querySelectorAll('section[id]');
+  const navLinks = document.querySelectorAll('.nav-links a');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        navLinks.forEach(l => l.classList.remove('active'));
+        const link = document.querySelector(`.nav-links a[href="#${e.target.id}"]`);
+        if (link) link.classList.add('active');
+      }
+    });
+  }, { threshold: 0.4 });
+  sections.forEach(s => observer.observe(s));
+
+  // ── TIER TABS ──
+  function switchTier(id) {
+    document.querySelectorAll('.tier-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tier-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('tier-' + id).classList.add('active');
+    event.currentTarget.classList.add('active');
+  }
+
+  // ── TOOL FILTER ──
+  function filterTools(cat, btn) {
+    document.querySelectorAll('.tool-filter').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.tool-card').forEach(card => {
+      if (cat === 'all' || card.dataset.cat === cat) {
+        card.classList.remove('hidden');
+      } else {
+        card.classList.add('hidden');
+      }
+    });
+  }
+
+  // ── PHASE TIMELINE ──
+  function switchPhase(num) {
+    document.querySelectorAll('.phase-content').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.phase-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('phase-' + num).classList.add('active');
+    document.querySelector(`.phase-btn[data-phase="${num}"]`).classList.add('active');
+  }
+
+  // ── BANDWIDTH BARS (animate on scroll) ──
+  const bwObserver = new IntersectionObserver((entries) => {
+    if (entries[0].isIntersecting) {
+      document.querySelectorAll('.bw-fill').forEach(el => {
+        el.style.width = el.dataset.pct + '%';
+      });
+      bwObserver.disconnect();
+    }
+  }, { threshold: 0.3 });
+  const bwSection = document.getElementById('bw-bars');
+  if (bwSection) bwObserver.observe(bwSection);
+
+  // ── AUTOPILOT CHECKLIST ──
+  function toggleCheck(li) {
+    li.classList.toggle('done');
+  }
+</script>
+
+</body>
+</html>
