@@ -1,0 +1,314 @@
+{
+  "name": "01 — AI Content Generation Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "30 1 * * 1-5" }]
+        }
+      },
+      "id": "11111111-0001-0001-0001-000000000001",
+      "name": "Daily 7am IST (Mon–Fri)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300],
+      "notes": "Fires at 01:30 UTC = 07:00 IST every weekday"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://feeds.feedburner.com/ICAI-News",
+        "options": { "response": { "response": { "responseFormat": "text" } } }
+      },
+      "id": "11111111-0002-0002-0002-000000000002",
+      "name": "RSS: ICAI Announcements",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 180],
+      "notes": "ICAI official news feed. Swap URL if feed changes."
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://economictimes.indiatimes.com/industry/banking/finance/rssfeeds/13358259.cms",
+        "options": { "response": { "response": { "responseFormat": "text" } } }
+      },
+      "id": "11111111-0003-0003-0003-000000000003",
+      "name": "RSS: ET Finance",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300],
+      "notes": "Economic Times finance/CA feed"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://www.gst.gov.in/rss/news.xml",
+        "options": { "response": { "response": { "responseFormat": "text" } } }
+      },
+      "id": "11111111-0004-0004-0004-000000000004",
+      "name": "RSS: GST Council",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 420],
+      "notes": "GST Council official updates"
+    },
+    {
+      "parameters": {
+        "mode": "append",
+        "options": {}
+      },
+      "id": "11111111-0005-0005-0005-000000000005",
+      "name": "Merge All RSS Feeds",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse RSS XML feeds and extract top articles\nconst items = $input.all();\nconst allArticles = [];\n\nfor (const item of items) {\n  const raw = item.json.data || item.json.body || '';\n  const sourceName = item.json.url || 'RSS Feed';\n\n  // Extract items between <item> tags\n  const itemMatches = raw.match(/<item[^>]*>([\\s\\S]*?)<\\/item>/gi) || [];\n\n  for (const block of itemMatches.slice(0, 8)) {\n    // Title\n    const titleMatch = block.match(/<title>(?:<!\\[CDATA\\[)?(.*?)(?:\\]\\]>)?<\\/title>/i);\n    const title = titleMatch ? titleMatch[1].trim() : '';\n\n    // Link\n    const linkMatch = block.match(/<link>([^<]+)<\\/link>/i);\n    const link = linkMatch ? linkMatch[1].trim() : '';\n\n    // Description\n    const descMatch = block.match(/<description>(?:<!\\[CDATA\\[)?(.*?)(?:\\]\\]>)?<\\/description>/is);\n    const desc = descMatch\n      ? descMatch[1].replace(/<[^>]+>/g, '').trim().substring(0, 250)\n      : '';\n\n    // Pub date\n    const dateMatch = block.match(/<pubDate>(.*?)<\\/pubDate>/i);\n    const pubDate = dateMatch ? dateMatch[1].trim() : '';\n\n    if (title && title.length > 15 && !title.toLowerCase().includes('advertisement')) {\n      allArticles.push({ title, link, desc, pubDate, source: sourceName });\n    }\n  }\n}\n\n// Deduplicate by first 40 chars of title\nconst seen = new Set();\nconst unique = allArticles.filter(a => {\n  const key = a.title.substring(0, 40).toLowerCase();\n  if (seen.has(key)) return false;\n  seen.add(key);\n  return true;\n});\n\nconsole.log(`Parsed ${unique.length} unique articles from ${items.length} feeds`);\n\nreturn [{ json: { articles: unique.slice(0, 25), count: unique.length, scrapedAt: new Date().toISOString() } }];"
+      },
+      "id": "11111111-0006-0006-0006-000000000006",
+      "name": "Code: Parse + Deduplicate RSS",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [960, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "={{$env.ANTHROPIC_API_KEY}}" },
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawBody": "={{\nJSON.stringify({\n  model: 'claude-opus-4-5',\n  max_tokens: 1500,\n  messages: [{\n    role: 'user',\n    content: `You are a content strategist for an AI community targeting Indian CA professionals.\\n\\nHere are today's news articles:\\n${$json.articles.map((a, i) => `${i+1}. ${a.title}\\n   Source: ${a.source}\\n   Summary: ${a.desc}`).join('\\n\\n')}\\n\\nSelect the TOP 7 articles most likely to generate high engagement from CA firms and finance professionals in India. Prioritise topics about: AI automation, GST/TDS/compliance updates, time-saving workflows, income tax changes, technology for accounting firms.\\n\\nFor each selected article, respond in this exact format:\\n1. [TITLE] - [WHY IT WILL PERFORM WELL in one sentence]\\n2. [TITLE] - [WHY]\\n...\\n\\nRespond with ONLY the numbered list, nothing else.`\n  }]\n})\n}}",
+        "options": { "timeout": 30000 }
+      },
+      "id": "11111111-0007-0007-0007-000000000007",
+      "name": "Claude: Rank Top Ideas",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1200, 300],
+      "notes": "Set ANTHROPIC_API_KEY in n8n environment variables"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract and parse Claude's ranked idea list\nconst response = $input.first().json;\nconst content = response.content?.[0]?.text || '';\n\nif (!content) {\n  throw new Error('Claude returned empty response. Check API key and quota.');\n}\n\n// Parse numbered list\nconst lines = content.split('\\n').filter(l => l.trim());\nconst ideas = [];\n\nfor (const line of lines) {\n  const match = line.match(/^(\\d+)\\.\\s+(.+?)\\s+-\\s+(.+)$/);\n  if (match) {\n    ideas.push({\n      rank: parseInt(match[1]),\n      title: match[2].trim().replace(/^\\[|\\]$/g, ''),\n      why: match[3].trim(),\n      generatedAt: new Date().toISOString()\n    });\n  }\n}\n\nif (ideas.length === 0) {\n  // Fallback: treat each line as an idea title\n  lines.slice(0, 7).forEach((line, i) => {\n    ideas.push({ rank: i+1, title: line.replace(/^\\d+\\.\\s*/, '').trim(), why: 'Selected by AI', generatedAt: new Date().toISOString() });\n  });\n}\n\nconsole.log(`Extracted ${ideas.length} ranked ideas`);\n\n// Return each idea as a separate item (SplitInBatches will process them one by one)\nreturn ideas.slice(0, 7).map(idea => ({ json: idea }));"
+      },
+      "id": "11111111-0008-0008-0008-000000000008",
+      "name": "Code: Extract Top 7 Ideas",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1440, 300]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "11111111-0009-0009-0009-000000000009",
+      "name": "Process Each Idea (Loop)",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1680, 300],
+      "notes": "Processes one idea at a time. Output 0 = current idea, Output 1 = all done"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "={{$env.ANTHROPIC_API_KEY}}" },
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawBody": "={{\nJSON.stringify({\n  model: 'claude-opus-4-5',\n  max_tokens: 2500,\n  messages: [{\n    role: 'user',\n    content: `You are a social media content creator for an AI community for Indian CA professionals. Write engaging content about:\\n\\nTOPIC: ${$json.title}\\nWHY IT MATTERS: ${$json.why}\\n\\nCreate 3 versions below. Use the exact section headers shown.\\n\\n---LINKEDIN---\\nWrite a LinkedIn post (900-1200 characters). Start with a bold hook line. Use short paragraphs (2-3 lines max). Include 1-2 emojis. End with a clear CTA like 'Drop a comment if you want the full checklist' or 'Save this for your next filing'. Professional but conversational tone. No hashtags.\\n\\n---INSTAGRAM---\\nWrite an Instagram caption (150-220 characters). Punchy opener. 2 sentences max. Then 20-25 relevant hashtags on a new line. Examples: #CAIndia #GSTUpdate #AIForCA #TaxAutomation #CharteredAccountant #IndiaFinance\\n\\n---WHATSAPP---\\nWrite a WhatsApp community message (under 180 words). Conversational, like texting a CA friend. No formal language. Start with an attention grabber. Include one clear action or takeaway. Sign off naturally.\\n\\nReturn ONLY the three sections with their headers. No intro, no explanation.`\n  }]\n})\n}}",
+        "options": { "timeout": 45000 }
+      },
+      "id": "11111111-0010-0010-0010-000000000010",
+      "name": "Claude: Draft All 3 Formats",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1920, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse Claude's multi-format response into structured data\nconst claudeResponse = $input.first().json;\nconst ideaData = $('Process Each Idea (Loop)').first().json;\n\nconst content = claudeResponse.content?.[0]?.text || '';\n\nif (!content) {\n  throw new Error('Claude draft response was empty');\n}\n\n// Extract each section\nconst extractSection = (text, startMarker, endMarker) => {\n  const start = text.indexOf(startMarker);\n  if (start === -1) return '';\n  const contentStart = start + startMarker.length;\n  const end = endMarker ? text.indexOf(endMarker, contentStart) : text.length;\n  return text.substring(contentStart, end === -1 ? text.length : end).trim();\n};\n\nconst linkedin = extractSection(content, '---LINKEDIN---', '---INSTAGRAM---');\nconst instagram = extractSection(content, '---INSTAGRAM---', '---WHATSAPP---');\nconst whatsapp = extractSection(content, '---WHATSAPP---', null);\n\n// Validate we got content\nif (!linkedin || !instagram || !whatsapp) {\n  console.warn('Warning: One or more sections missing from Claude response');\n  console.log('Raw content:', content.substring(0, 500));\n}\n\n// Image prompt for this topic\nconst imagePrompt = `Professional infographic for Indian CA professionals. Topic: ${ideaData.title}. Style: clean, minimal, dark navy background, purple and white accent colors. Include 3-4 key data points or steps. No stock photos. Modern SaaS aesthetic.`;\n\nconsole.log(`Parsed drafts for: ${ideaData.title}`);\n\nreturn [{\n  json: {\n    idea_title: ideaData.title,\n    idea_rank: ideaData.rank,\n    idea_why: ideaData.why,\n    linkedin_draft: linkedin,\n    instagram_draft: instagram,\n    whatsapp_draft: whatsapp,\n    image_prompt: imagePrompt,\n    char_count_linkedin: linkedin.length,\n    drafted_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "11111111-0011-0011-0011-000000000011",
+      "name": "Code: Parse Drafts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2160, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hcti.io/v1/image",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawBody": "={{\nJSON.stringify({\n  html: `<div style=\"font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:linear-gradient(135deg,#0a0a1a,#1a0a2e);width:1080px;height:1080px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px;box-sizing:border-box;\"><div style=\"background:rgba(124,58,237,0.15);border:2px solid rgba(124,58,237,0.4);border-radius:16px;padding:60px;text-align:center;width:100%;\"><div style=\"font-size:28px;color:#a78bfa;font-weight:800;letter-spacing:4px;margin-bottom:30px;\">AI FOR CA INDIA</div><div style=\"font-size:52px;font-weight:900;color:#ffffff;line-height:1.2;margin-bottom:30px;\">${$json.idea_title.substring(0,60).replace(/\"/g, '&quot;')}</div><div style=\"width:80px;height:4px;background:linear-gradient(90deg,#7c3aed,#06b6d4);margin:0 auto 30px;\"></div><div style=\"font-size:24px;color:#94a3b8;\">🤖 Powered by AI · Built for CAs</div></div></div>`,\n  css: ''\n})\n}}",
+        "authentication": "basicAuth",
+        "options": { "timeout": 20000 }
+      },
+      "id": "11111111-0012-0012-0012-000000000012",
+      "name": "Generate Branded Image (HCTI)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2400, 300],
+      "notes": "Uses htmlcsstoimage.com (HCTI) API. Add 'hcti-basic-auth' credential with your user_id as username and api_key as password. Free tier: 50 images/month. OR replace this node with any image gen service."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Combine parsed drafts with generated image URL\nconst drafts = $('Code: Parse Drafts').first().json;\nconst imageResponse = $input.first().json;\n\n// HCTI returns { url: 'https://...', ... }\nconst imageUrl = imageResponse.url || imageResponse.image_url || '';\n\nreturn [{\n  json: {\n    ...drafts,\n    image_url: imageUrl,\n    ready_for_storage: true\n  }\n}];"
+      },
+      "id": "11111111-0012b-0012-0012-00000000012b",
+      "name": "Code: Combine Draft + Image",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2640, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/content_queue",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_KEY}}" },
+            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_KEY}}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=representation" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawBody": "={{\nJSON.stringify({\n  idea_title: $json.idea_title,\n  topic_source: $json.idea_why,\n  linkedin_draft: $json.linkedin_draft,\n  instagram_draft: $json.instagram_draft,\n  whatsapp_draft: $json.whatsapp_draft,\n  image_url: $json.image_url,\n  image_prompt: $json.image_prompt,\n  status: 'pending',\n  week_of: new Date().toISOString().split('T')[0]\n})\n}}",
+        "options": { "timeout": 10000 }
+      },
+      "id": "11111111-0013-0013-0013-000000000013",
+      "name": "Supabase: Store Draft",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2880, 300],
+      "notes": "Set SUPABASE_URL and SUPABASE_SERVICE_KEY in n8n environment variables"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{$env.RESEND_API_KEY}}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawBody": "={{\nJSON.stringify({\n  from: 'noreply@planora.app',\n  to: ['saksham.gpt2001@gmail.com'],\n  subject: `✅ ${$('Process Each Idea (Loop)').all().length} posts drafted — approve this week's content`,\n  html: `<h2>Your AI content pipeline ran successfully.</h2><p><strong>${$('Code: Extract Top 7 Ideas').all().length} posts</strong> have been drafted for LinkedIn, Instagram, and WhatsApp.</p><p>Open your approval dashboard to review and schedule them:</p><a href='https://your-planora-domain.com/admin/content' style='background:#7c3aed;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:700;display:inline-block;margin-top:12px;'>Review & Approve Posts →</a><hr/><p style='color:#888;font-size:12px;'>Generated at ${new Date().toLocaleString('en-IN', {timeZone:'Asia/Kolkata'})} IST</p>`\n})\n}}",
+        "options": { "timeout": 10000 }
+      },
+      "id": "11111111-0015-0015-0015-000000000015",
+      "name": "Resend: Notify You for Approval",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3120, 180],
+      "notes": "Fires once after ALL ideas are processed (connected from Split Done output). Set RESEND_API_KEY env var."
+    },
+    {
+      "parameters": {},
+      "id": "11111111-0016-0016-0016-000000000016",
+      "name": "Pipeline Complete",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [3360, 180]
+    }
+  ],
+  "connections": {
+    "Daily 7am IST (Mon–Fri)": {
+      "main": [
+        [
+          { "node": "RSS: ICAI Announcements", "type": "main", "index": 0 },
+          { "node": "RSS: ET Finance", "type": "main", "index": 0 },
+          { "node": "RSS: GST Council", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "RSS: ICAI Announcements": {
+      "main": [[{ "node": "Merge All RSS Feeds", "type": "main", "index": 0 }]]
+    },
+    "RSS: ET Finance": {
+      "main": [[{ "node": "Merge All RSS Feeds", "type": "main", "index": 1 }]]
+    },
+    "RSS: GST Council": {
+      "main": [[{ "node": "Merge All RSS Feeds", "type": "main", "index": 2 }]]
+    },
+    "Merge All RSS Feeds": {
+      "main": [[{ "node": "Code: Parse + Deduplicate RSS", "type": "main", "index": 0 }]]
+    },
+    "Code: Parse + Deduplicate RSS": {
+      "main": [[{ "node": "Claude: Rank Top Ideas", "type": "main", "index": 0 }]]
+    },
+    "Claude: Rank Top Ideas": {
+      "main": [[{ "node": "Code: Extract Top 7 Ideas", "type": "main", "index": 0 }]]
+    },
+    "Code: Extract Top 7 Ideas": {
+      "main": [[{ "node": "Process Each Idea (Loop)", "type": "main", "index": 0 }]]
+    },
+    "Process Each Idea (Loop)": {
+      "main": [
+        [{ "node": "Claude: Draft All 3 Formats", "type": "main", "index": 0 }],
+        [{ "node": "Resend: Notify You for Approval", "type": "main", "index": 0 }]
+      ]
+    },
+    "Claude: Draft All 3 Formats": {
+      "main": [[{ "node": "Code: Parse Drafts", "type": "main", "index": 0 }]]
+    },
+    "Code: Parse Drafts": {
+      "main": [[{ "node": "Generate Branded Image (HCTI)", "type": "main", "index": 0 }]]
+    },
+    "Generate Branded Image (HCTI)": {
+      "main": [[{ "node": "Code: Combine Draft + Image", "type": "main", "index": 0 }]]
+    },
+    "Code: Combine Draft + Image": {
+      "main": [[{ "node": "Supabase: Store Draft", "type": "main", "index": 0 }]]
+    },
+    "Supabase: Store Draft": {
+      "main": [[{ "node": "Process Each Idea (Loop)", "type": "main", "index": 0 }]]
+    },
+    "Resend: Notify You for Approval": {
+      "main": [[{ "node": "Pipeline Complete", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "versionId": "11111111-ffff-ffff-ffff-111111111111",
+  "id": "ai-content-gen-v1",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

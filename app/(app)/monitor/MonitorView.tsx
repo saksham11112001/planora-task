@@ -10,19 +10,27 @@ import type { Task } from '@/types'
 interface MonTask {
   id: string
   title: string
+  description?: string | null
   status: string
   priority: string
   due_date: string | null
+  completed_at?: string | null
+  updated_at?: string | null
+  created_at: string
   is_recurring: boolean
+  frequency?: string | null
+  next_occurrence_date?: string | null
+  estimated_hours?: number | null
   project_id: string | null
+  parent_task_id?: string | null
   client_id: string | null
   assignee_id: string | null
   approver_id: string | null
   approval_status: string | null
+  approval_required?: boolean
+  is_billable?: boolean
+  billable_amount?: number | null
   custom_fields?: Record<string, any> | null
-  created_at: string
-  completed_at?: string | null
-  updated_at?: string | null
   assignee: { id: string; name: string } | null
   approver: { id: string; name: string } | null
   creator: { id: string; name: string } | null
@@ -150,7 +158,6 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
   // ── UI state ──
   const [showChart,       setShowChart]       = useState(false)
   const [panelTask,       setPanelTask]       = useState<Task | null>(null)
-  const [panelLoading,    setPanelLoading]    = useState(false)
   const [groupBy,         setGroupBy]         = useState<'status' | 'assignee' | 'client' | 'type' | 'none'>('status')
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
 
@@ -158,13 +165,9 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
     setCollapsedGroups(prev => { const s = new Set(prev); s.has(k) ? s.delete(k) : s.add(k); return s })
   }
 
-  async function openTask(id: string) {
-    setPanelLoading(true)
-    try {
-      const res  = await fetch(`/api/tasks/${id}`)
-      const data = await res.json()
-      if (data?.data) setPanelTask(data.data as Task)
-    } finally { setPanelLoading(false) }
+  function openTask(id: string) {
+    const t = tasks.find(t => t.id === id)
+    if (t) setPanelTask(t as unknown as Task)
   }
 
   // ── Export ──

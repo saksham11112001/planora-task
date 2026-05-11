@@ -452,6 +452,221 @@
     }
     footer span { color: var(--purple-light); }
 
+    /* ── UNIFIED SYSTEM ── */
+    .unified-wrap {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; align-items: start;
+    }
+    @media(max-width:780px){ .unified-wrap { grid-template-columns: 1fr; } }
+
+    .unified-node {
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 1.75rem; position: relative;
+      transition: border-color 0.3s, transform 0.3s;
+    }
+    .unified-node:hover { transform: translateY(-4px); }
+    .unified-node.planora { border-top: 3px solid var(--purple); }
+    .unified-node.planora:hover { border-color: var(--purple); }
+    .unified-node.community { border-top: 3px solid var(--cyan); }
+    .unified-node.community:hover { border-color: var(--cyan); }
+    .un-label {
+      font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em;
+      margin-bottom: 0.6rem;
+    }
+    .planora .un-label { color: var(--purple-light); }
+    .community .un-label { color: var(--cyan-light); }
+    .un-title { font-size: 1.3rem; font-weight: 800; margin-bottom: 1rem; }
+    .un-flows { display: flex; flex-direction: column; gap: 0.6rem; }
+    .un-flow {
+      display: flex; align-items: flex-start; gap: 0.75rem; font-size: 0.85rem;
+      background: var(--bg); border-radius: 8px; padding: 0.6rem 0.9rem;
+    }
+    .un-flow-icon { font-size: 1rem; flex-shrink: 0; }
+    .un-flow-text { color: var(--text-muted); line-height: 1.4; }
+    .un-flow-text strong { color: var(--text); }
+
+    .arrows-center {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 0.75rem; padding: 1rem 0;
+    }
+    .arr-pill {
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 50px; padding: 0.5rem 1.1rem;
+      font-size: 0.78rem; color: var(--text-muted); text-align: center;
+      max-width: 200px; line-height: 1.4;
+    }
+    .arr-icon { font-size: 1.4rem; color: var(--purple); opacity: 0.6; }
+
+    .unified-bottom {
+      grid-column: 1 / -1; background: var(--bg3); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 1.75rem;
+      border-top: 3px solid var(--green);
+    }
+    .ub-label { font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: #6ee7b7; margin-bottom: 0.6rem; }
+    .ub-title { font-size: 1.1rem; font-weight: 800; margin-bottom: 1.25rem; }
+    .ub-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; }
+    .ub-item {
+      background: var(--bg); border-radius: 8px; padding: 0.75rem 1rem;
+      font-size: 0.82rem; display: flex; gap: 0.6rem; align-items: flex-start;
+    }
+    .ub-item-icon { font-size: 1rem; flex-shrink: 0; }
+    .ub-item-text { color: var(--text-muted); line-height: 1.4; }
+    .ub-item-text strong { color: var(--text); display: block; }
+
+    .week-timeline {
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 2rem; margin-top: 1.5rem;
+    }
+    .wt-title { font-weight: 700; margin-bottom: 1.5rem; font-size: 1rem; }
+    .wt-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.5rem; }
+    @media(max-width:640px){ .wt-days { grid-template-columns: repeat(2, 1fr); } }
+    .wt-day { background: var(--bg); border-radius: 8px; padding: 0.85rem 0.75rem; }
+    .wt-day-name { font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); margin-bottom: 0.5rem; }
+    .wt-task { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.3rem; line-height: 1.4; }
+    .wt-auto { color: var(--green); font-size: 0.7rem; font-weight: 600; margin-top: 0.4rem; }
+    .wt-day.highlight { border: 1px solid rgba(124,58,237,0.3); }
+
+    /* ── YOUTUBE ANALYSIS ── */
+    .yt-score-card {
+      background: linear-gradient(135deg, rgba(220,38,38,0.1), rgba(220,38,38,0.05));
+      border: 1px solid rgba(220,38,38,0.25); border-radius: var(--radius-lg);
+      padding: 2rem; margin-bottom: 2rem; display: flex; gap: 2rem; align-items: center; flex-wrap: wrap;
+    }
+    .yt-score-big { text-align: center; flex-shrink: 0; }
+    .yt-score-num { font-size: 4rem; font-weight: 900; line-height: 1; color: #f87171; }
+    .yt-score-denom { font-size: 1.2rem; color: var(--text-dim); font-weight: 600; }
+    .yt-score-label { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.3rem; }
+    .yt-score-info { flex: 1; min-width: 220px; }
+    .yt-score-title { font-size: 1.3rem; font-weight: 800; margin-bottom: 0.5rem; }
+    .yt-score-desc { color: var(--text-muted); font-size: 0.88rem; line-height: 1.6; }
+
+    .yt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem; margin-bottom: 2rem; }
+    .yt-card {
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 1.5rem;
+    }
+    .yt-card-title { font-weight: 700; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; font-size: 0.95rem; }
+    .yt-card ul { list-style: none; display: flex; flex-direction: column; gap: 0.55rem; }
+    .yt-card li { font-size: 0.83rem; display: flex; gap: 0.6rem; align-items: flex-start; color: var(--text-muted); }
+    .yt-card li .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; margin-top: 6px; }
+    .dot-green { background: var(--green); }
+    .dot-red { background: #f87171; }
+    .dot-orange { background: var(--orange); }
+
+    .yt-roi-table {
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: var(--radius); overflow: hidden; margin-bottom: 2rem;
+    }
+    .yt-roi-table table { width: 100%; border-collapse: collapse; }
+    .yt-roi-table th {
+      background: var(--bg); font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.06em; color: var(--text-muted); padding: 0.85rem 1.25rem; text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    .yt-roi-table td { padding: 0.9rem 1.25rem; font-size: 0.85rem; border-bottom: 1px solid var(--border); }
+    .yt-roi-table tr:last-child td { border-bottom: none; }
+    .yt-roi-table tr:hover td { background: rgba(255,255,255,0.02); }
+    .yt-good { color: var(--green); font-weight: 600; }
+    .yt-bad { color: #f87171; font-weight: 600; }
+    .yt-mid { color: var(--orange); font-weight: 600; }
+
+    .yt-verdict {
+      background: var(--bg3); border: 1px solid rgba(220,38,38,0.25);
+      border-radius: var(--radius-lg); padding: 1.75rem;
+    }
+    .yt-verdict-title { font-weight: 800; font-size: 1.05rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.6rem; }
+    .yt-phases { display: flex; flex-direction: column; gap: 0.75rem; }
+    .yt-phase {
+      display: flex; gap: 1rem; align-items: flex-start;
+      background: var(--bg); border-radius: 8px; padding: 0.85rem 1rem;
+    }
+    .yt-phase-month {
+      font-size: 0.72rem; font-weight: 800; text-transform: uppercase;
+      white-space: nowrap; color: var(--text-dim); padding-top: 2px; min-width: 60px;
+    }
+    .yt-phase-text { font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; }
+    .yt-phase-text strong { color: var(--text); }
+
+    /* ── AUTO-POST PIPELINE ── */
+    .pipeline {
+      display: flex; flex-direction: column; gap: 0;
+      position: relative;
+    }
+    .pipeline::before {
+      content: ''; position: absolute; left: 28px; top: 48px; bottom: 48px;
+      width: 2px; background: linear-gradient(to bottom, var(--purple), var(--cyan), var(--green));
+      opacity: 0.3;
+    }
+    .pipe-step {
+      display: flex; gap: 1.25rem; align-items: flex-start;
+      padding: 1.25rem 0; position: relative;
+    }
+    .pipe-num {
+      width: 56px; height: 56px; border-radius: 50%; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.3rem; font-weight: 800; position: relative; z-index: 1;
+      border: 2px solid var(--border); background: var(--bg3);
+      transition: all 0.3s;
+    }
+    .pipe-step:hover .pipe-num { border-color: var(--purple); background: rgba(124,58,237,0.15); transform: scale(1.08); }
+    .pipe-body { flex: 1; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem 1.5rem; transition: border-color 0.3s; }
+    .pipe-step:hover .pipe-body { border-color: rgba(124,58,237,0.35); }
+    .pipe-title { font-weight: 700; font-size: 1rem; margin-bottom: 0.35rem; display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+    .pipe-badge {
+      font-size: 0.68rem; font-weight: 700; padding: 0.18rem 0.6rem;
+      border-radius: 50px;
+    }
+    .badge-ai { background: rgba(124,58,237,0.2); color: var(--purple-light); }
+    .badge-api { background: rgba(6,182,212,0.2); color: var(--cyan-light); }
+    .badge-auto { background: rgba(16,185,129,0.2); color: #6ee7b7; }
+    .badge-review { background: rgba(245,158,11,0.2); color: #fcd34d; }
+    .pipe-desc { color: var(--text-muted); font-size: 0.85rem; line-height: 1.6; }
+    .pipe-tools { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.75rem; }
+    .pipe-tool {
+      font-size: 0.72rem; font-weight: 600; padding: 0.22rem 0.7rem;
+      border-radius: 50px; border: 1px solid var(--border); color: var(--text-muted);
+      background: var(--bg);
+    }
+    .pipe-connector {
+      display: flex; align-items: center; padding-left: 28px; gap: 0.5rem;
+      color: var(--text-dim); font-size: 0.75rem; padding-top: 0; padding-bottom: 0;
+    }
+    .pipe-connector::before { content: '↓'; font-size: 1rem; color: var(--purple); opacity: 0.5; }
+
+    .platforms-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.25rem;
+      margin-top: 2.5rem;
+    }
+    .plat-card {
+      background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 1.5rem; transition: border-color 0.3s, transform 0.3s;
+    }
+    .plat-card:hover { transform: translateY(-3px); }
+    .plat-card.linkedin:hover { border-color: rgba(10,102,194,0.5); }
+    .plat-card.instagram:hover { border-color: rgba(225,48,108,0.5); }
+    .plat-card.whatsapp:hover { border-color: rgba(37,211,102,0.5); }
+    .plat-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }
+    .plat-icon { font-size: 1.8rem; }
+    .plat-name { font-weight: 700; font-size: 1rem; }
+    .plat-format { font-size: 0.75rem; color: var(--text-muted); }
+    .plat-specs { display: flex; flex-direction: column; gap: 0.5rem; }
+    .plat-spec { font-size: 0.82rem; display: flex; gap: 0.6rem; align-items: flex-start; }
+    .plat-spec::before { content: '→'; color: var(--text-dim); flex-shrink: 0; }
+    .plat-api {
+      margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border);
+      font-size: 0.75rem; font-weight: 600;
+    }
+    .plat-card.linkedin .plat-api { color: #60a5fa; }
+    .plat-card.instagram .plat-api { color: #f472b6; }
+    .plat-card.whatsapp .plat-api { color: #4ade80; }
+
+    .autopost-note {
+      background: linear-gradient(135deg, rgba(124,58,237,0.08), rgba(6,182,212,0.06));
+      border: 1px solid rgba(124,58,237,0.25); border-radius: var(--radius);
+      padding: 1.25rem 1.5rem; margin-top: 2rem; font-size: 0.88rem;
+      color: var(--text-muted); display: flex; gap: 0.75rem; align-items: flex-start;
+    }
+    .autopost-note strong { color: var(--text); }
+
     /* ── RESPONSIVE ── */
     @media (max-width: 640px) {
       nav { padding: 0 1rem; }
@@ -472,11 +687,14 @@
   <div class="nav-logo">⚡ AI Community Strategy</div>
   <ul class="nav-links">
     <li><a href="#edge">Edge</a></li>
+    <li><a href="#unified">System</a></li>
     <li><a href="#community">Community</a></li>
     <li><a href="#tools">Tools</a></li>
     <li><a href="#revenue">Revenue</a></li>
     <li><a href="#roadmap">Roadmap</a></li>
     <li><a href="#autopilot">Autopilot</a></li>
+    <li><a href="#autopost">Auto-Post</a></li>
+    <li><a href="#youtube">YouTube</a></li>
     <li><a href="#first-step">Start</a></li>
   </ul>
 </nav>
@@ -520,7 +738,7 @@
   </div>
 
   <div class="hero-inspo">
-    Inspired by <span>Nate Hetz</span> &amp; <span>Sanjeev Jain (Ceoitbox)</span> — adapted for the Indian CA market
+    <span>Build · Automate · Scale</span> — The AI playbook for India's finance professionals
   </div>
 </section>
 
@@ -595,6 +813,143 @@
     <div class="fw-step">
       <div class="fw-circle">📈</div>
       <div class="fw-label">Revenue funds next tool</div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider" />
+
+<!-- UNIFIED SYSTEM -->
+<section id="unified">
+  <h2 class="section-title">One System, Not Two</h2>
+  <p class="section-sub">Planora and the community aren't running in parallel — they're the same flywheel. Each feeds the other automatically.</p>
+
+  <div class="unified-wrap">
+    <div class="unified-node planora">
+      <div class="un-label">⚡ Planora SaaS</div>
+      <div class="un-title">The Product</div>
+      <div class="un-flows">
+        <div class="un-flow">
+          <div class="un-flow-icon">💰</div>
+          <div class="un-flow-text"><strong>Funds everything</strong> — Planora MRR pays your bills while community revenue is still growing</div>
+        </div>
+        <div class="un-flow">
+          <div class="un-flow-icon">👥</div>
+          <div class="un-flow-text"><strong>Built-in audience</strong> — every Planora user is a warm community prospect, not a cold lead</div>
+        </div>
+        <div class="un-flow">
+          <div class="un-flow-icon">📖</div>
+          <div class="un-flow-text"><strong>Endless content</strong> — every feature you ship = a post, a workshop topic, a tool demo</div>
+        </div>
+        <div class="un-flow">
+          <div class="un-flow-icon">🎯</div>
+          <div class="un-flow-text"><strong>Exact niche match</strong> — Planora targets CA firms. Community targets CA firms. Same person, twice the touch points</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="unified-node community">
+      <div class="un-label">🌐 AI Community</div>
+      <div class="un-title">The Distribution</div>
+      <div class="un-flows">
+        <div class="un-flow">
+          <div class="un-flow-icon">🔄</div>
+          <div class="un-flow-text"><strong>Free marketing for Planora</strong> — cohort graduates need a tool to implement what they learned. You hand them Planora.</div>
+        </div>
+        <div class="un-flow">
+          <div class="un-flow-icon">🧪</div>
+          <div class="un-flow-text"><strong>Live product lab</strong> — community feedback shapes Planora's roadmap. No need for expensive user research.</div>
+        </div>
+        <div class="un-flow">
+          <div class="un-flow-icon">🤝</div>
+          <div class="un-flow-text"><strong>Sachit's pipeline</strong> — CA firm intros from his network become both enterprise community members and Planora Business subscribers</div>
+        </div>
+        <div class="un-flow">
+          <div class="un-flow-icon">📈</div>
+          <div class="un-flow-text"><strong>Second revenue engine</strong> — when Planora hits a ceiling, community keeps scaling. Two income streams, one audience.</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="grid-column:1/-1; display:flex; align-items:center; justify-content:center; gap:1.5rem; flex-wrap:wrap; padding:0.5rem 0;">
+      <div class="arr-pill">Community member tries Planora free → converts to paid</div>
+      <div class="arr-icon">⇄</div>
+      <div class="arr-pill">Planora user joins community for AI tips → buys cohort</div>
+    </div>
+
+    <div class="unified-bottom">
+      <div class="ub-label">⚙️ Automation Layer — runs both silently</div>
+      <div class="ub-title">What n8n + Inngest handle so you don't have to</div>
+      <div class="ub-grid">
+        <div class="ub-item">
+          <div class="ub-item-icon">📣</div>
+          <div class="ub-item-text"><strong>Content pipeline</strong> Idea → draft → image → LinkedIn + Instagram. Zero manual work.</div>
+        </div>
+        <div class="ub-item">
+          <div class="ub-item-icon">🎧</div>
+          <div class="ub-item-text"><strong>Planora support</strong> AI first-response + VA handles tier 1. Escalates only edge cases.</div>
+        </div>
+        <div class="ub-item">
+          <div class="ub-item-icon">📧</div>
+          <div class="ub-item-text"><strong>Onboarding + retention</strong> 7-email sequences, churn alerts, dunning — all Inngest jobs.</div>
+        </div>
+        <div class="ub-item">
+          <div class="ub-item-icon">💳</div>
+          <div class="ub-item-text"><strong>Billing + metrics</strong> Razorpay webhooks → weekly MRR snapshot. No manual reporting.</div>
+        </div>
+        <div class="ub-item">
+          <div class="ub-item-icon">🔁</div>
+          <div class="ub-item-text"><strong>Recurring tasks</strong> Planora's recurring spawn runs daily without you touching anything.</div>
+        </div>
+        <div class="ub-item">
+          <div class="ub-item-icon">📊</div>
+          <div class="ub-item-text"><strong>Analytics loop</strong> Post performance feeds back into next week's content scoring automatically.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACTUAL WEEK AT MONTH 6 -->
+  <div class="week-timeline">
+    <div class="wt-title">⏱ Your actual week at Month 6 — after both are running</div>
+    <div class="wt-days">
+      <div class="wt-day">
+        <div class="wt-day-name">Mon</div>
+        <div class="wt-task">n8n posts to LinkedIn + Instagram</div>
+        <div class="wt-auto">✦ Fully automated</div>
+      </div>
+      <div class="wt-day">
+        <div class="wt-day-name">Tue</div>
+        <div class="wt-task">Reply to 3–5 interesting comments (optional)</div>
+        <div class="wt-auto">20 mins max</div>
+      </div>
+      <div class="wt-day">
+        <div class="wt-day-name">Wed</div>
+        <div class="wt-task">Planora metrics check</div>
+        <div class="wt-task">Community manager update</div>
+        <div class="wt-auto">30 mins total</div>
+      </div>
+      <div class="wt-day">
+        <div class="wt-day-name">Thu</div>
+        <div class="wt-task">Build: tool or Planora feature</div>
+        <div class="wt-auto">4–5 hrs deep work</div>
+      </div>
+      <div class="wt-day">
+        <div class="wt-day-name">Fri</div>
+        <div class="wt-task">Sachit sync: CA leads, workshop prep</div>
+        <div class="wt-auto">1 hr call</div>
+      </div>
+      <div class="wt-day">
+        <div class="wt-day-name">Sat</div>
+        <div class="wt-task">Off or overflow build time</div>
+        <div class="wt-auto">Optional</div>
+      </div>
+      <div class="wt-day highlight">
+        <div class="wt-day-name">Sun</div>
+        <div class="wt-task">Approve 7 posts in dashboard</div>
+        <div class="wt-task">Fill newsletter template</div>
+        <div class="wt-auto">⭐ 20–30 mins total</div>
+      </div>
     </div>
   </div>
 </section>
@@ -1155,7 +1510,7 @@
         <li>Annual review — what worked, what to double down on</li>
         <li>Consider a second hire (tool developer)</li>
         <li>Planora on full autopilot — community is your primary job</li>
-        <li>You are now the "Sanjeev Jain for CA firms in India"</li>
+        <li>You are the go-to AI authority for CA firms in India</li>
         <li>Plan Year 2: expand niche (CS, lawyers, finance teams)</li>
       </ul>
       <div class="month-kpi">🎯 Goal: Portfolio of revenue streams, location independence</div>
@@ -1172,26 +1527,33 @@
 
   <div class="bw-bars" id="bw-bars">
     <div class="bw-row">
-      <div class="bw-label"><span>🔧 Building Tools</span><span>6 hrs/week</span></div>
+      <div class="bw-label"><span>🔧 Building Tools + Planora features</span><span>6 hrs/week</span></div>
       <div class="bw-track"><div class="bw-fill" data-pct="30" style="background: linear-gradient(90deg, #7c3aed, #4f46e5);"></div></div>
     </div>
     <div class="bw-row">
-      <div class="bw-label"><span>📢 Content + Community</span><span>5 hrs/week</span></div>
-      <div class="bw-track"><div class="bw-fill" data-pct="25" style="background: linear-gradient(90deg, #06b6d4, #0891b2);"></div></div>
+      <div class="bw-label"><span>📢 Community management + approvals</span><span>4 hrs/week</span></div>
+      <div class="bw-track"><div class="bw-fill" data-pct="20" style="background: linear-gradient(90deg, #06b6d4, #0891b2);"></div></div>
     </div>
     <div class="bw-row">
-      <div class="bw-label"><span>⚡ Planora (Autopilot Setup)</span><span>4 hrs/week</span></div>
-      <div class="bw-track"><div class="bw-fill" data-pct="20" style="background: linear-gradient(90deg, #10b981, #059669);"></div></div>
+      <div class="bw-label"><span>⚡ Planora autopilot setup (Month 1–3)</span><span>3 hrs/week</span></div>
+      <div class="bw-track"><div class="bw-fill" data-pct="15" style="background: linear-gradient(90deg, #10b981, #059669);"></div></div>
     </div>
     <div class="bw-row">
       <div class="bw-label"><span>🎓 Sales + Workshops + Cohort Prep</span><span>3 hrs/week</span></div>
-      <div class="bw-track"><div class="bw-fill" data-pct="13" style="background: linear-gradient(90deg, #f59e0b, #d97706);"></div></div>
+      <div class="bw-track"><div class="bw-fill" data-pct="15" style="background: linear-gradient(90deg, #f59e0b, #d97706);"></div></div>
     </div>
     <div class="bw-row">
-      <div class="bw-label"><span>🤝 Sachit Coordination</span><span>2 hrs/week</span></div>
-      <div class="bw-track"><div class="bw-fill" data-pct="12" style="background: linear-gradient(90deg, #ec4899, #db2777);"></div></div>
+      <div class="bw-label"><span>▶️ YouTube — record + review (editor does rest)</span><span>1.5 hrs/week</span></div>
+      <div class="bw-track"><div class="bw-fill" data-pct="8" style="background: linear-gradient(90deg, #dc2626, #b91c1c);"></div></div>
+    </div>
+    <div class="bw-row">
+      <div class="bw-label"><span>🤝 Sachit coordination + CA firm calls</span><span>2 hrs/week</span></div>
+      <div class="bw-track"><div class="bw-fill" data-pct="10" style="background: linear-gradient(90deg, #ec4899, #db2777);"></div></div>
     </div>
   </div>
+  <p style="margin-top:1.5rem; font-size:0.82rem; color:var(--text-muted);">
+    ✦ Content creation (LinkedIn, Instagram, WhatsApp, YouTube Shorts) = <strong style="color:var(--text);">0 hrs</strong> — fully automated by n8n pipeline. The 4 hrs above is for community replies and approvals only.
+  </p>
 </section>
 
 <hr class="divider" />
@@ -1261,15 +1623,18 @@
     <div class="ap-card">
       <div class="ap-card-header">
         <div class="ap-icon">📣</div>
-        <div class="ap-title">Marketing & Content</div>
+        <div class="ap-title">Content — Full Auto-Post Pipeline</div>
       </div>
       <ul class="ap-checklist">
-        <li onclick="toggleCheck(this)"><div class="ap-check"></div><span>Content repurposer tool → batch-create a week of posts in 1 session</span></li>
-        <li onclick="toggleCheck(this)"><div class="ap-check"></div><span>Schedule posts via Buffer or Typefully (2 hrs/week → 30 mins)</span></li>
-        <li onclick="toggleCheck(this)"><div class="ap-check"></div><span>Newsletter template — fill in 3 fields, rest auto-generates</span></li>
-        <li onclick="toggleCheck(this)"><div class="ap-check"></div><span>Community digest builder → newsletter section auto-written</span></li>
+        <li onclick="toggleCheck(this)"><div class="ap-check"></div><span>Inngest cron: daily idea scraper (Reddit, RSS, LinkedIn trends)</span></li>
+        <li onclick="toggleCheck(this)"><div class="ap-check"></div><span>Claude API: auto-draft LinkedIn + Instagram + WhatsApp versions</span></li>
+        <li onclick="toggleCheck(this)"><div class="ap-check"></div><span>Canva API or html-to-image: auto-generate branded visuals</span></li>
+        <li onclick="toggleCheck(this)"><div class="ap-check"></div><span>Approval dashboard: one Sunday session, 5–10 mins for the whole week</span></li>
+        <li onclick="toggleCheck(this)"><div class="ap-check"></div><span>LinkedIn UGC Posts API: auto-publish on schedule</span></li>
+        <li onclick="toggleCheck(this)"><div class="ap-check"></div><span>Meta Graph API: auto-publish to Instagram Business</span></li>
+        <li onclick="toggleCheck(this)"><div class="ap-check"></div><span>Analytics pull-back: engagement data feeds back into next week's ideas</span></li>
       </ul>
-      <div class="ap-eta">⏱ Estimated: Month 1–3 as tools get built</div>
+      <div class="ap-eta">⏱ Full pipeline built in Month 1–2. See Auto-Post section for details.</div>
     </div>
 
     <div class="ap-card">
@@ -1284,6 +1649,375 @@
         <li onclick="toggleCheck(this)"><div class="ap-check"></div><span>Revenue split agreement documented and signed</span></li>
       </ul>
       <div class="ap-eta">⏱ Do this in Month 1 — align before building</div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider" />
+
+<!-- AUTO-POST PIPELINE -->
+<section id="autopost">
+  <h2 class="section-title">Full Content Automation Pipeline</h2>
+  <p class="section-sub">From raw idea to live post on LinkedIn &amp; Instagram — zero manual steps after approval.</p>
+
+  <div class="pipeline">
+
+    <div class="pipe-step">
+      <div class="pipe-num">💡</div>
+      <div class="pipe-body">
+        <div class="pipe-title">Step 1 — Idea Generation <span class="pipe-badge badge-ai">AI</span></div>
+        <div class="pipe-desc">A scheduled job (Inngest cron, daily 7am) scrapes trending CA/finance/AI topics from Reddit, LinkedIn, Twitter, and RBI/ICAI announcements. Claude ranks them by relevance + engagement potential and queues 7 ideas for the week automatically.</div>
+        <div class="pipe-tools">
+          <span class="pipe-tool">Inngest Cron</span>
+          <span class="pipe-tool">Claude API</span>
+          <span class="pipe-tool">Reddit API</span>
+          <span class="pipe-tool">RSS Feeds</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="pipe-connector">Ranked idea handed to drafting engine</div>
+
+    <div class="pipe-step">
+      <div class="pipe-num">✍️</div>
+      <div class="pipe-body">
+        <div class="pipe-title">Step 2 — Multi-Format Draft Creation <span class="pipe-badge badge-ai">AI</span></div>
+        <div class="pipe-desc">Claude generates 3 formats simultaneously from one idea: (1) LinkedIn post — hook + insight + CTA, 1200 chars, your tone. (2) Instagram caption — punchy, emoji-rich, hashtags included. (3) WhatsApp community drop — conversational, no fluff, under 200 words. All three stored in your content DB.</div>
+        <div class="pipe-tools">
+          <span class="pipe-tool">Claude API</span>
+          <span class="pipe-tool">System Prompt (your tone)</span>
+          <span class="pipe-tool">Supabase content table</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="pipe-connector">Draft + visual request sent to design engine</div>
+
+    <div class="pipe-step">
+      <div class="pipe-num">🎨</div>
+      <div class="pipe-body">
+        <div class="pipe-title">Step 3 — Visual / Carousel Generation <span class="pipe-badge badge-ai">AI</span></div>
+        <div class="pipe-desc">For Instagram: auto-generates a 5-slide carousel using a pre-built Canva template via Canva API (or html-to-image for custom branded cards). Key stats and points from the post become slide text. For LinkedIn: optional 1080×1080 branded image auto-generated. No Photoshop, no Canva manually.</div>
+        <div class="pipe-tools">
+          <span class="pipe-tool">Canva API</span>
+          <span class="pipe-tool">html-to-image</span>
+          <span class="pipe-tool">Cloudflare R2 (already set up)</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="pipe-connector">Draft lands in your 2-minute approval queue</div>
+
+    <div class="pipe-step">
+      <div class="pipe-num">✅</div>
+      <div class="pipe-body">
+        <div class="pipe-title">Step 4 — Quick Approval Dashboard <span class="pipe-badge badge-review">1 Touch</span></div>
+        <div class="pipe-desc">A simple internal web page (built into Planora or standalone) shows you the week's 7 drafted posts. You see the LinkedIn post, Instagram caption, and image side-by-side. Three buttons: <strong>Approve → Schedule</strong>, <strong>Edit</strong>, or <strong>Reject</strong>. Approving one post takes under 10 seconds. Do all 7 in one Sunday sitting (under 5 minutes total).</div>
+        <div class="pipe-tools">
+          <span class="pipe-tool">Internal dashboard</span>
+          <span class="pipe-tool">Next.js page</span>
+          <span class="pipe-tool">Supabase status update</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="pipe-connector">Approved post handed to scheduler</div>
+
+    <div class="pipe-step">
+      <div class="pipe-num">🗓️</div>
+      <div class="pipe-body">
+        <div class="pipe-title">Step 5 — Auto-Schedule at Optimal Times <span class="pipe-badge badge-auto">Automated</span></div>
+        <div class="pipe-desc">On approval, the post is automatically scheduled via API at the best posting times: LinkedIn (Tue–Thu, 8–9am or 6–7pm IST), Instagram (Mon/Wed/Fri, 7pm IST). No Buffer needed — direct API calls from your own system. You own the scheduling logic.</div>
+        <div class="pipe-tools">
+          <span class="pipe-tool">Inngest delayed event</span>
+          <span class="pipe-tool">Optimal time config</span>
+          <span class="pipe-tool">Queue per platform</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="pipe-connector">Scheduled job fires at posting time</div>
+
+    <div class="pipe-step">
+      <div class="pipe-num">🚀</div>
+      <div class="pipe-body">
+        <div class="pipe-title">Step 6 — Auto-Post to LinkedIn <span class="pipe-badge badge-api">LinkedIn API</span></div>
+        <div class="pipe-desc">LinkedIn Marketing API (UGC Posts endpoint) publishes the post with image directly to your profile or company page. Supports text posts, image posts, and article shares. Auth via OAuth 2.0 — one-time setup, runs forever. Posts as you, not a third-party tool watermark.</div>
+        <div class="pipe-tools">
+          <span class="pipe-tool">LinkedIn Marketing API v2</span>
+          <span class="pipe-tool">UGC Posts endpoint</span>
+          <span class="pipe-tool">OAuth 2.0 token (refresh auto)</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="pipe-step">
+      <div class="pipe-num">📸</div>
+      <div class="pipe-body">
+        <div class="pipe-title">Step 7 — Auto-Post to Instagram <span class="pipe-badge badge-api">Meta API</span></div>
+        <div class="pipe-desc">Meta Graph API (Instagram Business) publishes carousel or single image posts with caption + hashtags. Requires Instagram Business account linked to a Facebook Page — one-time setup. Supports feed posts and carousels. Reels need a video file (can auto-generate screen-recording style with ffmpeg).</div>
+        <div class="pipe-tools">
+          <span class="pipe-tool">Meta Graph API</span>
+          <span class="pipe-tool">Instagram Business account</span>
+          <span class="pipe-tool">Facebook Page (required)</span>
+          <span class="pipe-tool">Long-lived access token</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="pipe-step">
+      <div class="pipe-num">📊</div>
+      <div class="pipe-body">
+        <div class="pipe-title">Step 8 — Analytics Pull-back &amp; Learning Loop <span class="pipe-badge badge-auto">Automated</span></div>
+        <div class="pipe-desc">48 hours after posting, a cron job pulls engagement data (likes, comments, shares, reach) from both APIs. Data stored in Supabase. Claude analyzes which post formats, topics, and hooks performed best — and uses that to score next week's idea queue higher. The system gets smarter every week.</div>
+        <div class="pipe-tools">
+          <span class="pipe-tool">LinkedIn Analytics API</span>
+          <span class="pipe-tool">Meta Insights API</span>
+          <span class="pipe-tool">Claude scoring model</span>
+          <span class="pipe-tool">Supabase analytics table</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- PLATFORM SPECS -->
+  <div class="platforms-grid">
+    <div class="plat-card linkedin">
+      <div class="plat-header">
+        <div class="plat-icon">💼</div>
+        <div>
+          <div class="plat-name">LinkedIn</div>
+          <div class="plat-format">Text + Image + Carousel</div>
+        </div>
+      </div>
+      <div class="plat-specs">
+        <div class="plat-spec">Post format: hook line + 3–5 insight lines + CTA</div>
+        <div class="plat-spec">Character limit: 3,000 (sweet spot: 900–1,200)</div>
+        <div class="plat-spec">Image: 1200×627px or 1080×1080 square</div>
+        <div class="plat-spec">Best times: Tue–Thu 8–9am or 6–7pm IST</div>
+        <div class="plat-spec">Frequency: 5×/week (auto-scheduled)</div>
+      </div>
+      <div class="plat-api">⚡ LinkedIn UGC Posts API · OAuth 2.0</div>
+    </div>
+
+    <div class="plat-card instagram">
+      <div class="plat-header">
+        <div class="plat-icon">📸</div>
+        <div>
+          <div class="plat-name">Instagram</div>
+          <div class="plat-format">Carousel + Single Image + Reels</div>
+        </div>
+      </div>
+      <div class="plat-specs">
+        <div class="plat-spec">Carousel: 5–7 slides, key insight per slide</div>
+        <div class="plat-spec">Caption: punchy opener + hashtags (20–25)</div>
+        <div class="plat-spec">Image: 1080×1080 (square) or 1080×1350 (portrait)</div>
+        <div class="plat-spec">Best times: Mon/Wed/Fri 7–8pm IST</div>
+        <div class="plat-spec">Frequency: 3×/week (auto-scheduled)</div>
+      </div>
+      <div class="plat-api">⚡ Meta Graph API · Instagram Business required</div>
+    </div>
+
+    <div class="plat-card whatsapp">
+      <div class="plat-header">
+        <div class="plat-icon">💬</div>
+        <div>
+          <div class="plat-name">WhatsApp Community</div>
+          <div class="plat-format">Text + PDF + Voice note script</div>
+        </div>
+      </div>
+      <div class="plat-specs">
+        <div class="plat-spec">Format: conversational, no jargon, actionable</div>
+        <div class="plat-spec">Length: under 200 words (people don't read long WA)</div>
+        <div class="plat-spec">Attachments: auto-generated PDF checklists</div>
+        <div class="plat-spec">Best time: weekday mornings 8–9am IST</div>
+        <div class="plat-spec">Frequency: daily (repurposed from LinkedIn)</div>
+      </div>
+      <div class="plat-api">⚡ WhatsApp Business API (already in lib/whatsapp/)</div>
+    </div>
+
+    <div class="plat-card" style="border-top:2px solid rgba(220,38,38,0.5);">
+      <div class="plat-header">
+        <div class="plat-icon">▶️</div>
+        <div>
+          <div class="plat-name">YouTube</div>
+          <div class="plat-format">Shorts (auto) + Long-form (Month 3+)</div>
+        </div>
+      </div>
+      <div class="plat-specs">
+        <div class="plat-spec">Shorts: auto-generated from LinkedIn posts via script-to-video</div>
+        <div class="plat-spec">Long-form: workshop recordings repurposed (zero extra filming)</div>
+        <div class="plat-spec">Frequency: 3 Shorts/week (auto) + 1 long-form/week (Month 3+)</div>
+        <div class="plat-spec">Best times: daily 6–8pm IST for Shorts</div>
+        <div class="plat-spec">Editing: outsource to editor (₹2k–3k/video)</div>
+      </div>
+      <div class="plat-api" style="color:#f87171;">⚡ YouTube Data API v3 · See full analysis below ↓</div>
+    </div>
+  </div>
+
+  <div class="autopost-note">
+    <span>⚡</span>
+    <div>
+      <strong>Your actual weekly time commitment for all content:</strong> One Sunday session, 5–10 minutes, approving the week's posts in the dashboard. Everything else — ideation, writing, designing, scheduling, posting, analytics — runs without you. The only thing you do is optionally reply to comments.
+    </div>
+  </div>
+</section>
+
+<hr class="divider" />
+
+<!-- YOUTUBE ANALYSIS -->
+<section id="youtube">
+  <h2 class="section-title">YouTube — Full Analysis</h2>
+  <p class="section-sub">Scored on success probability, ROI, and time-to-returns. Honest numbers, no hype.</p>
+
+  <div class="yt-score-card">
+    <div class="yt-score-big">
+      <div class="yt-score-num">7.5</div>
+      <div class="yt-score-denom">/10</div>
+      <div class="yt-score-label">Overall Score</div>
+    </div>
+    <div class="yt-score-info">
+      <div class="yt-score-title">Strong long-term play. Wrong time to start it.</div>
+      <div class="yt-score-desc">
+        YouTube is the highest-trust, highest-compounding content channel available. A 2-year-old video can still bring in leads every day. But it takes 8–12 months of consistent output before it meaningfully contributes to revenue — and it's the most time-intensive channel. The smart move: <strong>automate Shorts from Day 1</strong> using your existing content pipeline, and <strong>start long-form at Month 3</strong> when Planora is more hands-off and you have workshop recordings to repurpose.
+      </div>
+    </div>
+  </div>
+
+  <!-- SCORES BREAKDOWN -->
+  <div class="yt-grid">
+    <div class="yt-card">
+      <div class="yt-card-title">✅ Why It Works for You</div>
+      <ul>
+        <li><span class="dot dot-green"></span>CA + AI on YouTube is wide open in India — almost no direct competition</li>
+        <li><span class="dot dot-green"></span>Sachit on camera = instant credibility. CAs trust other CAs, not tech bros</li>
+        <li><span class="dot dot-green"></span>Workshop recordings = free long-form content. You're already making it.</li>
+        <li><span class="dot dot-green"></span>YouTube SEO: "GST filing with AI", "CA automation" — high intent, low competition</li>
+        <li><span class="dot dot-green"></span>Compounding: videos from Month 3 still bring leads at Month 24</li>
+        <li><span class="dot dot-green"></span>Shorts can be 100% auto-generated from your LinkedIn pipeline (n8n)</li>
+        <li><span class="dot dot-green"></span>Planora demo videos = product marketing + YouTube content simultaneously</li>
+      </ul>
+    </div>
+    <div class="yt-card">
+      <div class="yt-card-title">⚠️ The Real Challenges</div>
+      <ul>
+        <li><span class="dot dot-red"></span>8–12 months before YouTube meaningfully drives revenue. Long patience test.</li>
+        <li><span class="dot dot-red"></span>Long-form editing: 3–4 hrs/video DIY. Must outsource to stay sane.</li>
+        <li><span class="dot dot-red"></span>Algorithm requires consistency — missing 2 weeks resets momentum</li>
+        <li><span class="dot dot-red"></span>Indian CA audience skews WhatsApp-first, YouTube second. Not their primary platform.</li>
+        <li><span class="dot dot-red"></span>AdSense revenue will be low (Indian CPM ₹30–80). Not the monetization path.</li>
+        <li><span class="dot dot-orange"></span>Camera presence needs to be developed. First 20 videos will feel uncomfortable.</li>
+        <li><span class="dot dot-orange"></span>Thumbnail design matters massively. Needs a system or a designer.</li>
+      </ul>
+    </div>
+    <div class="yt-card">
+      <div class="yt-card-title">💸 One-Time Setup Costs</div>
+      <ul>
+        <li><span class="dot dot-orange"></span><strong>Mic:</strong> Rode NT-USB Mini or Blue Yeti — ₹8,000–12,000</li>
+        <li><span class="dot dot-orange"></span><strong>Lighting:</strong> Elgato Key Light or ring light — ₹5,000–8,000</li>
+        <li><span class="dot dot-orange"></span><strong>Camera:</strong> Your phone on a ₹2,000 tripod works fine to start</li>
+        <li><span class="dot dot-orange"></span><strong>Background:</strong> Clean wall or basic bookshelf. ₹0.</li>
+        <li><span class="dot dot-orange"></span><strong>Editing software:</strong> DaVinci Resolve (free) or give to editor</li>
+        <li><span class="dot dot-green"></span><strong>Total one-time:</strong> ₹15,000–22,000. Low barrier.</li>
+      </ul>
+    </div>
+    <div class="yt-card">
+      <div class="yt-card-title">⏱ Weekly Time Cost (Ongoing)</div>
+      <ul>
+        <li><span class="dot dot-green"></span><strong>Shorts (auto):</strong> 0 hrs — n8n generates from LinkedIn posts</li>
+        <li><span class="dot dot-orange"></span><strong>Long-form script:</strong> 45–60 mins (Claude drafts it, you edit)</li>
+        <li><span class="dot dot-orange"></span><strong>Recording:</strong> 20–30 mins per video</li>
+        <li><span class="dot dot-green"></span><strong>Editing:</strong> 0 hrs — outsource to editor (₹2,000–3,000/video)</li>
+        <li><span class="dot dot-orange"></span><strong>Thumbnail + description:</strong> 15 mins (template system)</li>
+        <li><span class="dot dot-green"></span><strong>Total your time:</strong> ~1.5 hrs/week for long-form</li>
+        <li><span class="dot dot-green"></span><strong>Monthly editor cost:</strong> ₹8,000–12,000 (4 videos/month)</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ROI TABLE -->
+  <div class="yt-roi-table">
+    <table>
+      <thead>
+        <tr>
+          <th>Milestone</th>
+          <th>Timeframe</th>
+          <th>Subscribers</th>
+          <th>Direct Revenue</th>
+          <th>Lead Gen Value</th>
+          <th>Verdict</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Shorts launch (auto)</td>
+          <td>Month 1</td>
+          <td>0 → 200</td>
+          <td class="yt-bad">₹0</td>
+          <td class="yt-mid">Low</td>
+          <td>Building base</td>
+        </tr>
+        <tr>
+          <td>Long-form begins</td>
+          <td>Month 3</td>
+          <td>200 → 800</td>
+          <td class="yt-bad">₹500–2,000 AdSense</td>
+          <td class="yt-mid">5–10 community signups</td>
+          <td>Early traction</td>
+        </tr>
+        <tr>
+          <td>First meaningful views</td>
+          <td>Month 6</td>
+          <td>800 → 3,000</td>
+          <td class="yt-mid">₹3,000–8,000 AdSense</td>
+          <td class="yt-good">₹25,000–50,000 lead gen</td>
+          <td>Starting to pay off</td>
+        </tr>
+        <tr>
+          <td>10k subscribers</td>
+          <td>Month 10–14</td>
+          <td>10,000</td>
+          <td class="yt-mid">₹8,000–20,000 AdSense</td>
+          <td class="yt-good">₹80,000–1,50,000 lead gen</td>
+          <td>Real asset</td>
+        </tr>
+        <tr>
+          <td>Sponsorship eligible</td>
+          <td>Month 12–18</td>
+          <td>10,000+</td>
+          <td class="yt-good">₹15,000–40,000/video</td>
+          <td class="yt-good">₹1,00,000+ lead gen</td>
+          <td>Significant revenue</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- VERDICT + PHASE PLAN -->
+  <div class="yt-verdict">
+    <div class="yt-verdict-title">▶️ The Smart YouTube Approach — Phase by Phase</div>
+    <div class="yt-phases">
+      <div class="yt-phase">
+        <div class="yt-phase-month">Month 1–2</div>
+        <div class="yt-phase-text"><strong>Shorts only, fully automated.</strong> n8n converts your LinkedIn posts into 60-second Shorts scripts → text-to-video (Pictory or Runway) → auto-uploads via YouTube Data API. Zero extra effort. Builds channel authority before you even film anything.</div>
+      </div>
+      <div class="yt-phase">
+        <div class="yt-phase-month">Month 3</div>
+        <div class="yt-phase-text"><strong>Start long-form with zero extra filming.</strong> Your first workshop recording becomes Episode 1. Hire an editor on Fiverr/Toptal (₹2k–3k/video). Claude writes the title, description, and chapters. You spend 1.5 hrs/week total. Upload 1 video/week.</div>
+      </div>
+      <div class="yt-phase">
+        <div class="yt-phase-month">Month 4–6</div>
+        <div class="yt-phase-text"><strong>Sachit appears on camera.</strong> His credibility in front of CAs makes these videos significantly more trustworthy. "CA + Tech founder" format performs well. Each video ends with a Planora CTA and community invite link. Lead gen starts working.</div>
+      </div>
+      <div class="yt-phase">
+        <div class="yt-phase-month">Month 7–12</div>
+        <div class="yt-phase-text"><strong>SEO compound effect kicks in.</strong> Older videos keep bringing traffic. Start pitching CA software companies and accounting tools for sponsorships (₹15k–40k/video at 5k+ subscribers). YouTube becomes the top-of-funnel that feeds everything else.</div>
+      </div>
+      <div class="yt-phase">
+        <div class="yt-phase-month">Year 2+</div>
+        <div class="yt-phase-text"><strong>Your highest-value asset.</strong> A 50-video library of CA + AI content is nearly impossible for a competitor to replicate quickly. AdSense + sponsorships + lead gen = ₹1,50,000–3,00,000/month. The channel funds itself and then some.</div>
+      </div>
     </div>
   </div>
 </section>
