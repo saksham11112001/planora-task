@@ -28,6 +28,7 @@ export async function TasksFetcher() {
     { data: assignedByMeRaw },
     { data: caAssignments },
     { data: caInstances },
+    { data: pendingApprovalRaw },
   ] = await Promise.all([
     scopedBase.limit(500),
 
@@ -53,6 +54,18 @@ export async function TasksFetcher() {
     isOwnerAdmin
       ? supabase.from('ca_task_instances').select('assignment_id, due_date').eq('org_id', mb.org_id)
       : Promise.resolve({ data: [] as any[] }),
+
+    // Tasks where current user is the designated approver and approval is pending.
+    // Excludes tasks where the user is also the assignee (those are already in their own list).
+    supabase.from('tasks').select(TASK_COLS)
+      .eq('org_id', mb.org_id)
+      .eq('approver_id', user.id)
+      .eq('approval_status', 'pending')
+      .neq('is_archived', true)
+      .is('parent_task_id', null)
+      .neq('assignee_id', user.id)
+      .order('due_date', { ascending: true, nullsFirst: false })
+      .limit(100),
   ])
 
   const clientMap: Record<string, { id: string; name: string; color: string }> = {}
@@ -87,8 +100,9 @@ export async function TasksFetcher() {
     project: (t.projects as any) ?? null,
   })
 
-  const taskList         = (tasks ?? []).filter(isVisible).map(enrich) as any[]
-  const assignedByMeList = (assignedByMeRaw ?? []).filter(isVisible).map(enrich)
+  const taskList            = (tasks ?? []).filter(isVisible).map(enrich) as any[]
+  const assignedByMeList    = (assignedByMeRaw ?? []).filter(isVisible).map(enrich)
+  const pendingApprovalList = (pendingApprovalRaw ?? []).map(enrich) as any[]
 
   // Context tasks: parents of subtasks assigned to the current user
   const subtaskParentIds = (tasks ?? [])
@@ -155,6 +169,7 @@ export async function TasksFetcher() {
   return (
     <MyTasksView
       tasks={displayTaskList as any}
+      pendingApprovalTasks={pendingApprovalList}
       assignedByMeTasks={assignedByMeList as any}
       isManager={isOwnerAdmin}
       members={memberList}
