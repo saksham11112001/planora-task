@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
                 .eq('is_active', true),
               admin
                 .from('clients')
-                .select('name, email, phone, company, website, industry, color, status, notes, custom_fields')
+                .select('*')          // select('*') never errors on missing columns
                 .eq('org_id', orgId)
                 .order('name', { ascending: true }),
             ])
