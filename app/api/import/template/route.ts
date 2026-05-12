@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
                 .eq('is_active', true),
               admin
                 .from('clients')
-                .select('name, email, phone, gstin, company, website, industry, color, status, notes')
+                .select('name, email, phone, company, website, industry, color, status, notes, custom_fields')
                 .eq('org_id', orgId)
                 .order('name', { ascending: true }),
             ])
@@ -98,16 +98,17 @@ export async function GET(request: NextRequest) {
 
             if (clientsRes.data) {
               existingClients = (clientsRes.data as any[]).map(c => ({
-                name     : c.name     ?? '',
-                email    : c.email    ?? '',
-                phone    : c.phone    ?? '',
-                gstin    : c.gstin    ?? '',
-                company  : c.company  ?? '',
-                website  : c.website  ?? '',
-                industry : c.industry ?? '',
-                color    : c.color    ?? '',
-                status   : c.status   ?? 'active',
-                notes    : c.notes    ?? '',
+                name     : c.name                       ?? '',
+                email    : c.email                      ?? '',
+                phone    : c.phone                      ?? '',
+                // gstin is stored inside the custom_fields JSONB column, not as a direct column
+                gstin    : c.custom_fields?.gstin       ?? '',
+                company  : c.company                    ?? '',
+                website  : c.website                    ?? '',
+                industry : c.industry                   ?? '',
+                color    : c.color                      ?? '',
+                status   : c.status                     ?? 'active',
+                notes    : c.notes                      ?? '',
               }))
             }
           }

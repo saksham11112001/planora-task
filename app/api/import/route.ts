@@ -811,28 +811,44 @@ export async function POST(request: NextRequest) {
           })
         }
 
-        // Bulk upsert in batches of 200 (upsert handles name collisions gracefully)
+        // Insert in batches of 200.
+        // We intentionally use insert (not upsert) because:
+        //  a) The clients table may not have a unique constraint on (org_id, name).
+        //  b) Duplicate names are already filtered out above via clientNameToId + seenClientNames.
         const CLIENT_BATCH = 200
         for (let bi = 0; bi < toInsertClients.length; bi += CLIENT_BATCH) {
           const batch = toInsertClients.slice(bi, bi + CLIENT_BATCH)
           const rows2insert = batch.map(({ _lname: _, ...rest }: any) => rest)
           const { data: created, error } = await admin
             .from('clients')
-            .upsert(rows2insert, { onConflict: 'org_id,name', ignoreDuplicates: true })
+            .insert(rows2insert)
             .select('id, name')
           if (error) {
             // Batch failed — try row-by-row to isolate the bad record(s)
             for (const row of rows2insert) {
-              const { data: r1, error: e1 } = await admin
+              // Check live DB in case the pre-load cache was stale
+              const { data: existing } = await admin
                 .from('clients')
-                .upsert([row], { onConflict: 'org_id,name', ignoreDuplicates: true })
                 .select('id, name')
-              if (e1) {
-                results.clients.errors.push(`Could not import client "${row.name}": ${e1.message ?? 'unknown error'}`)
+                .eq('org_id', orgId)
+                .ilike('name', row.name)
+                .maybeSingle()
+              if (existing?.id) {
+                // Already exists — treat as skipped, not an error
+                clientNameToId[existing.name.toLowerCase()] = existing.id
                 results.clients.skipped++
               } else {
-                ;(r1 ?? []).forEach((c: any) => { clientNameToId[c.name.toLowerCase()] = c.id })
-                results.clients.created += r1?.length ?? 0
+                const { data: r1, error: e1 } = await admin
+                  .from('clients')
+                  .insert([row])
+                  .select('id, name')
+                if (e1) {
+                  results.clients.errors.push(`Could not import client "${row.name}": ${e1.message ?? 'unknown error'}`)
+                  results.clients.skipped++
+                } else {
+                  ;(r1 ?? []).forEach((c: any) => { clientNameToId[c.name.toLowerCase()] = c.id })
+                  results.clients.created += r1?.length ?? 0
+                }
               }
             }
           } else {
