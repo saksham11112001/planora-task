@@ -1,6 +1,7 @@
 'use client'
 import { useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { createClient as createBrowserClient } from '@/lib/supabase/client'
 import {
   Upload, FileSpreadsheet, Download, CheckCircle2,
   AlertCircle, Users, FolderOpen, CheckSquare, X,
@@ -133,11 +134,19 @@ export function ImportView() {
   }
 
   /* ── download template ────────────────────────────────────────── */
-  // Using fetch() instead of window.open() so the request is guaranteed to
-  // carry the session cookie (same-origin credentials are always included).
+  // Explicitly reads the current session token and sends it as a Bearer header.
+  // This is more reliable than relying on cookie forwarding in route handlers.
   async function downloadTemplate() {
     try {
-      const res = await fetch('/api/import/template', { credentials: 'include' })
+      const sb = createBrowserClient()
+      const { data: { session } } = await sb.auth.getSession()
+
+      const headers: Record<string, string> = {}
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`
+      }
+
+      const res = await fetch('/api/import/template', { credentials: 'include', headers })
       if (!res.ok) { toast.error('Could not generate template — please try again'); return }
       const blob = await res.blob()
       const url  = URL.createObjectURL(blob)

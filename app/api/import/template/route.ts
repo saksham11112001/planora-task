@@ -1,5 +1,4 @@
-import { NextResponse }      from 'next/server'
-import { createClient }      from '@/lib/supabase/server'
+import { NextResponse, type NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { COMPLIANCE_TASKS }  from '@/lib/data/complianceTasks'
 
@@ -26,7 +25,7 @@ const R_CLIENT   = "'🏢 Clients'!$A$3:$A$202"
 const R_APPROVER    = '_helpers!$A$2:$A$101'
 const R_COMPLIANCE  = '_helpers!$B$2:$B$200'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     // ── Auth & pre-fetch existing org data ────────────────────────────────
     type MemberRow = { name: string; email: string; role: string }
@@ -39,72 +38,82 @@ export async function GET() {
     let existingClients: ClientRow[] = []
 
     try {
-      // Use the user client only to verify identity.
-      // All data queries go through the admin client to bypass RLS —
-      // the same pattern used in app/api/import/route.ts.
-      const supabase = await createClient()
-      const authResult = await supabase.auth.getUser()
-      const user = authResult?.data?.user ?? null
+      // Read the Bearer token sent by the client (ImportView.tsx fetch call).
+      // Using admin.auth.getUser(token) is the only reliable way to validate
+      // identity in a Route Handler — cookie-based createClient() can silently
+      // return null when the request comes from a same-page fetch().
+      const authHeader = request.headers.get('Authorization') ?? ''
+      const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : null
 
-      if (user) {
+      console.log('[template] token present:', !!token)
+
+      if (token) {
         const admin = createAdminClient()
 
-        // maybeSingle() never throws — returns null if no row found
-        const { data: mb, error: mbErr } = await admin
-          .from('org_members')
-          .select('org_id, role')
-          .eq('user_id', user.id)
-          .eq('is_active', true)
-          .maybeSingle()
+        const { data: { user }, error: userErr } = await admin.auth.getUser(token)
+        if (userErr) console.error('[template] getUser error:', userErr)
+        console.log('[template] resolved user:', user?.id ?? 'null')
 
-        if (mbErr) console.error('[template] org_members lookup error:', mbErr)
+        if (user) {
+          // maybeSingle() never throws — returns null if no row found
+          const { data: mb, error: mbErr } = await admin
+            .from('org_members')
+            .select('org_id, role')
+            .eq('user_id', user.id)
+            .eq('is_active', true)
+            .maybeSingle()
 
-        if (mb?.org_id) {
-          const orgId = mb.org_id
+          if (mbErr) console.error('[template] org_members lookup error:', mbErr)
+          console.log('[template] org_id:', mb?.org_id ?? 'null')
 
-          const [membersRes, clientsRes] = await Promise.all([
-            admin
-              .from('org_members')
-              .select('role, users!inner(name, email)')
-              .eq('org_id', orgId)
-              .eq('is_active', true),
-            admin
-              .from('clients')
-              .select('name, email, phone, gstin, company, website, industry, color, status, notes')
-              .eq('org_id', orgId)
-              .order('name', { ascending: true }),
-          ])
+          if (mb?.org_id) {
+            const orgId = mb.org_id
 
-          if (membersRes.error) console.error('[template] members query error:', membersRes.error)
-          if (clientsRes.error) console.error('[template] clients query error:', clientsRes.error)
+            const [membersRes, clientsRes] = await Promise.all([
+              admin
+                .from('org_members')
+                .select('role, users!inner(name, email)')
+                .eq('org_id', orgId)
+                .eq('is_active', true),
+              admin
+                .from('clients')
+                .select('name, email, phone, gstin, company, website, industry, color, status, notes')
+                .eq('org_id', orgId)
+                .order('name', { ascending: true }),
+            ])
 
-          if (membersRes.data) {
-            existingMembers = (membersRes.data as any[])
-              .map(m => ({
-                name  : m.users?.name  ?? '',
-                email : m.users?.email ?? '',
-                role  : m.role         ?? 'member',
+            if (membersRes.error) console.error('[template] members query error:', membersRes.error)
+            if (clientsRes.error) console.error('[template] clients query error:', clientsRes.error)
+            console.log('[template] members count:', membersRes.data?.length ?? 0, '| clients count:', clientsRes.data?.length ?? 0)
+
+            if (membersRes.data) {
+              existingMembers = (membersRes.data as any[])
+                .map(m => ({
+                  name  : m.users?.name  ?? '',
+                  email : m.users?.email ?? '',
+                  role  : m.role         ?? 'member',
+                }))
+                .filter(m => m.email)
+            }
+
+            if (clientsRes.data) {
+              existingClients = (clientsRes.data as any[]).map(c => ({
+                name     : c.name     ?? '',
+                email    : c.email    ?? '',
+                phone    : c.phone    ?? '',
+                gstin    : c.gstin    ?? '',
+                company  : c.company  ?? '',
+                website  : c.website  ?? '',
+                industry : c.industry ?? '',
+                color    : c.color    ?? '',
+                status   : c.status   ?? 'active',
+                notes    : c.notes    ?? '',
               }))
-              .filter(m => m.email)
-          }
-
-          if (clientsRes.data) {
-            existingClients = (clientsRes.data as any[]).map(c => ({
-              name     : c.name     ?? '',
-              email    : c.email    ?? '',
-              phone    : c.phone    ?? '',
-              gstin    : c.gstin    ?? '',
-              company  : c.company  ?? '',
-              website  : c.website  ?? '',
-              industry : c.industry ?? '',
-              color    : c.color    ?? '',
-              status   : c.status   ?? 'active',
-              notes    : c.notes    ?? '',
-            }))
+            }
           }
         }
       } else {
-        console.warn('[template] No authenticated user — generating blank template')
+        console.warn('[template] No Bearer token — generating blank template')
       }
     } catch (e) {
       console.error('[template] Auth/fetch error (non-fatal, falling back to blank template):', e)
