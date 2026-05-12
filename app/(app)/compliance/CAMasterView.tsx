@@ -895,7 +895,7 @@ const btnGhost: React.CSSProperties = {
 interface NewTaskDraft {
   name: string
   group_name: string
-  task_type: string
+  frequency: string
   priority: string
   days_before_due: number
 }
@@ -910,7 +910,7 @@ function AddTaskModal({
   onSave: (t: CAMasterTask) => void
 }) {
   const [draft, setDraft] = useState<NewTaskDraft>({
-    name: '', group_name: 'GST', task_type: '',
+    name: '', group_name: 'GST', frequency: 'monthly',
     priority: 'high', days_before_due: 7,
   })
   const [saving, setSaving] = useState(false)
@@ -923,7 +923,7 @@ function AddTaskModal({
     if (!draft.name.trim()) { toast.error('Task name is required'); return }
     setSaving(true)
     try {
-      const code = `${draft.name.trim()} (${draft.task_type.trim() || 'Custom'})`
+      const code = `${draft.name.trim()} (${draft.frequency || 'custom'})`
       const res = await fetch('/api/ca/master', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -931,7 +931,7 @@ function AddTaskModal({
           code,
           name: draft.name.trim(),
           group_name: draft.group_name,
-          task_type: draft.task_type.trim(),
+          task_type: draft.frequency,
           financial_year: financialYear,
           dates: {},
           days_before_due: draft.days_before_due,
@@ -956,18 +956,25 @@ function AddTaskModal({
     <div style={{
       position: 'fixed', inset: 0, zIndex: 100,
       background: 'rgba(0,0,0,0.45)', display: 'flex',
-      alignItems: 'flex-end', justifyContent: 'center',
-    }}>
+      alignItems: 'center', justifyContent: 'center',
+      padding: '16px',
+    }}
+      onClick={onClose}
+    >
       <div style={{
-        background: 'var(--surface)', borderRadius: '16px 16px 0 0',
-        padding: '28px 28px 36px', width: '100%', maxWidth: 560,
-        boxShadow: '0 -8px 40px rgba(0,0,0,0.18)',
-      }}>
+        background: 'var(--surface)', borderRadius: 16,
+        padding: '28px 28px 28px', width: '100%', maxWidth: 520,
+        boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
+        border: '1px solid var(--border)',
+        maxHeight: 'calc(100vh - 64px)', overflowY: 'auto',
+      }}
+        onClick={e => e.stopPropagation()}
+      >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
           <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--text-primary)' }}>
             Add Custom Task
           </h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center' }}>
             <X size={20} />
           </button>
         </div>
@@ -995,12 +1002,14 @@ function AddTaskModal({
             />
           </div>
           <div>
-            <label style={labelStyle}>Task type</label>
-            <input
-              value={draft.task_type}
-              onChange={e => set('task_type', e.target.value)}
-              placeholder="e.g. Monthly, QRMP"
-              style={inputStyle}
+            <label style={labelStyle}>Frequency</label>
+            <SearchableSelect
+              value={draft.frequency}
+              options={FREQ_SELECT_OPTS}
+              onChange={v => set('frequency', v)}
+              wrapperStyle={{ width: '100%' }}
+              buttonStyle={{ ...inputStyle, display: 'flex' }}
+              dropdownWidth={220}
             />
           </div>
           <div>
@@ -2535,7 +2544,7 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
                   <UploadCloud size={18} style={{ color: 'var(--brand, #0d9488)' }} />
                 </div>
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--text-primary)' }}>Import CA Master from CSV</div>
+                  <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--text-primary)' }}>Import CA Calendar from CSV</div>
                   <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 1 }}>Upserts tasks — existing codes are updated, new ones are created</div>
                 </div>
               </div>

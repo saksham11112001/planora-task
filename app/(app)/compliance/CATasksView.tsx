@@ -97,6 +97,7 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
   const [bulkAssigning,   setBulkAssigning]   = useState(false)
   const [filterQuick,     setFilterQuick]     = useState<'overdue' | 'week' | 'pending' | ''>('')  // quick health filter
   const [inlineEdit,      setInlineEdit]      = useState<{ taskId: string; field: string } | null>(null)
+  const [sectionCollapsed, setSectionCollapsed] = useState<Record<string,boolean>>({})
 
   const canManage = ['owner', 'admin', 'manager'].includes(userRole)
 
@@ -636,33 +637,70 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
           </div>
 
           <div style={{ flex: 1, overflowY: 'auto' }}>
-            {visible.length === 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '56px 24px', color: 'var(--text-muted)', textAlign: 'center' }}>
-                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ marginBottom: 12, opacity: 0.3 }}>
-                  <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                </svg>
-                <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>
-                  {activeFilters > 0 ? 'No tasks match the active filters' : 'No CA compliance tasks found'}
-                </div>
-                <div style={{ fontSize: 12 }}>CA compliance tasks are auto-created by the system</div>
-              </div>
-            )}
+            {(() => {
+              const today2 = todayStr()
+              const TASK_SECTIONS = [
+                { key: 'overdue',  label: 'Overdue',           tasks: visible.filter(t => t.status !== 'completed' && t.due_date && t.due_date < today2) },
+                { key: 'todo',     label: 'To do',             tasks: visible.filter(t => t.status === 'todo' && !(t.due_date && t.due_date < today2)) },
+                { key: 'pending',  label: 'Pending approval',  tasks: visible.filter(t => t.status === 'in_review') },
+                { key: 'done',     label: 'Done',              tasks: visible.filter(t => t.status === 'completed') },
+              ].filter(s => s.tasks.length > 0)
 
-            {visible.map(task => {
-              const ov = isOverdue(task.due_date, task.status)
-              const sc = STATUS_CONFIG[task.status] ?? STATUS_CONFIG.todo
-              const pc = PRIORITY_COLOR[task.priority] ?? PRIORITY_COLOR.none
+              if (TASK_SECTIONS.length === 0) {
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '56px 24px', color: 'var(--text-muted)', textAlign: 'center' }}>
+                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ marginBottom: 12, opacity: 0.3 }}>
+                      <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                    <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>
+                      {activeFilters > 0 ? 'No tasks match the active filters' : 'No CA compliance tasks found'}
+                    </div>
+                    <div style={{ fontSize: 12 }}>CA compliance tasks are auto-created by the system</div>
+                  </div>
+                )
+              }
+
               return (
-                <div key={task.id} className="group"
-                  style={{
-                    display: 'grid', gridTemplateColumns: '28px 1fr 80px 80px 80px 80px 60px',
-                    alignItems: 'center', padding: '0 18px', minHeight: 38,
-                    borderBottom: '1px solid var(--border-light)', cursor: 'pointer',
-                    background: checked.has(task.id) ? 'var(--brand-light)' : 'rgba(234,179,8,0.04)',
-                    borderLeft: '3px solid rgba(217,119,6,0.5)',
-                    transition: 'background 0.1s',
-                  }}
-                  onClick={() => setSelTask(task)}>
+                <>
+                  {TASK_SECTIONS.map(section => {
+                    const isCollapsed = sectionCollapsed[section.key]
+                    const sectionColor = section.key === 'overdue' ? '#dc2626' : section.key === 'pending' ? '#7c3aed' : section.key === 'done' ? '#16a34a' : 'var(--text-secondary)'
+                    return (
+                      <div key={section.key}>
+                        {/* Section header */}
+                        <button
+                          onClick={() => setSectionCollapsed(p => ({ ...p, [section.key]: !p[section.key] }))}
+                          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 7, padding: '7px 18px',
+                            background: 'var(--surface-subtle)', border: 'none', borderBottom: '1px solid var(--border)',
+                            cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
+                          <span style={{ fontSize: 11, transition: 'transform 0.15s', display: 'inline-block',
+                            transform: isCollapsed ? 'rotate(-90deg)' : 'none', color: sectionColor }}>▾</span>
+                          <span style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.07em', color: sectionColor }}>
+                            {section.label}
+                          </span>
+                          <span style={{ fontSize: 10, color: 'var(--text-muted)', padding: '1px 6px', borderRadius: 99,
+                            background: 'var(--surface)', border: '1px solid var(--border)' }}>
+                            {section.tasks.length}
+                          </span>
+                        </button>
+
+                        {/* Section rows */}
+                        {!isCollapsed && section.tasks.map(task => {
+                          const ov = isOverdue(task.due_date, task.status)
+                          const sc = STATUS_CONFIG[task.status] ?? STATUS_CONFIG.todo
+                          const pc = PRIORITY_COLOR[task.priority] ?? PRIORITY_COLOR.none
+                          return (
+                            <div key={task.id} className="group"
+                              style={{
+                                display: 'grid', gridTemplateColumns: '28px 1fr 80px 80px 80px 80px 60px',
+                                alignItems: 'center', padding: '0 18px', minHeight: 38,
+                                borderBottom: '1px solid var(--border-light)', cursor: 'pointer',
+                                background: checked.has(task.id) ? 'var(--brand-light)' : 'transparent',
+                                transition: 'background 0.1s',
+                              }}
+                              onMouseEnter={e => { if (!checked.has(task.id)) (e.currentTarget as HTMLElement).style.background = 'var(--surface-subtle)' }}
+                              onMouseLeave={e => { if (!checked.has(task.id)) (e.currentTarget as HTMLElement).style.background = 'transparent' }}
+                              onClick={() => setSelTask(task)}>
 
                   <input type="checkbox" checked={checked.has(task.id)}
                     onChange={() => setChecked(p => { const s = new Set(p); s.has(task.id) ? s.delete(task.id) : s.add(task.id); return s })}
@@ -687,9 +725,6 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
                         </svg>
                       )}
                     </button>
-
-                    {/* CA badge */}
-                    <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4, background: '#fef3c7', color: '#d97706', flexShrink: 0, letterSpacing: '0.04em' }}>CA</span>
 
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <p style={{
@@ -792,6 +827,12 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
                 </div>
               )
             })}
+              </div>
+            )
+          })}
+                </>
+              )
+            })()}
           </div>
         </div>
       )}
@@ -948,7 +989,6 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
                             <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 99, background: pc.bg, color: pc.color }}>
                               {task.priority}
                             </span>
-                            <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4, background: '#fef3c7', color: '#d97706' }}>CA</span>
                             {task.due_date && (
                               <span style={{ fontSize: 10, color: ov ? '#dc2626' : 'var(--text-muted)', marginLeft: 'auto', fontWeight: ov ? 700 : 400 }}>
                                 {fmtDate(task.due_date)}

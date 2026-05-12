@@ -558,14 +558,16 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     if (current.includes(blockingTaskId)) { setBlockingSearch(''); setBlockingResults([]); return }
     const newBlockedBy = [...current, blockingTaskId]
     setBlockingSearch(''); setBlockingResults([])
+    // Use title from search results immediately — no extra round-trip
+    const knownTitle = blockingResults.find(r => r.id === blockingTaskId)?.title
+      ?? blockingTasks.find(t => t.id === blockingTaskId)?.title
+      ?? blockingTaskId
     const res = await fetch(`/api/tasks/${task.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ custom_fields: { _blocked_by: newBlockedBy } }),
     })
     if (res.ok) {
-      const tr = await fetch(`/api/tasks/${blockingTaskId}`)
-      const td = await tr.json()
-      if (td.data) setBlockingTasks(p => [...p.filter(t => t.id !== blockingTaskId), { id: blockingTaskId, title: td.data.title }])
+      setBlockingTasks(p => [...p.filter(t => t.id !== blockingTaskId), { id: blockingTaskId, title: knownTitle }])
       onUpdated?.({ custom_fields: { ...(task as any).custom_fields, _blocked_by: newBlockedBy } })
       toast.success('Blocking task added')
     } else toast.error('Failed to add dependency')
@@ -609,14 +611,18 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
       setBlocksTasks(p => [...p, { id: targetTaskId, title: td.data.title, status: td.data.status }])
       return
     }
+    // Optimistically add to UI before waiting for PATCH response
+    setBlocksTasks(p => [...p, { id: targetTaskId, title: td.data.title, status: td.data.status }])
     const res = await fetch(`/api/tasks/${targetTaskId}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ custom_fields: { _blocked_by: [...currentBlockedBy, task.id] } }),
     })
     if (res.ok) {
-      setBlocksTasks(p => [...p, { id: targetTaskId, title: td.data.title, status: td.data.status }])
       toast.success(`"${td.data.title}" is now blocked by this task`)
-    } else toast.error('Failed to add block link')
+    } else {
+      setBlocksTasks(p => p.filter(t => t.id !== targetTaskId))  // rollback
+      toast.error('Failed to add block link')
+    }
   }
 
   // Remove "this task blocks task X" = remove this task's id from task X's _blocked_by
@@ -825,46 +831,55 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
             {/* Mobile drag-handle pill */}
             <div className="detail-panel-handle" aria-hidden="true"/>
 
-            {/* ── Panel header ── */}
-            <div className="flex items-center gap-2 px-4 py-3 border-b sticky top-0 z-10"
-              style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
-              {canEdit ? (
-                <button
-                  onClick={handleComplete}
-                  className={cn('task-check flex-shrink-0', isCompleted && 'done', isInReview && 'popping', completing && 'popping')}
-                  title={isCompleted ? 'Mark incomplete' : isInReview ? 'Pending approval — click to reopen' : 'Submit for approval'}
-                >
-                  {(isCompleted || isInReview) && (
-                    <svg viewBox="0 0 16 16" fill="none" className="h-2.5 w-2.5">
-                      <path d="M13 4L6.5 11 3 7.5" stroke={isInReview ? '#7c3aed' : 'white'} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            {/* ── Panel header — minimal sticky toolbar ── */}
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '0 16px', height: 48, borderBottom: '1px solid var(--border)',
+              background: 'var(--surface)', position: 'sticky', top: 0, zIndex: 10, flexShrink: 0,
+            }}>
+              {/* Left: type badges + project pill */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                {(task as any).is_recurring && (
+                  <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99,
+                    background: 'rgba(13,148,136,0.12)', color: 'var(--brand)',
+                    border: '1px solid rgba(13,148,136,0.25)', letterSpacing: '0.04em' }}>
+                    🔁 Repeat
+                  </span>
+                )}
+                {(task as any).custom_fields?._ca_compliance && (
+                  <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99,
+                    background: 'rgba(217,119,6,0.12)', color: '#b45309',
+                    border: '1px solid rgba(217,119,6,0.25)', letterSpacing: '0.04em' }}>
+                    🛡 CA Compliance
+                  </span>
+                )}
+                {task.project && (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--text-muted)' }}>
+                    <span style={{ width: 7, height: 7, borderRadius: 2, background: (task.project as any).color, display: 'inline-block', flexShrink: 0 }}/>
+                    {(task.project as any).name}
+                  </span>
+                )}
+              </div>
+              {/* Right: save indicator + close */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {isSaving && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Saving…</span>}
+                {!isSaving && isSaved && (
+                  <span style={{ fontSize: 11, color: '#16a34a', display: 'flex', alignItems: 'center', gap: 3 }}>
+                    <svg viewBox="0 0 12 12" fill="none" style={{ width: 10, height: 10 }}>
+                      <path d="M2 6l3 3 5-5" stroke="#16a34a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
-                  )}
+                    Saved
+                  </span>
+                )}
+                <button onClick={onClose} title="Close (Esc)"
+                  style={{ width: 28, height: 28, borderRadius: 7, border: 'none', background: 'transparent',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: 'var(--text-muted)', cursor: 'pointer', transition: 'background 0.12s' }}
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--border-light)'}
+                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}>
+                  <X className="h-4 w-4" />
                 </button>
-              ) : (
-                <div className="task-check flex-shrink-0" style={{ opacity: 0.3, cursor: 'not-allowed' }} title="Only the task assignee can submit this task" />
-              )}
-              <span className="text-xs font-medium flex-1" style={{ color: isCompleted ? '#16a34a' : isInReview ? '#7c3aed' : 'var(--text-muted)' }}>
-                {isCompleted ? '✓ Completed' : isInReview ? '⏳ Pending approval' : canEdit ? 'Submit for approval' : 'View only'}
-              </span>
-              {isSaving && (
-                <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>Saving…</span>
-              )}
-              {!isSaving && isSaved && (
-                <span style={{ fontSize: 11, color: '#16a34a', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 3 }}>
-                  <svg viewBox="0 0 12 12" fill="none" style={{ width: 10, height: 10 }}>
-                    <path d="M2 6l3 3 5-5" stroke="#16a34a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                  Saved
-                </span>
-              )}
-              <button onClick={onClose}
-                className="h-8 w-8 flex items-center justify-center rounded-lg transition-colors"
-                title="Close (Esc)"
-                style={{ color: 'var(--text-muted)', flexShrink: 0 }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'var(--border-light)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                <X className="h-4 w-4" />
-              </button>
+              </div>
             </div>
 
             {/* ── Context task banner ── */}
@@ -882,61 +897,142 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
               </div>
             )}
 
-            {/* ── Approval banners ── */}
+            {/* ── Prominent approval / status banners ── */}
+
+            {/* Pending approval — action required by this approver */}
             {isPending && isDesignatedApprover && (
-              <div className="px-4 py-3 flex items-center gap-3 border-b" style={{ background: 'var(--warning-surface, #fffbeb)', borderColor: 'var(--warning-border, #fde68a)' }}>
-                <p className="text-xs font-semibold text-amber-800 flex-1">Pending your approval</p>
-                <button onClick={() => callApproveAPI('approve')} disabled={approving}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50">
-                  <ThumbsUp className="h-3.5 w-3.5" /> Approve
-                </button>
-                <button onClick={() => callApproveAPI('reject')} disabled={approving}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50">
-                  <ThumbsDown className="h-3.5 w-3.5" /> Reject
-                </button>
+              <div style={{
+                padding: '14px 20px', borderBottom: '1px solid #fde68a',
+                background: 'linear-gradient(135deg,rgba(254,243,199,0.9),rgba(253,230,138,0.4))',
+                display: 'flex', alignItems: 'center', gap: 12,
+              }}>
+                <div style={{ width: 38, height: 38, borderRadius: 10, background: '#f59e0b', flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <ShieldCheck style={{ width: 18, height: 18, color: '#fff' }}/>
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#92400e' }}>Awaiting your approval</p>
+                  <p style={{ margin: '2px 0 0', fontSize: 11, color: '#b45309' }}>Review and approve or reject this task</p>
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                  <button onClick={() => callApproveAPI('approve')} disabled={approving}
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px',
+                      background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8,
+                      fontSize: 12, fontWeight: 700, cursor: approving ? 'not-allowed' : 'pointer', opacity: approving ? 0.7 : 1 }}>
+                    <ThumbsUp style={{ width: 13, height: 13 }}/> Approve
+                  </button>
+                  <button onClick={() => callApproveAPI('reject')} disabled={approving}
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px',
+                      background: '#dc2626', color: '#fff', border: 'none', borderRadius: 8,
+                      fontSize: 12, fontWeight: 700, cursor: approving ? 'not-allowed' : 'pointer', opacity: approving ? 0.7 : 1 }}>
+                    <ThumbsDown style={{ width: 13, height: 13 }}/> Reject
+                  </button>
+                </div>
               </div>
             )}
 
-            {/* Designated approver info (read-only banner for non-managers when approval is required) */}
+            {/* Non-manager: designated approver info */}
             {task.approval_required && !canManage && (
-              <div className="mb-3 flex items-center gap-2 px-3 py-2 rounded-lg text-xs"
-                style={{ background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.25)' }}>
-                <ShieldCheck className="h-3.5 w-3.5 text-violet-500 flex-shrink-0"/>
-                <span className="text-violet-700">
+              <div style={{ padding: '10px 20px', borderBottom: '1px solid rgba(124,58,237,0.2)',
+                background: 'rgba(124,58,237,0.07)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <ShieldCheck style={{ width: 14, height: 14, color: '#7c3aed', flexShrink: 0 }}/>
+                <span style={{ fontSize: 12, color: '#5b21b6' }}>
                   {approverMember
-                    ? <>Approver: <strong>{approverMember.name}</strong></>
+                    ? <><span>Approver: </span><strong>{approverMember.name}</strong></>
                     : task.approver_id
                     ? 'Approver assigned (pending registration)'
                     : 'Any manager can approve this task'}
                 </span>
               </div>
             )}
+
+            {/* Rejected */}
             {task.approval_status === 'rejected' && (
-              <div className="px-4 py-2.5 border-b" style={{ background: 'rgba(220,38,38,0.1)', borderColor:'rgba(220,38,38,0.25)' }}>
-                <p className="text-xs font-semibold text-red-700">❌ Rejected — please revise and resubmit</p>
-              </div>
-            )}
-
-            {task.approval_status === 'approved' && (
-              <div className="px-4 py-2.5 border-b" style={{ background: 'rgba(22,163,74,0.1)', borderColor:'rgba(22,163,74,0.25)' }}>
-                <p className="text-xs font-semibold text-green-700">✅ Approved</p>
-              </div>
-            )}
-
-            {task.approval_required && !task.approval_status && isAssignee && status !== 'completed' && (
-              <div className="px-4 py-2.5 border-b" style={{ background: 'rgba(59,130,246,0.1)', borderColor:'rgba(59,130,246,0.25)' }}>
-                <div className="flex items-center justify-between">
-                  <p className="text-xs text-blue-700">This task requires approval before it can be completed</p>
-                  <button onClick={() => callApproveAPI('submit')} disabled={approving}
-                    className="text-xs font-semibold text-blue-700 hover:text-blue-900 underline ml-3">
-                    Submit for review →
-                  </button>
+              <div style={{ padding: '12px 20px', borderBottom: '1px solid rgba(220,38,38,0.25)',
+                background: 'rgba(220,38,38,0.07)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#dc2626', flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <ThumbsDown style={{ width: 14, height: 14, color: '#fff' }}/>
+                </div>
+                <div>
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#b91c1c' }}>Rejected — please revise and resubmit</p>
                 </div>
               </div>
             )}
 
-            {/* ── Editable title + description ── */}
-            <div className="px-5 py-4">
+            {/* Approved — with completed timestamp */}
+            {task.approval_status === 'approved' && (
+              <div style={{ padding: '12px 20px', borderBottom: '1px solid rgba(22,163,74,0.25)',
+                background: 'rgba(22,163,74,0.07)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#16a34a', flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <ThumbsUp style={{ width: 14, height: 14, color: '#fff' }}/>
+                </div>
+                <div>
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#15803d' }}>Approved & Completed ✓</p>
+                  {(task as any).completed_at && (
+                    <p style={{ margin: '2px 0 0', fontSize: 11, color: '#16a34a' }}>
+                      {new Date((task as any).completed_at).toLocaleString('en-IN', {
+                        day: '2-digit', month: 'short', year: 'numeric',
+                        hour: '2-digit', minute: '2-digit', hour12: true,
+                      })}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Submit for approval prompt (assignee, approval required, not yet submitted) */}
+            {task.approval_required && !task.approval_status && isAssignee && status !== 'completed' && (
+              <div style={{ padding: '12px 20px', borderBottom: '1px solid rgba(59,130,246,0.25)',
+                background: 'rgba(59,130,246,0.07)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#3b82f6', flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Send style={{ width: 13, height: 13, color: '#fff' }}/>
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#1d4ed8' }}>Ready to submit for approval?</p>
+                  <p style={{ margin: '2px 0 0', fontSize: 11, color: '#3b82f6' }}>This task requires sign-off before it can be completed</p>
+                </div>
+                <button onClick={() => callApproveAPI('submit')} disabled={approving}
+                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px',
+                    background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 8,
+                    fontSize: 12, fontWeight: 700, cursor: approving ? 'not-allowed' : 'pointer', opacity: approving ? 0.7 : 1, flexShrink: 0 }}>
+                  <Send style={{ width: 12, height: 12 }}/> Submit →
+                </button>
+              </div>
+            )}
+
+            {/* In review — submitted, waiting for someone else */}
+            {isInReview && !isDesignatedApprover && (
+              <div style={{ padding: '10px 20px', borderBottom: '1px solid rgba(124,58,237,0.2)',
+                background: 'rgba(124,58,237,0.06)' }}>
+                <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: '#5b21b6' }}>⏳ Submitted — awaiting approval from {approverMember?.name ?? 'a manager'}</p>
+              </div>
+            )}
+
+            {/* ── Title + description + submit toggle ── */}
+            <div style={{ padding: '16px 20px 12px', borderBottom: '1px solid var(--border-light)' }}>
+              {/* Submit for approval / completion toggle row */}
+              {canEdit && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                  <button
+                    onClick={handleComplete}
+                    className={cn('task-check flex-shrink-0', isCompleted && 'done', isInReview && 'popping', completing && 'popping')}
+                    title={isCompleted ? 'Mark incomplete' : isInReview ? 'Pending approval — click to reopen' : 'Submit for approval'}>
+                    {(isCompleted || isInReview) && (
+                      <svg viewBox="0 0 16 16" fill="none" className="h-2.5 w-2.5">
+                        <path d="M13 4L6.5 11 3 7.5" stroke={isInReview ? '#7c3aed' : 'white'} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    )}
+                  </button>
+                  <span style={{ fontSize: 11, fontWeight: 600,
+                    color: isCompleted ? '#16a34a' : isInReview ? '#7c3aed' : 'var(--text-muted)' }}>
+                    {isCompleted ? '✓ Completed' : isInReview ? '⏳ Pending approval' : 'Mark done / submit for approval'}
+                  </span>
+                </div>
+              )}
+              {/* Title — editable large text */}
               <textarea
                 ref={titleRef}
                 value={title}
@@ -945,21 +1041,22 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                 rows={1}
                 readOnly={!canEdit}
                 className={cn(
-                  'w-full text-lg font-bold resize-none outline-none bg-transparent leading-snug',
+                  'w-full text-xl font-bold resize-none outline-none bg-transparent leading-snug',
                   isCompleted ? 'line-through' : '',
                   !canEdit ? 'cursor-default select-text' : ''
                 )}
                 style={{ color: isCompleted ? 'var(--text-muted)' : 'var(--text-primary)' }}
               />
+              {/* Description — compact, small font, max 2 rows visible */}
               <textarea
                 value={description}
                 onChange={e => { if (!canEdit) return; setDescription(e.target.value); patchDebounced({ description: e.target.value || null }, 800) }}
                 onBlur={() => { if (!canEdit) return; if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; } if (task && description !== (task.description ?? '')) patch({ description: description || null }) }}
-                placeholder={canEdit ? 'Add a description...' : ''}
-                rows={3}
+                placeholder={canEdit ? 'Add a description…' : ''}
+                rows={2}
                 readOnly={!canEdit}
-                className="w-full mt-2 text-sm resize-none outline-none bg-transparent leading-relaxed"
-                style={{ color: 'var(--text-secondary)', caretColor: 'var(--brand)', cursor: canEdit ? undefined : 'default' }}
+                className="w-full mt-1.5 text-xs resize-none outline-none bg-transparent leading-relaxed"
+                style={{ color: 'var(--text-muted)', caretColor: 'var(--brand)', cursor: canEdit ? undefined : 'default' }}
               />
             </div>
 
@@ -1218,136 +1315,203 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
             {/* ── Details ── */}
             {tab === 'details' && (
               <>
-              <div className="px-5 py-3">
-                <FieldRow label="Status">
-                  <select value={status} onChange={e => { if (!canEdit) return; const prev = status; const next = e.target.value; setStatus(next); onUpdated?.({ status: next }); patch({ status: next }, () => { setStatus(prev); onUpdated?.({ status: prev }) }) }}
-                    disabled={!canEdit}
-                    className="text-sm bg-transparent outline-none flex-1"
-                    style={{ color: 'var(--text-primary)', cursor: canEdit ? 'pointer' : 'default' }}>
-                    {Object.entries(STATUS_CONFIG).map(([v, c]) => <option key={v} value={v}>{c.label}</option>)}
-                  </select>
-                </FieldRow>
+              {/* ── 2-column field grid ── */}
+              <div style={{ padding: '12px 16px 4px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 12px' }}>
 
-                <FieldRow label="Priority">
-                  <Flag className="h-3.5 w-3.5" style={{ color: priConf.color }} />
-                  <select value={priority} onChange={e => { if (!canEdit) return; const prev = priority; setPriority(e.target.value); patch({ priority: e.target.value }, () => setPriority(prev)) }}
-                    disabled={!canEdit}
-                    className="text-sm bg-transparent outline-none flex-1"
-                    style={{ color: 'var(--text-primary)', cursor: canEdit ? 'pointer' : 'default' }}>
-                    {Object.entries(PRIORITY_CONFIG).map(([v, c]) => <option key={v} value={v}>{c.label}</option>)}
-                  </select>
-                </FieldRow>
+                {/* LEFT column */}
+                <div>
+                  {/* Status */}
+                  <FieldCard label="Status">
+                    <select value={status} onChange={e => { if (!canEdit) return; const prev = status; const next = e.target.value; setStatus(next); onUpdated?.({ status: next }); patch({ status: next }, () => { setStatus(prev); onUpdated?.({ status: prev }) }) }}
+                      disabled={!canEdit}
+                      className="text-sm bg-transparent outline-none w-full"
+                      style={{ color: 'var(--text-primary)', cursor: canEdit ? 'pointer' : 'default' }}>
+                      {Object.entries(STATUS_CONFIG).map(([v, c]) => <option key={v} value={v}>{c.label}</option>)}
+                    </select>
+                  </FieldCard>
 
-                <FieldRow label="Assignee">
-                  {assigneeId && <Avatar name={assignee?.name ?? '?'} size="xs" />}
-                  <select value={assigneeId} onChange={e => {
-                    if (!canEdit) return
-                    const prev = assigneeId
-                    const newId = e.target.value || null
-                    setAssigneeId(e.target.value)
-                    // If subtasks share the old assignee, update them too
-                    if (prev && newId !== prev) {
-                      const matching = subtasks.filter(s => s.assignee_id === prev)
-                      if (matching.length > 0) {
-                        setSubtasks(p => p.map(s => s.assignee_id === prev ? { ...s, assignee_id: newId } : s))
-                        matching.forEach(s => fetch(`/api/tasks/${s.id}`, {
-                          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ assignee_id: newId }),
-                        }))
+                  {/* Assignee */}
+                  <FieldCard label="Assignee">
+                    {assigneeId && <Avatar name={assignee?.name ?? '?'} size="xs" />}
+                    <select value={assigneeId} onChange={e => {
+                      if (!canEdit) return
+                      const prev = assigneeId
+                      const newId = e.target.value || null
+                      setAssigneeId(e.target.value)
+                      if (prev && newId !== prev) {
+                        const matching = subtasks.filter(s => s.assignee_id === prev)
+                        if (matching.length > 0) {
+                          setSubtasks(p => p.map(s => s.assignee_id === prev ? { ...s, assignee_id: newId } : s))
+                          matching.forEach(s => fetch(`/api/tasks/${s.id}`, {
+                            method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ assignee_id: newId }),
+                          }))
+                        }
                       }
-                    }
-                    patch({ assignee_id: newId }, () => setAssigneeId(prev))
-                  }}
-                    disabled={!canEdit}
-                    className="text-sm bg-transparent outline-none flex-1"
-                    style={{ color: 'var(--text-primary)', cursor: canEdit ? 'pointer' : 'default' }}>
-                    <option value="">Unassigned</option>
-                    {members.map(m => (
-                      <option key={m.id} value={m.id}>{m.name}{m.id === currentUserId ? ' (me)' : ''}</option>
-                    ))}
-                  </select>
-                </FieldRow>
-
-                {/* Approver — editable by managers/admins/owners */}
-                {canManage && (
-                  <FieldRow label="Approver">
-                    <ShieldCheck className="h-3.5 w-3.5" style={{ color: approverId ? '#7c3aed' : 'var(--text-muted)' }} />
-                    <select
-                      value={approverId}
-                      onChange={e => {
-                        const prev = approverId
-                        const newId = e.target.value || null
-                        setApproverId(e.target.value)
-                        patch({ approver_id: newId }, () => setApproverId(prev))
-                      }}
-                      className="text-sm bg-transparent outline-none flex-1"
-                      style={{ color: 'var(--text-primary)', cursor: 'pointer' }}
-                    >
-                      <option value="">Any manager can approve</option>
+                      patch({ assignee_id: newId }, () => setAssigneeId(prev))
+                    }}
+                      disabled={!canEdit}
+                      className="text-sm bg-transparent outline-none w-full"
+                      style={{ color: 'var(--text-primary)', cursor: canEdit ? 'pointer' : 'default' }}>
+                      <option value="">Unassigned</option>
                       {members.map(m => (
-                        <option key={m.id} value={m.id}>
-                          {m.name}{m.id === currentUserId ? ' (me)' : ''}
-                        </option>
+                        <option key={m.id} value={m.id}>{m.name}{m.id === currentUserId ? ' (me)' : ''}</option>
                       ))}
                     </select>
-                  </FieldRow>
-                )}
+                  </FieldCard>
 
-                {/* Assigned by */}
-                {(() => {
-                  const creator = ((task as any).creator as { id: string; name: string } | null)
-                    ?? members.find(m => m.id === (task as any).created_by)
-                    ?? null
-                  if (!creator) return null
-                  const isSelf = creator.id === currentUserId
-                  return (
-                    <FieldRow label="Assigned by">
-                      <Avatar name={creator.name} size="xs" />
-                      <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                        {isSelf ? `${creator.name} (you)` : creator.name}
+                  {/* Due date */}
+                  <FieldCard label="Due date">
+                    <input type="date" value={dueDate}
+                      onChange={e => { if (!canEdit) return; const prev = dueDate; setDueDate(e.target.value); patch({ due_date: e.target.value || null }, () => setDueDate(prev)) }}
+                      readOnly={!canEdit}
+                      disabled={!canEdit}
+                      className="text-sm outline-none w-full rounded px-1 py-0.5"
+                      style={{
+                        color: overdue ? '#dc2626' : dueDate ? 'var(--text-primary)' : 'var(--text-muted)',
+                        background: 'var(--surface-subtle)', border: '1px solid var(--border)',
+                        colorScheme: 'light dark', cursor: canEdit ? 'pointer' : 'default',
+                      }}
+                    />
+                    {overdue && <span className="text-xs text-red-500 font-medium" style={{ flexShrink: 0 }}>Overdue</span>}
+                  </FieldCard>
+
+                  {/* Client */}
+                  {clients.length > 0 && (
+                    <FieldCard label="Client">
+                      {clientId && <div className="h-3 w-3 rounded-sm flex-shrink-0" style={{ background: client?.color }} />}
+                      <select value={clientId} onChange={e => { if (!canEdit) return; setClientId(e.target.value); patch({ client_id: e.target.value || null }) }}
+                        disabled={!canEdit}
+                        className="text-sm bg-transparent outline-none w-full"
+                        style={{ color: 'var(--text-primary)', cursor: canEdit ? 'pointer' : 'default' }}>
+                        <option value="">No client</option>
+                        {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                    </FieldCard>
+                  )}
+
+                  {/* Project */}
+                  {task.project && (
+                    <FieldCard label="Project">
+                      <div className="h-2.5 w-2.5 rounded-sm flex-shrink-0" style={{ background: (task.project as any).color }} />
+                      <span className="text-sm" style={{ color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(task.project as any).name}</span>
+                    </FieldCard>
+                  )}
+
+                  {/* Created */}
+                  {task.created_at && (
+                    <FieldCard label="Created">
+                      <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                        {new Date(task.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}
                       </span>
-                    </FieldRow>
-                  )
-                })()}
+                    </FieldCard>
+                  )}
+                </div>
 
-                {/* Co-assignees from custom_fields */}
-                {(() => {
-                  const coIds: string[] = (task as any)?.custom_fields?._co_assignees ?? []
-                  if (!coIds.length) return null
-                  const coNames = coIds.map((id: string) => members.find(m => m.id === id)?.name).filter(Boolean)
-                  if (!coNames.length) return null
-                  return (
-                    <FieldRow label="Co-assignees">
-                      <User className="h-3.5 w-3.5" style={{ color: 'var(--text-muted)' }} />
-                      <div className="flex gap-1 flex-wrap">
-                        {coNames.map((name, i) => (
-                          <span key={i} style={{ fontSize: 11, padding: '1px 8px', borderRadius: 99, background: 'var(--surface-subtle)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>
-                            {name as string}
-                          </span>
-                        ))}
-                      </div>
-                    </FieldRow>
-                  )
-                })()}
+                {/* RIGHT column */}
+                <div>
+                  {/* Priority */}
+                  <FieldCard label="Priority">
+                    <Flag className="h-3 w-3 flex-shrink-0" style={{ color: priConf.color }} />
+                    <select value={priority} onChange={e => { if (!canEdit) return; const prev = priority; setPriority(e.target.value); patch({ priority: e.target.value }, () => setPriority(prev)) }}
+                      disabled={!canEdit}
+                      className="text-sm bg-transparent outline-none w-full"
+                      style={{ color: 'var(--text-primary)', cursor: canEdit ? 'pointer' : 'default' }}>
+                      {Object.entries(PRIORITY_CONFIG).map(([v, c]) => <option key={v} value={v}>{c.label}</option>)}
+                    </select>
+                  </FieldCard>
 
-                <FieldRow label="Due date">
-                  <Calendar className="h-3.5 w-3.5" style={{ color: 'var(--text-muted)' }} />
-                  <input type="date" value={dueDate}
-                    onChange={e => { if (!canEdit) return; const prev = dueDate; setDueDate(e.target.value); patch({ due_date: e.target.value || null }, () => setDueDate(prev)) }}
-                    readOnly={!canEdit}
-                    disabled={!canEdit}
-                    className="text-sm outline-none flex-1 rounded-md px-2 py-1"
-                    style={{
-                      color: overdue ? '#dc2626' : dueDate ? 'var(--text-primary)' : 'var(--text-muted)',
-                      background: 'var(--surface-subtle)',
-                      border: '1px solid var(--border)',
-                      colorScheme: 'light dark',
-                      cursor: canEdit ? 'pointer' : 'default',
+                  {/* Approver */}
+                  {canManage && (
+                    <FieldCard label="Approver">
+                      <ShieldCheck className="h-3 w-3 flex-shrink-0" style={{ color: approverId ? '#7c3aed' : 'var(--text-muted)' }} />
+                      <select value={approverId} onChange={e => {
+                        const prev = approverId; const newId = e.target.value || null
+                        setApproverId(e.target.value); patch({ approver_id: newId }, () => setApproverId(prev))
+                      }}
+                        className="text-sm bg-transparent outline-none w-full"
+                        style={{ color: 'var(--text-primary)', cursor: 'pointer' }}>
+                        <option value="">Any manager</option>
+                        {members.map(m => <option key={m.id} value={m.id}>{m.name}{m.id === currentUserId ? ' (me)' : ''}</option>)}
+                      </select>
+                    </FieldCard>
+                  )}
+
+                  {/* Assigned by / creator */}
+                  {(() => {
+                    const creator = ((task as any).creator as { id: string; name: string } | null)
+                      ?? members.find(m => m.id === (task as any).created_by)
+                      ?? null
+                    if (!creator) return null
+                    const isSelf = creator.id === currentUserId
+                    return (
+                      <FieldCard label="Assigned by">
+                        <Avatar name={creator.name} size="xs" />
+                        <span className="text-sm" style={{ color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {isSelf ? `${creator.name} (you)` : creator.name}
+                        </span>
+                      </FieldCard>
+                    )
+                  })()}
+
+                  {/* Co-assignees */}
+                  {(() => {
+                    const coIds: string[] = (task as any)?.custom_fields?._co_assignees ?? []
+                    if (!coIds.length) return null
+                    const coNames = coIds.map((id: string) => members.find(m => m.id === id)?.name).filter(Boolean)
+                    if (!coNames.length) return null
+                    return (
+                      <FieldCard label="Co-assignees">
+                        <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                          {coNames.map((name, i) => (
+                            <span key={i} style={{ fontSize: 10, padding: '1px 6px', borderRadius: 99, background: 'var(--surface-subtle)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>
+                              {name as string}
+                            </span>
+                          ))}
+                        </div>
+                      </FieldCard>
+                    )
+                  })()}
+
+                  {/* Billable */}
+                  <FieldCard label="Billable">
+                    <button type="button" onClick={() => {
+                      if (!canEdit) return
+                      const next = !isBillable
+                      setIsBillable(next)
+                      patch({ is_billable: next, billable_amount: next && billableAmount ? Number(billableAmount) : null })
                     }}
-                  />
-                  {overdue && <span className="text-xs text-red-500 font-medium flex-shrink-0">Overdue</span>}
-                </FieldRow>
+                      style={{ display: 'flex', alignItems: 'center', gap: 4,
+                        padding: '2px 8px', borderRadius: 20, cursor: canEdit ? 'pointer' : 'default',
+                        border: isBillable ? '1.5px solid #16a34a' : '1px solid var(--border)',
+                        background: isBillable ? '#f0fdf4' : 'var(--surface-subtle)',
+                        color: isBillable ? '#16a34a' : 'var(--text-secondary)',
+                        fontSize: 11, fontWeight: isBillable ? 600 : 400 }}>
+                      <DollarSign style={{ width: 10, height: 10 }}/>{isBillable ? 'Yes' : 'No'}
+                    </button>
+                    {isBillable && (
+                      <input type="number" min="0" step="0.01" value={billableAmount} placeholder="Amount"
+                        onChange={e => { if (!canEdit) return; setBillableAmount(e.target.value) }}
+                        onBlur={() => { if (!canEdit) return; patch({ is_billable: true, billable_amount: billableAmount ? Number(billableAmount) : null }) }}
+                        style={{ width: 80, fontSize: 11, padding: '2px 6px', borderRadius: 14,
+                          border: '1.5px solid #16a34a', outline: 'none', background: '#f0fdf4', color: '#16a34a' }}
+                      />
+                    )}
+                  </FieldCard>
 
+                  {/* Last modified */}
+                  {(task as any).updated_at && (
+                    <FieldCard label="Modified">
+                      <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                        {new Date((task as any).updated_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}
+                      </span>
+                    </FieldCard>
+                  )}
+                </div>
+              </div>
+
+              {/* ── Full-width fields below grid ── */}
+              <div style={{ padding: '0 16px 4px' }}>
                 {/* ── Frequency editing (recurring tasks only) ── */}
                 {(task as any).is_recurring && (
                   <>
@@ -1455,70 +1619,6 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                   </>
                 )}
 
-                {clients.length > 0 && (
-                  <FieldRow label="Client">
-                    {clientId && <div className="h-3 w-3 rounded-sm flex-shrink-0" style={{ background: client?.color }} />}
-                    <select value={clientId} onChange={e => { if (!canEdit) return; setClientId(e.target.value); patch({ client_id: e.target.value || null }) }}
-                      disabled={!canEdit}
-                      className="text-sm bg-transparent outline-none flex-1"
-                      style={{ color: 'var(--text-primary)', cursor: canEdit ? 'pointer' : 'default' }}>
-                      <option value="">No client</option>
-                      {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
-                  </FieldRow>
-                )}
-
-                {task.project && (
-                  <FieldRow label="Project">
-                    <div className="h-2.5 w-2.5 rounded-sm flex-shrink-0" style={{ background: (task.project as any).color }} />
-                    <span className="text-sm" style={{ color: 'var(--text-primary)' }}>{(task.project as any).name}</span>
-                  </FieldRow>
-                )}
-
-                {/* Billable */}
-                <FieldRow label="Billable">
-                  <DollarSign className="h-3.5 w-3.5" style={{ color: isBillable ? '#16a34a' : 'var(--text-muted)', flexShrink: 0 }} />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!canEdit) return
-                      const next = !isBillable
-                      setIsBillable(next)
-                      patch({ is_billable: next, billable_amount: next && billableAmount ? Number(billableAmount) : null })
-                    }}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 5,
-                      padding: '3px 10px', borderRadius: 20, cursor: canEdit ? 'pointer' : 'default',
-                      border: isBillable ? '1.5px solid #16a34a' : '1px solid var(--border)',
-                      background: isBillable ? '#f0fdf4' : 'var(--surface-subtle)',
-                      color: isBillable ? '#16a34a' : 'var(--text-secondary)',
-                      fontSize: 12, fontWeight: isBillable ? 600 : 400,
-                    }}
-                  >
-                    {isBillable ? 'Yes — billable' : 'No'}
-                  </button>
-                  {isBillable && (
-                    <input
-                      type="number" min="0" step="0.01"
-                      value={billableAmount}
-                      placeholder="Amount (optional)"
-                      onChange={e => {
-                        if (!canEdit) return
-                        setBillableAmount(e.target.value)
-                      }}
-                      onBlur={() => {
-                        if (!canEdit) return
-                        patch({ is_billable: true, billable_amount: billableAmount ? Number(billableAmount) : null })
-                      }}
-                      style={{
-                        width: 120, fontSize: 12, padding: '3px 8px', borderRadius: 20,
-                        border: '1.5px solid #16a34a', outline: 'none',
-                        background: '#f0fdf4', color: '#16a34a',
-                      }}
-                    />
-                  )}
-                </FieldRow>
-
                 {/* Dependencies: Blocked by */}
                 <FieldRow label="Blocked by">
                   <Link2 className="h-3.5 w-3.5" style={{ color: 'var(--text-muted)' }}/>
@@ -1545,7 +1645,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                           <input
                             value={blockingSearch}
                             onChange={e => { setBlockingSearch(e.target.value); searchBlockingTasks(e.target.value) }}
-                            onBlur={() => setTimeout(() => setBlockingResults([]), 150)}
+                            onBlur={() => setTimeout(() => setBlockingResults([]), 220)}
                             placeholder="Search task to block by…"
                             style={{ flex:1, fontSize:11, padding:'3px 8px', borderRadius:6, border:'1px solid var(--border)',
                               background:'var(--surface-subtle)', color:'var(--text-primary)', outline:'none', fontFamily:'inherit', width:'100%' }}
@@ -1603,7 +1703,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                             <input
                               value={blocksSearch}
                               onChange={e => { setBlocksSearch(e.target.value); searchBlocksTasks(e.target.value) }}
-                              onBlur={() => setTimeout(() => setBlocksResults([]), 150)}
+                              onBlur={() => setTimeout(() => setBlocksResults([]), 220)}
                               placeholder="Search task this blocks…"
                               style={{ flex:1, fontSize:11, padding:'3px 8px', borderRadius:6, border:'1px solid var(--border)',
                                 background:'var(--surface-subtle)', color:'var(--text-primary)', outline:'none', fontFamily:'inherit', width:'100%' }}
@@ -1627,26 +1727,6 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                         </div>
                       )}
                     </div>
-                  </FieldRow>
-                )}
-
-                {/* Created date */}
-                {task.created_at && (
-                  <FieldRow label="Created">
-                    <Clock className="h-3.5 w-3.5" style={{ color: 'var(--text-muted)' }} />
-                    <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                      {new Date(task.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}
-                    </span>
-                  </FieldRow>
-                )}
-
-                {/* Last modified date */}
-                {(task as any).updated_at && (
-                  <FieldRow label="Last modified">
-                    <Clock className="h-3.5 w-3.5" style={{ color: 'var(--text-muted)' }} />
-                    <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                      {new Date((task as any).updated_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}
-                    </span>
                   </FieldRow>
                 )}
               </div>
@@ -2017,57 +2097,129 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
               </div>
             )}
 
-            {/* ── Activity / Audit trail ── */}
-            {tab === 'activity' && (
-              <div className="px-5 py-4">
-                {activityLoading && (
-                  <p className="text-sm text-center py-8" style={{ color: 'var(--text-muted)' }}>Loading history…</p>
-                )}
-                {!activityLoading && activityLog.length === 0 && (
-                  <p className="text-sm text-center py-8" style={{ color: 'var(--text-muted)' }}>No activity recorded yet.</p>
-                )}
-                {!activityLoading && activityLog.length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-                    {activityLog.map((entry: any, i: number) => {
-                      const actor = members.find(m => m.id === entry.actor_id)?.name ?? 'Someone'
-                      const date  = new Date(entry.created_at)
-                      const dateStr = date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-                      const timeStr = date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
-                      return (
-                        <div key={entry.id} style={{ display: 'flex', gap: 12, paddingBottom: 14,
-                          position: 'relative' }}>
-                          {/* Timeline spine */}
-                          {i < activityLog.length - 1 && (
-                            <div style={{ position: 'absolute', left: 7, top: 16, bottom: 0, width: 2,
-                              background: 'var(--border-light)' }}/>
-                          )}
-                          {/* Dot */}
-                          <div style={{ width: 16, height: 16, borderRadius: '50%', flexShrink: 0, marginTop: 2,
-                            background: 'var(--surface-subtle)', border: '2px solid var(--border)',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1 }}>
-                            <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--brand)' }}/>
+            {/* ── Activity / History tab ── */}
+            {tab === 'activity' && (() => {
+              const isRecurringOrCA = (task as any).is_recurring || (task as any).custom_fields?._ca_compliance === true
+
+              // Shared activity log renderer
+              const ActivityLog = () => (
+                <>
+                  {activityLoading && <p className="text-sm text-center py-8" style={{ color: 'var(--text-muted)' }}>Loading history…</p>}
+                  {!activityLoading && activityLog.length === 0 && (
+                    <p className="text-sm text-center py-8" style={{ color: 'var(--text-muted)' }}>No activity recorded yet.</p>
+                  )}
+                  {!activityLoading && activityLog.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                      {activityLog.map((entry: any, i: number) => {
+                        const actor = members.find(m => m.id === entry.actor_id)?.name ?? 'Someone'
+                        const date  = new Date(entry.created_at)
+                        const dateStr = date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                        const timeStr = date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+                        return (
+                          <div key={entry.id} style={{ display: 'flex', gap: 10, paddingBottom: 12, position: 'relative' }}>
+                            {i < activityLog.length - 1 && (
+                              <div style={{ position: 'absolute', left: 7, top: 16, bottom: 0, width: 2, background: 'var(--border-light)' }}/>
+                            )}
+                            <div style={{ width: 16, height: 16, borderRadius: '50%', flexShrink: 0, marginTop: 2,
+                              background: 'var(--surface-subtle)', border: '2px solid var(--border)',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1 }}>
+                              <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--brand)' }}/>
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <p style={{ margin: '0 0 2px', fontSize: 12, color: 'var(--text-primary)' }}>
+                                <strong>{actor}</strong>{' '}
+                                <span style={{ color: 'var(--text-secondary)' }}>{entry.action.replace(/_/g, ' ')}</span>
+                                {entry.new_value && entry.new_value !== entry.old_value && (
+                                  <span style={{ color: 'var(--text-muted)' }}>
+                                    {entry.old_value ? ` from "${entry.old_value}"` : ''}{' → '}<em>"{entry.new_value}"</em>
+                                  </span>
+                                )}
+                              </p>
+                              <p style={{ margin: 0, fontSize: 10, color: 'var(--text-muted)' }}>{dateStr} · {timeStr}</p>
+                            </div>
                           </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <p style={{ margin: '0 0 2px', fontSize: 13, color: 'var(--text-primary)' }}>
-                              <strong>{actor}</strong>{' '}
-                              <span style={{ color: 'var(--text-secondary)' }}>{entry.action.replace(/_/g, ' ')}</span>
-                              {entry.new_value && entry.new_value !== entry.old_value && (
-                                <span style={{ color: 'var(--text-muted)' }}>
-                                  {entry.old_value ? ` from "${entry.old_value}"` : ''}{' → '}<em>"{entry.new_value}"</em>
-                                </span>
-                              )}
-                            </p>
-                            <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)' }}>
-                              {dateStr} at {timeStr}
-                            </p>
-                          </div>
-                        </div>
-                      )
-                    })}
+                        )
+                      })}
+                    </div>
+                  )}
+                </>
+              )
+
+              if (!isRecurringOrCA) {
+                // Simple single-column view for regular tasks
+                return (
+                  <div className="px-5 py-4">
+                    <ActivityLog />
                   </div>
-                )}
-              </div>
-            )}
+                )
+              }
+
+              // Split 50/50 view: left = triggered instances, right = change log
+              return (
+                <div style={{ display: 'flex', height: '100%', minHeight: 300 }}>
+                  {/* Left half — triggered instances */}
+                  <div style={{ flex: 1, borderRight: '1px solid var(--border)', padding: '14px 16px', overflowY: 'auto' }}>
+                    <p style={{ margin: '0 0 10px', fontSize: 10, fontWeight: 800, color: 'var(--brand)',
+                      textTransform: 'uppercase', letterSpacing: '0.07em', display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <Repeat2 style={{ width: 11, height: 11 }}/> Triggered instances
+                    </p>
+                    {!recurHistoryLoaded ? (
+                      <button
+                        onClick={async () => {
+                          const res = await fetch(`/api/tasks?parent_recurring_id=${task.id}&limit=50`).catch(() => null)
+                          const d = res ? await res.json().catch(() => ({})) : {}
+                          setRecurHistory((d.data ?? []).sort((a: any, b: any) =>
+                            (b.created_at ?? '') > (a.created_at ?? '') ? 1 : -1
+                          ))
+                          setRecurHistoryLoaded(true)
+                        }}
+                        style={{ fontSize: 12, color: 'var(--brand)', background: 'none', border: '1px solid var(--brand-border)',
+                          padding: '4px 12px', borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit' }}>
+                        Load instances
+                      </button>
+                    ) : recurHistory.length === 0 ? (
+                      <p style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>No instances triggered yet.</p>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {recurHistory.map((inst: any) => {
+                          const statusColor = inst.status === 'completed' ? '#16a34a' : inst.status === 'in_review' ? '#7c3aed' : '#64748b'
+                          const statusBg = inst.status === 'completed' ? 'rgba(22,163,74,0.1)' : inst.status === 'in_review' ? 'rgba(124,58,237,0.1)' : 'rgba(100,116,139,0.1)'
+                          return (
+                            <div key={inst.id} style={{ padding: '6px 9px', borderRadius: 7,
+                              border: '1px solid var(--border)', background: 'var(--surface-subtle)', fontSize: 11 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                                <span style={{ color: 'var(--text-secondary)' }}>
+                                  {inst.due_date
+                                    ? new Date(inst.due_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+                                    : new Date(inst.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                </span>
+                                <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 99, fontWeight: 600, background: statusBg, color: statusColor, flexShrink: 0 }}>
+                                  {inst.status.replace('_', ' ')}
+                                </span>
+                              </div>
+                              {inst.completed_at && inst.status === 'completed' && (
+                                <p style={{ margin: '2px 0 0', fontSize: 10, color: '#16a34a' }}>
+                                  ✓ {new Date(inst.completed_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                </p>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right half — change log */}
+                  <div style={{ flex: 1, padding: '14px 16px', overflowY: 'auto' }}>
+                    <p style={{ margin: '0 0 10px', fontSize: 10, fontWeight: 800, color: 'var(--text-muted)',
+                      textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                      Change log
+                    </p>
+                    <ActivityLog />
+                  </div>
+                </div>
+              )
+            })()}
           </>
         )}
       </div>
@@ -2221,6 +2373,16 @@ function FieldRow({ label, children }: { label: string; children: React.ReactNod
       style={{ borderBottom: '1px solid var(--border-light)' }}>
       <div className="w-24 text-xs flex-shrink-0" style={{ color: 'var(--text-muted)' }}>{label}</div>
       <div className="flex items-center gap-2 flex-1 min-w-0">{children}</div>
+    </div>
+  )
+}
+
+function FieldCard({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ padding: '8px 0', borderBottom: '1px solid var(--border-light)' }}>
+      <p style={{ margin: '0 0 3px', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)',
+        textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', minWidth: 0 }}>{children}</div>
     </div>
   )
 }

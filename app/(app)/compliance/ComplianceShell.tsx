@@ -262,7 +262,6 @@ function CAKanbanView({ userRole, currentUserId }: { userRole: string; currentUs
         onClick={() => { setSelUpcoming(task); setSelUpcomingClientId(clientId) }}
         style={{
           background: 'var(--surface)', border: '1px solid var(--border)',
-          borderLeft: '3px solid rgba(234,179,8,0.6)',  // amber — all CA compliance cards
           borderRadius: 8, padding: '8px 10px', marginBottom: 6, cursor: 'pointer',
           boxShadow: '0 1px 3px rgba(0,0,0,0.05)', transition: 'box-shadow 0.12s',
         }}
@@ -606,7 +605,9 @@ function CAKanbanView({ userRole, currentUserId }: { userRole: string; currentUs
             : () => true
 
           const active = allTasks.filter(t => (board[t.id] ?? 'active') === 'active').filter(taskFilter)
-          const paused = allTasks.filter(t => board[t.id] === 'paused').filter(taskFilter)
+          // Paused tasks are never filtered by search — they must always be accessible to activate
+          const allPaused = allTasks.filter(t => board[t.id] === 'paused')
+          const paused = allPaused
 
           return (
             <div key={client.id} style={{ minWidth: 250, width: 265, flexShrink: 0,
@@ -670,23 +671,19 @@ function CAKanbanView({ userRole, currentUserId }: { userRole: string; currentUs
                     active.map(t => <KanbanCard key={t.id} task={t} clientId={client.id} />)
                   )}
 
-                  {/* Paused section — only show if there are paused tasks */}
-                  {(paused.length > 0 || allTasks.some(t => board[t.id] === 'paused')) && (
+                  {/* Paused section — always visible when any task is paused so activate is accessible */}
+                  {allPaused.length > 0 && (
                     <div style={{ marginTop: 14 }}>
                       <div style={{ fontSize: 11, fontWeight: 700, color: '#b45309',
                         textTransform: 'uppercase', letterSpacing: '0.06em',
                         paddingBottom: 6, marginBottom: 8,
                         borderBottom: '1px solid rgba(245,158,11,0.2)',
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span>Paused</span>
+                        <span>⏸ Paused</span>
                         <span style={{ fontWeight: 600, fontSize: 10, background: 'rgba(245,158,11,0.12)',
-                          color: '#b45309', padding: '1px 7px', borderRadius: 99 }}>{paused.length}</span>
+                          color: '#b45309', padding: '1px 7px', borderRadius: 99 }}>{allPaused.length}</span>
                       </div>
-                      {paused.length === 0 ? (
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', padding: '8px 0', opacity: 0.6 }}>None</div>
-                      ) : (
-                        paused.map(t => <KanbanCard key={t.id} task={t} clientId={client.id} />)
-                      )}
+                      {paused.map(t => <KanbanCard key={t.id} task={t} clientId={client.id} />)}
                     </div>
                   )}
                 </div>
@@ -779,7 +776,7 @@ export function ComplianceShell({ userRole, currentUserId }: Props) {
             display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
           }}>1</div>
           <span style={{ fontSize: 13, fontWeight: step === 1 ? 700 : 500, color: step === 1 ? 'var(--brand)' : 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
-            Compliance Master
+            CA Calendar
           </span>
           {!isAdmin && (
             <span style={{ fontSize: 10, color: 'var(--text-muted)', background: 'var(--surface-subtle)', padding: '1px 6px', borderRadius: 4, border: '1px solid var(--border)' }}>
@@ -891,7 +888,7 @@ export function ComplianceShell({ userRole, currentUserId }: Props) {
         {step === 1 && !isAdmin && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 300, gap: 12, color: 'var(--text-muted)', fontSize: 14 }}>
             <FileCheck style={{ width: 32, height: 32, opacity: 0.4 }}/>
-            <p>Compliance Master setup is restricted to admins.</p>
+            <p>CA Calendar setup is restricted to admins.</p>
             <button onClick={() => setStep(2)} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: 13 }}>
               Go to Client Setup →
             </button>

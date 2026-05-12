@@ -221,8 +221,12 @@ function TaskGroup({ groupName, tasks, selections, members, onToggle, onSelectCh
         </span>
       </button>
 
-      {/* Task rows */}
-      {open && tasks.map(task => {
+      {/* Task rows — checked tasks float to the top */}
+      {open && [...tasks].sort((a, b) => {
+        const aChecked = selections[a.id]?.checked ? 0 : 1
+        const bChecked = selections[b.id]?.checked ? 0 : 1
+        return aChecked - bChecked
+      }).map(task => {
         const sel = selections[task.id] ?? { checked: false, assignee_id: '', approver_id: '' }
         return (
           <div
