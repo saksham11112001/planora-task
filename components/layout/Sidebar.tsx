@@ -255,8 +255,8 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
           </Link>
         </div>
         {projectsOpen && (
-          <div style={{ maxHeight: 240, overflowY: 'auto' }}>
-            {projects.map(p => (
+          <div>
+            {projects.slice(0, 3).map(p => (
               <Link key={p.id} href={`/projects/${p.id}`}
                 className={cn('flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm transition-colors',
                   pathname.startsWith(`/projects/${p.id}`)
@@ -266,6 +266,22 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
                 <span className="truncate text-xs">{p.name}</span>
               </Link>
             ))}
+            {projects.length > 3 && (
+              <button
+                onClick={openFlyout}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '5px 12px', background: 'none', border: 'none',
+                  cursor: 'pointer', fontFamily: 'inherit',
+                  color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: 500,
+                  transition: 'color 0.12s',
+                }}
+                onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.8)'}
+                onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.4)'}>
+                <ChevronRight className="h-3 w-3" style={{ flexShrink: 0 }}/>
+                Show {projects.length - 3} more
+              </button>
+            )}
           </div>
         )}
         {nav.clients && <SI href="/clients"    active={isActive('/clients')}    icon={<Users2    className="h-4 w-4"/>} label="Clients"/>}
