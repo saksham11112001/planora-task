@@ -1,6 +1,7 @@
-import { NextResponse }    from 'next/server'
-import { createClient }    from '@/lib/supabase/server'
-import { COMPLIANCE_TASKS } from '@/lib/data/complianceTasks'
+import { NextResponse }      from 'next/server'
+import { createClient }      from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { COMPLIANCE_TASKS }  from '@/lib/data/complianceTasks'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -38,11 +39,16 @@ export async function GET() {
     let existingClients: ClientRow[] = []
 
     try {
+      // Use the user client only to verify identity + get org_id.
+      // All data queries go through the admin client to bypass RLS —
+      // the same pattern used in app/api/import/route.ts.
       const supabase = await createClient()
       const { data: { user } } = await supabase.auth.getUser()
 
       if (user) {
-        const { data: mb } = await supabase
+        const admin = createAdminClient()
+
+        const { data: mb } = await admin
           .from('org_members')
           .select('org_id, role')
           .eq('user_id', user.id)
@@ -53,12 +59,12 @@ export async function GET() {
           const orgId = mb.org_id
 
           const [{ data: members }, { data: clients }] = await Promise.all([
-            supabase
+            admin
               .from('org_members')
               .select('role, users!inner(name, email)')
               .eq('org_id', orgId)
               .eq('is_active', true),
-            supabase
+            admin
               .from('clients')
               .select('name, email, phone, gstin, company, website, industry, color, status, notes')
               .eq('org_id', orgId)
