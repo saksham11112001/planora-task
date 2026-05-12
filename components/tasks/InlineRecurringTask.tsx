@@ -593,12 +593,13 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, defa
 
     {/* ── Frequency Picker Modal ─────────────────────────────── */}
     {freqModalOpen && (
-      <div style={{ position:'fixed', inset:0, zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center',
+      <div style={{ position:'fixed', inset:0, zIndex:1000,
         background:'rgba(0,0,0,0.35)', backdropFilter:'blur(4px)' }}
         onClick={e => { if (e.target === e.currentTarget) setFreqModalOpen(false) }}>
-        <div style={{ background:'var(--surface)', borderRadius:16, padding:'24px 24px 20px',
-          width:440, maxWidth:'calc(100vw - 32px)',
-          boxShadow:'0 20px 60px rgba(0,0,0,0.18)', border:'1px solid var(--border)' }}>
+        <div style={{ position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)',
+          background:'var(--surface)', borderRadius:16, padding:'24px 24px 20px',
+          width:440, maxWidth:'calc(100vw - 32px)', maxHeight:'calc(100vh - 40px)', overflowY:'auto',
+          boxShadow:'0 20px 60px rgba(0,0,0,0.18)', border:'1px solid var(--border)', zIndex:1001 }}>
 
           {/* Header */}
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:18 }}>

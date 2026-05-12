@@ -664,6 +664,22 @@ export function RecurringView({
             <span />
           </div>
 
+          {/* ── Create repeat task — always at top like quick tasks ── */}
+          {canManage && (
+            <InlineRecurringTask
+              members={members}
+              clients={clients}
+              currentUserId={currentUserId}
+              defaultOpen={autoOpen}
+              onCreated={(newTask?: any) => {
+                if (newTask) {
+                  setLocalTasks((prev) => [...prev, newTask])
+                }
+                startT(() => router.refresh())
+              }}
+            />
+          )}
+
           {visibleTasks.length === 0 && !canManage && (
             <div style={{ textAlign: 'center', padding: '48px 24px' }}>
               <RefreshCw style={{ width: 36, height: 36, color: 'var(--border)', margin: '0 auto 12px' }} />
@@ -1127,21 +1143,6 @@ export function RecurringView({
                 Show {Math.min(RECURRING_PAGE_SIZE, sortedVisibleTasks.length - recurringShown)} more ({recurringShown} of {sortedVisibleTasks.length} shown)
               </button>
             </div>
-          )}
-
-          {canManage && (
-            <InlineRecurringTask
-              members={members}
-              clients={clients}
-              currentUserId={currentUserId}
-              defaultOpen={autoOpen}
-              onCreated={(newTask?: any) => {
-                if (newTask) {
-                  setLocalTasks((prev) => [...prev, newTask])
-                }
-                startT(() => router.refresh())
-              }}
-            />
           )}
 
           <p

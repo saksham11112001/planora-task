@@ -1,10 +1,12 @@
 'use client'
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Plus, FolderOpen, Clock, Trash2, Search, LayoutGrid, List, Copy, ChevronDown, ChevronRight } from 'lucide-react'
+import { Plus, FolderOpen, Clock, Trash2, Search, LayoutGrid, List, Copy, ChevronDown, ChevronRight, X } from 'lucide-react'
 import { fmtDate } from '@/lib/utils/format'
 import { toast } from '@/store/appStore'
+
+const DEFAULT_VISIBLE = 3
 
 interface Project {
   id: string; name: string; color: string; status: string
@@ -34,6 +36,7 @@ export function ProjectsView({ projects, counts, clients, canManage }: Props) {
   const [viewMode,     setViewMode]     = useState<'grid' | 'list'>('grid')
   const [cloning,      setCloning]      = useState<string | null>(null)
   const [collapsed,    setCollapsed]    = useState<Set<string>>(new Set())
+  const [panelOpen,    setPanelOpen]    = useState(false)
 
   function refresh() { startT(() => router.refresh()) }
 
@@ -397,6 +400,162 @@ export function ProjectsView({ projects, counts, clients, canManage }: Props) {
         </div>
       )}
 
+      {/* ── All-projects side panel ── */}
+      {panelOpen && (
+        <>
+          {/* Backdrop */}
+          <div
+            onClick={() => setPanelOpen(false)}
+            style={{
+              position: 'fixed', inset: 0, zIndex: 40,
+              background: 'rgba(0,0,0,0.28)', backdropFilter: 'blur(2px)',
+            }}
+          />
+
+          {/* Panel */}
+          <div style={{
+            position: 'fixed', top: 0, right: 0, bottom: 0, zIndex: 41,
+            width: 420, maxWidth: '92vw',
+            background: 'var(--surface)',
+            borderLeft: '1px solid var(--border)',
+            boxShadow: '-8px 0 40px rgba(0,0,0,0.14)',
+            display: 'flex', flexDirection: 'column',
+          }}>
+            {/* Panel header */}
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '16px 20px', borderBottom: '1px solid var(--border)',
+              background: 'var(--surface)', flexShrink: 0,
+            }}>
+              <div>
+                <h2 style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                  All Projects
+                </h2>
+                <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '2px 0 0' }}>
+                  {filtered.length} project{filtered.length !== 1 ? 's' : ''}
+                  {clientFilter || statusFilter !== 'all' ? ' · filtered' : ''}
+                </p>
+              </div>
+              <button
+                onClick={() => setPanelOpen(false)}
+                style={{
+                  width: 30, height: 30, borderRadius: 8, border: 'none',
+                  background: 'var(--surface-subtle)', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: 'var(--text-muted)', transition: 'all 0.12s',
+                }}
+                onMouseEnter={e => {
+                  const el = e.currentTarget as HTMLElement
+                  el.style.background = 'rgba(220,38,38,0.1)'
+                  el.style.color = '#dc2626'
+                }}
+                onMouseLeave={e => {
+                  const el = e.currentTarget as HTMLElement
+                  el.style.background = 'var(--surface-subtle)'
+                  el.style.color = 'var(--text-muted)'
+                }}>
+                <X style={{ width: 14, height: 14 }}/>
+              </button>
+            </div>
+
+            {/* Panel body — scrollable list of all projects by group */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '12px 0' }}>
+              {groups.map(grp => (
+                <div key={grp.key} style={{ marginBottom: 8 }}>
+                  {/* Group label */}
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '6px 20px 4px',
+                  }}>
+                    <span style={{
+                      fontSize: 10, fontWeight: 800, textTransform: 'uppercase',
+                      letterSpacing: '0.07em', color: grp.color,
+                    }}>
+                      {grp.label}
+                    </span>
+                    <span style={{
+                      fontSize: 10, color: 'var(--text-muted)', padding: '1px 5px',
+                      borderRadius: 99, background: 'var(--surface-subtle)',
+                      border: '1px solid var(--border)',
+                    }}>
+                      {grp.items.length}
+                    </span>
+                  </div>
+
+                  {/* Compact project rows */}
+                  {grp.items.map(p => {
+                    const cnt = counts[p.id] ?? { total: 0, done: 0 }
+                    const progress = cnt.total > 0 ? Math.round((cnt.done / cnt.total) * 100) : 0
+                    return (
+                      <Link
+                        key={p.id}
+                        href={`/projects/${p.id}`}
+                        onClick={() => setPanelOpen(false)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 10,
+                          padding: '9px 20px', textDecoration: 'none',
+                          borderBottom: '1px solid var(--border-light)',
+                          transition: 'background 0.1s',
+                        }}
+                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--surface-subtle)'}
+                        onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = ''}>
+                        {/* Color bar */}
+                        <div style={{
+                          width: 3, height: 32, borderRadius: 2,
+                          background: p.color, flexShrink: 0,
+                        }}/>
+                        {/* Name + client */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{
+                            fontSize: 13, fontWeight: 600, color: 'var(--text-primary)',
+                            overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
+                          }}>
+                            {p.name}
+                          </div>
+                          {p.client && (
+                            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
+                              {p.client.name}
+                            </div>
+                          )}
+                        </div>
+                        {/* Mini progress */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
+                          <div style={{ width: 52, height: 3, borderRadius: 99, background: 'var(--border-light)', overflow: 'hidden' }}>
+                            <div style={{
+                              height: '100%', width: `${progress}%`, borderRadius: 99,
+                              background: progress === 100 ? '#16a34a' : p.color,
+                            }}/>
+                          </div>
+                          <span style={{ fontSize: 10, color: 'var(--text-muted)', width: 26, textAlign: 'right' }}>
+                            {progress}%
+                          </span>
+                        </div>
+                        {/* Due date */}
+                        {p.due_date && (
+                          <span style={{
+                            fontSize: 10, color: 'var(--text-muted)',
+                            flexShrink: 0, display: 'flex', alignItems: 'center', gap: 2,
+                          }}>
+                            <Clock style={{ width: 9, height: 9 }}/>
+                            {fmtDate(p.due_date)}
+                          </span>
+                        )}
+                      </Link>
+                    )
+                  })}
+                </div>
+              ))}
+
+              {filtered.length === 0 && (
+                <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+                  No projects match your filters
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
       {/* ── Groups ── */}
       {groups.map(grp => (
         <div key={grp.key} style={{ marginBottom: 20 }}>
@@ -421,30 +580,60 @@ export function ProjectsView({ projects, counts, clients, canManage }: Props) {
           )}
 
           {!collapsed.has(grp.key) && (
-            viewMode === 'grid' ? (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 14 }}>
-                {grp.items.map(p => <ProjectCard key={p.id} p={p}/>)}
-              </div>
-            ) : (
-              <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
-                {viewMode === 'list' && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '7px 16px',
-                    background: 'var(--surface-subtle)', borderBottom: '1px solid var(--border)',
-                    fontSize: 10, fontWeight: 700, color: 'var(--text-muted)',
-                    textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                    <div style={{ width: 8, flexShrink: 0 }}/>
-                    <div style={{ flex: 1 }}>Name</div>
-                    <div style={{ width: 100, flexShrink: 0 }}>Client</div>
-                    <div style={{ width: 120, flexShrink: 0 }}>Progress</div>
-                    <div style={{ width: 60, textAlign: 'right', flexShrink: 0 }}>Tasks</div>
-                    <div style={{ width: 70, flexShrink: 0 }}>Status</div>
-                    <div style={{ width: 80, textAlign: 'right', flexShrink: 0 }}>Due</div>
-                    {canManage && <div style={{ width: 56, flexShrink: 0 }}/>}
-                  </div>
-                )}
-                {grp.items.map(p => <ProjectRow key={p.id} p={p}/>)}
-              </div>
-            )
+            <>
+              {viewMode === 'grid' ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 14 }}>
+                  {grp.items.slice(0, DEFAULT_VISIBLE).map(p => <ProjectCard key={p.id} p={p}/>)}
+                </div>
+              ) : (
+                <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
+                  {viewMode === 'list' && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '7px 16px',
+                      background: 'var(--surface-subtle)', borderBottom: '1px solid var(--border)',
+                      fontSize: 10, fontWeight: 700, color: 'var(--text-muted)',
+                      textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                      <div style={{ width: 8, flexShrink: 0 }}/>
+                      <div style={{ flex: 1 }}>Name</div>
+                      <div style={{ width: 100, flexShrink: 0 }}>Client</div>
+                      <div style={{ width: 120, flexShrink: 0 }}>Progress</div>
+                      <div style={{ width: 60, textAlign: 'right', flexShrink: 0 }}>Tasks</div>
+                      <div style={{ width: 70, flexShrink: 0 }}>Status</div>
+                      <div style={{ width: 80, textAlign: 'right', flexShrink: 0 }}>Due</div>
+                      {canManage && <div style={{ width: 56, flexShrink: 0 }}/>}
+                    </div>
+                  )}
+                  {grp.items.slice(0, DEFAULT_VISIBLE).map(p => <ProjectRow key={p.id} p={p}/>)}
+                </div>
+              )}
+
+              {/* ── Show more button ── */}
+              {grp.items.length > DEFAULT_VISIBLE && (
+                <button
+                  onClick={() => setPanelOpen(true)}
+                  style={{
+                    marginTop: 10, display: 'inline-flex', alignItems: 'center', gap: 5,
+                    padding: '6px 14px', borderRadius: 8, border: '1px solid var(--border)',
+                    background: 'var(--surface)', color: 'var(--text-secondary)',
+                    fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                    transition: 'all 0.12s',
+                  }}
+                  onMouseEnter={e => {
+                    const el = e.currentTarget as HTMLElement
+                    el.style.borderColor = 'var(--brand)'
+                    el.style.color = 'var(--brand)'
+                    el.style.background = 'rgba(13,148,136,0.06)'
+                  }}
+                  onMouseLeave={e => {
+                    const el = e.currentTarget as HTMLElement
+                    el.style.borderColor = 'var(--border)'
+                    el.style.color = 'var(--text-secondary)'
+                    el.style.background = 'var(--surface)'
+                  }}>
+                  <ChevronDown style={{ width: 12, height: 12 }}/>
+                  Show {grp.items.length - DEFAULT_VISIBLE} more
+                </button>
+              )}
+            </>
           )}
         </div>
       ))}
