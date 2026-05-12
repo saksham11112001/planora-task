@@ -149,7 +149,7 @@ function CAKanbanView({ userRole, currentUserId }: { userRole: string; currentUs
         fetch('/api/clients').then(r => r.json()),
         fetch('/api/team').then(r => r.json()),
         // No client_id → returns all org assignments (the API already supports this)
-        fetch('/api/ca/assignments').then(r => r.json()),
+        fetch('/api/ca/assignments?include_inactive=true').then(r => r.json()),
         // ca_compliance=true filters server-side; limit=2000 handles large orgs
         fetch('/api/tasks?top_level=true&ca_compliance=true&limit=2000').then(r => r.json()),
       ])

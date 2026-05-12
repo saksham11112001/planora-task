@@ -18,7 +18,12 @@ export async function GET(req: NextRequest) {
   const mb = await getOrgMember(supabase)
   if (!mb) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
-  const clientId = req.nextUrl.searchParams.get('client_id')
+  const clientId       = req.nextUrl.searchParams.get('client_id')
+  // include_inactive=true is used by the CA kanban board so paused assignments
+  // are still returned and can be shown in the "Paused" section with an Activate button.
+  // All other callers (e.g. CAClientSetupView) omit this param and get only active ones.
+  const includeInactive = req.nextUrl.searchParams.get('include_inactive') === 'true'
+
   let query = supabase
     .from('ca_client_assignments')
     .select(`
@@ -29,8 +34,9 @@ export async function GET(req: NextRequest) {
       approver:users!ca_client_assignments_approver_id_fkey(id, name)
     `)
     .eq('org_id', mb.org_id)
-    .eq('is_active', true)
     .order('created_at', { ascending: false })
+
+  if (!includeInactive) query = query.eq('is_active', true)
 
   if (clientId) query = query.eq('client_id', clientId)
   const { data, error } = await query
