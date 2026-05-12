@@ -144,14 +144,14 @@ export function ClientGroupsSection({ initialGroups, allClients, canManage }: Pr
 
   // ── render ────────────────────────────────────────────────────────────
   return (
-    <div style={{ marginTop: 48 }}>
+    <div style={{ marginTop: 16 }}>
       {/* ── section header ── */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <div>
-          <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
             Client Groups
           </h2>
-          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 3 }}>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
             {groups.length} group{groups.length !== 1 ? 's' : ''} — organise clients under a parent company or family business
           </p>
         </div>

@@ -106,6 +106,13 @@ function selectStyle(active: boolean) {
 export function MonitorView({ tasks, members, clients, currentUserId, userRole }: Props) {
   const today = todayStr()
 
+  // ── Current-month boundaries ──────────────────────────────────────────────
+  const _now       = new Date()
+  const monthStart = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-01`
+  const _lastDay   = new Date(_now.getFullYear(), _now.getMonth() + 1, 0)
+  const monthEnd   = _lastDay.toISOString().slice(0, 10)
+  const monthLabel = _now.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
+
   // ── Filter state ──
   const [search,         setSearch]         = useState('')
   const [filterStatus,   setFilterStatus]   = useState<string[]>([])
@@ -313,20 +320,29 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
   }, [tasks, search, filterStatus, filterPrio, filterClient, filterMember, filterType.join(','),
       dueDateFrom, dueDateTo, createdFrom, createdTo, updatedFrom, updatedTo])
 
-  // ── Stats ──
+  // ── Current-month task slice (used by stats & charts) ────────────────────
+  const monthTasks = useMemo(
+    () => tasks.filter(t => !!t.due_date && t.due_date >= monthStart && t.due_date <= monthEnd),
+    [tasks, monthStart, monthEnd],
+  )
+
+  // ── Stats — scoped to tasks due in the current month ──────────────────────
+  // All four status buckets (todo + inReview + completed + cancelled) sum to total.
+  // Overdue and Unassigned are subsets of the above (annotation stats).
   const stats = useMemo(() => {
-    const all = tasks
+    const m = monthTasks
     return {
-      total:      all.length,
-      todo:       all.filter(t => t.status === 'todo').length,
-      inReview:   all.filter(t => t.status === 'in_review').length,
-      completed:  all.filter(t => t.status === 'completed').length,
-      overdue:    all.filter(t => !!t.due_date && t.due_date < today && !['completed', 'cancelled'].includes(t.status)).length,
-      ca:         all.filter(t => t.custom_fields?._ca_compliance).length,
-      recurring:  all.filter(t => t.is_recurring).length,
-      unassigned: all.filter(t => !t.assignee_id).length,
+      total:      m.length,
+      todo:       m.filter(t => t.status === 'todo').length,
+      inReview:   m.filter(t => t.status === 'in_review').length,
+      completed:  m.filter(t => t.status === 'completed').length,
+      cancelled:  m.filter(t => t.status === 'cancelled').length,
+      overdue:    m.filter(t => t.due_date! < today && !['completed', 'cancelled'].includes(t.status)).length,
+      ca:         m.filter(t => !!t.custom_fields?._ca_compliance).length,
+      recurring:  m.filter(t => t.is_recurring).length,
+      unassigned: m.filter(t => !t.assignee_id && !['completed', 'cancelled'].includes(t.status)).length,
     }
-  }, [tasks, today])
+  }, [monthTasks, today])
 
   // ── Trend data (last 14 days, derived from full task list) ──
   const trendData = useMemo(() => {
@@ -427,21 +443,45 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
         </div>
 
         {/* ── Stats bar ── */}
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {[
-            { label: 'Total',       value: stats.total,      color: '#0d9488', bg: 'rgba(13,148,136,0.1)',  border: 'rgba(13,148,136,0.25)' },
-            { label: 'To do',       value: stats.todo,       color: '#64748b', bg: 'var(--surface-subtle)', border: 'var(--border)'         },
-            { label: 'In review',   value: stats.inReview,   color: '#7c3aed', bg: 'rgba(124,58,237,0.08)', border: 'rgba(124,58,237,0.25)' },
-            { label: 'Completed',   value: stats.completed,  color: '#16a34a', bg: 'rgba(22,163,74,0.08)',  border: 'rgba(22,163,74,0.25)'  },
-            { label: 'Overdue',     value: stats.overdue,    color: stats.overdue > 0 ? '#dc2626' : '#94a3b8', bg: stats.overdue > 0 ? 'rgba(220,38,38,0.08)' : 'var(--surface-subtle)', border: stats.overdue > 0 ? 'rgba(220,38,38,0.25)' : 'var(--border)' },
-            { label: 'Unassigned',  value: stats.unassigned, color: stats.unassigned > 0 ? '#d97706' : '#94a3b8', bg: stats.unassigned > 0 ? 'rgba(234,179,8,0.08)' : 'var(--surface-subtle)', border: stats.unassigned > 0 ? 'rgba(234,179,8,0.25)' : 'var(--border)' },
-            { label: 'CA',          value: stats.ca,         color: '#d97706', bg: 'rgba(234,179,8,0.08)',  border: 'rgba(234,179,8,0.25)'  },
-          ].map(s => (
-            <div key={s.label} style={{ padding: '6px 12px', borderRadius: 8, background: s.bg, border: `1px solid ${s.border}` }}>
-              <span style={{ fontSize: 16, fontWeight: 800, color: s.color, display: 'block', lineHeight: 1 }}>{s.value}</span>
-              <span style={{ fontSize: 10, color: 'var(--text-muted)', display: 'block', marginTop: 1 }}>{s.label}</span>
-            </div>
-          ))}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {/* Month label */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+              {monthLabel}
+            </span>
+            <span style={{ fontSize: 10, color: 'var(--text-muted)', opacity: 0.5 }}>· tasks due this month</span>
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            {/* ── Status counts — these always sum to Total ── */}
+            {[
+              { label: 'Total',     value: stats.total,     color: '#0d9488', bg: 'rgba(13,148,136,0.1)',  border: 'rgba(13,148,136,0.25)' },
+              { label: 'To do',     value: stats.todo,      color: '#64748b', bg: 'var(--surface-subtle)', border: 'var(--border)'         },
+              { label: 'In review', value: stats.inReview,  color: '#7c3aed', bg: 'rgba(124,58,237,0.08)', border: 'rgba(124,58,237,0.25)' },
+              { label: 'Completed', value: stats.completed, color: '#16a34a', bg: 'rgba(22,163,74,0.08)',  border: 'rgba(22,163,74,0.25)'  },
+              { label: 'Cancelled', value: stats.cancelled, color: '#94a3b8', bg: 'var(--surface-subtle)', border: 'var(--border)'         },
+            ].map(s => (
+              <div key={s.label} style={{ padding: '6px 12px', borderRadius: 8, background: s.bg, border: `1px solid ${s.border}` }}>
+                <span style={{ fontSize: 16, fontWeight: 800, color: s.color, display: 'block', lineHeight: 1 }}>{s.value}</span>
+                <span style={{ fontSize: 10, color: 'var(--text-muted)', display: 'block', marginTop: 1 }}>{s.label}</span>
+              </div>
+            ))}
+
+            {/* Thin divider */}
+            <div style={{ width: 1, height: 36, background: 'var(--border)', flexShrink: 0 }}/>
+
+            {/* ── Annotation stats (subsets — not expected to sum to Total) ── */}
+            {[
+              { label: 'Overdue',    value: stats.overdue,    color: stats.overdue > 0    ? '#dc2626' : '#94a3b8', bg: stats.overdue > 0    ? 'rgba(220,38,38,0.08)'  : 'var(--surface-subtle)', border: stats.overdue > 0    ? 'rgba(220,38,38,0.25)'  : 'var(--border)' },
+              { label: 'Unassigned', value: stats.unassigned, color: stats.unassigned > 0 ? '#d97706' : '#94a3b8', bg: stats.unassigned > 0 ? 'rgba(234,179,8,0.08)'  : 'var(--surface-subtle)', border: stats.unassigned > 0 ? 'rgba(234,179,8,0.25)'  : 'var(--border)' },
+              { label: 'CA',         value: stats.ca,         color: '#d97706',                                    bg: 'rgba(234,179,8,0.08)',                           border: 'rgba(234,179,8,0.25)'                                                              },
+            ].map(s => (
+              <div key={s.label} style={{ padding: '6px 12px', borderRadius: 8, background: s.bg, border: `1px solid ${s.border}` }}>
+                <span style={{ fontSize: 16, fontWeight: 800, color: s.color, display: 'block', lineHeight: 1 }}>{s.value}</span>
+                <span style={{ fontSize: 10, color: 'var(--text-muted)', display: 'block', marginTop: 1 }}>{s.label}</span>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* ── Chart (collapsible) ── */}
@@ -475,8 +515,8 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
                   <BarChart data={[
                     { name: 'CA',      value: stats.ca,        fill: '#d97706' },
                     { name: 'Repeat',  value: stats.recurring, fill: '#0d9488' },
-                    { name: 'Project', value: tasks.filter(t => !!t.project_id && !t.is_recurring && !t.custom_fields?._ca_compliance).length, fill: '#7c3aed' },
-                    { name: 'Quick',   value: tasks.filter(t => !t.project_id && !t.is_recurring && !t.custom_fields?._ca_compliance).length,  fill: '#0891b2' },
+                    { name: 'Project', value: monthTasks.filter(t => !!t.project_id && !t.is_recurring && !t.custom_fields?._ca_compliance).length, fill: '#7c3aed' },
+                    { name: 'Quick',   value: monthTasks.filter(t => !t.project_id && !t.is_recurring && !t.custom_fields?._ca_compliance).length,  fill: '#0891b2' },
                     { name: 'Overdue', value: stats.overdue,   fill: '#dc2626' },
                   ]} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                     <XAxis dataKey="name" tick={{ fontSize: 9 }}/>

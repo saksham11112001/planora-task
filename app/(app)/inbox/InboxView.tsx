@@ -370,13 +370,13 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
       <style>{`@media(max-width:640px){.hide-mobile{display:none!important}.inbox-task-row{grid-template-columns:36px 22px 1fr 80px 32px 40px!important}}`}
-        {`.inbox-col-header{display:grid;grid-template-columns:36px 22px 1fr 90px 90px 90px 90px 40px;align-items:center;padding:0 16px;}`}
+        {`.inbox-col-header{display:grid;grid-template-columns:36px 22px 1fr 90px 90px 90px 90px 40px;align-items:center;padding:4px 16px;}`}
       </style>
 
-      <div style={{ display:'flex', borderBottom:'1px solid var(--border)', padding:'0 20px', background:'var(--surface)', flexShrink:0 }}>
+      <div style={{ display:'flex', borderBottom:'1px solid var(--border)', padding:'0 16px', background:'var(--surface)', flexShrink:0 }}>
         {(['List','Board'] as const).map(t => (
           <button key={t} onClick={() => setViewTab(t)}
-            style={{ padding:'10px 15px', fontSize:14, fontWeight:500, border:'none', background:'transparent', cursor:'pointer', marginBottom:-1, borderBottom:`2px solid ${viewTab===t?'var(--brand)':'transparent'}`, color:viewTab===t?'var(--brand)':'var(--text-muted)' }}>
+            style={{ padding:'7px 12px', fontSize:13, fontWeight:500, border:'none', background:'transparent', cursor:'pointer', marginBottom:-1, borderBottom:`2px solid ${viewTab===t?'var(--brand)':'transparent'}`, color:viewTab===t?'var(--brand)':'var(--text-muted)' }}>
             {t}
           </button>
         ))}
@@ -481,22 +481,57 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
       {viewTab === 'List' && (
         <div style={{ flex:1, display:'flex', overflow:'hidden' }}>
           <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-            <div style={{ padding:'16px 20px 12px', background:'var(--surface)', borderBottom:'1px solid var(--border)', flexShrink:0 }}>
-              <h1 style={{ fontSize:20, fontWeight:700, color:'var(--text-primary)', margin:0 }}>Quick tasks</h1>
+            {/* ── Compact title + stats + sort — all in one row ── */}
+            <div style={{ display:'flex', alignItems:'center', gap:10, padding:'6px 16px',
+              borderBottom:'1px solid var(--border)', background:'var(--surface)', flexShrink:0, flexWrap:'wrap' }}>
+              {/* Title */}
+              <span style={{ fontSize:13, fontWeight:700, color:'var(--text-primary)', whiteSpace:'nowrap', marginRight:4 }}>Quick tasks</span>
+              {/* Inline stats */}
+              {localTasks.length > 0 && (
+                <div style={{ display:'flex', alignItems:'center', gap:10, flex:1, flexWrap:'wrap' }}>
+                  {overdue.length>0  && <span style={{ fontSize:11, fontWeight:600, color:'#dc2626' }}>⚠ {overdue.length} overdue</span>}
+                  {inProg.length>0   && <span style={{ fontSize:11, fontWeight:600, color:'#0d9488' }}>● {inProg.length} in progress</span>}
+                  {inReview.length>0 && <span style={{ fontSize:11, fontWeight:600, color:'#7c3aed' }}>◎ {inReview.length} pending</span>}
+                  {done.length>0     && <span style={{ fontSize:11, color:'var(--text-muted)' }}>✓ {done.length} done</span>}
+                  <span style={{ fontSize:11, color:'var(--text-muted)', opacity:0.55 }}>· {localTasks.length} total</span>
+                </div>
+              )}
+              {/* Sort — pushed to right */}
+              <div style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:5, flexShrink:0 }}>
+                <span style={{ fontSize:11, color:'var(--text-muted)' }}>Sort:</span>
+                <div style={{ position:'relative' }}>
+                  <button onClick={() => setSortOpen(v => !v)}
+                    style={{ display:'flex', alignItems:'center', gap:4, padding:'3px 9px', borderRadius:6,
+                      border:'1px solid var(--border)', cursor:'pointer', fontSize:11, fontWeight:500,
+                      color: sortBy !== 'due_date' ? 'var(--brand)' : 'var(--text-secondary)',
+                      background: sortBy !== 'due_date' ? 'var(--brand-light)' : 'var(--surface)' }}>
+                    <SortAsc style={{ width:11, height:11 }}/>
+                    {sortBy === 'due_date' ? 'Due date' : sortBy === 'created_at' ? 'Created' : 'Modified'}
+                    {' '}{sortDir === 'asc' ? '↑' : '↓'}
+                  </button>
+                  {sortOpen && (
+                    <div style={{ position:'absolute', top:'100%', right:0, marginTop:4, background:'var(--surface)',
+                      border:'1px solid var(--border)', borderRadius:10, boxShadow:'0 8px 24px rgba(0,0,0,0.12)',
+                      zIndex:9999, padding:8, minWidth:160 }} onClick={e => e.stopPropagation()}>
+                      {([['due_date','Due date'],['created_at','Created date'],['updated_at','Modified date']] as const).map(([val,label]) => (
+                        <button key={val} onClick={() => { if (sortBy===val) setSortDir(d => d==='asc'?'desc':'asc'); else { setSortBy(val); setSortDir('asc') } setSortOpen(false) }}
+                          style={{ display:'flex', alignItems:'center', justifyContent:'space-between', width:'100%',
+                            padding:'7px 10px', borderRadius:6, border:'none', cursor:'pointer', textAlign:'left',
+                            background: sortBy===val ? 'var(--brand-light)' : 'transparent',
+                            color: sortBy===val ? 'var(--brand)' : 'var(--text-primary)',
+                            fontSize:12, fontWeight: sortBy===val ? 600 : 400 }}>
+                          {label}
+                          {sortBy===val && <span style={{ fontSize:10 }}>{sortDir==='asc'?'↑':'↓'}</span>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
 
             {/* Universal filter bar */}
             <UniversalFilterBar clients={clients} members={members} showSearch showPriority showStatus showAssignee showAssignor showDueDate showCreatedDate showUpdatedDate/>
-
-            {localTasks.length > 0 && (
-              <div style={{ padding:'6px 16px', borderBottom:'1px solid var(--border-light)', background:'var(--surface-subtle)', display:'flex', alignItems:'center', gap:12, flexWrap:'wrap', flexShrink:0 }}>
-                {overdue.length>0  && <span style={{ fontSize:11, fontWeight:600, color:'#dc2626' }}>⚠ {overdue.length} overdue</span>}
-                {inProg.length>0   && <span style={{ fontSize:11, fontWeight:600, color:'#0d9488' }}>● {inProg.length} in progress</span>}
-                {inReview.length>0 && <span style={{ fontSize:11, fontWeight:600, color:'#7c3aed' }}>◎ {inReview.length} pending</span>}
-                {done.length>0     && <span style={{ fontSize:11, color:'var(--text-muted)' }}>✓ {done.length} done</span>}
-                <span style={{ fontSize:11, color:'var(--text-muted)', marginLeft:'auto' }}>{localTasks.length} total</span>
-              </div>
-            )}
 
             {checked.size > 0 && (
               <div style={{ display:'flex', alignItems:'center', gap:12, padding:'8px 20px', background:'#f0fdfa', borderBottom:'1px solid #99f6e4', flexShrink:0 }}>
@@ -518,41 +553,8 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
               </div>
             )}
 
-            {/* Sort bar */}
-            <div style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 16px', borderBottom:'1px solid var(--border-light)', background:'var(--surface)', flexShrink:0 }}>
-              <span style={{ fontSize:11, color:'var(--text-muted)', marginLeft:'auto' }}>Sort:</span>
-              <div style={{ position:'relative' }}>
-                <button onClick={() => setSortOpen(v => !v)}
-                  style={{ display:'flex', alignItems:'center', gap:4, padding:'3px 10px', borderRadius:6,
-                    border:'1px solid var(--border)', cursor:'pointer', fontSize:11, fontWeight:500,
-                    color: sortBy !== 'due_date' ? 'var(--brand)' : 'var(--text-secondary)',
-                    background: sortBy !== 'due_date' ? 'var(--brand-light)' : 'var(--surface)' }}>
-                  <SortAsc style={{ width:12, height:12 }}/>
-                  {sortBy === 'due_date' ? 'Due date' : sortBy === 'created_at' ? 'Created' : 'Modified'}
-                  {' '}{sortDir === 'asc' ? '↑' : '↓'}
-                </button>
-                {sortOpen && (
-                  <div style={{ position:'absolute', top:'100%', right:0, marginTop:4, background:'var(--surface)',
-                    border:'1px solid var(--border)', borderRadius:10, boxShadow:'0 8px 24px rgba(0,0,0,0.12)',
-                    zIndex:9999, padding:8, minWidth:160 }} onClick={e => e.stopPropagation()}>
-                    {([['due_date','Due date'],['created_at','Created date'],['updated_at','Modified date']] as const).map(([val,label]) => (
-                      <button key={val} onClick={() => { if (sortBy===val) setSortDir(d => d==='asc'?'desc':'asc'); else { setSortBy(val); setSortDir('asc') } setSortOpen(false) }}
-                        style={{ display:'flex', alignItems:'center', justifyContent:'space-between', width:'100%',
-                          padding:'7px 10px', borderRadius:6, border:'none', cursor:'pointer', textAlign:'left',
-                          background: sortBy===val ? 'var(--brand-light)' : 'transparent',
-                          color: sortBy===val ? 'var(--brand)' : 'var(--text-primary)',
-                          fontSize:12, fontWeight: sortBy===val ? 600 : 400 }}>
-                        {label}
-                        {sortBy===val && <span style={{ fontSize:10 }}>{sortDir==='asc'?'↑':'↓'}</span>}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
             {/* Column headers */}
-            <div className="inbox-col-header hide-mobile" style={{ borderBottom:'1px solid var(--border)', background:'var(--surface-subtle)', flexShrink:0 }}>
+            <div className="inbox-col-header hide-mobile" style={{ borderBottom:'1px solid var(--border)', background:'var(--surface-subtle)', flexShrink:0, minHeight:0 }}>
               <div/><div/>
               <div style={{ fontSize:10, fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.07em', paddingLeft:2 }}>Task</div>
               <div style={{ fontSize:10, fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.07em' }}>Assignee</div>

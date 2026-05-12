@@ -71,21 +71,21 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
     if (now - _countCacheTime < COUNT_CACHE_TTL) return // still fresh
 
     countFetchRef.current = true
-    const today = new Date().toISOString().slice(0, 10)
 
     Promise.all([
-      // My tasks — used to compute overdue count
+      // My tasks — fetch all assigned tasks to count active ones
       fetch('/api/tasks?mine=true&limit=500').then(r => r.json()).catch(() => ({ data: [] })),
       // Pending approval tasks — all in_review across the org (managers see these)
       canManage
         ? fetch('/api/tasks?status=in_review&limit=200').then(r => r.json()).catch(() => ({ data: [] }))
         : Promise.resolve({ data: [] }),
     ]).then(([myData, pendData]) => {
+      // Count ALL active tasks assigned to me (todo + in_review), not just overdue.
+      // This matches what the user sees on the My Tasks page.
       const ov = Array.isArray(myData.data)
         ? myData.data.filter((t: any) =>
-            t.due_date && t.due_date < today &&
-            !['completed', 'cancelled', 'in_review'].includes(t.status) &&
-            t.approval_status !== 'pending'
+            !['completed', 'cancelled'].includes(t.status) &&
+            !t.custom_fields?._context_task  // exclude parent tasks surfaced for subtask context
           ).length
         : 0
       const pend = Array.isArray(pendData.data) ? pendData.data.length : 0

@@ -127,92 +127,95 @@ export function ClientsView({ initialClients, initialGroups, canManage }: Props)
 
       {/* ── sticky top bar ── */}
       <div style={{
-        padding: '20px 28px 0',
+        padding: '10px 20px 10px',
         background: 'var(--surface)',
         borderBottom: '1px solid var(--border)',
         flexShrink: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
       }}>
-        {/* Row 1: Title + CTA */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 }}>
-          <div>
-            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
-              Clients
-            </h1>
-            <p style={{ margin: '3px 0 0', fontSize: 13, color: 'var(--text-muted)' }}>
-              {clients.length.toLocaleString()} client{clients.length !== 1 ? 's' : ''}
-              {(search || statusTab !== 'all') && filtered.length !== clients.length
-                ? ` · ${filtered.length.toLocaleString()} shown`
-                : ''}
-            </p>
-          </div>
+        {/* Row 1: Title + count + status pills + CTA — all on one line */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <h1 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.01em', whiteSpace: 'nowrap' }}>
+            Clients
+          </h1>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)', flexShrink: 0 }}>
+            {clients.length.toLocaleString()}
+            {(search || statusTab !== 'all') && filtered.length !== clients.length
+              ? ` · ${filtered.length.toLocaleString()} shown` : ''}
+          </span>
+
+          {/* Status pills */}
+          {clients.length > 0 && (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {([
+                { key: 'all',      label: 'All',      count: stats.total,    color: 'var(--text-secondary)', border: 'var(--border)',           activeBg: 'var(--surface-subtle)' },
+                { key: 'active',   label: 'Active',   count: stats.active,   color: '#16a34a',               border: 'rgba(22,163,74,0.25)',    activeBg: 'rgba(22,163,74,0.08)'  },
+                { key: 'prospect', label: 'Prospect', count: stats.prospect, color: '#d97706',               border: 'rgba(217,119,6,0.25)',    activeBg: 'rgba(217,119,6,0.08)'  },
+                { key: 'inactive', label: 'Inactive', count: stats.inactive, color: '#64748b',               border: 'rgba(100,116,139,0.25)', activeBg: 'rgba(100,116,139,0.08)'},
+              ] as const).map(t => (
+                <button key={t.key} onClick={() => setStatusTab(t.key as StatusTab)}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 5,
+                    padding: '3px 10px', borderRadius: 99, fontSize: 11, fontWeight: 600,
+                    border: `1.5px solid ${statusTab === t.key ? t.color : t.border}`,
+                    background: statusTab === t.key ? t.activeBg : 'transparent',
+                    color: statusTab === t.key ? t.color : 'var(--text-muted)',
+                    cursor: 'pointer', transition: 'all 0.12s',
+                  }}>
+                  {t.label}
+                  <span style={{
+                    fontSize: 10, fontWeight: 700, minWidth: 16, height: 16,
+                    borderRadius: 99, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    background: statusTab === t.key ? t.color : 'var(--border)',
+                    color: statusTab === t.key ? '#fff' : 'var(--text-muted)',
+                    padding: '0 4px',
+                  }}>
+                    {t.count}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* CTA pushed to right */}
           {canManage && (
             <Link href="/clients/new" style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '8px 16px', borderRadius: 9, fontSize: 13, fontWeight: 600,
+              marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 5,
+              padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600,
               background: 'var(--brand)', color: '#fff', textDecoration: 'none',
-              boxShadow: '0 2px 8px rgba(13,148,136,0.25)', transition: 'opacity 0.12s',
+              boxShadow: '0 2px 8px rgba(13,148,136,0.20)', transition: 'opacity 0.12s',
+              flexShrink: 0,
             }}
               onMouseEnter={e => (e.currentTarget as HTMLElement).style.opacity = '0.88'}
               onMouseLeave={e => (e.currentTarget as HTMLElement).style.opacity = '1'}>
-              <Plus style={{ width: 14, height: 14 }}/> New client
+              <Plus style={{ width: 13, height: 13 }}/> New client
             </Link>
           )}
         </div>
 
-        {/* Row 2: Stats pills */}
+        {/* Row 2: Search */}
         {clients.length > 0 && (
-          <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
-            {([
-              { key: 'all',      label: 'All',      count: stats.total,    bg: 'var(--surface-subtle)', color: 'var(--text-primary)', border: 'var(--border)' },
-              { key: 'active',   label: 'Active',   count: stats.active,   bg: 'rgba(22,163,74,0.08)',  color: '#16a34a',             border: 'rgba(22,163,74,0.2)' },
-              { key: 'prospect', label: 'Prospect', count: stats.prospect, bg: 'rgba(217,119,6,0.08)',  color: '#d97706',             border: 'rgba(217,119,6,0.2)' },
-              { key: 'inactive', label: 'Inactive', count: stats.inactive, bg: 'rgba(100,116,139,0.08)',color: '#64748b',             border: 'rgba(100,116,139,0.2)' },
-            ] as const).map(t => (
-              <button key={t.key} onClick={() => setStatusTab(t.key as StatusTab)}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 6,
-                  padding: '5px 12px', borderRadius: 99, fontSize: 12, fontWeight: 600,
-                  border: `1.5px solid ${statusTab === t.key ? t.color : t.border}`,
-                  background: statusTab === t.key ? t.bg : 'transparent',
-                  color: statusTab === t.key ? t.color : 'var(--text-muted)',
-                  cursor: 'pointer', transition: 'all 0.12s',
-                }}>
-                {t.label}
-                <span style={{
-                  fontSize: 11, fontWeight: 700, minWidth: 18, height: 18,
-                  borderRadius: 99, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  background: statusTab === t.key ? t.color : 'var(--border)',
-                  color: statusTab === t.key ? '#fff' : 'var(--text-muted)',
-                  padding: '0 5px',
-                }}>
-                  {t.count}
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Row 3: Search */}
-        {clients.length > 0 && (
-          <div style={{ position: 'relative', maxWidth: 480, marginBottom: 0, paddingBottom: 14 }}>
-            <Search style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, color: 'var(--text-muted)', pointerEvents: 'none' }} />
+          <div style={{ position: 'relative', maxWidth: 420 }}>
+            <Search style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 13, height: 13, color: 'var(--text-muted)', pointerEvents: 'none' }} />
             <input
               ref={searchRef}
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search by name, company, email, industry…"
               style={{
-                width: '100%', paddingLeft: 34, paddingRight: search ? 34 : 12,
-                height: 38, fontSize: 13, border: '1.5px solid var(--border)',
-                borderRadius: 9, background: 'var(--surface-subtle)', color: 'var(--text-primary)',
+                width: '100%', paddingLeft: 30, paddingRight: search ? 30 : 10,
+                height: 32, fontSize: 12, border: '1.5px solid var(--border)',
+                borderRadius: 8, background: 'var(--surface-subtle)', color: 'var(--text-primary)',
                 outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
               }}
               onFocus={e => { (e.target as HTMLElement).style.borderColor = 'var(--brand)'; (e.target as HTMLElement).style.background = 'var(--surface)' }}
               onBlur={e => { (e.target as HTMLElement).style.borderColor = 'var(--border)'; (e.target as HTMLElement).style.background = 'var(--surface-subtle)' }}
             />
             {search && (
-              <button onClick={() => setSearch('')} style={{ position: 'absolute', right: 9, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 2, display: 'flex' }}>
-                <X style={{ width: 14, height: 14 }} />
+              <button onClick={() => setSearch('')} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 2, display: 'flex' }}>
+                <X style={{ width: 13, height: 13 }} />
               </button>
             )}
           </div>
@@ -220,7 +223,7 @@ export function ClientsView({ initialClients, initialGroups, canManage }: Props)
       </div>
 
       {/* ── Client Groups ── */}
-      <div style={{ padding: '0 28px', flexShrink: 0 }}>
+      <div style={{ padding: '0 20px', flexShrink: 0 }}>
         <ClientGroupsSection
           initialGroups={initialGroups}
           allClients={clients.map(c => ({ id: c.id, name: c.name, color: c.color, status: c.status, group_id: c.group_id ?? null }))}
@@ -270,7 +273,7 @@ export function ClientsView({ initialClients, initialGroups, canManage }: Props)
         )}
 
         {/* Client list */}
-        <div style={{ flex: 1, padding: '20px 28px', minWidth: 0 }}>
+        <div style={{ flex: 1, padding: '12px 20px', minWidth: 0 }}>
 
           {/* ── empty states ── */}
           {clients.length === 0 ? (
@@ -303,17 +306,17 @@ export function ClientsView({ initialClients, initialGroups, canManage }: Props)
           ) : (
             <div>
               {letterGroups.map(([letter, group]) => (
-                <div key={letter} style={{ marginBottom: 32 }}
+                <div key={letter} style={{ marginBottom: 18 }}
                   ref={el => { letterRefs.current[letter] = el }}>
 
                   {/* Letter header */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, position: 'sticky', top: 0, zIndex: 2, padding: '6px 0', background: 'var(--bg, #f8fafc)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 7, position: 'sticky', top: 0, zIndex: 2, padding: '4px 0', background: 'var(--bg, #f8fafc)' }}>
                     <div style={{
-                      width: 28, height: 28, borderRadius: 7, flexShrink: 0,
+                      width: 22, height: 22, borderRadius: 6, flexShrink: 0,
                       background: jumpLetter === letter ? 'var(--brand)' : 'var(--surface-subtle)',
                       color: jumpLetter === letter ? '#fff' : 'var(--text-muted)',
                       border: `1.5px solid ${jumpLetter === letter ? 'var(--brand)' : 'var(--border)'}`,
-                      fontWeight: 800, fontSize: 13,
+                      fontWeight: 800, fontSize: 11,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       transition: 'all 0.15s',
                     }}>

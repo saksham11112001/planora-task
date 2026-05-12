@@ -1,4 +1,5 @@
 import { NextResponse }    from 'next/server'
+import { createClient }    from '@/lib/supabase/server'
 import { COMPLIANCE_TASKS } from '@/lib/data/complianceTasks'
 
 export const dynamic = 'force-dynamic'
@@ -26,6 +27,74 @@ const R_COMPLIANCE  = '_helpers!$B$2:$B$200'
 
 export async function GET() {
   try {
+    // ── Auth & pre-fetch existing org data ────────────────────────────────
+    type MemberRow = { name: string; email: string; role: string }
+    type ClientRow = {
+      name: string; email: string; phone: string; gstin: string;
+      company: string; website: string; industry: string;
+      color: string; status: string; notes: string
+    }
+    let existingMembers: MemberRow[] = []
+    let existingClients: ClientRow[] = []
+
+    try {
+      const supabase = await createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+
+      if (user) {
+        const { data: mb } = await supabase
+          .from('org_members')
+          .select('org_id, role')
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+          .single()
+
+        if (mb?.org_id) {
+          const orgId = mb.org_id
+
+          const [{ data: members }, { data: clients }] = await Promise.all([
+            supabase
+              .from('org_members')
+              .select('role, users!inner(name, email)')
+              .eq('org_id', orgId)
+              .eq('is_active', true),
+            supabase
+              .from('clients')
+              .select('name, email, phone, gstin, company, website, industry, color, status, notes')
+              .eq('org_id', orgId)
+              .order('name', { ascending: true }),
+          ])
+
+          if (members) {
+            existingMembers = (members as any[])
+              .map(m => ({
+                name  : m.users?.name  ?? '',
+                email : m.users?.email ?? '',
+                role  : m.role         ?? 'member',
+              }))
+              .filter(m => m.email)
+          }
+
+          if (clients) {
+            existingClients = (clients as any[]).map(c => ({
+              name     : c.name     ?? '',
+              email    : c.email    ?? '',
+              phone    : c.phone    ?? '',
+              gstin    : c.gstin    ?? '',
+              company  : c.company  ?? '',
+              website  : c.website  ?? '',
+              industry : c.industry ?? '',
+              color    : c.color    ?? '',
+              status   : c.status   ?? 'active',
+              notes    : c.notes    ?? '',
+            }))
+          }
+        }
+      }
+    } catch {
+      // Auth failure is non-fatal — fall back to blank template
+    }
+
     // Handle both default and named exports across ExcelJS versions
     const exceljs = await import('exceljs')
     const ExcelJS  = (exceljs as any).default ?? exceljs
@@ -35,13 +104,15 @@ export async function GET() {
 
     // ── Palette ────────────────────────────────────────────────────────────
     const C = {
-      headerBg : 'FF1E293B',
-      hintBg   : 'FF0F172A',
-      white    : 'FFFFFFFF',
-      muted    : 'FF64748B',
-      teal     : 'FF0D9488',
-      slate    : 'FFCBD5E1',
-      border   : 'FF334155',
+      headerBg  : 'FF1E293B',
+      hintBg    : 'FF0F172A',
+      white     : 'FFFFFFFF',
+      muted     : 'FF64748B',
+      teal      : 'FF0D9488',
+      slate     : 'FFCBD5E1',
+      border    : 'FF334155',
+      preFillBg : 'FFE0F2FE',   // light sky-blue — marks pre-existing rows
+      preFillFg : 'FF0C4A6E',   // dark navy text for pre-existing rows
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────
@@ -74,6 +145,16 @@ export async function GET() {
           fill : { type: 'pattern', pattern: 'solid', fgColor: { argb: C.hintBg } },
           font : { italic: true, name: 'Arial', size: 10, color: { argb: C.muted } },
         })
+      }
+    }
+
+    /** Apply light-blue fill to a pre-existing data row so users can distinguish it */
+    function stylePreFill(ws: any, rowNum: number, cols: number) {
+      const row = ws.getRow(rowNum)
+      for (let c = 1; c <= cols; c++) {
+        const cell = row.getCell(c)
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.preFillBg } }
+        cell.font = { name: 'Arial', size: 10, color: { argb: C.preFillFg } }
       }
     }
 
@@ -128,7 +209,9 @@ wsRM.views = [
         { size: 11, color: { argb: C.slate }, name: 'Arial' }],
       ['6.  Priority & Frequency use fixed dropdowns — always select from the list.',
         { size: 11, color: { argb: C.slate }, name: 'Arial' }],
-      ['7.  Delete all [SAMPLE] rows before uploading.',
+      ['7.  Blue-highlighted rows in Team Members & Clients are your existing data — keep, edit, or delete them as needed.',
+        { size: 11, color: { argb: C.slate }, name: 'Arial' }],
+      ['8.  Delete all [SAMPLE] rows before uploading.',
         { size: 11, color: { argb: C.slate }, name: 'Arial' }],
     ]
     instructions.forEach(([text, font], i) => {
@@ -143,10 +226,19 @@ wsRM.views = [
     setup(wsTeam, [28, 32, 16, 30])
     wsTeam.addRow(['Full Name *', 'Email *', 'Role *', 'Notes'])
     wsTeam.addRow(["Person's display name", 'Work email', 'manager | member | viewer', 'Optional'])
-    wsTeam.addRow(['[SAMPLE] Alex Johnson',  'alex@yourcompany.com',    'manager', ''])
-    wsTeam.addRow(['[SAMPLE] Sarah Lee',     'sarah@yourcompany.com',   'member',  ''])
     styleHeader(wsTeam, 4)
     styleHints(wsTeam,  4)
+    // Pre-fill with existing members (light-blue rows)
+    if (existingMembers.length > 0) {
+      existingMembers.forEach((m, i) => {
+        wsTeam.addRow([m.name, m.email, m.role, ''])
+        stylePreFill(wsTeam, DATA_START + i, 4)
+      })
+    } else {
+      // No existing data — show sample rows so the sheet isn't empty
+      wsTeam.addRow(['[SAMPLE] Alex Johnson', 'alex@yourcompany.com',  'manager', ''])
+      wsTeam.addRow(['[SAMPLE] Sarah Lee',    'sarah@yourcompany.com', 'member',  ''])
+    }
     dv(wsTeam, 'C', [L_ROLE])
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -156,9 +248,18 @@ wsRM.views = [
     setup(wsClients, [24, 28, 18, 22, 22, 26, 18, 10, 16, 28])
     wsClients.addRow(['Client Name *', 'Contact Email', 'Phone', 'GSTIN', 'Company', 'Website', 'Industry', 'Color', 'Status', 'Notes'])
     wsClients.addRow(['Unique name', 'contact@client.com', '+91 9876543210', '15-char GST number', 'Company Ltd', 'https://company.com', 'Technology', '#6366f1', 'active | inactive | lead', 'Optional'])
-    wsClients.addRow(['[SAMPLE] Acme Corp', 'hello@acme.com', '', '', 'Acme Corp Ltd', '', 'Technology', '#6366f1', 'active', ''])
     styleHeader(wsClients, 10)
     styleHints(wsClients,  10)
+    // Pre-fill with existing clients (light-blue rows)
+    if (existingClients.length > 0) {
+      existingClients.forEach((c, i) => {
+        wsClients.addRow([c.name, c.email, c.phone, c.gstin, c.company, c.website, c.industry, c.color, c.status, c.notes])
+        stylePreFill(wsClients, DATA_START + i, 10)
+      })
+    } else {
+      // No existing data — show a sample row
+      wsClients.addRow(['[SAMPLE] Acme Corp', 'hello@acme.com', '', '', 'Acme Corp Ltd', '', 'Technology', '#6366f1', 'active', ''])
+    }
     dv(wsClients, 'I', [L_CLIENT_ST])
 
     // ══════════════════════════════════════════════════════════════════════════
