@@ -39,26 +39,30 @@ export async function GET() {
     let existingClients: ClientRow[] = []
 
     try {
-      // Use the user client only to verify identity + get org_id.
+      // Use the user client only to verify identity.
       // All data queries go through the admin client to bypass RLS —
       // the same pattern used in app/api/import/route.ts.
       const supabase = await createClient()
-      const { data: { user } } = await supabase.auth.getUser()
+      const authResult = await supabase.auth.getUser()
+      const user = authResult?.data?.user ?? null
 
       if (user) {
         const admin = createAdminClient()
 
-        const { data: mb } = await admin
+        // maybeSingle() never throws — returns null if no row found
+        const { data: mb, error: mbErr } = await admin
           .from('org_members')
           .select('org_id, role')
           .eq('user_id', user.id)
           .eq('is_active', true)
-          .single()
+          .maybeSingle()
+
+        if (mbErr) console.error('[template] org_members lookup error:', mbErr)
 
         if (mb?.org_id) {
           const orgId = mb.org_id
 
-          const [{ data: members }, { data: clients }] = await Promise.all([
+          const [membersRes, clientsRes] = await Promise.all([
             admin
               .from('org_members')
               .select('role, users!inner(name, email)')
@@ -71,8 +75,11 @@ export async function GET() {
               .order('name', { ascending: true }),
           ])
 
-          if (members) {
-            existingMembers = (members as any[])
+          if (membersRes.error) console.error('[template] members query error:', membersRes.error)
+          if (clientsRes.error) console.error('[template] clients query error:', clientsRes.error)
+
+          if (membersRes.data) {
+            existingMembers = (membersRes.data as any[])
               .map(m => ({
                 name  : m.users?.name  ?? '',
                 email : m.users?.email ?? '',
@@ -81,8 +88,8 @@ export async function GET() {
               .filter(m => m.email)
           }
 
-          if (clients) {
-            existingClients = (clients as any[]).map(c => ({
+          if (clientsRes.data) {
+            existingClients = (clientsRes.data as any[]).map(c => ({
               name     : c.name     ?? '',
               email    : c.email    ?? '',
               phone    : c.phone    ?? '',
@@ -96,9 +103,11 @@ export async function GET() {
             }))
           }
         }
+      } else {
+        console.warn('[template] No authenticated user — generating blank template')
       }
-    } catch {
-      // Auth failure is non-fatal — fall back to blank template
+    } catch (e) {
+      console.error('[template] Auth/fetch error (non-fatal, falling back to blank template):', e)
     }
 
     // Handle both default and named exports across ExcelJS versions

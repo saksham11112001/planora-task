@@ -133,8 +133,24 @@ export function ImportView() {
   }
 
   /* ── download template ────────────────────────────────────────── */
-  function downloadTemplate() {
-    window.open('/api/import/template', '_blank')
+  // Using fetch() instead of window.open() so the request is guaranteed to
+  // carry the session cookie (same-origin credentials are always included).
+  async function downloadTemplate() {
+    try {
+      const res = await fetch('/api/import/template', { credentials: 'include' })
+      if (!res.ok) { toast.error('Could not generate template — please try again'); return }
+      const blob = await res.blob()
+      const url  = URL.createObjectURL(blob)
+      const a    = document.createElement('a')
+      a.href     = url
+      a.download = 'floatup_import_template.xlsx'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch {
+      toast.error('Could not download template — please try again')
+    }
   }
 
   const isDragging = state === 'dragging'
