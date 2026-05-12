@@ -231,13 +231,21 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
         {/* WORK */}
         <GL>Work</GL>
         <div style={{ display: 'flex', alignItems: 'center', padding: '5px 10px 2px' }}>
+          {/* Chevron toggles inline list; "Projects" text navigates to /projects page */}
           <button onClick={() => setProjectsOpen(p => !p)}
-            style={{ display: 'flex', alignItems: 'center', gap: 5, flex: 1, background: 'none',
-              border: 'none', cursor: 'pointer', fontSize: 10, fontWeight: 700, letterSpacing: '0.07em',
-              textTransform: 'uppercase', color: 'rgba(255,255,255,0.65)' }}>
+            style={{ background: 'none', border: 'none', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', padding: '2px 5px 2px 0',
+              color: 'rgba(255,255,255,0.65)', flexShrink: 0 }}>
             {projectsOpen ? <ChevronDown className="h-3 w-3"/> : <ChevronRight className="h-3 w-3"/>}
-            Projects
           </button>
+          <Link href="/projects"
+            style={{ flex: 1, fontSize: 10, fontWeight: 700, letterSpacing: '0.07em',
+              textTransform: 'uppercase', color: 'rgba(255,255,255,0.65)', textDecoration: 'none',
+              transition: 'color 0.12s' }}
+            onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#fff'}
+            onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.65)'}>
+            Projects
+          </Link>
           <Link href="/projects/new" onClick={() => { _cacheTime = 0 }}
             style={{ display: 'flex', alignItems: 'center', justifyContent: 'center',
               width: 20, height: 20, borderRadius: 4, color: 'rgba(255,255,255,0.65)', textDecoration: 'none' }}
