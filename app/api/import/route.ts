@@ -321,11 +321,50 @@ export async function POST(request: NextRequest) {
     const orgId = mb.org_id
 
     // Pre-fetch all active CA master tasks once — shared across all sheet processors
-    const { data: _allCaMasterTasks } = await admin
+    let { data: _allCaMasterTasks } = await admin
       .from('ca_master_tasks')
       .select('id, name, dates')
       .eq('org_id', orgId)
       .eq('is_active', true)
+
+    // ── Auto-seed CA master tasks if the org has none yet ──────────
+    // Without this, compliance imports on brand-new orgs fail 100% —
+    // findMasterEntry can't match anything if caMasterMap is empty.
+    if (!_allCaMasterTasks || _allCaMasterTasks.length === 0) {
+      const DEFAULT_FY = '2026-27'
+      const seedRows = CA_DEFAULT_TASKS.map((t, i) => ({
+        org_id:             orgId,
+        code:               t.code,
+        name:               t.name,
+        group_name:         t.group_name,
+        task_type:          t.task_type,
+        financial_year:     DEFAULT_FY,
+        dates:              t.dates,
+        days_before_due:    7,
+        attachment_count:   t.attachment_count,
+        attachment_headers: t.attachment_headers ?? [],
+        priority:           'medium',
+        sort_order:         t.sort_order ?? i,
+        is_active:          true,
+        is_user_saved:      false,
+      }))
+      // Use upsert so re-running the import never duplicates rows
+      const { data: seeded } = await admin
+        .from('ca_master_tasks')
+        .upsert(seedRows, { onConflict: 'org_id,code,financial_year', ignoreDuplicates: true })
+        .select('id, name, dates')
+      if (seeded && seeded.length > 0) {
+        _allCaMasterTasks = seeded
+      } else {
+        // Re-fetch in case upsert returned nothing (ignoreDuplicates)
+        const { data: refetched } = await admin
+          .from('ca_master_tasks')
+          .select('id, name, dates')
+          .eq('org_id', orgId)
+          .eq('is_active', true)
+        _allCaMasterTasks = refetched
+      }
+    }
 
     type MasterEntry = { id: string; dates: Record<string, string> }
     const caMasterMap = new Map<string, MasterEntry>(
@@ -742,7 +781,8 @@ export async function POST(request: NextRequest) {
           }
           seenClientNames.add(lname)
 
-          const status = cell(row, iStatus) || 'active'
+          const rawStatus = cell(row, iStatus).toLowerCase() || 'active'
+          const status = ['active', 'inactive', 'lead', 'prospect'].includes(rawStatus) ? rawStatus : 'active'
           const rawColor = cell(row, iColor) || '#0d9488'
           const color = rawColor.startsWith('#') ? rawColor : `#${rawColor}`
 
@@ -764,22 +804,37 @@ export async function POST(request: NextRequest) {
             website: cell(row, iWebsite) || null,
             industry: cell(row, iIndustry) || null,
             color,
-            status: ['active', 'inactive', 'lead'].includes(status) ? status : 'active',
+            status,
             notes: cell(row, iNotes) || null,
             ...(clientCustomFields ? { custom_fields: clientCustomFields } : {}),
             created_by: user.id,
           })
         }
 
-        // Bulk insert in batches of 200
+        // Bulk upsert in batches of 200 (upsert handles name collisions gracefully)
         const CLIENT_BATCH = 200
         for (let bi = 0; bi < toInsertClients.length; bi += CLIENT_BATCH) {
           const batch = toInsertClients.slice(bi, bi + CLIENT_BATCH)
           const rows2insert = batch.map(({ _lname: _, ...rest }: any) => rest)
-          const { data: created, error } = await admin.from('clients').insert(rows2insert).select('id, name')
+          const { data: created, error } = await admin
+            .from('clients')
+            .upsert(rows2insert, { onConflict: 'org_id,name', ignoreDuplicates: true })
+            .select('id, name')
           if (error) {
-            results.clients.errors.push('Some clients could not be imported. Please check for duplicates or invalid data.')
-            results.clients.skipped += batch.length
+            // Batch failed — try row-by-row to isolate the bad record(s)
+            for (const row of rows2insert) {
+              const { data: r1, error: e1 } = await admin
+                .from('clients')
+                .upsert([row], { onConflict: 'org_id,name', ignoreDuplicates: true })
+                .select('id, name')
+              if (e1) {
+                results.clients.errors.push(`Could not import client "${row.name}": ${e1.message ?? 'unknown error'}`)
+                results.clients.skipped++
+              } else {
+                ;(r1 ?? []).forEach((c: any) => { clientNameToId[c.name.toLowerCase()] = c.id })
+                results.clients.created += r1?.length ?? 0
+              }
+            }
           } else {
             ;(created ?? []).forEach((c: any) => { clientNameToId[c.name.toLowerCase()] = c.id })
             results.clients.created += created?.length ?? 0
