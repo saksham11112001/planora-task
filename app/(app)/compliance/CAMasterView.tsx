@@ -3,6 +3,7 @@
 import {
   useState, useEffect, useCallback, useRef, useMemo,
 } from 'react'
+import ReactDOM from 'react-dom'
 import {
   ChevronDown, ChevronRight, Plus, Trash2, Pencil, Check, X,
   RefreshCw, Calendar, Paperclip, AlertCircle, Save, Search,
@@ -764,19 +765,35 @@ function SearchableSelect({
   disabled?: boolean
 }) {
   const [open, setOpen] = useState(false)
-  const [alignRight, setAlignRight] = useState(false)
   const [q, setQ] = useState('')
-  const ref = useRef<HTMLDivElement>(null)
-  const searchRef = useRef<HTMLInputElement>(null)
+  const [rect, setRect] = useState<DOMRect | null>(null)
+  const ref         = useRef<HTMLDivElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+  const searchRef   = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!open) { setQ(''); return }
     setTimeout(() => searchRef.current?.focus(), 0)
     function onDown(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+      const target = e.target as Node
+      if (
+        ref.current && !ref.current.contains(target) &&
+        dropdownRef.current && !dropdownRef.current.contains(target)
+      ) setOpen(false)
     }
     document.addEventListener('mousedown', onDown)
     return () => document.removeEventListener('mousedown', onDown)
+  }, [open])
+
+  // Recalculate rect on scroll / resize while open
+  useEffect(() => {
+    if (!open) return
+    function update() {
+      if (ref.current) setRect(ref.current.getBoundingClientRect())
+    }
+    window.addEventListener('scroll', update, true)
+    window.addEventListener('resize', update)
+    return () => { window.removeEventListener('scroll', update, true); window.removeEventListener('resize', update) }
   }, [open])
 
   const selected = options.find(o => o.value === value)
@@ -787,16 +804,30 @@ function SearchableSelect({
       )
     : options
 
+  // Compute portal position from stored rect
+  const dropdownStyle: React.CSSProperties = rect ? (() => {
+    const alignRight = rect.left + dropdownWidth > window.innerWidth - 8
+    return {
+      position: 'fixed',
+      top: rect.bottom + 4,
+      ...(alignRight ? { right: window.innerWidth - rect.right } : { left: rect.left }),
+      zIndex: 999999,
+      width: dropdownWidth,
+      background: 'var(--surface)',
+      border: '1px solid var(--border)',
+      borderRadius: 10,
+      boxShadow: '0 8px 28px rgba(0,0,0,0.18)',
+      overflow: 'hidden',
+    }
+  })() : {}
+
   return (
     <div ref={ref} style={{ position: 'relative', display: 'inline-block', ...wrapperStyle }}>
       <button
         type="button"
         onClick={() => {
           if (disabled) return
-          if (!open && ref.current) {
-            const r = ref.current.getBoundingClientRect()
-            setAlignRight(r.left + dropdownWidth > window.innerWidth - 8)
-          }
+          if (!open && ref.current) setRect(ref.current.getBoundingClientRect())
           setOpen(o => !o)
         }}
         style={{
@@ -812,13 +843,8 @@ function SearchableSelect({
         <ChevronDown size={11} style={{ flexShrink: 0, opacity: 0.6 }} />
       </button>
 
-      {open && (
-        <div style={{
-          position: 'absolute', top: '100%', ...(alignRight ? {right:0} : {left:0}), marginTop: 4, zIndex: 9999,
-          width: dropdownWidth, background: 'var(--surface)',
-          border: '1px solid var(--border)', borderRadius: 10,
-          boxShadow: '0 8px 28px rgba(0,0,0,0.15)', overflow: 'hidden',
-        }}>
+      {open && rect && typeof document !== 'undefined' && ReactDOM.createPortal(
+        <div ref={dropdownRef} style={dropdownStyle}>
           <div style={{ padding: '8px 8px 4px' }}>
             <div style={{
               display: 'flex', alignItems: 'center', gap: 6, padding: '5px 9px',
@@ -872,7 +898,8 @@ function SearchableSelect({
               )
             })}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )
