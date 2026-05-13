@@ -14,7 +14,7 @@ export async function MonitorFetcher() {
 
   const supabase = await createClient()
 
-  const from90 = new Date(Date.now() - 90 * 86400000).toISOString()
+  const from90 = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10)
 
   // Owner/admin always have monitor access — skip the DB round-trip for canDo.
   // For other roles run the permission check in parallel with the data fetches.
@@ -29,9 +29,8 @@ export async function MonitorFetcher() {
       .eq('org_id', mb.org_id)
       .neq('is_archived', true)
       .is('parent_task_id', null)
-      .or(`status.neq.completed,completed_at.gte.${from90}`)
       .order('due_date', { ascending: true, nullsFirst: false })
-      .limit(1500),
+      .limit(2000),
     supabase.from('org_members')
       .select('user_id, users(id, name)').eq('org_id', mb.org_id).eq('is_active', true),
     supabase.from('clients').select('id, name, color, status').eq('org_id', mb.org_id).order('name'),
@@ -75,5 +74,6 @@ export async function MonitorFetcher() {
     clients={clientList}
     currentUserId={user.id}
     userRole={mb.role}
+    from90={from90}
   />
 }
