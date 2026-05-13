@@ -1,660 +1,845 @@
 'use client'
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { createPortal }    from 'react-dom'
-import { useRouter }       from 'next/navigation'
-import { X, ChevronRight, ChevronLeft, Sparkles, ArrowRight, CheckCircle2, ExternalLink } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { useRouter }    from 'next/navigation'
+import { X, ChevronRight, ChevronLeft, ArrowRight, CheckCircle2 } from 'lucide-react'
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Slide illustrations — SVG/HTML mini-mockups of each feature
+// ─────────────────────────────────────────────────────────────────────────────
+
+function IllustrationWelcome() {
+  return (
+    <svg viewBox="0 0 320 260" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width:'100%', height:'100%' }}>
+      {/* Background grid */}
+      {[0,1,2,3,4].map(i => (
+        <line key={`h${i}`} x1="0" y1={30+i*52} x2="320" y2={30+i*52} stroke="#e2e8f0" strokeWidth="1"/>
+      ))}
+      {[0,1,2,3,4,5].map(i => (
+        <line key={`v${i}`} x1={20+i*54} y1="0" x2={20+i*54} y2="260" stroke="#e2e8f0" strokeWidth="1"/>
+      ))}
+      {/* Central logo circle */}
+      <circle cx="160" cy="120" r="58" fill="#0d9488" fillOpacity="0.1" stroke="#0d9488" strokeWidth="1.5"/>
+      <circle cx="160" cy="120" r="42" fill="#0d9488" fillOpacity="0.15"/>
+      <circle cx="160" cy="120" r="28" fill="#0d9488"/>
+      {/* Checkmark */}
+      <path d="M148 120 L157 130 L174 112" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/>
+      {/* Orbiting modules */}
+      {[
+        { angle: -45, color:'#7c3aed', label:'CA', r:78 },
+        { angle: 45,  color:'#0891b2', label:'Tasks', r:78 },
+        { angle: 135, color:'#d97706', label:'Clients', r:78 },
+        { angle: 225, color:'#16a34a', label:'Reports', r:78 },
+      ].map(({ angle, color, label, r }, i) => {
+        const rad = (angle * Math.PI) / 180
+        const cx  = 160 + r * Math.cos(rad)
+        const cy  = 120 + r * Math.sin(rad)
+        return (
+          <g key={i}>
+            <line x1="160" y1="120" x2={cx} y2={cy} stroke={color} strokeWidth="1" strokeDasharray="3 3" opacity="0.5"/>
+            <circle cx={cx} cy={cy} r="20" fill={color} fillOpacity="0.12" stroke={color} strokeWidth="1.5"/>
+            <text x={cx} y={cy+4} textAnchor="middle" fontSize="8" fontWeight="700" fill={color}>{label}</text>
+          </g>
+        )
+      })}
+      {/* Bottom stats */}
+      {[
+        { x:50,  val:'69+', label:'Tasks', color:'#0d9488' },
+        { x:160, val:'∞',   label:'Clients', color:'#7c3aed' },
+        { x:270, val:'100%', label:'Compliance', color:'#d97706' },
+      ].map(({ x, val, label, color }) => (
+        <g key={label}>
+          <rect x={x-30} y="222" width="60" height="32" rx="8" fill={color} fillOpacity="0.1" stroke={color} strokeWidth="1" strokeOpacity="0.3"/>
+          <text x={x} y="239" textAnchor="middle" fontSize="11" fontWeight="800" fill={color}>{val}</text>
+          <text x={x} y="249" textAnchor="middle" fontSize="7" fontWeight="600" fill={color} fillOpacity="0.7">{label}</text>
+        </g>
+      ))}
+    </svg>
+  )
+}
+
+function IllustrationTeam() {
+  const members = [
+    { name:'Rahul G', role:'Owner', color:'#0d9488', y:55 },
+    { name:'Priya S', role:'Manager', color:'#7c3aed', y:120 },
+    { name:'Amit K', role:'Member', color:'#0891b2', y:185 },
+  ]
+  return (
+    <svg viewBox="0 0 320 260" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width:'100%', height:'100%' }}>
+      <rect x="20" y="20" width="280" height="220" rx="12" fill="#f8fafc" stroke="#e2e8f0" strokeWidth="1.5"/>
+      <rect x="20" y="20" width="280" height="32" rx="12" fill="#0d9488" fillOpacity="0.08"/>
+      <text x="36" y="40" fontSize="10" fontWeight="700" fill="#0d9488">Team Members</text>
+      <rect x="240" y="27" width="48" height="18" rx="5" fill="#0d9488"/>
+      <text x="264" y="38.5" textAnchor="middle" fontSize="9" fontWeight="700" fill="white">+ Invite</text>
+      {members.map(m => (
+        <g key={m.name}>
+          <rect x="32" y={m.y} width="256" height="44" rx="8" fill="white" stroke="#e2e8f0" strokeWidth="1"/>
+          <circle cx="56" cy={m.y+22} r="14" fill={m.color} fillOpacity="0.15"/>
+          <text x="56" y={m.y+26} textAnchor="middle" fontSize="10" fontWeight="700" fill={m.color}>{m.name[0]}</text>
+          <text x="78" y={m.y+17} fontSize="11" fontWeight="600" fill="#1e293b">{m.name}</text>
+          <text x="78" y={m.y+30} fontSize="9" fill="#94a3b8">{m.role}</text>
+          <rect x="240" y={m.y+12} width="36" height="18" rx="5" fill={m.color} fillOpacity="0.12" stroke={m.color} strokeWidth="1" strokeOpacity="0.4"/>
+          <text x="258" y={m.y+24} textAnchor="middle" fontSize="8" fontWeight="700" fill={m.color}>{m.role === 'Owner' ? 'Owner' : m.role === 'Manager' ? 'Mgr' : 'Mem'}</text>
+        </g>
+      ))}
+    </svg>
+  )
+}
+
+function IllustrationClients() {
+  const clients = [
+    { name:'Shanti Chemicals', gstin:'27AABC...', dsc:'15 Jun', color:'#0891b2' },
+    { name:'Mehta & Sons LLP', gstin:'06XXYZ...', dsc:'3 days', color:'#dc2626' },
+    { name:'Sunrise Exports', gstin:'29PQRS...', dsc:'45 days', color:'#16a34a' },
+  ]
+  return (
+    <svg viewBox="0 0 320 260" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width:'100%', height:'100%' }}>
+      <rect x="20" y="20" width="280" height="220" rx="12" fill="#f8fafc" stroke="#e2e8f0" strokeWidth="1.5"/>
+      <rect x="20" y="20" width="280" height="32" rx="12" fill="#0891b2" fillOpacity="0.08"/>
+      <text x="36" y="40" fontSize="10" fontWeight="700" fill="#0891b2">Clients</text>
+      <rect x="32" y="60" width="135" height="22" rx="6" fill="white" stroke="#e2e8f0" strokeWidth="1"/>
+      <text x="44" y="75" fontSize="9" fill="#94a3b8">🔍 Search clients…</text>
+      <rect x="175" y="60" width="113" height="22" rx="6" fill="#0891b2"/>
+      <text x="231" y="75" textAnchor="middle" fontSize="9" fontWeight="700" fill="white">+ Add Client</text>
+      {clients.map((c, i) => (
+        <g key={c.name}>
+          <rect x="32" y={92+i*52} width="256" height="44" rx="8" fill="white" stroke="#e2e8f0" strokeWidth="1"/>
+          <rect x="32" y={92+i*52} width="4" height="44" rx="2" fill={c.color}/>
+          <circle cx="56" cy={92+i*52+22} r="10" fill={c.color} fillOpacity="0.15"/>
+          <text x="56" y={92+i*52+26} textAnchor="middle" fontSize="8" fontWeight="800" fill={c.color}>{c.name[0]}</text>
+          <text x="74" y={92+i*52+17} fontSize="10" fontWeight="600" fill="#1e293b">{c.name}</text>
+          <text x="74" y={92+i*52+30} fontSize="8" fill="#94a3b8">GSTIN: {c.gstin}</text>
+          <rect x="230" y={92+i*52+11} width="46" height="18" rx="5"
+            fill={c.dsc === '3 days' ? '#fee2e2' : c.dsc === '15 Jun' ? '#fef3c7' : '#dcfce7'}
+            stroke={c.color} strokeWidth="0.8" strokeOpacity="0.5"/>
+          <text x="253" y={92+i*52+23} textAnchor="middle" fontSize="7.5" fontWeight="700"
+            fill={c.color}>DSC {c.dsc}</text>
+        </g>
+      ))}
+    </svg>
+  )
+}
+
+function IllustrationCompliance() {
+  const months = ['Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar']
+  const tasks  = [
+    { name:'GSTR 3B', color:'#0891b2', months:[0,1,2,3,4,5,6,7,8,9,10,11] },
+    { name:'ITR Filing', color:'#7c3aed', months:[3,4] },
+    { name:'TDS Return', color:'#d97706', months:[0,3,6,9] },
+  ]
+  return (
+    <svg viewBox="0 0 320 260" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width:'100%', height:'100%' }}>
+      <rect x="10" y="10" width="300" height="240" rx="10" fill="#f8fafc" stroke="#e2e8f0" strokeWidth="1.5"/>
+      <rect x="10" y="10" width="300" height="30" rx="10" fill="#d97706" fillOpacity="0.1"/>
+      <text x="22" y="29" fontSize="10" fontWeight="700" fill="#b45309">CA Compliance Calendar — FY 2025-26</text>
+      {/* Month headers */}
+      {months.map((m, i) => (
+        <text key={m} x={22+i*23.5} y="55" fontSize="6.5" fontWeight="700" fill="#94a3b8">{m}</text>
+      ))}
+      {/* Task rows */}
+      {tasks.map((t, ti) => (
+        <g key={t.name}>
+          <text x="14" y={72+ti*42} fontSize="7.5" fontWeight="600" fill="#475569">{t.name}</text>
+          {months.map((_, mi) => {
+            const hasTask = t.months.includes(mi)
+            return (
+              <rect key={mi} x={18+mi*23.5} y={62+ti*42} width="18" height="18" rx="4"
+                fill={hasTask ? t.color : '#f1f5f9'}
+                fillOpacity={hasTask ? 0.2 : 1}
+                stroke={hasTask ? t.color : '#e2e8f0'}
+                strokeWidth={hasTask ? 1.5 : 0.8}
+              />
+            )
+          })}
+          {months.map((_, mi) => {
+            const hasTask = t.months.includes(mi)
+            return hasTask ? (
+              <text key={mi} x={27+mi*23.5} y={75+ti*42} textAnchor="middle" fontSize="6" fontWeight="700" fill={t.color}>✓</text>
+            ) : null
+          })}
+        </g>
+      ))}
+      {/* Footer */}
+      <rect x="10" y="214" width="300" height="36" rx="0" fill="#fef3c7"/>
+      <rect x="10" y="214" width="300" height="36" rx="0" ry="0"/>
+      <path d="M10 214 L310 214 L310 240 Q310 250 300 250 L20 250 Q10 250 10 240 Z" fill="#fef3c7"/>
+      <text x="20" y="228" fontSize="8" fontWeight="700" fill="#b45309">⏰  3 tasks triggering in next 7 days</text>
+      <text x="20" y="242" fontSize="7.5" fill="#b45309" fillOpacity="0.8">GSTR 3B · TDS Q1 · ESI Return</text>
+    </svg>
+  )
+}
+
+function IllustrationKanban() {
+  const cols = [
+    { label:'Overdue', color:'#dc2626', tasks:['GSTR 9C Audit','Form 16 Issue'] },
+    { label:'To Do',   color:'#64748b', tasks:['ITR Filing','ROC Annual'] },
+    { label:'In Review', color:'#7c3aed', tasks:['TDS Return Q1'] },
+    { label:'Done',    color:'#16a34a', tasks:['GSTR 3B May'] },
+  ]
+  return (
+    <svg viewBox="0 0 320 260" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width:'100%', height:'100%' }}>
+      {cols.map((col, ci) => {
+        const x = 10 + ci * 76
+        return (
+          <g key={col.label}>
+            {/* Column header */}
+            <rect x={x} y="10" width="70" height="22" rx="6" fill={col.color} fillOpacity="0.12" stroke={col.color} strokeWidth="1" strokeOpacity="0.4"/>
+            <circle cx={x+10} cy="21" r="4" fill={col.color}/>
+            <text x={x+18} y="25" fontSize="7.5" fontWeight="700" fill={col.color}>{col.label}</text>
+            {/* Task cards */}
+            {col.tasks.map((t, ti) => (
+              <g key={t}>
+                <rect x={x} y={40+ti*54} width="70" height="46" rx="6" fill="white" stroke="#e2e8f0" strokeWidth="1"/>
+                <rect x={x} y={40+ti*54} width="3" height="46" rx="1.5" fill={col.color}/>
+                <text x={x+8} y={57+ti*54} fontSize="7" fontWeight="600" fill="#1e293b"
+                  style={{ overflow:'hidden' }}>{t.length>12 ? t.slice(0,12)+'…' : t}</text>
+                <rect x={x+6} y={66+ti*54} width="20" height="10" rx="3" fill={col.color} fillOpacity="0.12"/>
+                <text x={x+16} y={74+ti*54} textAnchor="middle" fontSize="6" fontWeight="600" fill={col.color}>High</text>
+                <circle cx={x+56} cy={71+ti*54} r="8" fill={col.color} fillOpacity="0.15"/>
+                <text x={x+56} y={74+ti*54} textAnchor="middle" fontSize="7" fontWeight="700" fill={col.color}>R</text>
+              </g>
+            ))}
+          </g>
+        )
+      })}
+      {/* Drag hint */}
+      <rect x="86" y="195" width="70" height="46" rx="6" fill="white" stroke="#7c3aed" strokeWidth="1.5" strokeDasharray="3 2"/>
+      <text x="121" y="222" textAnchor="middle" fontSize="7" fill="#7c3aed">Drag here…</text>
+    </svg>
+  )
+}
+
+function IllustrationApproval() {
+  return (
+    <svg viewBox="0 0 320 260" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width:'100%', height:'100%' }}>
+      {/* Flow diagram */}
+      {/* Step 1 — Assignee completes */}
+      <rect x="30" y="40" width="100" height="50" rx="10" fill="#0891b2" fillOpacity="0.1" stroke="#0891b2" strokeWidth="1.5"/>
+      <circle cx="55" cy="65" r="14" fill="#0891b2" fillOpacity="0.2"/>
+      <text x="55" y="69" textAnchor="middle" fontSize="10" fontWeight="700" fill="#0891b2">A</text>
+      <text x="79" y="59" fontSize="9" fontWeight="600" fill="#1e293b">Work Done</text>
+      <text x="79" y="73" fontSize="8" fill="#64748b">Assignee marks</text>
+      <text x="79" y="84" fontSize="8" fill="#64748b">task complete</text>
+      {/* Arrow */}
+      <path d="M130 65 L160 65" stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="3 2"/>
+      <polygon points="160,60 170,65 160,70" fill="#94a3b8"/>
+      {/* Step 2 — In Review */}
+      <rect x="170" y="40" width="120" height="50" rx="10" fill="#7c3aed" fillOpacity="0.1" stroke="#7c3aed" strokeWidth="1.5"/>
+      <circle cx="192" cy="65" r="14" fill="#7c3aed" fillOpacity="0.2"/>
+      <text x="192" y="69" textAnchor="middle" fontSize="7" fill="#7c3aed">⏳</text>
+      <text x="212" y="59" fontSize="9" fontWeight="600" fill="#1e293b">Pending Review</text>
+      <text x="212" y="73" fontSize="8" fill="#64748b">Manager gets</text>
+      <text x="212" y="84" fontSize="8" fill="#64748b">notification</text>
+      {/* Down arrow */}
+      <path d="M230 90 L230 118" stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="3 2"/>
+      <polygon points="225,118 230,128 235,118" fill="#94a3b8"/>
+      {/* Approve path */}
+      <rect x="170" y="128" width="120" height="44" rx="10" fill="#16a34a" fillOpacity="0.1" stroke="#16a34a" strokeWidth="1.5"/>
+      <text x="230" y="150" textAnchor="middle" fontSize="9" fontWeight="600" fill="#15803d">✓ Approved</text>
+      <text x="230" y="163" textAnchor="middle" fontSize="8" fill="#64748b">Task closed</text>
+      {/* Reject path */}
+      <path d="M170 150 L140 150" stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="3 2"/>
+      <polygon points="140,145 130,150 140,155" fill="#94a3b8"/>
+      <rect x="30" y="128" width="100" height="44" rx="10" fill="#dc2626" fillOpacity="0.1" stroke="#dc2626" strokeWidth="1.5"/>
+      <text x="80" y="150" textAnchor="middle" fontSize="9" fontWeight="600" fill="#dc2626">✕ Returned</text>
+      <text x="80" y="163" textAnchor="middle" fontSize="8" fill="#64748b">Back to assignee</text>
+      {/* Labels */}
+      <text x="145" y="146" fontSize="7" fill="#16a34a" fontWeight="700">Approve</text>
+      <text x="138" y="158" fontSize="7" fill="#dc2626" fontWeight="700">Return</text>
+      {/* Audit trail */}
+      <rect x="30" y="195" width="260" height="36" rx="8" fill="#f8fafc" stroke="#e2e8f0" strokeWidth="1"/>
+      <text x="44" y="210" fontSize="8.5" fontWeight="700" fill="#475569">📋  Full audit trail maintained</text>
+      <text x="44" y="224" fontSize="8" fill="#94a3b8">Every action timestamped · Email & SMS notifications sent</text>
+    </svg>
+  )
+}
+
+function IllustrationCalendar() {
+  const days = Array.from({ length: 30 }, (_, i) => i + 1)
+  const deadlines: Record<number, string> = { 7:'#dc2626', 11:'#d97706', 15:'#0891b2', 20:'#7c3aed', 25:'#0d9488', 28:'#dc2626' }
+  return (
+    <svg viewBox="0 0 320 260" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width:'100%', height:'100%' }}>
+      <rect x="15" y="10" width="290" height="240" rx="12" fill="#f8fafc" stroke="#e2e8f0" strokeWidth="1.5"/>
+      {/* Header */}
+      <rect x="15" y="10" width="290" height="36" rx="12" fill="#0d9488" fillOpacity="0.1"/>
+      <text x="30" y="32" fontSize="11" fontWeight="700" fill="#0d9488">May 2026</text>
+      <text x="260" y="32" textAnchor="middle" fontSize="9" fill="#0d9488">◀  ▶</text>
+      {/* Day headers */}
+      {['S','M','T','W','T','F','S'].map((d, i) => (
+        <text key={i} x={30+i*39} y="60" textAnchor="middle" fontSize="9" fontWeight="700" fill="#94a3b8">{d}</text>
+      ))}
+      {/* Day cells — simplified 5×6 grid starting Monday */}
+      {days.slice(0,28).map((day, i) => {
+        const col = (i + 2) % 7  // shift start to Thursday (Apr ~)
+        const row = Math.floor((i + 2) / 7)
+        const x   = 30 + col * 39
+        const y   = 72 + row * 34
+        const color = deadlines[day]
+        return (
+          <g key={day}>
+            {color && <circle cx={x} cy={y+8} r="13" fill={color} fillOpacity="0.12" stroke={color} strokeWidth="1.5"/>}
+            <text x={x} y={y+12} textAnchor="middle" fontSize="10"
+              fontWeight={color ? '700' : '400'} fill={color ?? '#475569'}>{day}</text>
+            {color && <circle cx={x+9} cy={y-1} r="3.5" fill={color}/>}
+          </g>
+        )
+      })}
+      {/* Legend */}
+      <rect x="15" y="228" width="290" height="22" rx="0"/>
+      <path d="M15 228 L305 228 L305 240 Q305 250 295 250 L35 250 Q15 250 15 240 Z" fill="#fef3c7"/>
+      <text x="25" y="242" fontSize="7.5" fontWeight="700" fill="#b45309">● GST  ● TDS  ● ITR  ● ROC  ● PF/ESI  ● Other</text>
+    </svg>
+  )
+}
+
+function IllustrationMyTasks() {
+  return (
+    <svg viewBox="0 0 320 260" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width:'100%', height:'100%' }}>
+      <rect x="15" y="10" width="290" height="240" rx="12" fill="#f8fafc" stroke="#e2e8f0" strokeWidth="1.5"/>
+      {/* Stats strip */}
+      {[
+        { x:15,   label:'Overdue', val:'3', color:'#dc2626' },
+        { x:88,   label:'Today',   val:'2', color:'#0d9488' },
+        { x:161,  label:'Pending', val:'5', color:'#7c3aed' },
+        { x:234,  label:'Done',    val:'12', color:'#16a34a' },
+      ].map(s => (
+        <g key={s.label}>
+          <rect x={s.x} y="10" width="72" height="42" rx="0"
+            fill={s.color} fillOpacity="0.07"
+            stroke={s.color} strokeWidth="0" strokeOpacity="0.2"/>
+          <text x={s.x+36} y="34" textAnchor="middle" fontSize="16" fontWeight="800" fill={s.color}>{s.val}</text>
+          <text x={s.x+36} y="45" textAnchor="middle" fontSize="7" fontWeight="600" fill={s.color} fillOpacity="0.8">{s.label}</text>
+        </g>
+      ))}
+      {/* Section tabs */}
+      <rect x="15" y="52" width="290" height="26" rx="0" fill="white" stroke="#e2e8f0" strokeWidth="1"/>
+      {[
+        { label:'My Tasks', x:35, active:true },
+        { label:'Needs Approval', x:110, active:false, badge:'5' },
+        { label:'Assigned by Me', x:210, active:false },
+      ].map(t => (
+        <g key={t.label}>
+          <text x={t.x} y="68" fontSize="8.5" fontWeight={t.active ? '700' : '500'} fill={t.active ? '#0d9488' : '#94a3b8'}>{t.label}</text>
+          {t.active && <rect x={t.x-2} y="76" width={t.label.length*5+4} height="2" rx="1" fill="#0d9488"/>}
+          {t.badge && <rect x={t.x+t.label.length*5+4} y="60" width="13" height="12" rx="6" fill="#7c3aed"/>}
+          {t.badge && <text x={t.x+t.label.length*5+10} y="70" textAnchor="middle" fontSize="7" fontWeight="700" fill="white">{t.badge}</text>}
+        </g>
+      ))}
+      {/* Task rows */}
+      {[
+        { title:'GSTR 3B — Mehta & Sons', due:'Today', color:'#dc2626', priority:'Urgent', section:'Overdue' },
+        { title:'TDS Return Q1',           due:'May 7', color:'#d97706', priority:'High',   section:'Today' },
+        { title:'PF Challan — Sunrise',    due:'May 11',color:'#0891b2', priority:'Medium', section:'This Week' },
+        { title:'ITR Filing — R. Gupta',   due:'May 31',color:'#7c3aed', priority:'High',   section:'Later' },
+      ].map((t, i) => (
+        <g key={t.title}>
+          {i === 0 && <text x="22" y="94" fontSize="7" fontWeight="800" fill="#dc2626" style={{textTransform:'uppercase'}}>▾ OVERDUE (1)</text>}
+          {i === 1 && <text x="22" y="126" fontSize="7" fontWeight="800" fill="#0d9488" style={{textTransform:'uppercase'}}>▾ TODAY (1)</text>}
+          {i === 2 && <text x="22" y="158" fontSize="7" fontWeight="800" fill="#475569" style={{textTransform:'uppercase'}}>▾ THIS WEEK (1)</text>}
+          {i === 3 && <text x="22" y="190" fontSize="7" fontWeight="800" fill="#94a3b8" style={{textTransform:'uppercase'}}>▾ LATER (1)</text>}
+          <rect x="22" y={97+i*32} width="271" height="24" rx="4" fill="white" stroke="#f1f5f9" strokeWidth="1"/>
+          <rect x="22" y={97+i*32} width="3" height="24" rx="1.5" fill={t.color}/>
+          <circle cx="37" cy={109+i*32} r="6" fill="transparent" stroke={t.color} strokeWidth="1.5"/>
+          <text x="47" y={112+i*32} fontSize="8.5" fontWeight="500" fill="#1e293b">{t.title.length > 28 ? t.title.slice(0,28)+'…' : t.title}</text>
+          <text x="253" y={112+i*32} textAnchor="end" fontSize="7.5" fontWeight="600"
+            fill={t.due === 'Today' ? '#dc2626' : '#94a3b8'}>{t.due}</text>
+        </g>
+      ))}
+    </svg>
+  )
+}
+
+function IllustrationDone() {
+  return (
+    <svg viewBox="0 0 320 260" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width:'100%', height:'100%' }}>
+      {/* Confetti dots */}
+      {[
+        [50,30,'#0d9488'],[90,20,'#7c3aed'],[140,40,'#d97706'],[200,25,'#0891b2'],[250,35,'#16a34a'],[280,50,'#ec4899'],
+        [30,80,'#d97706'],[270,70,'#0d9488'],[160,15,'#dc2626'],[60,110,'#7c3aed'],[290,100,'#0891b2'],
+      ].map(([x,y,c], i) => (
+        <circle key={i} cx={x as number} cy={y as number} r={i%3===0?5:3.5} fill={c as string} fillOpacity="0.7"/>
+      ))}
+      {[
+        [80,45,'#0d9488'],[190,55,'#7c3aed'],[230,30,'#d97706'],[120,22,'#0891b2'],
+      ].map(([x,y,c], i) => (
+        <rect key={i} x={(x as number)-3} y={(y as number)-3} width="6" height="6" rx="1" fill={c as string} fillOpacity="0.6" transform={`rotate(${i*25})`}/>
+      ))}
+      {/* Central circle */}
+      <circle cx="160" cy="130" r="70" fill="#16a34a" fillOpacity="0.08"/>
+      <circle cx="160" cy="130" r="52" fill="#16a34a" fillOpacity="0.12"/>
+      <circle cx="160" cy="130" r="36" fill="#16a34a"/>
+      <path d="M142 130 L155 144 L180 116" stroke="white" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round"/>
+      {/* Text */}
+      <text x="160" y="218" textAnchor="middle" fontSize="16" fontWeight="800" fill="#15803d">You're all set!</text>
+      <text x="160" y="236" textAnchor="middle" fontSize="10" fill="#64748b">Start by adding your first client</text>
+      {/* Arrow pointing to client button */}
+      <path d="M195 242 Q220 248 240 238" stroke="#0d9488" strokeWidth="1.5" fill="none" strokeDasharray="3 2"/>
+      <polygon points="238,233 244,240 235,242" fill="#0d9488"/>
+    </svg>
+  )
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Step definitions
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface Action {
-  label: string
-  href:  string
-}
-
 interface Step {
-  id:      string
-  icon:    string
-  color:   string
-  accent:  string
-  title:   string
-  body:    string
-  chips?:  string[]
-  target?: string   // CSS selector — element to spotlight
-  path?:   string   // navigate here when this step becomes active (forward only)
-  action?: Action   // primary CTA inside the card
+  id:          string
+  icon:        string
+  color:       string
+  accent:      string
+  title:       string
+  subtitle:    string
+  body:        string
+  bullets:     { emoji: string; text: string }[]
+  path?:       string
+  actionLabel?: string
+  actionHref?: string
+  Illustration: () => JSX.Element
 }
 
 const STEPS: Step[] = [
   {
-    id:     'welcome',
-    icon:   '👋',
-    color:  '#0d9488',
-    accent: 'rgba(13,148,136,0.12)',
-    title:  'Welcome to Floatup!',
-    body:   "You're all set up. Let's take 60 seconds to create your first task and show you how everything works — you can skip at any time.",
-    chips:  ['Task management', 'CA Compliance', 'Approval workflow', 'Client portal'],
+    id: 'welcome',
+    icon: '🏢', color: '#0d9488', accent: 'rgba(13,148,136,0.1)',
+    title: 'Welcome to Planora',
+    subtitle: 'Your CA & CPA Practice Management Platform',
+    body: "Everything your firm needs — compliance, tasks, clients, approvals, and team — in one place. This 90-second tour will show you exactly where everything lives.",
+    bullets: [
+      { emoji: '⚖️', text: '69+ statutory tasks auto-generated for every client' },
+      { emoji: '👥', text: 'Manage unlimited clients with DSC & GSTIN tracking' },
+      { emoji: '✅', text: 'Full approval workflow with audit trail' },
+      { emoji: '📅', text: 'Never miss a due date again' },
+    ],
+    Illustration: IllustrationWelcome,
   },
   {
-    id:     'quick-tasks',
-    icon:   '⚡',
-    color:  '#0891b2',
-    accent: 'rgba(8,145,178,0.12)',
-    title:  'Create your first task',
-    body:   "Start here. Hit the button below to create a Quick Task — give it a name, assign it to yourself, and set a due date. That's it. You just ran Floatup.",
-    chips:  ['Assignee & co-assignees', 'Due date', 'Priority', 'File attachments'],
-    target: 'a[href="/inbox"]',
-    path:   '/inbox',
-    action: { label: 'Create your first task', href: '/inbox' },
+    id: 'team',
+    icon: '👥', color: '#0d9488', accent: 'rgba(13,148,136,0.1)',
+    title: 'Set Up Your Team',
+    subtitle: 'Settings → Team · Invite members by email',
+    body: "Go to Settings → Team and invite your staff. Assign roles — Owner, Admin, Manager, or Member — to control what each person can see and do.",
+    bullets: [
+      { emoji: '📧', text: 'Invite by email — they get a login link instantly' },
+      { emoji: '🔐', text: 'Owner / Admin / Manager / Member roles' },
+      { emoji: '📋', text: 'Assign tasks only to active team members' },
+      { emoji: '🔔', text: 'Each member gets their own task view & notifications' },
+    ],
+    path: '/settings',
+    actionLabel: 'Go to Team Settings',
+    actionHref: '/settings',
+    Illustration: IllustrationTeam,
   },
   {
-    id:     'repeat-tasks',
-    icon:   '🔁',
-    color:  '#0d9488',
-    accent: 'rgba(13,148,136,0.12)',
-    title:  'Repeat Tasks',
-    body:   'Tasks that auto-respawn on schedule — daily, weekly, monthly, quarterly. Set it once and it keeps coming back. Perfect for bank recs, GST returns, and monthly closings.',
-    chips:  ['Daily · Weekly · Quarterly', 'Auto-creates on schedule', 'Assignable per cycle'],
-    target: 'a[href="/recurring"]',
-    path:   '/recurring',
+    id: 'clients',
+    icon: '👤', color: '#0891b2', accent: 'rgba(8,145,178,0.1)',
+    title: 'Add Your Clients',
+    subtitle: 'Sidebar → Clients → + Add Client',
+    body: "Each client becomes the hub for all their tasks, compliance filings, and documents. Type their GSTIN and business details auto-fill.",
+    bullets: [
+      { emoji: '🆔', text: 'GSTIN → auto-fills business name & state' },
+      { emoji: '🔒', text: 'DSC expiry tracked with colour-coded warnings' },
+      { emoji: '📂', text: 'All tasks, projects, and filings linked to client' },
+      { emoji: '📋', text: 'Use Import to bulk-add clients from Excel' },
+    ],
+    path: '/clients',
+    actionLabel: 'Add your first client',
+    actionHref: '/clients',
+    Illustration: IllustrationClients,
   },
   {
-    id:     'my-tasks',
-    icon:   '📋',
-    color:  '#059669',
-    accent: 'rgba(5,150,105,0.12)',
-    title:  'My Tasks — Kanban Board',
-    body:   'A live board of everything assigned to you and your team. Drag tasks across columns to update status instantly. Subtasks keep work broken down without clutter.',
-    chips:  ['Kanban + List view', 'Drag to update status', 'Subtasks on demand'],
-    target: 'a[href="/tasks"]',
-    path:   '/tasks',
+    id: 'compliance',
+    icon: '⚖️', color: '#b45309', accent: 'rgba(180,83,9,0.1)',
+    title: 'CA Compliance Calendar',
+    subtitle: 'Sidebar → CA Compliance',
+    body: "The heart of the platform. Select the financial year, pick your clients, and Planora auto-generates all statutory filing tasks on their correct due dates — for every client, every month.",
+    bullets: [
+      { emoji: '📋', text: 'GST · TDS · ITR · ROC · PF · ESI · PT and more' },
+      { emoji: '📅', text: 'Step 1 – Select tasks  ›  Step 2 – Add clients  ›  Step 3 – Track on Kanban' },
+      { emoji: '⏰', text: 'Tasks auto-spawn N days before the due date' },
+      { emoji: '📎', text: 'Attach documents directly to each compliance task' },
+    ],
+    path: '/compliance',
+    actionLabel: 'Open Compliance',
+    actionHref: '/compliance',
+    Illustration: IllustrationCompliance,
   },
   {
-    id:     'projects',
-    icon:   '📁',
-    color:  '#7c3aed',
-    accent: 'rgba(124,58,237,0.12)',
-    title:  'Projects',
-    body:   'Group tasks under a project — GST Registration, Company Incorporation, ITR Filing. Track overall progress, manage team visibility, and link a client.',
-    chips:  ['Progress bar', 'Team scoping', 'Client-linked', 'Templates'],
-    target: 'a[href="/projects"]',
-    path:   '/projects',
+    id: 'kanban',
+    icon: '📊', color: '#7c3aed', accent: 'rgba(124,58,237,0.1)',
+    title: 'Track Work on Kanban',
+    subtitle: 'My Tasks → Board view',
+    body: "Every task — compliance or otherwise — lands in the Kanban board. Drag cards across columns to update status instantly. Filter by client, assignee, or priority.",
+    bullets: [
+      { emoji: '🟠', text: 'Overdue · To Do · In Review · Done' },
+      { emoji: '🖱️', text: 'Drag & drop to move tasks between columns' },
+      { emoji: '👤', text: 'See your tasks or switch to Assigned-by-Me' },
+      { emoji: '🔍', text: 'Filter by client, date range, or priority' },
+    ],
+    path: '/tasks',
+    Illustration: IllustrationKanban,
   },
   {
-    id:     'clients',
-    icon:   '👥',
-    color:  '#0891b2',
-    accent: 'rgba(8,145,178,0.12)',
-    title:  'Clients',
-    body:   'Manage every client in one place. GSTIN auto-fills all business details. DSC expiry dates are tracked with colour-coded warnings. Every task and project links back here.',
-    chips:  ['GSTIN auto-fill', 'DSC expiry tracker', 'Full task history'],
-    target: 'a[href="/clients"]',
-    path:   '/clients',
+    id: 'approvals',
+    icon: '✅', color: '#7c3aed', accent: 'rgba(124,58,237,0.1)',
+    title: 'Approval Workflow',
+    subtitle: 'My Tasks → Needs Approval tab',
+    body: "When a team member completes a task, they submit it for review. As a manager you see it under 'Needs Approval' — approve to close it or return it with a note.",
+    bullets: [
+      { emoji: '📤', text: 'Assignee clicks ✓ → task goes to "Pending Review"' },
+      { emoji: '🔔', text: 'Manager gets an in-app + email notification' },
+      { emoji: '✓', text: 'Approve closes the task · Return sends it back' },
+      { emoji: '🗂️', text: 'Full audit trail — who did what and when' },
+    ],
+    path: '/approvals',
+    Illustration: IllustrationApproval,
   },
   {
-    id:     'approvals',
-    icon:   '✅',
-    color:  '#7c3aed',
-    accent: 'rgba(124,58,237,0.12)',
-    title:  'Approval Workflow',
-    body:   "When work is done, the assignee submits it for review. The approver approves (closing the task) or sends it back with a comment. Full audit trail maintained.",
-    chips:  ['Submit → Approve / Reject', 'Rejection comments', 'Email & SMS alerts'],
-    target: 'a[href="/approvals"]',
-    path:   '/approvals',
+    id: 'calendar',
+    icon: '📅', color: '#d97706', accent: 'rgba(217,119,6,0.1)',
+    title: 'Never Miss a Deadline',
+    subtitle: 'Sidebar → Calendar',
+    body: "The calendar shows every task due date and upcoming compliance trigger across all clients and team members. Filter to any person or client in one click.",
+    bullets: [
+      { emoji: '📆', text: 'All client deadlines in a single month view' },
+      { emoji: '👁️', text: 'Filter by team member or client' },
+      { emoji: '⏰', text: 'Compliance triggers highlighted 7 days before spawn' },
+      { emoji: '📊', text: 'GST · TDS · ITR · ROC colour-coded by type' },
+    ],
+    path: '/calendar',
+    Illustration: IllustrationCalendar,
   },
   {
-    id:     'calendar',
-    icon:   '📅',
-    color:  '#d97706',
-    accent: 'rgba(217,119,6,0.12)',
-    title:  'Calendar',
-    body:   'A month view of every task deadline and upcoming CA compliance trigger — across all clients and team members. Filter by member, task type, or client.',
-    chips:  ['All deadlines in one view', 'Member filter', 'CA triggers highlighted'],
-    target: 'a[href="/calendar"]',
-    path:   '/calendar',
+    id: 'my-tasks',
+    icon: '📋', color: '#059669', accent: 'rgba(5,150,105,0.1)',
+    title: 'Your Daily Command Centre',
+    subtitle: 'Sidebar → My Tasks',
+    body: "My Tasks is your personal dashboard. See exactly what needs attention today — overdue work, tasks due today, pending approvals waiting for you, and everything you've assigned to others.",
+    bullets: [
+      { emoji: '⚠️', text: 'Stats strip: Overdue · Due Today · Needs Approval · Done' },
+      { emoji: '📋', text: 'My Tasks tab — your personal list or board' },
+      { emoji: '⏳', text: 'Needs Approval tab — review & approve team work' },
+      { emoji: '📤', text: 'Assigned by Me — track what you delegated' },
+    ],
+    path: '/tasks',
+    actionLabel: 'Open My Tasks',
+    actionHref: '/tasks',
+    Illustration: IllustrationMyTasks,
   },
   {
-    id:     'compliance',
-    icon:   '⚖️',
-    color:  '#b45309',
-    accent: 'rgba(180,83,9,0.12)',
-    title:  'CA Compliance',
-    body:   'Auto-generates all 69 statutory filing tasks — ITR, GST, TDS, ROC, PF, ESI, and more — for every client, on their correct due dates. The only compliance tool built for Indian CA firms.',
-    chips:  ['69 compliance tasks', 'Auto-spawn on due dates', 'DSC tracker', 'Client portal'],
-    target: 'a[href="/compliance"]',
-    path:   '/compliance',
-  },
-  {
-    id:     'done',
-    icon:   '🚀',
-    color:  '#16a34a',
-    accent: 'rgba(22,163,74,0.12)',
-    title:  "You're all set!",
-    body:   "Now add your first client — once your clients are in, compliance tasks and project tracking come alive automatically. Go build something great.",
-    chips:  ['Add a client →'],
+    id: 'done',
+    icon: '🚀', color: '#16a34a', accent: 'rgba(22,163,74,0.1)',
+    title: "You're Ready to Go!",
+    subtitle: 'Start by adding your first client',
+    body: "Everything is set up. Add your clients and Planora will auto-generate all their compliance tasks. Your firm runs on auto-pilot from here.",
+    bullets: [
+      { emoji: '1️⃣', text: 'Add clients → compliance tasks generate automatically' },
+      { emoji: '2️⃣', text: 'Assign tasks to team members' },
+      { emoji: '3️⃣', text: 'Track progress on the Kanban board' },
+      { emoji: '4️⃣', text: 'Approve completed work from My Tasks' },
+    ],
+    actionLabel: '+ Add your first client',
+    actionHref: '/clients',
+    Illustration: IllustrationDone,
   },
 ]
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Helpers
+// Constants & helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-const STORAGE_PREFIX = 'planora_wt_v1_'
-const TOOLTIP_W      = 360
-const SPOTLIGHT_PAD  = 10
-const TOOLTIP_GAP    = 18
-// Show to accounts created within the last 7 days
-const MAX_AGE_MS     = 7 * 24 * 60 * 60 * 1000
+const STORAGE_PREFIX = 'planora_wt_v2_'
+const MAX_AGE_MS     = 14 * 24 * 60 * 60 * 1000   // show to accounts < 14 days old
 
 const CONFETTI_COLORS = ['#0d9488','#7c3aed','#0891b2','#d97706','#16a34a','#ec4899','#f43f5e']
 
 function storageKey(userId: string) { return STORAGE_PREFIX + userId }
-
-interface Rect { top: number; left: number; right: number; bottom: number; width: number; height: number }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Component
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface Props {
-  userId:           string
-  userCreatedAt:    string
-  tourCompletedAt:  string | null
+  userId:          string
+  userCreatedAt:   string
+  tourCompletedAt: string | null
 }
 
 export function WalkthroughOverlay({ userId, userCreatedAt, tourCompletedAt }: Props) {
-  const router                            = useRouter()
-  const [step,           setStep]         = useState(0)
-  const [visible,        setVisible]      = useState(false)
-  const [mounted,        setMounted]      = useState(false)
-  const [spotlight,      setSpot]         = useState<Rect | null>(null)
-  const [animKey,        setAnimKey]      = useState(0)
-  const [confettiActive, setConfetti]     = useState(false)
-  const resizeTimer                       = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const router = useRouter()
+  const [step,           setStep]     = useState(0)
+  const [visible,        setVisible]  = useState(false)
+  const [mounted,        setMounted]  = useState(false)
+  const [confettiActive, setConfetti] = useState(false)
+  const [animDir,        setAnimDir]  = useState<'forward'|'back'>('forward')
+  const [animKey,        setAnimKey]  = useState(0)
 
-  // Stable confetti pieces (random values computed once)
   const confettiPieces = useMemo(() =>
-    Array.from({ length: 40 }, (_, i) => ({
+    Array.from({ length: 50 }, (_, i) => ({
       id:    i,
       color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
-      left:  8 + (i / 40) * 84 + (i % 7) * 0.8,
-      delay: i * 0.018,
-      size:  6 + (i % 6),
+      left:  4 + (i / 50) * 92,
+      delay: i * 0.015,
+      size:  5 + (i % 6),
       round: i % 3 === 0,
-      speed: 0.7 + (i % 5) * 0.12,
+      speed: 0.65 + (i % 5) * 0.14,
     }))
   , [])
 
-  // 1. Mount guard (no SSR)
+  // 1. Mount guard
   useEffect(() => { setMounted(true) }, [])
 
-  // 2. Show only for new users (account < 7 days old) who haven't completed
-  //    Checks DB flag first (cross-device), then localStorage (fast path)
+  // 2. Show for new users who haven't completed the tour
   useEffect(() => {
     if (!mounted) return
-    if (tourCompletedAt) return                                   // DB says done — never show
-    const accountAge = Date.now() - new Date(userCreatedAt).getTime()
-    if (accountAge > MAX_AGE_MS) return                           // existing user
+    if (tourCompletedAt) return
+    const age = Date.now() - new Date(userCreatedAt).getTime()
+    if (age > MAX_AGE_MS) return
     const done = localStorage.getItem(storageKey(userId))
     if (!done) setVisible(true)
   }, [mounted, userId, userCreatedAt, tourCompletedAt])
 
-  // 3. Keyboard navigation: → next, ← back, Esc dismiss
+  // 3. Keyboard navigation
   useEffect(() => {
     if (!visible) return
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape')       { dismiss(); return }
-      if (e.key === 'ArrowRight')   { next();    return }
-      if (e.key === 'ArrowLeft')    { back();    return }
+      if (e.key === 'Escape')      { dismiss(); return }
+      if (e.key === 'ArrowRight')  { advance(); return }
+      if (e.key === 'ArrowLeft')   { retreat(); return }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, step])
 
-  // 4. Measure spotlight target whenever step changes
-  const measure = useCallback(() => {
-    const s = STEPS[step]
-    if (!s?.target) { setSpot(null); return }
-    const el = document.querySelector(s.target)
-    if (!el) { setSpot(null); return }
-    const r = el.getBoundingClientRect()
-    setSpot({
-      top:    r.top    - SPOTLIGHT_PAD,
-      left:   r.left   - SPOTLIGHT_PAD,
-      right:  r.right  + SPOTLIGHT_PAD,
-      bottom: r.bottom + SPOTLIGHT_PAD,
-      width:  r.width  + SPOTLIGHT_PAD * 2,
-      height: r.height + SPOTLIGHT_PAD * 2,
-    })
-    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-  }, [step])
-
-  useEffect(() => {
-    if (!visible) return
-    const t = setTimeout(measure, 80)
-    setAnimKey(k => k + 1)
-
-    function onResize() {
-      clearTimeout(resizeTimer.current)
-      resizeTimer.current = setTimeout(measure, 120)
-    }
-    window.addEventListener('resize', onResize)
-    return () => { window.removeEventListener('resize', onResize); clearTimeout(resizeTimer.current); clearTimeout(t) }
-  }, [visible, step, measure])
-
-  // ── Actions ───────────────────────────────────────────────────────────────
-
   function dismiss() {
     localStorage.setItem(storageKey(userId), '1')
     setVisible(false)
-    // Persist cross-device — fire-and-forget
     fetch('/api/user/tour-complete', { method: 'POST' }).catch(() => {})
   }
 
-  function goTo(n: number) {
+  function goTo(n: number, dir: 'forward'|'back' = 'forward') {
+    setAnimDir(dir)
+    setAnimKey(k => k + 1)
     setStep(Math.max(0, Math.min(STEPS.length - 1, n)))
   }
 
-  function next() {
+  function advance() {
     if (step === STEPS.length - 1) { dismiss(); return }
-    const nextStep = STEPS[step + 1]
-    if (nextStep?.path) router.push(nextStep.path)
-    goTo(step + 1)
+    const next = STEPS[step + 1]
+    if (next?.path) router.push(next.path)
+    goTo(step + 1, 'forward')
   }
 
-  function back() {
-    if (step > 0) goTo(step - 1)
+  function retreat() {
+    if (step > 0) goTo(step - 1, 'back')
   }
 
-  // Last step gets a confetti burst before closing
   function handleFinish() {
     setConfetti(true)
-    setTimeout(() => dismiss(), 900)
+    if (STEPS[step].actionHref) router.push(STEPS[step].actionHref!)
+    setTimeout(() => dismiss(), 1400)
   }
-
-  // ─────────────────────────────────────────────────────────────────────────
 
   if (!mounted || !visible) return null
 
-  const cur      = STEPS[step]
-  const isFirst  = step === 0
-  const isLast   = step === STEPS.length - 1
-  const isCenter = !cur.target || !spotlight
-
-  // Tooltip position
-  let tooltipStyle: React.CSSProperties = {}
-
-  if (isCenter) {
-    tooltipStyle = {
-      position:  'fixed',
-      top:       '50%',
-      left:      '50%',
-      transform: 'translate(-50%, -50%)',
-      width:     isFirst || isLast ? 420 : TOOLTIP_W,
-    }
-  } else if (spotlight) {
-    const vpW = window.innerWidth
-    const vpH = window.innerHeight
-    const tw  = TOOLTIP_W
-
-    if (spotlight.right + TOOLTIP_GAP + tw <= vpW) {
-      tooltipStyle = {
-        position: 'fixed',
-        left: spotlight.right + TOOLTIP_GAP,
-        top:  Math.max(16, Math.min(spotlight.top + spotlight.height / 2 - 220, vpH - 460)),
-        width: tw,
-      }
-    } else if (spotlight.left - TOOLTIP_GAP - tw >= 0) {
-      tooltipStyle = {
-        position: 'fixed',
-        right: vpW - spotlight.left + TOOLTIP_GAP,
-        top:   Math.max(16, Math.min(spotlight.top + spotlight.height / 2 - 220, vpH - 460)),
-        width: tw,
-      }
-    } else if (spotlight.bottom + TOOLTIP_GAP + 320 <= vpH) {
-      tooltipStyle = {
-        position: 'fixed',
-        top:  spotlight.bottom + TOOLTIP_GAP,
-        left: Math.max(16, Math.min(spotlight.left + spotlight.width / 2 - tw / 2, vpW - tw - 16)),
-        width: tw,
-      }
-    } else {
-      tooltipStyle = {
-        position: 'fixed',
-        bottom: vpH - spotlight.top + TOOLTIP_GAP,
-        left:   Math.max(16, Math.min(spotlight.left + spotlight.width / 2 - tw / 2, vpW - tw - 16)),
-        width: tw,
-      }
-    }
-  }
-
-  const pct = Math.round(((step + 1) / STEPS.length) * 100)
+  const cur    = STEPS[step]
+  const isFirst = step === 0
+  const isLast  = step === STEPS.length - 1
+  const pct     = Math.round(((step + 1) / STEPS.length) * 100)
+  const { Illustration } = cur
 
   return createPortal(
     <>
-      {/* ── Global styles ──────────────────────────────────────────────── */}
+      {/* ── Global styles ── */}
       <style>{`
-        @keyframes wt-tooltip-in {
-          0%  { opacity:0; transform: translateY(10px) scale(0.96); }
-          100%{ opacity:1; transform: translateY(0)    scale(1);    }
-        }
-        @keyframes wt-center-in {
-          0%  { opacity:0; transform: translate(-50%,-50%) scale(0.93); }
-          100%{ opacity:1; transform: translate(-50%,-50%) scale(1);    }
-        }
-        @keyframes wt-pulse-ring {
-          0%   { transform: scale(1);    opacity: 1;   }
-          50%  { transform: scale(1.05); opacity: 0.6; }
-          100% { transform: scale(1);    opacity: 1;   }
-        }
-        @keyframes wt-chip-bounce {
-          0%   { opacity:0; transform: translateY(6px); }
-          100% { opacity:1; transform: translateY(0); }
-        }
-        @keyframes wt-action-pop {
-          0%   { opacity:0; transform: translateY(8px) scale(0.97); }
-          100% { opacity:1; transform: translateY(0)   scale(1);    }
-        }
-        @keyframes wt-confetti-fall {
-          0%   { transform: translateY(-20px) rotate(0deg)   scale(1);   opacity: 1; }
-          80%  { opacity: 0.9; }
-          100% { transform: translateY(105vh) rotate(540deg) scale(0.8); opacity: 0; }
-        }
-        .wt-chip       { animation: wt-chip-bounce 0.25s ease both; }
-        .wt-action-btn { animation: wt-action-pop  0.3s 0.12s cubic-bezier(0.34,1.56,0.64,1) both; }
-        .wt-next-btn:hover  { filter: brightness(1.1); transform: translateY(-1px); }
-        .wt-next-btn        { transition: all 0.15s ease; }
-        .wt-action-btn:hover{ filter: brightness(1.05); transform: translateY(-1px) !important; box-shadow: 0 6px 20px var(--wt-color-shadow) !important; }
-        .wt-dot { cursor:pointer; transition:all 0.2s ease; border:none; padding:0; }
-        .wt-dot:hover { opacity:0.8; }
+        @keyframes wt-slide-in-fwd  { from { opacity:0; transform:translateX(32px) scale(0.98); } to { opacity:1; transform:translateX(0) scale(1); } }
+        @keyframes wt-slide-in-back { from { opacity:0; transform:translateX(-32px) scale(0.98); } to { opacity:1; transform:translateX(0) scale(1); } }
+        @keyframes wt-illus-in      { from { opacity:0; transform:scale(0.94); } to { opacity:1; transform:scale(1); } }
+        @keyframes wt-chip-in       { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:translateY(0); } }
+        @keyframes wt-confetti-fall { 0%{transform:translateY(-20px) rotate(0) scale(1);opacity:1} 100%{transform:translateY(105vh) rotate(540deg) scale(0.8);opacity:0} }
+        .wt-card-inner { animation: var(--wt-anim) 0.3s cubic-bezier(0.34,1.25,0.64,1) both; }
+        .wt-illus      { animation: wt-illus-in 0.4s 0.05s cubic-bezier(0.34,1.25,0.64,1) both; }
+        .wt-chip       { animation: wt-chip-in 0.25s ease both; }
+        .wt-nav-btn    { transition: all 0.15s ease; }
+        .wt-nav-btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
+        .wt-dot        { cursor:pointer; border:none; padding:0; transition:all 0.2s ease; }
+        .wt-dot:hover  { opacity:0.75; }
+        .wt-action:hover { filter:brightness(1.06); transform:translateY(-1px); box-shadow:0 8px 24px var(--wt-shadow) !important; }
+        .wt-action     { transition:all 0.15s ease; }
       `}</style>
 
-      {/* ── Confetti burst ─────────────────────────────────────────────── */}
+      {/* ── Confetti burst ── */}
       {confettiActive && (
         <div style={{ position:'fixed', inset:0, pointerEvents:'none', zIndex:999999, overflow:'hidden' }}>
           {confettiPieces.map(p => (
-            <div key={p.id} style={{
-              position:    'absolute',
-              left:        `${p.left}%`,
-              top:         '-12px',
-              width:       p.size,
-              height:      p.size,
-              background:  p.color,
-              borderRadius: p.round ? '50%' : 3,
-              animation:   `wt-confetti-fall ${p.speed}s ${p.delay}s ease-in forwards`,
-            }}/>
+            <div key={p.id} style={{ position:'absolute', left:`${p.left}%`, top:'-12px',
+              width:p.size, height:p.size, background:p.color, borderRadius:p.round?'50%':3,
+              animation:`wt-confetti-fall ${p.speed}s ${p.delay}s ease-in forwards` }}/>
           ))}
         </div>
       )}
 
-      {/* ── Backdrop (4 quadrants around spotlight) ─────────────────────── */}
-      <div style={{ position: 'fixed', inset: 0, zIndex: 99990, pointerEvents: 'none' }}>
-        {spotlight ? (
-          <>
-            <div style={{ position:'fixed', top:0, left:0, right:0, height: Math.max(0, spotlight.top),
-              background:'rgba(2,6,23,0.65)', pointerEvents:'all', transition:'height 0.25s ease' }}/>
-            <div style={{ position:'fixed', top: spotlight.bottom, left:0, right:0, bottom:0,
-              background:'rgba(2,6,23,0.65)', pointerEvents:'all', transition:'top 0.25s ease' }}/>
-            <div style={{ position:'fixed', top: spotlight.top, left:0, width: Math.max(0, spotlight.left), height: spotlight.height,
-              background:'rgba(2,6,23,0.65)', pointerEvents:'all', transition:'all 0.25s ease' }}/>
-            <div style={{ position:'fixed', top: spotlight.top, left: spotlight.right, right:0, height: spotlight.height,
-              background:'rgba(2,6,23,0.65)', pointerEvents:'all', transition:'all 0.25s ease' }}/>
-            {/* Spotlight ring — color matches current step */}
-            <div style={{
-              position:'fixed',
-              top: spotlight.top, left: spotlight.left, width: spotlight.width, height: spotlight.height,
-              borderRadius: 10, pointerEvents:'none',
-              border: `2px solid ${cur.color}`,
-              boxShadow: `0 0 0 4px ${cur.color}30`,
-              animation: 'wt-pulse-ring 2s ease-in-out infinite',
-              transition: 'all 0.25s ease',
-            }}/>
-          </>
-        ) : (
-          <div style={{ position:'fixed', inset:0, background:'rgba(2,6,23,0.65)', pointerEvents:'all' }}/>
-        )}
-      </div>
+      {/* ── Backdrop ── */}
+      <div style={{ position:'fixed', inset:0, background:'rgba(2,8,20,0.72)',
+        backdropFilter:'blur(3px)', zIndex:99990, display:'flex',
+        alignItems:'center', justifyContent:'center', padding:'16px' }}
+        onClick={dismiss}>
 
-      {/* ── Tooltip card ──────────────────────────────────────────────────── */}
-      <div
-        key={animKey}
-        style={{
-          ...tooltipStyle,
-          zIndex: 99999,
-          animation: isCenter
-            ? 'wt-center-in 0.28s cubic-bezier(0.34,1.56,0.64,1) both'
-            : 'wt-tooltip-in 0.24s cubic-bezier(0.34,1.56,0.64,1) both',
-          pointerEvents: 'all',
-        }}
-      >
-        <div style={{
-          background: '#fff',
-          borderRadius: 20,
-          boxShadow: '0 32px 80px rgba(0,0,0,0.35), 0 8px 24px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.06)',
-          overflow: 'hidden',
-        }}>
+        {/* ── Main card ── */}
+        <div
+          onClick={e => e.stopPropagation()}
+          style={{ width:'100%', maxWidth:860, borderRadius:24,
+            background:'#fff', overflow:'hidden',
+            boxShadow:'0 40px 100px rgba(0,0,0,0.4), 0 12px 32px rgba(0,0,0,0.2)',
+            display:'flex', flexDirection:'column' }}>
 
           {/* Progress bar */}
-          <div style={{ height: 3, background: '#f1f5f9', position: 'relative' }}>
-            <div style={{
-              position:'absolute', inset:0, width:`${pct}%`,
-              background:`linear-gradient(90deg,${cur.color},${cur.color}99)`,
-              borderRadius:99, transition:'width 0.4s cubic-bezier(0.65,0,0.35,1)',
-            }}/>
+          <div style={{ height:3, background:'#f1f5f9', position:'relative', flexShrink:0 }}>
+            <div style={{ position:'absolute', inset:0, width:`${pct}%`,
+              background:`linear-gradient(90deg,${cur.color},${cur.color}aa)`,
+              transition:'width 0.4s cubic-bezier(0.65,0,0.35,1)', borderRadius:99 }}/>
           </div>
 
-          <div style={{ padding: isFirst || isLast ? '28px 28px 24px' : '20px 22px 22px' }}>
+          {/* Body */}
+          <div style={{ display:'flex', flex:1, minHeight:420, maxHeight:'calc(100vh - 120px)' }}>
 
-            {/* Welcome / Done: centered hero */}
-            {(isFirst || isLast) && (
-              <div style={{ textAlign:'center', marginBottom:20 }}>
-                <div style={{
-                  width:80, height:80, borderRadius:'50%',
-                  background:cur.accent,
-                  border:`2px solid ${cur.color}30`,
-                  display:'inline-flex', alignItems:'center', justifyContent:'center',
-                  fontSize:38, marginBottom:12,
-                  boxShadow:`0 0 0 8px ${cur.accent}, 0 8px 24px ${cur.color}30`,
-                }}>{cur.icon}</div>
-                {isFirst && (
-                  <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:6, marginBottom:8 }}>
-                    <Sparkles size={12} style={{ color:cur.color }}/>
-                    <span style={{ fontSize:11, fontWeight:700, color:cur.color, textTransform:'uppercase', letterSpacing:'0.1em' }}>
-                      Quick tour · ~60 seconds
-                    </span>
-                    <Sparkles size={12} style={{ color:cur.color }}/>
-                  </div>
-                )}
-              </div>
-            )}
+            {/* ── Left: Illustration panel ── */}
+            <div className="wt-illus"
+              key={`illus-${animKey}`}
+              style={{ width:'42%', flexShrink:0, display:'flex', alignItems:'center',
+                justifyContent:'center', padding:'28px 20px 24px 28px',
+                background:`linear-gradient(145deg, ${cur.accent}, ${cur.accent.replace('0.1','0.04')})`,
+                borderRight:'1px solid rgba(0,0,0,0.06)' }}>
+              <Illustration/>
+            </div>
 
-            {/* Spotlight steps: icon + header row */}
-            {!isFirst && !isLast && (
-              <div style={{ display:'flex', alignItems:'flex-start', gap:12, marginBottom:14 }}>
-                <div style={{
-                  width:42, height:42, borderRadius:12, flexShrink:0,
-                  background:cur.accent,
-                  border:`1.5px solid ${cur.color}30`,
-                  display:'flex', alignItems:'center', justifyContent:'center',
-                  fontSize:20,
-                  boxShadow:`0 4px 12px ${cur.color}20`,
-                }}>{cur.icon}</div>
-                <div style={{ flex:1, minWidth:0, paddingTop:2 }}>
-                  <div style={{ fontSize:10, fontWeight:700, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:3 }}>
-                    Step {step + 1} of {STEPS.length}
+            {/* ── Right: Content panel ── */}
+            <div
+              key={`content-${animKey}`}
+              className="wt-card-inner"
+              style={{ flex:1, padding:'28px 28px 24px', display:'flex', flexDirection:'column',
+                overflowY:'auto',
+                ['--wt-anim' as any]: animDir === 'forward' ? 'wt-slide-in-fwd' : 'wt-slide-in-back' }}>
+
+              {/* Top row: step counter + close */}
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:18 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  <div style={{ width:32, height:32, borderRadius:10, background:cur.accent,
+                    display:'flex', alignItems:'center', justifyContent:'center', fontSize:16 }}>
+                    {cur.icon}
                   </div>
-                  <h3 style={{ margin:0, fontSize:16, fontWeight:700, color:'#0f172a', lineHeight:1.2 }}>
-                    {cur.title}
-                  </h3>
+                  <span style={{ fontSize:11, fontWeight:700, color:'#94a3b8',
+                    textTransform:'uppercase', letterSpacing:'0.08em' }}>
+                    {isFirst ? 'Getting started' : isLast ? 'All done' : `Step ${step} of ${STEPS.length - 2}`}
+                  </span>
                 </div>
-                <button onClick={dismiss} title="Skip tour" style={{
-                  width:28, height:28, borderRadius:8, border:'none', flexShrink:0,
-                  background:'#f8fafc', cursor:'pointer',
-                  display:'flex', alignItems:'center', justifyContent:'center',
-                  color:'#94a3b8', transition:'all 0.12s',
-                }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background='#fee2e2'; (e.currentTarget as HTMLElement).style.color='#dc2626' }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background='#f8fafc'; (e.currentTarget as HTMLElement).style.color='#94a3b8' }}>
+                <button onClick={dismiss} title="Skip tour"
+                  style={{ width:28, height:28, borderRadius:8, border:'none',
+                    background:'#f8fafc', cursor:'pointer', display:'flex',
+                    alignItems:'center', justifyContent:'center', color:'#94a3b8' }}
+                  onMouseEnter={e => { const el=e.currentTarget as HTMLElement; el.style.background='#fee2e2'; el.style.color='#dc2626' }}
+                  onMouseLeave={e => { const el=e.currentTarget as HTMLElement; el.style.background='#f8fafc'; el.style.color='#94a3b8' }}>
                   <X size={13}/>
                 </button>
               </div>
-            )}
 
-            {/* Centered title */}
-            {(isFirst || isLast) && (
-              <h2 style={{ margin:'0 0 10px', fontSize:isFirst?22:20, fontWeight:800, color:'#0f172a', textAlign:'center', lineHeight:1.2 }}>
+              {/* Subtitle — where to find it */}
+              <div style={{ fontSize:10, fontWeight:700, color:cur.color, textTransform:'uppercase',
+                letterSpacing:'0.1em', marginBottom:6, display:'flex', alignItems:'center', gap:5 }}>
+                <span style={{ display:'inline-block', width:14, height:2, background:cur.color, borderRadius:99 }}/>
+                {cur.subtitle}
+              </div>
+
+              {/* Title */}
+              <h2 style={{ margin:'0 0 10px', fontSize:22, fontWeight:800, color:'#0f172a', lineHeight:1.2 }}>
                 {cur.title}
               </h2>
-            )}
 
-            {/* Body */}
-            <p style={{
-              margin:'0 0 16px', fontSize:13.5, color:'#475569', lineHeight:1.7,
-              textAlign: isFirst || isLast ? 'center' : 'left',
-            }}>
-              {cur.body}
-            </p>
+              {/* Body */}
+              <p style={{ margin:'0 0 18px', fontSize:13, color:'#475569', lineHeight:1.75 }}>
+                {cur.body}
+              </p>
 
-            {/* ── Primary action CTA (e.g. "Create your first task") ──────── */}
-            {cur.action && (
-              <button
-                className="wt-action-btn"
-                onClick={(e) => {
-                  e.preventDefault()
-                  // Navigate to the action page but keep the walkthrough alive
-                  router.push(cur.action!.href)
-                }}
-                style={{
-                  display:'flex', alignItems:'center', justifyContent:'center', gap:8,
-                  padding:'11px 18px', borderRadius:12, marginBottom:16, width:'100%',
-                  background:`linear-gradient(135deg, ${cur.color}, ${cur.color}dd)`,
-                  color:'#fff', fontSize:13.5, fontWeight:700,
-                  border:'none', cursor:'pointer',
-                  boxShadow:`0 4px 16px ${cur.color}40`,
-                  transition:'all 0.15s ease',
-                  ['--wt-color-shadow' as any]: `${cur.color}55`,
-                }}
-              >
-                <ExternalLink size={14}/> {cur.action.label}
-              </button>
-            )}
-
-            {/* Feature chips */}
-            {cur.chips && cur.chips.length > 0 && (
-              <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:18,
-                justifyContent: isFirst || isLast ? 'center' : 'flex-start' }}>
-                {cur.chips.map((chip, i) => (
-                  <span key={chip} className="wt-chip"
-                    style={{
-                      display:'inline-flex', alignItems:'center', gap:4,
-                      padding:'4px 10px', borderRadius:99, fontSize:11, fontWeight:600,
-                      background:cur.accent,
-                      color:cur.color,
-                      border:`1px solid ${cur.color}25`,
-                      animationDelay:`${i * 40}ms`,
-                    }}>
-                    <span style={{ width:5, height:5, borderRadius:'50%', background:cur.color, flexShrink:0, display:'inline-block' }}/>
-                    {chip}
-                  </span>
+              {/* Bullet points */}
+              <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:18, flex:1 }}>
+                {cur.bullets.map((b, i) => (
+                  <div key={i} className="wt-chip"
+                    style={{ display:'flex', alignItems:'flex-start', gap:10,
+                      animationDelay:`${i * 50}ms` }}>
+                    <span style={{ width:26, height:26, borderRadius:8, background:cur.accent,
+                      display:'flex', alignItems:'center', justifyContent:'center',
+                      fontSize:13, flexShrink:0 }}>{b.emoji}</span>
+                    <span style={{ fontSize:12.5, color:'#334155', lineHeight:1.55, paddingTop:4 }}>{b.text}</span>
+                  </div>
                 ))}
               </div>
-            )}
 
-            {/* Step dots */}
-            <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:18,
-              justifyContent: isFirst || isLast ? 'center' : 'flex-start' }}>
-              {STEPS.map((s, i) => (
-                <button key={i} className="wt-dot" onClick={() => goTo(i)}
-                  title={`Go to step ${i + 1}`}
-                  style={{
-                    width: i === step ? 20 : 6,
-                    height: 6,
-                    borderRadius: 99,
-                    background: i === step ? cur.color : i < step ? `${cur.color}55` : '#e2e8f0',
-                    boxShadow: i === step ? `0 0 6px ${cur.color}60` : 'none',
-                  }}/>
-              ))}
-            </div>
-
-            {/* Action row */}
-            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-
-              {/* Skip (always left, intentionally low-contrast) */}
-              <button onClick={dismiss} style={{
-                fontSize:11.5, fontWeight:500, color:'#b0bec5',
-                background:'none', border:'none', cursor:'pointer',
-                padding:'6px 2px', marginRight:'auto',
-                transition:'color 0.12s',
-              }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color='#64748b' }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color='#b0bec5' }}>
-                Skip
-              </button>
-
-              {/* Keyboard hint */}
-              {!isFirst && !isLast && (
-                <span style={{ fontSize:10, color:'#cbd5e1', fontWeight:500, marginRight:4 }}>
-                  ← →
-                </span>
-              )}
-
-              {/* Back */}
-              {step > 0 && (
-                <button onClick={back} style={{
-                  display:'flex', alignItems:'center', gap:4,
-                  padding:'8px 14px', borderRadius:10,
-                  border:'1.5px solid #e2e8f0', background:'#fff',
-                  color:'#475569', fontSize:13, fontWeight:600,
-                  cursor:'pointer', transition:'all 0.12s',
-                }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor='#cbd5e1'; (e.currentTarget as HTMLElement).style.background='#f8fafc' }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor='#e2e8f0'; (e.currentTarget as HTMLElement).style.background='#fff' }}>
-                  <ChevronLeft size={14}/> Back
+              {/* CTA action button */}
+              {cur.actionHref && !isFirst && (
+                <button className="wt-action"
+                  onClick={() => { router.push(cur.actionHref!); if (isLast) handleFinish() }}
+                  style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+                    padding:'10px 18px', borderRadius:12, marginBottom:16, width:'100%',
+                    background:`linear-gradient(135deg,${cur.color},${cur.color}cc)`,
+                    color:'#fff', fontSize:13, fontWeight:700, border:'none', cursor:'pointer',
+                    boxShadow:`0 4px 16px ${cur.color}40`,
+                    ['--wt-shadow' as any]: `${cur.color}55` }}>
+                  {cur.actionLabel}
+                  <ArrowRight size={14}/>
                 </button>
               )}
 
-              {/* Next / Start / Finish */}
-              <button className="wt-next-btn" onClick={isLast ? handleFinish : next} style={{
-                display:'flex', alignItems:'center', gap:6,
-                padding: isLast ? '10px 22px' : '8px 18px',
-                borderRadius:10, border:'none',
-                background:`linear-gradient(135deg, ${cur.color}, ${cur.color}cc)`,
-                color:'#fff', fontSize:13, fontWeight:700,
-                cursor:'pointer',
-                boxShadow:`0 4px 14px ${cur.color}45`,
-                letterSpacing:'0.01em',
-              }}>
-                {isFirst ? <><span>Start tour</span> <ArrowRight size={14}/></>
-                : isLast  ? <><CheckCircle2 size={14}/> <span>Let&apos;s go!</span></>
-                :           <><span>Next</span> <ChevronRight size={14}/></>}
-              </button>
-            </div>
+              {/* Step dots */}
+              <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:16 }}>
+                {STEPS.map((_, i) => (
+                  <button key={i} className="wt-dot" onClick={() => goTo(i, i > step ? 'forward' : 'back')}
+                    title={`Step ${i+1}`}
+                    style={{ width: i===step ? 22 : 6, height:6, borderRadius:99, border:'none',
+                      background: i===step ? cur.color : i<step ? `${cur.color}55` : '#e2e8f0',
+                      boxShadow: i===step ? `0 0 6px ${cur.color}60` : 'none' }}/>
+                ))}
+                <span style={{ marginLeft:'auto', fontSize:10, color:'#cbd5e1' }}>← →</span>
+              </div>
 
+              {/* Navigation row */}
+              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                <button onClick={dismiss} style={{ fontSize:11, fontWeight:500, color:'#b0bec5',
+                  background:'none', border:'none', cursor:'pointer', padding:'6px 0', marginRight:'auto' }}
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.color='#64748b'}
+                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.color='#b0bec5'}>
+                  Skip tour
+                </button>
+
+                {step > 0 && (
+                  <button onClick={retreat} className="wt-nav-btn"
+                    style={{ display:'flex', alignItems:'center', gap:4, padding:'8px 16px',
+                      borderRadius:10, border:'1.5px solid #e2e8f0', background:'#fff',
+                      color:'#475569', fontSize:13, fontWeight:600, cursor:'pointer' }}
+                    onMouseEnter={e => { const el=e.currentTarget as HTMLElement; el.style.borderColor='#cbd5e1'; el.style.background='#f8fafc' }}
+                    onMouseLeave={e => { const el=e.currentTarget as HTMLElement; el.style.borderColor='#e2e8f0'; el.style.background='#fff' }}>
+                    <ChevronLeft size={14}/> Back
+                  </button>
+                )}
+
+                <button onClick={isLast ? handleFinish : advance} className="wt-nav-btn"
+                  style={{ display:'flex', alignItems:'center', gap:6, padding:'9px 20px',
+                    borderRadius:10, border:'none',
+                    background:`linear-gradient(135deg,${cur.color},${cur.color}cc)`,
+                    color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer',
+                    boxShadow:`0 4px 14px ${cur.color}45` }}>
+                  {isFirst
+                    ? <><span>Start Tour</span><ChevronRight size={14}/></>
+                    : isLast
+                    ? <><CheckCircle2 size={14}/><span>Add First Client</span></>
+                    : <><span>Next</span><ChevronRight size={14}/></>
+                  }
+                </button>
+              </div>
+
+            </div>
           </div>
         </div>
-
-        {/* Arrow pointer toward highlighted element */}
-        {!isCenter && spotlight && (() => {
-          const vpW = window.innerWidth
-          const sl  = tooltipStyle as any
-          let arrowStyle: React.CSSProperties | null = null
-
-          if (sl.left !== undefined && spotlight.right + TOOLTIP_GAP + TOOLTIP_W <= vpW) {
-            const tipTop = sl.top ?? 0
-            const midY   = spotlight.top + spotlight.height / 2 - tipTop
-            arrowStyle = {
-              position:'absolute',
-              left:-10, top: Math.max(20, Math.min(midY, 280)),
-              borderTop:'10px solid transparent', borderBottom:'10px solid transparent',
-              borderRight:'10px solid #fff', filter:'drop-shadow(-3px 0 4px rgba(0,0,0,0.12))',
-            }
-          }
-          if (!arrowStyle) return null
-          return <div style={arrowStyle}/>
-        })()}
-
       </div>
     </>,
     document.body
