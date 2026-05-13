@@ -587,15 +587,46 @@ export async function POST(request: NextRequest) {
       if (n.includes('select') || n.includes('enter') || n.includes('client name') || n.includes('e.g')) return null
       if (clientNameToId[n]) return clientNameToId[n]
 
-      const { data } = await admin
+      // 1. Exact ilike
+      const { data: exact } = await admin
         .from('clients')
-        .select('id')
+        .select('id, name')
         .eq('org_id', orgId)
         .ilike('name', rawName.trim())
         .maybeSingle()
+      if (exact?.id) {
+        clientNameToId[n] = exact.id
+        clientNameToId[exact.name.toLowerCase()] = exact.id
+        return exact.id
+      }
 
-      if (data?.id) clientNameToId[n] = data.id
-      return data?.id ?? null
+      // 2. Normalized alphanumeric exact match against preloaded cache
+      const nA = alphaNum(n)
+      for (const [key, id] of Object.entries(clientNameToId)) {
+        if (alphaNum(key) === nA) { clientNameToId[n] = id; return id }
+      }
+
+      // 3. Partial containment match (min 4 chars to avoid false positives)
+      for (const [key, id] of Object.entries(clientNameToId)) {
+        const kA = alphaNum(key)
+        if (kA.length >= 4 && nA.length >= 4 && (nA.includes(kA) || kA.includes(nA))) {
+          clientNameToId[n] = id; return id
+        }
+      }
+
+      // 4. Auto-create with just the name so downstream rows don't fail
+      const { data: created } = await admin
+        .from('clients')
+        .insert({ org_id: orgId, name: rawName.trim(), color: '#0d9488', status: 'active', created_by: user.id })
+        .select('id')
+        .maybeSingle()
+      if (created?.id) {
+        clientNameToId[n] = created.id
+        results.clients.created++
+        return created.id
+      }
+
+      return null
     }
 
     async function resolveProject(rawName: string): Promise<string | null> {
@@ -747,102 +778,149 @@ export async function POST(request: NextRequest) {
 
     if (clientSheet) {
       const rows = sheets[clientSheet]
+
+      // Header keywords that are NOT client names (used in name-only fallback)
+      const CLIENT_HEADER_WORDS = new Set([
+        'name','clientname','client','companyname','company','email','contactemail',
+        'phone','mobile','website','url','industry','color','colour','status','notes',
+        'group','gstin','pan','id',
+      ])
+
+      // Shared batch-insert helper used by both header and name-only paths
+      const toInsertClients: any[] = []
+      const seenClientNames = new Set<string>()
+
+      function queueClient(
+        name: string,
+        extra: { email?: string|null; phone?: string|null; company?: string|null;
+                 website?: string|null; industry?: string|null; color?: string;
+                 status?: string; notes?: string|null } = {}
+      ) {
+        const lname = name.toLowerCase()
+        if (clientNameToId[lname] || seenClientNames.has(lname)) {
+          results.clients.skipped++
+          return
+        }
+        seenClientNames.add(lname)
+        toInsertClients.push({
+          _lname: lname,
+          org_id: orgId,
+          name: name.trim(),
+          email:    extra.email    ?? null,
+          phone:    extra.phone    ?? null,
+          company:  extra.company  ?? null,
+          website:  extra.website  ?? null,
+          industry: extra.industry ?? null,
+          color:    extra.color    ?? '#0d9488',
+          status:   extra.status   ?? 'active',
+          notes:    extra.notes    ?? null,
+          created_by: user.id,
+        })
+      }
+
+      // More flexible header detection: accept 'name', 'clientname', 'client', 'companyname'
       const hdrIdx = rows.findIndex(r =>
-        r.some(c => norm(c) === 'name' || norm(c).includes('clientname'))
+        r.some(c =>
+          norm(c) === 'name' ||
+          norm(c).includes('clientname') ||
+          norm(c) === 'client' ||
+          norm(c).includes('companyname')
+        )
       )
 
       if (hdrIdx !== -1) {
+        // ── Normal header-based path ──────────────────────────────
         const headers = rows[hdrIdx]
-        const iName     = findCol(headers, 'clientname', 'name')
+        const iName     = findCol(headers, 'clientname', 'name', 'client', 'companyname')
         const iEmail    = findCol(headers, 'email', 'contactemail')
-        const iPhone    = findCol(headers, 'phone')
+        const iPhone    = findCol(headers, 'phone', 'mobile')
         const iCompany  = findCol(headers, 'company')
-        const iWebsite  = findCol(headers, 'website')
+        const iWebsite  = findCol(headers, 'website', 'url')
         const iIndustry = findCol(headers, 'industry')
         const iColor    = findCol(headers, 'color', 'colour')
         const iStatus   = findCol(headers, 'status')
         const iNotes    = findCol(headers, 'notes')
-
-        const toInsertClients: any[] = []
-        const seenClientNames = new Set<string>()
 
         for (const row of dataRows(rows, hdrIdx)) {
           if (isSampleRow(row)) continue
           const name = cell(row, iName)
           if (!name) continue
 
-          const lname = name.toLowerCase()
-          if (clientNameToId[lname] || seenClientNames.has(lname)) {
-            results.clients.skipped++
-            continue
-          }
-          seenClientNames.add(lname)
-
           const rawStatus = cell(row, iStatus).toLowerCase() || 'active'
           const status = ['active', 'inactive', 'lead', 'prospect'].includes(rawStatus) ? rawStatus : 'active'
           const rawColor = cell(row, iColor) || '#0d9488'
           const color = rawColor.startsWith('#') ? rawColor : `#${rawColor}`
 
-          toInsertClients.push({
-            _lname: lname,
-            org_id: orgId,
-            name: name.trim(),
-            email: cell(row, iEmail) || null,
-            phone: cell(row, iPhone) || null,
-            company: cell(row, iCompany) || null,
-            website: cell(row, iWebsite) || null,
+          queueClient(name, {
+            email:    cell(row, iEmail)    || null,
+            phone:    cell(row, iPhone)    || null,
+            company:  cell(row, iCompany)  || null,
+            website:  cell(row, iWebsite)  || null,
             industry: cell(row, iIndustry) || null,
             color,
             status,
-            notes: cell(row, iNotes) || null,
-            created_by: user.id,
+            notes:    cell(row, iNotes)    || null,
           })
         }
+      } else {
+        // ── Name-only fallback: no recognised header row ──────────
+        // Scan every row; take the first cell value that isn't a known
+        // header keyword and looks like a real name (length > 1, not numeric).
+        for (const row of rows) {
+          if (isSampleRow(row)) continue
+          const name = row
+            .map(cleanText)
+            .find(v =>
+              v.length > 1 &&
+              isNaN(Number(v)) &&
+              !CLIENT_HEADER_WORDS.has(norm(v))
+            ) ?? ''
+          if (name) queueClient(name)
+        }
+      }
 
-        // Insert in batches of 200.
-        // We intentionally use insert (not upsert) because:
-        //  a) The clients table may not have a unique constraint on (org_id, name).
-        //  b) Duplicate names are already filtered out above via clientNameToId + seenClientNames.
-        const CLIENT_BATCH = 200
-        for (let bi = 0; bi < toInsertClients.length; bi += CLIENT_BATCH) {
-          const batch = toInsertClients.slice(bi, bi + CLIENT_BATCH)
-          const rows2insert = batch.map(({ _lname: _, ...rest }: any) => rest)
-          const { data: created, error } = await admin
-            .from('clients')
-            .insert(rows2insert)
-            .select('id, name')
-          if (error) {
-            // Batch failed — try row-by-row to isolate the bad record(s)
-            for (const row of rows2insert) {
-              // Check live DB in case the pre-load cache was stale
-              const { data: existing } = await admin
+      // Insert in batches of 200.
+      // We intentionally use insert (not upsert) because:
+      //  a) The clients table may not have a unique constraint on (org_id, name).
+      //  b) Duplicate names are already filtered out above via clientNameToId + seenClientNames.
+      const CLIENT_BATCH = 200
+      for (let bi = 0; bi < toInsertClients.length; bi += CLIENT_BATCH) {
+        const batch = toInsertClients.slice(bi, bi + CLIENT_BATCH)
+        const rows2insert = batch.map(({ _lname: _, ...rest }: any) => rest)
+        const { data: created, error } = await admin
+          .from('clients')
+          .insert(rows2insert)
+          .select('id, name')
+        if (error) {
+          // Batch failed — try row-by-row to isolate the bad record(s)
+          for (const row of rows2insert) {
+            // Check live DB in case the pre-load cache was stale
+            const { data: existing } = await admin
+              .from('clients')
+              .select('id, name')
+              .eq('org_id', orgId)
+              .ilike('name', row.name)
+              .maybeSingle()
+            if (existing?.id) {
+              clientNameToId[existing.name.toLowerCase()] = existing.id
+              results.clients.skipped++
+            } else {
+              const { data: r1, error: e1 } = await admin
                 .from('clients')
+                .insert([row])
                 .select('id, name')
-                .eq('org_id', orgId)
-                .ilike('name', row.name)
-                .maybeSingle()
-              if (existing?.id) {
-                // Already exists — treat as skipped, not an error
-                clientNameToId[existing.name.toLowerCase()] = existing.id
+              if (e1) {
+                results.clients.errors.push(`Could not import client "${row.name}": ${e1.message ?? 'unknown error'}`)
                 results.clients.skipped++
               } else {
-                const { data: r1, error: e1 } = await admin
-                  .from('clients')
-                  .insert([row])
-                  .select('id, name')
-                if (e1) {
-                  results.clients.errors.push(`Could not import client "${row.name}": ${e1.message ?? 'unknown error'}`)
-                  results.clients.skipped++
-                } else {
-                  ;(r1 ?? []).forEach((c: any) => { clientNameToId[c.name.toLowerCase()] = c.id })
-                  results.clients.created += r1?.length ?? 0
-                }
+                ;(r1 ?? []).forEach((c: any) => { clientNameToId[c.name.toLowerCase()] = c.id })
+                results.clients.created += r1?.length ?? 0
               }
             }
-          } else {
-            ;(created ?? []).forEach((c: any) => { clientNameToId[c.name.toLowerCase()] = c.id })
-            results.clients.created += created?.length ?? 0
           }
+        } else {
+          ;(created ?? []).forEach((c: any) => { clientNameToId[c.name.toLowerCase()] = c.id })
+          results.clients.created += created?.length ?? 0
         }
       }
     }
