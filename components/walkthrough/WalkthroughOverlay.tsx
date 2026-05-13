@@ -563,12 +563,14 @@ interface Props {
   userId:          string
   userCreatedAt:   string
   tourCompletedAt: string | null
+  /** Render as a full-page experience instead of a modal overlay */
+  standalone?:     boolean
 }
 
-export function WalkthroughOverlay({ userId, userCreatedAt, tourCompletedAt }: Props) {
+export function WalkthroughOverlay({ userId, userCreatedAt, tourCompletedAt, standalone = false }: Props) {
   const router = useRouter()
   const [step,           setStep]     = useState(0)
-  const [visible,        setVisible]  = useState(false)
+  const [visible,        setVisible]  = useState(standalone) // standalone always visible
   const [mounted,        setMounted]  = useState(false)
   const [confettiActive, setConfetti] = useState(false)
   const [animDir,        setAnimDir]  = useState<'forward'|'back'>('forward')
@@ -589,15 +591,16 @@ export function WalkthroughOverlay({ userId, userCreatedAt, tourCompletedAt }: P
   // 1. Mount guard
   useEffect(() => { setMounted(true) }, [])
 
-  // 2. Show for new users who haven't completed the tour
+  // 2. Show for new users who haven't completed the tour (modal mode only)
   useEffect(() => {
+    if (standalone) return   // page mode — always show
     if (!mounted) return
     if (tourCompletedAt) return
     const age = Date.now() - new Date(userCreatedAt).getTime()
     if (age > MAX_AGE_MS) return
     const done = localStorage.getItem(storageKey(userId))
     if (!done) setVisible(true)
-  }, [mounted, userId, userCreatedAt, tourCompletedAt])
+  }, [mounted, userId, userCreatedAt, tourCompletedAt, standalone])
 
   // 3. Keyboard navigation
   useEffect(() => {
@@ -613,6 +616,10 @@ export function WalkthroughOverlay({ userId, userCreatedAt, tourCompletedAt }: P
   }, [visible, step])
 
   function dismiss() {
+    if (standalone) {
+      router.push('/dashboard')
+      return
+    }
     localStorage.setItem(storageKey(userId), '1')
     setVisible(false)
     fetch('/api/user/tour-complete', { method: 'POST' }).catch(() => {})
@@ -627,7 +634,7 @@ export function WalkthroughOverlay({ userId, userCreatedAt, tourCompletedAt }: P
   function advance() {
     if (step === STEPS.length - 1) { dismiss(); return }
     const next = STEPS[step + 1]
-    if (next?.path) router.push(next.path)
+    if (!standalone && next?.path) router.push(next.path)
     goTo(step + 1, 'forward')
   }
 
@@ -637,7 +644,7 @@ export function WalkthroughOverlay({ userId, userCreatedAt, tourCompletedAt }: P
 
   function handleFinish() {
     setConfetti(true)
-    if (STEPS[step].actionHref) router.push(STEPS[step].actionHref!)
+    if (!standalone && STEPS[step].actionHref) router.push(STEPS[step].actionHref!)
     setTimeout(() => dismiss(), 1400)
   }
 
@@ -649,7 +656,7 @@ export function WalkthroughOverlay({ userId, userCreatedAt, tourCompletedAt }: P
   const pct     = Math.round(((step + 1) / STEPS.length) * 100)
   const { Illustration } = cur
 
-  return createPortal(
+  const cardContent = (
     <>
       {/* ── Global styles ── */}
       <style>{`
@@ -680,11 +687,16 @@ export function WalkthroughOverlay({ userId, userCreatedAt, tourCompletedAt }: P
         </div>
       )}
 
-      {/* ── Backdrop ── */}
-      <div style={{ position:'fixed', inset:0, background:'rgba(2,8,20,0.72)',
-        backdropFilter:'blur(3px)', zIndex:99990, display:'flex',
-        alignItems:'center', justifyContent:'center', padding:'16px' }}
-        onClick={dismiss}>
+      {/* ── Wrapper: backdrop (modal) or page container (standalone) ── */}
+      <div style={standalone ? {
+          display:'flex', alignItems:'flex-start', justifyContent:'center',
+          padding:'0', width:'100%',
+        } : {
+          position:'fixed', inset:0, background:'rgba(2,8,20,0.72)',
+          backdropFilter:'blur(3px)', zIndex:99990, display:'flex',
+          alignItems:'center', justifyContent:'center', padding:'16px',
+        }}
+        onClick={standalone ? undefined : dismiss}>
 
         {/* ── Main card ── */}
         <div
@@ -841,7 +853,9 @@ export function WalkthroughOverlay({ userId, userCreatedAt, tourCompletedAt }: P
           </div>
         </div>
       </div>
-    </>,
-    document.body
+    </>
   )
+
+  if (standalone) return cardContent
+  return createPortal(cardContent, document.body)
 }

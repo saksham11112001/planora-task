@@ -7,7 +7,7 @@ import {
   Home, ListTodo, Users2, FolderOpen,
   RefreshCw, Users, BarChart2, Settings, Plus,
   ChevronDown, ChevronRight, Clock, Zap, X, Upload,
-  Calendar, Shield, LogOut, FileCheck, ArrowRight, Eye, Receipt, Copy, Check, Activity,
+  Calendar, Shield, LogOut, FileCheck, ArrowRight, Eye, Receipt, Copy, Check, Activity, BookOpen,
 } from 'lucide-react'
 import { cn }            from '@/lib/utils/cn'
 import { createClient }  from '@/lib/supabase/client'
@@ -305,6 +305,7 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
         {canManage && (
           <SI href="/settings/permissions" active={isActive('/settings/permissions')} icon={<Shield className="h-4 w-4"/>} label="Permissions"/>
         )}
+        <SI href="/walkthrough" active={isActive('/walkthrough')} icon={<BookOpen className="h-4 w-4"/>} label="Onboarding tour"/>
         {/* Settings scrolls with nav instead of being frozen */}
         <SI href="/settings" active={isActive('/settings')} icon={<Settings className="h-4 w-4"/>} label="Settings"/>
 
