@@ -4,7 +4,8 @@ import { inngest }            from '@/lib/inngest/client'
 import { NextResponse }       from 'next/server'
 import type { NextRequest }   from 'next/server'
 import { assertCan }          from '@/lib/utils/permissionGate'
-import { dbError } from '@/lib/api-error'
+import { dbError }             from '@/lib/api-error'
+import { nextOccurrence }      from '@/lib/utils/recurringSchedule'
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -185,6 +186,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
   if (!Object.keys(updates).length)
     return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
+
+  // When frequency changes, always recalculate next_occurrence_date from today
+  // unless the caller explicitly supplied a new date (e.g. user edited it manually).
+  if (updates.frequency && typeof updates.frequency === 'string' && !('next_occurrence_date' in updates)) {
+    const today = new Date().toISOString().split('T')[0]
+    updates.next_occurrence_date = nextOccurrence(updates.frequency as string, today)
+  }
 
   // Merge custom_fields rather than overwrite — preserve existing flags (_ca_compliance, etc.)
   if (updates.custom_fields && typeof updates.custom_fields === 'object') {
