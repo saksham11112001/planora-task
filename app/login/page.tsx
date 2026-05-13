@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
-type Mode = 'choose' | 'magic' | 'magic_sent' | 'email_password' | 'email_signup' | 'signup_confirm'
+type Mode = 'choose' | 'magic' | 'magic_sent' | 'email_password' | 'email_signup' | 'signup_confirm' | 'reset_password' | 'reset_sent'
 
 function MicrosoftIcon() {
   return (
@@ -169,6 +169,20 @@ export default function LoginPage() {
     setMode('signup_confirm')
   }
 
+  // ── Password reset ────────────────────────────────────────────────────────
+  async function handleResetPassword(e: React.FormEvent) {
+    e.preventDefault()
+    if (!email.trim()) { setError('Enter your email address'); return }
+    setLoading(true); setError('')
+    const supabase = createClient()
+    const { error: err } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: `${window.location.origin}/auth/confirm`,
+    })
+    setLoading(false)
+    if (err) { setError(err.message); return }
+    setMode('reset_sent')
+  }
+
   // Calls the server-side provision endpoint to create/update the users row
   async function provisionUser() {
     try {
@@ -325,12 +339,48 @@ export default function LoginPage() {
               </p>
               <p style={{ marginTop: 8, textAlign: 'center', fontSize: 13, color: '#64748b' }}>
                 Forgot password?{' '}
-                <button onClick={() => resetForm('magic')}
+                <button onClick={() => resetForm('reset_password')}
                   style={{ color: '#0d9488', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
-                  Get a magic link
+                  Reset it
                 </button>
               </p>
             </>
+          )}
+
+          {/* ── Reset password ── */}
+          {mode === 'reset_password' && (
+            <>
+              <BackBtn onClick={() => resetForm('email_password')} />
+              <h1 style={h1}>Reset password</h1>
+              <p style={subStyle}>Enter your email and we'll send a reset link</p>
+
+              {error && <ErrorBox msg={error} />}
+
+              <form onSubmit={handleResetPassword}>
+                <EmailInput value={email} onChange={setEmail} />
+                <SubmitBtn loading={loading} label="Send reset link →" loadingLabel="Sending..." />
+              </form>
+            </>
+          )}
+
+          {/* ── Reset sent confirmation ── */}
+          {mode === 'reset_sent' && (
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 48, marginBottom: 16 }}>📬</div>
+              <h2 style={h2}>Check your inbox</h2>
+              <p style={bodyStyle}>
+                We sent a password reset link to <strong style={{ color: '#0f172a' }}>{email}</strong>.<br/>
+                Click it to set a new password.
+              </p>
+              <p style={{ fontSize: 12, color: '#94a3b8' }}>
+                Didn't get it? Check spam or{' '}
+                <button onClick={() => { setMode('reset_password'); setError('') }}
+                  style={{ color: '#0d9488', background: 'none', border: 'none', cursor: 'pointer',
+                    fontSize: 12, fontWeight: 600, textDecoration: 'underline' }}>
+                  try again
+                </button>
+              </p>
+            </div>
           )}
 
           {/* ── Email + password sign-up ── */}
