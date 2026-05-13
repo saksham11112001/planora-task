@@ -195,6 +195,7 @@ export function MyTasksView({
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
   const [groupPages,      setGroupPages]      = useState<Record<string, number>>({})
   const [showAssignedByMe, setShowAssignedByMe] = useState(false)
+  const [activeSection, setActiveSection]       = useState<'mine'|'approval'|'assigned'>('mine')
   const [sortBy, setSortBy] = useState<'due_date'|'created_at'|'updated_at'>('due_date')
   const [sortDir, setSortDir] = useState<'asc'|'desc'>('asc')
   const [sortOpen, setSortOpen] = useState(false)
@@ -203,28 +204,6 @@ export function MyTasksView({
   // Inline editing for subtask rows
   const [subInlineEdit, setSubInlineEdit] = useState<{parentId:string;subId:string;field:string}|null>(null)
   const [subAssigneeOpen, setSubAssigneeOpen] = useState<{parentId:string;subId:string}|null>(null)
-  // Admin: one-shot cleanup of stale compliance-subtask rows
-  const [fixLoading, setFixLoading] = useState(false)
-
-  async function fixComplianceTasks() {
-    if (fixLoading) return
-    setFixLoading(true)
-    try {
-      const res = await fetch('/api/admin/fix-compliance-tasks', { method: 'POST' })
-      const d   = await res.json()
-      if (res.ok) {
-        toast.success(d.message ?? 'Compliance tasks cleaned up ✓')
-        refresh()
-      } else {
-        toast.error(d.error ?? 'Cleanup failed')
-      }
-    } catch {
-      toast.error('Network error during cleanup')
-    } finally {
-      setFixLoading(false)
-    }
-  }
-
   function toggleGroup(key: string) {
     setCollapsedGroups(prev => { const s = new Set(prev); s.has(key) ? s.delete(key) : s.add(key); return s })
   }
@@ -677,62 +656,259 @@ export function MyTasksView({
     )
   }
 
-  const isOwnerAdmin = ['owner','admin'].includes(userRole ?? '')
+  // ── Computed stats for header strip ──────────────────────────────────────
+  const overdueCount = useMemo(() =>
+    tasks.filter(t => !!t.due_date && t.due_date < today && !['completed','cancelled','in_review'].includes(t.status)).length,
+    [tasks, today])
+  const todayCount = useMemo(() =>
+    tasks.filter(t => t.due_date === today && !['completed','cancelled','in_review'].includes(t.status) && t.approval_status !== 'pending').length,
+    [tasks, today])
+  const doneCount = useMemo(() =>
+    tasks.filter(t => t.status === 'completed').length,
+    [tasks])
 
-  const Tabs = () => (
-    <div role="tablist" style={{ display:'flex', alignItems:'center', borderBottom:`1px solid var(--border)`, padding:'0 20px',
-      background:'var(--surface)', flexShrink:0, gap:8 }}>
-      {(['List','Board'] as const).map(t => (
-        <button key={t} onClick={() => setTab(t)}
-          role="tab"
-          aria-selected={tab === t}
-          style={{ padding:'10px 15px', fontSize:14, fontWeight:500, border:'none',
-            background:'transparent', cursor:'pointer', marginBottom:-1,
-            borderBottom:`2px solid ${tab===t?'var(--brand)':'transparent'}`,
-            color: tab===t?'var(--brand)':'var(--text-muted)' }}>
-          {t}
-        </button>
-      ))}
-      {canManage && (
-        <button
-          type="button"
-          onClick={() => setShowAssignedByMe(v => !v)}
-          style={{
-            padding: '5px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-            border: showAssignedByMe ? '1.5px solid #0d9488' : '1.5px solid #e5e7eb',
-            background: showAssignedByMe ? 'rgba(13,148,136,0.08)' : 'transparent',
-            color: showAssignedByMe ? '#0d9488' : 'var(--text-secondary)',
-            transition: 'all 0.15s',
-          }}>
-          Assigned by me
-        </button>
-      )}
-      {/* Admin-only: clean up stale compliance-subtask rows created before the fix */}
-      {isOwnerAdmin && (
-        <button
-          type="button"
-          onClick={fixComplianceTasks}
-          disabled={fixLoading}
-          title="Remove stale compliance attachment-header subtasks that were created before the fix. Safe to run multiple times."
-          style={{
-            marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5,
-            padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600,
-            border: '1.5px solid var(--border)', cursor: fixLoading ? 'wait' : 'pointer',
-            background: 'transparent', color: 'var(--text-muted)',
-            opacity: fixLoading ? 0.6 : 1, transition: 'all 0.15s',
-          }}
-          onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.borderColor='#d97706'; el.style.color='#d97706'; el.style.background='rgba(234,179,8,0.07)' }}
-          onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.borderColor='var(--border)'; el.style.color='var(--text-muted)'; el.style.background='transparent' }}>
-          {fixLoading ? '⟳' : '⚙'}
-          {fixLoading ? 'Fixing…' : 'Fix tasks'}
-        </button>
+  const PageHeader = () => {
+    const STATS = [
+      { label:'Overdue',        value: overdueCount,        color:'#dc2626', bg:'rgba(220,38,38,0.07)',    icon:'⚠',  section: null as null|'approval' },
+      { label:'Due Today',      value: todayCount,          color:'#0d9488', bg:'rgba(13,148,136,0.07)',   icon:'📅', section: null },
+      { label:'Needs Approval', value: pendingTasks.length, color:'#7c3aed', bg:'rgba(124,58,237,0.07)',  icon:'⏳', section: 'approval' as const },
+      { label:'Completed',      value: doneCount,           color:'#16a34a', bg:'rgba(22,163,74,0.07)',   icon:'✓',  section: null },
+    ]
+    return (
+      <>
+        {/* ── Stats strip ── */}
+        <div style={{ display:'flex', background:'var(--surface)', borderBottom:'1px solid var(--border)', flexShrink:0 }}>
+          {STATS.map((s, i) => {
+            const clickable = !!s.section && canManage
+            return (
+              <div key={i}
+                onClick={() => { if (clickable && s.section) { setActiveSection(s.section); setShowAssignedByMe(false) } }}
+                style={{ flex:1, padding:'12px 18px', display:'flex', alignItems:'center', gap:12,
+                  borderRight: i < STATS.length-1 ? '1px solid var(--border)' : 'none',
+                  background: s.bg, cursor: clickable ? 'pointer' : 'default',
+                  transition:'filter 0.15s' }}
+                onMouseEnter={e => { if (clickable) (e.currentTarget as HTMLElement).style.filter='brightness(0.96)' }}
+                onMouseLeave={e => { if (clickable) (e.currentTarget as HTMLElement).style.filter='none' }}>
+                <div style={{ width:38, height:38, borderRadius:10, background:'var(--surface)',
+                  display:'flex', alignItems:'center', justifyContent:'center',
+                  fontSize:18, boxShadow:'0 1px 4px rgba(0,0,0,0.08)', flexShrink:0 }}>
+                  {s.icon}
+                </div>
+                <div>
+                  <div style={{ fontSize:24, fontWeight:800, color:s.color, lineHeight:1 }}>{s.value}</div>
+                  <div style={{ fontSize:10, color:'var(--text-muted)', fontWeight:600,
+                    textTransform:'uppercase', letterSpacing:'0.07em', marginTop:3 }}>{s.label}</div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* ── Section navigation ── */}
+        <div style={{ display:'flex', alignItems:'center', background:'var(--surface)',
+          borderBottom:'1px solid var(--border)', padding:'0 16px', flexShrink:0, gap:2 }}>
+
+          {/* My Tasks */}
+          <button onClick={() => { setActiveSection('mine'); setShowAssignedByMe(false) }}
+            style={{ display:'flex', alignItems:'center', gap:7, padding:'11px 14px', border:'none',
+              background:'transparent', cursor:'pointer', fontSize:13, fontWeight:600,
+              borderBottom:`2px solid ${activeSection==='mine'?'var(--brand)':'transparent'}`,
+              color: activeSection==='mine' ? 'var(--brand)' : 'var(--text-muted)',
+              marginBottom:-1, transition:'color 0.15s' }}>
+            My Tasks
+            <span style={{ fontSize:11, padding:'1px 7px', borderRadius:99,
+              background: activeSection==='mine' ? 'rgba(13,148,136,0.12)' : 'var(--surface-subtle)',
+              border:'1px solid var(--border)', color: activeSection==='mine' ? 'var(--brand)' : 'var(--text-secondary)',
+              fontWeight:700 }}>
+              {tasks.length}
+            </span>
+          </button>
+
+          {/* Needs Approval */}
+          {canManage && (
+            <button onClick={() => { setActiveSection('approval'); setShowAssignedByMe(false) }}
+              style={{ display:'flex', alignItems:'center', gap:7, padding:'11px 14px', border:'none',
+                background:'transparent', cursor:'pointer', fontSize:13, fontWeight:600,
+                borderBottom:`2px solid ${activeSection==='approval'?'#7c3aed':'transparent'}`,
+                color: activeSection==='approval' ? '#7c3aed' : 'var(--text-muted)',
+                marginBottom:-1, transition:'color 0.15s' }}>
+              Needs Approval
+              {pendingTasks.length > 0 && (
+                <span style={{ fontSize:11, padding:'1px 7px', borderRadius:99, fontWeight:700,
+                  background: activeSection==='approval' ? '#7c3aed' : 'rgba(124,58,237,0.12)',
+                  color: activeSection==='approval' ? '#fff' : '#7c3aed' }}>
+                  {pendingTasks.length}
+                </span>
+              )}
+            </button>
+          )}
+
+          {/* Assigned by Me */}
+          {canManage && (
+            <button onClick={() => { setActiveSection('assigned'); setShowAssignedByMe(true) }}
+              style={{ display:'flex', alignItems:'center', gap:7, padding:'11px 14px', border:'none',
+                background:'transparent', cursor:'pointer', fontSize:13, fontWeight:600,
+                borderBottom:`2px solid ${activeSection==='assigned'?'var(--brand)':'transparent'}`,
+                color: activeSection==='assigned' ? 'var(--brand)' : 'var(--text-muted)',
+                marginBottom:-1, transition:'color 0.15s' }}>
+              Assigned by Me
+              <span style={{ fontSize:11, padding:'1px 7px', borderRadius:99,
+                background: activeSection==='assigned' ? 'rgba(13,148,136,0.12)' : 'var(--surface-subtle)',
+                border:'1px solid var(--border)', color: activeSection==='assigned' ? 'var(--brand)' : 'var(--text-secondary)',
+                fontWeight:700 }}>
+                {assignedByMeList.length}
+              </span>
+            </button>
+          )}
+
+          {/* List / Board toggle — right side, only for My Tasks section */}
+          {activeSection === 'mine' && (
+            <div style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:4, padding:'8px 0' }}>
+              {(['List','Board'] as const).map(t => (
+                <button key={t} onClick={() => setTab(t)}
+                  style={{ padding:'5px 14px', borderRadius:7, fontSize:12, fontWeight:600,
+                    border: tab===t ? 'none' : '1px solid var(--border)',
+                    cursor:'pointer', transition:'all 0.15s',
+                    background: tab===t ? 'var(--brand)' : 'transparent',
+                    color: tab===t ? '#fff' : 'var(--text-secondary)' }}>
+                  {t === 'List' ? '≡ List' : '⊞ Board'}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </>
+    )
+  }
+
+  // ── Approval section (dedicated view) ────────────────────────────────────
+  const ApprovalSection = () => (
+    <div style={{ flex:1, overflowY:'auto', background:'var(--surface-subtle)' }}>
+      {pendingTasks.length === 0 ? (
+        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+          height:'100%', gap:14, padding:40, textAlign:'center' }}>
+          <div style={{ width:64, height:64, borderRadius:'50%',
+            background:'rgba(124,58,237,0.08)', border:'1px solid rgba(124,58,237,0.2)',
+            display:'flex', alignItems:'center', justifyContent:'center', fontSize:28 }}>✓</div>
+          <div style={{ fontSize:18, fontWeight:700, color:'var(--text-primary)' }}>All caught up!</div>
+          <div style={{ fontSize:13, color:'var(--text-muted)', maxWidth:280, lineHeight:1.6 }}>
+            No tasks are currently waiting for your approval. You'll see them here as team members submit work.
+          </div>
+        </div>
+      ) : (
+        <div style={{ padding:20, display:'flex', flexDirection:'column', gap:10, maxWidth:900, margin:'0 auto' }}>
+          {/* Hero banner */}
+          <div style={{ background:'linear-gradient(135deg, rgba(124,58,237,0.1) 0%, rgba(139,92,246,0.05) 100%)',
+            border:'1px solid rgba(124,58,237,0.2)', borderRadius:14, padding:'18px 22px',
+            display:'flex', alignItems:'center', gap:16, marginBottom:4 }}>
+            <div style={{ width:48, height:48, borderRadius:12, background:'rgba(124,58,237,0.12)',
+              display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, flexShrink:0 }}>⏳</div>
+            <div>
+              <div style={{ fontSize:18, fontWeight:800, color:'#7c3aed' }}>
+                {pendingTasks.length} task{pendingTasks.length!==1?'s':''} awaiting your review
+              </div>
+              <div style={{ fontSize:12, color:'var(--text-muted)', marginTop:4 }}>
+                Approve to mark complete, or return to the assignee for revisions
+              </div>
+            </div>
+          </div>
+
+          {pendingTasks.map(task => {
+            const assignee = task.assignee as {id:string;name:string}|null
+            const client   = (task as any).client as {id:string;name:string;color:string}|null
+            const ov       = isOverdue(task.due_date, task.status)
+            return (
+              <div key={task.id}
+                onClick={() => setSelTask(selTask?.id===task.id ? null : task)}
+                style={{ background:'var(--surface)', border:'1px solid var(--border)',
+                  borderRadius:12, padding:'16px 20px', borderLeft:'4px solid #7c3aed',
+                  boxShadow:'0 2px 8px rgba(0,0,0,0.05)', cursor:'pointer', transition:'box-shadow 0.15s' }}
+                onMouseEnter={e => (e.currentTarget as HTMLElement).style.boxShadow='0 4px 16px rgba(0,0,0,0.1)'}
+                onMouseLeave={e => (e.currentTarget as HTMLElement).style.boxShadow='0 2px 8px rgba(0,0,0,0.05)'}>
+                <div style={{ display:'flex', alignItems:'flex-start', gap:16 }}>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:15, fontWeight:700, color:'var(--text-primary)', marginBottom:8,
+                      overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
+                      {task.title}
+                    </div>
+                    <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+                      {assignee && (
+                        <span style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'3px 10px',
+                          borderRadius:99, background:'var(--surface-subtle)', border:'1px solid var(--border)',
+                          fontSize:12, fontWeight:500, color:'var(--text-secondary)' }}>
+                          <Avatar name={assignee.name} size="xs"/>
+                          {assignee.name}
+                        </span>
+                      )}
+                      {client && (
+                        <span style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'3px 10px',
+                          borderRadius:99, background:`${client.color}15`, border:`1px solid ${client.color}44`,
+                          fontSize:12, fontWeight:500, color:client.color }}>
+                          <span style={{ width:7, height:7, borderRadius:2, background:client.color, flexShrink:0 }}/>
+                          {client.name}
+                        </span>
+                      )}
+                      {task.due_date && (
+                        <span style={{ fontSize:12, color:ov?'#dc2626':'var(--text-muted)', fontWeight:ov?600:400 }}>
+                          📅 {fmtDate(task.due_date)}{ov?' · Overdue':''}
+                        </span>
+                      )}
+                      <PriorityBadge priority={task.priority}/>
+                    </div>
+                  </div>
+                  <div style={{ display:'flex', gap:8, flexShrink:0, alignItems:'center' }}
+                    onClick={e => e.stopPropagation()}>
+                    <button onClick={() => handleApproveDecision(task.id, 'approve')}
+                      style={{ padding:'8px 20px', borderRadius:10, border:'none', cursor:'pointer',
+                        background:'linear-gradient(135deg,#0d9488,#0f766e)', color:'#fff',
+                        fontSize:13, fontWeight:700, display:'flex', alignItems:'center', gap:5,
+                        boxShadow:'0 2px 8px rgba(13,148,136,0.28)', fontFamily:'inherit' }}>
+                      ✓ Approve
+                    </button>
+                    <button onClick={() => handleApproveDecision(task.id, 'reject')}
+                      style={{ padding:'8px 18px', borderRadius:10, cursor:'pointer', fontSize:13,
+                        fontWeight:600, display:'flex', alignItems:'center', gap:5,
+                        border:'1.5px solid var(--border)', background:'var(--surface)',
+                        color:'var(--text-secondary)', fontFamily:'inherit' }}>
+                      ✕ Return
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
       )}
     </div>
   )
 
-  if (tab === 'List') return (
+  // ── Approval section early return ──────────────────────────────────────
+  if (activeSection === 'approval') return (
     <>
-      {/* ── Undo completion banners (List view) ── */}
+      <style>{`
+        .mytasks-row:hover .delete-task-btn { opacity: 1 !important; }
+        @media (max-width: 640px) { .hide-mobile { display: none !important; } }
+      `}</style>
+      <PageHeader/>
+      <ApprovalSection/>
+      <TaskDetailPanel task={selTask} members={members} clients={clients}
+        currentUserId={currentUserId} userRole={userRole}
+        onClose={() => { setSelTask(null) }}
+        onUpdated={handleTaskUpdated}/>
+    </>
+  )
+
+  if ((activeSection === 'mine' || activeSection === 'assigned') && tab === 'List') return (
+    <>
+      <style>{`
+        .mytasks-row:hover .delete-task-btn { opacity: 1 !important; }
+        @media (max-width: 640px) {
+          .hide-mobile { display: none !important; }
+          .mytasks-row, .mytasks-header { grid-template-columns: 28px 22px 1fr 28px !important; }
+          .show-mobile-meta { display: flex !important; }
+        }
+      `}</style>
+      {/* ── Undo completion banners ── */}
       {pendingUndo.length > 0 && (
         <div style={{ position:'fixed', bottom:24, left:'50%', transform:'translateX(-50%)',
           zIndex:9999, display:'flex', flexDirection:'column', gap:8, alignItems:'center' }}>
@@ -762,10 +938,10 @@ export function MyTasksView({
         </div>
       )}
       <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden', background:'var(--surface)' }}>
-        <Tabs/>
+        <PageHeader/>
 
-        {/* ── Quick add task bar at top of list ── */}
-        {canCreate && (
+        {/* ── Quick add task bar at top of list (My Tasks only) ── */}
+        {canCreate && activeSection === 'mine' && (
           <div style={{ borderBottom: '1px solid var(--border-light)', background: 'var(--surface)' }}>
             <InlineOneTimeTask
               members={members} clients={clients} currentUserId={currentUserId}
@@ -833,112 +1009,19 @@ export function MyTasksView({
             </button>
           </div>
         )}
-        {/* ── Needs your approval section ─────────────────────────── */}
-        {pendingTasks.length > 0 && (
-          <div style={{ borderBottom:'2px solid #7c3aed', marginBottom:0 }}>
-            {/* Section header */}
-            <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 18px 8px',
-              background:'var(--pending-surface, #faf5ff)' }}>
-              <span style={{ fontSize:11, fontWeight:700, color:'#7c3aed',
-                textTransform:'uppercase', letterSpacing:'0.06em' }}>
-                🔔 Needs your approval
-              </span>
-              <span style={{ fontSize:11, background:'#7c3aed', color:'#fff',
-                borderRadius:99, padding:'1px 8px', fontWeight:600 }}>
-                {pendingTasks.length}
-              </span>
-            </div>
-            {/* Approval task rows */}
-            {pendingTasks.map(task => {
-              const assignee = task.assignee as {id:string;name:string}|null
-              const ov = isOverdue(task.due_date, task.status)
-              return (
-                <React.Fragment key={task.id}>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 140px 100px 110px 200px',
-                  alignItems:'center', padding:'0 18px', minHeight:52,
-                  borderBottom:'1px solid var(--border-light)',
-                  background:'var(--pending-surface, #faf5ff)',
-                  cursor:'pointer' }}
-                  onClick={() => setSelTask(selTask?.id === task.id ? null : task)}>
-                  {/* Title */}
-                  <div style={{ minWidth:0, paddingRight:12 }}>
-                    <div style={{ fontSize:13, fontWeight:600, color:'var(--text-primary)',
-                      overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
-                      {task.title}
-                    </div>
-                    {assignee && (
-                      <div style={{ fontSize:11, color:'var(--text-muted)', marginTop:2,
-                        display:'flex', alignItems:'center', gap:4 }}>
-                        <span>Submitted by {assignee.name}</span>
-                        {task.client_id && (task as any).client && (
-                          <>
-                            <span>·</span>
-                            <span style={{ width:6, height:6, borderRadius:1,
-                              background:(task as any).client?.color ?? '#ccc', display:'inline-block' }}/>
-                            <span>{(task as any).client?.name}</span>
-                          </>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  {/* Assignee */}
-                  <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                    {assignee && <><Avatar name={assignee.name} size="xs"/>
-                      <span style={{ fontSize:12, color:'var(--text-muted)',
-                        overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{assignee.name}</span>
-                    </>}
-                  </div>
-                  {/* Due date */}
-                  <div style={{ textAlign:'center', fontSize:13,
-                    color: ov ? '#dc2626' : 'var(--text-muted)', fontWeight: ov ? 600 : 400 }}>
-                    {task.due_date ? fmtDate(task.due_date) : '—'}
-                  </div>
-                  {/* Priority */}
-                  <div style={{ display:'flex', justifyContent:'center' }}>
-                    <PriorityBadge priority={task.priority}/>
-                  </div>
-                  {/* Approve / Reject buttons */}
-                  <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}
-                    onClick={e => e.stopPropagation()}>
-                    <button onClick={() => handleApproveDecision(task.id, 'approve')}
-                      style={{ padding:'6px 16px', borderRadius:8, border:'none', cursor:'pointer',
-                        background:'#0d9488', color:'#fff', fontSize:12, fontWeight:600,
-                        fontFamily:'inherit', display:'flex', alignItems:'center', gap:4 }}>
-                      ✓ Approve
-                    </button>
-                    <button onClick={() => handleApproveDecision(task.id, 'reject')}
-                      style={{ padding:'6px 16px', borderRadius:8, cursor:'pointer', fontSize:12,
-                        fontWeight:600, fontFamily:'inherit', display:'flex', alignItems:'center', gap:4,
-                        border:'1px solid var(--border)', background:'var(--surface)', color:'var(--text-secondary)' }}>
-                      ✕ Return
-                    </button>
-                  </div>
-                </div>
-                {/* Subtasks if any */}
-                {expandedTasks.has(task.id) && (subtaskMap[task.id] ?? []).length > 0 && (
-                  <div style={{ background:'var(--surface-subtle)', borderBottom:'1px solid var(--border-light)' }}>
-                    {(subtaskMap[task.id] ?? []).map((sub: any) => (
-                      <div key={sub.id} style={{ display:'flex', alignItems:'center', gap:8,
-                        padding:'5px 18px 5px 60px', borderBottom:'1px solid var(--border-light)' }}>
-                        <span style={{ width:10, height:10, borderRadius:'50%', flexShrink:0,
-                          background: sub.status==='completed' ? 'var(--brand)' : 'transparent',
-                          outline: '2px solid ' + (sub.status==='completed' ? 'var(--brand)' : 'var(--border)') }}/>
-                        <span style={{ flex:1, fontSize:12,
-                          color: sub.status==='completed' ? 'var(--text-muted)' : 'var(--text-primary)',
-                          textDecoration: sub.status==='completed' ? 'line-through' : 'none' }}>{sub.title}</span>
-                        <span style={{ fontSize:11, padding:'1px 8px', borderRadius:99,
-                          background: sub.status==='completed' ? 'rgba(13,148,136,0.1)' : 'var(--surface-subtle)',
-                          color: sub.status==='completed' ? 'var(--brand)' : 'var(--text-muted)' }}>
-                          {sub.status === 'completed' ? '✓ Done' : 'Pending'}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                </React.Fragment>
-              )
-            })}
-          </div>
+        {/* Approval badge — compact reminder when approvals exist, click to switch section */}
+        {pendingTasks.length > 0 && canManage && (
+          <button
+            onClick={() => setActiveSection('approval')}
+            style={{ display:'flex', alignItems:'center', gap:8, padding:'7px 18px',
+              background:'rgba(124,58,237,0.06)', borderBottom:'1px solid rgba(124,58,237,0.15)',
+              border:'none', cursor:'pointer', width:'100%', textAlign:'left', fontFamily:'inherit' }}>
+            <span style={{ fontSize:18 }}>⏳</span>
+            <span style={{ fontSize:12, fontWeight:600, color:'#7c3aed' }}>
+              {pendingTasks.length} task{pendingTasks.length!==1?'s':''} waiting for your approval
+            </span>
+            <span style={{ fontSize:11, color:'#7c3aed', marginLeft:'auto', opacity:0.7 }}>Review →</span>
+          </button>
         )}
 
         {/* Universal filter bar */}
@@ -1643,8 +1726,8 @@ export function MyTasksView({
           onCancel={() => setCompletingTask(null)}
         />
       )}
-      <Tabs/>
-      {/* Universal filter bar (no assignee — My Tasks is already user-scoped) */}
+      <PageHeader/>
+      {/* Universal filter bar */}
       <UniversalFilterBar clients={clients} members={members} showSearch showPriority showDueDate showAssignor showCreatedDate showUpdatedDate/>
 
       {/* ── Undo completion banners ── */}
@@ -1658,10 +1741,11 @@ export function MyTasksView({
               background:'#1e293b', color:'#fff',
               boxShadow:'0 8px 32px rgba(0,0,0,0.3)',
               fontSize:13, fontWeight:500, minWidth:280,
-              animation:'slideUp 0.2s ease',
             }}>
               <span style={{ flex:1, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
-                ✓ "{tasks.find(t => t.id === u.taskId)?.title ?? 'Task'}" completed
+                {u.action === 'completed' ? '✓' : '⏳'}{' '}
+                "{tasks.find(t => t.id === u.taskId)?.title ?? 'Task'}"{' '}
+                {u.action === 'completed' ? 'completed' : 'submitted for approval'}
               </span>
               <button onClick={() => fireUndo(u.taskId)}
                 style={{ padding:'4px 12px', borderRadius:6, border:'1px solid rgba(255,255,255,0.25)',
