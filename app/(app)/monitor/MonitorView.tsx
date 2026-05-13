@@ -103,7 +103,8 @@ function selectStyle(active: boolean) {
   } as React.CSSProperties
 }
 
-export function MonitorView({ tasks, members, clients, currentUserId, userRole }: Props) {
+export function MonitorView({ tasks: initialTasks, members, clients, currentUserId, userRole }: Props) {
+  const [tasks, setTasks] = useState<MonTask[]>(initialTasks)
   const today = todayStr()
 
   // ── Current-month boundaries ──────────────────────────────────────────────
@@ -924,7 +925,12 @@ export function MonitorView({ tasks, members, clients, currentUserId, userRole }
         currentUserId={currentUserId}
         userRole={['owner', 'admin'].includes(userRole) ? userRole : 'viewer'}
         onClose={() => setPanelTask(null)}
-        onUpdated={() => {
+        onUpdated={(fields) => {
+          if (fields && panelTask) {
+            setTasks(prev => prev.map(t =>
+              t.id === panelTask.id ? { ...t, ...(fields as Partial<MonTask>) } : t
+            ))
+          }
           setPanelTask(null)
         }}
       />
