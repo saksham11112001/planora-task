@@ -289,7 +289,13 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
   // ── Filtering ──
   const visible = useMemo(() => {
     return tasks.filter(t => {
-      if (search        && !t.title.toLowerCase().includes(search.toLowerCase()))         return false
+      if (search) {
+        const q = search.toLowerCase()
+        const hit = t.title.toLowerCase().includes(q) ||
+          (t.client?.name.toLowerCase().includes(q) ?? false) ||
+          (t.assignee?.name.toLowerCase().includes(q) ?? false)
+        if (!hit) return false
+      }
       if (filterStatus.length > 0  && !filterStatus.includes(t.status))       return false
       if (filterPrio.length > 0    && !filterPrio.includes(t.priority))      return false
       if (filterClient.length > 0  && !filterClient.includes(t.client_id ?? '')) return false
