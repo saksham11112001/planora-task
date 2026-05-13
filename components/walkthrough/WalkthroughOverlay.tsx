@@ -379,6 +379,224 @@ function IllustrationDone() {
   )
 }
 
+function IllustrationClientGroups() {
+  const groups = [
+    { label:'Manufacturing', count:6, color:'#0891b2', clients:['Shanti Chemicals','Sunrise Exports','Mehta & Sons'] },
+    { label:'Service & Trade', count:4, color:'#7c3aed', clients:['R K Traders','Vista Pvt Ltd'] },
+    { label:'Individual ITR', count:12, color:'#d97706', clients:['Ramesh Gupta','Priya Shah'] },
+  ]
+  return (
+    <svg viewBox="0 0 320 260" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width:'100%', height:'100%' }}>
+      <rect x="15" y="10" width="290" height="240" rx="12" fill="#f8fafc" stroke="#e2e8f0" strokeWidth="1.5"/>
+      {/* header */}
+      <rect x="15" y="10" width="290" height="32" rx="12" fill="#0891b2" fillOpacity="0.08"/>
+      <text x="30" y="30" fontSize="10" fontWeight="700" fill="#0891b2">Clients</text>
+      <rect x="220" y="17" width="74" height="18" rx="5" fill="#0891b2"/>
+      <text x="257" y="29" textAnchor="middle" fontSize="8.5" fontWeight="700" fill="white">+ New Group</text>
+      {/* groups */}
+      {groups.map((g, gi) => (
+        <g key={g.label}>
+          {/* group row */}
+          <rect x="22" y={48+gi*68} width="276" height="24" rx="6" fill={g.color} fillOpacity="0.07" stroke={g.color} strokeWidth="1" strokeOpacity="0.3"/>
+          <text x="34" y={63+gi*68} fontSize="9" fontWeight="700" fill={g.color}>▾  📁  {g.label}</text>
+          <rect x="254" y={53+gi*68} width="34" height="15" rx="4" fill={g.color} fillOpacity="0.15"/>
+          <text x="271" y={64+gi*68} textAnchor="middle" fontSize="8" fontWeight="700" fill={g.color}>{g.count} clients</text>
+          {/* client rows */}
+          {g.clients.map((c, ci) => (
+            <g key={c}>
+              <line x1="38" y1={72+gi*68+ci*15+7} x2="42" y2={72+gi*68+ci*15+7} stroke={g.color} strokeWidth="1" strokeOpacity="0.4"/>
+              <rect x="42" y={72+gi*68+ci*15} width="230" height="13" rx="3" fill="white" stroke="#f1f5f9" strokeWidth="0.8"/>
+              <circle cx="51" cy={72+gi*68+ci*15+6} r="4" fill={g.color} fillOpacity="0.2"/>
+              <text x="59" y={72+gi*68+ci*15+10} fontSize="7.5" fill="#334155">{c}</text>
+            </g>
+          ))}
+        </g>
+      ))}
+    </svg>
+  )
+}
+
+function IllustrationCAAdvanced() {
+  return (
+    <svg viewBox="0 0 320 260" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width:'100%', height:'100%' }}>
+      {/* Task card */}
+      <rect x="15" y="10" width="290" height="240" rx="12" fill="#f8fafc" stroke="#e2e8f0" strokeWidth="1.5"/>
+      <rect x="15" y="10" width="290" height="32" rx="12" fill="#b45309" fillOpacity="0.08"/>
+      <text x="30" y="30" fontSize="9.5" fontWeight="700" fill="#b45309">GSTR 3B — Mehta &amp; Sons · May 2026</text>
+
+      {/* NIL return section */}
+      <rect x="22" y="50" width="133" height="44" rx="8" fill="white" stroke="#e2e8f0" strokeWidth="1"/>
+      <rect x="30" y="58" width="12" height="12" rx="3" fill="#0d9488" stroke="#0d9488" strokeWidth="1"/>
+      <path d="M33 64 L36 68 L41 60" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <text x="48" y="66" fontSize="8.5" fontWeight="700" fill="#0d9488">Mark as NIL Return</text>
+      <text x="30" y="83" fontSize="7.5" fill="#64748b">No transactions this period</text>
+
+      {/* GDrive section */}
+      <rect x="163" y="50" width="130" height="44" rx="8" fill="white" stroke="#e2e8f0" strokeWidth="1"/>
+      <rect x="170" y="58" width="14" height="14" rx="3" fill="#4285f4" fillOpacity="0.15" stroke="#4285f4" strokeWidth="0.8"/>
+      <text x="170" y="65" fontSize="8" fill="#4285f4">📎</text>
+      <text x="190" y="66" fontSize="8.5" fontWeight="700" fill="#1e293b">Google Drive</text>
+      <text x="170" y="82" fontSize="7.5" fill="#64748b">Paste Drive link to attach</text>
+
+      {/* Attachment headers */}
+      <rect x="22" y="103" width="271" height="22" rx="5" fill="#f1f5f9" stroke="#e2e8f0" strokeWidth="1"/>
+      <text x="30" y="117" fontSize="7.5" fontWeight="700" fill="#475569">Acknowledgement</text>
+      <text x="110" y="117" fontSize="7.5" fontWeight="700" fill="#475569">Computation</text>
+      <text x="190" y="117" fontSize="7.5" fontWeight="700" fill="#475569">Challan</text>
+      <text x="250" y="117" fontSize="7.5" fontWeight="700" fill="#475569">Others</text>
+
+      {/* Uploaded files */}
+      {[
+        { name:'3B_May26.pdf', col:30, color:'#dc2626' },
+        { name:'Comp_sheet.xlsx', col:110, color:'#16a34a' },
+        { name:'Challan.pdf', col:190, color:'#0891b2' },
+      ].map(f => (
+        <g key={f.name}>
+          <rect x={f.col-4} y="128" width="72" height="18" rx="4" fill={f.color} fillOpacity="0.08" stroke={f.color} strokeWidth="0.8" strokeOpacity="0.4"/>
+          <text x={f.col} y="140" fontSize="6.5" fontWeight="600" fill={f.color}>{f.name}</text>
+        </g>
+      ))}
+
+      {/* Divider */}
+      <line x1="22" y1="155" x2="293" y2="155" stroke="#e2e8f0" strokeWidth="1"/>
+
+      {/* Bulk assign + Priority row */}
+      <rect x="22" y="161" width="85" height="18" rx="5" fill="#7c3aed" fillOpacity="0.1" stroke="#7c3aed" strokeWidth="0.8"/>
+      <text x="64" y="173" textAnchor="middle" fontSize="7.5" fontWeight="700" fill="#7c3aed">👤 Bulk Assign</text>
+
+      <rect x="115" y="161" width="75" height="18" rx="5" fill="#d97706" fillOpacity="0.1" stroke="#d97706" strokeWidth="0.8"/>
+      <text x="152" y="173" textAnchor="middle" fontSize="7.5" fontWeight="700" fill="#d97706">⚡ Priority: High</text>
+
+      <rect x="198" y="161" width="96" height="18" rx="5" fill="#0d9488" fillOpacity="0.1" stroke="#0d9488" strokeWidth="0.8"/>
+      <text x="246" y="173" textAnchor="middle" fontSize="7.5" fontWeight="700" fill="#0d9488">📅 Due: 20 May</text>
+
+      {/* Status strip */}
+      <rect x="22" y="188" width="271" height="48" rx="8" fill="#fef3c7" stroke="#d97706" strokeWidth="0.8" strokeOpacity="0.4"/>
+      <text x="34" y="203" fontSize="8" fontWeight="700" fill="#b45309">⏰  3 similar tasks for other clients this month</text>
+      <text x="34" y="216" fontSize="7.5" fill="#b45309" fillOpacity="0.8">Shanti Chemicals · Sunrise Exports · Vista Pvt Ltd</text>
+      <rect x="196" y="222" width="86" height="10" rx="3" fill="#b45309" fillOpacity="0.15"/>
+      <text x="239" y="230" textAnchor="middle" fontSize="6.5" fontWeight="700" fill="#b45309">Assign All at Once →</text>
+    </svg>
+  )
+}
+
+function IllustrationTaskDetail() {
+  return (
+    <svg viewBox="0 0 320 260" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width:'100%', height:'100%' }}>
+      {/* Panel */}
+      <rect x="10" y="8" width="300" height="244" rx="12" fill="#f8fafc" stroke="#e2e8f0" strokeWidth="1.5"/>
+      {/* Header */}
+      <rect x="10" y="8" width="300" height="30" rx="12" fill="#0d9488" fillOpacity="0.08"/>
+      <text x="22" y="27" fontSize="9.5" fontWeight="700" fill="#0d9488">ITR Filing — Ramesh Gupta</text>
+      <rect x="264" y="13" width="36" height="16" rx="5" fill="#dc2626" fillOpacity="0.12" stroke="#dc2626" strokeWidth="0.8"/>
+      <text x="282" y="24" textAnchor="middle" fontSize="7" fontWeight="700" fill="#dc2626">Overdue</text>
+
+      {/* Attachments */}
+      <text x="20" y="51" fontSize="8" fontWeight="700" fill="#475569">📎  ATTACHMENTS (3)</text>
+      {[
+        { name:'ITR_Computation.pdf', color:'#dc2626' },
+        { name:'Form_26AS.xlsx', color:'#16a34a' },
+        { name:'AIS_Report.pdf', color:'#0891b2' },
+      ].map((f, i) => (
+        <g key={f.name}>
+          <rect x={20+i*91} y="55" width="86" height="20" rx="5" fill={f.color} fillOpacity="0.08" stroke={f.color} strokeWidth="0.8" strokeOpacity="0.5"/>
+          <text x={63+i*91} y="68" textAnchor="middle" fontSize="6.5" fontWeight="600" fill={f.color}>{f.name.length>14 ? f.name.slice(0,14)+'…' : f.name}</text>
+        </g>
+      ))}
+
+      {/* Blocked by */}
+      <text x="20" y="92" fontSize="8" fontWeight="700" fill="#475569">🔗  BLOCKED BY</text>
+      <rect x="20" y="96" width="280" height="18" rx="5" fill="#fef3c7" stroke="#d97706" strokeWidth="0.8"/>
+      <text x="30" y="108" fontSize="7.5" fill="#b45309">⚠️  Form 16 collection — Ramesh Gupta  ·  Waiting on client</text>
+
+      {/* Comments */}
+      <text x="20" y="127" fontSize="8" fontWeight="700" fill="#475569">💬  COMMENTS (2)</text>
+      <rect x="20" y="131" width="280" height="32" rx="6" fill="white" stroke="#e2e8f0" strokeWidth="1"/>
+      <circle cx="33" cy="147" r="8" fill="#7c3aed" fillOpacity="0.2"/>
+      <text x="33" y="150" textAnchor="middle" fontSize="7" fontWeight="700" fill="#7c3aed">P</text>
+      <text x="47" y="142" fontSize="8" fontWeight="600" fill="#1e293b">Priya S</text>
+      <text x="47" y="154" fontSize="7.5" fill="#64748b">Waiting for Form 26AS from client, will update EOD</text>
+
+      <rect x="20" y="167" width="280" height="28" rx="6" fill="white" stroke="#e2e8f0" strokeWidth="1"/>
+      <circle cx="33" cy="181" r="8" fill="#0d9488" fillOpacity="0.2"/>
+      <text x="33" y="184" textAnchor="middle" fontSize="7" fontWeight="700" fill="#0d9488">R</text>
+      <text x="47" y="176" fontSize="8" fontWeight="600" fill="#1e293b">Rahul G</text>
+      <text x="47" y="188" fontSize="7.5" fill="#64748b">Also check AIS — there were discrepancies last year</text>
+
+      {/* Meta row */}
+      <rect x="20" y="202" width="280" height="40" rx="8" fill="white" stroke="#e2e8f0" strokeWidth="1"/>
+      {[
+        { label:'Due', val:'Jul 31', color:'#dc2626' },
+        { label:'Priority', val:'High', color:'#d97706' },
+        { label:'Assignee', val:'Priya S', color:'#7c3aed' },
+        { label:'Approver', val:'Rahul G', color:'#0d9488' },
+      ].map((m, i) => (
+        <g key={m.label}>
+          <text x={30+i*68} y="217" fontSize="6.5" fontWeight="600" fill="#94a3b8">{m.label}</text>
+          <text x={30+i*68} y="232" fontSize="8" fontWeight="700" fill={m.color}>{m.val}</text>
+        </g>
+      ))}
+    </svg>
+  )
+}
+
+function IllustrationMonitor() {
+  const members = [
+    { name:'Priya S', done:8, total:12, color:'#0d9488' },
+    { name:'Amit K',  done:5, total:9,  color:'#0891b2' },
+    { name:'Neha R',  done:10,total:10, color:'#16a34a' },
+    { name:'Karan J', done:2, total:8,  color:'#d97706' },
+  ]
+  return (
+    <svg viewBox="0 0 320 260" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width:'100%', height:'100%' }}>
+      <rect x="10" y="8" width="300" height="244" rx="12" fill="#f8fafc" stroke="#e2e8f0" strokeWidth="1.5"/>
+      {/* Header */}
+      <rect x="10" y="8" width="300" height="30" rx="12" fill="#7c3aed" fillOpacity="0.08"/>
+      <text x="22" y="27" fontSize="10" fontWeight="700" fill="#7c3aed">Monitor</text>
+      <rect x="244" y="13" width="56" height="16" rx="5" fill="#16a34a" fillOpacity="0.15" stroke="#16a34a" strokeWidth="0.8"/>
+      <circle cx="252" cy="21" r="3" fill="#16a34a"/>
+      <text x="268" y="24" fontSize="7.5" fontWeight="700" fill="#16a34a">LIVE</text>
+
+      {/* Summary tiles */}
+      {[
+        { val:'25', label:'Total Tasks', color:'#0d9488' },
+        { val:'7',  label:'Overdue',     color:'#dc2626' },
+        { val:'4',  label:'In Review',   color:'#7c3aed' },
+        { val:'14', label:'Done',        color:'#16a34a' },
+      ].map((s, i) => (
+        <g key={s.label}>
+          <rect x={16+i*71} y="44" width="66" height="34" rx="7" fill={s.color} fillOpacity="0.08" stroke={s.color} strokeWidth="0.8" strokeOpacity="0.4"/>
+          <text x={49+i*71} y="62" textAnchor="middle" fontSize="14" fontWeight="800" fill={s.color}>{s.val}</text>
+          <text x={49+i*71} y="73" textAnchor="middle" fontSize="6.5" fontWeight="600" fill={s.color} fillOpacity="0.75">{s.label}</text>
+        </g>
+      ))}
+
+      {/* Team workload */}
+      <text x="18" y="96" fontSize="8" fontWeight="700" fill="#475569">TEAM WORKLOAD</text>
+      {members.map((m, i) => {
+        const pct = m.done / m.total
+        return (
+          <g key={m.name}>
+            <circle cx="30" cy={107+i*30} r="9" fill={m.color} fillOpacity="0.18"/>
+            <text x="30" y={110+i*30} textAnchor="middle" fontSize="7" fontWeight="700" fill={m.color}>{m.name[0]}</text>
+            <text x="46" y={110+i*30} fontSize="8" fontWeight="600" fill="#1e293b">{m.name}</text>
+            {/* progress bar track */}
+            <rect x="100" y={101+i*30} width="150" height="10" rx="5" fill="#e2e8f0"/>
+            {/* progress bar fill */}
+            <rect x="100" y={101+i*30} width={150*pct} height="10" rx="5" fill={m.color} fillOpacity="0.85"/>
+            <text x="258" y={110+i*30} fontSize="7.5" fontWeight="700" fill={m.color}>{m.done}/{m.total}</text>
+          </g>
+        )
+      })}
+
+      {/* Live activity feed */}
+      <line x1="16" y1="230" x2="304" y2="230" stroke="#e2e8f0" strokeWidth="1"/>
+      <text x="18" y="220" fontSize="7.5" fontWeight="700" fill="#475569">RECENT ACTIVITY</text>
+      <text x="18" y="243" fontSize="7" fill="#64748b">✅  Priya S completed TDS Return — Mehta &amp; Sons  ·  2m ago</text>
+    </svg>
+  )
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Step definitions
 // ─────────────────────────────────────────────────────────────────────────────
@@ -448,6 +666,20 @@ const STEPS: Step[] = [
     Illustration: IllustrationClients,
   },
   {
+    id: 'client-groups',
+    icon: '📁', color: '#0891b2', accent: 'rgba(8,145,178,0.1)',
+    title: 'Organise with Client Groups',
+    subtitle: 'Clients → Groups tab',
+    body: "As your client list grows, groups keep things tidy. Create folders like 'Manufacturing', 'Individual ITR', or 'Audit Clients' — then filter and assign tasks to an entire group at once.",
+    bullets: [
+      { emoji: '📁', text: 'Create unlimited groups (e.g. GST, Non-GST, Audit)' },
+      { emoji: '⚡', text: 'Assign a task type to the whole group in one click' },
+      { emoji: '🔍', text: 'Filter the Kanban and calendar by group instantly' },
+      { emoji: '📊', text: 'Reports show completion rates per group' },
+    ],
+    Illustration: IllustrationClientGroups,
+  },
+  {
     id: 'compliance',
     icon: '⚖️', color: '#b45309', accent: 'rgba(180,83,9,0.1)',
     title: 'CA Compliance Calendar',
@@ -465,6 +697,20 @@ const STEPS: Step[] = [
     Illustration: IllustrationCompliance,
   },
   {
+    id: 'ca-advanced',
+    icon: '📎', color: '#b45309', accent: 'rgba(180,83,9,0.1)',
+    title: 'NIL Returns, GDrive & Attachments',
+    subtitle: 'CA Compliance → Open any task',
+    body: "Each compliance task has a full detail panel. Mark it as a NIL return with one click, attach documents against custom header columns, or paste a Google Drive link — everything is saved and audit-ready.",
+    bullets: [
+      { emoji: '0️⃣', text: 'NIL Return checkbox — marks task done with no filing' },
+      { emoji: '📎', text: 'Custom attachment columns: Acknowledgement, Computation, Challan…' },
+      { emoji: '🔗', text: 'Paste a Google Drive / Dropbox link as an attachment' },
+      { emoji: '👥', text: 'Bulk-assign an entire batch of tasks to a team member at once' },
+    ],
+    Illustration: IllustrationCAAdvanced,
+  },
+  {
     id: 'kanban',
     icon: '📊', color: '#7c3aed', accent: 'rgba(124,58,237,0.1)',
     title: 'Track Work on Kanban',
@@ -478,6 +724,20 @@ const STEPS: Step[] = [
     ],
     path: '/tasks',
     Illustration: IllustrationKanban,
+  },
+  {
+    id: 'task-detail',
+    icon: '📋', color: '#0d9488', accent: 'rgba(13,148,136,0.1)',
+    title: 'Inside a Task — Attachments, Comments & Blockers',
+    subtitle: 'My Tasks or CA Compliance → Click any task',
+    body: "Click any task to open its detail panel. Attach files, leave threaded comments for your team, link a blocking task, and set the due date, priority, assignee, and approver — all in one place.",
+    bullets: [
+      { emoji: '📎', text: 'Attach PDFs, spreadsheets, images directly to the task' },
+      { emoji: '💬', text: 'Threaded comments — tag teammates, discuss inline' },
+      { emoji: '🔗', text: 'Blocked by — link tasks that must finish first' },
+      { emoji: '👤', text: 'Set assignee + approver per task for clear ownership' },
+    ],
+    Illustration: IllustrationTaskDetail,
   },
   {
     id: 'approvals',
@@ -508,6 +768,23 @@ const STEPS: Step[] = [
     ],
     path: '/calendar',
     Illustration: IllustrationCalendar,
+  },
+  {
+    id: 'monitor',
+    icon: '📡', color: '#7c3aed', accent: 'rgba(124,58,237,0.1)',
+    title: 'Monitor — Your Firm at a Glance',
+    subtitle: 'Sidebar → Monitor',
+    body: "Monitor gives managers a live bird's-eye view of the entire firm. See every team member's workload, overdue count, and recent activity in real time — without asking anyone for a status update.",
+    bullets: [
+      { emoji: '📊', text: 'Team workload bars — see who is over-capacity at a glance' },
+      { emoji: '🔴', text: 'Overdue tasks flagged per person, per client' },
+      { emoji: '🔔', text: 'Live activity feed — every action timestamped' },
+      { emoji: '🎯', text: 'Filter by date range, client, or team member' },
+    ],
+    path: '/monitor',
+    actionLabel: 'Open Monitor',
+    actionHref: '/monitor',
+    Illustration: IllustrationMonitor,
   },
   {
     id: 'my-tasks',
@@ -548,7 +825,7 @@ const STEPS: Step[] = [
 // Constants & helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-const STORAGE_PREFIX = 'planora_wt_v2_'
+const STORAGE_PREFIX = 'planora_wt_v3_'
 const MAX_AGE_MS     = 14 * 24 * 60 * 60 * 1000   // show to accounts < 14 days old
 
 const CONFETTI_COLORS = ['#0d9488','#7c3aed','#0891b2','#d97706','#16a34a','#ec4899','#f43f5e']
