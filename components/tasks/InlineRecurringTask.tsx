@@ -1,5 +1,6 @@
 'use client'
 import { useState, useRef, useCallback, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { Plus, X, RefreshCw, User, Flag, Briefcase, Paperclip, Shield, ToggleLeft, ToggleRight, ListPlus, Trash2 } from 'lucide-react'
 import { toast } from '@/store/appStore'
@@ -755,4 +756,309 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, defa
   )
 }
 
-export { FREQ_LABEL }
+export { FREQ_LABEL, getFreqLabel }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FrequencyPickerButton — shared, self-contained frequency picker
+// Identical modal to the creation form so edit & create are always in sync.
+// Usage: <FrequencyPickerButton value={storedFreq} onChange={newFreq => ...} />
+// ─────────────────────────────────────────────────────────────────────────────
+
+const _optStyle = (active: boolean): React.CSSProperties => ({
+  display: 'flex', alignItems: 'flex-start', gap: 8, padding: '12px 14px',
+  borderRadius: 10, cursor: 'pointer',
+  border: `1.5px solid ${active ? 'var(--brand)' : 'var(--border)'}`,
+  background: active ? 'var(--brand-light)' : 'var(--surface-subtle)',
+})
+const _ts: React.CSSProperties = { fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', whiteSpace: 'nowrap' }
+const _numStyle: React.CSSProperties = {
+  width: 52, padding: '3px 6px', borderRadius: 6, fontSize: 13, fontWeight: 600,
+  textAlign: 'center', border: '1px solid var(--border)', background: 'var(--surface)',
+  color: 'var(--text-primary)', outline: 'none', fontFamily: 'inherit',
+}
+const _dayBtn = (on: boolean): React.CSSProperties => ({
+  padding: '3px 9px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+  border: `1.5px solid ${on ? 'var(--brand)' : 'var(--border)'}`,
+  background: on ? 'var(--brand)' : 'var(--surface)',
+  color: on ? '#fff' : 'var(--text-secondary)',
+})
+
+export function FrequencyPickerButton({
+  value,
+  onChange,
+  disabled = false,
+}: {
+  value:    string
+  onChange: (newFreq: string) => void
+  disabled?: boolean
+}) {
+  type DT = 'daily' | 'every_n_days' | 'weekly_days' | 'every_n_weeks' | 'monthly_days' | 'quarterly' | 'annual'
+  const [open,           setOpen]          = useState(false)
+  const [mounted,        setMounted]        = useState(false)
+  const [draftType,      setDraftType]      = useState<DT>('daily')
+  const [draftNDays,     setDraftNDays]     = useState(2)
+  const [draftWeekdays,  setDraftWeekdays]  = useState<string[]>(['mon'])
+  const [draftNWeeks,    setDraftNWeeks]    = useState(2)
+  const [draftMonthDays, setDraftMonthDays] = useState<number[]>([1])
+  const [draftQDay,      setDraftQDay]      = useState(15)
+  const [draftADay,      setDraftADay]      = useState(31)
+  const [draftAMonth,    setDraftAMonth]    = useState('jul')
+
+  useEffect(() => { setMounted(true) }, [])
+
+  function openPicker() {
+    if (disabled) return
+    // Derive draft state from stored frequency string
+    if (value === 'daily') {
+      setDraftType('daily')
+    } else if (value.startsWith('weekly_days:')) {
+      setDraftType('weekly_days'); setDraftWeekdays(value.replace('weekly_days:', '').split(','))
+    } else if (value === 'bi_weekly') {
+      setDraftType('every_n_weeks'); setDraftNWeeks(2)
+    } else if (value.startsWith('weekly_')) {
+      const day = value.replace('weekly_', '')
+      if (['mon','tue','wed','thu','fri','sat','sun'].includes(day)) {
+        setDraftType('weekly_days'); setDraftWeekdays([day])
+      } else { setDraftType('daily') }
+    } else if (value.startsWith('quarterly')) {
+      setDraftType('quarterly')
+      const qM = value.match(/^quarterly_(\d+)$/)
+      if (qM) setDraftQDay(parseInt(qM[1]))
+      else if (value === 'quarterly_last') setDraftQDay(0)
+      else setDraftQDay(15)
+    } else if (value.startsWith('annual')) {
+      setDraftType('annual')
+      const aM = value.match(/^annual_(\d+)([a-z]+)$/)
+      if (aM) { setDraftADay(parseInt(aM[1])); setDraftAMonth(aM[2]) }
+    } else {
+      const evM  = value.match(/^every_(\d+)_days$/)
+      const moM  = value.match(/^monthly_(\d+)$/)
+      const mdM  = value.match(/^monthly_days:(.+)$/)
+      if (evM) {
+        const d = parseInt(evM[1])
+        if (d % 7 === 0 && d >= 14) { setDraftType('every_n_weeks'); setDraftNWeeks(d / 7) }
+        else { setDraftType('every_n_days'); setDraftNDays(d) }
+      } else if (mdM) {
+        setDraftType('monthly_days'); setDraftMonthDays(mdM[1].split(',').map(Number))
+      } else if (moM) {
+        if (moM[1] === 'last') { setDraftType('monthly_days'); setDraftMonthDays([31]) }
+        else { setDraftType('monthly_days'); setDraftMonthDays([parseInt(moM[1])]) }
+      } else { setDraftType('daily') }
+    }
+    setOpen(true)
+  }
+
+  function confirm() {
+    let freq = 'daily'
+    if (draftType === 'every_n_days') {
+      freq = `every_${draftNDays}_days`
+    } else if (draftType === 'weekly_days') {
+      const sorted = [...draftWeekdays].sort((a, b) => WEEKDAY_ORDER.indexOf(a) - WEEKDAY_ORDER.indexOf(b))
+      freq = sorted.length === 1 ? `weekly_${sorted[0]}` : `weekly_days:${sorted.join(',')}`
+    } else if (draftType === 'every_n_weeks') {
+      freq = draftNWeeks === 2 ? 'bi_weekly' : `every_${draftNWeeks * 7}_days`
+    } else if (draftType === 'monthly_days') {
+      const sorted = [...draftMonthDays].sort((a, b) => a - b)
+      freq = sorted.length === 1
+        ? (sorted[0] === 31 ? 'monthly_last' : `monthly_${sorted[0]}`)
+        : `monthly_days:${sorted.join(',')}`
+    } else if (draftType === 'quarterly') {
+      freq = draftQDay === 0 ? 'quarterly_last' : `quarterly_${draftQDay}`
+    } else if (draftType === 'annual') {
+      freq = `annual_${draftADay}${draftAMonth}`
+    }
+    onChange(freq)
+    setOpen(false)
+  }
+
+  const label = getFreqLabel(value) || value
+
+  const modal = (
+    <div
+      style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(4px)' }}
+      onClick={e => { if (e.target === e.currentTarget) setOpen(false) }}>
+      <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+        background: 'var(--surface)', borderRadius: 16, padding: '24px 24px 20px',
+        width: 460, maxWidth: 'calc(100vw - 32px)', maxHeight: 'calc(100vh - 40px)', overflowY: 'auto',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.18)', border: '1px solid var(--border)', zIndex: 100000 }}>
+
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Set Repeat Schedule</h3>
+          <button type="button" onClick={() => setOpen(false)}
+            style={{ background: 'var(--surface-subtle)', border: '1px solid var(--border)', cursor: 'pointer',
+              color: 'var(--text-muted)', borderRadius: 8, width: 28, height: 28, display: 'flex',
+              alignItems: 'center', justifyContent: 'center' }}>
+            <X style={{ width: 13, height: 13 }}/>
+          </button>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {/* 1 — Daily */}
+          <label style={_optStyle(draftType === 'daily')}>
+            <input type="radio" name="fpb_freq" checked={draftType === 'daily'} onChange={() => setDraftType('daily')}
+              style={{ accentColor: 'var(--brand)', width: 15, height: 15, flexShrink: 0 }}/>
+            <span style={_ts}>Daily</span>
+          </label>
+
+          {/* 2 — Every N days */}
+          <label style={_optStyle(draftType === 'every_n_days')} onClick={() => setDraftType('every_n_days')}>
+            <input type="radio" name="fpb_freq" checked={draftType === 'every_n_days'} onChange={() => setDraftType('every_n_days')}
+              style={{ accentColor: 'var(--brand)', width: 15, height: 15, flexShrink: 0 }}/>
+            <span style={_ts}>Every</span>
+            <input type="number" min={2} max={365} value={draftNDays}
+              onClick={e => { e.stopPropagation(); setDraftType('every_n_days') }}
+              onChange={e => setDraftNDays(Math.max(2, Math.min(365, parseInt(e.target.value) || 2)))}
+              style={_numStyle}/>
+            <span style={_ts}>days</span>
+          </label>
+
+          {/* 3 — Weekly day checkboxes */}
+          <div style={_optStyle(draftType === 'weekly_days')} onClick={() => setDraftType('weekly_days')}>
+            <input type="radio" name="fpb_freq" checked={draftType === 'weekly_days'} onChange={() => setDraftType('weekly_days')}
+              style={{ accentColor: 'var(--brand)', width: 15, height: 15, flexShrink: 0, marginTop: 2 }}/>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <span style={_ts}>Every</span>
+              <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                {(['mon','tue','wed','thu','fri','sat','sun'] as const).map((v, i) => {
+                  const on = draftWeekdays.includes(v)
+                  const l  = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][i]
+                  return (
+                    <button key={v} type="button"
+                      onClick={e => {
+                        e.stopPropagation(); setDraftType('weekly_days')
+                        setDraftWeekdays(prev => prev.includes(v) ? (prev.length > 1 ? prev.filter(d => d !== v) : prev) : [...prev, v])
+                      }}
+                      style={_dayBtn(on)}>{l}</button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* 4 — Every N weeks */}
+          <label style={_optStyle(draftType === 'every_n_weeks')} onClick={() => setDraftType('every_n_weeks')}>
+            <input type="radio" name="fpb_freq" checked={draftType === 'every_n_weeks'} onChange={() => setDraftType('every_n_weeks')}
+              style={{ accentColor: 'var(--brand)', width: 15, height: 15, flexShrink: 0 }}/>
+            <span style={_ts}>Every</span>
+            <input type="number" min={2} max={52} value={draftNWeeks}
+              onClick={e => { e.stopPropagation(); setDraftType('every_n_weeks') }}
+              onChange={e => setDraftNWeeks(Math.max(2, Math.min(52, parseInt(e.target.value) || 2)))}
+              style={_numStyle}/>
+            <span style={_ts}>weeks</span>
+          </label>
+
+          {/* 5 — Monthly day grid */}
+          <div style={_optStyle(draftType === 'monthly_days')} onClick={() => setDraftType('monthly_days')}>
+            <input type="radio" name="fpb_freq" checked={draftType === 'monthly_days'} onChange={() => setDraftType('monthly_days')}
+              style={{ accentColor: 'var(--brand)', width: 15, height: 15, flexShrink: 0, marginTop: 2 }}/>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <span style={_ts}>On the ___ of every month</span>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                {Array.from({ length: 31 }, (_, i) => i + 1).map(day => {
+                  const on = draftMonthDays.includes(day)
+                  return (
+                    <button key={day} type="button"
+                      onClick={e => {
+                        e.stopPropagation(); setDraftType('monthly_days')
+                        setDraftMonthDays(prev => prev.includes(day) ? (prev.length > 1 ? prev.filter(d => d !== day) : prev) : [...prev, day])
+                      }}
+                      style={{ ..._dayBtn(on), width: 28, height: 28, borderRadius: 5, fontSize: 11, padding: '0' }}>
+                      {day}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* 6 — Quarterly */}
+          <div style={_optStyle(draftType === 'quarterly')} onClick={() => setDraftType('quarterly')}>
+            <input type="radio" name="fpb_freq" checked={draftType === 'quarterly'} onChange={() => setDraftType('quarterly')}
+              style={{ accentColor: 'var(--brand)', width: 15, height: 15, flexShrink: 0, marginTop: 2 }}/>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <span style={_ts}>Quarterly — on day</span>
+              <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
+                {[13, 15, 20, 25].map(d => (
+                  <button key={d} type="button"
+                    onClick={e => { e.stopPropagation(); setDraftType('quarterly'); setDraftQDay(d) }}
+                    style={{ ..._dayBtn(draftQDay === d), fontFamily: 'inherit' }}>{d}th</button>
+                ))}
+                <button type="button"
+                  onClick={e => { e.stopPropagation(); setDraftType('quarterly'); setDraftQDay(0) }}
+                  style={{ ..._dayBtn(draftQDay === 0), fontFamily: 'inherit' }}>Last day</button>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>or:</span>
+                <input type="number" min={1} max={31} value={draftQDay === 0 ? 1 : draftQDay}
+                  onClick={e => { e.stopPropagation(); setDraftType('quarterly') }}
+                  onChange={e => { setDraftType('quarterly'); setDraftQDay(Math.max(1, Math.min(31, parseInt(e.target.value) || 1))) }}
+                  style={{ ..._numStyle, width: 44 }} placeholder="day"/>
+              </div>
+            </div>
+          </div>
+
+          {/* 7 — Annual */}
+          <div style={_optStyle(draftType === 'annual')} onClick={() => setDraftType('annual')}>
+            <input type="radio" name="fpb_freq" checked={draftType === 'annual'} onChange={() => setDraftType('annual')}
+              style={{ accentColor: 'var(--brand)', width: 15, height: 15, flexShrink: 0, marginTop: 2 }}/>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <span style={_ts}>Annually</span>
+              <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
+                {([['31','jul','31 Jul'],['30','sep','30 Sep'],['31','dec','31 Dec'],['31','mar','31 Mar']] as const).map(([d, m, l]) => {
+                  const on = draftADay === parseInt(d) && draftAMonth === m
+                  return (
+                    <button key={l} type="button"
+                      onClick={e => { e.stopPropagation(); setDraftType('annual'); setDraftADay(parseInt(d)); setDraftAMonth(m) }}
+                      style={{ ..._dayBtn(on), padding: '3px 8px', fontSize: 11, fontFamily: 'inherit' }}>{l}</button>
+                  )
+                })}
+                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>or:</span>
+                <input type="number" min={1} max={31} value={draftADay}
+                  onClick={e => { e.stopPropagation(); setDraftType('annual') }}
+                  onChange={e => { setDraftType('annual'); setDraftADay(Math.max(1, Math.min(31, parseInt(e.target.value) || 1))) }}
+                  style={{ ..._numStyle, width: 44 }}/>
+                <select value={draftAMonth}
+                  onClick={e => { e.stopPropagation(); setDraftType('annual') }}
+                  onChange={e => { setDraftType('annual'); setDraftAMonth(e.target.value) }}
+                  style={{ fontSize: 11, border: '1px solid var(--border)', borderRadius: 6, padding: '3px 6px',
+                    background: 'var(--surface)', fontFamily: 'inherit', color: 'var(--text-primary)', outline: 'none' }}>
+                  {MONTHS_SHORT.map((m, i) => <option key={m} value={m}>{MONTHS_LABEL[i]}</option>)}
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+          <button type="button" onClick={() => setOpen(false)}
+            style={{ flex: 1, padding: '10px 0', borderRadius: 10, border: '1px solid var(--border)',
+              background: 'transparent', color: 'var(--text-secondary)', fontSize: 13, fontWeight: 500,
+              cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
+          <button type="button" onClick={confirm}
+            style={{ flex: 2, padding: '10px 0', borderRadius: 10, border: 'none',
+              background: 'var(--brand)', color: '#fff', fontSize: 13, fontWeight: 700,
+              cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 2px 10px rgba(13,148,136,0.35)' }}>
+            Confirm</button>
+        </div>
+      </div>
+    </div>
+  )
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={openPicker}
+        disabled={disabled}
+        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderRadius: 8,
+          border: '1px solid var(--border)', background: disabled ? 'transparent' : 'var(--surface-subtle)',
+          color: 'var(--text-primary)', fontSize: 13, fontWeight: 500,
+          cursor: disabled ? 'default' : 'pointer', fontFamily: 'inherit',
+          opacity: disabled ? 0.6 : 1 }}>
+        <RefreshCw style={{ width: 12, height: 12, color: 'var(--brand)', flexShrink: 0 }}/>
+        {label}
+      </button>
+      {open && mounted && createPortal(modal, document.body)}
+    </>
+  )
+}

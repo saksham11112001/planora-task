@@ -4,7 +4,7 @@ import { CustomFieldsPanel } from '@/components/tasks/CustomFieldsPanel'
 import type { CustomFieldDef } from '@/components/tasks/CustomFieldsPanel'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { X, ThumbsUp, ThumbsDown, Flag, Calendar, User, Briefcase, Send, Clock, Sparkles, ShieldCheck, RefreshCw, FolderPlus, ArrowRightLeft, ExternalLink, Link2, Repeat2, DollarSign } from 'lucide-react'
-import { FREQUENCIES, FREQ_LABEL } from '@/components/tasks/InlineRecurringTask'
+import { FREQ_LABEL, FrequencyPickerButton } from '@/components/tasks/InlineRecurringTask'
 import { cn }             from '@/lib/utils/cn'
 import { PRIORITY_CONFIG, STATUS_CONFIG } from '@/types'
 import type { Task }      from '@/types'
@@ -140,25 +140,10 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     setDueDate(task.due_date ?? '')
     setIsBillable((task as any).is_billable ?? false)
     setBillableAmount((task as any).billable_amount != null ? String((task as any).billable_amount) : '')
-    // Sync recurring fields
+    // Sync recurring fields — store the raw effective frequency; FrequencyPickerButton handles all parsing internally
     const rawFreq = (task as any).frequency ?? ''
     setRecurFreq(rawFreq)
     setRecurNextDate((task as any).next_occurrence_date ?? '')
-    // Pre-fill custom sub-inputs from stored frequency value
-    const everyM = rawFreq.match(/^every_(\d+)_days$/)
-    if (everyM) { setRecurFreq('custom_daily'); setRecurCustomInterval(Number(everyM[1])) }
-    const moM = rawFreq.match(/^monthly_(\d+)$/)
-    if (moM && !['1','7','10','11','13','15','20','25'].includes(moM[1]) && moM[1] !== 'last') {
-      setRecurFreq('monthly_custom'); setRecurCustomDay(Number(moM[1]))
-    }
-    const qM = rawFreq.match(/^quarterly_(\d+)$/)
-    if (qM && !['13','15','25'].includes(qM[1]) && qM[1] !== 'last') {
-      setRecurFreq('quarterly_custom'); setRecurCustomDay(Number(qM[1]))
-    }
-    const annM = rawFreq.match(/^annual_(\d+)([a-z]+)$/)
-    if (annM && !['31jul','30sep','31dec','31mar'].includes(`${annM[1]}${annM[2]}`)) {
-      setRecurFreq('annual_custom'); setRecurCustomDay(Number(annM[1])); setRecurCustomMonth(annM[2])
-    }
     setTab('details')
     setActivityLog([])
     setActivityLoaded(false)
@@ -1517,81 +1502,14 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                   <>
                     <FieldRow label="Frequency">
                       <Repeat2 className="h-3.5 w-3.5" style={{ color: 'var(--brand)', flexShrink: 0 }} />
-                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 5 }}>
-                        <select
-                          value={recurFreq}
-                          onChange={e => {
-                            const v = e.target.value
-                            setRecurFreq(v)
-                            // Patch immediately for non-custom values
-                            if (!['custom_daily','monthly_custom','quarterly_custom','annual_custom'].includes(v)) {
-                              patch({ frequency: v })
-                            }
-                          }}
-                          disabled={!canManage}
-                          className="text-sm outline-none rounded-md px-2 py-1"
-                          style={{
-                            color: 'var(--text-primary)', background: 'var(--surface-subtle)',
-                            border: '1px solid var(--border)', cursor: canManage ? 'pointer' : 'default',
-                          }}>
-                          {(['Daily','Weekly','Monthly','Quarterly','Annual'] as const).map(grp => (
-                            <optgroup key={grp} label={grp}>
-                              {FREQUENCIES.filter(f => f.group === grp).map(f => (
-                                <option key={f.v} value={f.v}>{f.l}</option>
-                              ))}
-                            </optgroup>
-                          ))}
-                        </select>
-
-                        {/* Custom daily: every N days */}
-                        {recurFreq === 'custom_daily' && canManage && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Every</span>
-                            <input type="number" min={1} max={365} value={recurCustomInterval}
-                              onChange={e => setRecurCustomInterval(Math.max(1, Number(e.target.value)))}
-                              onBlur={() => patch({ frequency: `every_${recurCustomInterval}_days` })}
-                              style={{ width: 52, fontSize: 12, padding: '2px 6px', border: '1px solid var(--border)', borderRadius: 6, background: 'var(--surface-subtle)', fontFamily: 'inherit', outline: 'none' }}/>
-                            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>days</span>
-                          </div>
-                        )}
-
-                        {/* Custom monthly / quarterly: specific day of month */}
-                        {(recurFreq === 'monthly_custom' || recurFreq === 'quarterly_custom') && canManage && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Day</span>
-                            <input type="number" min={1} max={31} value={recurCustomDay}
-                              onChange={e => setRecurCustomDay(Math.max(1, Math.min(31, Number(e.target.value))))}
-                              onBlur={() => {
-                                const prefix = recurFreq === 'monthly_custom' ? 'monthly' : 'quarterly'
-                                patch({ frequency: `${prefix}_${recurCustomDay}` })
-                              }}
-                              style={{ width: 52, fontSize: 12, padding: '2px 6px', border: '1px solid var(--border)', borderRadius: 6, background: 'var(--surface-subtle)', fontFamily: 'inherit', outline: 'none' }}/>
-                            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>of each {recurFreq === 'monthly_custom' ? 'month' : 'quarter-end month'}</span>
-                          </div>
-                        )}
-
-                        {/* Custom annual: specific day + month */}
-                        {recurFreq === 'annual_custom' && canManage && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Day</span>
-                            <input type="number" min={1} max={31} value={recurCustomDay}
-                              onChange={e => setRecurCustomDay(Math.max(1, Math.min(31, Number(e.target.value))))}
-                              style={{ width: 48, fontSize: 12, padding: '2px 6px', border: '1px solid var(--border)', borderRadius: 6, background: 'var(--surface-subtle)', fontFamily: 'inherit', outline: 'none' }}/>
-                            <select value={recurCustomMonth}
-                              onChange={e => setRecurCustomMonth(e.target.value)}
-                              style={{ fontSize: 11, border: '1px solid var(--border)', borderRadius: 6, padding: '2px 6px', background: 'var(--surface-subtle)', fontFamily: 'inherit', outline: 'none', color: 'var(--text-primary)' }}>
-                              {['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'].map((m, i) => (
-                                <option key={m} value={m}>{['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][i]}</option>
-                              ))}
-                            </select>
-                            <button
-                              onClick={() => patch({ frequency: `annual_${recurCustomDay}${recurCustomMonth}` })}
-                              style={{ fontSize: 11, fontWeight: 600, padding: '2px 10px', border: 'none', borderRadius: 5, background: 'var(--brand)', color: '#fff', cursor: 'pointer', fontFamily: 'inherit' }}>
-                              Save
-                            </button>
-                          </div>
-                        )}
-                      </div>
+                      <FrequencyPickerButton
+                        value={recurFreq}
+                        onChange={freq => {
+                          setRecurFreq(freq)
+                          patch({ frequency: freq })
+                        }}
+                        disabled={!canManage}
+                      />
                     </FieldRow>
 
                     <FieldRow label="Next recurrence">
