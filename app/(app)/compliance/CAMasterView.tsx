@@ -2406,7 +2406,7 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
       </div>
 
       {/* ── Main content ── */}
-      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+      <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
 
         {/* Loading spinner */}
         {loading && (
@@ -2443,7 +2443,7 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
 
         {/* Grid */}
         {!loading && tasks.length > 0 && (
-          <div style={{ overflowX: 'auto', minWidth: 0 }}>
+          <div style={{ minWidth: 0 }}>
             <table style={{
               borderCollapse: 'collapse', width: '100%',
               fontSize: 13, tableLayout: 'auto',
@@ -2766,4 +2766,5 @@ const thStyle: React.CSSProperties = {
   padding: '8px 10px', fontWeight: 600, fontSize: 12,
   color: 'var(--text-secondary)', textAlign: 'left',
   whiteSpace: 'nowrap', borderBottom: '1px solid var(--border)',
+  position: 'sticky', top: 0, zIndex: 3, background: 'var(--surface-alt)',
 }

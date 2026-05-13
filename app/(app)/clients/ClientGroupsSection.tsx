@@ -143,6 +143,9 @@ export function ClientGroupsSection({ initialGroups, allClients, canManage }: Pr
   }, [clients, cSearch])
 
   // ── render ────────────────────────────────────────────────────────────
+  // Hide the entire section when there are no groups and the create form is closed
+  if (groups.length === 0 && !showCreate) return null
+
   return (
     <div style={{ marginTop: 16 }}>
       {/* ── section header ── */}
