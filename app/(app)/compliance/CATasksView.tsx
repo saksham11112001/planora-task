@@ -150,6 +150,20 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
 
   /* ── Optimistic status patch ───────────────────────────────── */
   async function patchStatus(taskId: string, newStatus: string) {
+    // Compliance tasks must go through approval before they can be completed
+    if (newStatus === 'completed') {
+      const target = tasks.find(t => t.id === taskId)
+      if (target?.custom_fields?._ca_compliance) {
+        const isApproverOrAdmin =
+          ['owner', 'admin'].includes(userRole) ||
+          (target.approver_id != null && target.approver_id === currentUserId)
+        if (!isApproverOrAdmin) {
+          newStatus = 'in_review'
+          toast.info('Compliance tasks require approval — submitted for review')
+        }
+      }
+    }
+
     const prevTasks   = tasks
     const prevSelTask = selTask
     setTasks(p => p.map(t => t.id === taskId ? { ...t, status: newStatus } : t))

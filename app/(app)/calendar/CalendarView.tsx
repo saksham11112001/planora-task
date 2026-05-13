@@ -455,6 +455,11 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
                             {t.custom_fields?._ca_compliance && (
                               <span style={{ fontSize:9, fontWeight:700, color:'#d97706' }}>CA</span>
                             )}
+                            {t.custom_fields?._ca_compliance && t.client && (
+                              <span style={{ fontSize:9, color:'#a16207', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis', maxWidth:70 }}>
+                                {t.client.name.length > 12 ? t.client.name.slice(0, 12)+'…' : t.client.name}
+                              </span>
+                            )}
                             <span style={{ marginLeft:'auto', fontSize:9, padding:'1px 5px', borderRadius:4,
                               background: isDone ? 'rgba(22,163,74,0.15)' : 'var(--surface-subtle)',
                               color: STATUS_DOT[t.status] ?? '#94a3b8', fontWeight:500 }}>
@@ -722,6 +727,12 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
                           {t.custom_fields?._ca_compliance && (
                             <span style={{ fontSize:10, fontWeight:700, color:'#d97706',
                               background:'rgba(234,179,8,0.12)', padding:'1px 6px', borderRadius:4 }}>CA</span>
+                          )}
+                          {t.custom_fields?._ca_compliance && t.client && (
+                            <span style={{ display:'inline-flex', alignItems:'center', gap:3, fontSize:10, color:'#a16207' }}>
+                              <span style={{ width:6, height:6, borderRadius:2, background:t.client.color, display:'inline-block' }}/>
+                              {t.client.name}
+                            </span>
                           )}
                           <span style={{ display:'inline-flex',alignItems:'center',gap:3,fontSize:10,
                             padding:'1px 6px',borderRadius:4,
