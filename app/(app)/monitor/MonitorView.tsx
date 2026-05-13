@@ -44,6 +44,7 @@ interface Props {
   clients: { id: string; name: string; color: string }[]
   currentUserId: string
   userRole: string
+  from90: string
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
@@ -103,8 +104,14 @@ function selectStyle(active: boolean) {
   } as React.CSSProperties
 }
 
-export function MonitorView({ tasks: initialTasks, members, clients, currentUserId, userRole }: Props) {
-  const [tasks, setTasks] = useState<MonTask[]>(initialTasks)
+export function MonitorView({ tasks: initialTasks, members, clients, currentUserId, userRole, from90 }: Props) {
+  // Pre-filter server data: drop completed tasks older than 90 days (done client-side
+  // so the DB query has no OR condition that could silently exclude active tasks).
+  const [tasks, setTasks] = useState<MonTask[]>(
+    initialTasks.filter(t =>
+      t.status !== 'completed' || !t.completed_at || t.completed_at.slice(0, 10) >= from90
+    )
+  )
   const today = todayStr()
 
   // ── Current-month boundaries ──────────────────────────────────────────────
