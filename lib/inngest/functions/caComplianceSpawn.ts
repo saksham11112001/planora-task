@@ -147,7 +147,11 @@ export const caComplianceSpawn = inngest.createFunction(
             status:        'created',
           })
           if (instErr) {
+            // Roll back the task so the next cron run can retry cleanly (avoids phantom tasks
+            // that exist in `tasks` but have no instance record — the root cause of duplication).
             console.error(`[caComplianceSpawn] instance insert failed (${asgn.id}/${monthKey}):`, instErr.message)
+            await admin.from('tasks').delete().eq('id', newTask.id)
+            return
           }
 
           spawned++
