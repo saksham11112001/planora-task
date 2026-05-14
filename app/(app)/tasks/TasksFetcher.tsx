@@ -125,7 +125,18 @@ export async function TasksFetcher() {
     })
   }
 
-  const displayTaskList = taskList.filter((t: any) => !t.parent_task_id)
+  // Deduplicate CA compliance tasks: if the same (title, client_id, due_date) was
+  // spawned twice (race condition between cron + manual trigger), keep only the first.
+  const seenCAKeys = new Set<string>()
+  const displayTaskList = taskList.filter((t: any) => {
+    if (t.parent_task_id) return false
+    if (t.custom_fields?._ca_compliance === true) {
+      const key = `${t.title}__${t.client_id ?? ''}__${t.due_date ?? ''}`
+      if (seenCAKeys.has(key)) return false
+      seenCAKeys.add(key)
+    }
+    return true
+  })
 
   type UpcomingCATrigger = {
     id: string; title: string; triggerDate: string; dueDate: string

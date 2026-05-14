@@ -74,6 +74,19 @@ export async function POST() {
     (instances ?? []).map((r: any) => `${r.assignment_id}__${r.due_date}`)
   )
 
+  // Also check actual tasks table — guards against ca_task_instances being out of sync
+  // (e.g. if a previous spawn wrote the task but the instance insert failed).
+  const { data: existingCATasks } = await admin
+    .from('tasks')
+    .select('title, client_id, due_date')
+    .eq('org_id', mb.org_id)
+    .contains('custom_fields', { _ca_compliance: true })
+    .neq('is_archived', true)
+
+  const existingTaskKeys = new Set(
+    (existingCATasks ?? []).map((t: any) => `${t.title}__${t.client_id ?? ''}__${t.due_date ?? ''}`)
+  )
+
   // ── 3. Walk each assignment × each due date ───────────────────────
   let spawned = 0
   let skipped = 0
@@ -118,9 +131,10 @@ export async function POST() {
         continue
       }
 
-      // Skip if already spawned
+      // Skip if already spawned (check both instance table and actual tasks)
       const instanceKey = `${asgn.id}__${dueDateStr}`
-      if (existingKeys.has(instanceKey)) {
+      const taskKey     = `${master.name}__${asgn.client_id ?? ''}__${dueDateStr}`
+      if (existingKeys.has(instanceKey) || existingTaskKeys.has(taskKey)) {
         detail.push({ ...logBase, action: 'skipped', reason: 'already spawned' })
         continue
       }
@@ -162,7 +176,8 @@ export async function POST() {
         status:        'created',
       })
 
-      existingKeys.add(instanceKey) // prevent duplicate within same request
+      existingKeys.add(instanceKey)   // prevent duplicate within same request
+      existingTaskKeys.add(taskKey)   // same
       detail.push({ client_id: asgn.client_id, task: master.name, month: monthKey, due: dueDateStr, action: 'spawned' })
       spawned++
     }
