@@ -91,7 +91,10 @@ export const recurringSpawn = inngest.createFunction(
     let spawned = 0
 
     for (const tmpl of templates) {
-      await step.run(`spawn-${tmpl.id}`, async () => {
+      // Return 1/0 from the step so the counter is accurate even when Inngest
+      // replays completed steps (the closure variable resets but the memoised
+      // return value is preserved across retries).
+      const didSpawn: number = await step.run(`spawn-${tmpl.id}`, async () => {
         // Create new task instance
         const { error } = await admin.from('tasks').insert({
           org_id:            tmpl.org_id,
@@ -114,11 +117,13 @@ export const recurringSpawn = inngest.createFunction(
           await admin.from('tasks')
             .update({ next_occurrence_date: nextDate })
             .eq('id', tmpl.id)
-          spawned++
+          return 1
         } else {
           console.error(`[recurringSpawn] Failed to spawn task ${tmpl.id}:`, error.message)
+          return 0
         }
       })
+      spawned += didSpawn ?? 0
     }
 
     return { templates_checked: templates.length, tasks_spawned: spawned }

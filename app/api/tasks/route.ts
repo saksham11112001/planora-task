@@ -156,7 +156,10 @@ export async function POST(request: NextRequest) {
       custom_fields:  s.required ? { _compliance_subtask: true } : null,
     }))
     const { error: subErr } = await supabase.from('tasks').insert(subtaskInserts)
-    if (subErr) console.error('[tasks POST] subtask insert failed:', subErr.message)
+    if (subErr) {
+      console.error('[tasks POST] subtask insert failed:', subErr.message)
+      return NextResponse.json({ data: task, warning: 'subtasks_failed' }, { status: 201 })
+    }
   }
 
   return NextResponse.json({ data: task }, { status: 201 })

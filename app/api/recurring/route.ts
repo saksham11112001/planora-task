@@ -17,7 +17,8 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json()
   const { title, priority = 'medium', frequency, assignee_id, approver_id,
-          project_id, client_id, start_date, subtasks } = body
+          project_id, client_id, start_date, subtasks,
+          approval_required: bodyApprovalRequired } = body
 
   if (!title?.trim()) return NextResponse.json({ error: 'Title required' }, { status: 400 })
   if (!frequency)     return NextResponse.json({ error: 'Frequency required' }, { status: 400 })
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest) {
     priority,
     status:               'todo',
     is_recurring:         true,
-    approval_required:    !!(client_id),
+    approval_required:    typeof bodyApprovalRequired === 'boolean' ? bodyApprovalRequired : !!(client_id),
     frequency:            dbFrequency,
     next_occurrence_date: nextDate,
     assignee_id:          assignee_id  || null,

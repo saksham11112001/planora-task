@@ -219,9 +219,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         .eq('id', data.parent_task_id).eq('org_id', mb.org_id).maybeSingle()
       // Skip auto-complete if parent requires approval and hasn't been approved yet
       if (!parentTask?.approval_required || parentTask?.approval_status === 'approved') {
-        await supabase.from('tasks')
-          .update({ status: 'completed', completed_at: new Date().toISOString() })
-          .eq('id', data.parent_task_id)
+        const autoUpdate: Record<string, unknown> = {
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+        }
+        // Clear any stale pending approval_status on non-approval-required parents.
+        // (approval_required=true + approved tasks keep their 'approved' status.)
+        if (!parentTask?.approval_required) {
+          autoUpdate.approval_status = null
+        }
+        await supabase.from('tasks').update(autoUpdate).eq('id', data.parent_task_id)
       }
     }
   }

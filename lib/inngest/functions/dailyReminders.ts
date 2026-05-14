@@ -21,15 +21,19 @@ export const dailyReminders = inngest.createFunction(
 
   async ({ step }) => {
     const admin = createAdminClient()
-    const now   = new Date()
-    const today = now.toISOString().split('T')[0]
+    const now    = new Date()
+    // Use IST (UTC+5:30) for all date-boundary comparisons so task due dates,
+    // which are stored as YYYY-MM-DD in the Indian business day, are compared
+    // against the correct calendar day — not UTC midnight (5.5 h behind IST).
+    const nowIST    = new Date(Date.now() + 5.5 * 60 * 60 * 1000)
+    const today     = nowIST.toISOString().split('T')[0]
 
     // Due-soon window: tasks due in 1, 2, or 3 days
-    const in1day = new Date(now.getTime() + 1 * 86400000).toISOString().split('T')[0]
-    const in3day = new Date(now.getTime() + 3 * 86400000).toISOString().split('T')[0]
+    const in1day    = new Date(nowIST.getTime() + 1 * 86400000).toISOString().split('T')[0]
+    const in3day    = new Date(nowIST.getTime() + 3 * 86400000).toISOString().split('T')[0]
 
     // Escalation window: tasks overdue by exactly 1 day
-    const yesterday = new Date(now.getTime() - 1 * 86400000).toISOString().split('T')[0]
+    const yesterday = new Date(nowIST.getTime() - 1 * 86400000).toISOString().split('T')[0]
 
     // ── Step 1: Due-soon tasks (due in 1–3 days) ──────────────────────
     const dueSoonTasks = await step.run('fetch-due-soon-tasks', async () => {
