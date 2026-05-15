@@ -85,7 +85,8 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
       const ov = Array.isArray(myData.data)
         ? myData.data.filter((t: any) =>
             !['completed', 'cancelled'].includes(t.status) &&
-            !t.custom_fields?._context_task  // exclude parent tasks surfaced for subtask context
+            !t.parent_task_id &&
+            !t.custom_fields?._context_task
           ).length
         : 0
       const pend = Array.isArray(pendData.data) ? pendData.data.length : 0
