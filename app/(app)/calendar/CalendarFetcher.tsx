@@ -30,7 +30,7 @@ export async function CalendarFetcher() {
     : base.or(`assignee_id.eq.${user.id},approver_id.eq.${user.id}`)
 
   const [{ data: tasks }, { data: clients }, { data: members }, { data: caAssignments }, { data: caInstances }] = await Promise.all([
-    taskQuery.limit(2000),
+    taskQuery,
     supabase.from('clients').select('id, name, color').eq('org_id', mb.org_id).eq('status', 'active').order('name'),
     supabase.from('org_members').select('user_id, users(id, name)').eq('org_id', mb.org_id).eq('is_active', true),
     isOwnerAdmin

@@ -48,7 +48,6 @@ export async function ApprovalsFetcher() {
     .neq('is_archived', true)
     .is('parent_task_id', null)
     .order('completed_at', { ascending: false })
-    .limit(30)
 
   const { data: clientsRaw } = await supabase
     .from('clients').select('id, name, color').eq('org_id', mb.org_id)

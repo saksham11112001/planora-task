@@ -23,7 +23,7 @@ export async function InboxFetcher() {
       return (canViewAll
         ? q
         : q.or(`assignee_id.eq.${user.id},approver_id.eq.${user.id}`)
-      ).limit(500)
+      )
     })(),
     supabase.from('org_members').select('user_id, role, users(id, name)').eq('org_id', mb.org_id).eq('is_active', true),
     supabase.from('clients').select('id, name, color').eq('org_id', mb.org_id),

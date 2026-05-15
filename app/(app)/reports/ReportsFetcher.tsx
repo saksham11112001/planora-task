@@ -28,8 +28,7 @@ export async function ReportsFetcher() {
       .select('id, title, status, priority, due_date, assignee_id, created_at, completed_at, project_id')
       .eq('org_id', orgId).eq('is_recurring', false).neq('is_archived', true).is('parent_task_id', null)
       .or(`status.neq.completed,completed_at.gte.${from90}`)
-      .gte('created_at', from90)
-      .limit(2000),
+      .gte('created_at', from90),
     supabase.from('tasks')
       .select('*', { count: 'exact', head: true })
       .eq('org_id', orgId).neq('is_archived', true).is('parent_task_id', null)

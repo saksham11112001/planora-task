@@ -30,7 +30,7 @@ export async function TasksFetcher() {
     { data: caInstances },
     { data: pendingApprovalRaw },
   ] = await Promise.all([
-    scopedBase.limit(500),
+    scopedBase,
 
     supabase.from('org_members')
       .select('user_id, users(id, name)').eq('org_id', mb.org_id).eq('is_active', true),
@@ -43,7 +43,7 @@ export async function TasksFetcher() {
           .neq('is_archived', true).is('parent_task_id', null)
           .or('is_recurring.is.null,is_recurring.eq.false')
           .or('custom_fields.is.null,custom_fields.not.cs.{"_ca_compliance":true}')
-          .order('due_date', { ascending: true, nullsFirst: false }).limit(500)
+          .order('due_date', { ascending: true, nullsFirst: false })
       : Promise.resolve({ data: [] }),
 
     isOwnerAdmin
@@ -65,8 +65,7 @@ export async function TasksFetcher() {
       .neq('is_archived', true)
       .is('parent_task_id', null)
       .neq('assignee_id', user.id)
-      .order('due_date', { ascending: true, nullsFirst: false })
-      .limit(100),
+      .order('due_date', { ascending: true, nullsFirst: false }),
   ])
 
   const clientMap: Record<string, { id: string; name: string; color: string }> = {}
