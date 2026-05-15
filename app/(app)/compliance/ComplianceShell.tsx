@@ -523,9 +523,17 @@ function CAKanbanView({ userRole, currentUserId }: { userRole: string; currentUs
               {(() => {
                 const cid = selUpcomingClientId
                 const allRaw = cid ? (rawTasksByClient[cid] ?? []) : []
-                const hist = allRaw
+                const histRaw = allRaw
                   .filter(t => (t.title ?? '').toLowerCase().trim() === (selUpcoming.name ?? '').toLowerCase().trim())
                   .sort((a: any, b: any) => (b.created_at ?? '') > (a.created_at ?? '') ? 1 : -1)
+                // Deduplicate by due_date: keep the most-recently-created instance per date
+                const seenDates = new Set<string>()
+                const hist = histRaw.filter((t: any) => {
+                  const key = t.due_date ?? t.created_at?.slice(0, 10) ?? t.id
+                  if (seenDates.has(key)) return false
+                  seenDates.add(key)
+                  return true
+                })
                 if (!hist.length) return null
                 return (
                   <div style={{ marginTop: 14, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
