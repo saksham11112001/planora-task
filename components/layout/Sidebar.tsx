@@ -75,9 +75,9 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
     Promise.all([
       // My tasks — fetch all assigned tasks to count active ones
       fetch('/api/tasks?mine=true&limit=500').then(r => r.json()).catch(() => ({ data: [] })),
-      // Pending approval tasks — all in_review across the org (managers see these)
+      // Pending approval tasks — only tasks where I am the designated approver
       canManage
-        ? fetch('/api/tasks?status=in_review&limit=200').then(r => r.json()).catch(() => ({ data: [] }))
+        ? fetch('/api/tasks?pending_approvals=true').then(r => r.json()).catch(() => ({ data: [] }))
         : Promise.resolve({ data: [] }),
     ]).then(([myData, pendData]) => {
       // Count ALL active tasks assigned to me (todo + in_review), not just overdue.

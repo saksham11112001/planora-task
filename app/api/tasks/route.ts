@@ -27,6 +27,9 @@ export async function GET(request: NextRequest) {
   if (sp.get('client_id'))    q = q.eq('client_id', sp.get('client_id')!)
   if (sp.get('status'))       q = q.eq('status', sp.get('status')!)
   if (sp.get('mine') === 'true') q = q.eq('assignee_id', user.id)
+  // pending_approvals=true: tasks where the current user is approver and decision is pending
+  if (sp.get('pending_approvals') === 'true')
+    q = q.eq('status', 'in_review').eq('approval_status', 'pending').eq('approver_id', user.id)
   if (sp.get('parent_id'))    q = q.eq('parent_task_id', sp.get('parent_id')!)
   if (sp.get('top_level') === 'true') q = q.is('parent_task_id', null)
   if (sp.get('parent_recurring_id')) q = q.eq('parent_recurring_id', sp.get('parent_recurring_id')!)
