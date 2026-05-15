@@ -107,7 +107,7 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
     try {
       // ca_compliance=true filters server-side via JSONB @> query — avoids fetching
       // all org tasks and discarding non-CA rows on the client.
-      const res = await fetch('/api/tasks?top_level=true&ca_compliance=true&limit=1000')
+      const res = await fetch('/api/tasks?top_level=true&ca_compliance=true')
       const json = await res.json().catch(() => ({}))
       const all: any[] = json.data ?? json ?? []
       const caTasks = all // already filtered server-side

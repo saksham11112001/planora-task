@@ -37,14 +37,10 @@ export async function GET(request: NextRequest) {
     const btid = sp.get('blocks_task_id')!
     q = (q as any).contains('custom_fields', { _blocked_by: [btid] })
   }
-  const parsedLimit  = parseInt(sp.get('limit')  ?? '100', 10)
-  const parsedOffset = parseInt(sp.get('offset') ?? '0',   10)
-  // ca_compliance=true queries are pre-filtered server-side (JSONB @>) so allow a higher cap.
-  // 2000 handles large orgs (200 clients × ~10 active tasks each = 2000).
-  // All other callers stay capped at 500 to protect against accidental over-fetching.
-  const hardCap = sp.get('ca_compliance') === 'true' ? 2000 : 500
-  const _limit  = Math.min(isNaN(parsedLimit)  ? 100 : parsedLimit,  hardCap)
-  const _offset = Math.max(isNaN(parsedOffset) ? 0   : parsedOffset, 0)
+  const parsedLimit  = parseInt(sp.get('limit')  ?? '0', 10)
+  const parsedOffset = parseInt(sp.get('offset') ?? '0', 10)
+  const _limit  = (!isNaN(parsedLimit) && parsedLimit > 0) ? parsedLimit : 10000
+  const _offset = Math.max(isNaN(parsedOffset) ? 0 : parsedOffset, 0)
   q = q.order('due_date', { ascending: true, nullsFirst: false }).range(_offset, _offset + _limit - 1)
 
   const { data, error } = await q
