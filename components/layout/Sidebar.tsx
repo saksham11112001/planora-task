@@ -22,7 +22,7 @@ let _cacheTime    = 0
 const CACHE_TTL   = 60_000
 
 // Lightweight task-count cache shared across nav renders
-let _countCache = { overdue: 0, pending: 0 }
+let _countCache = { overdue: 0 }
 let _countCacheTime = 0
 const COUNT_CACHE_TTL = 45_000
 
@@ -36,7 +36,6 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
   const [allProjects,   setAllProjects]   = useState<Project[]>([])
   const [flyoutLoading, setFlyoutLoading] = useState(false)
   const [overdueCount,  setOverdueCount]  = useState(_countCache.overdue)
-  const [pendingCount,  setPendingCount]  = useState(_countCache.pending)
   const fetchRef     = useRef(false)
   const countFetchRef = useRef(false)
   const flyoutRef    = useRef<HTMLDivElement>(null)
@@ -64,7 +63,7 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
 
   useEffect(() => { if (pathname === '/projects') _cacheTime = 0 }, [pathname])
 
-  // Fetch overdue + pending-approval counts for nav badges
+  // Fetch active task count for My Tasks badge
   useEffect(() => {
     if (countFetchRef.current) return
     const now = Date.now()
@@ -72,34 +71,25 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
 
     countFetchRef.current = true
 
-    Promise.all([
-      // My tasks — top-level, non-recurring tasks assigned to me
-      fetch('/api/tasks?mine=true&top_level=true&exclude_recurring=true').then(r => r.json()).catch(() => ({ data: [] })),
-      // Pending approval tasks — only tasks where I am the designated approver
-      canManage
-        ? fetch('/api/tasks?pending_approvals=true').then(r => r.json()).catch(() => ({ data: [] }))
-        : Promise.resolve({ data: [] }),
-    ]).then(([myData, pendData]) => {
-      // Count ALL active tasks assigned to me (todo + in_review), not just overdue.
-      // This matches what the user sees on the My Tasks page.
-      const ov = Array.isArray(myData.data)
-        ? myData.data.filter((t: any) => {
-            if (['completed', 'cancelled'].includes(t.status)) return false
-            // exclude un-triggered CA tasks (same rule as My Tasks page isVisible)
-            if (t.custom_fields?._ca_compliance === true && t.custom_fields?._triggered !== true) return false
-            return true
-          }).length
-        : 0
-      const pend = Array.isArray(pendData.data) ? pendData.data.length : 0
+    fetch('/api/tasks?mine=true&top_level=true&exclude_recurring=true')
+      .then(r => r.json())
+      .catch(() => ({ data: [] }))
+      .then((myData) => {
+        const ov = Array.isArray(myData.data)
+          ? myData.data.filter((t: any) => {
+              if (['completed', 'cancelled'].includes(t.status)) return false
+              if (t.custom_fields?._ca_compliance === true && t.custom_fields?._triggered !== true) return false
+              return true
+            }).length
+          : 0
 
-      _countCache = { overdue: ov, pending: pend }
-      _countCacheTime = Date.now()
-      setOverdueCount(ov)
-      setPendingCount(pend)
-    }).catch(() => {}).finally(() => { countFetchRef.current = false })
+        _countCache = { overdue: ov }
+        _countCacheTime = Date.now()
+        setOverdueCount(ov)
+      }).catch(() => {}).finally(() => { countFetchRef.current = false })
   // Re-fetch whenever the user navigates (pathname change) but rate-limited by cache TTL
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname, canManage])
+  }, [pathname])
 
   // Close flyout on outside click
   useEffect(() => {
@@ -293,7 +283,7 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
         {/* ORGANISATION */}
         <GL>Organisation</GL>
         {nav.team && <SI href="/team"    active={isActive('/team')}    icon={<Users    className="h-4 w-4"/>} label="Team"/>}
-        {canManage && <SI href="/approvals" active={isActive('/approvals')} icon={<CheckSquare className="h-4 w-4"/>} label="Approvals" badge={pendingCount > 0 ? pendingCount : undefined}/>}
+
         {nav.time_tracking && isPaid && <SI href="/time" active={isActive('/time')} icon={<Clock className="h-4 w-4"/>} label="Time tracking"/>}
         {nav.reports && isPaid && <SI href="/reports" active={isActive('/reports')} icon={<BarChart2 className="h-4 w-4"/>} label="Reports"/>}
         {canManage && <SI href="/invoices" active={isActive('/invoices')} icon={<Receipt className="h-4 w-4"/>} label="Invoices"/>}
