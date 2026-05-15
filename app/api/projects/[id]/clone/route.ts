@@ -42,7 +42,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 
   // Fetch top-level tasks from the source project
   const { data: tasks } = await supabase.from('tasks')
-    .select('*').eq('project_id', id).is('parent_task_id', null).neq('is_archived', true)
+    .select('*').eq('project_id', id).eq('org_id', mb.org_id).is('parent_task_id', null).neq('is_archived', true)
 
   let taskCount = 0
   let subtaskCount = 0
@@ -69,7 +69,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 
     // Copy subtasks
     const { data: subtasks } = await supabase.from('tasks')
-      .select('*').eq('parent_task_id', task.id).neq('is_archived', true)
+      .select('*').eq('parent_task_id', task.id).eq('org_id', mb.org_id).neq('is_archived', true)
 
     if (subtasks?.length) {
       await admin.from('tasks').insert(
