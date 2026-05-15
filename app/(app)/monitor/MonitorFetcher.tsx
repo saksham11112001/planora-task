@@ -29,6 +29,7 @@ export async function MonitorFetcher() {
       .eq('org_id', mb.org_id)
       .neq('is_archived', true)
       .is('parent_task_id', null)
+      .or('is_recurring.is.null,is_recurring.eq.false')
       .order('due_date', { ascending: true, nullsFirst: false })
       .limit(2000),
     supabase.from('org_members')

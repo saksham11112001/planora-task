@@ -19,7 +19,7 @@ export async function TasksFetcher() {
     .eq('org_id', mb.org_id).neq('is_archived', true)
     .order('due_date', { ascending: true, nullsFirst: false })
 
-  const scopedBase = base.eq('assignee_id', user.id)
+  const scopedBase = base.eq('assignee_id', user.id).or('is_recurring.is.null,is_recurring.eq.false')
 
   const [
     { data: tasks },
@@ -41,6 +41,7 @@ export async function TasksFetcher() {
       ? supabase.from('tasks').select(TASK_COLS)
           .eq('org_id', mb.org_id).eq('created_by', user.id)
           .neq('is_archived', true).is('parent_task_id', null)
+          .or('is_recurring.is.null,is_recurring.eq.false')
           .or('custom_fields.is.null,custom_fields.not.cs.{"_ca_compliance":true}')
           .order('due_date', { ascending: true, nullsFirst: false }).limit(500)
       : Promise.resolve({ data: [] }),
@@ -125,13 +126,18 @@ export async function TasksFetcher() {
     })
   }
 
-  // Deduplicate CA compliance tasks: if the same (title, client_id, due_date) was
-  // spawned twice (race condition between cron + manual trigger), keep only the first.
+  // Deduplicate CA compliance tasks: collapse same-assignment tasks spawned twice
+  // (race condition between cron + manual trigger). Use _assignment_id if present
+  // so tasks from different assignments sharing the same title/client/date are NOT
+  // incorrectly treated as duplicates.
   const seenCAKeys = new Set<string>()
   const displayTaskList = taskList.filter((t: any) => {
     if (t.parent_task_id) return false
     if (t.custom_fields?._ca_compliance === true) {
-      const key = `${t.title}__${t.client_id ?? ''}__${t.due_date ?? ''}`
+      const assignmentId = t.custom_fields._assignment_id ?? ''
+      const key = assignmentId
+        ? `${assignmentId}__${t.due_date ?? ''}`
+        : `${t.title}__${t.client_id ?? ''}__${t.due_date ?? ''}`
       if (seenCAKeys.has(key)) return false
       seenCAKeys.add(key)
     }

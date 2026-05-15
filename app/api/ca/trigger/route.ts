@@ -154,7 +154,7 @@ export async function POST() {
           due_date:          dueDateStr,
           is_recurring:      false,
           created_by:        user.id,           // use triggering admin's ID
-          custom_fields:     { _ca_compliance: true, _triggered: true },
+          custom_fields:     { _ca_compliance: true, _triggered: true, _assignment_id: asgn.id },
         })
         .select('id')
         .single()
