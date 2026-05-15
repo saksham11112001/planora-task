@@ -29,7 +29,7 @@ export async function MonitorFetcher() {
       .eq('org_id', mb.org_id)
       .neq('is_archived', true)
       .is('parent_task_id', null)
-      .order('due_date', { ascending: true, nullsFirst: false }),
+      .order('due_date', { ascending: true, nullsFirst: false }).limit(10000),
     supabase.from('org_members')
       .select('user_id, users(id, name)').eq('org_id', mb.org_id).eq('is_active', true),
     supabase.from('clients').select('id, name, color, status').eq('org_id', mb.org_id).order('name'),

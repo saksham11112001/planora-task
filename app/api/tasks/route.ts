@@ -39,11 +39,9 @@ export async function GET(request: NextRequest) {
   }
   const parsedLimit  = parseInt(sp.get('limit')  ?? '0', 10)
   const parsedOffset = parseInt(sp.get('offset') ?? '0', 10)
+  const _limit  = (!isNaN(parsedLimit) && parsedLimit > 0) ? parsedLimit : 10000
   const _offset = Math.max(isNaN(parsedOffset) ? 0 : parsedOffset, 0)
-  q = q.order('due_date', { ascending: true, nullsFirst: false })
-  if (!isNaN(parsedLimit) && parsedLimit > 0) {
-    q = q.range(_offset, _offset + parsedLimit - 1)
-  }
+  q = q.order('due_date', { ascending: true, nullsFirst: false }).range(_offset, _offset + _limit - 1)
 
   const { data, error } = await q
   if (error) return NextResponse.json(dbError(error, 'tasks'), { status: 500 })
