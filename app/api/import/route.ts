@@ -722,6 +722,14 @@ export async function POST(request: NextRequest) {
             } else {
               await admin.from('org_members').insert({ org_id: orgId, user_id: uid, role, is_active: true })
             }
+            // Deactivate any active memberships in OTHER orgs — a user must belong to
+            // exactly one active org at a time. Duplicate active rows cause getOrgMembership
+            // to return the wrong org non-deterministically, making all tasks invisible.
+            await admin.from('org_members')
+              .update({ is_active: false })
+              .eq('user_id', uid)
+              .neq('org_id', orgId)
+              .eq('is_active', true)
             if (name) await admin.from('users').update({ name }).eq('id', uid)
             // Keep roleCache fresh so later sections (e.g. CA compliance) can resolve approver
             roleCache[uid] = role
@@ -737,6 +745,11 @@ export async function POST(request: NextRequest) {
                 if (authId) {
                   await admin.from('users').upsert({ id: authId, email, name: name || email.split('@')[0] }, { onConflict: 'id', ignoreDuplicates: true })
                   await admin.from('org_members').upsert({ org_id: orgId, user_id: authId, role, is_active: true }, { onConflict: 'org_id,user_id', ignoreDuplicates: false })
+                  await admin.from('org_members')
+                    .update({ is_active: false })
+                    .eq('user_id', authId)
+                    .neq('org_id', orgId)
+                    .eq('is_active', true)
                   // Update caches so later sections can resolve this member as approver
                   emailCache[email.toLowerCase()] = authId
                   roleCache[authId] = role
