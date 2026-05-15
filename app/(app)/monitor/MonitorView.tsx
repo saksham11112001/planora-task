@@ -105,13 +105,10 @@ function selectStyle(active: boolean) {
 }
 
 export function MonitorView({ tasks: initialTasks, members, clients, currentUserId, userRole, from90 }: Props) {
-  // Pre-filter server data: drop completed tasks older than 90 days (done client-side
-  // so the DB query has no OR condition that could silently exclude active tasks).
-  const [tasks, setTasks] = useState<MonTask[]>(
-    initialTasks.filter(t =>
-      t.status !== 'completed' || !t.completed_at || t.completed_at.slice(0, 10) >= from90
-    )
-  )
+  // Show all tasks returned by MonitorFetcher without additional client-side filtering.
+  // MonitorFetcher already caps at 2000 rows. Applying a secondary completed-at cutoff
+  // here can silently hide active tasks whose completed_at was not cleared on reopen.
+  const [tasks, setTasks] = useState<MonTask[]>(initialTasks)
   const today = todayStr()
 
   // ── Current-month boundaries ──────────────────────────────────────────────
