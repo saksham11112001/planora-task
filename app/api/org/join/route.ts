@@ -58,6 +58,16 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    // Deactivate any active memberships in OTHER orgs.
+    // A user must belong to exactly one active org at a time — multiple active rows
+    // cause getOrgMembership() (.maybeSingle() with no ORDER BY) to return a random
+    // org on each request, making tasks from the previous org disappear.
+    await admin.from('org_members')
+      .update({ is_active: false })
+      .eq('user_id', user.id)
+      .neq('org_id', org.id)
+      .eq('is_active', true)
+
     // Ensure user profile exists
     await admin.from('users').upsert({
       id:    user.id,
