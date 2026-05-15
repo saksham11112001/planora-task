@@ -73,8 +73,8 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
     countFetchRef.current = true
 
     Promise.all([
-      // My tasks — fetch all assigned tasks to count active ones
-      fetch('/api/tasks?mine=true&limit=500').then(r => r.json()).catch(() => ({ data: [] })),
+      // My tasks — top-level, non-recurring tasks assigned to me
+      fetch('/api/tasks?mine=true&top_level=true&exclude_recurring=true').then(r => r.json()).catch(() => ({ data: [] })),
       // Pending approval tasks — only tasks where I am the designated approver
       canManage
         ? fetch('/api/tasks?pending_approvals=true').then(r => r.json()).catch(() => ({ data: [] }))
@@ -83,10 +83,12 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
       // Count ALL active tasks assigned to me (todo + in_review), not just overdue.
       // This matches what the user sees on the My Tasks page.
       const ov = Array.isArray(myData.data)
-        ? myData.data.filter((t: any) =>
-            !['completed', 'cancelled'].includes(t.status) &&
-            !t.custom_fields?._context_task  // exclude parent tasks surfaced for subtask context
-          ).length
+        ? myData.data.filter((t: any) => {
+            if (['completed', 'cancelled'].includes(t.status)) return false
+            // exclude un-triggered CA tasks (same rule as My Tasks page isVisible)
+            if (t.custom_fields?._ca_compliance === true && t.custom_fields?._triggered !== true) return false
+            return true
+          }).length
         : 0
       const pend = Array.isArray(pendData.data) ? pendData.data.length : 0
 

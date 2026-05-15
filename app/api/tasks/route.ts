@@ -32,6 +32,7 @@ export async function GET(request: NextRequest) {
     q = q.eq('status', 'in_review').eq('approval_status', 'pending').eq('approver_id', user.id)
   if (sp.get('parent_id'))    q = q.eq('parent_task_id', sp.get('parent_id')!)
   if (sp.get('top_level') === 'true') q = q.is('parent_task_id', null)
+  if (sp.get('exclude_recurring') === 'true') q = q.or('is_recurring.is.null,is_recurring.eq.false')
   if (sp.get('parent_recurring_id')) q = q.eq('parent_recurring_id', sp.get('parent_recurring_id')!)
   // Filter to CA compliance tasks only (custom_fields @> '{"_ca_compliance":true}')
   if (sp.get('ca_compliance') === 'true') q = (q as any).contains('custom_fields', { _ca_compliance: true })
