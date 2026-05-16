@@ -2,7 +2,7 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { Search, Filter, BarChart2, Download, Calendar } from 'lucide-react'
 import { MultiPillSelect } from '@/components/filters/MultiPillSelect'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LineChart, Line, Legend } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LineChart, Line, Legend, PieChart, Pie } from 'recharts'
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
 import { isOverdue, fmtDate } from '@/lib/utils/format'
 import type { Task } from '@/types'
@@ -376,6 +376,40 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
     return result
   }, [tasks])
 
+  // ── Priority distribution (donut) ──
+  const priorityData = useMemo(() => {
+    const counts: Record<string, number> = { urgent: 0, high: 0, medium: 0, low: 0, none: 0 }
+    visible.forEach(t => { if (t.priority in counts) counts[t.priority]++ })
+    return [
+      { name: 'Urgent', value: counts.urgent, fill: '#dc2626' },
+      { name: 'High',   value: counts.high,   fill: '#ea580c' },
+      { name: 'Medium', value: counts.medium, fill: '#ca8a04' },
+      { name: 'Low',    value: counts.low,    fill: '#16a34a' },
+      { name: 'None',   value: counts.none,   fill: '#94a3b8' },
+    ].filter(d => d.value > 0)
+  }, [visible])
+
+  // ── Overdue aging ──
+  const overdueAging = useMemo(() => {
+    const overdue = visible.filter(t =>
+      t.due_date && t.due_date < today && !['completed', 'cancelled'].includes(t.status)
+    )
+    let b0 = 0, b1 = 0, b2 = 0, b3 = 0
+    overdue.forEach(t => {
+      const days = Math.floor((Date.now() - new Date(t.due_date!).getTime()) / 86400000)
+      if (days < 3) b0++
+      else if (days < 7) b1++
+      else if (days < 14) b2++
+      else b3++
+    })
+    return [
+      { name: '< 3 days',  value: b0, fill: '#fca5a5' },
+      { name: '3–7 days',  value: b1, fill: '#f87171' },
+      { name: '1–2 weeks', value: b2, fill: '#ef4444' },
+      { name: '> 2 weeks', value: b3, fill: '#b91c1c' },
+    ]
+  }, [visible, today])
+
   // ── Grouping ──
   const groups = useMemo<{ key: string; label: string; color: string; tasks: MonTask[] }[]>(() => {
     if (groupBy === 'none') return [{ key: 'all', label: 'All tasks', color: 'var(--brand)', tasks: visible }]
@@ -542,6 +576,62 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* ── Priority distribution donut + Overdue aging ── */}
+            <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border-light)' }}>
+              <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Advanced analytics</p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+
+                {/* Priority donut */}
+                <div>
+                  <p style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Priority distribution</p>
+                  {priorityData.length === 0 ? (
+                    <p style={{ fontSize: 11, color: 'var(--text-muted)', padding: '32px 0', textAlign: 'center' }}>No tasks match current filters</p>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <ResponsiveContainer width={120} height={120}>
+                        <PieChart>
+                          <Pie data={priorityData} cx="50%" cy="50%" innerRadius={34} outerRadius={54} dataKey="value" paddingAngle={2} startAngle={90} endAngle={-270}>
+                            {priorityData.map((entry, i) => <Cell key={i} fill={entry.fill}/>)}
+                          </Pie>
+                          <Tooltip contentStyle={{ fontSize: 11 }} formatter={(v: number) => [v, 'tasks']}/>
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {priorityData.map(d => (
+                          <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                            <div style={{ width: 8, height: 8, borderRadius: 2, background: d.fill, flexShrink: 0 }}/>
+                            <span style={{ fontSize: 10, color: 'var(--text-muted)', minWidth: 44 }}>{d.name}</span>
+                            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-primary)' }}>{d.value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Overdue aging */}
+                <div>
+                  <p style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>
+                    Overdue aging
+                    <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: '#dc2626' }}>
+                      {overdueAging.reduce((s, b) => s + b.value, 0)} overdue
+                    </span>
+                  </p>
+                  <ResponsiveContainer width="100%" height={120}>
+                    <BarChart data={overdueAging} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                      <XAxis dataKey="name" tick={{ fontSize: 9 }} interval={0}/>
+                      <YAxis tick={{ fontSize: 9 }} allowDecimals={false}/>
+                      <Tooltip contentStyle={{ fontSize: 11 }} formatter={(v: number) => [v, 'tasks']}/>
+                      <Bar dataKey="value" radius={[3, 3, 0, 0]}>
+                        {overdueAging.map((e, i) => <Cell key={i} fill={e.fill}/>)}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+
               </div>
             </div>
 

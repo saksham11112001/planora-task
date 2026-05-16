@@ -1,7 +1,7 @@
 'use client'
 import { useState }   from 'react'
 import { useRouter }  from 'next/navigation'
-import { UserPlus, Mail, Crown, Shield, User, ChevronDown, Check, Plus, X, Send, Pencil } from 'lucide-react'
+import { UserPlus, Mail, Crown, Shield, User, ChevronDown, Check, Plus, X, Send, Pencil, Activity } from 'lucide-react'
 import { cn }         from '@/lib/utils/cn'
 import { toast }      from '@/store/appStore'
 import { fmtDate }    from '@/lib/utils/format'
@@ -24,41 +24,83 @@ interface Member {
   id: string; name: string; email: string; avatar_url: string | null
   role: string; joined_at: string; tasks_30d: number; done_30d: number; inprog_30d?: number
   phone_number?: string | null
+  heatmap: Record<string, number>
 }
+
+// ── Heatmap helpers ──────────────────────────────────────────────────────────
+
+function buildHeatmapWeeks(heatmap: Record<string, number>) {
+  const today      = new Date()
+  const todayStr   = today.toISOString().slice(0, 10)
+  const dayOfWeek  = today.getDay() // 0=Sun … 6=Sat
+  const sinceMonday = (dayOfWeek + 6) % 7  // days since last Monday
+
+  // Oldest Monday = 11 full weeks back + sinceMonday more days
+  const startDate = new Date(today)
+  startDate.setDate(today.getDate() - sinceMonday - 11 * 7)
+
+  // Build 7 rows (Mon–Sun) × 12 columns (weeks)
+  const rows: { date: string; count: number; label: string; isFuture: boolean }[][] = []
+  for (let d = 0; d < 7; d++) {
+    const row: { date: string; count: number; label: string; isFuture: boolean }[] = []
+    for (let w = 0; w < 12; w++) {
+      const cell = new Date(startDate)
+      cell.setDate(startDate.getDate() + w * 7 + d)
+      const dateStr = cell.toISOString().slice(0, 10)
+      row.push({
+        date:     dateStr,
+        count:    heatmap[dateStr] ?? 0,
+        label:    cell.toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric' }),
+        isFuture: dateStr > todayStr,
+      })
+    }
+    rows.push(row)
+  }
+  return rows
+}
+
+function heatColor(count: number, isFuture: boolean): string {
+  if (isFuture)   return 'rgba(0,0,0,0.03)'
+  if (count === 0) return 'rgba(0,0,0,0.07)'
+  if (count === 1) return 'rgba(13,148,136,0.30)'
+  if (count === 2) return 'rgba(13,148,136,0.55)'
+  if (count === 3) return 'rgba(13,148,136,0.75)'
+  return 'rgba(13,148,136,0.92)'
+}
+
+const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+const MEDAL_COLORS = ['#ca8a04', '#94a3b8', '#cd7f32']
 
 export function TeamView({ members, canManage, currentUserId }: {
   members: Member[]; canManage: boolean; currentUserId: string
 }) {
   const router = useRouter()
 
-  // Single invite state
   const [showInvite,  setShowInvite]  = useState(false)
-
-  // Bulk invite state — list of rows
   const [showBulk,    setShowBulk]    = useState(false)
-  const [bulkRows,    setBulkRows]    = useState<InviteRow[]>([
-    { email: '', role: 'member' },
-  ])
+  const [bulkRows,    setBulkRows]    = useState<InviteRow[]>([{ email: '', role: 'member' }])
   const [bulkSending, setBulkSending] = useState(false)
   const [bulkResults, setBulkResults] = useState<{email:string;ok:boolean;msg:string}[]>([])
-
-  // Single invite state
   const [invEmail,    setInvEmail]    = useState('')
   const [invRole,     setInvRole]     = useState<'manager'|'member'|'viewer'>('member')
   const [inviting,    setInviting]    = useState(false)
-
   const [roleEditing, setRoleEditing] = useState<string | null>(null)
   const [saving,      setSaving]      = useState<string | null>(null)
-  const [removingId,  setRemovingId]  = useState<string | null>(null)  // user_id being removed
-  const [removeConfirm, setRemoveConfirm] = useState<string | null>(null) // user_id in confirm state
-
-  // Edit member info
+  const [removingId,  setRemovingId]  = useState<string | null>(null)
+  const [removeConfirm, setRemoveConfirm] = useState<string | null>(null)
   const [editingMember, setEditingMember] = useState<Member | null>(null)
   const [editName,      setEditName]      = useState('')
   const [editPhone,     setEditPhone]     = useState('')
   const [editSaving,    setEditSaving]    = useState(false)
+  const [showHeatmap, setShowHeatmap] = useState(false)
 
-  // ── Single invite ──────────────────────────────────────────────────────
+  // ── Leaderboard data ─────────────────────────────────────────────────────
+  const ranked = [...members]
+    .sort((a, b) => b.done_30d - a.done_30d)
+    .slice(0, 3)
+    .filter(m => m.done_30d > 0)
+
+  // ── Single invite ──────────────────────────────────────────────────────────
   async function invite(e: React.FormEvent) {
     e.preventDefault()
     if (!invEmail.trim()) return
@@ -69,35 +111,21 @@ export function TeamView({ members, canManage, currentUserId }: {
     })
     setInviting(false)
     const d = await res.json()
-    if (res.ok) {
-      toast.success('Invite sent!')
-      setInvEmail('')
-      setShowInvite(false)
-      router.refresh()
-    } else {
-      toast.error(d.error ?? 'Failed to invite')
-    }
+    if (res.ok) { toast.success('Invite sent!'); setInvEmail(''); setShowInvite(false); router.refresh() }
+    else toast.error(d.error ?? 'Failed to invite')
   }
 
-  // ── Bulk invite ────────────────────────────────────────────────────────
-  function addBulkRow() {
-    setBulkRows(r => [...r, { email: '', role: 'member' }])
-  }
-
+  // ── Bulk invite ────────────────────────────────────────────────────────────
+  function addBulkRow() { setBulkRows(r => [...r, { email: '', role: 'member' }]) }
   function updateBulkRow(i: number, field: keyof InviteRow, value: string) {
     setBulkRows(r => r.map((row, idx) => idx === i ? { ...row, [field]: value } : row))
   }
-
-  function removeBulkRow(i: number) {
-    setBulkRows(r => r.filter((_, idx) => idx !== i))
-  }
+  function removeBulkRow(i: number) { setBulkRows(r => r.filter((_, idx) => idx !== i)) }
 
   async function sendBulk() {
     const valid = bulkRows.filter(r => r.email.trim())
     if (!valid.length) { toast.error('Add at least one email'); return }
-    setBulkSending(true)
-    setBulkResults([])
-
+    setBulkSending(true); setBulkResults([])
     const results: {email:string;ok:boolean;msg:string}[] = []
     for (const row of valid) {
       const res = await fetch('/api/team', {
@@ -107,74 +135,47 @@ export function TeamView({ members, canManage, currentUserId }: {
       const d = await res.json()
       results.push({ email: row.email, ok: res.ok, msg: res.ok ? 'Invited' : (d.error ?? 'Failed') })
     }
-
-    setBulkSending(false)
-    setBulkResults(results)
-
+    setBulkSending(false); setBulkResults(results)
     const succeeded = results.filter(r => r.ok).length
     const failed    = results.filter(r => !r.ok).length
     if (succeeded) toast.success(`${succeeded} invite${succeeded > 1 ? 's' : ''} sent!`)
     if (failed)    toast.error(`${failed} invite${failed > 1 ? 's' : ''} failed`)
-
-    if (!failed) {
-      // All succeeded — reset
-      setBulkRows([{ email: '', role: 'member' }])
-      setShowBulk(false)
-      router.refresh()
-    } else {
-      // Keep failed rows for retry
-      setBulkRows(bulkRows.filter((r, i) => !results[i]?.ok))
-    }
+    if (!failed) { setBulkRows([{ email: '', role: 'member' }]); setShowBulk(false); router.refresh() }
+    else setBulkRows(bulkRows.filter((r, i) => !results[i]?.ok))
   }
 
-  // ── Remove member ──────────────────────────────────────────────────────
+  // ── Remove member ──────────────────────────────────────────────────────────
   async function removeMember(userId: string, memberName: string) {
-    // Two-step confirm: first click shows confirm state, second click executes
     if (removeConfirm !== userId) {
       setRemoveConfirm(userId)
-      // Auto-reset after 4 seconds if user doesn't confirm
       setTimeout(() => setRemoveConfirm(c => c === userId ? null : c), 4000)
       return
     }
-    setRemovingId(userId)
-    setRemoveConfirm(null)
+    setRemovingId(userId); setRemoveConfirm(null)
     const res = await fetch('/api/team', {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id: userId, is_active: false }),
     })
     setRemovingId(null)
-    if (res.ok) {
-      toast.success(`${memberName} removed from the workspace`)
-      router.refresh()
-    } else {
-      const d = await res.json().catch(() => ({}))
-      toast.error(d.error ?? 'Failed to remove member')
-    }
+    if (res.ok) { toast.success(`${memberName} removed from the workspace`); router.refresh() }
+    else { const d = await res.json().catch(() => ({})); toast.error(d.error ?? 'Failed to remove member') }
   }
 
-  // ── Role change ────────────────────────────────────────────────────────
+  // ── Role change ────────────────────────────────────────────────────────────
   async function changeRole(userId: string, newRole: string) {
-    if (!userId || userId === 'undefined') {
-      toast.error('Cannot identify member — please refresh and try again.')
-      return
-    }
+    if (!userId || userId === 'undefined') { toast.error('Cannot identify member — please refresh and try again.'); return }
     setSaving(userId)
     const res = await fetch('/api/team', {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id: userId, role: newRole }),
     })
-    setSaving(null)
-    setRoleEditing(null)
+    setSaving(null); setRoleEditing(null)
     if (res.ok) { toast.success('Role updated'); router.refresh() }
     else { const d = await res.json(); toast.error(d.error ?? 'Failed to update role') }
   }
 
-  // ── Edit member info ───────────────────────────────────────────────────
-  function openEditMember(m: Member) {
-    setEditingMember(m)
-    setEditName(m.name)
-    setEditPhone(m.phone_number ?? '')
-  }
+  // ── Edit member info ───────────────────────────────────────────────────────
+  function openEditMember(m: Member) { setEditingMember(m); setEditName(m.name); setEditPhone(m.phone_number ?? '') }
 
   async function saveMemberEdit(e: React.FormEvent) {
     e.preventDefault()
@@ -186,20 +187,15 @@ export function TeamView({ members, canManage, currentUserId }: {
     })
     setEditSaving(false)
     const d = await res.json().catch(() => ({}))
-    if (res.ok) {
-      toast.success('Member info updated')
-      setEditingMember(null)
-      router.refresh()
-    } else {
-      toast.error(d.error ?? 'Failed to update member')
-    }
+    if (res.ok) { toast.success('Member info updated'); setEditingMember(null); router.refresh() }
+    else toast.error(d.error ?? 'Failed to update member')
   }
 
   return (
     <div className="flex-1 overflow-y-auto p-6" style={{ background: 'var(--surface-subtle)' }}>
       <div className="max-w-3xl mx-auto">
 
-        {/* Header */}
+        {/* ── Header ── */}
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Team</h1>
@@ -207,25 +203,166 @@ export function TeamView({ members, canManage, currentUserId }: {
               {members.length} member{members.length !== 1 ? 's' : ''}
             </p>
           </div>
-          {canManage && (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                onClick={() => { setShowBulk(false); setShowInvite(v => !v) }}
-                className="btn btn-outline flex items-center gap-2"
-              >
-                <Mail className="h-4 w-4" /> Invite member
-              </button>
-              <button
-                onClick={() => { setShowInvite(false); setShowBulk(v => !v); setBulkResults([]) }}
-                className="btn btn-brand flex items-center gap-2"
-              >
-                <UserPlus className="h-4 w-4" /> Invite multiple
-              </button>
-            </div>
-          )}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            <button
+              onClick={() => setShowHeatmap(v => !v)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8,
+                border: showHeatmap ? '1px solid var(--brand)' : '1px solid var(--border)',
+                background: showHeatmap ? 'rgba(13,148,136,0.08)' : 'var(--surface)',
+                color: showHeatmap ? 'var(--brand)' : 'var(--text-secondary)',
+                fontSize: 12, fontWeight: showHeatmap ? 600 : 400, cursor: 'pointer', fontFamily: 'inherit',
+              }}>
+              <Activity style={{ width: 13, height: 13 }}/>
+              Activity
+            </button>
+            {canManage && (
+              <>
+                <button onClick={() => { setShowBulk(false); setShowInvite(v => !v) }} className="btn btn-outline flex items-center gap-2">
+                  <Mail className="h-4 w-4" /> Invite member
+                </button>
+                <button onClick={() => { setShowInvite(false); setShowBulk(v => !v); setBulkResults([]) }} className="btn btn-brand flex items-center gap-2">
+                  <UserPlus className="h-4 w-4" /> Invite multiple
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
-        {/* Single invite form */}
+        {/* ── Leaderboard ── */}
+        {ranked.length > 0 && (
+          <div style={{ marginBottom: 20 }}>
+            <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase',
+              color: 'var(--text-muted)', marginBottom: 10 }}>
+              Top performers · last 30 days
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${ranked.length}, 1fr)`, gap: 10 }}>
+              {ranked.map((m, i) => {
+                const rate    = m.tasks_30d ? Math.round((m.done_30d / m.tasks_30d) * 100) : 100
+                const medal   = MEDAL_COLORS[i]
+                const isFirst = i === 0
+                return (
+                  <div key={m.id} style={{
+                    borderRadius: 12, padding: '14px 16px',
+                    background: isFirst
+                      ? 'linear-gradient(135deg,rgba(202,138,4,0.13),rgba(202,138,4,0.05))'
+                      : 'var(--surface)',
+                    border: `1.5px solid ${isFirst ? 'rgba(202,138,4,0.35)' : 'var(--border)'}`,
+                    display: 'flex', flexDirection: 'column', gap: 8,
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 18, lineHeight: 1, flexShrink: 0 }}>
+                        {i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'}
+                      </span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', margin: 0,
+                          overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+                          {m.name}
+                        </p>
+                        <p style={{ fontSize: 10, color: 'var(--text-muted)', margin: 0, textTransform: 'capitalize' }}>{m.role}</p>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                      <span style={{ fontSize: 28, fontWeight: 800, color: medal, lineHeight: 1 }}>{m.done_30d}</span>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>tasks done</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <div style={{ flex: 1, height: 4, borderRadius: 99, background: 'var(--border-light)' }}>
+                        <div style={{ height: '100%', borderRadius: 99, background: medal, width: `${rate}%`, transition: 'width 0.5s ease' }}/>
+                      </div>
+                      <span style={{ fontSize: 10, fontWeight: 600, color: medal, flexShrink: 0 }}>{rate}%</span>
+                    </div>
+                    {isFirst && (
+                      <div style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 4,
+                        padding: '3px 8px', borderRadius: 99, alignSelf: 'flex-start',
+                        background: 'rgba(202,138,4,0.15)', border: '1px solid rgba(202,138,4,0.3)',
+                      }}>
+                        <span style={{ fontSize: 9, fontWeight: 700, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          ⭐ Star performer
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ── Productivity heatmaps (toggle) ── */}
+        {showHeatmap && members.length > 0 && (
+          <div className="card p-5 mb-5">
+            <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase',
+              color: 'var(--text-muted)', marginBottom: 14 }}>
+              Productivity heatmap · last 12 weeks
+            </p>
+
+            {/* Legend */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 16 }}>
+              <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>Less</span>
+              {[0, 1, 2, 3, 4].map(n => (
+                <div key={n} style={{ width: 11, height: 11, borderRadius: 2, background: heatColor(n, false) }}/>
+              ))}
+              <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>More</span>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              {members.map(m => {
+                const weeks = buildHeatmapWeeks(m.heatmap)
+                const totalDone = Object.values(m.heatmap).reduce((s, n) => s + n, 0)
+                return (
+                  <div key={m.id}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                      <div style={{ width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
+                        background: ROLE_COLORS[m.role] ?? '#94a3b8', display: 'flex', alignItems: 'center',
+                        justifyContent: 'center', color: '#fff', fontSize: 10, fontWeight: 700 }}>
+                        {m.name[0]?.toUpperCase()}
+                      </div>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>{m.name}</span>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                        {totalDone > 0 ? `${totalDone} task${totalDone !== 1 ? 's' : ''} completed` : 'No completions'}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      {/* Day labels */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, paddingTop: 1 }}>
+                        {DAY_LABELS.map(label => (
+                          <div key={label} style={{ height: 11, fontSize: 8, color: 'var(--text-muted)',
+                            display: 'flex', alignItems: 'center', width: 20, flexShrink: 0 }}>
+                            {label}
+                          </div>
+                        ))}
+                      </div>
+                      {/* Grid: 7 rows × 12 columns */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        {weeks.map((row, rowIdx) => (
+                          <div key={rowIdx} style={{ display: 'flex', gap: 2 }}>
+                            {row.map(cell => (
+                              <div
+                                key={cell.date}
+                                title={cell.isFuture ? '' : `${cell.label}: ${cell.count} completed`}
+                                style={{
+                                  width: 11, height: 11, borderRadius: 2,
+                                  background: heatColor(cell.count, cell.isFuture),
+                                  cursor: cell.isFuture || cell.count === 0 ? 'default' : 'pointer',
+                                  flexShrink: 0,
+                                }}
+                              />
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ── Single invite form ── */}
         {showInvite && (
           <form onSubmit={invite} className="card p-5 mb-6 flex gap-3 items-end flex-wrap">
             <div className="flex-1 min-w-[200px]">
@@ -258,7 +395,7 @@ export function TeamView({ members, canManage, currentUserId }: {
           </form>
         )}
 
-        {/* Bulk invite panel */}
+        {/* ── Bulk invite panel ── */}
         {showBulk && (
           <div className="card p-5 mb-6">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
@@ -271,15 +408,11 @@ export function TeamView({ members, canManage, currentUserId }: {
                 <X className="h-4 w-4" />
               </button>
             </div>
-
-            {/* Column headers */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 130px 32px', gap: 8, marginBottom: 6, padding: '0 4px' }}>
               <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Email</span>
               <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Role</span>
               <span />
             </div>
-
-            {/* Rows */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
               {bulkRows.map((row, i) => {
                 const result = bulkResults.find(r => r.email === row.email)
@@ -301,47 +434,36 @@ export function TeamView({ members, canManage, currentUserId }: {
                         onBlur={e => { if (!result) e.currentTarget.style.borderColor = 'var(--border)' }}
                       />
                       {result && (
-                        <span style={{
-                          position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
-                          fontSize: 11, fontWeight: 600, color: result.ok ? '#16a34a' : '#dc2626',
-                        }}>
+                        <span style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+                          fontSize: 11, fontWeight: 600, color: result.ok ? '#16a34a' : '#dc2626' }}>
                           {result.ok ? '✓ Sent' : result.msg}
                         </span>
                       )}
                     </div>
                     <select value={row.role} onChange={e => updateBulkRow(i, 'role', e.target.value as any)}
-                      style={{
-                        padding: '7px 10px', borderRadius: 8, fontSize: 13, outline: 'none', cursor: 'pointer',
-                        border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-primary)',
-                        fontFamily: 'inherit',
-                      }}>
+                      style={{ padding: '7px 10px', borderRadius: 8, fontSize: 13, outline: 'none', cursor: 'pointer',
+                        border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-primary)', fontFamily: 'inherit' }}>
                       <option value="admin">Admin</option>
                       <option value="manager">Manager</option>
                       <option value="member">Member</option>
                       <option value="viewer">Viewer</option>
                     </select>
                     <button onClick={() => removeBulkRow(i)} disabled={bulkRows.length === 1}
-                      style={{
-                        width: 32, height: 32, borderRadius: 8, border: '1px solid var(--border)',
+                      style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid var(--border)',
                         background: 'var(--surface-subtle)', cursor: bulkRows.length === 1 ? 'not-allowed' : 'pointer',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        color: 'var(--text-muted)', opacity: bulkRows.length === 1 ? 0.4 : 1,
-                      }}>
+                        color: 'var(--text-muted)', opacity: bulkRows.length === 1 ? 0.4 : 1 }}>
                       <X style={{ width: 13, height: 13 }} />
                     </button>
                   </div>
                 )
               })}
             </div>
-
-            {/* Add row + Send buttons */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <button onClick={addBulkRow}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px',
-                  borderRadius: 8, border: '1px dashed var(--border)', background: 'transparent',
-                  cursor: 'pointer', fontSize: 13, color: 'var(--text-muted)', fontFamily: 'inherit',
-                }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8,
+                  border: '1px dashed var(--border)', background: 'transparent', cursor: 'pointer',
+                  fontSize: 13, color: 'var(--text-muted)', fontFamily: 'inherit' }}>
                 <Plus style={{ width: 14, height: 14 }} /> Add another
               </button>
               <div style={{ display: 'flex', gap: 8 }}>
@@ -358,7 +480,7 @@ export function TeamView({ members, canManage, currentUserId }: {
           </div>
         )}
 
-        {/* Members list */}
+        {/* ── Members list ── */}
         <div className="card" style={{ overflow: 'visible' }}>
           {members.map((m, i) => {
             const RoleIcon  = ROLE_ICONS[m.role] ?? User
@@ -477,7 +599,7 @@ export function TeamView({ members, canManage, currentUserId }: {
                   )}
                 </div>
 
-                {/* Edit member info — owner/admin only, not self, not other owners */}
+                {/* Edit member info */}
                 {canManage && !isMe && !isOwner && (
                   <div style={{ marginLeft: 4, flexShrink: 0 }}>
                     <button
@@ -502,7 +624,7 @@ export function TeamView({ members, canManage, currentUserId }: {
                   </div>
                 )}
 
-                {/* Remove member button — owners/admins only, not self, not other owners */}
+                {/* Remove member */}
                 {canManage && !isMe && !isOwner && (
                   <div style={{ marginLeft: 8, flexShrink: 0 }}>
                     {removeConfirm === m.id ? (
@@ -553,7 +675,7 @@ export function TeamView({ members, canManage, currentUserId }: {
           })}
         </div>
 
-        {/* Edit member modal */}
+        {/* ── Edit member modal ── */}
         {editingMember && (
           <div style={{
             position: 'fixed', inset: 0, zIndex: 1000,
@@ -568,7 +690,6 @@ export function TeamView({ members, canManage, currentUserId }: {
                 padding: '28px 28px 22px', width: 420, maxWidth: '92vw',
                 border: '1px solid var(--border)',
               }}>
-              {/* Header */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <div style={{ width: 36, height: 36, borderRadius: '50%', background: ROLE_COLORS[editingMember.role] ?? '#94a3b8',
@@ -585,14 +706,10 @@ export function TeamView({ members, canManage, currentUserId }: {
                   <X className="h-4 w-4" />
                 </button>
               </div>
-
               <form onSubmit={saveMemberEdit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                {/* Name */}
                 <div>
                   <label style={{ display: 'block', fontSize: 11, fontWeight: 600, textTransform: 'uppercase',
-                    letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: 6 }}>
-                    Full name
-                  </label>
+                    letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: 6 }}>Full name</label>
                   <input
                     type="text" value={editName} onChange={e => setEditName(e.target.value)}
                     required autoFocus placeholder="e.g. Ravi Kumar"
@@ -603,8 +720,6 @@ export function TeamView({ members, canManage, currentUserId }: {
                     onBlur={e => (e.currentTarget.style.borderColor = 'var(--border)')}
                   />
                 </div>
-
-                {/* Phone */}
                 <div>
                   <label style={{ display: 'block', fontSize: 11, fontWeight: 600, textTransform: 'uppercase',
                     letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: 6 }}>
@@ -620,9 +735,7 @@ export function TeamView({ members, canManage, currentUserId }: {
                     onBlur={e => (e.currentTarget.style.borderColor = 'var(--border)')}
                   />
                 </div>
-
                 <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
-
                 <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                   <button type="button" onClick={() => setEditingMember(null)} disabled={editSaving}
                     style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)',
@@ -644,7 +757,6 @@ export function TeamView({ members, canManage, currentUserId }: {
           </div>
         )}
 
-        {/* Empty state */}
         {members.length === 0 && (
           <div style={{ textAlign: 'center', padding: '40px 24px', color: 'var(--text-muted)', fontSize: 13 }}>
             No team members yet. Invite your colleagues above.
