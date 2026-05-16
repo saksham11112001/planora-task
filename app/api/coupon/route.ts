@@ -2,6 +2,7 @@ import { createClient }      from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse }       from 'next/server'
 import type { NextRequest }   from 'next/server'
+import { PLAN_LIMITS }        from '@/lib/utils/planGate'
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
@@ -58,6 +59,18 @@ export async function POST(request: NextRequest) {
       status:        'active',
       trial_ends_at: expiresAt.toISOString(),
     }).eq('id', mb.org_id)
+
+    // Auto-enable feature toggles included in the granted plan so the user
+    // doesn't have to discover them manually in Settings → Features.
+    const planFeatures: readonly string[] =
+      (PLAN_LIMITS[coupon.plan_tier as keyof typeof PLAN_LIMITS]?.features ?? []) as readonly string[]
+    if (planFeatures.includes('ca_compliance')) {
+      await admin.from('org_feature_settings')
+        .upsert(
+          { org_id: mb.org_id, feature_key: 'ca_compliance_mode', is_enabled: true },
+          { onConflict: 'org_id,feature_key' }
+        )
+    }
 
     await admin.from('coupons')
       .update({ uses_count: (coupon.uses_count ?? 0) + 1 })
