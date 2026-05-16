@@ -17,6 +17,29 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       getUserOrgs(user.id),
     ])
 
+    // Repair: reactivate owner memberships incorrectly deactivated by a past system bug.
+    // The team API explicitly blocks removing owners, so any is_active=false owner row
+    // was set by the old cross-org deactivation code — not a legitimate admin action.
+    // Only check when allOrgs.length < 2 (users with 2+ orgs are already fine).
+    // This is self-healing: once fixed, the query returns [] and is skipped.
+    if (allOrgs.length < 2) {
+      const { createAdminClient: _adminForRepair } = await import('@/lib/supabase/admin')
+      const adminRepair = _adminForRepair()
+      const { data: inactiveOwnerRows } = await adminRepair
+        .from('org_members')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('role', 'owner')
+        .eq('is_active', false)
+
+      if (inactiveOwnerRows && inactiveOwnerRows.length > 0) {
+        await adminRepair.from('org_members')
+          .update({ is_active: true })
+          .in('id', inactiveOwnerRows.map((m: any) => m.id))
+        redirect('/dashboard')
+      }
+    }
+
     // No active membership — try to recover before giving up
     if (!membership) {
       const { createAdminClient } = await import('@/lib/supabase/admin')
@@ -52,25 +75,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         redirect('/dashboard')
       }
 
-      // 2. Reactivate owner memberships incorrectly deactivated by a past system bug.
-      //    The API explicitly blocks removing owners ("Cannot remove an owner"), so any
-      //    is_active=false row with role='owner' was set by the old cross-org deactivation
-      //    bug — not by a legitimate admin action. Safe to restore.
-      const { data: inactiveOwnerRows } = await admin
-        .from('org_members')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('role', 'owner')
-        .eq('is_active', false)
-
-      if (inactiveOwnerRows && inactiveOwnerRows.length > 0) {
-        await admin.from('org_members')
-          .update({ is_active: true })
-          .in('id', inactiveOwnerRows.map((m: any) => m.id))
-        redirect('/dashboard')
-      }
-
-      // 3. Truly no org membership anywhere — send to onboarding to create one
+      // 2. Truly no org membership anywhere — send to onboarding to create one
       //    (do NOT redirect to /login here — the user IS authenticated)
       redirect('/onboarding')
     }
