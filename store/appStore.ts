@@ -7,7 +7,8 @@ interface Org     {
   trial_started_at?: string | null; trial_extension_days?: number
   referral_code?: string | null; join_code?: string | null
 }
-interface Session { user: User; org: Org; role: string; workspaceId: string | null }
+export interface OrgSummary { id: string; name: string; logo_color: string; role: string }
+interface Session { user: User; org: Org; role: string; workspaceId: string | null; allOrgs: OrgSummary[] }
 
 interface AppState {
   session: Session | null
