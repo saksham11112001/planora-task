@@ -2,6 +2,7 @@ import { createClient }   from '@/lib/supabase/server'
 import { NextResponse }    from 'next/server'
 import type { NextRequest } from 'next/server'
 import { dbError }         from '@/lib/api-error'
+import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
 
 const SETUP_FEE_PAISE = 49900 // $499 in cents
 
@@ -10,12 +11,7 @@ export async function POST(_req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
-  const { data: mb } = await supabase
-    .from('org_members')
-    .select('org_id, role, organisations(name, razorpay_customer_id, setup_fee_paid)')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .single()
+  const mb = await getApiOrgMembership(supabase, user.id, _req, 'org_id, role, organisations(name, razorpay_customer_id, setup_fee_paid)')
   if (!mb || !['owner', 'admin'].includes(mb.role))
     return NextResponse.json({ error: 'Admins only' }, { status: 403 })
 

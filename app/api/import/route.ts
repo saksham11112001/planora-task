@@ -5,6 +5,7 @@ import type { NextRequest }   from 'next/server'
 import { COMPLIANCE_TASKS }   from '@/lib/data/complianceTasks'
 import { CA_DEFAULT_TASKS }   from '@/lib/data/caDefaultTasks'
 import { effectivePlan, canUseFeature } from '@/lib/utils/planGate'
+import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
 
 export const maxDuration = 60 // seconds — Vercel Hobby plan cap
 export const dynamic = 'force-dynamic'
@@ -263,12 +264,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
     }
 
-    const { data: mb } = await supabase
-      .from('org_members')
-      .select('org_id, role')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .single()
+    const mb = await getApiOrgMembership(supabase, user.id, request, 'org_id, role')
 
     if (!mb || !['owner', 'admin', 'manager'].includes(mb.role)) {
       return NextResponse.json(

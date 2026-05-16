@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 import { dbError } from '@/lib/api-error'
 import { generateCode } from '@/lib/utils/codeGen'
+import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
     const { createClient: createSupabaseClient } = await import('@supabase/supabase-js')
     const { createClient } = await import('@/lib/supabase/server')
@@ -17,12 +19,7 @@ export async function POST() {
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
 
-    const { data: mb } = await admin
-      .from('org_members')
-      .select('org_id, role')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .maybeSingle()
+    const mb = await getApiOrgMembership(supabase, user.id, request, 'org_id, role')
 
     if (!mb) return NextResponse.json({ error: 'No active organisation' }, { status: 400 })
     if (!['owner', 'admin'].includes(mb.role)) {

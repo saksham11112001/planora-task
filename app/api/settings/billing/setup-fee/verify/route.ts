@@ -3,6 +3,7 @@ import { NextResponse }    from 'next/server'
 import type { NextRequest } from 'next/server'
 import { createHmac }      from 'crypto'
 import { dbError }         from '@/lib/api-error'
+import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -21,12 +22,7 @@ export async function POST(req: NextRequest) {
   if (expected !== razorpay_signature)
     return NextResponse.json({ error: 'Invalid payment signature' }, { status: 400 })
 
-  const { data: mb } = await supabase
-    .from('org_members')
-    .select('org_id, role')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .single()
+  const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')
   if (!mb || !['owner', 'admin'].includes(mb.role))
     return NextResponse.json({ error: 'Admins only' }, { status: 403 })
 

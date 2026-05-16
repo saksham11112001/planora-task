@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { effectivePlan, canUseFeature } from '@/lib/utils/planGate'
 import { NextResponse }    from 'next/server'
 import type { NextRequest } from 'next/server'
+import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
 
 export const maxDuration = 60 // seconds — report export can be slow on large orgs
 
@@ -10,7 +11,7 @@ export async function GET(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-  const { data: mb } = await supabase.from('org_members').select('org_id').eq('user_id', user.id).eq('is_active', true).single()
+  const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id')
   if (!mb) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   // Reports requires Starter+ plan

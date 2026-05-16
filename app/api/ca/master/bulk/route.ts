@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { NextRequest } from 'next/server'
 import { dbError } from '@/lib/api-error'
+import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
 
 export const maxDuration = 30
 
@@ -23,8 +24,7 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
-  const { data: mb } = await supabase.from('org_members').select('org_id, role')
-    .eq('user_id', user.id).eq('is_active', true).single()
+  const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'No membership' }, { status: 403 })
   if (!['owner', 'admin'].includes(mb.role))
     return NextResponse.json({ error: 'Admin only' }, { status: 403 })

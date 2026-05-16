@@ -2,23 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient }              from '@/lib/supabase/server'
 import { createAdminClient }         from '@/lib/supabase/admin'
 import { dbError } from '@/lib/api-error'
-
-async function getOrgAndRole(supabase: Awaited<ReturnType<typeof createClient>>) {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
-  const { data: mb } = await supabase
-    .from('org_members')
-    .select('org_id, role')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .maybeSingle()
-  return mb
-}
+import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
 
 // GET /api/settings/document-types
-export async function GET() {
+export async function GET(request: NextRequest) {
   const supabase = await createClient()
-  const mb = await getOrgAndRole(supabase)
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const mb = await getApiOrgMembership(supabase, user.id, request, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { data } = await supabase
@@ -34,7 +25,9 @@ export async function GET() {
 // Body: { name, category, linked_task_types?, sort_order? }
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
-  const mb = await getOrgAndRole(supabase)
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!['owner', 'admin'].includes(mb.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
@@ -63,7 +56,9 @@ export async function POST(req: NextRequest) {
 // Body: { id, name?, category?, linked_task_types?, sort_order?, is_active? }
 export async function PATCH(req: NextRequest) {
   const supabase = await createClient()
-  const mb = await getOrgAndRole(supabase)
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!['owner', 'admin'].includes(mb.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
@@ -92,7 +87,9 @@ export async function PATCH(req: NextRequest) {
 // DELETE /api/settings/document-types?id=xxx
 export async function DELETE(req: NextRequest) {
   const supabase = await createClient()
-  const mb = await getOrgAndRole(supabase)
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!['owner', 'admin'].includes(mb.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
