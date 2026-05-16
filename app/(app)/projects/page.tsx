@@ -1,5 +1,6 @@
 import { Suspense }          from 'react'
-import { getSessionUser, getOrgMembership } from '@/lib/supabase/cached'
+import { getSessionUser } from '@/lib/supabase/cached'
+import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { redirect }          from 'next/navigation'
 import { ProjectsFetcher }   from './ProjectsFetcher'
 import { ProjectsSkeleton }  from './ProjectsSkeleton'
@@ -11,7 +12,7 @@ export const metadata: Metadata = { title: 'Projects' }
 export default async function ProjectsPage() {
   const user = await getSessionUser()
   if (!user) redirect('/login')
-  const mb = await getOrgMembership(user.id)
+  const mb = await getActiveOrgMembership(user.id)
   if (!mb) redirect('/onboarding')
 
   return (

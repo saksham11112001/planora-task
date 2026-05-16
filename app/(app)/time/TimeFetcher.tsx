@@ -1,5 +1,6 @@
 import { createClient }  from '@/lib/supabase/server'
-import { getSessionUser, getOrgMembership } from '@/lib/supabase/cached'
+import { getSessionUser } from '@/lib/supabase/cached'
+import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { TimeView }      from './TimeView'
 
 interface Props {
@@ -10,7 +11,7 @@ interface Props {
 export async function TimeFetcher({ fromDate, toDate }: Props) {
   const user = await getSessionUser()
   if (!user) return null
-  const mb = await getOrgMembership(user.id)
+  const mb = await getActiveOrgMembership(user.id)
   if (!mb) return null
 
   const supabase = await createClient()

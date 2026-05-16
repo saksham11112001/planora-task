@@ -1,5 +1,6 @@
 import { createClient }    from '@/lib/supabase/server'
-import { getSessionUser, getOrgMembership } from '@/lib/supabase/cached'
+import { getSessionUser } from '@/lib/supabase/cached'
+import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { redirect }        from 'next/navigation'
 import { ProjectEditForm } from './ProjectEditForm'
 import type { Metadata }   from 'next'
@@ -11,7 +12,7 @@ export default async function ProjectEditPage({ params }: { params: Promise<{ pr
   const { projectId } = await params
   const user = await getSessionUser()
   if (!user) redirect('/login')
-  const mb = await getOrgMembership(user.id)
+  const mb = await getActiveOrgMembership(user.id)
   if (!mb) redirect('/onboarding')
 
   const supabase = await createClient()

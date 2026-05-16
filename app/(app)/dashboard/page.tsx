@@ -1,5 +1,6 @@
 import { redirect }     from 'next/navigation'
-import { getSessionUser, getOrgMembership, getUserProfile } from '@/lib/supabase/cached'
+import { getSessionUser, getUserProfile } from '@/lib/supabase/cached'
+import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { createClient } from '@/lib/supabase/server'
 import { todayStr }     from '@/lib/utils/format'
 import { DashboardClient } from './DashboardClient'
@@ -11,7 +12,7 @@ export default async function DashboardPage() {
   if (!user) redirect('/login')
 
   const [mb, profile] = await Promise.all([
-    getOrgMembership(user.id),
+    getActiveOrgMembership(user.id),
     getUserProfile(user.id),
   ])
   if (!mb) redirect('/onboarding')

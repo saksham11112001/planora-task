@@ -1,5 +1,6 @@
 import { Suspense }           from 'react'
-import { getSessionUser, getOrgMembership } from '@/lib/supabase/cached'
+import { getSessionUser } from '@/lib/supabase/cached'
+import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { redirect }           from 'next/navigation'
 import { RecurringFetcher }   from './RecurringFetcher'
 import { RecurringSkeleton }  from './RecurringSkeleton'
@@ -11,7 +12,7 @@ export const metadata: Metadata = { title: 'Repeat tasks' }
 export default async function RecurringPage() {
   const user = await getSessionUser()
   if (!user) redirect('/login')
-  const mb = await getOrgMembership(user.id)
+  const mb = await getActiveOrgMembership(user.id)
   if (!mb) redirect('/onboarding')
 
   return (

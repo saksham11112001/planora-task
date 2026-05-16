@@ -1,5 +1,6 @@
 import { createAdminClient }                from '@/lib/supabase/admin'
-import { getSessionUser, getOrgMembership } from '@/lib/supabase/cached'
+import { getSessionUser } from '@/lib/supabase/cached'
+import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { redirect }                         from 'next/navigation'
 import { ActivityView }                     from './ActivityView'
 import type { Metadata }                    from 'next'
@@ -11,7 +12,7 @@ export default async function ActivityPage() {
   const user = await getSessionUser()
   if (!user) redirect('/login')
 
-  const mb = await getOrgMembership(user.id)
+  const mb = await getActiveOrgMembership(user.id)
   if (!mb) redirect('/onboarding')
 
   if (!['owner', 'admin'].includes(mb.role)) redirect('/dashboard')

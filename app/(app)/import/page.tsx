@@ -1,4 +1,5 @@
-import { getSessionUser, getOrgMembership } from '@/lib/supabase/cached'
+import { getSessionUser } from '@/lib/supabase/cached'
+import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { redirect }      from 'next/navigation'
 import { ImportView }    from './ImportView'
 
@@ -11,7 +12,7 @@ export default async function ImportPage() {
   const user = await getSessionUser()
   if (!user) redirect('/login')
 
-  const mb = await getOrgMembership(user.id)
+  const mb = await getActiveOrgMembership(user.id)
 
   // Only managers and above can see this page
   if (!mb || !['owner', 'admin', 'manager'].includes(mb.role)) redirect('/dashboard')

@@ -1,5 +1,6 @@
 export const dynamic = 'force-dynamic'
-import { getSessionUser, getOrgMembership } from '@/lib/supabase/cached'
+import { getSessionUser } from '@/lib/supabase/cached'
+import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { redirect }     from 'next/navigation'
 import { BillingView }  from './BillingView'
 import type { Metadata } from 'next'
@@ -10,7 +11,7 @@ export const revalidate = 20
 export default async function BillingPage() {
   const user = await getSessionUser()
   if (!user) redirect('/login')
-  const mb = await getOrgMembership(user.id)
+  const mb = await getActiveOrgMembership(user.id)
   if (!mb || !['owner','admin'].includes(mb.role)) redirect('/settings')
   // org data (including subscription_id) comes from the cached membership join
   const org = mb.organisations as any

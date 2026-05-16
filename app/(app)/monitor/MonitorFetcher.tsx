@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
-import { getSessionUser, getOrgMembership } from '@/lib/supabase/cached'
+import { getSessionUser } from '@/lib/supabase/cached'
+import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { MonitorView }  from './MonitorView'
 import { canDo }        from '@/lib/utils/permissionGate'
 import { redirect }     from 'next/navigation'
@@ -9,7 +10,7 @@ const TASK_COLS = 'id, title, description, status, priority, due_date, completed
 export async function MonitorFetcher() {
   const user = await getSessionUser()
   if (!user) return null
-  const mb = await getOrgMembership(user.id)
+  const mb = await getActiveOrgMembership(user.id)
   if (!mb) return null
 
   const supabase = await createClient()
