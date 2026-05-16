@@ -5,12 +5,13 @@ import type { NextRequest }  from 'next/server'
 import { inngest }           from '@/lib/inngest/client'
 import { assertCan }         from '@/lib/utils/permissionGate'
 import { dbError }           from '@/lib/api-error'
+import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-  const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).maybeSingle()
+  const mb = await getApiOrgMembership(supabase, user.id, request, 'org_id, role')
   if (!mb) return NextResponse.json({ data: [] })
 
   const sp  = request.nextUrl.searchParams
@@ -59,9 +60,7 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
-  const { data: mb } = await supabase.from('org_members')
-    .select('org_id, role, organisations(name), users(name)')
-    .eq('user_id', user.id).eq('is_active', true).single()
+  const mb = await getApiOrgMembership(supabase, user.id, request, 'org_id, role, organisations(name), users(name)')
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
 
   const body = await request.json()

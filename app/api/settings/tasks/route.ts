@@ -3,12 +3,13 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse }       from 'next/server'
 import type { NextRequest }   from 'next/server'
 import { assertCan }          from '@/lib/utils/permissionGate'
+import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-  const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).single()
+  const mb = await getApiOrgMembership(supabase, user.id, request, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
   const taskSettingsDenied = await assertCan(supabase, mb.org_id, mb.role, 'settings.tasks')
   if (taskSettingsDenied) return NextResponse.json({ error: taskSettingsDenied.error }, { status: taskSettingsDenied.status })

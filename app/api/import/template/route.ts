@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { COMPLIANCE_TASKS }  from '@/lib/data/complianceTasks'
+import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -55,15 +56,7 @@ export async function GET(request: NextRequest) {
         console.log('[template] resolved user:', user?.id ?? 'null')
 
         if (user) {
-          // maybeSingle() never throws — returns null if no row found
-          const { data: mb, error: mbErr } = await admin
-            .from('org_members')
-            .select('org_id, role')
-            .eq('user_id', user.id)
-            .eq('is_active', true)
-            .maybeSingle()
-
-          if (mbErr) console.error('[template] org_members lookup error:', mbErr)
+          const mb = await getApiOrgMembership(admin, user.id, request, 'org_id, role')
           console.log('[template] org_id:', mb?.org_id ?? 'null')
 
           if (mb?.org_id) {

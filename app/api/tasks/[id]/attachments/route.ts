@@ -4,6 +4,7 @@ import { NextResponse }       from 'next/server'
 import type { NextRequest }   from 'next/server'
 import { dbError }            from '@/lib/api-error'
 import { uploadToR2, deleteFromR2, R2_CONFIGURED } from '@/lib/storage/r2'
+import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
 
 // Allow up to 60s for large file uploads
 export const maxDuration = 60
@@ -13,7 +14,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-  const { data: mb } = await supabase.from('org_members').select('org_id, role, can_view_all_tasks').eq('user_id', user.id).eq('is_active', true).single()
+  const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role, can_view_all_tasks')
   if (!mb) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   // Verify user can access this task (org_id match + visibility rules)
   const canSeeAll = ['owner','admin','manager'].includes(mb.role) || mb.can_view_all_tasks
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-  const { data: mb } = await supabase.from('org_members').select('org_id, role, can_view_all_tasks').eq('user_id', user.id).eq('is_active', true).single()
+  const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role, can_view_all_tasks')
   if (!mb) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   // Verify task exists in this org and user has access
   const canSeeAll = ['owner','admin','manager'].includes(mb.role) || mb.can_view_all_tasks
@@ -152,7 +153,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-  const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).single()
+  const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   const { data: att } = await supabase.from('task_attachments').select('storage_path, uploaded_by, attachment_type, drive_url').eq('id', attId).eq('task_id', id).single()
   if (!att) return NextResponse.json({ error: 'Not found' }, { status: 404 })
