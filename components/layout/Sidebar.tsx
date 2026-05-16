@@ -8,6 +8,7 @@ import {
   RefreshCw, Users, BarChart2, Settings, Plus,
   ChevronDown, ChevronRight, Clock, Zap, X, Upload,
   Calendar, Shield, LogOut, FileCheck, ArrowRight, Eye, Receipt, Copy, Check, Activity, BookOpen,
+  ChevronsUpDown,
 } from 'lucide-react'
 import { cn }            from '@/lib/utils/cn'
 import { createClient }  from '@/lib/supabase/client'
@@ -36,9 +37,12 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
   const [allProjects,   setAllProjects]   = useState<Project[]>([])
   const [flyoutLoading, setFlyoutLoading] = useState(false)
   const [overdueCount,  setOverdueCount]  = useState(_countCache.overdue)
-  const fetchRef     = useRef(false)
+  const [orgSwitcherOpen, setOrgSwitcherOpen] = useState(false)
+  const [switching, setSwitching]             = useState(false)
+  const fetchRef      = useRef(false)
   const countFetchRef = useRef(false)
-  const flyoutRef    = useRef<HTMLDivElement>(null)
+  const flyoutRef     = useRef<HTMLDivElement>(null)
+  const orgSwitcherRef = useRef<HTMLDivElement>(null)
 
   // Derive role-based values BEFORE any useEffect that references them
   const plan      = session?.org.plan_tier ?? 'free'
@@ -103,6 +107,31 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
     return () => document.removeEventListener('mousedown', handler)
   }, [flyoutOpen])
 
+  // Close org switcher on outside click
+  useEffect(() => {
+    if (!orgSwitcherOpen) return
+    function handler(e: MouseEvent) {
+      if (orgSwitcherRef.current && !orgSwitcherRef.current.contains(e.target as Node)) {
+        setOrgSwitcherOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [orgSwitcherOpen])
+
+  async function switchOrg(orgId: string) {
+    if (switching || orgId === session?.org.id) return
+    setSwitching(true)
+    try {
+      await fetch('/api/org/switch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ org_id: orgId }),
+      })
+    } catch {}
+    window.location.href = '/dashboard'
+  }
+
   const openFlyout = useCallback(async () => {
     setFlyoutOpen(true)
     if (allProjects.length > 0) return
@@ -127,24 +156,94 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
     <aside style={{ width: 236, background: '#0f172a', display: 'flex', flexDirection: 'column', height: '100%' }}>
 
       {/* ── Brand ── */}
-      <div style={{ padding: '13px 12px', borderBottom: '1px solid rgba(255,255,255,0.08)',
-        display: 'flex', alignItems: 'center', gap: 9, flexShrink: 0 }}>
-        <div style={{ width: 27, height: 27, borderRadius: 7, background: session?.org.logo_color ?? '#0d9488',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: '#fff', fontWeight: 700, fontSize: 13, flexShrink: 0 }}>
-          <Zap className="h-4 w-4 text-white"/>
+      <div style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0, position: 'relative' }}
+        ref={orgSwitcherRef}>
+        <div style={{ padding: '13px 12px', display: 'flex', alignItems: 'center', gap: 9 }}>
+          <div style={{ width: 27, height: 27, borderRadius: 7, background: session?.org.logo_color ?? '#0d9488',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: '#fff', fontWeight: 700, fontSize: 13, flexShrink: 0 }}>
+            <Zap className="h-4 w-4 text-white"/>
+          </div>
+          {/* Org name — clickable for switcher if multiple orgs */}
+          {(session?.allOrgs?.length ?? 0) > 1 ? (
+            <button
+              onClick={() => setOrgSwitcherOpen(o => !o)}
+              disabled={switching}
+              style={{ flex: 1, background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 4, minWidth: 0, textAlign: 'left' }}>
+              <span style={{ color: '#fff', fontWeight: 600, fontSize: 13, overflow: 'hidden',
+                whiteSpace: 'nowrap', textOverflow: 'ellipsis', flex: 1 }}>
+                {session?.org.name ?? 'Planora'}
+              </span>
+              <ChevronsUpDown style={{ width: 13, height: 13, color: 'rgba(255,255,255,0.35)', flexShrink: 0 }}/>
+            </button>
+          ) : (
+            <span style={{ color: '#fff', fontWeight: 600, fontSize: 13, flex: 1, overflow: 'hidden',
+              whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+              {session?.org.name ?? 'Planora'}
+            </span>
+          )}
+          <PlanBadge plan={plan}/>
+          {onClose && (
+            <button onClick={onClose}
+              style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)',
+                cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+              <X className="h-4 w-4"/>
+            </button>
+          )}
         </div>
-        <span style={{ color: '#fff', fontWeight: 600, fontSize: 13, flex: 1, overflow: 'hidden',
-          whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
-          {session?.org.name ?? 'Floatup'}
-        </span>
-        <PlanBadge plan={plan}/>
-        {onClose && (
-          <button onClick={onClose}
-            style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)',
-              cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-            <X className="h-4 w-4"/>
-          </button>
+
+        {/* Org switcher dropdown */}
+        {orgSwitcherOpen && (session?.allOrgs?.length ?? 0) > 1 && (
+          <div style={{
+            position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200,
+            background: '#1e293b', border: '1px solid rgba(255,255,255,0.12)',
+            borderTop: 'none', borderRadius: '0 0 10px 10px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+            overflow: 'hidden',
+          }}>
+            <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase',
+              color: 'rgba(255,255,255,0.3)', padding: '8px 12px 4px' }}>
+              Switch workspace
+            </p>
+            {session!.allOrgs.map(org => {
+              const isCurrent = org.id === session?.org.id
+              return (
+                <button key={org.id}
+                  onClick={() => { setOrgSwitcherOpen(false); switchOrg(org.id) }}
+                  disabled={isCurrent || switching}
+                  style={{
+                    width: '100%', display: 'flex', alignItems: 'center', gap: 9,
+                    padding: '9px 12px', background: isCurrent ? 'rgba(20,184,166,0.12)' : 'none',
+                    border: 'none', cursor: isCurrent ? 'default' : 'pointer',
+                    textAlign: 'left', transition: 'background 0.12s',
+                  }}
+                  onMouseEnter={e => { if (!isCurrent) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)' }}
+                  onMouseLeave={e => { if (!isCurrent) (e.currentTarget as HTMLElement).style.background = 'none' }}>
+                  <div style={{ width: 22, height: 22, borderRadius: 5,
+                    background: org.logo_color, flexShrink: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: '#fff', fontSize: 10, fontWeight: 700 }}>
+                    {org.name[0]?.toUpperCase()}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ color: isCurrent ? '#2dd4bf' : '#fff', fontSize: 12, fontWeight: isCurrent ? 600 : 400,
+                      margin: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+                      {org.name}
+                    </p>
+                    <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, margin: 0,
+                      textTransform: 'capitalize' }}>
+                      {org.role}
+                    </p>
+                  </div>
+                  {isCurrent && (
+                    <Check style={{ width: 13, height: 13, color: '#2dd4bf', flexShrink: 0 }}/>
+                  )}
+                </button>
+              )
+            })}
+            <div style={{ height: 6 }}/>
+          </div>
         )}
       </div>
 
