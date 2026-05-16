@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient }              from '@/lib/supabase/server'
 import { createAdminClient }         from '@/lib/supabase/admin'
 import crypto                        from 'crypto'
+import { getApiOrgMembership }       from '@/lib/supabase/apiActiveOrg'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://taska.in'
 
@@ -13,12 +14,7 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data: mb } = await supabase
-    .from('org_members')
-    .select('org_id, role')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .maybeSingle()
+  const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'Not a member' }, { status: 403 })
   if (!['owner', 'admin', 'manager'].includes(mb.role)) {
     return NextResponse.json({ error: 'Insufficient role' }, { status: 403 })
@@ -77,12 +73,7 @@ export async function DELETE(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data: mb } = await supabase
-    .from('org_members')
-    .select('org_id, role')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .maybeSingle()
+  const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'Not a member' }, { status: 403 })
   if (!['owner', 'admin', 'manager'].includes(mb.role)) {
     return NextResponse.json({ error: 'Insufficient role' }, { status: 403 })
@@ -113,12 +104,7 @@ export async function GET(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data: mb } = await supabase
-    .from('org_members')
-    .select('org_id, role')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .maybeSingle()
+  const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'Not a member' }, { status: 403 })
 
   const client_id = req.nextUrl.searchParams.get('client_id')

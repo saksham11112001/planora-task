@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
-import { getSessionUser, getOrgMembership } from '@/lib/supabase/cached'
+import { getSessionUser } from '@/lib/supabase/cached'
+import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { MonitorView }  from './MonitorView'
 import { canDo }        from '@/lib/utils/permissionGate'
 import { redirect }     from 'next/navigation'
@@ -9,7 +10,7 @@ const TASK_COLS = 'id, title, description, status, priority, due_date, completed
 export async function MonitorFetcher() {
   const user = await getSessionUser()
   if (!user) return null
-  const mb = await getOrgMembership(user.id)
+  const mb = await getActiveOrgMembership(user.id)
   if (!mb) return null
 
   const supabase = await createClient()
@@ -20,20 +21,31 @@ export async function MonitorFetcher() {
   // For other roles run the permission check in parallel with the data fetches.
   const isOwnerOrAdmin = ['owner', 'admin'].includes(mb.role)
 
-  const [hasRoleAccess, { data: tasks }, { data: members }, { data: clientsData }] = await Promise.all([
+  const makeBase = () => supabase.from('tasks')
+    .select(TASK_COLS)
+    .eq('org_id', mb.org_id)
+    .neq('is_archived', true)
+    .is('parent_task_id', null)
+
+  const [
+    hasRoleAccess,
+    { data: datedTasks },
+    { data: undatedTasks },
+    { data: members },
+    { data: clientsData },
+  ] = await Promise.all([
     isOwnerOrAdmin
       ? Promise.resolve(true)
       : canDo(supabase, mb.org_id, mb.role, 'monitor.view'),
-    supabase.from('tasks')
-      .select(TASK_COLS)
-      .eq('org_id', mb.org_id)
-      .neq('is_archived', true)
-      .is('parent_task_id', null)
-      .order('due_date', { ascending: true, nullsFirst: false }).limit(10000),
+    makeBase().not('due_date', 'is', null)
+      .order('due_date', { ascending: true }).limit(10000),
+    makeBase().is('due_date', null).limit(10000),
     supabase.from('org_members')
       .select('user_id, users(id, name)').eq('org_id', mb.org_id).eq('is_active', true),
     supabase.from('clients').select('id, name, color, status').eq('org_id', mb.org_id).order('name'),
   ])
+
+  const tasks = [...(datedTasks ?? []), ...(undatedTasks ?? [])]
 
   const hasMemberAccess = mb.can_view_monitor === true
   if (!hasRoleAccess && !hasMemberAccess) {

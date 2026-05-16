@@ -5,17 +5,13 @@ import { CA_DEFAULT_TASKS } from '@/lib/data/caDefaultTasks'
 import { getTasksForCountries } from '@/lib/data/caDefaultTasksByCountry'
 import type { NextRequest } from 'next/server'
 import { dbError } from '@/lib/api-error'
-
-async function getOrgMember(supabase: Awaited<ReturnType<typeof createClient>>) {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
-  const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).single()
-  return mb ? { ...mb, user_id: user.id } : null
-}
+import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
 
 export async function GET(req: NextRequest) {
   const supabase = await createClient()
-  const mb = await getOrgMember(supabase)
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+  const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
   const fy   = req.nextUrl.searchParams.get('fy') ?? '2026-27'
@@ -41,7 +37,9 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
-  const mb = await getOrgMember(supabase)
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+  const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   if (!['owner','admin'].includes(mb.role)) return NextResponse.json({ error: 'Admin only' }, { status: 403 })
 

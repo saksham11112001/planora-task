@@ -1,5 +1,6 @@
 import { createClient }      from '@/lib/supabase/server'
-import { getSessionUser, getOrgMembership } from '@/lib/supabase/cached'
+import { getSessionUser } from '@/lib/supabase/cached'
+import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { redirect }           from 'next/navigation'
 import Link                   from 'next/link'
 import { ArrowLeft }          from 'lucide-react'
@@ -12,7 +13,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
   const { projectId } = await params
   const user = await getSessionUser()
   if (!user) redirect('/login')
-  const mb = await getOrgMembership(user.id)
+  const mb = await getActiveOrgMembership(user.id)
   if (!mb) redirect('/onboarding')
 
   const supabase = await createClient()

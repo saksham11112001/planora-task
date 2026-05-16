@@ -3,19 +3,15 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { NextRequest } from 'next/server'
 import { dbError } from '@/lib/api-error'
+import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
 
 export const maxDuration = 30
 
-async function getOrgMember(supabase: Awaited<ReturnType<typeof createClient>>) {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
-  const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).single()
-  return mb ? { ...mb, user_id: user.id } : null
-}
-
 export async function GET(req: NextRequest) {
   const supabase = await createClient()
-  const mb = await getOrgMember(supabase)
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+  const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
   const clientId       = req.nextUrl.searchParams.get('client_id')
@@ -47,7 +43,9 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
-  const mb = await getOrgMember(supabase)
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+  const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   if (!['owner','admin','manager'].includes(mb.role)) return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
 
@@ -64,7 +62,7 @@ export async function POST(req: NextRequest) {
     assignee_id: a.assignee_id ?? null,
     approver_id: a.approver_id ?? null,
     start_date: a.start_date ?? null,
-    created_by: mb.user_id,
+    created_by: user.id,
     is_active: true,
   }))
 

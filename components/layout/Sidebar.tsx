@@ -8,6 +8,7 @@ import {
   RefreshCw, Users, BarChart2, Settings, Plus,
   ChevronDown, ChevronRight, Clock, Zap, X, Upload,
   Calendar, Shield, LogOut, FileCheck, ArrowRight, Eye, Receipt, Copy, Check, Activity, BookOpen,
+  ChevronsUpDown,
 } from 'lucide-react'
 import { cn }            from '@/lib/utils/cn'
 import { createClient }  from '@/lib/supabase/client'
@@ -22,7 +23,7 @@ let _cacheTime    = 0
 const CACHE_TTL   = 60_000
 
 // Lightweight task-count cache shared across nav renders
-let _countCache = { overdue: 0, pending: 0 }
+let _countCache = { overdue: 0 }
 let _countCacheTime = 0
 const COUNT_CACHE_TTL = 45_000
 
@@ -36,10 +37,12 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
   const [allProjects,   setAllProjects]   = useState<Project[]>([])
   const [flyoutLoading, setFlyoutLoading] = useState(false)
   const [overdueCount,  setOverdueCount]  = useState(_countCache.overdue)
-  const [pendingCount,  setPendingCount]  = useState(_countCache.pending)
-  const fetchRef     = useRef(false)
+  const [orgSwitcherOpen, setOrgSwitcherOpen] = useState(false)
+  const [switching, setSwitching]             = useState(false)
+  const fetchRef      = useRef(false)
   const countFetchRef = useRef(false)
-  const flyoutRef    = useRef<HTMLDivElement>(null)
+  const flyoutRef     = useRef<HTMLDivElement>(null)
+  const orgSwitcherRef = useRef<HTMLDivElement>(null)
 
   // Derive role-based values BEFORE any useEffect that references them
   const plan      = session?.org.plan_tier ?? 'free'
@@ -64,7 +67,7 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
 
   useEffect(() => { if (pathname === '/projects') _cacheTime = 0 }, [pathname])
 
-  // Fetch overdue + pending-approval counts for nav badges
+  // Fetch active task count for My Tasks badge
   useEffect(() => {
     if (countFetchRef.current) return
     const now = Date.now()
@@ -72,32 +75,25 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
 
     countFetchRef.current = true
 
-    Promise.all([
-      // My tasks — fetch all assigned tasks to count active ones
-      fetch('/api/tasks?mine=true&limit=500').then(r => r.json()).catch(() => ({ data: [] })),
-      // Pending approval tasks — all in_review across the org (managers see these)
-      canManage
-        ? fetch('/api/tasks?status=in_review&limit=200').then(r => r.json()).catch(() => ({ data: [] }))
-        : Promise.resolve({ data: [] }),
-    ]).then(([myData, pendData]) => {
-      // Count ALL active tasks assigned to me (todo + in_review), not just overdue.
-      // This matches what the user sees on the My Tasks page.
-      const ov = Array.isArray(myData.data)
-        ? myData.data.filter((t: any) =>
-            !['completed', 'cancelled'].includes(t.status) &&
-            !t.custom_fields?._context_task  // exclude parent tasks surfaced for subtask context
-          ).length
-        : 0
-      const pend = Array.isArray(pendData.data) ? pendData.data.length : 0
+    fetch('/api/tasks?mine=true&top_level=true&exclude_recurring=true')
+      .then(r => r.json())
+      .catch(() => ({ data: [] }))
+      .then((myData) => {
+        const ov = Array.isArray(myData.data)
+          ? myData.data.filter((t: any) => {
+              if (['completed', 'cancelled'].includes(t.status)) return false
+              if (t.custom_fields?._ca_compliance === true && t.custom_fields?._triggered !== true) return false
+              return true
+            }).length
+          : 0
 
-      _countCache = { overdue: ov, pending: pend }
-      _countCacheTime = Date.now()
-      setOverdueCount(ov)
-      setPendingCount(pend)
-    }).catch(() => {}).finally(() => { countFetchRef.current = false })
+        _countCache = { overdue: ov }
+        _countCacheTime = Date.now()
+        setOverdueCount(ov)
+      }).catch(() => {}).finally(() => { countFetchRef.current = false })
   // Re-fetch whenever the user navigates (pathname change) but rate-limited by cache TTL
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname, canManage])
+  }, [pathname])
 
   // Close flyout on outside click
   useEffect(() => {
@@ -110,6 +106,31 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [flyoutOpen])
+
+  // Close org switcher on outside click
+  useEffect(() => {
+    if (!orgSwitcherOpen) return
+    function handler(e: MouseEvent) {
+      if (orgSwitcherRef.current && !orgSwitcherRef.current.contains(e.target as Node)) {
+        setOrgSwitcherOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [orgSwitcherOpen])
+
+  async function switchOrg(orgId: string) {
+    if (switching || orgId === session?.org.id) return
+    setSwitching(true)
+    try {
+      await fetch('/api/org/switch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ org_id: orgId }),
+      })
+    } catch {}
+    window.location.href = '/dashboard'
+  }
 
   const openFlyout = useCallback(async () => {
     setFlyoutOpen(true)
@@ -135,24 +156,94 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
     <aside style={{ width: 236, background: '#0f172a', display: 'flex', flexDirection: 'column', height: '100%' }}>
 
       {/* ── Brand ── */}
-      <div style={{ padding: '13px 12px', borderBottom: '1px solid rgba(255,255,255,0.08)',
-        display: 'flex', alignItems: 'center', gap: 9, flexShrink: 0 }}>
-        <div style={{ width: 27, height: 27, borderRadius: 7, background: session?.org.logo_color ?? '#0d9488',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: '#fff', fontWeight: 700, fontSize: 13, flexShrink: 0 }}>
-          <Zap className="h-4 w-4 text-white"/>
+      <div style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0, position: 'relative' }}
+        ref={orgSwitcherRef}>
+        <div style={{ padding: '13px 12px', display: 'flex', alignItems: 'center', gap: 9 }}>
+          <div style={{ width: 27, height: 27, borderRadius: 7, background: session?.org.logo_color ?? '#0d9488',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: '#fff', fontWeight: 700, fontSize: 13, flexShrink: 0 }}>
+            <Zap className="h-4 w-4 text-white"/>
+          </div>
+          {/* Org name — clickable for switcher if multiple orgs */}
+          {(session?.allOrgs?.length ?? 0) > 1 ? (
+            <button
+              onClick={() => setOrgSwitcherOpen(o => !o)}
+              disabled={switching}
+              style={{ flex: 1, background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 4, minWidth: 0, textAlign: 'left' }}>
+              <span style={{ color: '#fff', fontWeight: 600, fontSize: 13, overflow: 'hidden',
+                whiteSpace: 'nowrap', textOverflow: 'ellipsis', flex: 1 }}>
+                {session?.org.name ?? 'Planora'}
+              </span>
+              <ChevronsUpDown style={{ width: 13, height: 13, color: 'rgba(255,255,255,0.35)', flexShrink: 0 }}/>
+            </button>
+          ) : (
+            <span style={{ color: '#fff', fontWeight: 600, fontSize: 13, flex: 1, overflow: 'hidden',
+              whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+              {session?.org.name ?? 'Planora'}
+            </span>
+          )}
+          <PlanBadge plan={plan}/>
+          {onClose && (
+            <button onClick={onClose}
+              style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)',
+                cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+              <X className="h-4 w-4"/>
+            </button>
+          )}
         </div>
-        <span style={{ color: '#fff', fontWeight: 600, fontSize: 13, flex: 1, overflow: 'hidden',
-          whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
-          {session?.org.name ?? 'Floatup'}
-        </span>
-        <PlanBadge plan={plan}/>
-        {onClose && (
-          <button onClick={onClose}
-            style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)',
-              cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-            <X className="h-4 w-4"/>
-          </button>
+
+        {/* Org switcher dropdown */}
+        {orgSwitcherOpen && (session?.allOrgs?.length ?? 0) > 1 && (
+          <div style={{
+            position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200,
+            background: '#1e293b', border: '1px solid rgba(255,255,255,0.12)',
+            borderTop: 'none', borderRadius: '0 0 10px 10px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+            overflow: 'hidden',
+          }}>
+            <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase',
+              color: 'rgba(255,255,255,0.3)', padding: '8px 12px 4px' }}>
+              Switch workspace
+            </p>
+            {session!.allOrgs.map(org => {
+              const isCurrent = org.id === session?.org.id
+              return (
+                <button key={org.id}
+                  onClick={() => { setOrgSwitcherOpen(false); switchOrg(org.id) }}
+                  disabled={isCurrent || switching}
+                  style={{
+                    width: '100%', display: 'flex', alignItems: 'center', gap: 9,
+                    padding: '9px 12px', background: isCurrent ? 'rgba(20,184,166,0.12)' : 'none',
+                    border: 'none', cursor: isCurrent ? 'default' : 'pointer',
+                    textAlign: 'left', transition: 'background 0.12s',
+                  }}
+                  onMouseEnter={e => { if (!isCurrent) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)' }}
+                  onMouseLeave={e => { if (!isCurrent) (e.currentTarget as HTMLElement).style.background = 'none' }}>
+                  <div style={{ width: 22, height: 22, borderRadius: 5,
+                    background: org.logo_color, flexShrink: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: '#fff', fontSize: 10, fontWeight: 700 }}>
+                    {org.name[0]?.toUpperCase()}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ color: isCurrent ? '#2dd4bf' : '#fff', fontSize: 12, fontWeight: isCurrent ? 600 : 400,
+                      margin: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+                      {org.name}
+                    </p>
+                    <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, margin: 0,
+                      textTransform: 'capitalize' }}>
+                      {org.role}
+                    </p>
+                  </div>
+                  {isCurrent && (
+                    <Check style={{ width: 13, height: 13, color: '#2dd4bf', flexShrink: 0 }}/>
+                  )}
+                </button>
+              )
+            })}
+            <div style={{ height: 6 }}/>
+          </div>
         )}
       </div>
 
@@ -291,7 +382,7 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
         {/* ORGANISATION */}
         <GL>Organisation</GL>
         {nav.team && <SI href="/team"    active={isActive('/team')}    icon={<Users    className="h-4 w-4"/>} label="Team"/>}
-        {canManage && <SI href="/approvals" active={isActive('/approvals')} icon={<CheckSquare className="h-4 w-4"/>} label="Approvals" badge={pendingCount > 0 ? pendingCount : undefined}/>}
+
         {nav.time_tracking && isPaid && <SI href="/time" active={isActive('/time')} icon={<Clock className="h-4 w-4"/>} label="Time tracking"/>}
         {nav.reports && isPaid && <SI href="/reports" active={isActive('/reports')} icon={<BarChart2 className="h-4 w-4"/>} label="Reports"/>}
         {canManage && <SI href="/invoices" active={isActive('/invoices')} icon={<Receipt className="h-4 w-4"/>} label="Invoices"/>}

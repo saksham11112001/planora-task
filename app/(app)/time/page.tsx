@@ -1,5 +1,6 @@
 import { Suspense }        from 'react'
-import { getSessionUser, getOrgMembership } from '@/lib/supabase/cached'
+import { getSessionUser } from '@/lib/supabase/cached'
+import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { effectivePlan, canUseFeature } from '@/lib/utils/planGate'
 import { redirect }        from 'next/navigation'
 import { TimeFetcher }     from './TimeFetcher'
@@ -18,7 +19,7 @@ export default async function TimePage({
   const sp   = await searchParams
   const user = await getSessionUser()
   if (!user) redirect('/login')
-  const mb = await getOrgMembership(user.id)
+  const mb = await getActiveOrgMembership(user.id)
   if (!mb) redirect('/onboarding')
 
   const plan = effectivePlan((mb.organisations as any) ?? { plan_tier: 'free', status: 'active' })

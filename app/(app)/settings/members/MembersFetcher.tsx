@@ -1,11 +1,12 @@
 import { createClient } from '@/lib/supabase/server'
-import { getSessionUser, getOrgMembership } from '@/lib/supabase/cached'
+import { getSessionUser } from '@/lib/supabase/cached'
+import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { MembersView }  from './MembersView'
 
 export async function MembersFetcher() {
   const user = await getSessionUser()
   if (!user) return null
-  const mb = await getOrgMembership(user.id)
+  const mb = await getActiveOrgMembership(user.id)
   if (!mb) return null
 
   const supabase = await createClient()

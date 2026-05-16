@@ -1,5 +1,6 @@
 import { createClient }          from '@/lib/supabase/server'
-import { getSessionUser, getOrgMembership } from '@/lib/supabase/cached'
+import { getSessionUser } from '@/lib/supabase/cached'
+import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { redirect }               from 'next/navigation'
 import { NotifFrequencyView }     from './NotifFrequencyView'
 import type { Metadata }          from 'next'
@@ -11,7 +12,7 @@ export default async function NotifFrequencyPage() {
   const user = await getSessionUser()
   if (!user) redirect('/login')
 
-  const mb = await getOrgMembership(user.id)
+  const mb = await getActiveOrgMembership(user.id)
   if (!mb) redirect('/onboarding')
 
   const supabase = await createClient()

@@ -14,6 +14,7 @@ import { NextRequest, NextResponse }          from 'next/server'
 import { createClient }                       from '@/lib/supabase/server'
 import { createAdminClient }                  from '@/lib/supabase/admin'
 import { r2SignedUrl, R2_CONFIGURED }         from '@/lib/storage/r2'
+import { getApiOrgMembership }               from '@/lib/supabase/apiActiveOrg'
 
 export async function GET(req: NextRequest) {
   const supabase = await createClient()
@@ -30,12 +31,7 @@ export async function GET(req: NextRequest) {
   // Verify key belongs to this user's org.
   // All task attachment keys are: `{org_id}/{task_id}/...`
   // Issue-report keys are: `issue-reports/...` (internal, any authenticated user is fine)
-  const { data: mb } = await supabase
-    .from('org_members')
-    .select('org_id')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .single()
+  const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id')
 
   if (!mb) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 

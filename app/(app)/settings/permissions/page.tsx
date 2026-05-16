@@ -1,7 +1,8 @@
 export const dynamic = 'force-dynamic'
 
 import { createClient } from '@/lib/supabase/server'
-import { getSessionUser, getOrgMembership } from '@/lib/supabase/cached'
+import { getSessionUser } from '@/lib/supabase/cached'
+import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { redirect }     from 'next/navigation'
 import { PermissionsView } from './PermissionsView'
 import type { Metadata } from 'next'
@@ -11,7 +12,7 @@ export default async function PermissionsPage() {
   const user = await getSessionUser()
   if (!user) redirect('/login')
 
-  const mb = await getOrgMembership(user.id)
+  const mb = await getActiveOrgMembership(user.id)
   if (!mb || !['owner','admin'].includes(mb.role)) redirect('/settings')
 
   const supabase = await createClient()

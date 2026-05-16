@@ -6,13 +6,14 @@ import type { NextRequest }   from 'next/server'
 import { assertCan }          from '@/lib/utils/permissionGate'
 import { dbError }             from '@/lib/api-error'
 import { nextOccurrence }      from '@/lib/utils/recurringSchedule'
+import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-  const { data: mb } = await supabase.from('org_members').select('org_id').eq('user_id', user.id).eq('is_active', true).single()
+  const mb = await getApiOrgMembership(supabase, user.id, _req, 'org_id')
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
   const { data, error } = await supabase.from('tasks')
     .select('*, assignee:users!tasks_assignee_id_fkey(id,name), approver:users!tasks_approver_id_fkey(id,name), creator:users!tasks_created_by_fkey(id,name), projects(id,name,color), clients(id,name,color)')
@@ -27,9 +28,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
-  const { data: mb } = await supabase
-    .from('org_members').select('org_id, role')
-    .eq('user_id', user.id).eq('is_active', true).single()
+  const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
 
   const { data: task } = await supabase
@@ -287,9 +286,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-  const { data: mb } = await supabase
-    .from('org_members').select('org_id, role')
-    .eq('user_id', user.id).eq('is_active', true).single()
+  const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
   const deleteDenied = await assertCan(supabase, mb.org_id, mb.role, 'tasks.delete')
   if (deleteDenied) return NextResponse.json({ error: deleteDenied.error }, { status: deleteDenied.status })

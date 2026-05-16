@@ -4,13 +4,14 @@ import type { NextRequest } from 'next/server'
 import { assertCan }     from '@/lib/utils/permissionGate'
 import { inngest }       from '@/lib/inngest/client'
 import { dbError } from '@/lib/api-error'
+import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-  const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).single()
+  const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
   const projectEditDenied = await assertCan(supabase, mb.org_id, mb.role, 'projects.edit')
   if (projectEditDenied) return NextResponse.json({ error: projectEditDenied.error }, { status: projectEditDenied.status })
@@ -54,7 +55,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-  const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).single()
+  const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
   const projectDeleteDenied = await assertCan(supabase, mb.org_id, mb.role, 'projects.delete')
   if (projectDeleteDenied) return NextResponse.json({ error: projectDeleteDenied.error }, { status: projectDeleteDenied.status })

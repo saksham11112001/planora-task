@@ -2,15 +2,14 @@ import { createClient }   from '@/lib/supabase/server'
 import { NextResponse }    from 'next/server'
 import type { NextRequest } from 'next/server'
 import { dbError } from '@/lib/api-error'
+import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
-  const { data: mb } = await supabase
-    .from('org_members').select('org_id, role')
-    .eq('user_id', user.id).eq('is_active', true).maybeSingle()
+  const mb = await getApiOrgMembership(supabase, user.id, request, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
 
   const { data } = await supabase
@@ -29,9 +28,7 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
-  const { data: mb } = await supabase
-    .from('org_members').select('org_id, role')
-    .eq('user_id', user.id).eq('is_active', true).maybeSingle()
+  const mb = await getApiOrgMembership(supabase, user.id, request, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
 
   // Only owner/admin can change org-wide notification frequency

@@ -1,5 +1,6 @@
 import { Suspense }        from 'react'
-import { getSessionUser, getOrgMembership } from '@/lib/supabase/cached'
+import { getSessionUser } from '@/lib/supabase/cached'
+import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { redirect }        from 'next/navigation'
 import { TasksFetcher }    from './TasksFetcher'
 import { TasksSkeleton }   from './TasksSkeleton'
@@ -13,7 +14,7 @@ export default async function MyTasksPage() {
   const user = await getSessionUser()
   if (!user) redirect('/login')
 
-  const mb = await getOrgMembership(user.id)
+  const mb = await getActiveOrgMembership(user.id)
   if (!mb) redirect('/onboarding')
 
   return (

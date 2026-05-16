@@ -1,6 +1,7 @@
 import { redirect }  from 'next/navigation'
 import { AppShell }  from './AppShell'
-import { getSessionUser, getOrgMembership, getUserProfile } from '@/lib/supabase/cached'
+import { getSessionUser, getUserProfile } from '@/lib/supabase/cached'
+import { getActiveOrgMembership, getUserOrgs } from '@/lib/supabase/activeOrg'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   try {
@@ -9,10 +10,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     const user = await getSessionUser()
     if (!user) redirect('/login')
 
-    // Membership + profile can run in parallel — both only need user.id
-    const [membership, profile] = await Promise.all([
-      getOrgMembership(user.id),
+    // Membership + profile + all orgs can run in parallel
+    const [membership, profile, allOrgs] = await Promise.all([
+      getActiveOrgMembership(user.id),
       getUserProfile(user.id),
+      getUserOrgs(user.id),
     ])
 
     // No active membership — try to recover before giving up
@@ -42,13 +44,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           await admin.from('org_members').update({ is_active: true, role: pendingRole }).eq('id', existingMember.id)
         }
 
-        // Deactivate any active memberships in OTHER orgs to ensure single active org per user.
-        await admin.from('org_members')
-          .update({ is_active: false })
-          .eq('user_id', user.id)
-          .neq('org_id', pendingOrgId)
-          .eq('is_active', true)
-
+        // Clear the pending invite metadata — do NOT deactivate other org memberships
         await admin.auth.admin.updateUserById(user.id, {
           user_metadata: { ...authUserData?.user?.user_metadata, invited_to_org: null, invited_role: null },
         })
@@ -67,13 +63,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         .maybeSingle()
 
       if (anyMembership) {
-        // Reactivate this membership and deactivate any others to ensure single active org per user.
+        // Reactivate this membership — do NOT deactivate other org memberships
         await admin.from('org_members').update({ is_active: true }).eq('id', anyMembership.id)
-        await admin.from('org_members')
-          .update({ is_active: false })
-          .eq('user_id', user.id)
-          .neq('id', anyMembership.id)
-          .eq('is_active', true)
         redirect('/dashboard')
       }
 
@@ -110,6 +101,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         }}
         role={membership.role ?? 'member'}
         workspaceId={null}
+        allOrgs={allOrgs.map((m: any) => ({
+          id:         (m.organisations as any)?.id   ?? m.org_id,
+          name:       (m.organisations as any)?.name ?? '',
+          logo_color: (m.organisations as any)?.logo_color ?? '#0d9488',
+          role:       m.role ?? 'member',
+        }))}
       >
         {children}
       </AppShell>

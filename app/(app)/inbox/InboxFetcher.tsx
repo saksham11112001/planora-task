@@ -1,5 +1,6 @@
 import { createClient }   from '@/lib/supabase/server'
-import { getSessionUser, getOrgMembership } from '@/lib/supabase/cached'
+import { getSessionUser } from '@/lib/supabase/cached'
+import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { InboxView }       from './InboxView'
 
 const TASK_SELECT = 'id, title, status, priority, due_date, approval_status, approval_required, approver_id, client_id, assignee_id, created_by, is_recurring, estimated_hours, custom_fields, created_at, updated_at, is_billable, billable_amount, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), approver:users!tasks_approver_id_fkey(id, name), creator:users!tasks_created_by_fkey(id, name)'
@@ -7,7 +8,7 @@ const TASK_SELECT = 'id, title, status, priority, due_date, approval_status, app
 export async function InboxFetcher() {
   const user = await getSessionUser()
   if (!user) return null
-  const mb = await getOrgMembership(user.id)
+  const mb = await getActiveOrgMembership(user.id)
   if (!mb) return null
 
   const supabase = await createClient()

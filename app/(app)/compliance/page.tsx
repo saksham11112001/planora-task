@@ -1,5 +1,6 @@
 import { createClient }     from '@/lib/supabase/server'
-import { getSessionUser, getOrgMembership } from '@/lib/supabase/cached'
+import { getSessionUser } from '@/lib/supabase/cached'
+import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { redirect }          from 'next/navigation'
 import { Suspense }          from 'react'
 import { ComplianceShell }   from './ComplianceShell'
@@ -13,7 +14,7 @@ export default async function CompliancePage() {
   // getOrgMembership joins organisations, eliminating the separate admin org query.
   const user = await getSessionUser()
   if (!user) redirect('/login')
-  const mb = await getOrgMembership(user.id)
+  const mb = await getActiveOrgMembership(user.id)
   if (!mb) redirect('/onboarding')
 
   const supabase = await createClient()

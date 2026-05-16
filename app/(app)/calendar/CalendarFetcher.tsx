@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
-import { getSessionUser, getOrgMembership } from '@/lib/supabase/cached'
+import { getSessionUser } from '@/lib/supabase/cached'
+import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { CalendarView } from './CalendarView'
 
 const TASK_SELECT = 'id, title, status, priority, due_date, is_recurring, project_id, assignee_id, approver_id, approval_status, approval_required, client_id, frequency, custom_fields, is_billable, billable_amount, projects(id,name,color), assignee:users!tasks_assignee_id_fkey(id,name), approver:users!tasks_approver_id_fkey(id,name)'
@@ -7,7 +8,7 @@ const TASK_SELECT = 'id, title, status, priority, due_date, is_recurring, projec
 export async function CalendarFetcher() {
   const user = await getSessionUser()
   if (!user) return null
-  const mb = await getOrgMembership(user.id)
+  const mb = await getActiveOrgMembership(user.id)
   if (!mb) return null
 
   const supabase = await createClient()

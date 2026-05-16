@@ -2,14 +2,15 @@ import { createClient }      from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse }       from 'next/server'
 import type { NextRequest }   from 'next/server'
+import { PLAN_LIMITS }        from '@/lib/utils/planGate'
+import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
-  const { data: mb } = await supabase.from('org_members')
-    .select('org_id, role').eq('user_id', user.id).eq('is_active', true).single()
+  const mb = await getApiOrgMembership(supabase, user.id, request, 'org_id, role')
   if (!mb || !['owner','admin'].includes(mb.role))
     return NextResponse.json({ error: 'Admin only' }, { status: 403 })
 
@@ -29,9 +30,10 @@ export async function POST(request: NextRequest) {
 
   if (!coupon) return NextResponse.json({ error: 'Invalid or expired coupon code' }, { status: 400 })
 
-  // Check usage limit
-  if (coupon.max_uses && coupon.uses_count >= coupon.max_uses)
-    return NextResponse.json({ error: 'This coupon has reached its usage limit' }, { status: 400 })
+  // Check usage limit — default to 1 (single-use) when max_uses is not set
+  const maxUses = coupon.max_uses ?? 1
+  if (coupon.uses_count >= maxUses)
+    return NextResponse.json({ error: 'This coupon has already been used and is no longer valid' }, { status: 400 })
 
   // Check expiry
   if (coupon.expires_at && new Date(coupon.expires_at) < new Date())
@@ -58,6 +60,18 @@ export async function POST(request: NextRequest) {
       status:        'active',
       trial_ends_at: expiresAt.toISOString(),
     }).eq('id', mb.org_id)
+
+    // Auto-enable feature toggles included in the granted plan so the user
+    // doesn't have to discover them manually in Settings → Features.
+    const planFeatures: readonly string[] =
+      (PLAN_LIMITS[coupon.plan_tier as keyof typeof PLAN_LIMITS]?.features ?? []) as readonly string[]
+    if (planFeatures.includes('ca_compliance')) {
+      await admin.from('org_feature_settings')
+        .upsert(
+          { org_id: mb.org_id, feature_key: 'ca_compliance_mode', is_enabled: true },
+          { onConflict: 'org_id,feature_key' }
+        )
+    }
 
     await admin.from('coupons')
       .update({ uses_count: (coupon.uses_count ?? 0) + 1 })

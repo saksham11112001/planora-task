@@ -8,6 +8,7 @@ import { RouteLoader }   from '@/components/ui/RouteLoader'
 import { AppLoader }     from '@/components/ui/AppLoader'
 import { SearchModal }    from '@/components/search/SearchModal'
 import { useAppStore }    from '@/store/appStore'
+import type { OrgSummary } from '@/store/appStore'
 import { WalkthroughOverlay } from '@/components/walkthrough/WalkthroughOverlay'
 
 interface Props {
@@ -15,10 +16,11 @@ interface Props {
   org:         { id: string; name: string; slug: string; plan_tier: any; logo_color: string; status: string | null; trial_ends_at: string | null; trial_started_at?: string | null; trial_extension_days?: number; referral_code?: string | null; join_code?: string | null }
   role:        string
   workspaceId: string | null
+  allOrgs:     OrgSummary[]
   children:    React.ReactNode
 }
 
-export function AppShell({ user, org, role, workspaceId, children }: Props) {
+export function AppShell({ user, org, role, workspaceId, allOrgs, children }: Props) {
   const setSession  = useAppStore(s => s.setSession)
   const pathname    = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -43,7 +45,7 @@ export function AppShell({ user, org, role, workspaceId, children }: Props) {
   }, [mobileOpen])
 
   useEffect(() => {
-    setSession({ user, org, role, workspaceId })
+    setSession({ user, org, role, workspaceId, allOrgs })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user.id, org.id, role, workspaceId, setSession])
 

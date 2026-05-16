@@ -1,6 +1,7 @@
 import { Suspense }       from 'react'
 import { createClient }   from '@/lib/supabase/server'
-import { getSessionUser, getOrgMembership } from '@/lib/supabase/cached'
+import { getSessionUser } from '@/lib/supabase/cached'
+import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { redirect }       from 'next/navigation'
 import { NewProjectForm } from './NewProjectForm'
 import type { Metadata }  from 'next'
@@ -11,7 +12,7 @@ export const revalidate = 20
 export default async function NewProjectPage() {
   const user = await getSessionUser()
   if (!user) redirect('/login')
-  const mb = await getOrgMembership(user.id)
+  const mb = await getActiveOrgMembership(user.id)
   if (!mb || !['owner','admin','manager'].includes(mb.role)) redirect('/projects')
 
   const supabase = await createClient()

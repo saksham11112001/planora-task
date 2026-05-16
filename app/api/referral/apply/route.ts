@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { dbError } from '@/lib/api-error'
 import { normaliseCode } from '@/lib/utils/codeGen'
+import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
 
 const MAX_EXTENSION_DAYS = 42
 const EXTENSION_PER_REFERRAL = 7
@@ -26,12 +27,7 @@ export async function POST(request: NextRequest) {
     )
 
     // Get calling user's org
-    const { data: myMembership } = await admin
-      .from('org_members')
-      .select('org_id, organisations(id, trial_ends_at, trial_extension_days, status, referral_code)')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .maybeSingle()
+    const myMembership = await getApiOrgMembership(admin, user.id, request, 'org_id, organisations(id, trial_ends_at, trial_extension_days, status, referral_code)')
 
     if (!myMembership) return NextResponse.json({ error: 'No active organisation' }, { status: 400 })
 

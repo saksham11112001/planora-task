@@ -1,5 +1,6 @@
 import { createClient }   from '@/lib/supabase/server'
-import { getSessionUser, getOrgMembership } from '@/lib/supabase/cached'
+import { getSessionUser } from '@/lib/supabase/cached'
+import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { ReportsCharts }  from './ReportsCharts'
 import { ReportsExport }  from './ReportsExport'
 import { fmtHours }       from '@/lib/utils/format'
@@ -7,7 +8,7 @@ import { fmtHours }       from '@/lib/utils/format'
 export async function ReportsFetcher() {
   const user = await getSessionUser()
   if (!user) return null
-  const mb = await getOrgMembership(user.id)
+  const mb = await getActiveOrgMembership(user.id)
   if (!mb) return null
 
   const supabase = await createClient()

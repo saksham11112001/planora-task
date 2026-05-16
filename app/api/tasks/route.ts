@@ -5,12 +5,13 @@ import type { NextRequest }  from 'next/server'
 import { inngest }           from '@/lib/inngest/client'
 import { assertCan }         from '@/lib/utils/permissionGate'
 import { dbError }           from '@/lib/api-error'
+import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-  const { data: mb } = await supabase.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).maybeSingle()
+  const mb = await getApiOrgMembership(supabase, user.id, request, 'org_id, role')
   if (!mb) return NextResponse.json({ data: [] })
 
   const sp  = request.nextUrl.searchParams
@@ -27,8 +28,12 @@ export async function GET(request: NextRequest) {
   if (sp.get('client_id'))    q = q.eq('client_id', sp.get('client_id')!)
   if (sp.get('status'))       q = q.eq('status', sp.get('status')!)
   if (sp.get('mine') === 'true') q = q.eq('assignee_id', user.id)
+  // pending_approvals=true: tasks where the current user is approver and decision is pending
+  if (sp.get('pending_approvals') === 'true')
+    q = q.eq('status', 'in_review').eq('approval_status', 'pending').eq('approver_id', user.id)
   if (sp.get('parent_id'))    q = q.eq('parent_task_id', sp.get('parent_id')!)
   if (sp.get('top_level') === 'true') q = q.is('parent_task_id', null)
+  if (sp.get('exclude_recurring') === 'true') q = q.or('is_recurring.is.null,is_recurring.eq.false')
   if (sp.get('parent_recurring_id')) q = q.eq('parent_recurring_id', sp.get('parent_recurring_id')!)
   // Filter to CA compliance tasks only (custom_fields @> '{"_ca_compliance":true}')
   if (sp.get('ca_compliance') === 'true') q = (q as any).contains('custom_fields', { _ca_compliance: true })
@@ -55,9 +60,7 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
-  const { data: mb } = await supabase.from('org_members')
-    .select('org_id, role, organisations(name), users(name)')
-    .eq('user_id', user.id).eq('is_active', true).single()
+  const mb = await getApiOrgMembership(supabase, user.id, request, 'org_id, role, organisations(name), users(name)')
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
 
   const body = await request.json()
