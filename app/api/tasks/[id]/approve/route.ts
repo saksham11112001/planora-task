@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient }             from '@/lib/supabase/server'
+import { createAdminClient }        from '@/lib/supabase/admin'
 import { inngest }                   from '@/lib/inngest/client'
 import { getApiOrgMembership }       from '@/lib/supabase/apiActiveOrg'
 
@@ -14,8 +15,9 @@ export async function POST(
 
   const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role, organisations(name), users(name)')
   if (!mb) return NextResponse.json({ error: 'Not a member' }, { status: 403 })
+  const admin = createAdminClient()
 
-  const { data: task } = await supabase
+  const { data: task } = await admin
     .from('tasks')
     .select('id, title, status, approval_status, approval_required, assignee_id, approver_id, org_id, parent_task_id, custom_fields')
     .eq('id', id).eq('org_id', mb.org_id).single()
@@ -38,7 +40,7 @@ export async function POST(
     const blockedByIds: string[] = (task as any).custom_fields?._blocked_by ?? []
     if (blockedByIds.length > 0) {
       // Use a single .in() query instead of N individual queries
-      const { data: blockerTasks } = await supabase
+      const { data: blockerTasks } = await admin
         .from('tasks').select('id, title, status')
         .in('id', blockedByIds).eq('org_id', mb.org_id)
       const incomplete = (blockerTasks ?? []).filter(t => t.status !== 'completed').map(t => t.title as string)
@@ -55,7 +57,7 @@ export async function POST(
     // Owner/admin bypass: they can force-submit regardless of subtask state
     // _compliance_subtask rows are attachment-header placeholders — not real work items,
     // so they are always excluded from this gate.
-    const { data: subtasks } = await supabase
+    const { data: subtasks } = await admin
       .from('tasks').select('id, status, parent_task_id, custom_fields').eq('parent_task_id', id).eq('org_id', mb.org_id)
     const realSubtasks = (subtasks ?? []).filter((s: any) => s.custom_fields?._compliance_subtask !== true)
     if (!isOwnerOrAdmin && realSubtasks.length > 0) {
@@ -74,7 +76,7 @@ export async function POST(
       subtasks?.some((s: any) => s.custom_fields?._compliance_subtask === true)
     if (isCaCompliance) {
       // Look up how many attachments the admin requires for this task in the CA master
-      const { data: masterTask } = await supabase
+      const { data: masterTask } = await admin
         .from('ca_master_tasks')
         .select('attachment_count, attachment_headers')
         .eq('org_id', mb.org_id)
@@ -84,7 +86,7 @@ export async function POST(
         .maybeSingle()
 
       const requiredCount = Math.max(1, masterTask?.attachment_count ?? 1)
-      const { data: attachments } = await supabase
+      const { data: attachments } = await admin
         .from('task_attachments').select('id').eq('task_id', id).eq('org_id', mb.org_id)
       const actualCount = attachments?.length ?? 0
 
@@ -101,7 +103,7 @@ export async function POST(
 
     // Owner/admin submitting: auto-complete without entering approval queue
     if (isOwnerOrAdmin) {
-      await supabase.from('tasks').update({
+      await admin.from('tasks').update({
         status: 'completed',
         completed_at: new Date().toISOString(),
         approval_status: 'approved',
@@ -112,7 +114,7 @@ export async function POST(
     // If no approver is assigned → auto-complete regardless of approval_required
     // (there is nobody who could approve it, so just complete the task)
     if (!task.approver_id) {
-      await supabase.from('tasks').update({
+      await admin.from('tasks').update({
         status: 'completed',
         completed_at: new Date().toISOString(),
         approval_status: 'approved',
@@ -121,13 +123,13 @@ export async function POST(
     }
 
     const existingCfForSubmit = (task as any).custom_fields ?? {}
-    await supabase.from('tasks').update({
+    await admin.from('tasks').update({
       approval_status: 'pending', status: 'in_review',
       custom_fields: { ...existingCfForSubmit, _submitted_by: user.id },
     }).eq('id', id)
 
     // Notify designated approver
-    const { data: approverProfile } = await supabase
+    const { data: approverProfile } = await admin
       .from('users').select('email, name, phone_number').eq('id', task.approver_id!).single()
     if (approverProfile?.email) {
       try {
@@ -163,7 +165,7 @@ export async function POST(
     // Block approving a parent task if real subtasks are still incomplete.
     // _compliance_subtask rows are attachment-header placeholders — excluded from this gate.
     // Owner/admin bypass: they can force-approve regardless of subtask state
-    const { data: subtasksForApprove } = await supabase
+    const { data: subtasksForApprove } = await admin
       .from('tasks').select('id, status, custom_fields').eq('parent_task_id', id).eq('org_id', mb.org_id)
     const realSubtasksForApprove = (subtasksForApprove ?? []).filter((s: any) => s.custom_fields?._compliance_subtask !== true)
     if (!isOwnerOrAdmin && realSubtasksForApprove.length > 0) {
@@ -178,7 +180,7 @@ export async function POST(
 
     const cfForApprove = { ...((task as any).custom_fields ?? {}) }
     delete cfForApprove._submitted_by
-    await supabase.from('tasks').update({
+    await admin.from('tasks').update({
       approval_status: 'approved', status: 'completed',
       approved_by: user.id, approved_at: new Date().toISOString(), completed_at: new Date().toISOString(),
       custom_fields: cfForApprove,
@@ -189,7 +191,7 @@ export async function POST(
     const updatedCf  = comment?.trim()
       ? { ...existingCf, _rejection_comment: comment.trim() }
       : existingCf
-    await supabase.from('tasks').update({
+    await admin.from('tasks').update({
       approval_status: 'rejected', status: 'todo', approved_by: user.id,
       approved_at: new Date().toISOString(),
       custom_fields: updatedCf,
@@ -199,7 +201,7 @@ export async function POST(
   // Notify assignee
   if (task.assignee_id) {
     try {
-      const { data: assigneeProfile } = await supabase
+      const { data: assigneeProfile } = await admin
         .from('users').select('email, phone_number').eq('id', task.assignee_id).single()
       if (assigneeProfile?.email) {
         await inngest.send({

@@ -15,7 +15,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   const mb = await getApiOrgMembership(supabase, user.id, _req, 'org_id')
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
-  const { data, error } = await supabase.from('tasks')
+  const admin = createAdminClient()
+  const { data, error } = await admin.from('tasks')
     .select('*, assignee:users!tasks_assignee_id_fkey(id,name), approver:users!tasks_approver_id_fkey(id,name), creator:users!tasks_created_by_fkey(id,name), projects(id,name,color), clients(id,name,color)')
     .eq('id', id).eq('org_id', mb.org_id).single()
   if (error || !data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -30,8 +31,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
+  const admin = createAdminClient()
 
-  const { data: task } = await supabase
+  const { data: task } = await admin
     .from('tasks')
     .select('id, assignee_id, approver_id, org_id, approval_required, approval_status, status, parent_task_id, custom_fields')
     .eq('id', id).eq('org_id', mb.org_id).single()
@@ -49,7 +51,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   // and needs to check off individual subtasks (e.g. "Computation", "Reconciliation").
   let isParentAssignee = false
   if (!isManager && !isAssignee && task.parent_task_id) {
-    const { data: parentTask } = await supabase
+    const { data: parentTask } = await admin
       .from('tasks').select('assignee_id').eq('id', task.parent_task_id).eq('org_id', mb.org_id).maybeSingle()
     isParentAssignee = parentTask?.assignee_id === user.id
   }
@@ -62,18 +64,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   // ── PERMISSION GATE ────────────────────────────────────────────────────────
   // Complete task
   if (body.status === 'completed' || body.status === 'in_review') {
-    const denied = await assertCan(supabase, mb.org_id, mb.role, 'tasks.complete')
+    const denied = await assertCan(admin, mb.org_id, mb.role, 'tasks.complete')
     if (denied) return NextResponse.json({ error: denied.error }, { status: denied.status })
   }
   // Re-assign task to someone else
   if ('assignee_id' in body && body.assignee_id !== task.assignee_id) {
-    const denied = await assertCan(supabase, mb.org_id, mb.role, 'tasks.assign')
+    const denied = await assertCan(admin, mb.org_id, mb.role, 'tasks.assign')
     if (denied) return NextResponse.json({ error: denied.error }, { status: denied.status })
   }
   // General edit permission: assignees (or parent-task assignees) check edit_own, others check edit
   {
     const perm = (isAssignee || isParentAssignee) ? 'tasks.edit_own' : 'tasks.edit'
-    const denied = await assertCan(supabase, mb.org_id, mb.role, perm)
+    const denied = await assertCan(admin, mb.org_id, mb.role, perm)
     if (denied) return NextResponse.json({ error: denied.error }, { status: denied.status })
   }
 
@@ -83,7 +85,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (body.status === 'completed' || body.status === 'in_review') {
     const blockedByIds: string[] = (task as any).custom_fields?._blocked_by ?? []
     if (blockedByIds.length > 0) {
-      const { data: blockerTasks } = await supabase
+      const { data: blockerTasks } = await admin
         .from('tasks').select('id, title, status')
         .in('id', blockedByIds).eq('org_id', mb.org_id)
       const incomplete = (blockerTasks ?? []).filter(t => t.status !== 'completed').map(t => t.title as string)
@@ -100,7 +102,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   // Block completing a PARENT task if it has incomplete subtasks
   // Manager/owner/admin bypass: they can force-complete regardless of subtask state
   if (body.status === 'completed' && !task.parent_task_id && !isManager) {
-    const { data: subtasks } = await supabase
+    const { data: subtasks } = await admin
       .from('tasks').select('id, status').eq('parent_task_id', id).eq('org_id', mb.org_id)
     if (subtasks && subtasks.length > 0) {
       const incomplete = subtasks.filter(s => s.status !== 'completed')
@@ -119,11 +121,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const isComplianceSubtask = (task as any).custom_fields?._compliance_subtask === true
     if (isComplianceSubtask) {
       // Check attachments on the subtask itself first, then fall back to parent task
-      const { data: subtaskAttachments } = await supabase
+      const { data: subtaskAttachments } = await admin
         .from('task_attachments').select('id').eq('task_id', id).eq('org_id', mb.org_id).limit(1)
       let hasAttachment = !!(subtaskAttachments && subtaskAttachments.length > 0)
       if (!hasAttachment) {
-        const { data: parentAttachments } = await supabase
+        const { data: parentAttachments } = await admin
           .from('task_attachments').select('id').eq('task_id', task.parent_task_id).eq('org_id', mb.org_id).limit(1)
         hasAttachment = !!(parentAttachments && parentAttachments.length > 0)
       }
@@ -201,7 +203,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await admin
     .from('tasks').update(updates).eq('id', id).select('*').maybeSingle()
   if (error) return NextResponse.json(dbError(error, 'tasks/[id]'), { status: 500 })
   // maybeSingle() returns null when RLS hides the updated row — treat as success
@@ -209,16 +211,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   // Auto-complete parent when all subtasks done — only if parent doesn't require approval
   if (updates.status === 'completed' && data?.parent_task_id) {
-    const { data: siblings } = await supabase
+    const { data: siblings } = await admin
       .from('tasks').select('id, status')
       .eq('parent_task_id', data.parent_task_id).eq('org_id', mb.org_id)
     if (siblings?.length && siblings.every(s => s.status === 'completed')) {
-      const { data: parentTask } = await supabase
+      const { data: parentTask } = await admin
         .from('tasks').select('approval_required, approval_status')
         .eq('id', data.parent_task_id).eq('org_id', mb.org_id).maybeSingle()
       // Skip auto-complete if parent requires approval and hasn't been approved yet
       if (!parentTask?.approval_required || parentTask?.approval_status === 'approved') {
-        await supabase.from('tasks')
+        await admin.from('tasks')
           .update({ status: 'completed', completed_at: new Date().toISOString() })
           .eq('id', data.parent_task_id)
       }
@@ -230,7 +232,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (newAssigneeId && newAssigneeId !== user.id &&
       newAssigneeId !== task.assignee_id) {
     try {
-      const admin = createAdminClient()
       const { data: assignee } = await admin.from('users')
         .select('email, phone_number').eq('id', newAssigneeId).single()
       const { data: assigner } = await admin.from('users')
@@ -263,9 +264,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     try {
       const isCompleted = updates.status === 'completed'
       const action = isCompleted ? 'task.completed' : 'task.status_changed'
-      const { data: actor } = await supabase.from('users').select('name').eq('id', user.id).maybeSingle()
-      const adminLog = createAdminClient()
-      await adminLog.from('activity_log').insert({
+      const { data: actor } = await admin.from('users').select('name').eq('id', user.id).maybeSingle()
+      await admin.from('activity_log').insert({
         org_id:      mb.org_id,
         user_id:     user.id,
         user_name:   (actor as any)?.name ?? null,
@@ -288,19 +288,20 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
-  const deleteDenied = await assertCan(supabase, mb.org_id, mb.role, 'tasks.delete')
+  const admin = createAdminClient()
+  const deleteDenied = await assertCan(admin, mb.org_id, mb.role, 'tasks.delete')
   if (deleteDenied) return NextResponse.json({ error: deleteDenied.error }, { status: deleteDenied.status })
   // Soft delete — move to trash with deleted_at timestamp
   // Tasks are permanently purged after 30 days via cron
   const deletedAt = new Date().toISOString()
-  const { error } = await supabase
+  const { error } = await admin
     .from('tasks')
     .update({ is_archived: true, deleted_at: deletedAt })
     .eq('id', id).eq('org_id', mb.org_id)
   if (error) return NextResponse.json(dbError(error, 'tasks/[id]'), { status: 500 })
 
   // Also archive all subtasks so they don't linger in other views
-  await supabase
+  await admin
     .from('tasks')
     .update({ is_archived: true, deleted_at: deletedAt })
     .eq('parent_task_id', id).eq('org_id', mb.org_id)

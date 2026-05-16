@@ -13,9 +13,10 @@ export async function GET(request: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   const mb = await getApiOrgMembership(supabase, user.id, request, 'org_id, role')
   if (!mb) return NextResponse.json({ data: [] })
+  const admin = createAdminClient()
 
   const sp  = request.nextUrl.searchParams
-  let q = supabase.from('tasks')
+  let q = admin.from('tasks')
     .select('id, title, status, priority, due_date, assignee_id, project_id, client_id, is_recurring, frequency, next_occurrence_date, parent_task_id, parent_recurring_id, custom_fields, created_at, updated_at, is_billable, billable_amount')
     .eq('org_id', mb.org_id).neq('is_archived', true)
 
@@ -62,11 +63,12 @@ export async function POST(request: NextRequest) {
 
   const mb = await getApiOrgMembership(supabase, user.id, request, 'org_id, role, organisations(name), users(name)')
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
+  const admin = createAdminClient()
 
   const body = await request.json()
 
   // Always check tasks.create permission — subtask creation is not exempt
-  const denied = await assertCan(supabase, mb.org_id, mb.role, 'tasks.create')
+  const denied = await assertCan(admin, mb.org_id, mb.role, 'tasks.create')
   if (denied) return NextResponse.json({ error: denied.error }, { status: denied.status })
 
   const { title, description, status = 'todo', priority = 'medium', assignee_id, approver_id,
@@ -78,12 +80,12 @@ export async function POST(request: NextRequest) {
 
   // If attaching to a parent task, verify it belongs to the same org
   if (parent_task_id) {
-    const { data: parentTask } = await supabase
+    const { data: parentTask } = await admin
       .from('tasks').select('id, org_id').eq('id', parent_task_id).eq('org_id', mb.org_id).single()
     if (!parentTask) return NextResponse.json({ error: 'Parent task not found' }, { status: 404 })
   }
 
-  const { data: task, error } = await supabase.from('tasks').insert({
+  const { data: task, error } = await admin.from('tasks').insert({
     org_id: mb.org_id, title: title.trim(), description: description || null,
     status, priority, assignee_id: assignee_id || null, client_id: client_id || null,
     project_id: project_id || null, due_date: due_date || null,
@@ -100,7 +102,6 @@ export async function POST(request: NextRequest) {
 
   // ── Activity log (non-blocking) ────────────────────────────────────────────
   try {
-    const admin = createAdminClient()
     await admin.from('activity_log').insert({
       org_id:      mb.org_id,
       user_id:     user.id,
@@ -115,10 +116,10 @@ export async function POST(request: NextRequest) {
 
   if (assignee_id && assignee_id !== user.id) {
     try {
-      const { data: assignee } = await supabase.from('users')
+      const { data: assignee } = await admin.from('users')
         .select('email, name, phone_number, whatsapp_opted_in').eq('id', assignee_id).single()
       const { data: project } = project_id
-        ? await supabase.from('projects').select('name').eq('id', project_id).single()
+        ? await admin.from('projects').select('name').eq('id', project_id).single()
         : { data: null }
       if (assignee?.email) {
         await inngest.send({
@@ -154,7 +155,7 @@ export async function POST(request: NextRequest) {
       is_recurring:   false,
       custom_fields:  s.required ? { _compliance_subtask: true } : null,
     }))
-    const { error: subErr } = await supabase.from('tasks').insert(subtaskInserts)
+    const { error: subErr } = await admin.from('tasks').insert(subtaskInserts)
     if (subErr) console.error('[tasks POST] subtask insert failed:', subErr.message)
   }
 
