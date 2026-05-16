@@ -50,13 +50,23 @@ export async function POST(request: NextRequest) {
     const orgReferralCode = generateCode(8)
     const orgJoinCode     = generateCode(8)
 
-    // Create org with 14-day pro trial
+    // Only the user's very first org gets a 14-day Pro trial.
+    // Subsequent orgs start on free to prevent trial gaming.
+    const { count: ownedOrgCount } = await admin
+      .from('org_members')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('role', 'owner')
+    const isFirstOrg = (ownedOrgCount ?? 0) === 0
+
     const now         = new Date()
     const trialEndsAt = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000).toISOString()
     const { data: org, error: orgErr } = await admin.from('organisations').insert({
-      name: org_name.trim(), slug, plan_tier: 'pro', status: 'trialing',
-      trial_started_at: now.toISOString(),
-      trial_ends_at: trialEndsAt,
+      name: org_name.trim(), slug,
+      plan_tier:            isFirstOrg ? 'pro'        : 'free',
+      status:               isFirstOrg ? 'trialing'   : 'active',
+      trial_started_at:     isFirstOrg ? now.toISOString() : null,
+      trial_ends_at:        isFirstOrg ? trialEndsAt  : null,
       trial_extension_days: 0,
       referral_code: orgReferralCode,
       join_code: orgJoinCode,

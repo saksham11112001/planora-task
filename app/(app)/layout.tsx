@@ -52,19 +52,21 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         redirect('/dashboard')
       }
 
-      // 2. Check for any existing membership row (active or inactive)
-      //    This catches users added directly to org_members by an admin in Supabase dashboard
-      const { data: anyMembership } = await admin
+      // 2. Reactivate owner memberships incorrectly deactivated by a past system bug.
+      //    The API explicitly blocks removing owners ("Cannot remove an owner"), so any
+      //    is_active=false row with role='owner' was set by the old cross-org deactivation
+      //    bug — not by a legitimate admin action. Safe to restore.
+      const { data: inactiveOwnerRows } = await admin
         .from('org_members')
-        .select('id, org_id, role, organisations(id, name, slug, plan_tier, logo_color, status, trial_ends_at)')
+        .select('id')
         .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
+        .eq('role', 'owner')
+        .eq('is_active', false)
 
-      if (anyMembership) {
-        // Reactivate this membership — do NOT deactivate other org memberships
-        await admin.from('org_members').update({ is_active: true }).eq('id', anyMembership.id)
+      if (inactiveOwnerRows && inactiveOwnerRows.length > 0) {
+        await admin.from('org_members')
+          .update({ is_active: true })
+          .in('id', inactiveOwnerRows.map((m: any) => m.id))
         redirect('/dashboard')
       }
 

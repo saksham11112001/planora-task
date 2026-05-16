@@ -60,8 +60,8 @@ function buildHeatmapWeeks(heatmap: Record<string, number>) {
 }
 
 function heatColor(count: number, isFuture: boolean): string {
-  if (isFuture)   return 'rgba(0,0,0,0.03)'
-  if (count === 0) return 'rgba(0,0,0,0.07)'
+  if (isFuture)    return 'var(--border-light)'
+  if (count === 0) return 'var(--border)'
   if (count === 1) return 'rgba(13,148,136,0.30)'
   if (count === 2) return 'rgba(13,148,136,0.55)'
   if (count === 3) return 'rgba(13,148,136,0.75)'
@@ -98,7 +98,6 @@ export function TeamView({ members, canManage, currentUserId }: {
   const ranked = [...members]
     .sort((a, b) => b.done_30d - a.done_30d)
     .slice(0, 3)
-    .filter(m => m.done_30d > 0)
 
   // ── Single invite ──────────────────────────────────────────────────────────
   async function invite(e: React.FormEvent) {
@@ -230,7 +229,7 @@ export function TeamView({ members, canManage, currentUserId }: {
         </div>
 
         {/* ── Leaderboard ── */}
-        {ranked.length > 0 && (
+        {members.length >= 2 && (
           <div style={{ marginBottom: 20 }}>
             <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase',
               color: 'var(--text-muted)', marginBottom: 10 }}>
