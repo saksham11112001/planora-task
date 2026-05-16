@@ -48,10 +48,10 @@ interface Props {
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  todo:      { label: 'To do',            color: '#64748b', bg: '#f1f5f9' },
-  in_review: { label: 'Pending approval', color: '#7c3aed', bg: '#fdf4ff' },
-  completed: { label: 'Completed',        color: '#16a34a', bg: '#f0fdf4' },
-  cancelled: { label: 'Cancelled',        color: '#94a3b8', bg: '#f8fafc' },
+  todo:      { label: 'To do',            color: '#64748b', bg: 'rgba(100,116,139,0.10)' },
+  in_review: { label: 'Pending approval', color: '#7c3aed', bg: 'rgba(124,58,237,0.10)'  },
+  completed: { label: 'Completed',        color: '#16a34a', bg: 'rgba(22,163,74,0.10)'   },
+  cancelled: { label: 'Cancelled',        color: '#94a3b8', bg: 'rgba(148,163,184,0.08)' },
 }
 const PRIORITY_DOT: Record<string, string> = {
   urgent: '#dc2626', high: '#ea580c', medium: '#ca8a04', low: '#16a34a', none: '#94a3b8',
@@ -549,7 +549,7 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
                   ]} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                     <XAxis dataKey="name" tick={{ fontSize: 9 }} interval={0} angle={-20} textAnchor="end" height={32}/>
                     <YAxis tick={{ fontSize: 9 }} allowDecimals={false}/>
-                    <Tooltip contentStyle={{ fontSize: 11 }}/>
+                    <Tooltip contentStyle={{ fontSize: 11, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-primary)', borderRadius: 6 }}/>
                     <Bar dataKey="value" radius={[3, 3, 0, 0]}>
                       {[{ fill: '#64748b' }, { fill: '#2563eb' }, { fill: '#7c3aed' }, { fill: '#16a34a' }]
                         .map((e, i) => <Cell key={i} fill={e.fill}/>)}
@@ -569,7 +569,7 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
                   ]} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                     <XAxis dataKey="name" tick={{ fontSize: 9 }}/>
                     <YAxis tick={{ fontSize: 9 }} allowDecimals={false}/>
-                    <Tooltip contentStyle={{ fontSize: 11 }}/>
+                    <Tooltip contentStyle={{ fontSize: 11, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-primary)', borderRadius: 6 }}/>
                     <Bar dataKey="value" radius={[3, 3, 0, 0]}>
                       {[{ fill: '#d97706' }, { fill: '#0d9488' }, { fill: '#7c3aed' }, { fill: '#0891b2' }, { fill: '#dc2626' }]
                         .map((e, i) => <Cell key={i} fill={e.fill}/>)}
@@ -596,7 +596,7 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
                           <Pie data={priorityData} cx="50%" cy="50%" innerRadius={34} outerRadius={54} dataKey="value" paddingAngle={2} startAngle={90} endAngle={-270}>
                             {priorityData.map((entry, i) => <Cell key={i} fill={entry.fill}/>)}
                           </Pie>
-                          <Tooltip contentStyle={{ fontSize: 11 }} formatter={(v: number) => [v, 'tasks']}/>
+                          <Tooltip contentStyle={{ fontSize: 11, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-primary)', borderRadius: 6 }} formatter={(v: number) => [v, 'tasks']}/>
                         </PieChart>
                       </ResponsiveContainer>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -624,7 +624,7 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
                     <BarChart data={overdueAging} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                       <XAxis dataKey="name" tick={{ fontSize: 9 }} interval={0}/>
                       <YAxis tick={{ fontSize: 9 }} allowDecimals={false}/>
-                      <Tooltip contentStyle={{ fontSize: 11 }} formatter={(v: number) => [v, 'tasks']}/>
+                      <Tooltip contentStyle={{ fontSize: 11, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-primary)', borderRadius: 6 }} formatter={(v: number) => [v, 'tasks']}/>
                       <Bar dataKey="value" radius={[3, 3, 0, 0]}>
                         {overdueAging.map((e, i) => <Cell key={i} fill={e.fill}/>)}
                       </Bar>
@@ -648,7 +648,7 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
                       <XAxis dataKey="date" tick={{ fontSize: 8 }} interval={1} angle={-30} textAnchor="end" height={36}/>
                       <YAxis tick={{ fontSize: 9 }} allowDecimals={false}/>
                       <Tooltip
-                        contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #e2e8f0' }}
+                        contentStyle={{ fontSize: 11, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-primary)', borderRadius: 8 }}
                         formatter={(v: number) => [v, 'Created']}
                       />
                       <Line
@@ -668,7 +668,7 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
                       <XAxis dataKey="date" tick={{ fontSize: 8 }} interval={1} angle={-30} textAnchor="end" height={36}/>
                       <YAxis tick={{ fontSize: 9 }} allowDecimals={false}/>
                       <Tooltip
-                        contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #e2e8f0' }}
+                        contentStyle={{ fontSize: 11, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-primary)', borderRadius: 8 }}
                         formatter={(v: number) => [v, 'Completed']}
                       />
                       <Line
@@ -689,7 +689,7 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
                   <LineChart data={trendData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
                     <XAxis dataKey="date" tick={{ fontSize: 8 }} interval={1} angle={-30} textAnchor="end" height={36}/>
                     <YAxis tick={{ fontSize: 9 }} allowDecimals={false}/>
-                    <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #e2e8f0' }}/>
+                    <Tooltip contentStyle={{ fontSize: 11, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-primary)', borderRadius: 8 }}/>
                     <Legend wrapperStyle={{ fontSize: 10, paddingTop: 4 }}/>
                     <Line type="monotone" dataKey="created"   name="Created"   stroke="#0d9488" strokeWidth={2} dot={{ r: 2.5, fill: '#0d9488', strokeWidth: 0 }} activeDot={{ r: 4 }}/>
                     <Line type="monotone" dataKey="completed" name="Completed" stroke="#16a34a" strokeWidth={2} dot={{ r: 2.5, fill: '#16a34a', strokeWidth: 0 }} activeDot={{ r: 4 }} strokeDasharray="4 2"/>

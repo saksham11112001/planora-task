@@ -427,7 +427,7 @@ export function TeamView({ members, canManage, currentUserId }: {
                         style={{
                           width: '100%', padding: '7px 10px', borderRadius: 8, fontSize: 13, outline: 'none',
                           border: `1px solid ${result ? (result.ok ? '#16a34a' : '#dc2626') : 'var(--border)'}`,
-                          background: result ? (result.ok ? '#f0fdf4' : '#fef2f2') : 'var(--surface)',
+                          background: result ? (result.ok ? 'rgba(22,163,74,0.12)' : 'rgba(220,38,38,0.12)') : 'var(--surface)',
                           color: 'var(--text-primary)', boxSizing: 'border-box',
                         }}
                         onFocus={e => { if (!result) e.currentTarget.style.borderColor = 'var(--brand)' }}
@@ -610,8 +610,8 @@ export function TeamView({ members, canManage, currentUserId }: {
                         alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)',
                         transition: 'all 0.15s', flexShrink: 0 }}
                       onMouseEnter={e => {
-                        (e.currentTarget as HTMLElement).style.background = '#eff6ff'
-                        ;(e.currentTarget as HTMLElement).style.borderColor = '#bfdbfe'
+                        (e.currentTarget as HTMLElement).style.background = 'rgba(37,99,235,0.10)'
+                        ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(37,99,235,0.35)'
                         ;(e.currentTarget as HTMLElement).style.color = '#2563eb'
                       }}
                       onMouseLeave={e => {
@@ -653,8 +653,8 @@ export function TeamView({ members, canManage, currentUserId }: {
                           alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)',
                           transition: 'all 0.15s', flexShrink: 0 }}
                         onMouseEnter={e => {
-                          (e.currentTarget as HTMLElement).style.background = '#fef2f2'
-                          ;(e.currentTarget as HTMLElement).style.borderColor = '#fecaca'
+                          (e.currentTarget as HTMLElement).style.background = 'rgba(220,38,38,0.10)'
+                          ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(220,38,38,0.35)'
                           ;(e.currentTarget as HTMLElement).style.color = '#dc2626'
                         }}
                         onMouseLeave={e => {
