@@ -13,6 +13,7 @@ import {
 import { cn }            from '@/lib/utils/cn'
 import { createClient }  from '@/lib/supabase/client'
 import { useAppStore }   from '@/store/appStore'
+import { toast }         from '@/store/appStore'
 import { PlanBadge }     from '@/components/ui/Badge'
 import { useOrgSettings } from '@/lib/hooks/useOrgSettings'
 
@@ -123,12 +124,21 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
     if (switching || orgId === session?.org.id) return
     setSwitching(true)
     try {
-      await fetch('/api/org/switch', {
+      const res = await fetch('/api/org/switch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ org_id: orgId }),
       })
-    } catch {}
+      if (!res.ok) {
+        toast.error('Failed to switch workspace')
+        setSwitching(false)
+        return
+      }
+    } catch {
+      toast.error('Failed to switch workspace')
+      setSwitching(false)
+      return
+    }
     window.location.href = '/dashboard'
   }
 

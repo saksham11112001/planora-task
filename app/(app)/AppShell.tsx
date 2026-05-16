@@ -44,10 +44,13 @@ export function AppShell({ user, org, role, workspaceId, allOrgs, children }: Pr
     return () => document.body.classList.remove('sidebar-open')
   }, [mobileOpen])
 
+  // Stable key for allOrgs — re-run when the set of org IDs changes without org.id changing
+  const allOrgsKey = allOrgs.map(o => o.id).join(',')
+
   useEffect(() => {
     setSession({ user, org, role, workspaceId, allOrgs })
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user.id, org.id, role, workspaceId, setSession])
+  }, [user.id, org.id, role, workspaceId, setSession, allOrgsKey])
 
   return (
     <div className="app-shell">

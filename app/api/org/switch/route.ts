@@ -1,6 +1,7 @@
-import { NextResponse }    from 'next/server'
-import type { NextRequest } from 'next/server'
-import { createClient }     from '@/lib/supabase/server'
+import { NextResponse }     from 'next/server'
+import type { NextRequest }  from 'next/server'
+import { createClient }      from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { ACTIVE_ORG_COOKIE } from '@/lib/supabase/activeOrg'
 
 export async function POST(request: NextRequest) {
@@ -11,8 +12,10 @@ export async function POST(request: NextRequest) {
   const { org_id } = await request.json() as { org_id?: string }
   if (!org_id) return NextResponse.json({ error: 'org_id required' }, { status: 400 })
 
-  // Verify user is an active member of the requested org
-  const { data: mb } = await supabase
+  // Verify user is an active member of the requested org.
+  // Admin client bypasses RLS so we can check memberships beyond the current active org.
+  const admin = createAdminClient()
+  const { data: mb } = await admin
     .from('org_members')
     .select('org_id')
     .eq('user_id', user.id)

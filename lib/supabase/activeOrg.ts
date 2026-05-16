@@ -9,9 +9,10 @@
  * that respects the cookie. It returns the same shape so callers need no
  * changes beyond swapping the import.
  */
-import { cache }        from 'react'
-import { cookies }      from 'next/headers'
-import { createClient } from './server'
+import { cache }             from 'react'
+import { cookies }           from 'next/headers'
+import { createClient }      from './server'
+import { createAdminClient } from './admin'
 
 export const ACTIVE_ORG_COOKIE = 'planora_active_org'
 
@@ -26,8 +27,10 @@ export async function getActiveOrgId(): Promise<string | null> {
  * Cached per request (React cache).
  */
 export const getUserOrgs = cache(async (userId: string) => {
-  const supabase = await createClient()
-  const { data } = await supabase
+  // Use admin client to bypass RLS — the anon client's RLS policy may only expose
+  // the currently-active org membership, causing the org switcher to see < 2 orgs.
+  const admin = createAdminClient()
+  const { data } = await admin
     .from('org_members')
     .select('org_id, role, organisations(id, name, slug, plan_tier, logo_color, status, trial_ends_at)')
     .eq('user_id', userId)
