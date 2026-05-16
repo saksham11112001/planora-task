@@ -52,23 +52,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         redirect('/dashboard')
       }
 
-      // 2. Check for any existing membership row (active or inactive)
-      //    This catches users added directly to org_members by an admin in Supabase dashboard
-      const { data: anyMembership } = await admin
-        .from('org_members')
-        .select('id, org_id, role, organisations(id, name, slug, plan_tier, logo_color, status, trial_ends_at)')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-
-      if (anyMembership) {
-        // Reactivate this membership — do NOT deactivate other org memberships
-        await admin.from('org_members').update({ is_active: true }).eq('id', anyMembership.id)
-        redirect('/dashboard')
-      }
-
-      // 3. Truly no org membership anywhere — send to onboarding to create one
+      // 2. Truly no org membership anywhere — send to onboarding to create one
       //    (do NOT redirect to /login here — the user IS authenticated)
       redirect('/onboarding')
     }

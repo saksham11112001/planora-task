@@ -60,8 +60,8 @@ function buildHeatmapWeeks(heatmap: Record<string, number>) {
 }
 
 function heatColor(count: number, isFuture: boolean): string {
-  if (isFuture)   return 'rgba(0,0,0,0.03)'
-  if (count === 0) return 'rgba(0,0,0,0.07)'
+  if (isFuture)    return 'var(--border-light)'
+  if (count === 0) return 'var(--border)'
   if (count === 1) return 'rgba(13,148,136,0.30)'
   if (count === 2) return 'rgba(13,148,136,0.55)'
   if (count === 3) return 'rgba(13,148,136,0.75)'
