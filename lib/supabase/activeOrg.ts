@@ -48,13 +48,17 @@ export const getUserOrgs = cache(async (userId: string) => {
  *  2. First active membership ordered by created_at (oldest first)
  */
 export const getActiveOrgMembership = cache(async (userId: string) => {
-  const supabase    = await createClient()
+  // Use admin client to bypass RLS — same reason as getUserOrgs.
+  // The anon client may only expose the previously-active org membership,
+  // causing the cookie-based org lookup to silently fall back to the oldest org.
+  // userId is always the verified auth.uid() from the calling layout, so this is safe.
+  const admin       = createAdminClient()
   const activeOrgId = await getActiveOrgId()
 
   const SELECT = 'org_id, role, can_view_all_tasks, can_view_monitor, organisations(id, name, slug, plan_tier, logo_color, status, trial_ends_at, trial_started_at, trial_extension_days, referral_code, join_code, subscription_id)'
 
   if (activeOrgId) {
-    const { data } = await supabase
+    const { data } = await admin
       .from('org_members')
       .select(SELECT)
       .eq('user_id', userId)
@@ -65,7 +69,7 @@ export const getActiveOrgMembership = cache(async (userId: string) => {
   }
 
   // Fall back to oldest membership so the default is stable
-  const { data } = await supabase
+  const { data } = await admin
     .from('org_members')
     .select(SELECT)
     .eq('user_id', userId)
