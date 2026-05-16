@@ -1,5 +1,5 @@
 import { Suspense }       from 'react'
-import { createClient }   from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { getSessionUser } from '@/lib/supabase/cached'
 import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { redirect }       from 'next/navigation'
@@ -15,7 +15,7 @@ export default async function NewProjectPage() {
   const mb = await getActiveOrgMembership(user.id)
   if (!mb || !['owner','admin','manager'].includes(mb.role)) redirect('/projects')
 
-  const supabase = await createClient()
+  const supabase = createAdminClient()
   const [{ data: clients }, { data: members }, { data: templateSettings }] = await Promise.all([
     supabase.from('clients').select('id, name, color').eq('org_id', mb.org_id).eq('status', 'active').order('name'),
     supabase.from('org_members').select('user_id, users(id, name)').eq('org_id', mb.org_id).eq('is_active', true),

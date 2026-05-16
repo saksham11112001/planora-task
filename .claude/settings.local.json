@@ -25,7 +25,8 @@
       "Bash(npm install *)",
       "Bash(npm list *)",
       "Bash(xargs wc *)",
-      "Bash(xargs grep -l \"allOrgs\")"
+      "Bash(xargs grep -l \"allOrgs\")",
+      "Bash(xargs grep -l \"createClient\\\\|useAppStore\")"
     ]
   }
 }

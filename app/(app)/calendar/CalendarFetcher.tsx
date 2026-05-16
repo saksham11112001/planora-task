@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { getSessionUser } from '@/lib/supabase/cached'
 import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { CalendarView } from './CalendarView'
@@ -11,7 +11,7 @@ export async function CalendarFetcher() {
   const mb = await getActiveOrgMembership(user.id)
   if (!mb) return null
 
-  const supabase = await createClient()
+  const supabase = createAdminClient()
   const isOwnerAdmin = ['owner', 'admin'].includes(mb.role)
   const isManager    = ['owner', 'admin', 'manager'].includes(mb.role)
   const canViewAll   = isManager || (mb as any).can_view_all_tasks === true

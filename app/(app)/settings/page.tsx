@@ -1,4 +1,6 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { getSessionUser } from '@/lib/supabase/cached'
+import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { redirect }     from 'next/navigation'
 import { SettingsClient } from './SettingsClient'
 import type { Metadata }  from 'next'
@@ -23,18 +25,15 @@ const SECTIONS = [
 ]
 
 export default async function SettingsPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getSessionUser()
   if (!user) redirect('/login')
-
-  const { data: mb } = await supabase
-    .from('org_members')
-    .select('role, org_id, organisations(name, plan_tier)')
-    .eq('user_id', user.id).eq('is_active', true).maybeSingle()
+  const mb = await getActiveOrgMembership(user.id)
   if (!mb) redirect('/onboarding')
 
   const isAdmin = ['owner', 'admin'].includes(mb.role)
-  const org = mb.organisations as unknown as { name: string; plan_tier: string } | null
+  const adminSupa = createAdminClient()
+  const { data: orgData } = await adminSupa.from('organisations').select('name, plan_tier').eq('id', mb.org_id).maybeSingle()
+  const org = orgData as { name: string; plan_tier: string } | null
 
   return (
     <SettingsClient

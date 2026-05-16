@@ -1,5 +1,4 @@
 export const dynamic = 'force-dynamic'
-import { createClient }       from '@/lib/supabase/server'
 import { getSessionUser } from '@/lib/supabase/cached'
 import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { redirect }           from 'next/navigation'
@@ -20,7 +19,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
   const mb = await getActiveOrgMembership(user.id)
   if (!mb) redirect('/onboarding')
 
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   const { data: client } = await supabase.from('clients').select('*').eq('id', clientId).eq('org_id', mb.org_id).single()
   if (!client) redirect('/clients')
@@ -54,8 +53,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
   const canManage     = ['owner', 'admin', 'manager'].includes(mb.role)
 
   // Fetch existing portal token metadata (never expose token_hash)
-  const adminDb = createAdminClient()
-  const { data: portalToken } = await adminDb
+  const { data: portalToken } = await supabase
     .from('client_portal_tokens')
     .select('id, expires_at, created_at')
     .eq('org_id', mb.org_id)

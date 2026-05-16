@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic'
 
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { getSessionUser } from '@/lib/supabase/cached'
 import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { redirect }     from 'next/navigation'
@@ -15,7 +15,7 @@ export default async function PermissionsPage() {
   const mb = await getActiveOrgMembership(user.id)
   if (!mb || !['owner','admin'].includes(mb.role)) redirect('/settings')
 
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   const org = mb.organisations as any
   const trialActive = org?.status === 'trialing' && org?.trial_ends_at && new Date(org.trial_ends_at) > new Date()

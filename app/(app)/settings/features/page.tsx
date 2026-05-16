@@ -1,7 +1,7 @@
 import { effectivePlan } from '@/lib/utils/planGate'
 export const dynamic = 'force-dynamic'
 
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { getSessionUser } from '@/lib/supabase/cached'
 import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { redirect }     from 'next/navigation'
@@ -15,7 +15,7 @@ export default async function FeaturesPage() {
   const mb = await getActiveOrgMembership(user.id)
   if (!mb || !['owner','admin'].includes(mb.role)) redirect('/settings')
 
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   const { data: rows } = await supabase.from('org_feature_settings').select('feature_key, is_enabled').eq('org_id', mb.org_id)
   const features: Record<string, boolean> = {}

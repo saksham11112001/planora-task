@@ -1,5 +1,4 @@
 import { createAdminClient } from '@/lib/supabase/admin'
-import { createClient }       from '@/lib/supabase/server'
 import { getSessionUser } from '@/lib/supabase/cached'
 import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { InvoicesView }       from './InvoicesView'
@@ -10,11 +9,10 @@ export async function InvoicesFetcher() {
   const mb = await getActiveOrgMembership(user.id)
   if (!mb) return null
 
-  const supabase = await createClient()
-  const admin = createAdminClient()
+  const supabase = createAdminClient()
 
   const [{ data: invoices }, { data: clients }, { data: companyCodes }, { data: groups }] = await Promise.all([
-    admin.from('invoices')
+    supabase.from('invoices')
       .select('*, client:clients(id, name, color)')
       .eq('org_id', mb.org_id)
       .order('created_at', { ascending: false })
@@ -23,7 +21,7 @@ export async function InvoicesFetcher() {
       .select('id, name, color, status')
       .eq('org_id', mb.org_id)
       .order('name'),
-    admin.from('invoice_company_codes')
+    supabase.from('invoice_company_codes')
       .select('*')
       .eq('org_id', mb.org_id)
       .order('group_name', { nullsFirst: true })

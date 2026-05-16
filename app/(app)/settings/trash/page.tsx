@@ -1,6 +1,5 @@
 export const dynamic = 'force-dynamic'
 
-import { createClient } from '@/lib/supabase/server'
 import { getSessionUser } from '@/lib/supabase/cached'
 import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { redirect }     from 'next/navigation'
@@ -13,7 +12,6 @@ export default async function TrashPage() {
   if (!user) redirect('/login')
 
   const mb = await getActiveOrgMembership(user.id)
-  const supabase = await createClient()
   if (!mb) redirect('/onboarding')
 
   const org       = mb.organisations as any

@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic'
 
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { getSessionUser } from '@/lib/supabase/cached'
 import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { redirect }     from 'next/navigation'
@@ -14,7 +14,7 @@ export default async function CustomFieldsPage() {
   const mb = await getActiveOrgMembership(user.id)
   if (!mb || !['owner','admin'].includes(mb.role)) redirect('/settings')
 
-  const supabase = await createClient()
+  const supabase = createAdminClient()
   const { data: settings } = await supabase.from('org_settings').select('custom_task_fields').eq('org_id', mb.org_id).maybeSingle()
   const initial = (settings?.custom_task_fields as any[]) ?? []
   return (

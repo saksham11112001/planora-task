@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { getSessionUser } from '@/lib/supabase/cached'
 import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { RecurringView } from './RecurringView'
@@ -11,7 +11,7 @@ export async function RecurringFetcher() {
   const mb = await getActiveOrgMembership(user.id)
   if (!mb) return null
 
-  const supabase = await createClient()
+  const supabase = createAdminClient()
   const canViewAll = ['owner', 'admin'].includes(mb.role) || (mb as any).can_view_all_tasks === true
   const canManage  = ['owner','admin','manager'].includes(mb.role)
 

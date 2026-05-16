@@ -1,7 +1,7 @@
 import { redirect }     from 'next/navigation'
 import { getSessionUser, getUserProfile } from '@/lib/supabase/cached'
 import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { todayStr }     from '@/lib/utils/format'
 import { DashboardClient } from './DashboardClient'
 import type { Metadata }   from 'next'
@@ -17,7 +17,7 @@ export default async function DashboardPage() {
   ])
   if (!mb) redirect('/onboarding')
 
-  const supabase = await createClient()
+  const supabase = createAdminClient()
   const orgId    = mb.org_id
   const today    = todayStr()
   const hour     = new Date().getHours()

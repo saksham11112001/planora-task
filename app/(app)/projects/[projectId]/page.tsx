@@ -1,4 +1,4 @@
-import { createClient }      from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { getSessionUser } from '@/lib/supabase/cached'
 import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { redirect }           from 'next/navigation'
@@ -16,7 +16,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
   const mb = await getActiveOrgMembership(user.id)
   if (!mb) redirect('/onboarding')
 
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   // All queries fire in parallel — was sequential before (500ms+ saved)
   const [

@@ -1,4 +1,4 @@
-import { createClient }  from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { getSessionUser } from '@/lib/supabase/cached'
 import { redirect }      from 'next/navigation'
 import { ProfileForm }   from './ProfileForm'
@@ -12,7 +12,7 @@ export default async function ProfilePage() {
   const user = await getSessionUser()
   if (!user) redirect('/login')
 
-  const supabase = await createClient()
+  const supabase = createAdminClient()
   const { data: profile } = await supabase.from('users')
     .select('id, name, email, avatar_url, phone_number, timezone, whatsapp_opted_in')
     .eq('id', user.id).single()

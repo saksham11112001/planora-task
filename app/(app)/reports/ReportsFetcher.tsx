@@ -1,4 +1,4 @@
-import { createClient }   from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { getSessionUser } from '@/lib/supabase/cached'
 import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { ReportsCharts }  from './ReportsCharts'
@@ -11,7 +11,7 @@ export async function ReportsFetcher() {
   const mb = await getActiveOrgMembership(user.id)
   if (!mb) return null
 
-  const supabase = await createClient()
+  const supabase = createAdminClient()
   const orgId  = mb.org_id
   const from30 = new Date(Date.now() - 30 * 86400000).toISOString()
   const from90 = new Date(Date.now() - 90 * 86400000).toISOString()

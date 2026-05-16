@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useTransition, useCallback } from 'react'
+import { useState, useEffect, useTransition, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Search, RefreshCw, Trash2, SortAsc, MessageCircle } from 'lucide-react'
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
@@ -92,6 +92,17 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
     newAssigneeName: string
   } | null>(null)
   const [masterUpdating,  setMasterUpdating]  = useState(false)
+
+  // Deferred actions: run after the task detail panel closes so the user can
+  // make multiple field changes (e.g. assignee + approver) without interruption.
+  const pendingMasterUpdateRef = useRef<{
+    assignmentClientId: string
+    masterTaskTitle: string
+    clientName: string
+    newAssigneeId: string
+    newAssigneeName: string
+  } | null>(null)
+  const pendingRefreshRef = useRef(false)
 
   const [bulkAssignId,    setBulkAssignId]    = useState('')   // member id to bulk-assign to
   const [bulkAssigning,   setBulkAssigning]   = useState(false)
@@ -351,7 +362,20 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
         clients={clients}
         currentUserId={currentUserId}
         userRole={userRole}
-        onClose={() => setSelTask(null)}
+        onClose={() => {
+          setSelTask(null)
+          // Flush deferred actions now that the panel is closing.
+          // This lets the user make multiple field edits (e.g. assignee + approver)
+          // without the recurring-assignment modal interrupting mid-session.
+          if (pendingMasterUpdateRef.current) {
+            setMasterUpdatePrompt(pendingMasterUpdateRef.current)
+            pendingMasterUpdateRef.current = null
+          }
+          if (pendingRefreshRef.current) {
+            pendingRefreshRef.current = false
+            startT(() => router.refresh())
+          }
+        }}
         onUpdated={fields => {
           if (fields && selTask) {
             // Enrich nested objects so the list updates immediately
@@ -366,7 +390,9 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
             }
 
             // ── Recurring-assignment prompt (update future tasks) ──
-            // Only offered when the assignee changes on a CA task that has a client
+            // Only offered when the assignee changes on a CA task that has a client.
+            // Stored in a ref and shown only after the panel closes so the user can
+            // make additional edits (e.g. approver) without the modal interrupting.
             if (
               canManage &&
               'assignee_id' in fields &&
@@ -387,8 +413,8 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
                   // Task was unassigned — auto-update master assignment immediately (no popup)
                   doMasterUpdate(promptData)
                 } else {
-                  // Task was already assigned to someone — ask before overwriting master
-                  setMasterUpdatePrompt(promptData)
+                  // Task was already assigned — defer the prompt until the panel closes
+                  pendingMasterUpdateRef.current = promptData
                 }
               }
             }
@@ -396,7 +422,9 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
             setTasks(p => p.map(t => t.id === selTask.id ? { ...t, ...enriched } as CATask : t))
             setSelTask(p => p ? { ...p, ...enriched } as CATask : null)
           }
-          startT(() => router.refresh())
+          // Defer the route refresh until the panel closes so mid-session refreshes
+          // don't disrupt the user while they are still editing fields.
+          pendingRefreshRef.current = true
         }}
       />
 

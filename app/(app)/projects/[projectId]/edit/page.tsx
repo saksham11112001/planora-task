@@ -1,4 +1,4 @@
-import { createClient }    from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { getSessionUser } from '@/lib/supabase/cached'
 import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { redirect }        from 'next/navigation'
@@ -15,7 +15,7 @@ export default async function ProjectEditPage({ params }: { params: Promise<{ pr
   const mb = await getActiveOrgMembership(user.id)
   if (!mb) redirect('/onboarding')
 
-  const supabase = await createClient()
+  const supabase = createAdminClient()
   if (!['owner','admin','manager'].includes(mb.role)) redirect(`/projects/${projectId}`)
   const { data: project } = await supabase.from('projects').select('*').eq('id', projectId).eq('org_id', mb.org_id).single()
   if (!project) redirect('/projects')

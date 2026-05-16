@@ -1,5 +1,4 @@
 export const dynamic = 'force-dynamic'
-import { createClient }     from '@/lib/supabase/server'
 import { getSessionUser } from '@/lib/supabase/cached'
 import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { redirect }         from 'next/navigation'
@@ -16,8 +15,6 @@ export default async function DocumentTypesPage() {
   const mb = await getActiveOrgMembership(user.id)
   if (!mb) redirect('/onboarding')
   if (!['owner', 'admin'].includes(mb.role)) redirect('/settings')
-
-  const supabase = await createClient()
 
   const admin = createAdminClient()
   const { data: docTypes } = await admin

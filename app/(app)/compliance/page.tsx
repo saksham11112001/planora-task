@@ -1,4 +1,3 @@
-import { createClient }     from '@/lib/supabase/server'
 import { getSessionUser } from '@/lib/supabase/cached'
 import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { redirect }          from 'next/navigation'
@@ -16,8 +15,6 @@ export default async function CompliancePage() {
   if (!user) redirect('/login')
   const mb = await getActiveOrgMembership(user.id)
   if (!mb) redirect('/onboarding')
-
-  const supabase = await createClient()
 
   // Gate: CA Compliance requires Pro plan or above — org data comes from the cached membership join
   const plan = effectivePlan((mb.organisations as any) ?? { plan_tier: 'free', status: 'active' })
