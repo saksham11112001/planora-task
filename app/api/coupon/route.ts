@@ -30,9 +30,10 @@ export async function POST(request: NextRequest) {
 
   if (!coupon) return NextResponse.json({ error: 'Invalid or expired coupon code' }, { status: 400 })
 
-  // Check usage limit
-  if (coupon.max_uses && coupon.uses_count >= coupon.max_uses)
-    return NextResponse.json({ error: 'This coupon has reached its usage limit' }, { status: 400 })
+  // Check usage limit — default to 1 (single-use) when max_uses is not set
+  const maxUses = coupon.max_uses ?? 1
+  if (coupon.uses_count >= maxUses)
+    return NextResponse.json({ error: 'This coupon has already been used and is no longer valid' }, { status: 400 })
 
   // Check expiry
   if (coupon.expires_at && new Date(coupon.expires_at) < new Date())
