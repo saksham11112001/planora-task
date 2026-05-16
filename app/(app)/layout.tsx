@@ -52,7 +52,25 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         redirect('/dashboard')
       }
 
-      // 2. Truly no org membership anywhere — send to onboarding to create one
+      // 2. Reactivate owner memberships incorrectly deactivated by a past system bug.
+      //    The API explicitly blocks removing owners ("Cannot remove an owner"), so any
+      //    is_active=false row with role='owner' was set by the old cross-org deactivation
+      //    bug — not by a legitimate admin action. Safe to restore.
+      const { data: inactiveOwnerRows } = await admin
+        .from('org_members')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('role', 'owner')
+        .eq('is_active', false)
+
+      if (inactiveOwnerRows && inactiveOwnerRows.length > 0) {
+        await admin.from('org_members')
+          .update({ is_active: true })
+          .in('id', inactiveOwnerRows.map((m: any) => m.id))
+        redirect('/dashboard')
+      }
+
+      // 3. Truly no org membership anywhere — send to onboarding to create one
       //    (do NOT redirect to /login here — the user IS authenticated)
       redirect('/onboarding')
     }

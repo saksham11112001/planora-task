@@ -98,7 +98,6 @@ export function TeamView({ members, canManage, currentUserId }: {
   const ranked = [...members]
     .sort((a, b) => b.done_30d - a.done_30d)
     .slice(0, 3)
-    .filter(m => m.done_30d > 0)
 
   // ── Single invite ──────────────────────────────────────────────────────────
   async function invite(e: React.FormEvent) {
@@ -230,7 +229,7 @@ export function TeamView({ members, canManage, currentUserId }: {
         </div>
 
         {/* ── Leaderboard ── */}
-        {ranked.length > 0 && (
+        {members.length >= 2 && (
           <div style={{ marginBottom: 20 }}>
             <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase',
               color: 'var(--text-muted)', marginBottom: 10 }}>

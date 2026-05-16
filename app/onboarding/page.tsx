@@ -145,6 +145,13 @@ export default function OnboardingPage() {
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error ?? 'Failed to create organisation'); return }
+      // Set the new org as active before redirecting so the cookie points to it
+      if (data.org_id) {
+        await fetch('/api/org/switch', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ org_id: data.org_id }),
+        })
+      }
       router.push('/dashboard'); router.refresh()
     } catch { setError('Network error — please try again') } finally { setSaving(false) }
   }
