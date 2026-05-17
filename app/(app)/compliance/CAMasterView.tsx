@@ -423,23 +423,14 @@ function TemplateSelectCell({
   onSelect: (ids: string[]) => void
   onManage?: () => void
 }) {
-  const [open, setOpen] = useState(false)
-  const [dropPos, setDropPos] = useState<{ top: number; left: number; width: number } | null>(null)
+  const [open,      setOpen]      = useState(false)
+  const [dropPos,   setDropPos]   = useState<{ top: number; left: number; width: number; maxH: number } | null>(null)
   const [previewId, setPreviewId] = useState<string | null>(null)
-  const triggerRef = useRef<HTMLDivElement>(null)
 
-  // Close on outside click
-  useEffect(() => {
-    if (!open) return
-    function handler(e: MouseEvent) {
-      const t = e.target as Node
-      if (triggerRef.current && !triggerRef.current.contains(t)) {
-        setOpen(false); setPreviewId(null)
-      }
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [open])
+  // NOTE: NO useEffect mousedown listener here.
+  // The portal backdrop div handles all outside-click closes.
+  // A useEffect that checks triggerRef.contains() will always fire for portal content
+  // (which lives in document.body, not inside the ref) and instantly close the dropdown.
 
   const selectedTemplates = selectedIds
     .map(id => templates.find(t => t.id === id))
@@ -447,179 +438,193 @@ function TemplateSelectCell({
 
   function openDropdown(e: React.MouseEvent) {
     if (!editable) return
+    if (open) { setOpen(false); return }
     const rect = (e.currentTarget as HTMLElement).closest('td')?.getBoundingClientRect()
                ?? (e.currentTarget as HTMLElement).getBoundingClientRect()
-    const dropWidth = 280
-    // Flip left if would overflow right edge
-    const left = rect.right + dropWidth > window.innerWidth - 8
-      ? rect.right - dropWidth
-      : rect.left
-    setDropPos({ top: rect.bottom + 4, left, width: dropWidth })
-    setOpen(o => !o)
+    const W = 300
+    // Horizontal: flip left if overflows right edge
+    const left = rect.right + W > window.innerWidth - 8 ? rect.right - W : rect.left
+    // Vertical: measure available space below and above, pick whichever is larger
+    const spaceBelow = window.innerHeight - rect.bottom - 8
+    const spaceAbove = rect.top - 8
+    const flipUp = spaceBelow < 200 && spaceAbove > spaceBelow
+    const maxH   = Math.min(440, Math.max(spaceBelow, spaceAbove, 160))
+    const top    = flipUp ? rect.top - maxH : rect.bottom + 4
+    setDropPos({ top, left, width: W, maxH })
+    setOpen(true)
   }
 
-  const dropdownContent = open && editable && dropPos && ReactDOM.createPortal(
-    <>
-      {/* Invisible backdrop to catch outside clicks */}
-      <div style={{ position: 'fixed', inset: 0, zIndex: 8000 }} onClick={() => { setOpen(false); setPreviewId(null) }} />
-      <div style={{
-        position: 'fixed', top: dropPos.top, left: dropPos.left, width: dropPos.width,
-        zIndex: 8001, background: 'var(--surface)', border: '1px solid var(--border)',
-        borderRadius: 12, boxShadow: '0 12px 32px rgba(0,0,0,0.2)',
-        padding: 8, maxHeight: '70vh', overflowY: 'auto',
-      }}
-        onClick={e => e.stopPropagation()}
-      >
-        {templates.length === 0 ? (
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '10px 8px', textAlign: 'center' }}>
-            No templates yet.<br/>
-            {onManage && (
-              <button
-                onClick={e => { e.stopPropagation(); setOpen(false); onManage() }}
-                style={{
-                  marginTop: 8, fontSize: 11, color: '#0d9488', background: 'rgba(13,148,136,0.08)',
-                  border: '1px solid rgba(13,148,136,0.3)', borderRadius: 6,
-                  padding: '4px 10px', cursor: 'pointer', fontFamily: 'inherit',
-                }}
-              >+ Create a template</button>
-            )}
-          </div>
-        ) : templates.map(tpl => {
-          const checked = selectedIds.includes(tpl.id)
-          const isPrev  = previewId === tpl.id
-          return (
-            <div key={tpl.id}>
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                padding: '8px 8px', borderRadius: 8,
-                background: checked ? 'rgba(13,148,136,0.08)' : 'transparent',
-                cursor: 'pointer',
-              }}
-                onClick={() => {
-                  const next = checked ? selectedIds.filter(id => id !== tpl.id) : [...selectedIds, tpl.id]
-                  onSelect(next)
-                }}
-              >
-                <input
-                  type="checkbox" checked={checked}
-                  onChange={() => {
-                    const next = checked ? selectedIds.filter(id => id !== tpl.id) : [...selectedIds, tpl.id]
-                    onSelect(next)
-                  }}
-                  onClick={e => e.stopPropagation()}
-                  style={{ width: 13, height: 13, accentColor: '#0d9488', cursor: 'pointer', flexShrink: 0 }}
-                />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: checked ? '#0d9488' : 'var(--text-primary)' }}>{tpl.name}</div>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{tpl.items.length} attachment{tpl.items.length !== 1 ? 's' : ''}</div>
-                </div>
-                <button
-                  onClick={e => { e.stopPropagation(); setPreviewId(isPrev ? null : tpl.id) }}
-                  title="Preview attachments"
-                  style={{
-                    background: isPrev ? 'rgba(13,148,136,0.12)' : 'none',
-                    border: 'none', cursor: 'pointer', padding: '2px 5px',
-                    borderRadius: 4, fontSize: 11,
-                    color: isPrev ? '#0d9488' : 'var(--text-muted)',
-                    flexShrink: 0, fontFamily: 'inherit',
-                  }}
-                >👁</button>
-              </div>
-              {isPrev && (
-                <div style={{
-                  margin: '2px 8px 6px 28px', padding: '8px 10px',
-                  background: 'var(--surface-subtle)', borderRadius: 6,
-                  border: '1px solid var(--border)',
-                }}>
-                  {tpl.items.length === 0 ? (
-                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>No attachments defined</span>
-                  ) : tpl.items.map((item, idx) => (
-                    <div key={idx} style={{ fontSize: 11, color: 'var(--text-secondary)', padding: '1px 0', display: 'flex', gap: 6 }}>
-                      <span style={{ color: 'var(--text-muted)', fontSize: 10, minWidth: 14, textAlign: 'right' }}>{idx + 1}.</span>
-                      <span>{item}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )
-        })}
-
-        {/* Merged result summary */}
-        {selectedTemplates.length > 0 && (
-          <div style={{
-            marginTop: 8, padding: '8px 10px',
-            background: 'rgba(13,148,136,0.06)', borderRadius: 8,
-            border: '1px solid rgba(13,148,136,0.2)',
-          }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: '#0d9488', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Merged result — {mergeTemplateItems(selectedIds, templates).length} attachments
-            </div>
-            {mergeTemplateItems(selectedIds, templates).map((item, i) => (
-              <div key={i} style={{ fontSize: 10, color: 'var(--text-secondary)', padding: '1px 0', display: 'flex', gap: 5 }}>
-                <span style={{ color: 'var(--text-muted)', minWidth: 12, textAlign: 'right' }}>{i + 1}.</span>
-                <span>{item}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Manage shortcut */}
-        {onManage && templates.length > 0 && (
-          <div style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 6 }}>
-            <button
-              onClick={e => { e.stopPropagation(); setOpen(false); onManage() }}
-              style={{
-                width: '100%', textAlign: 'left', fontSize: 11,
-                color: 'var(--text-muted)', background: 'none',
-                border: 'none', padding: '4px 8px', borderRadius: 6,
-                cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 5,
-              }}
-              onMouseEnter={e => (e.currentTarget.style.color = '#0d9488')}
-              onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
-            >
-              ✎ Manage templates
-            </button>
-          </div>
-        )}
-      </div>
-    </>,
-    document.body
-  )
+  function close() { setOpen(false); setPreviewId(null) }
 
   return (
     <td style={{ padding: '4px 6px', verticalAlign: 'middle', minWidth: 150 }}>
-      <div ref={triggerRef}>
-        {/* Trigger chip */}
-        <div
-          onClick={openDropdown}
-          style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', cursor: editable ? 'pointer' : 'default' }}
-        >
-          {selectedTemplates.length > 0 ? (
-            <>
-              {selectedTemplates.map(t => (
-                <span key={t.id} style={{
-                  fontSize: 10, padding: '1px 6px', borderRadius: 10,
-                  background: 'rgba(13,148,136,0.12)', color: '#0d9488',
-                  border: '1px solid rgba(13,148,136,0.3)', fontWeight: 600, whiteSpace: 'nowrap',
-                }}>{t.name}</span>
-              ))}
-              {editable && <ChevronDown size={9} style={{ color: 'var(--text-muted)', flexShrink: 0 }}/>}
-            </>
-          ) : editable ? (
-            <span style={{
-              fontSize: 11, color: 'var(--brand)', display: 'flex', alignItems: 'center', gap: 3,
-              padding: '2px 7px', borderRadius: 6,
-              border: '1px dashed rgba(13,148,136,0.4)', background: 'rgba(13,148,136,0.04)',
-            }}>
-              <Plus size={9}/> Templates
-            </span>
-          ) : (
-            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>—</span>
-          )}
-        </div>
-        {dropdownContent}
+      {/* Trigger chip */}
+      <div
+        onClick={openDropdown}
+        style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', cursor: editable ? 'pointer' : 'default' }}
+      >
+        {selectedTemplates.length > 0 ? (
+          <>
+            {selectedTemplates.map(t => (
+              <span key={t.id} style={{
+                fontSize: 10, padding: '1px 6px', borderRadius: 10,
+                background: 'rgba(13,148,136,0.12)', color: '#0d9488',
+                border: '1px solid rgba(13,148,136,0.3)', fontWeight: 600, whiteSpace: 'nowrap',
+              }}>{t.name}</span>
+            ))}
+            {editable && <ChevronDown size={9} style={{ color: 'var(--text-muted)', flexShrink: 0 }}/>}
+          </>
+        ) : editable ? (
+          <span style={{
+            fontSize: 11, color: 'var(--brand)', display: 'flex', alignItems: 'center', gap: 3,
+            padding: '2px 7px', borderRadius: 6,
+            border: '1px dashed rgba(13,148,136,0.4)', background: 'rgba(13,148,136,0.04)',
+          }}>
+            <Plus size={9}/> Templates
+          </span>
+        ) : (
+          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>—</span>
+        )}
       </div>
+
+      {/* Portal dropdown — rendered in document.body so it's never clipped by table/scroll */}
+      {open && editable && dropPos && ReactDOM.createPortal(
+        <>
+          {/* Full-screen backdrop — clicking anywhere outside the panel closes it */}
+          <div
+            style={{ position: 'fixed', inset: 0, zIndex: 8000 }}
+            onMouseDown={close}
+          />
+          {/* Panel — stopPropagation prevents backdrop's onMouseDown from firing */}
+          <div
+            onMouseDown={e => e.stopPropagation()}
+            style={{
+              position: 'fixed', top: dropPos.top, left: dropPos.left, width: dropPos.width,
+              maxHeight: dropPos.maxH, overflowY: 'auto',
+              zIndex: 8001, background: 'var(--surface)', border: '1px solid var(--border)',
+              borderRadius: 12, boxShadow: '0 16px 40px rgba(0,0,0,0.22)', padding: 8,
+            }}
+          >
+            {templates.length === 0 ? (
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '10px 8px', textAlign: 'center' }}>
+                No templates yet.<br/>
+                {onManage && (
+                  <button
+                    onClick={() => { close(); onManage!() }}
+                    style={{
+                      marginTop: 8, fontSize: 11, color: '#0d9488', background: 'rgba(13,148,136,0.08)',
+                      border: '1px solid rgba(13,148,136,0.3)', borderRadius: 6,
+                      padding: '4px 10px', cursor: 'pointer', fontFamily: 'inherit',
+                    }}
+                  >+ Create a template</button>
+                )}
+              </div>
+            ) : templates.map(tpl => {
+              const checked = selectedIds.includes(tpl.id)
+              const isPrev  = previewId === tpl.id
+              return (
+                <div key={tpl.id}>
+                  <div
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      padding: '8px 8px', borderRadius: 8,
+                      background: checked ? 'rgba(13,148,136,0.08)' : 'transparent',
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => {
+                      const next = checked ? selectedIds.filter(id => id !== tpl.id) : [...selectedIds, tpl.id]
+                      onSelect(next)
+                      // Keep open so user can multi-select — don't call close()
+                    }}
+                  >
+                    <input
+                      type="checkbox" checked={checked} readOnly
+                      style={{ width: 13, height: 13, accentColor: '#0d9488', cursor: 'pointer', flexShrink: 0, pointerEvents: 'none' }}
+                    />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: checked ? '#0d9488' : 'var(--text-primary)' }}>{tpl.name}</div>
+                      <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{tpl.items.length} attachment{tpl.items.length !== 1 ? 's' : ''}</div>
+                    </div>
+                    <button
+                      onClick={e => { e.stopPropagation(); setPreviewId(isPrev ? null : tpl.id) }}
+                      title="Preview attachments"
+                      style={{
+                        background: isPrev ? 'rgba(13,148,136,0.12)' : 'none',
+                        border: 'none', cursor: 'pointer', padding: '2px 5px',
+                        borderRadius: 4, fontSize: 11,
+                        color: isPrev ? '#0d9488' : 'var(--text-muted)',
+                        flexShrink: 0, fontFamily: 'inherit',
+                      }}
+                    >👁</button>
+                  </div>
+                  {isPrev && (
+                    <div style={{
+                      margin: '2px 8px 6px 28px', padding: '8px 10px',
+                      background: 'var(--surface-subtle)', borderRadius: 6,
+                      border: '1px solid var(--border)',
+                    }}>
+                      {tpl.items.length === 0 ? (
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>No attachments defined</span>
+                      ) : tpl.items.map((item, idx) => (
+                        <div key={idx} style={{ fontSize: 11, color: 'var(--text-secondary)', padding: '1px 0', display: 'flex', gap: 6 }}>
+                          <span style={{ color: 'var(--text-muted)', fontSize: 10, minWidth: 14, textAlign: 'right' }}>{idx + 1}.</span>
+                          <span>{item}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+
+            {/* Merged result summary */}
+            {selectedTemplates.length > 0 && (
+              <div style={{
+                marginTop: 8, padding: '8px 10px',
+                background: 'rgba(13,148,136,0.06)', borderRadius: 8,
+                border: '1px solid rgba(13,148,136,0.2)',
+              }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#0d9488', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Merged — {mergeTemplateItems(selectedIds, templates).length} attachments
+                </div>
+                {mergeTemplateItems(selectedIds, templates).map((item, i) => (
+                  <div key={i} style={{ fontSize: 10, color: 'var(--text-secondary)', padding: '1px 0', display: 'flex', gap: 5 }}>
+                    <span style={{ color: 'var(--text-muted)', minWidth: 12, textAlign: 'right' }}>{i + 1}.</span>
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Footer: done button + manage link */}
+            <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+              <button
+                onClick={close}
+                style={{
+                  fontSize: 11, fontWeight: 600, padding: '4px 14px', borderRadius: 6,
+                  background: 'rgba(13,148,136,0.10)', color: '#0d9488',
+                  border: '1px solid rgba(13,148,136,0.3)', cursor: 'pointer', fontFamily: 'inherit',
+                }}
+              >Done</button>
+              {onManage && templates.length > 0 && (
+                <button
+                  onClick={() => { close(); onManage!() }}
+                  style={{
+                    fontSize: 11, color: 'var(--text-muted)', background: 'none',
+                    border: 'none', padding: '4px 6px', borderRadius: 6,
+                    cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 4,
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.color = '#0d9488')}
+                  onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
+                >
+                  ✎ Manage templates
+                </button>
+              )}
+            </div>
+          </div>
+        </>,
+        document.body
+      )}
     </td>
   )
 }

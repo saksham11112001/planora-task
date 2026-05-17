@@ -782,14 +782,16 @@ export function TeamView({ members: initialMembers, canManage, isAdmin = false, 
       <>
         <div
           style={{ position: 'fixed', inset: 0, zIndex: 9100 }}
-          onClick={() => { setRoleEditing(null); setRoleDropPos(null) }}
+          onMouseDown={() => { setRoleEditing(null); setRoleDropPos(null) }}
         />
-        <div style={{
-          position: 'fixed', top: roleDropPos.top, right: roleDropPos.right,
-          borderRadius: 14, padding: '4px 0', minWidth: 260,
-          background: 'var(--surface)', border: '1px solid var(--border)',
-          boxShadow: '0 20px 48px rgba(0,0,0,0.22)', zIndex: 9101,
-        }}>
+        <div
+          onMouseDown={e => e.stopPropagation()}
+          style={{
+            position: 'fixed', top: roleDropPos.top, right: roleDropPos.right,
+            borderRadius: 14, padding: '4px 0', minWidth: 260,
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            boxShadow: '0 20px 48px rgba(0,0,0,0.22)', zIndex: 9101,
+          }}>
           <p className="px-4 pb-2 pt-1.5 text-xs font-bold uppercase tracking-widest"
             style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>
             Change role

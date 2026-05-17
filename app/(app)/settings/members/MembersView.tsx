@@ -1,7 +1,7 @@
 'use client'
 import { useState, useTransition } from 'react'
 import { useRouter }  from 'next/navigation'
-import { UserPlus, X, Copy, Check, RefreshCw, Share2, Gift, SlidersHorizontal } from 'lucide-react'
+import { UserPlus, X, Copy, Check, RefreshCw, Share2, Gift, SlidersHorizontal, Ticket, ArrowRight, Loader2 } from 'lucide-react'
 import { Avatar, RoleBadge } from '@/components/ui/Badge'
 import { toast }      from '@/store/appStore'
 import { UserPermissionsPanel } from './UserPermissionsPanel'
@@ -50,6 +50,9 @@ export function MembersView({
   const [copiedJoin, setCopiedJoin]       = useState(false)
   const [copiedReferral, setCopiedReferral] = useState(false)
   const [rotating, setRotating] = useState(false)
+  const [applyCode,    setApplyCode]    = useState('')
+  const [applyingCode, setApplyingCode] = useState(false)
+  const [applySuccess, setApplySuccess] = useState(false)
 
   // Local copy of members so we can update permissions immediately without a full refresh
   const [members, setMembers] = useState<Member[]>(initialMembers)
@@ -110,6 +113,28 @@ export function MembersView({
 
   function handlePermissionsSaved(memberId: string, newOverrides: Record<string, boolean> | null) {
     setMembers(prev => prev.map(m => m.id === memberId ? { ...m, permissions: newOverrides } : m))
+  }
+
+  async function applyReferralCode(e: React.FormEvent) {
+    e.preventDefault()
+    const raw = applyCode.trim()
+    if (!raw) return
+    setApplyingCode(true)
+    try {
+      const res = await fetch('/api/referral/apply', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: raw }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setApplySuccess(true)
+        setApplyCode('')
+        toast.success(`Referral applied! Your referrer's trial extended by ${data.extension_days ?? 7} days.`)
+        startT(() => router.refresh())
+      } else {
+        toast.error(data.error ?? 'Invalid or already used referral code')
+      }
+    } finally { setApplyingCode(false) }
   }
 
   function fmtCode(code: string | null) {
@@ -195,7 +220,7 @@ export function MembersView({
           </p>
         </div>
 
-        {/* Referral code */}
+        {/* Referral code — your outbound code */}
         {referralCode && (
           <div>
             <p className="text-xs font-medium text-gray-700 mb-1.5 flex items-center gap-1.5">
@@ -218,6 +243,48 @@ export function MembersView({
                 +{referralExtensionDays} day{referralExtensionDays !== 1 ? 's' : ''} earned from referrals so far
               </p>
             )}
+          </div>
+        )}
+
+        {/* Apply a referral code — inbound, extends the referrer's trial */}
+        {isAdmin && !applySuccess && (
+          <div>
+            <p className="text-xs font-medium text-gray-700 mb-1.5 flex items-center gap-1.5">
+              <Ticket className="h-3.5 w-3.5 text-teal-500"/> Have a referral code?
+              <span className="font-normal text-gray-400">— apply it to extend the sharer's trial by 7 days</span>
+            </p>
+            <form onSubmit={applyReferralCode} className="flex items-center gap-2">
+              <input
+                value={applyCode}
+                onChange={e => setApplyCode(e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, ''))}
+                placeholder="XXXX-XXXX"
+                maxLength={9}
+                disabled={applyingCode}
+                className="input flex-1 font-mono tracking-widest text-sm"
+                style={{ maxWidth: 180 }}
+              />
+              <button
+                type="submit"
+                disabled={applyingCode || applyCode.replace(/-/g,'').length < 6}
+                className="btn btn-brand px-4 py-2 flex items-center gap-1.5 text-xs disabled:opacity-50"
+              >
+                {applyingCode
+                  ? <><Loader2 className="h-3.5 w-3.5 animate-spin"/> Applying…</>
+                  : <><ArrowRight className="h-3.5 w-3.5"/> Apply</>}
+              </button>
+            </form>
+            <p className="mt-1.5 text-xs text-gray-400">
+              Each organisation can redeem one referral code. Your trial is unaffected.
+            </p>
+          </div>
+        )}
+        {applySuccess && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px',
+            background: 'rgba(13,148,136,0.08)', borderRadius: 10, border: '1px solid rgba(13,148,136,0.25)',
+          }}>
+            <Check className="h-4 w-4 text-teal-600" style={{ flexShrink: 0 }}/>
+            <p className="text-xs text-teal-700 font-medium">Referral code applied successfully! The referrer's trial has been extended.</p>
           </div>
         )}
       </div>
