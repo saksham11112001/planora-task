@@ -174,25 +174,19 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
             color: '#fff', fontWeight: 700, fontSize: 13, flexShrink: 0 }}>
             <Zap className="h-4 w-4 text-white"/>
           </div>
-          {/* Org name — clickable for switcher if multiple orgs */}
-          {(session?.allOrgs?.length ?? 0) > 1 ? (
-            <button
-              onClick={() => setOrgSwitcherOpen(o => !o)}
-              disabled={switching}
-              style={{ flex: 1, background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: 4, minWidth: 0, textAlign: 'left' }}>
-              <span style={{ color: '#fff', fontWeight: 600, fontSize: 13, overflow: 'hidden',
-                whiteSpace: 'nowrap', textOverflow: 'ellipsis', flex: 1 }}>
-                {session?.org.name ?? 'Planora'}
-              </span>
-              <ChevronsUpDown style={{ width: 13, height: 13, color: 'rgba(255,255,255,0.35)', flexShrink: 0 }}/>
-            </button>
-          ) : (
-            <span style={{ color: '#fff', fontWeight: 600, fontSize: 13, flex: 1, overflow: 'hidden',
-              whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+          {/* Org name — always clickable to open workspace switcher */}
+          <button
+            onClick={() => setOrgSwitcherOpen(o => !o)}
+            disabled={switching}
+            title="Switch or create a workspace"
+            style={{ flex: 1, background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 4, minWidth: 0, textAlign: 'left' }}>
+            <span style={{ color: '#fff', fontWeight: 600, fontSize: 13, overflow: 'hidden',
+              whiteSpace: 'nowrap', textOverflow: 'ellipsis', flex: 1 }}>
               {session?.org.name ?? 'Planora'}
             </span>
-          )}
+            <ChevronsUpDown style={{ width: 13, height: 13, color: 'rgba(255,255,255,0.35)', flexShrink: 0 }}/>
+          </button>
           <PlanBadge plan={plan}/>
           {onClose && (
             <button onClick={onClose}
@@ -203,8 +197,8 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
           )}
         </div>
 
-        {/* Org switcher dropdown */}
-        {orgSwitcherOpen && (session?.allOrgs?.length ?? 0) > 1 && (
+        {/* Org switcher dropdown — always available */}
+        {orgSwitcherOpen && (
           <div style={{
             position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200,
             background: '#1e293b', border: '1px solid rgba(255,255,255,0.12)',
@@ -214,9 +208,9 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
           }}>
             <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase',
               color: 'rgba(255,255,255,0.3)', padding: '8px 12px 4px' }}>
-              Switch workspace
+              My workspaces
             </p>
-            {session!.allOrgs.map(org => {
+            {(session?.allOrgs ?? []).map(org => {
               const isCurrent = org.id === session?.org.id
               return (
                 <button key={org.id}
@@ -252,6 +246,43 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
                 </button>
               )
             })}
+
+            {/* Divider */}
+            <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '4px 12px' }}/>
+
+            {/* New organisation — navigates to onboarding entry screen */}
+            <button
+              onClick={() => { setOrgSwitcherOpen(false); router.push('/onboarding') }}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', gap: 9,
+                padding: '9px 12px', background: 'none', border: 'none',
+                cursor: 'pointer', textAlign: 'left', transition: 'background 0.12s',
+                color: 'rgba(255,255,255,0.55)',
+              }}
+              onMouseEnter={e => {
+                (e.currentTarget as HTMLElement).style.background = 'rgba(13,148,136,0.12)'
+                ;(e.currentTarget as HTMLElement).style.color = '#2dd4bf'
+              }}
+              onMouseLeave={e => {
+                (e.currentTarget as HTMLElement).style.background = 'none'
+                ;(e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.55)'
+              }}>
+              <div style={{ width: 22, height: 22, borderRadius: 5, flexShrink: 0,
+                background: 'rgba(255,255,255,0.07)',
+                border: '1px dashed rgba(255,255,255,0.18)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Plus style={{ width: 12, height: 12 }}/>
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontSize: 12, fontWeight: 500, margin: 0, color: 'inherit' }}>
+                  New organisation
+                </p>
+                <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', margin: 0 }}>
+                  Create or join a workspace
+                </p>
+              </div>
+            </button>
+
             <div style={{ height: 6 }}/>
           </div>
         )}
