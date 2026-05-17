@@ -187,23 +187,30 @@ export const dailyReminders = inngest.createFunction(
         const { data: assigneeEscPrefs } = await admin.from('notification_preferences')
           .select('via_email')
           .eq('user_id', assignee.id).eq('event_type', 'task_overdue').maybeSingle()
-        if (
-          (assigneeEscPrefs?.via_email ?? true) &&
-          assignee?.email &&
-          (await acquireEmailSlot(assignee.id, `escalation_assignee_${task.id}`))
-        ) {
-          await sendEscalationEmail({
-            to:           assignee.email,
-            managerName:  'Your manager',
-            assigneeName: assignee.name ?? 'You',
-            taskId:       task.id,
-            taskTitle:    task.title,
-            dueDate:      task.due_date as string,
-            daysOverdue:  1,
-            orgName:      (task.org as any)?.name ?? '',
-            projectName:  (task.project as any)?.name ?? null,
-            projectId:    task.project_id,
-          })
+        if ((assigneeEscPrefs?.via_email ?? true) && assignee?.email) {
+          const assigneeOrgMode = await getOrgNotifMode((task as any).org_id)
+          if (assigneeOrgMode === 'digest') {
+            await queueNotification({
+              orgId:     (task as any).org_id,
+              userId:    assignee.id,
+              userEmail: assignee.email,
+              eventType: 'escalation_alert',
+              subject:   `Your task "${task.title}" is overdue and has been escalated to your manager`,
+            })
+          } else if (await acquireEmailSlot(assignee.id, `escalation_assignee_${task.id}`)) {
+            await sendEscalationEmail({
+              to:           assignee.email,
+              managerName:  'Your manager',
+              assigneeName: assignee.name ?? 'You',
+              taskId:       task.id,
+              taskTitle:    task.title,
+              dueDate:      task.due_date as string,
+              daysOverdue:  1,
+              orgName:      (task.org as any)?.name ?? '',
+              projectName:  (task.project as any)?.name ?? null,
+              projectId:    task.project_id,
+            })
+          }
         }
       })
     }
@@ -286,6 +293,26 @@ export const dailyReminders = inngest.createFunction(
           .eq('user_id', approver.id).eq('event_type', 'task_approved').maybeSingle()
         if ((approverPrefs?.via_email ?? true) === false) continue
 
+        const approverOrgId = (tasks[0] as any)?.org_id as string | undefined
+        const approverOrgMode = approverOrgId ? await getOrgNotifMode(approverOrgId) : 'immediate'
+
+        if (approverOrgMode === 'digest' && approverOrgId) {
+          // Queue each pending-approval task as a separate digest item so they're
+          // consolidated into the approver's next digest email (grouped by event type).
+          for (const t of tasks) {
+            await queueNotification({
+              orgId:     approverOrgId,
+              userId:    approver.id,
+              userEmail: approver.email,
+              eventType: 'approval_requested',
+              subject:   `"${t.title}" is awaiting your review (submitted by ${(t.assignee as any)?.name ?? 'a team member'})`,
+            })
+          }
+          sent++
+          continue
+        }
+
+        // Immediate mode — send a single approval-summary email listing all pending tasks
         if (!(await acquireEmailSlot(approver.id, 'approver_digest'))) continue
         await sendApprovalDigestEmail({
           to:           approver.email,

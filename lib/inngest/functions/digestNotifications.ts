@@ -90,10 +90,13 @@ async function runDigest(slot: 'morning' | 'evening') {
   return { sent: totalSent, orgs: orgIds.length }
 }
 
-// ── Morning digest — 8:00 AM IST (2:30 AM UTC) ───────────────────────────
+// ── Morning digest — 8:15 AM IST ─────────────────────────────────────────
+// Intentionally 15 min after dailyReminders (8:00 AM IST) so that all
+// due-soon / escalation / approval items queued by that job are captured
+// in this flush rather than deferred to the evening slot.
 export const digestMorning = inngest.createFunction(
-  { id: 'digest-morning', name: 'Morning digest (8 AM IST)' },
-  { cron: 'TZ=Asia/Kolkata 0 8 * * *' },
+  { id: 'digest-morning', name: 'Morning digest (8:15 AM IST)' },
+  { cron: 'TZ=Asia/Kolkata 15 8 * * *' },
   async () => runDigest('morning')
 )
 
