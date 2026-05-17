@@ -597,6 +597,111 @@ function IllustrationMonitor() {
   )
 }
 
+function IllustrationRecurring() {
+  const freqs = [
+    { label: 'Daily',     color: '#dc2626', active: false },
+    { label: 'Weekly',    color: '#d97706', active: false },
+    { label: 'Monthly',   color: '#0d9488', active: true  },
+    { label: 'Quarterly', color: '#7c3aed', active: false },
+  ]
+  const instances = [
+    { month: 'May 2026', status: 'done',     color: '#16a34a' },
+    { month: 'Jun 2026', status: 'todo',     color: '#0d9488' },
+    { month: 'Jul 2026', status: 'upcoming', color: '#94a3b8' },
+  ]
+  return (
+    <svg viewBox="0 0 320 260" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width:'100%', height:'100%' }}>
+      {/* Template card */}
+      <rect x="15" y="10" width="290" height="58" rx="10" fill="#f0fdf9" stroke="#0d9488" strokeWidth="1.5" strokeDasharray="4 2"/>
+      <text x="30" y="29" fontSize="8.5" fontWeight="800" fill="#0d9488" style={{textTransform:'uppercase'}}>🔁 Template (Master)</text>
+      <text x="30" y="48" fontSize="11" fontWeight="700" fill="#1e293b">GSTR 3B Filing</text>
+      <rect x="196" y="36" width="96" height="18" rx="5" fill="#0d9488" fillOpacity="0.12" stroke="#0d9488" strokeWidth="0.8" strokeOpacity="0.4"/>
+      <text x="244" y="48" textAnchor="middle" fontSize="8" fontWeight="700" fill="#0d9488">Monthly · 20th</text>
+      {/* Frequency row */}
+      <text x="15" y="84" fontSize="7" fontWeight="800" fill="#94a3b8" style={{textTransform:'uppercase', letterSpacing:'0.08em'}}>FREQUENCY</text>
+      {freqs.map((f, i) => (
+        <g key={f.label}>
+          <rect x={15+i*73} y="89" width="67" height="22" rx="7"
+            fill={f.active ? f.color : 'white'}
+            stroke={f.active ? f.color : '#e2e8f0'} strokeWidth={f.active ? 1.5 : 1}/>
+          <text x={48+i*73} y="104" textAnchor="middle" fontSize="8.5"
+            fontWeight={f.active ? '700' : '500'} fill={f.active ? 'white' : '#64748b'}>{f.label}</text>
+        </g>
+      ))}
+      {/* Spawn arrow */}
+      <text x="160" y="132" textAnchor="middle" fontSize="8.5" fontWeight="600" fill="#94a3b8">↓  auto-spawns a new task each cycle</text>
+      {/* Spawned instances */}
+      {instances.map((inst, i) => (
+        <g key={inst.month}>
+          <rect x={18+i*96} y="142" width="88" height="50" rx="8" fill="white" stroke="#e2e8f0" strokeWidth="1"/>
+          <rect x={18+i*96} y="142" width="88" height="5" rx="2.5" fill={inst.color}/>
+          <text x={62+i*96} y="163" textAnchor="middle" fontSize="8.5" fontWeight="700" fill="#1e293b">GSTR 3B</text>
+          <text x={62+i*96} y="174" textAnchor="middle" fontSize="7.5" fill="#64748b">{inst.month}</text>
+          <rect x={28+i*96} y="180" width="68" height="13" rx="4"
+            fill={inst.color} fillOpacity="0.1" stroke={inst.color} strokeWidth="0.6" strokeOpacity="0.4"/>
+          <text x={62+i*96} y="190" textAnchor="middle" fontSize="7" fontWeight="700" fill={inst.color}>
+            {inst.status === 'done' ? '✓ Done' : inst.status === 'todo' ? 'In Progress' : 'Upcoming'}
+          </text>
+        </g>
+      ))}
+      {/* Footer */}
+      <rect x="15" y="203" width="290" height="47" rx="8" fill="#fef3c7" stroke="#d97706" strokeWidth="0.8" strokeOpacity="0.5"/>
+      <text x="30" y="220" fontSize="8" fontWeight="700" fill="#b45309">💡  Tasks spawn automatically before the due date</text>
+      <text x="30" y="234" fontSize="7.5" fill="#b45309" fillOpacity="0.85">Every client gets their own copy · Assignee inherited from template</text>
+    </svg>
+  )
+}
+
+function IllustrationMultiOrg() {
+  const orgs = [
+    { name: 'SNG Advisers',       plan: 'Pro',     color: '#0d9488', active: true  },
+    { name: 'Mehta & Associates', plan: 'Starter', color: '#7c3aed', active: false },
+    { name: 'Priya CA Firm',      plan: 'Free',    color: '#0891b2', active: false },
+  ]
+  return (
+    <svg viewBox="0 0 320 260" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width:'100%', height:'100%' }}>
+      <rect x="15" y="10" width="290" height="240" rx="12" fill="#f8fafc" stroke="#e2e8f0" strokeWidth="1.5"/>
+      {/* Header */}
+      <rect x="15" y="10" width="290" height="32" rx="12" fill="#0d9488" fillOpacity="0.08"/>
+      <text x="30" y="30" fontSize="10" fontWeight="700" fill="#0d9488">Switch Organisation</text>
+      <text x="285" y="30" textAnchor="end" fontSize="8" fill="#94a3b8">⌘K</text>
+      {/* Org rows */}
+      {orgs.map((o, i) => (
+        <g key={o.name}>
+          <rect x="22" y={50+i*60} width="276" height="50" rx="10"
+            fill={o.active ? '#f0fdf9' : 'white'}
+            stroke={o.active ? '#0d9488' : '#e2e8f0'} strokeWidth={o.active ? 1.5 : 1}/>
+          {/* Avatar */}
+          <circle cx="50" cy={75+i*60} r="15" fill={o.color} fillOpacity={o.active ? 0.22 : 0.1}/>
+          <text x="50" y={80+i*60} textAnchor="middle" fontSize="12" fontWeight="800" fill={o.color}>{o.name[0]}</text>
+          {/* Name */}
+          <text x="73" y={70+i*60} fontSize="11" fontWeight="700" fill={o.active ? '#0d9488' : '#1e293b'}>
+            {o.name.length > 20 ? o.name.slice(0,19)+'…' : o.name}
+          </text>
+          {/* Plan badge */}
+          <rect x="73" y={76+i*60} width="40" height="14" rx="4" fill={o.color} fillOpacity="0.12"/>
+          <text x="93" y={86+i*60} textAnchor="middle" fontSize="7.5" fontWeight="700" fill={o.color}>{o.plan}</text>
+          {/* Active checkmark */}
+          {o.active && (
+            <g>
+              <circle cx="276" cy={75+i*60} r="9" fill="#0d9488"/>
+              <path d={`M271 ${75+i*60} L275 ${79+i*60} L281 ${70+i*60}`}
+                stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </g>
+          )}
+          {/* Hover arrow for inactive */}
+          {!o.active && (
+            <text x="277" y={79+i*60} textAnchor="middle" fontSize="12" fill="#cbd5e1">›</text>
+          )}
+        </g>
+      ))}
+      {/* Create new org */}
+      <path d="M15 228 L305 228 L305 240 Q305 250 295 250 L35 250 Q15 250 15 240 Z" fill="#f0fdf9"/>
+      <text x="160" y="243" textAnchor="middle" fontSize="9" fontWeight="700" fill="#0d9488">＋  Create New Organisation</text>
+    </svg>
+  )
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Step definitions
 // ─────────────────────────────────────────────────────────────────────────────
@@ -726,6 +831,21 @@ const STEPS: Step[] = [
     Illustration: IllustrationKanban,
   },
   {
+    id: 'recurring',
+    icon: '🔁', color: '#0d9488', accent: 'rgba(13,148,136,0.1)',
+    title: 'Recurring Tasks',
+    subtitle: 'Sidebar → Repeat Tasks',
+    body: "Set any task as recurring and Planora auto-spawns a fresh copy on schedule. Each instance tracks its own status, assignee, and attachments — the template stays clean for the next cycle.",
+    bullets: [
+      { emoji: '🔁', text: 'Daily, weekly, monthly, quarterly, or custom frequency' },
+      { emoji: '📅', text: 'Instances auto-spawn before the due date — never miss a cycle' },
+      { emoji: '👤', text: 'Each spawned task inherits assignee & approver from the master' },
+      { emoji: '📊', text: 'View all recurring tasks and next occurrences in Repeat Tasks' },
+    ],
+    path: '/recurring',
+    Illustration: IllustrationRecurring,
+  },
+  {
     id: 'task-detail',
     icon: '📋', color: '#0d9488', accent: 'rgba(13,148,136,0.1)',
     title: 'Inside a Task — Attachments, Comments & Blockers',
@@ -802,6 +922,20 @@ const STEPS: Step[] = [
     actionLabel: 'Open My Tasks',
     actionHref: '/tasks',
     Illustration: IllustrationMyTasks,
+  },
+  {
+    id: 'multi-org',
+    icon: '🏢', color: '#0d9488', accent: 'rgba(13,148,136,0.1)',
+    title: 'Multiple Organisations',
+    subtitle: 'Sidebar → Org Switcher (bottom)',
+    body: "Manage multiple CA firms or entities from a single login. Each organisation has its own clients, team, tasks, and settings — completely isolated. Switch instantly from the org switcher in the sidebar.",
+    bullets: [
+      { emoji: '🏢', text: 'One login — switch between unlimited organisations instantly' },
+      { emoji: '🔒', text: 'Each org is fully isolated — clients and data never mix' },
+      { emoji: '👥', text: 'Different team members, roles, and settings per organisation' },
+      { emoji: '➕', text: 'Create a new organisation anytime from the sidebar switcher' },
+    ],
+    Illustration: IllustrationMultiOrg,
   },
   {
     id: 'done',
