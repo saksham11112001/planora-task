@@ -29,7 +29,9 @@
       "Bash(xargs grep -l \"createClient\\\\|useAppStore\")",
       "Bash(grep -rn \"= supabase\\\\b\\\\s*$\\\\|= supabase\\\\.\" \"app/api\" --include=\"*.ts\")",
       "Bash(xargs ls -la)",
-      "Bash(xargs grep -l \"email\\\\|digest\\\\|notification\")"
+      "Bash(xargs grep -l \"email\\\\|digest\\\\|notification\")",
+      "Bash(xargs grep -l \"template\\\\|Template\")",
+      "Bash(xargs grep -l \"AttachTemplate\\\\|Template\")"
     ]
   }
 }

@@ -407,11 +407,13 @@ function TemplateSelectCell({
   selectedIds,
   editable,
   onSelect,
+  onManage,
 }: {
   templates: AttachTemplate[]
   selectedIds: string[]
   editable: boolean
   onSelect: (ids: string[]) => void
+  onManage?: () => void
 }) {
   const [open, setOpen] = useState(false)
   const [alignRight, setAlignRight] = useState(false)
@@ -486,7 +488,16 @@ function TemplateSelectCell({
             {templates.length === 0 ? (
               <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '10px 8px', textAlign: 'center' }}>
                 No templates yet.<br/>
-                <span style={{ fontSize: 11 }}>Use "Manage Templates" in the toolbar to create some.</span>
+                {onManage && (
+                  <button
+                    onClick={e => { e.stopPropagation(); setOpen(false); onManage() }}
+                    style={{
+                      marginTop: 8, fontSize: 11, color: '#0d9488', background: 'rgba(13,148,136,0.08)',
+                      border: '1px solid rgba(13,148,136,0.3)', borderRadius: 6,
+                      padding: '4px 10px', cursor: 'pointer', fontFamily: 'inherit',
+                    }}
+                  >+ Create a template</button>
+                )}
               </div>
             ) : templates.map(tpl => {
               const checked = selectedIds.includes(tpl.id)
@@ -566,6 +577,24 @@ function TemplateSelectCell({
                     <span>{item}</span>
                   </div>
                 ))}
+              </div>
+            )}
+            {/* Manage templates shortcut */}
+            {onManage && templates.length > 0 && (
+              <div style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 6 }}>
+                <button
+                  onClick={e => { e.stopPropagation(); setOpen(false); onManage() }}
+                  style={{
+                    width: '100%', textAlign: 'left', fontSize: 11,
+                    color: 'var(--text-muted)', background: 'none',
+                    border: 'none', padding: '4px 8px', borderRadius: 6,
+                    cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 5,
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.color = '#0d9488')}
+                  onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
+                >
+                  ✎ Manage templates
+                </button>
               </div>
             )}
           </div>
@@ -1298,7 +1327,7 @@ const inputStyle: React.CSSProperties = {
 function TaskRow({
   task, editable, fy,
   onUpdate, onDelete, hasPendingChanges, onSave,
-  templates, selectedTemplateIds, onTemplateSelect,
+  templates, selectedTemplateIds, onTemplateSelect, onManageTemplates,
 }: {
   task: CAMasterTask
   editable: boolean
@@ -1310,6 +1339,7 @@ function TaskRow({
   templates: AttachTemplate[]
   selectedTemplateIds: string[]
   onTemplateSelect: (ids: string[]) => void
+  onManageTemplates?: () => void
 }) {
   const [hovered, setHovered] = useState(false)
   const [nameEditing, setNameEditing] = useState(false)
@@ -1403,6 +1433,7 @@ function TaskRow({
           const merged = mergeTemplateItems(ids, templates)
           onUpdate({ attachment_headers: merged, attachment_count: merged.length })
         }}
+        onManage={onManageTemplates}
       />
 
       {/* Attach count — read-only, computed from selected templates */}
@@ -1513,7 +1544,7 @@ function TaskRow({
 function GroupSection({
   groupName, tasks, editable, fy,
   pendingChanges, onUpdate, onDelete, onSaveRow,
-  templates, taskSel, onTemplateSelect,
+  templates, taskSel, onTemplateSelect, onManageTemplates,
 }: {
   groupName: string
   tasks: CAMasterTask[]
@@ -1526,6 +1557,7 @@ function GroupSection({
   templates: AttachTemplate[]
   taskSel: Record<string, string[]>
   onTemplateSelect: (taskId: string, ids: string[]) => void
+  onManageTemplates?: () => void
 }) {
   const [expanded, setExpanded] = useState(true)
 
@@ -1571,6 +1603,7 @@ function GroupSection({
           templates={templates}
           selectedTemplateIds={taskSel[task.id] ?? []}
           onTemplateSelect={ids => onTemplateSelect(task.id, ids)}
+          onManageTemplates={onManageTemplates}
         />
       ))}
     </>
@@ -2486,6 +2519,7 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
                     templates={attTemplates}
                     taskSel={taskSel}
                     onTemplateSelect={handleTaskTemplateSelect}
+                    onManageTemplates={() => setShowManageTemplates(true)}
                   />
                 ))}
               </tbody>
