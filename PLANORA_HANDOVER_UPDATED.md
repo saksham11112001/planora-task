@@ -2,7 +2,7 @@
 **GitHub:** saksham11112001/planora-task  
 **Live URL:** sng-adwisers.com  
 **Stack:** Next.js 15.5 · Supabase (xjaybcthnneppfdgmtaq) · Tailwind v4 · Inngest · Resend · Vercel  
-**Last Updated:** 2026-04-25 (Session 12)
+**Last Updated:** 2026-05-17 (Sessions 14–17)
 
 ---
 
@@ -25,17 +25,25 @@
 14. **NEW:** Import template sample rows now have `[SAMPLE]` prefix — `isSampleRow()` catches them
 15. **NEW:** Project `member_ids uuid[]` column controls visibility. NULL = org-wide. Only owner sees all.
 16. **NEW:** All hardcoded light bg colors (`#f0fdfa`, `#f5f3ff` etc.) break dark mode — always use `rgba(color, 0.12)` or CSS vars instead.
+17. **NEW (Sessions 14–17):** Portal dropdown/modal pattern — any dropdown or modal that could be clipped by parent `overflow`/`transform` must use `createPortal(..., document.body)` + `position: fixed` + `onMouseDown` for backdrop (never `onClick`). See CODEBASE_TRANSFER.md "Portal Dropdown Pattern".
+18. **NEW (Sessions 14–17):** Phone number is the identity anchor for trials — one phone = one account = one trial. Phone is required at org creation (`app/api/onboarding`). `users.phone_number` has a unique partial index (NULLs allowed). Never skip phone validation in onboarding.
+19. **NEW (Sessions 14–17):** Referral anti-abuse has 7 guards including org age gate (48h), user-ID overlap, phone overlap, circular ring, and network ring. Constants: `MAX_EXTENSION_DAYS=42`, `EXTENSION_PER_REFERRAL=7`, `MIN_ORG_AGE_HOURS=48`. All guard failures return a single generic error (no enumeration).
+20. **NEW (Sessions 14–17):** Digest email mode is the default for ALL orgs (when no `org_feature_settings.notification_frequency` record exists, `getOrgNotifMode` returns `'digest'`). Every notification handler MUST check `getOrgNotifMode` or `getOrgNotifModeForUser` before calling a direct send function.
 
 ---
 
 ## 2. SUPABASE TABLES
 
-### ✅ KEEP (16 core tables)
+### ✅ KEEP (22 core tables)
 ```
 billing_events, clients, email_daily_log, organisations, org_members,
 org_settings, org_feature_settings, product_subscriptions, projects,
 tasks, task_activity, task_attachments, task_comments, users,
-notification_preferences, user_profiles
+notification_preferences, user_profiles,
+invoices, invoice_items,                  ← Session 13 (add_billable_invoices.sql)
+referral_redemptions,                     ← Session 13 (add_org_codes_trial.sql) + Sessions 14–17 (redeemer_owner_phone column)
+notification_queue,                       ← digest email system
+ca_master_tasks, ca_client_assignments, ca_task_instances
 ```
 
 ### ❌ DELETE (legacy merged tables)
@@ -50,6 +58,39 @@ workspaces
 -- Projects member visibility (run this if not done)
 ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS member_ids uuid[] DEFAULT NULL;
 CREATE INDEX IF NOT EXISTS idx_projects_member_ids ON public.projects USING GIN (member_ids);
+```
+
+### Schema additions — Sessions 13–17
+```sql
+-- Session 13: Billable tasks + Invoices (supabase/migrations/add_billable_invoices.sql)
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS is_billable bool DEFAULT false;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS billable_amount numeric(12,2);
+-- Creates: invoices, invoice_items tables + RLS + indexes + auto updated_at trigger
+
+-- Session 13: Trial + Referral + Join codes (supabase/migrations/add_org_codes_trial.sql)
+ALTER TABLE organisations ADD COLUMN IF NOT EXISTS trial_started_at timestamptz;
+ALTER TABLE organisations ADD COLUMN IF NOT EXISTS trial_extension_days int DEFAULT 0;
+ALTER TABLE organisations ADD COLUMN IF NOT EXISTS referral_code text UNIQUE;
+ALTER TABLE organisations ADD COLUMN IF NOT EXISTS join_code text UNIQUE;
+-- Creates: referral_redemptions table with UNIQUE(redeemer_org_id)
+
+-- Sessions 14–17: Anti-abuse phone identity anchor (supabase/migrations/anti_abuse_referral.sql)
+CREATE UNIQUE INDEX IF NOT EXISTS users_phone_unique_idx ON users (phone_number) WHERE phone_number IS NOT NULL;
+CREATE INDEX IF NOT EXISTS rr_redeemer_referrer_idx ON referral_redemptions (redeemer_org_id, referrer_org_id);
+CREATE INDEX IF NOT EXISTS orgs_created_at_idx ON organisations (created_at);
+ALTER TABLE referral_redemptions ADD COLUMN IF NOT EXISTS redeemer_owner_phone TEXT;
+
+-- notification_queue table (required for digest email system)
+CREATE TABLE IF NOT EXISTS notification_queue (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id uuid NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL,
+  user_email text NOT NULL,
+  event_type text NOT NULL,
+  subject text NOT NULL,
+  sent_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
 ```
 
 ---
@@ -161,8 +202,12 @@ app/(app)/approvals/ApprovalsView.tsx – Pending table + 7-day history. Approve
 
 **Team**
 ```
-app/(app)/team/page.tsx       – Members with stats
-app/(app)/team/TeamView.tsx   – Role editing (inline dropdown). Bulk invite (multiple emails at once).
+app/(app)/team/page.tsx       – Members with stats. Fetches org_members.id + permissions + org_settings.role_permissions.
+                                Passes isAdmin + rolePermissions to TeamView.
+app/(app)/team/TeamView.tsx   – Role editing via portal dropdown (position:fixed, createPortal).
+                                Permissions button (SlidersHorizontal icon, amber when overrides exist)
+                                for non-owner/admin members when isAdmin; opens UserPermissionsPanel via portal.
+                                Bulk invite (multiple emails at once).
                                 Remove member: 2-step inline confirm (no modal). Uses PATCH is_active:false.
 ```
 
@@ -173,7 +218,12 @@ app/(app)/settings/SettingsClient.tsx          – Search bar. Icon bg: ${color}
 app/(app)/settings/features/page.tsx           – Passes plan tier to FeaturesView.
 app/(app)/settings/features/FeaturesView.tsx   – PLAN GATING: pro features locked on free/starter.
                                                   Shows 🔒 badge. Toggle blocked with toast.
-app/(app)/settings/members/MembersView.tsx     – Old member management (Settings path)
+app/(app)/settings/members/MembersView.tsx     – Member management. Organisation codes card (join code + referral code).
+                                                  "Have a referral code?" card (admin-only): mono input + Apply button,
+                                                  calls POST /api/referral/apply, shows success banner.
+app/(app)/settings/members/UserPermissionsPanel.tsx – Per-member permission overrides modal.
+                                                  Fixed: createPortal to document.body, mounted guard,
+                                                  position:fixed backdrop (was trapped by parent transform).
 app/(app)/settings/billing/BillingView.tsx     – Plan display + upgrade
 app/(app)/settings/trash/TrashView.tsx         – 30-day soft delete recovery
 app/(app)/settings/appearance/AppearanceView.tsx
@@ -241,8 +291,22 @@ app/api/settings/billing/route.ts
 
 **Onboarding**
 ```
-app/api/onboarding/route.ts            – POST: create org + owner member + default workspace
+app/api/onboarding/route.ts            – POST: create org + owner member + default workspace.
+                                          Phone required + E.164 format validation.
+                                          Phone uniqueness check (blocks if another account has it).
+                                          One-trial-per-phone: blocks if any trialing org owner shares this phone.
+                                          Referral code applied inline if provided (3-layer anti-abuse check).
 app/api/onboarding/join-invite/route.ts – POST: add invited user to org
+```
+
+**Referral & Join**
+```
+app/api/referral/apply/route.ts        – POST: apply referral code post-signup (7 anti-abuse guards).
+                                          Guards: org age (48h), once-per-org, user-ID overlap, phone overlap,
+                                          circular ring, network ring, caller phone required.
+                                          All failures return generic "Invalid or ineligible referral code".
+app/api/org/join/route.ts              – POST: join org via 8-char join code (rate-limited: 10/5min).
+app/api/org/rotate-join-code/route.ts  – POST: owner/admin only; generates new join code.
 ```
 
 ### Components
@@ -297,10 +361,15 @@ lib/utils/format.ts        – fmtDate, isOverdue, todayStr, fmtHours
 lib/utils/cn.ts            – className merge
 lib/hooks/useOrgSettings.ts – Client-side org settings + feature flags
 lib/inngest/client.ts      – Inngest client
-lib/inngest/functions/     – onTaskAssigned, onApprovalRequested, onApprovalCompleted, onMemberInvited, etc.
+lib/inngest/functions/     – All digest-aware: onTaskAssigned, onApproval, onComment, onMemberInvited,
+                             dailyReminders (8 AM IST), digestNotifications (8:15 AM + 6 PM IST),
+                             recurringSpawn, caComplianceSpawn, trialExpiry, clientDocReminders
 lib/email/resend.ts        – Resend client + FROM address
-lib/email/send.ts          – sendTaskAssignedEmail, sendDueSoonEmail, sendMemberInvitedEmail, etc.
-lib/email/gate.ts          – Email daily dedup (email_daily_log)
+lib/email/send.ts          – Direct send functions (for immediate-mode orgs only)
+lib/email/gate.ts          – Email daily dedup via email_daily_log table
+lib/email/queue.ts         – getOrgNotifMode, getOrgNotifModeForUser, queueNotification, markQueueSent
+lib/email/templates/digestEmail.ts – digestEmailHtml: groups all event types into one HTML email
+lib/utils/codeGen.ts       – generateCode(), formatCode(), normaliseCode() (referral + join codes)
 lib/data/complianceTasks.ts – 69 CA compliance task definitions
 ```
 
@@ -439,6 +508,12 @@ setAll(toSet) {
 | Project view submit-for-approval required refresh | No optimistic state update in toggleDone | Read API response body; setTasks instantly |
 | Walkthrough showed to all users including existing | Used orgId localStorage key, no account age check | userCreatedAt < 7 days + per-userId key |
 | inngest security advisory (3.52.7) | Outdated dependency | Updated to 3.54.0 |
+| UserPermissionsPanel appeared inline without backdrop | Modal trapped by parent CSS transform/stacking | createPortal to document.body + position:fixed backdrop |
+| Team page role dropdown clipped at bottom of screen | position:absolute inside overflow container | Portal + position:fixed + viewport coordinate capture |
+| CA Compliance template dropdown closed instantly on click | useEffect mousedown checked ref.contains(target) — portal content is outside ref subtree, always false | Removed useEffect; backdrop onMouseDown + panel stopPropagation |
+| Digest emails sent individually per event | Assignee escalation + approver approval-digest paths called direct send functions bypassing queue | Added getOrgNotifMode check; digest → queueNotification |
+| Morning digest missed items queued by dailyReminders | Both ran at 8:00 AM IST — race condition | digestMorning shifted to 8:15 AM IST |
+| Multi-account referral farming | No phone identity anchor; multiple Google accounts = multiple trials | Phone required at signup; unique partial index on users.phone_number; 7-guard referral API |
 
 ---
 
@@ -470,13 +545,38 @@ INNGEST_SIGNING_KEY=...
 ## 10. INNGEST FUNCTIONS (background jobs)
 
 ```
-onTaskAssigned.ts          – Email when task assigned
-onApprovalRequested.ts     – Email approver when submitted
-onApprovalCompleted.ts     – Email assignee when approved/rejected  
-onMemberInvited.ts         – Email managers when member joins
-onDueSoon.ts               – Daily due-soon reminders (7AM IST cron)
-onRecurringSpawn.ts        – Daily recurring task instances (7AM IST cron)
-onEscalation.ts            – Overdue task escalation
+onTaskAssigned.ts          – Email when task assigned. Digest mode → queueNotification(task_assigned).
+onApproval.ts              – onApprovalRequested + onApprovalCompleted.
+                             Both check org notification mode; digest → queueNotification.
+onComment.ts               – onTaskCommented. Digest mode → queueNotification(task_commented).
+onMemberInvited.ts         – Email managers when member joins. Digest mode → queueNotification(member_invited).
+dailyReminders.ts          – Runs at 8:00 AM IST (2:30 UTC). 4 steps:
+                             1. Due-soon tasks (1–3 days out) → digest or sendDueSoonEmail
+                             2. Escalation (overdue by 1d) → managers AND assignee via digest or direct
+                             3. Overdue WhatsApp pings to assignee (if opted in)
+                             4. Pending approval digest to approvers → digest or sendApprovalDigestEmail
+recurringSpawn.ts          – Daily recurring task instance creation.
+caComplianceSpawn.ts       – Spawns CA compliance task instances.
+digestNotifications.ts     – digestMorning (8:15 AM IST) + digestEvening (6:00 PM IST).
+                             Fetches all pending notification_queue rows, groups by org → user,
+                             sends ONE email per user per slot containing ALL pending items grouped by event type.
+                             digestMorning intentionally runs at 8:15 (not 8:00) to let dailyReminders
+                             finish queueing before the flush.
+trialExpiry.ts             – Handles trial expiry notifications/status changes.
+clientDocReminders.ts      – Client document reminders.
+```
+
+### Digest Email Architecture
+```
+notification_queue table → digestNotifications.ts (flushes twice daily)
+                         → digestEmailHtml template (groups by event_type)
+                         → ONE email per user per slot
+
+All event handlers check getOrgNotifMode() FIRST:
+  'digest'    → queueNotification({ orgId, userId, userEmail, eventType, subject })
+  'immediate' → direct sendXxxEmail() call (behind acquireEmailSlot for daily dedup)
+
+Default mode (no org_feature_settings record) = 'digest'
 ```
 
 ---

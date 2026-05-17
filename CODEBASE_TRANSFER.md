@@ -1500,6 +1500,155 @@ window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
 
 ---
 
+### SESSIONS 14-17 — UI Fixes, Referral Anti-Abuse, Digest Email Grouping
+
+#### 50. UserPermissionsPanel modal — broken inline layout fixed with createPortal
+- **Bug**: Modal rendered inline on the left without backdrop, trapped by parent `transform`/`will-change` CSS stacking context.
+- **Fix**: Added `mounted` state + `useEffect(() => setMounted(true), [])` guard, then wrapped entire return in `createPortal(..., document.body)`. Backdrop uses `position: fixed; inset: 0` so it always covers the full viewport regardless of parent transforms.
+- **File**: `app/(app)/settings/members/UserPermissionsPanel.tsx`
+
+#### 51. Team page — Permissions editing added per member
+- **Problem**: The Permissions button (to override per-member role permissions) only existed in Settings → Members, not in the `/team` page.
+- **Fix**:
+  - `app/(app)/team/page.tsx`: added `id` and `permissions` to org_members select; parallel-fetches `org_settings.role_permissions`; maps `memberId` (org_members.id) per member; passes `isAdmin` and `rolePermissions` to TeamView.
+  - `app/(app)/team/TeamView.tsx`: added `memberId`, `permissions` to member interface; added `isAdmin?`, `rolePermissions?` props; added `permPanelMember` state; added `handlePermissionsSaved` for optimistic UI update; added amber Permissions button (SlidersHorizontal icon) for non-owner/admin members when `isAdmin`; renders `UserPermissionsPanel` via portal when `permPanelMember` is set; entire return wrapped in Fragment.
+
+#### 52. CA Compliance template dropdown — instant-close bug fixed
+- **Root cause**: A `useEffect` mousedown listener checked `triggerRef.current.contains(e.target)` to detect outside clicks. Since portal content renders in `document.body` (outside `triggerRef`'s DOM subtree), every click inside the dropdown was detected as "outside" and fired `setOpen(false)` before the click event reached the panel.
+- **Fix** (`app/(app)/compliance/CAMasterView.tsx`, `TemplateSelectCell` function):
+  - Removed the `useEffect` mousedown listener and `triggerRef` entirely.
+  - Added `dropPos` state `{ top, left, width, maxH }` — computed via `getBoundingClientRect()` on open; measures `spaceBelow`/`spaceAbove` to flip upward when near viewport bottom.
+  - Portal: backdrop with `onMouseDown={close}`, panel with `onMouseDown={e => e.stopPropagation()}`.
+  - Panel has `maxHeight: dropPos.maxH, overflowY: 'auto'` for scrollability.
+  - Checkbox is `readOnly` + `pointerEvents: 'none'`; parent div row handles click.
+  - Added "Done" button in panel footer for multi-select workflow.
+
+#### 53. Team page role dropdown — fixed clipping + viewport overflow
+- **Root cause**: Dropdown rendered with `position: absolute` inside a scrollable container, causing it to be clipped.
+- **Fix** (`app/(app)/team/TeamView.tsx`):
+  - Added `roleDropPos` state `{ top, right }`.
+  - Role button `onClick` captures `getBoundingClientRect()`, stores in `roleDropPos`, sets `roleEditing`.
+  - Entire role dropdown re-rendered via `createPortal` at Fragment level with `position: fixed`.
+  - Backdrop uses `onMouseDown`, panel uses `onMouseDown={e => e.stopPropagation()}`.
+
+#### 54. Referral code apply UI — Settings → Members
+- **Added** (`app/(app)/settings/members/MembersView.tsx`):
+  - New "Have a referral code?" section (admin-only) below the Organisation codes card.
+  - Monospace input (XXXX-XXXX format), Apply button with Loader2 spinner.
+  - `applyReferralCode()` calls `POST /api/referral/apply`.
+  - On success: `applySuccess` state shows a confirmation banner replacing the form; page refreshes.
+  - Imports added: `Ticket`, `ArrowRight`, `Loader2` from lucide-react.
+
+#### 55. Referral anti-abuse — 7-layer system with phone as identity anchor
+- **Problem**: Same person could create multiple orgs (including via multiple Google accounts) and farm referral trial extensions. Team members could also create personal orgs and apply each other's codes endlessly.
+- **Solution**: Phone number becomes the identity anchor — one phone = one account = one trial.
+
+**New migration** (`supabase/migrations/anti_abuse_referral.sql`):
+```sql
+-- Unique partial index on phone_number (NULLs allowed, non-NULL unique)
+CREATE UNIQUE INDEX IF NOT EXISTS users_phone_unique_idx ON users (phone_number) WHERE phone_number IS NOT NULL;
+-- Composite index for fast ring/network detection
+CREATE INDEX IF NOT EXISTS rr_redeemer_referrer_idx ON referral_redemptions (redeemer_org_id, referrer_org_id);
+-- Age-gate index
+CREATE INDEX IF NOT EXISTS orgs_created_at_idx ON organisations (created_at);
+-- Audit trail column
+ALTER TABLE referral_redemptions ADD COLUMN IF NOT EXISTS redeemer_owner_phone TEXT;
+```
+
+**`app/api/onboarding/route.ts`** — strengthened:
+- Phone validation (E.164-style regex `/^\+?[\d\s\-().]{7,15}$/`); required for org creators.
+- Phone uniqueness check: queries `users` by phone, blocks if another account already has it.
+- One-trial-per-phone: queries all trialing org owners, blocks if their phone matches.
+- Referral section: Layer A (user-ID overlap in referrer org), Layer B (phone in referrer org members), Layer C (circular ring). Stores `redeemer_owner_phone` in `referral_redemptions`.
+- Onboarding UI: phone shows "required" (red) when creating org; "optional" when joining via invite. Helper text: "Required to activate your trial — one trial per phone number."
+
+**`app/api/referral/apply/route.ts`** — complete 7-guard rewrite:
+1. **Org age gate**: `orgAgeHours < 48` → reject (prevents create→instantly-redeem).
+2. **Once-per-org**: checks `referral_redemptions` for existing `redeemer_org_id` row.
+3. **User-ID overlap**: all-time members (no `is_active` filter) of both orgs must be disjoint.
+4. **Phone overlap**: parallel fetch of user phones for both orgs' all-time members.
+5. **Circular ring**: `SELECT WHERE referrer_org_id = myOrg.id AND redeemer_org_id = referrerOrg.id`.
+6. **Network ring**: get previous redeemers of same referrer → their all-time members → phone overlap with current redeemer.
+7. **Caller must have a phone** on their profile to participate.
+- All validation failures return the same generic "Invalid or ineligible referral code" message (no enumeration).
+- Stores `redeemer_owner_phone` in insert.
+
+**DB constants**: `MAX_EXTENSION_DAYS = 42`, `EXTENSION_PER_REFERRAL = 7`, `MIN_ORG_AGE_HOURS = 48`.
+
+#### 56. Digest email grouping — all notification types consolidated into one email per slot
+- **Problem**: Escalation emails to assignees and pending-approval digest emails to approvers were still calling direct send functions inside `dailyReminders.ts`, bypassing the digest queue. This caused individual emails for each event even for digest-mode orgs.
+- **Fix** (`lib/inngest/functions/dailyReminders.ts`):
+  - **Assignee escalation path** (Step 2): Added `getOrgNotifMode()` check before the `sendEscalationEmail` call to the assignee. Digest-mode → `queueNotification({ eventType: 'escalation_alert' })`; immediate-mode → direct email (behind `acquireEmailSlot`).
+  - **Approval digest path** (Step 4): Added `getOrgNotifMode()` check. Digest-mode → queues one `approval_requested` item per pending task per approver (grouped in digest under "🔔 Approval Needed"). Immediate-mode → continues sending the consolidated `sendApprovalDigestEmail` batch email.
+- **Timing race fix** (`lib/inngest/functions/digestNotifications.ts`):
+  - `digestMorning` cron shifted from `TZ=Asia/Kolkata 0 8 * * *` (8:00 AM IST) → `TZ=Asia/Kolkata 15 8 * * *` (8:15 AM IST).
+  - Reason: `dailyReminders` starts at 8:00 AM and uses multiple Inngest steps. If `digestMorning` ran simultaneously, it would flush a near-empty queue before `dailyReminders` finished queuing escalation/approval items — those items would be deferred to the evening digest.
+
+**Summary of digest routing** (all notification types now fully covered):
+| Handler | Digest mode | Immediate mode |
+|---------|-------------|----------------|
+| `onTaskAssigned` | `queueNotification(task_assigned)` | `sendTaskAssignedEmail` |
+| `onApprovalRequested` | `queueNotification(approval_requested)` | `sendApprovalRequestedEmail` |
+| `onApprovalCompleted` | `queueNotification(approval_completed)` | `sendApprovalResultEmail` |
+| `onTaskCommented` | `queueNotification(task_commented)` | `sendTaskCommentedEmail` |
+| `onMemberInvited` | `queueNotification(member_invited)` | `sendMemberInvitedEmail` |
+| `dailyReminders` due-soon | `queueNotification(task_due_soon)` | `sendDueSoonEmail` |
+| `dailyReminders` escalation → mgr | `queueNotification(escalation_alert)` | `sendEscalationEmail` |
+| `dailyReminders` escalation → assignee | `queueNotification(escalation_alert)` ← **NEW** | `sendEscalationEmail` ← **NEW** |
+| `dailyReminders` approval digest | `queueNotification(approval_requested)` ← **NEW** | `sendApprovalDigestEmail` ← **NEW** |
+
+Default org mode (when `org_feature_settings` has no `notification_frequency` record) is `'digest'`.
+
+---
+
+## PORTAL DROPDOWN PATTERN (Sessions 14+)
+
+Use this whenever a dropdown or modal could be clipped by a parent `overflow`, `transform`, or stacking context:
+
+```tsx
+// 1. Capture position on trigger click
+const [dropPos, setDropPos] = useState<{ top: number; left: number; width: number; maxH: number } | null>(null)
+
+function openDropdown(e: React.MouseEvent<HTMLElement>) {
+  const rect = e.currentTarget.getBoundingClientRect()
+  const spaceBelow = window.innerHeight - rect.bottom
+  const spaceAbove = rect.top
+  const flipUp = spaceBelow < 240 && spaceAbove > spaceBelow
+  const maxH = Math.min(440, Math.max(flipUp ? spaceAbove : spaceBelow, 160))
+  setDropPos({
+    top:   flipUp ? rect.top - maxH - 4 : rect.bottom + 4,
+    left:  Math.min(rect.left, window.innerWidth - rect.width - 8),
+    width: rect.width,
+    maxH,
+  })
+}
+
+// 2. Render via createPortal with position: fixed
+{dropPos && createPortal(
+  <>
+    {/* Backdrop — closes on mousedown */}
+    <div onMouseDown={() => setDropPos(null)}
+      style={{ position: 'fixed', inset: 0, zIndex: 9998 }} />
+    {/* Panel — stopPropagation on mousedown prevents backdrop firing */}
+    <div onMouseDown={e => e.stopPropagation()}
+      style={{ position: 'fixed', top: dropPos.top, left: dropPos.left,
+               width: dropPos.width, maxHeight: dropPos.maxH,
+               overflowY: 'auto', zIndex: 9999, ... }}>
+      {/* dropdown content */}
+    </div>
+  </>,
+  document.body
+)}
+```
+
+**Key rules:**
+- Backdrop uses `onMouseDown` (not `onClick`) — fires before panel `onClick`, so panel clicks don't propagate to backdrop.
+- Panel uses `onMouseDown={e => e.stopPropagation()}` — prevents backdrop handler from firing.
+- Never use `useEffect` + `document.addEventListener('mousedown', ...)` with portal content — portal is in `document.body` so `ref.contains(target)` is always `false` for clicks inside the portal.
+- Always use `mounted` state guard before calling `createPortal` (SSR safety).
+
+---
+
 ## HOW TO START A NEW CHAT
 
 Paste this at the top of the new chat:
