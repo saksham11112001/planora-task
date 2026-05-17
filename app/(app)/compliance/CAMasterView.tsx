@@ -358,8 +358,16 @@ function AttachHeadersCell({
 
   return (
     <td style={{ padding: '4px 6px', verticalAlign: 'middle', position: 'relative' }}>
-      <div onClick={openPopover} style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 80 }}>
-        <Paperclip size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+      <div
+        onClick={openPopover}
+        title={
+          headers.filter(Boolean).length > 0
+            ? `Required attachments:\n${headers.filter(Boolean).map((h, i) => `${i + 1}. ${h}`).join('\n')}`
+            : count > 0 ? `${count} attachment${count > 1 ? 's' : ''} required (no labels set)` : undefined
+        }
+        style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 80, cursor: editable ? 'pointer' : 'default' }}
+      >
+        <Paperclip size={12} style={{ color: count > 0 ? '#0d9488' : 'var(--text-muted)', flexShrink: 0 }} />
         {preview}
       </div>
       {open && (
