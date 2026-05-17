@@ -13,11 +13,12 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+  const admin = createAdminClient()
 
   const fy   = req.nextUrl.searchParams.get('fy') ?? '2026-27'
   const name = req.nextUrl.searchParams.get('name')
 
-  let q = supabase
+  let q = admin
     .from('ca_master_tasks')
     .select(name ? 'name,attachment_count,attachment_headers' : '*')
     .eq('org_id', mb.org_id)

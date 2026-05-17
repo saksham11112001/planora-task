@@ -26,7 +26,8 @@
       "Bash(npm list *)",
       "Bash(xargs wc *)",
       "Bash(xargs grep -l \"allOrgs\")",
-      "Bash(xargs grep -l \"createClient\\\\|useAppStore\")"
+      "Bash(xargs grep -l \"createClient\\\\|useAppStore\")",
+      "Bash(grep -rn \"= supabase\\\\b\\\\s*$\\\\|= supabase\\\\.\" \"app/api\" --include=\"*.ts\")"
     ]
   }
 }

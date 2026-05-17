@@ -16,12 +16,12 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   if (!['owner', 'admin', 'manager'].includes(mb.role))
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
+  const admin = createAdminClient()
+
   // Fetch source project
-  const { data: project } = await supabase.from('projects')
+  const { data: project } = await admin.from('projects')
     .select('*').eq('id', id).eq('org_id', mb.org_id).single()
   if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 })
-
-  const admin = createAdminClient()
 
   // Create the cloned project
   const { data: newProject, error: projErr } = await admin.from('projects').insert({
@@ -41,7 +41,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json(dbError(projErr, 'projects/[id]/clone'), { status: 500 })
 
   // Fetch top-level tasks from the source project
-  const { data: tasks } = await supabase.from('tasks')
+  const { data: tasks } = await admin.from('tasks')
     .select('*').eq('project_id', id).eq('org_id', mb.org_id).is('parent_task_id', null).neq('is_archived', true)
 
   let taskCount = 0
@@ -68,7 +68,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     taskCount++
 
     // Copy subtasks
-    const { data: subtasks } = await supabase.from('tasks')
+    const { data: subtasks } = await admin.from('tasks')
       .select('*').eq('parent_task_id', task.id).eq('org_id', mb.org_id).neq('is_archived', true)
 
     if (subtasks?.length) {

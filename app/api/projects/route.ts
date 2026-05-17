@@ -1,5 +1,6 @@
 import { effectivePlan, isAtProjectLimit, projectLimit } from '@/lib/utils/planGate'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse }  from 'next/server'
 import type { NextRequest } from 'next/server'
 import { assertCan }     from '@/lib/utils/permissionGate'
@@ -12,12 +13,13 @@ export async function GET(request: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   const mb = await getApiOrgMembership(supabase, user.id, request, 'org_id, role')
   if (!mb) return NextResponse.json({ data: [] })
+  const admin = createAdminClient()
   const sp  = request.nextUrl.searchParams
   const parsedLim = parseInt(sp.get('limit') ?? '100', 10)
   const lim = Math.min(isNaN(parsedLim) ? 100 : parsedLim, 500)
   // Owners and admins see all projects; everyone else only sees org-wide or member projects
   const canSeeAll = mb.role === 'owner' || mb.role === 'admin'
-  let projectQuery = supabase.from('projects')
+  let projectQuery = admin.from('projects')
     .select('id, name, color, status, due_date, client_id, member_ids')
     .eq('org_id', mb.org_id).neq('is_archived', true)
     .order('updated_at', { ascending: false }).limit(lim)
@@ -38,13 +40,14 @@ export async function POST(request: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   const mb = await getApiOrgMembership(supabase, user.id, request, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
-  const projectCreateDenied = await assertCan(supabase, mb.org_id, mb.role, 'projects.create')
+  const admin = createAdminClient()
+  const projectCreateDenied = await assertCan(admin, mb.org_id, mb.role, 'projects.create')
   if (projectCreateDenied) return NextResponse.json({ error: projectCreateDenied.error }, { status: projectCreateDenied.status })
 
   // Enforce project limit based on plan
-  const { data: orgData } = await supabase.from('organisations')
+  const { data: orgData } = await admin.from('organisations')
     .select('plan_tier, status, trial_ends_at').eq('id', mb.org_id).single()
-  const { count: projectCount } = await supabase.from('projects')
+  const { count: projectCount } = await admin.from('projects')
     .select('*', { count: 'exact', head: true }).eq('org_id', mb.org_id).neq('is_archived', true)
   const plan = effectivePlan(orgData ?? { plan_tier: 'free', status: 'active' })
   if (isAtProjectLimit(plan, projectCount ?? 0)) {
@@ -55,7 +58,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json()
   if (!body.name?.trim()) return NextResponse.json({ error: 'Name required' }, { status: 400 })
   const isTemplate = body.is_template === true
-  const { data, error } = await supabase.from('projects').insert({
+  const { data, error } = await admin.from('projects').insert({
     org_id:      mb.org_id,
     name:        body.name.trim(),
     description: body.description || null,
@@ -76,7 +79,7 @@ export async function POST(request: NextRequest) {
     try {
       for (const t of templateTasks) {
         const validPriority = ['low','medium','high','urgent'].includes(t.priority) ? t.priority : 'medium'
-        const { data: newTask, error: taskErr } = await supabase.from('tasks').insert({
+        const { data: newTask, error: taskErr } = await admin.from('tasks').insert({
           org_id:      mb.org_id,
           project_id:  data.id,
           title:       t.title,
@@ -102,7 +105,7 @@ export async function POST(request: NextRequest) {
             is_recurring:   false,
             approval_required: false,
           }))
-          const { error: subErr } = await supabase.from('tasks').insert(subtaskInserts)
+          const { error: subErr } = await admin.from('tasks').insert(subtaskInserts)
           if (subErr) console.error('[project template subtask insert]', subErr.message)
         }
       }
@@ -115,7 +118,7 @@ export async function POST(request: NextRequest) {
   // Use the tasks actually inserted rather than body.template_tasks (which is empty for blank projects)
   if (isTemplate && data?.id) {
     try {
-      const { data: existing } = await supabase
+      const { data: existing } = await admin
         .from('org_feature_settings')
         .select('config')
         .eq('org_id', mb.org_id)
@@ -124,7 +127,7 @@ export async function POST(request: NextRequest) {
       const currentTemplates: any[] = (existing?.config as any) ?? []
 
       // Read back the tasks we just created so template_tasks is always accurate
-      const { data: insertedTasks } = await supabase
+      const { data: insertedTasks } = await admin
         .from('tasks')
         .select('id, title, priority, parent_task_id')
         .eq('project_id', data.id)
@@ -149,7 +152,7 @@ export async function POST(request: NextRequest) {
         color:          data.color,
         template_tasks: savedTemplateTasks,
       }
-      await supabase.from('org_feature_settings').upsert({
+      await admin.from('org_feature_settings').upsert({
         org_id:      mb.org_id,
         feature_key: 'project_templates',
         is_enabled:  true,

@@ -19,7 +19,8 @@ export async function GET(request: NextRequest) {
   if (!mb) return NextResponse.json({ data: [] })
 
   const from30 = new Date(Date.now() - 30*86400000).toISOString()
-  const { data } = await supabase.from('tasks')
+  const admin = createAdminClient()
+  const { data } = await admin.from('tasks')
     .select('id, title, status, priority, due_date, deleted_at, project_id, projects(name)')
     .eq('org_id', mb.org_id)
     .eq('is_archived', true)

@@ -1,4 +1,5 @@
 import { createClient }  from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse }   from 'next/server'
 import type { NextRequest } from 'next/server'
 import { dbError } from '@/lib/api-error'
@@ -38,7 +39,8 @@ export async function POST(request: NextRequest) {
       const cust = await custRes.json()
       if (!cust.id) throw new Error(cust.error?.description ?? 'Customer creation failed')
       customerId = cust.id
-      await supabase.from('organisations').update({ razorpay_customer_id: customerId }).eq('id', mb.org_id)
+      const admin = createAdminClient()
+      await admin.from('organisations').update({ razorpay_customer_id: customerId }).eq('id', mb.org_id)
     }
 
     // Create subscription

@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse }  from 'next/server'
 import type { NextRequest } from 'next/server'
 import { assertCan }     from '@/lib/utils/permissionGate'
@@ -12,7 +13,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
-  const clientEditDenied = await assertCan(supabase, mb.org_id, mb.role, 'clients.edit')
+  const admin = createAdminClient()
+  const clientEditDenied = await assertCan(admin, mb.org_id, mb.role, 'clients.edit')
   if (clientEditDenied) return NextResponse.json({ error: clientEditDenied.error }, { status: clientEditDenied.status })
 
   const body = await req.json()
@@ -22,12 +24,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   // Merge custom_fields — do not overwrite unrelated keys
   if ('custom_fields' in body && body.custom_fields && typeof body.custom_fields === 'object') {
-    const { data: existing } = await supabase
+    const { data: existing } = await admin
       .from('clients').select('custom_fields').eq('id', id).eq('org_id', mb.org_id).maybeSingle()
     updates.custom_fields = { ...(existing?.custom_fields ?? {}), ...(body.custom_fields as object) }
   }
 
-  const { data, error } = await supabase.from('clients').update(updates).eq('id', id).eq('org_id', mb.org_id).select('*').single()
+  const { data, error } = await admin.from('clients').update(updates).eq('id', id).eq('org_id', mb.org_id).select('*').single()
   if (error) return NextResponse.json(dbError(error, 'clients/[id]'), { status: 500 })
   return NextResponse.json({ data })
 }
@@ -39,10 +41,11 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
-  const clientDeleteDenied = await assertCan(supabase, mb.org_id, mb.role, 'clients.delete')
+  const admin = createAdminClient()
+  const clientDeleteDenied = await assertCan(admin, mb.org_id, mb.role, 'clients.delete')
   if (clientDeleteDenied) return NextResponse.json({ error: clientDeleteDenied.error }, { status: clientDeleteDenied.status })
 
-  const { error } = await supabase.from('clients').delete().eq('id', id).eq('org_id', mb.org_id)
+  const { error } = await admin.from('clients').delete().eq('id', id).eq('org_id', mb.org_id)
   if (error) return NextResponse.json(dbError(error, 'clients/[id]'), { status: 500 })
   return NextResponse.json({ success: true })
 }

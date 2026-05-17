@@ -1,4 +1,5 @@
 import { createClient }       from '@/lib/supabase/server'
+import { createAdminClient }   from '@/lib/supabase/admin'
 import { NextResponse }        from 'next/server'
 import type { NextRequest }    from 'next/server'
 import { assertCan }           from '@/lib/utils/permissionGate'
@@ -12,7 +13,8 @@ export async function POST(request: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   const mb = await getApiOrgMembership(supabase, user.id, request, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
-  const recurringCreateDenied = await assertCan(supabase, mb.org_id, mb.role, 'recurring.create')
+  const admin = createAdminClient()
+  const recurringCreateDenied = await assertCan(admin, mb.org_id, mb.role, 'recurring.create')
   if (recurringCreateDenied) return NextResponse.json({ error: recurringCreateDenied.error }, { status: recurringCreateDenied.status })
 
   const body = await request.json()
@@ -26,7 +28,7 @@ export async function POST(request: NextRequest) {
   const dbFrequency = normalizeFrequency(frequency)
   const nextDate    = nextOccurrence(frequency, today)
 
-  const { data: task, error } = await supabase.from('tasks').insert({
+  const { data: task, error } = await admin.from('tasks').insert({
     org_id:               mb.org_id,
     title:                title.trim(),
     priority,
@@ -61,7 +63,7 @@ export async function POST(request: NextRequest) {
         is_recurring:   false,
         custom_fields:  s.required ? { _compliance_subtask: true } : null,
       }))
-      await supabase.from('tasks').insert(subtaskInserts)
+      await admin.from('tasks').insert(subtaskInserts)
     } catch (e) {
       console.error('[recurring subtasks]', e)
     }
@@ -87,7 +89,8 @@ export async function PATCH(request: NextRequest) {
   const dbFrequency = frequency ? normalizeFrequency(frequency) : undefined
   const nextDate    = frequency ? nextOccurrence(frequency, today) : undefined
 
-  const { data, error } = await supabase.from('tasks')
+  const admin = createAdminClient()
+  const { data, error } = await admin.from('tasks')
     .update({
       title,
       frequency:            dbFrequency,

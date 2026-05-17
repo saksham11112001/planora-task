@@ -13,11 +13,11 @@ export async function POST(request: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   const mb = await getApiOrgMembership(supabase, user.id, request, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
-  const timeLogDenied = await assertCan(supabase, mb.org_id, mb.role, 'time.log')
+  const admin = createAdminClient()
+  const timeLogDenied = await assertCan(admin, mb.org_id, mb.role, 'time.log')
   if (timeLogDenied) return NextResponse.json({ error: timeLogDenied.error }, { status: timeLogDenied.status })
 
   // Time tracking requires Starter+ plan
-  const admin = createAdminClient()
   const { data: orgData } = await admin.from('organisations')
     .select('plan_tier, status, trial_ends_at').eq('id', mb.org_id).single()
   const plan = effectivePlan(orgData ?? { plan_tier: 'free', status: 'active' })
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
   const { hours, description, logged_date, project_id, task_id, is_billable = true } = body
   if (!hours || parseFloat(hours) <= 0) return NextResponse.json({ error: 'Hours must be > 0' }, { status: 400 })
 
-  const { data, error } = await supabase.from('time_logs').insert({
+  const { data, error } = await admin.from('time_logs').insert({
     org_id:      mb.org_id,
     user_id:     user.id,
     hours:       parseFloat(hours),
@@ -52,7 +52,8 @@ export async function GET(request: NextRequest) {
 
   const sp = request.nextUrl.searchParams
   const canSeeAll = ['owner','admin','manager'].includes(mb.role)
-  let q = supabase.from('time_logs').select('id, hours, is_billable, logged_date, description, project_id, task_id, user_id').eq('org_id', mb.org_id)
+  const admin = createAdminClient()
+  let q = admin.from('time_logs').select('id, hours, is_billable, logged_date, description, project_id, task_id, user_id').eq('org_id', mb.org_id)
   if (!canSeeAll) q = q.eq('user_id', user.id)
   if (sp.get('project_id')) q = q.eq('project_id', sp.get('project_id')!)
   if (sp.get('from')) q = q.gte('logged_date', sp.get('from')!)

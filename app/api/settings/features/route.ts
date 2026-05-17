@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse }  from 'next/server'
 import type { NextRequest } from 'next/server'
 import { dbError } from '@/lib/api-error'
@@ -13,7 +14,8 @@ export async function GET(request: NextRequest) {
     const mb = await getApiOrgMembership(supabase, user.id, request, 'org_id')
     if (!mb) return NextResponse.json({ data: {} })
 
-    const { data: rows, error } = await supabase
+    const admin = createAdminClient()
+    const { data: rows, error } = await admin
       .from('org_feature_settings')
       .select('feature_key, is_enabled')
       .eq('org_id', mb.org_id)
@@ -51,13 +53,7 @@ export async function POST(request: NextRequest) {
 
     if (!feature_key) return NextResponse.json({ error: 'feature_key required' }, { status: 400 })
 
-    // Use service role to bypass RLS entirely
-    const { createClient: createSupabase } = await import('@supabase/supabase-js')
-    const admin = createSupabase(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { autoRefreshToken: false, persistSession: false } }
-    )
+    const admin = createAdminClient()
 
     const { error } = await admin
       .from('org_feature_settings')

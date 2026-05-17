@@ -1,4 +1,5 @@
 import { createClient }    from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse }    from 'next/server'
 import type { NextRequest } from 'next/server'
 import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
@@ -14,14 +15,15 @@ export async function GET(request: NextRequest) {
   if (!q || q.length < 2) return NextResponse.json({ data: [] })
   const like = `%${q}%`
 
+  const admin = createAdminClient()
   const [{ data: tasks }, { data: projects }, { data: clients }] = await Promise.all([
-    supabase.from('tasks')
+    admin.from('tasks')
       .select('id, title, status, priority, project_id, projects(name, color)')
       .eq('org_id', mb.org_id).neq('is_archived', true).ilike('title', like).limit(6),
-    supabase.from('projects')
+    admin.from('projects')
       .select('id, name, status, color, clients(name)')
       .eq('org_id', mb.org_id).neq('is_archived', true).ilike('name', like).limit(5),
-    supabase.from('clients')
+    admin.from('clients')
       .select('id, name, status, color, company')
       .eq('org_id', mb.org_id).ilike('name', like).limit(4),
   ])

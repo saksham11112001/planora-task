@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
 
     // ── Activity log (non-blocking) ─────────────────────────────────────────
     try {
-      const { data: actor } = await supabase.from('users').select('name').eq('id', user.id).maybeSingle()
+      const { data: actor } = await admin.from('users').select('name').eq('id', user.id).maybeSingle()
       await admin.from('activity_log').insert({
         org_id:      mb.org_id,
         user_id:     user.id,

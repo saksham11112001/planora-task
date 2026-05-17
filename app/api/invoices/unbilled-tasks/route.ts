@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse }  from 'next/server'
 import type { NextRequest } from 'next/server'
 import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
@@ -14,7 +15,8 @@ export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams
   const client_id = sp.get('client_id')
 
-  let q = supabase.from('tasks')
+  const admin = createAdminClient()
+  let q = admin.from('tasks')
     .select('id, title, billable_amount, due_date, client_id, status, client:clients(id, name, color)')
     .eq('org_id', mb.org_id)
     .eq('is_billable', true)

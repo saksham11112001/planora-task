@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse }  from 'next/server'
 import type { NextRequest } from 'next/server'
 import { dbError } from '@/lib/api-error'
@@ -10,7 +11,8 @@ export async function GET(request: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   const mb = await getApiOrgMembership(supabase, user.id, request, 'org_id')
   if (!mb) return NextResponse.json({ data: [] })
-  const { data } = await supabase.from('notification_preferences').select('*').eq('user_id', user.id).eq('org_id', mb.org_id)
+  const admin = createAdminClient()
+  const { data } = await admin.from('notification_preferences').select('*').eq('user_id', user.id).eq('org_id', mb.org_id)
   return NextResponse.json({ data })
 }
 
@@ -34,7 +36,8 @@ export async function POST(request: NextRequest) {
     })
   )
 
-  const { error } = await supabase
+  const admin = createAdminClient()
+  const { error } = await admin
     .from('notification_preferences')
     .upsert(rows, { onConflict: 'user_id,org_id,event_type' })
 

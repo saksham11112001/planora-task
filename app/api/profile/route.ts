@@ -1,4 +1,5 @@
 import { createClient }    from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse }    from 'next/server'
 import type { NextRequest } from 'next/server'
 import { dbError } from '@/lib/api-error'
@@ -11,7 +12,8 @@ export async function PATCH(req: NextRequest) {
   const { name, phone_number, timezone, whatsapp_opted_in } = await req.json()
   if (!name?.trim()) return NextResponse.json({ error: 'Name required' }, { status: 400 })
 
-  const { error } = await supabase.from('users').update({
+  const admin = createAdminClient()
+  const { error } = await admin.from('users').update({
     name:              name.trim(),
     phone_number:      phone_number || null,
     timezone:          timezone || 'Asia/Kolkata',
@@ -27,7 +29,8 @@ export async function GET(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-  const { data } = await supabase.from('users')
+  const admin = createAdminClient()
+  const { data } = await admin.from('users')
     .select('id, name, email, avatar_url, phone_number, timezone, whatsapp_opted_in')
     .eq('id', user.id).single()
   return NextResponse.json({ data })

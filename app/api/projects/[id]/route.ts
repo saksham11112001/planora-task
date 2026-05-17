@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse }  from 'next/server'
 import type { NextRequest } from 'next/server'
 import { assertCan }     from '@/lib/utils/permissionGate'
@@ -13,11 +14,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
-  const projectEditDenied = await assertCan(supabase, mb.org_id, mb.role, 'projects.edit')
+  const admin = createAdminClient()
+  const projectEditDenied = await assertCan(admin, mb.org_id, mb.role, 'projects.edit')
   if (projectEditDenied) return NextResponse.json({ error: projectEditDenied.error }, { status: projectEditDenied.status })
 
   // Fetch existing project first — needed for status-change notification and org verification
-  const { data: existingProject } = await supabase
+  const { data: existingProject } = await admin
     .from('projects').select('id, status, name').eq('id', id).eq('org_id', mb.org_id).maybeSingle()
   if (!existingProject) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
@@ -27,12 +29,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   for (const k of ALLOWED) { if (k in body) updates[k] = body[k] }
   if (!Object.keys(updates).length) return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
 
-  const { data, error } = await supabase.from('projects').update(updates).eq('id', id).eq('org_id', mb.org_id).select('*').single()
+  const { data, error } = await admin.from('projects').update(updates).eq('id', id).eq('org_id', mb.org_id).select('*').single()
   if (error) return NextResponse.json(dbError(error, 'projects/[id]'), { status: 500 })
   // Fire project status change notification if status changed
   try {
     if (body.status && body.status !== existingProject.status) {
-      const { data: mb2 } = await supabase.from('org_members')
+      const { data: mb2 } = await admin.from('org_members')
         .select('users(name), organisations(name)').eq('user_id', user.id).maybeSingle()
       await inngest.send({
         name: 'project/status-updated',
@@ -57,11 +59,12 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
-  const projectDeleteDenied = await assertCan(supabase, mb.org_id, mb.role, 'projects.delete')
+  const admin = createAdminClient()
+  const projectDeleteDenied = await assertCan(admin, mb.org_id, mb.role, 'projects.delete')
   if (projectDeleteDenied) return NextResponse.json({ error: projectDeleteDenied.error }, { status: projectDeleteDenied.status })
 
   // Soft delete (archive)
-  const { error } = await supabase.from('projects').update({ is_archived: true }).eq('id', id).eq('org_id', mb.org_id)
+  const { error } = await admin.from('projects').update({ is_archived: true }).eq('id', id).eq('org_id', mb.org_id)
   if (error) return NextResponse.json(dbError(error, 'projects/[id]'), { status: 500 })
   return NextResponse.json({ success: true })
 }

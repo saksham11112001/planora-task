@@ -10,7 +10,8 @@ export async function GET(request: NextRequest) {
   if (!user) return NextResponse.json({ data: [] })
   const mb = await getApiOrgMembership(supabase, user.id, request, 'org_id')
   if (!mb) return NextResponse.json({ data: [] })
-  const { data: s } = await supabase.from('org_settings').select('custom_task_fields').eq('org_id', mb.org_id).maybeSingle()
+  const admin = createAdminClient()
+  const { data: s } = await admin.from('org_settings').select('custom_task_fields').eq('org_id', mb.org_id).maybeSingle()
   return NextResponse.json({ data: s?.custom_task_fields ?? [] })
 }
 

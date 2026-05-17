@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { inngest }       from '@/lib/inngest/client'
 import type { NextRequest } from 'next/server'
@@ -12,16 +13,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role, can_view_all_tasks')
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
+  const admin = createAdminClient()
   // Verify task access
   const canSeeAll = ['owner','admin','manager'].includes(mb.role) || mb.can_view_all_tasks
-  const taskQ = supabase.from('tasks').select('id').eq('id', id).eq('org_id', mb.org_id)
+  const taskQ = admin.from('tasks').select('id').eq('id', id).eq('org_id', mb.org_id)
   const { data: taskAccess } = await (canSeeAll ? taskQ : taskQ.or(`assignee_id.eq.${user.id},approver_id.eq.${user.id}`)).maybeSingle()
   if (!taskAccess) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const sp = req.nextUrl.searchParams
   const limit  = Math.min(parseInt(sp.get('limit') ?? '200', 10) || 200, 500)
   const offset = Math.max(parseInt(sp.get('offset') ?? '0', 10) || 0,   0)
-  const { data, error } = await supabase.from('task_comments')
+  const { data, error } = await admin.from('task_comments')
     .select('id, content, created_at, author:users!task_comments_author_id_fkey(id, name)')
     .eq('task_id', id).eq('org_id', mb.org_id)
     .order('created_at', { ascending: true })
@@ -37,27 +39,28 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role, can_view_all_tasks')
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
+  const admin = createAdminClient()
   // Verify task access before allowing comment
   const canSeeAll2 = ['owner','admin','manager'].includes(mb.role) || mb.can_view_all_tasks
-  const taskQ2 = supabase.from('tasks').select('id').eq('id', id).eq('org_id', mb.org_id)
+  const taskQ2 = admin.from('tasks').select('id').eq('id', id).eq('org_id', mb.org_id)
   const { data: taskAccess2 } = await (canSeeAll2 ? taskQ2 : taskQ2.or(`assignee_id.eq.${user.id},approver_id.eq.${user.id}`)).maybeSingle()
   if (!taskAccess2) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const { content } = await req.json()
   if (!content?.trim()) return NextResponse.json({ error: 'Empty comment' }, { status: 400 })
   if (content.trim().length > 5000) return NextResponse.json({ error: 'Comment too long (max 5000 chars)' }, { status: 400 })
-  const { data, error } = await supabase.from('task_comments')
+  const { data, error } = await admin.from('task_comments')
     .insert({ task_id: id, org_id: mb.org_id, author_id: user.id, content: content.trim() })
     .select('*').single()
   if (error) return NextResponse.json(dbError(error, 'tasks/[id]/comments'), { status: 500 })
   // Fire comment notification
   try {
     // Get task + assignee info
-    const { data: task } = await supabase.from('tasks')
+    const { data: task } = await admin.from('tasks')
       .select('title, assignee_id, project_id, assignee:users!tasks_assignee_id_fkey(name, email), org:organisations!inner(name)')
       .eq('id', id).maybeSingle()
     if (task?.assignee_id && task.assignee_id !== user.id) {
       const assignee = (task.assignee as any)
-      const { data: commenter } = await supabase.from('users').select('name').eq('id', user.id).maybeSingle()
+      const { data: commenter } = await admin.from('users').select('name').eq('id', user.id).maybeSingle()
       if (assignee?.email) {
         await inngest.send({
           name: 'task/commented',

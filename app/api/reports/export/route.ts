@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
   const from30 = new Date(Date.now() - 30 * 86400000).toISOString()
 
   if (type === 'tasks') {
-    const { data: tasks } = await supabase.from('tasks')
+    const { data: tasks } = await adminC.from('tasks')
       .select('title, status, priority, due_date, completed_at, assignee:users!tasks_assignee_id_fkey(name), project:projects(name), client:clients(name)')
       .eq('org_id', mb.org_id).gte('created_at', from30).neq('is_archived', true)
       .order('created_at', { ascending: false })
@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
   }
 
   if (type === 'time') {
-    const { data: logs } = await supabase.from('time_logs')
+    const { data: logs } = await adminC.from('time_logs')
       .select('hours, is_billable, description, logged_date, user:users!time_logs_user_id_fkey(name), project:projects(name), task:tasks(title)')
       .eq('org_id', mb.org_id).gte('logged_date', from30.split('T')[0]).order('logged_date', { ascending: false })
     const rows = [

@@ -1,4 +1,5 @@
 import { createClient }       from '@/lib/supabase/server'
+import { createAdminClient }   from '@/lib/supabase/admin'
 import { NextResponse }        from 'next/server'
 import type { NextRequest }    from 'next/server'
 import { assertCan }           from '@/lib/utils/permissionGate'
@@ -13,7 +14,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
-  const recurringEditDenied = await assertCan(supabase, mb.org_id, mb.role, 'recurring.edit')
+  const admin = createAdminClient()
+  const recurringEditDenied = await assertCan(admin, mb.org_id, mb.role, 'recurring.edit')
   if (recurringEditDenied) return NextResponse.json({ error: recurringEditDenied.error }, { status: recurringEditDenied.status })
 
   const { title, frequency, priority, assignee_id, project_id, client_id } = await req.json()
@@ -21,7 +23,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const dbFrequency = frequency ? normalizeFrequency(frequency) : undefined
   const nextDate    = frequency ? nextOccurrence(frequency, today) : undefined
 
-  const { data, error } = await supabase.from('tasks')
+  const { data, error } = await admin.from('tasks')
     .update({ title, frequency: dbFrequency, next_occurrence_date: nextDate, priority, assignee_id: assignee_id || null, project_id: project_id || null, client_id: client_id || null })
     .eq('id', id).eq('org_id', mb.org_id).select('*').single()
 

@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse }  from 'next/server'
 import type { NextRequest } from 'next/server'
 import { assertCan }     from '@/lib/utils/permissionGate'
@@ -11,12 +12,13 @@ export async function GET(request: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   const mb = await getApiOrgMembership(supabase, user.id, request, 'org_id')
   if (!mb) return NextResponse.json({ data: [] })
+  const admin = createAdminClient()
   const sp = request.nextUrl.searchParams
   const parsedLimit  = parseInt(sp.get('limit')  ?? '500', 10)
   const parsedOffset = parseInt(sp.get('offset') ?? '0',   10)
   const limit  = Math.min(isNaN(parsedLimit)  ? 500 : parsedLimit,  500)
   const offset = Math.max(isNaN(parsedOffset) ? 0   : parsedOffset, 0)
-  const { data, error } = await supabase.from('clients')
+  const { data, error } = await admin.from('clients')
     .select('id, name, color, status, email, company').eq('org_id', mb.org_id)
     .order('name').range(offset, offset + limit - 1)
   if (error) return NextResponse.json(dbError(error, 'clients'), { status: 500 })
@@ -31,7 +33,8 @@ export async function POST(request: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   const mb = await getApiOrgMembership(supabase, user.id, request, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
-  const clientCreateDenied = await assertCan(supabase, mb.org_id, mb.role, 'clients.create')
+  const admin = createAdminClient()
+  const clientCreateDenied = await assertCan(admin, mb.org_id, mb.role, 'clients.create')
   if (clientCreateDenied) return NextResponse.json({ error: clientCreateDenied.error }, { status: clientCreateDenied.status })
   const body = await request.json()
   if (!body.name?.trim()) return NextResponse.json({ error: 'Name required' }, { status: 400 })
@@ -50,7 +53,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid website URL (must start with http:// or https://)' }, { status: 400 })
     }
   }
-  const { data, error } = await supabase.from('clients').insert({
+  const { data, error } = await admin.from('clients').insert({
     org_id:        mb.org_id,
     name:          body.name.trim().slice(0, 200),
     email:         body.email?.slice(0, 255)   || null,

@@ -16,7 +16,8 @@ export async function GET(request: NextRequest) {
   const mb = await getApiOrgMembership(supabase, user.id, request, 'org_id')
   if (!mb) return NextResponse.json({ data: [] })
 
-  const { data, error } = await supabase.from('org_members')
+  const admin = createAdminClient()
+  const { data, error } = await admin.from('org_members')
     .select('id, role, joined_at, user_id, can_view_all_tasks, users(id, name, email, avatar_url)')
     .eq('org_id', mb.org_id).eq('is_active', true).order('joined_at')
   if (error) return NextResponse.json(dbError(error, 'team'), { status: 500 })
@@ -32,15 +33,14 @@ export async function POST(request: NextRequest) {
 
   const mb = await getApiOrgMembership(supabase, user.id, request, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
-  const inviteDenied = await assertCan(supabase, mb.org_id, mb.role, 'team.invite')
+  const admin = createAdminClient()
+  const inviteDenied = await assertCan(admin, mb.org_id, mb.role, 'team.invite')
   if (inviteDenied) return NextResponse.json({ error: inviteDenied.error }, { status: inviteDenied.status })
 
   const { email, role = 'member' } = await request.json()
   if (!email?.trim()) return NextResponse.json({ error: 'Email required' }, { status: 400 })
   if (!['admin', 'manager', 'member', 'viewer'].includes(role))
     return NextResponse.json({ error: 'Invalid role' }, { status: 400 })
-
-  const admin = createAdminClient()
 
   // Check member limit
   const { data: orgData } = await admin.from('organisations')
@@ -101,12 +101,13 @@ export async function PATCH(request: NextRequest) {
   const body = await request.json()
   const { member_id, user_id, role, is_active, can_view_all_tasks } = body
 
+  const admin = createAdminClient()
   // Gate based on action type
   if (is_active === false) {
-    const removeDenied = await assertCan(supabase, mb.org_id, mb.role, 'team.remove')
+    const removeDenied = await assertCan(admin, mb.org_id, mb.role, 'team.remove')
     if (removeDenied) return NextResponse.json({ error: removeDenied.error }, { status: removeDenied.status })
   } else {
-    const changeRoleDenied = await assertCan(supabase, mb.org_id, mb.role, 'team.change_role')
+    const changeRoleDenied = await assertCan(admin, mb.org_id, mb.role, 'team.change_role')
     if (changeRoleDenied) return NextResponse.json({ error: changeRoleDenied.error }, { status: changeRoleDenied.status })
   }
 
@@ -114,8 +115,6 @@ export async function PATCH(request: NextRequest) {
   const idToCheck = member_id || user_id
   if (!idToCheck || !UUID_RE.test(idToCheck))
     return NextResponse.json({ error: 'Valid member_id or user_id is required' }, { status: 400 })
-
-  const admin = createAdminClient()
 
   // ── Edit member info (name / phone) ───────────────────────────────────────
   if (body.name !== undefined || body.phone_number !== undefined) {
