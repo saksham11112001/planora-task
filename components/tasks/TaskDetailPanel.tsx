@@ -1413,7 +1413,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                       <ShieldCheck className="h-3 w-3 flex-shrink-0" style={{ color: approverId ? '#7c3aed' : 'var(--text-muted)' }} />
                       <select value={approverId} onChange={e => {
                         const prev = approverId; const newId = e.target.value || null
-                        setApproverId(e.target.value); patch({ approver_id: newId }, () => setApproverId(prev))
+                        setApproverId(e.target.value); patch({ approver_id: newId, approval_required: !!newId }, () => setApproverId(prev))
                       }}
                         className="text-sm bg-transparent outline-none w-full"
                         style={{ color: 'var(--text-primary)', cursor: 'pointer' }}>

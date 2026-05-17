@@ -1,6 +1,6 @@
 import { inngest }              from '../client'
 import { createAdminClient }    from '@/lib/supabase/admin'
-import { getOrgNotifMode, getPendingForOrg, markQueueSent } from '@/lib/email/queue'
+import { markQueueSent }        from '@/lib/email/queue'
 import { digestEmailHtml }      from '@/lib/email/templates/digestEmail'
 import { resend, FROM }         from '@/lib/email/resend'
 
@@ -9,51 +9,52 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://taska.in'
 async function runDigest(slot: 'morning' | 'evening') {
   const admin = createAdminClient()
 
-  // Find all orgs on digest mode
-  const { data: digestOrgs } = await admin
-    .from('org_feature_settings')
-    .select('org_id, config')
-    .eq('feature_key', 'notification_frequency')
+  // Fetch all pending queue items — items are only queued for digest-mode orgs
+  // (digest is now the default; immediate-mode orgs send directly and never queue).
+  const { data: pending } = await admin
+    .from('notification_queue')
+    .select('id, org_id, user_id, user_email, event_type, subject, created_at')
+    .is('sent_at', null)
+    .order('created_at', { ascending: true })
 
-  const digestOrgIds = (digestOrgs ?? [])
-    .filter(r => (r.config as any)?.mode === 'digest')
-    .map(r => r.org_id)
+  if (!pending?.length) return { sent: 0, orgs: 0 }
 
-  if (!digestOrgIds.length) return { sent: 0, orgs: 0 }
-
-  // Fetch org names for the email
+  // Fetch org names for all orgs that have pending items
+  const orgIds = [...new Set(pending.map(r => r.org_id))]
   const { data: orgs } = await admin
     .from('organisations')
     .select('id, name')
-    .in('id', digestOrgIds)
-  const orgNameMap = Object.fromEntries((orgs ?? []).map(o => [o.id, o.name]))
+    .in('id', orgIds)
+  const orgNameMap = Object.fromEntries((orgs ?? []).map(o => [o.id, o.name as string]))
+
+  // Group by org → user
+  const byOrg: Record<string, typeof pending> = {}
+  for (const item of pending) {
+    if (!byOrg[item.org_id]) byOrg[item.org_id] = []
+    byOrg[item.org_id].push(item)
+  }
 
   let totalSent = 0
+  const allSentIds: string[] = []
 
-  for (const orgId of digestOrgIds) {
-    const pending = await getPendingForOrg(orgId)
-    if (!pending.length) continue
-
+  for (const [orgId, orgItems] of Object.entries(byOrg)) {
     // Group by user
-    const byUser: Record<string, typeof pending> = {}
-    for (const item of pending) {
+    const byUser: Record<string, typeof orgItems> = {}
+    for (const item of orgItems) {
       if (!byUser[item.user_id]) byUser[item.user_id] = []
       byUser[item.user_id].push(item)
     }
-
-    const sentIds: string[] = []
 
     for (const [, items] of Object.entries(byUser)) {
       const first = items[0]
       const userEmail = first.user_email
 
-      // Get display name from users table
       const { data: u } = await admin
         .from('users')
         .select('name')
         .eq('id', first.user_id)
         .maybeSingle()
-      const recipientName = u?.name ?? userEmail.split('@')[0]
+      const recipientName = (u as any)?.name ?? userEmail.split('@')[0]
 
       const html = digestEmailHtml({
         recipientName,
@@ -76,17 +77,17 @@ async function runDigest(slot: 'morning' | 'evening') {
           subject: `📬 Floatup digest (${slotLabel} IST) — ${items.length} update${items.length === 1 ? '' : 's'}`,
           html,
         })
-        sentIds.push(...items.map(i => i.id))
+        allSentIds.push(...items.map(i => i.id))
         totalSent++
       } catch (err) {
         console.error('[digest] Failed to send to', userEmail, err)
       }
     }
-
-    if (sentIds.length) await markQueueSent(sentIds)
   }
 
-  return { sent: totalSent, orgs: digestOrgIds.length }
+  if (allSentIds.length) await markQueueSent(allSentIds)
+
+  return { sent: totalSent, orgs: orgIds.length }
 }
 
 // ── Morning digest — 8:00 AM IST (2:30 AM UTC) ───────────────────────────

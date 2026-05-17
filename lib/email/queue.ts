@@ -11,7 +11,7 @@ export async function getOrgNotifMode(orgId: string): Promise<NotifMode> {
     .eq('org_id', orgId)
     .eq('feature_key', 'notification_frequency')
     .maybeSingle()
-  return (data?.config as any)?.mode ?? 'immediate'
+  return (data?.config as any)?.mode ?? 'digest'
 }
 
 // ── Helper: look up org_id for a user then return the org's mode ──────────

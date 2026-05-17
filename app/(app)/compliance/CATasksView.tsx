@@ -88,8 +88,10 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
     assignmentClientId: string
     masterTaskTitle: string
     clientName: string
-    newAssigneeId: string
-    newAssigneeName: string
+    newAssigneeId?: string
+    newAssigneeName?: string
+    newApproverId?: string | null
+    newApproverName?: string | null
   } | null>(null)
   const [masterUpdating,  setMasterUpdating]  = useState(false)
 
@@ -99,8 +101,10 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
     assignmentClientId: string
     masterTaskTitle: string
     clientName: string
-    newAssigneeId: string
-    newAssigneeName: string
+    newAssigneeId?: string
+    newAssigneeName?: string
+    newApproverId?: string | null
+    newApproverName?: string | null
   } | null>(null)
   const pendingRefreshRef = useRef(false)
 
@@ -260,8 +264,10 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
   async function doMasterUpdate(data: {
     assignmentClientId: string
     masterTaskTitle: string
-    newAssigneeId: string
-    newAssigneeName: string
+    newAssigneeId?: string
+    newAssigneeName?: string
+    newApproverId?: string | null
+    newApproverName?: string | null
   }) {
     setMasterUpdating(true)
     try {
@@ -276,16 +282,22 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
         setMasterUpdating(false)
         return
       }
+      const patchBody: Record<string, unknown> = {}
+      if (data.newAssigneeId !== undefined) patchBody.assignee_id = data.newAssigneeId
+      if (data.newApproverId !== undefined) patchBody.approver_id = data.newApproverId
       const patch = await fetch(`/api/ca/assignments/${assignment.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ assignee_id: data.newAssigneeId }),
+        body: JSON.stringify(patchBody),
       })
       if (!patch.ok) {
         const d = await patch.json().catch(() => ({}))
         toast.error(d.error ?? 'Failed to update recurring assignment')
       } else {
-        toast.success(`Recurring assignment updated — future "${data.masterTaskTitle}" tasks → ${data.newAssigneeName}`)
+        const parts: string[] = []
+        if (data.newAssigneeName) parts.push(`assignee → ${data.newAssigneeName}`)
+        if (data.newApproverId !== undefined) parts.push(`approver → ${data.newApproverName ?? 'none'}`)
+        toast.success(`Recurring assignment updated — future "${data.masterTaskTitle}" tasks: ${parts.join(', ')}`)
       }
     } catch {
       toast.error('Failed to update recurring assignment')
@@ -390,31 +402,49 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
             }
 
             // ── Recurring-assignment prompt (update future tasks) ──
-            // Only offered when the assignee changes on a CA task that has a client.
+            // Offered when assignee OR approver changes on a CA task that has a client.
             // Stored in a ref and shown only after the panel closes so the user can
-            // make additional edits (e.g. approver) without the modal interrupting.
-            if (
-              canManage &&
-              'assignee_id' in fields &&
-              fields.assignee_id &&
-              fields.assignee_id !== selTask.assignee_id &&
-              selTask.client_id
-            ) {
-              const assigneeMember = members.find(m => m.id === (fields.assignee_id as string))
-              if (assigneeMember) {
-                const promptData = {
-                  assignmentClientId: selTask.client_id,
-                  masterTaskTitle:    selTask.title,
-                  clientName:         selTask.client?.name ?? 'this client',
-                  newAssigneeId:      fields.assignee_id as string,
-                  newAssigneeName:    assigneeMember.name,
+            // make additional edits without the modal interrupting.
+            if (canManage && selTask.client_id) {
+              const base = {
+                assignmentClientId: selTask.client_id,
+                masterTaskTitle:    selTask.title,
+                clientName:         selTask.client?.name ?? 'this client',
+              }
+
+              // ── Assignee changed ──
+              if (
+                'assignee_id' in fields &&
+                fields.assignee_id &&
+                fields.assignee_id !== selTask.assignee_id
+              ) {
+                const assigneeMember = members.find(m => m.id === (fields.assignee_id as string))
+                if (assigneeMember) {
+                  const assigneeData = { newAssigneeId: fields.assignee_id as string, newAssigneeName: assigneeMember.name }
+                  if (selTask.assignee_id === null) {
+                    // Task was unassigned — auto-update master immediately, merging any pending approver change
+                    doMasterUpdate({ ...base, ...assigneeData, ...pendingMasterUpdateRef.current })
+                    pendingMasterUpdateRef.current = null
+                  } else {
+                    pendingMasterUpdateRef.current = { ...base, ...pendingMasterUpdateRef.current, ...assigneeData }
+                  }
                 }
-                if (selTask.assignee_id === null) {
-                  // Task was unassigned — auto-update master assignment immediately (no popup)
-                  doMasterUpdate(promptData)
+              }
+
+              // ── Approver changed ──
+              if (
+                'approver_id' in fields &&
+                (fields.approver_id as string | null | undefined) !== selTask.approver_id
+              ) {
+                const newApproverId = (fields.approver_id as string | null) ?? null
+                const approverMember = newApproverId ? members.find(m => m.id === newApproverId) : null
+                const approverData = { newApproverId, newApproverName: approverMember?.name ?? null }
+                if (selTask.approver_id === null) {
+                  // No previous approver — auto-update master immediately, merging any pending assignee change
+                  doMasterUpdate({ ...base, ...approverData, ...pendingMasterUpdateRef.current })
+                  pendingMasterUpdateRef.current = null
                 } else {
-                  // Task was already assigned — defer the prompt until the panel closes
-                  pendingMasterUpdateRef.current = promptData
+                  pendingMasterUpdateRef.current = { ...base, ...pendingMasterUpdateRef.current, ...approverData }
                 }
               }
             }
@@ -914,10 +944,15 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
                   Update recurring assignment?
                 </p>
                 <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>
-                  You assigned <strong style={{ color: 'var(--text-primary)' }}>{masterUpdatePrompt.newAssigneeName}</strong> to this task.
+                  {masterUpdatePrompt.newAssigneeName && masterUpdatePrompt.newApproverName !== undefined
+                    ? <>You updated the assignee (<strong style={{ color: 'var(--text-primary)' }}>{masterUpdatePrompt.newAssigneeName}</strong>) and approver (<strong style={{ color: 'var(--text-primary)' }}>{masterUpdatePrompt.newApproverName ?? 'none'}</strong>) for this task.</>
+                    : masterUpdatePrompt.newApproverName !== undefined
+                    ? <>You set <strong style={{ color: 'var(--text-primary)' }}>{masterUpdatePrompt.newApproverName ?? 'none'}</strong> as the approver for this task.</>
+                    : <>You assigned <strong style={{ color: 'var(--text-primary)' }}>{masterUpdatePrompt.newAssigneeName}</strong> to this task.</>
+                  }{' '}
                   Would you also like to update the recurring CA assignment for{' '}
                   <strong style={{ color: 'var(--text-primary)' }}>{masterUpdatePrompt.clientName}</strong> so all future{' '}
-                  <em>"{masterUpdatePrompt.masterTaskTitle}"</em> tasks are assigned to them too?
+                  <em>"{masterUpdatePrompt.masterTaskTitle}"</em> tasks reflect this too?
                 </p>
               </div>
             </div>

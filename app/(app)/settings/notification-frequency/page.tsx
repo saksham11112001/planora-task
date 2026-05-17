@@ -25,7 +25,7 @@ export default async function NotifFrequencyPage() {
     .maybeSingle()
 
   const currentMode: 'immediate' | 'digest' =
-    (setting?.config as any)?.mode === 'digest' ? 'digest' : 'immediate'
+    (setting?.config as any)?.mode === 'immediate' ? 'immediate' : 'digest'
 
   const isAdmin = ['owner', 'admin'].includes(mb.role)
 
