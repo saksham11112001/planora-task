@@ -36,7 +36,8 @@
       "Bash(ls supabase/migrations/)",
       "Bash(ls supabase/)",
       "Bash(grep -r \"Templates\" app/\\\\\\(app\\\\\\)/compliance --include=\"*.tsx\" -l)",
-      "Bash(grep -r \"template\" app/\\\\\\(app\\\\\\)/compliance --include=\"*.tsx\" -l)"
+      "Bash(grep -r \"template\" app/\\\\\\(app\\\\\\)/compliance --include=\"*.tsx\" -l)",
+      "Bash(dir \"C:\\\\Users\\\\saksh\\\\Desktop\\\\planora-task\\\\app\\\\api\\\\onboarding\")"
     ]
   }
 }

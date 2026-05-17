@@ -77,6 +77,11 @@ export default function OnboardingPage() {
   // ── Step 0 submit ────────────────────────────────────────────────────────
   async function handleProfileNext() {
     if (!form.name.trim()) { setError('Name is required'); return }
+    // Phone is required for org creators (identity anchor for anti-abuse)
+    if (!inviteData) {
+      if (!form.phone.trim()) { setError('Phone number is required to create an organisation'); return }
+      if (!/^\+?[\d\s\-().]{7,15}$/.test(form.phone.trim())) { setError('Please enter a valid phone number with country code (e.g. +91 98765 43210)'); return }
+    }
     setError('')
 
     if (inviteData) {
@@ -371,7 +376,9 @@ export default function OnboardingPage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
                     Phone number
-                    <span className="ml-2 text-xs text-gray-400 font-normal">optional</span>
+                    {inviteData
+                      ? <span className="ml-2 text-xs text-gray-400 font-normal">optional</span>
+                      : <span className="ml-2 text-xs text-red-400 font-normal">required</span>}
                   </label>
                   <input
                     type="tel"
@@ -379,10 +386,11 @@ export default function OnboardingPage() {
                     onChange={e => set('phone', e.target.value)}
                     className="input"
                     placeholder="+91 98765 43210"
+                    required={!inviteData}
                     onKeyDown={e => e.key === 'Enter' && handleProfileNext()}
                   />
                   <p className="mt-1.5 text-xs text-gray-400">
-                    Include country code. Used only for WhatsApp task notifications.
+                    Include country code.{!inviteData && ' Required to activate your trial — one trial per phone number.'}
                   </p>
                 </div>
               </div>

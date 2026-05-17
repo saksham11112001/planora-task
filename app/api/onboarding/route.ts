@@ -16,11 +16,33 @@ export async function POST(request: NextRequest) {
     const { name, org_name, industry, team_size, phone, referral_code: rawReferralCode } = body
     if (!org_name?.trim()) return NextResponse.json({ error: 'Organisation name required' }, { status: 400 })
 
+    // ── Phone validation (required for org creators — identity anchor) ────────
+    const cleanPhone = (phone as string | undefined)?.trim() || null
+    if (!cleanPhone) {
+      return NextResponse.json({ error: 'Phone number is required to create an organisation' }, { status: 400 })
+    }
+    // Basic E.164-style check: optional +, then 7–15 digits (spaces/dashes allowed)
+    if (!/^\+?[\d\s\-().]{7,15}$/.test(cleanPhone)) {
+      return NextResponse.json({ error: 'Please provide a valid phone number with country code' }, { status: 400 })
+    }
+
     const admin = createSupabaseClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
       { auth: { autoRefreshToken: false, persistSession: false }, global: { headers: { apikey: process.env.SUPABASE_SERVICE_ROLE_KEY!, Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY!}` } } }
     )
+
+    // ── Phone uniqueness: ensure this phone isn't already registered to another account ──
+    const { data: existingPhoneUser } = await admin
+      .from('users')
+      .select('id')
+      .eq('phone_number', cleanPhone)
+      .neq('id', user.id)
+      .maybeSingle()
+
+    if (existingPhoneUser) {
+      return NextResponse.json({ error: 'This phone number is already registered to another account. Each phone number can only be associated with one account.' }, { status: 409 })
+    }
 
     // Upsert user profile — prefer the name the user explicitly typed over OAuth metadata
     const resolvedName =
@@ -59,6 +81,34 @@ export async function POST(request: NextRequest) {
       .eq('role', 'owner')
     const isFirstOrg = (ownedOrgCount ?? 0) === 0
 
+    // ── One active trial per phone number ──────────────────────────────────────
+    // If this is the user's first org (would be trialing), ensure no OTHER account
+    // sharing this phone already owns a trialing org — prevents multi-account farming.
+    if (isFirstOrg) {
+      // Find any other user who has this phone and owns a trialing org
+      const { data: samePhoneOwners } = await admin
+        .from('org_members')
+        .select('user_id, organisations!inner(status)')
+        .eq('role', 'owner')
+        .eq('organisations.status', 'trialing')
+
+      if (samePhoneOwners) {
+        const ownerIds = samePhoneOwners.map((m: any) => m.user_id).filter((id: string) => id !== user.id)
+        if (ownerIds.length > 0) {
+          const { data: phoneConflict } = await admin
+            .from('users')
+            .select('id')
+            .in('id', ownerIds)
+            .eq('phone_number', cleanPhone)
+            .limit(1)
+            .maybeSingle()
+          if (phoneConflict) {
+            return NextResponse.json({ error: 'A trial organisation is already active for this phone number. Only one trial is allowed per phone number.' }, { status: 409 })
+          }
+        }
+      }
+    }
+
     const now         = new Date()
     const trialEndsAt = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000).toISOString()
     const { data: org, error: orgErr } = await admin.from('organisations').insert({
@@ -74,7 +124,7 @@ export async function POST(request: NextRequest) {
     }).select('id').single()
     if (orgErr) return NextResponse.json(dbError(orgErr, 'onboarding'), { status: 500 })
 
-    // Apply referral code if provided — extend referrer's trial by 7 days
+    // ── Apply referral code — full anti-abuse validation ──────────────────────
     if (rawReferralCode) {
       const inputCode = normaliseCode(rawReferralCode)
       const { data: referrerOrg } = await admin
@@ -85,24 +135,54 @@ export async function POST(request: NextRequest) {
 
       const MAX_EXTENSION_DAYS = 42
       const alreadyExtended    = referrerOrg?.trial_extension_days ?? 0
-      const canExtend =
+      const baseEligible =
         referrerOrg &&
         referrerOrg.id !== org.id &&
         referrerOrg.status === 'trialing' &&
         alreadyExtended < MAX_EXTENSION_DAYS
 
-      if (canExtend) {
-        // Check no self-referral via shared members (same user is not in referrer org as member)
-        const { data: overlap } = await admin
+      if (baseEligible) {
+        // Layer A: user-ID self-referral (same account in referrer org)
+        const { data: userIdOverlap } = await admin
           .from('org_members')
           .select('id')
           .eq('org_id', referrerOrg.id)
           .eq('user_id', user.id)
           .maybeSingle()
 
-        if (!overlap) {
-          const extensionDays      = Math.min(7, MAX_EXTENSION_DAYS - alreadyExtended)
-          const newTrialEnds       = new Date(
+        // Layer B: phone-based self-referral
+        // Check if the calling user's phone matches any member of the referrer org
+        let phoneInReferrer = false
+        if (!userIdOverlap && cleanPhone) {
+          const { data: referrerMemberIds } = await admin
+            .from('org_members')
+            .select('user_id')
+            .eq('org_id', referrerOrg.id)
+          const rids = (referrerMemberIds ?? []).map((m: any) => m.user_id)
+          if (rids.length > 0) {
+            const { data: phoneMatch } = await admin
+              .from('users')
+              .select('id')
+              .in('id', rids)
+              .eq('phone_number', cleanPhone)
+              .limit(1)
+              .maybeSingle()
+            phoneInReferrer = !!phoneMatch
+          }
+        }
+
+        // Layer C: circular ring (referrer has already redeemed from this new org — impossible
+        // at signup since the org was just created, but guard for future-proofing)
+        const { data: circularCheck } = await admin
+          .from('referral_redemptions')
+          .select('id')
+          .eq('referrer_org_id', org.id)
+          .eq('redeemer_org_id', referrerOrg.id)
+          .maybeSingle()
+
+        if (!userIdOverlap && !phoneInReferrer && !circularCheck) {
+          const extensionDays = Math.min(7, MAX_EXTENSION_DAYS - alreadyExtended)
+          const newTrialEnds  = new Date(
             Math.max(new Date(referrerOrg.trial_ends_at).getTime(), Date.now()) +
             extensionDays * 24 * 60 * 60 * 1000
           ).toISOString()
@@ -113,9 +193,10 @@ export async function POST(request: NextRequest) {
               trial_extension_days: alreadyExtended + extensionDays,
             }).eq('id', referrerOrg.id),
             admin.from('referral_redemptions').insert({
-              referrer_org_id: referrerOrg.id,
-              redeemer_org_id: org.id,
-              extension_days:  extensionDays,
+              referrer_org_id:      referrerOrg.id,
+              redeemer_org_id:      org.id,
+              extension_days:       extensionDays,
+              redeemer_owner_phone: cleanPhone,
             }),
           ])
         }
