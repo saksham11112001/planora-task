@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json()
 
   // Always check tasks.create permission — subtask creation is not exempt
-  const denied = await assertCan(admin, mb.org_id, mb.role, 'tasks.create')
+  const denied = await assertCan(admin, mb.org_id, user.id, mb.role, 'tasks.create')
   if (denied) return NextResponse.json({ error: denied.error }, { status: denied.status })
 
   const { title, description, status = 'todo', priority = 'medium', assignee_id, approver_id,

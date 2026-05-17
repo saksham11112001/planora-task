@@ -15,7 +15,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
   const admin = createAdminClient()
-  const recurringEditDenied = await assertCan(admin, mb.org_id, mb.role, 'recurring.edit')
+  const recurringEditDenied = await assertCan(admin, mb.org_id, user.id, mb.role, 'recurring.edit')
   if (recurringEditDenied) return NextResponse.json({ error: recurringEditDenied.error }, { status: recurringEditDenied.status })
 
   const { title, frequency, priority, assignee_id, project_id, client_id } = await req.json()

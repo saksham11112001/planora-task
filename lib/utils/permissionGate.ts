@@ -1,11 +1,11 @@
 /**
  * Server-side permission gating utility.
- * Reads role_permissions from org_settings and checks if a given role
- * is allowed to perform an action. Falls back to DEFAULT_PERMISSIONS
- * if the org has never saved custom permissions.
  *
- * Owner is always allowed everything (bypasses all gates).
- * Admin is always allowed everything per product decision.
+ * Resolution order for every permission check:
+ *   1. owner / admin  → always allowed (cannot be restricted)
+ *   2. org_members.permissions[key]  → explicit per-user override, if set
+ *   3. org_settings.role_permissions[key][role]  → org-wide role default
+ *   4. DEFAULT_PERMISSIONS[key][role]  → hardcoded fallback
  */
 import { cache } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -13,7 +13,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 export type Role = 'owner' | 'admin' | 'manager' | 'member' | 'viewer'
 export type RolePermissions = Record<string, Record<string, boolean>>
 
-// Mirrors DEFAULT_PERMISSIONS in PermissionsView.tsx
+// Mirrors DEFAULT_PERMISSIONS in PermissionsView.tsx and useOrgSettings.ts
 const DEFAULT_PERMISSIONS: RolePermissions = {
   'tasks.create':       { admin: true,  manager: true,  member: true,  viewer: false },
   'tasks.edit':         { admin: true,  manager: true,  member: false, viewer: false },
@@ -53,7 +53,7 @@ const DEFAULT_PERMISSIONS: RolePermissions = {
 }
 
 /**
- * Cached per-request fetch of role_permissions for an org.
+ * Cached per-request fetch of org-wide role_permissions.
  * React cache() deduplicates identical calls within one server request.
  */
 const fetchOrgPermissions = cache(async (
@@ -69,33 +69,63 @@ const fetchOrgPermissions = cache(async (
 })
 
 /**
- * Returns true if `role` is allowed to do `permission` in `orgId`.
+ * Cached per-request fetch of a user's personal permission overrides
+ * from org_members.permissions. Returns null if no overrides are set.
+ */
+const fetchUserPermissionOverrides = cache(async (
+  supabase: SupabaseClient,
+  orgId: string,
+  userId: string,
+): Promise<Record<string, boolean> | null> => {
+  const { data } = await supabase
+    .from('org_members')
+    .select('permissions')
+    .eq('org_id', orgId)
+    .eq('user_id', userId)
+    .maybeSingle()
+  return (data?.permissions as Record<string, boolean> | null) ?? null
+})
+
+/**
+ * Returns true if `userId` with `role` is allowed to do `permission` in `orgId`.
  *
- * - 'owner' bypasses everything
- * - 'admin' bypasses everything (product decision — cannot be toggled)
- * - Falls back to DEFAULT_PERMISSIONS when org has no saved permissions
+ * Resolution order:
+ *   1. owner / admin              → always true
+ *   2. org_members.permissions    → per-user override if the key is set
+ *   3. org_settings.role_permissions → org-wide role grid
+ *   4. DEFAULT_PERMISSIONS        → hardcoded fallback
  */
 export async function canDo(
   supabase: SupabaseClient,
   orgId: string,
+  userId: string,
   role: string,
   permission: string,
 ): Promise<boolean> {
   if (role === 'owner' || role === 'admin') return true
+
+  // Per-user override takes priority over role default
+  const overrides = await fetchUserPermissionOverrides(supabase, orgId, userId)
+  if (overrides !== null && permission in overrides) {
+    return overrides[permission] === true
+  }
+
+  // Role-based fallback
   const perms = await fetchOrgPermissions(supabase, orgId)
   const row = perms[permission] ?? DEFAULT_PERMISSIONS[permission]
   if (!row) return false
   return row[role] === true
 }
 
-/** Convenience: returns a 403 NextResponse if the check fails, otherwise null. */
+/** Convenience: returns a 403 NextResponse payload if the check fails, otherwise null. */
 export async function assertCan(
   supabase: SupabaseClient,
   orgId: string,
+  userId: string,
   role: string,
   permission: string,
 ): Promise<{ error: string; status: 403 } | null> {
-  const allowed = await canDo(supabase, orgId, role, permission)
+  const allowed = await canDo(supabase, orgId, userId, role, permission)
   if (!allowed) return { error: 'You do not have permission to perform this action', status: 403 }
   return null
 }

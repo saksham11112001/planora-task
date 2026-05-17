@@ -11,14 +11,18 @@ export async function MembersFetcher() {
 
   const supabase = createAdminClient()
 
-  const [{ data: members }, { data: org }] = await Promise.all([
+  const [{ data: members }, { data: org }, { data: orgSettings }] = await Promise.all([
     supabase.from('org_members')
-      .select('id, role, joined_at, user_id, can_view_all_tasks, can_view_monitor, users(id, name, email, avatar_url)')
+      .select('id, role, joined_at, user_id, can_view_all_tasks, can_view_monitor, permissions, users(id, name, email, avatar_url)')
       .eq('org_id', mb.org_id).eq('is_active', true).order('joined_at'),
     supabase.from('organisations')
       .select('join_code, referral_code, trial_extension_days')
       .eq('id', mb.org_id)
       .single(),
+    supabase.from('org_settings')
+      .select('role_permissions')
+      .eq('org_id', mb.org_id)
+      .maybeSingle(),
   ])
 
   const isAdmin = ['owner','admin'].includes(mb.role)
@@ -26,12 +30,17 @@ export async function MembersFetcher() {
     <div className="page-container">
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Team members</h1>
       <MembersView
-        members={(members ?? []).map(m => ({ ...m, users: m.users as any }))}
+        members={(members ?? []).map(m => ({
+          ...m,
+          users:       m.users as any,
+          permissions: (m.permissions as Record<string, boolean> | null) ?? null,
+        }))}
         currentUserId={user.id}
         isAdmin={isAdmin}
         joinCode={org?.join_code ?? null}
         referralCode={org?.referral_code ?? null}
         referralExtensionDays={org?.trial_extension_days ?? 0}
+        rolePermissions={(orgSettings?.role_permissions as any) ?? null}
       />
     </div>
   )

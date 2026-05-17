@@ -64,18 +64,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   // ── PERMISSION GATE ────────────────────────────────────────────────────────
   // Complete task
   if (body.status === 'completed' || body.status === 'in_review') {
-    const denied = await assertCan(admin, mb.org_id, mb.role, 'tasks.complete')
+    const denied = await assertCan(admin, mb.org_id, user.id, mb.role, 'tasks.complete')
     if (denied) return NextResponse.json({ error: denied.error }, { status: denied.status })
   }
   // Re-assign task to someone else
   if ('assignee_id' in body && body.assignee_id !== task.assignee_id) {
-    const denied = await assertCan(admin, mb.org_id, mb.role, 'tasks.assign')
+    const denied = await assertCan(admin, mb.org_id, user.id, mb.role, 'tasks.assign')
     if (denied) return NextResponse.json({ error: denied.error }, { status: denied.status })
   }
   // General edit permission: assignees (or parent-task assignees) check edit_own, others check edit
   {
     const perm = (isAssignee || isParentAssignee) ? 'tasks.edit_own' : 'tasks.edit'
-    const denied = await assertCan(admin, mb.org_id, mb.role, perm)
+    const denied = await assertCan(admin, mb.org_id, user.id, mb.role, perm)
     if (denied) return NextResponse.json({ error: denied.error }, { status: denied.status })
   }
 
@@ -289,7 +289,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
   const admin = createAdminClient()
-  const deleteDenied = await assertCan(admin, mb.org_id, mb.role, 'tasks.delete')
+  const deleteDenied = await assertCan(admin, mb.org_id, user.id, mb.role, 'tasks.delete')
   if (deleteDenied) return NextResponse.json({ error: deleteDenied.error }, { status: deleteDenied.status })
   // Soft delete — move to trash with deleted_at timestamp
   // Tasks are permanently purged after 30 days via cron

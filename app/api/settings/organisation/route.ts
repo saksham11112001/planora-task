@@ -13,7 +13,7 @@ export async function PATCH(request: NextRequest) {
   const mb = await getApiOrgMembership(supabase, user.id, request, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
   const admin = createAdminClient()
-  const orgSettingsDenied = await assertCan(admin, mb.org_id, mb.role, 'settings.org')
+  const orgSettingsDenied = await assertCan(admin, mb.org_id, user.id, mb.role, 'settings.org')
   if (orgSettingsDenied) return NextResponse.json({ error: orgSettingsDenied.error }, { status: orgSettingsDenied.status })
   const { name, industry, team_size, logo_color } = await request.json()
   if (!name?.trim()) return NextResponse.json({ error: 'Name required' }, { status: 400 })

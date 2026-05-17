@@ -27,6 +27,9 @@ interface OrgSettings {
   caComplianceMode: boolean
   navFeatures:      NavFeatures
   rolePermissions:  RolePermissions | null
+  /** Flat per-user permission overrides for the currently signed-in user.
+   *  Only contains keys that have been explicitly set; unset keys fall back to rolePermissions. */
+  userPermissions:  Record<string, boolean> | null
   loading:          boolean
 }
 
@@ -87,22 +90,34 @@ async function fetchSettings(): Promise<OrgSettings> {
       permissions:        raw.permissions        !== undefined ? raw.permissions        : false,
       ca_compliance_mode: raw.ca_compliance_mode !== undefined ? raw.ca_compliance_mode : false,
     }
+    // permissionsRes.data is now { role_permissions, user_permissions } or null (legacy shape)
+    const permData = permissionsRes.data
+    const rolePermissions: RolePermissions | null =
+      permData && typeof permData === 'object' && 'role_permissions' in permData
+        ? (permData as any).role_permissions ?? null
+        : permData ?? null
+    const userPermissions: Record<string, boolean> | null =
+      permData && typeof permData === 'object' && 'user_permissions' in permData
+        ? (permData as any).user_permissions ?? null
+        : null
+
     return {
       customFields:     customRes.data ?? [],
       taskFields:       fieldsRes.data ? { ...DEFAULT_TASK_FIELDS, ...fieldsRes.data } : DEFAULT_TASK_FIELDS,
       caComplianceMode: nav.ca_compliance_mode,
       navFeatures:      nav,
-      rolePermissions:  permissionsRes.data ?? null,
+      rolePermissions,
+      userPermissions,
       loading:          false,
     }
   } catch {
-    return { customFields: [], taskFields: DEFAULT_TASK_FIELDS, caComplianceMode: false, navFeatures: DEFAULT_NAV, rolePermissions: null, loading: false }
+    return { customFields: [], taskFields: DEFAULT_TASK_FIELDS, caComplianceMode: false, navFeatures: DEFAULT_NAV, rolePermissions: null, userPermissions: null, loading: false }
   }
 }
 
 export function useOrgSettings(): OrgSettings {
   const [state, setState] = useState<OrgSettings>(
-    _cache ?? { customFields: [], taskFields: DEFAULT_TASK_FIELDS, caComplianceMode: false, navFeatures: DEFAULT_NAV, rolePermissions: null, loading: true }
+    _cache ?? { customFields: [], taskFields: DEFAULT_TASK_FIELDS, caComplianceMode: false, navFeatures: DEFAULT_NAV, rolePermissions: null, userPermissions: null, loading: true }
   )
 
   useEffect(() => {
@@ -170,15 +185,26 @@ const DEFAULT_PERMISSIONS: RolePermissions = {
 
 /**
  * Client-side permission check. Returns true if `role` can do `permission`.
- * Owner always returns true; admin always returns true.
- * Falls back to DEFAULT_PERMISSIONS if no custom permissions saved.
+ *
+ * Resolution order (mirrors server-side permissionGate.ts):
+ *   1. owner / admin              → always true
+ *   2. userPermissions[key]       → per-user override if the key is present
+ *   3. rolePermissions[key][role] → org-wide role grid
+ *   4. DEFAULT_PERMISSIONS        → hardcoded fallback
+ *
+ * `userPermissions` is optional — callers that don't have it yet still work correctly.
  */
 export function checkPermission(
   rolePermissions: RolePermissions | null,
   role: string,
   permission: string,
+  userPermissions?: Record<string, boolean> | null,
 ): boolean {
   if (role === 'owner' || role === 'admin') return true
+  // Per-user override takes priority
+  if (userPermissions != null && permission in userPermissions) {
+    return userPermissions[permission] === true
+  }
   const perms = rolePermissions ?? DEFAULT_PERMISSIONS
   const row = perms[permission] ?? DEFAULT_PERMISSIONS[permission]
   if (!row) return false

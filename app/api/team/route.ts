@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
 
   const admin = createAdminClient()
   const { data, error } = await admin.from('org_members')
-    .select('id, role, joined_at, user_id, can_view_all_tasks, users(id, name, email, avatar_url)')
+    .select('id, role, joined_at, user_id, can_view_all_tasks, can_view_monitor, permissions, users(id, name, email, avatar_url)')
     .eq('org_id', mb.org_id).eq('is_active', true).order('joined_at')
   if (error) return NextResponse.json(dbError(error, 'team'), { status: 500 })
   return NextResponse.json({ data }, {
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
   const mb = await getApiOrgMembership(supabase, user.id, request, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
   const admin = createAdminClient()
-  const inviteDenied = await assertCan(admin, mb.org_id, mb.role, 'team.invite')
+  const inviteDenied = await assertCan(admin, mb.org_id, user.id, mb.role, 'team.invite')
   if (inviteDenied) return NextResponse.json({ error: inviteDenied.error }, { status: inviteDenied.status })
 
   const { email, role = 'member' } = await request.json()
@@ -104,10 +104,10 @@ export async function PATCH(request: NextRequest) {
   const admin = createAdminClient()
   // Gate based on action type
   if (is_active === false) {
-    const removeDenied = await assertCan(admin, mb.org_id, mb.role, 'team.remove')
+    const removeDenied = await assertCan(admin, mb.org_id, user.id, mb.role, 'team.remove')
     if (removeDenied) return NextResponse.json({ error: removeDenied.error }, { status: removeDenied.status })
   } else {
-    const changeRoleDenied = await assertCan(admin, mb.org_id, mb.role, 'team.change_role')
+    const changeRoleDenied = await assertCan(admin, mb.org_id, user.id, mb.role, 'team.change_role')
     if (changeRoleDenied) return NextResponse.json({ error: changeRoleDenied.error }, { status: changeRoleDenied.status })
   }
 
@@ -171,6 +171,33 @@ export async function PATCH(request: NextRequest) {
     const { error: monErr } = await admin.from('org_members')
       .update({ can_view_monitor }).eq('org_id', mb.org_id).eq('id', member_id)
     if (monErr) return NextResponse.json(dbError(monErr, 'team'), { status: 500 })
+    return NextResponse.json({ success: true })
+  }
+
+  // ── Per-user permission overrides ─────────────────────────────────────────
+  // Owner/admin can set a flat { permission_key: boolean } map on any non-owner/admin member.
+  // Passing null clears all overrides (resets to role default).
+  const { permissions: permissionOverrides } = body
+  if (permissionOverrides !== undefined) {
+    if (!['owner', 'admin'].includes(mb.role))
+      return NextResponse.json({ error: 'Only owners and admins can set permission overrides' }, { status: 403 })
+    // Validate target is not an owner/admin
+    const targetId = member_id || user_id
+    const { data: target } = await admin.from('org_members')
+      .select('role').eq('org_id', mb.org_id).eq('id', targetId).maybeSingle()
+    if (target && ['owner', 'admin'].includes(target.role))
+      return NextResponse.json({ error: 'Cannot override permissions for owners or admins' }, { status: 400 })
+    // null = clear overrides; otherwise must be a plain object of { string: boolean }
+    const sanitized: Record<string, boolean> | null = permissionOverrides === null
+      ? null
+      : Object.fromEntries(
+          Object.entries(permissionOverrides as Record<string, unknown>)
+            .filter(([, v]) => typeof v === 'boolean')
+            .map(([k, v]) => [k, v as boolean])
+        )
+    const { error: permErr } = await admin.from('org_members')
+      .update({ permissions: sanitized }).eq('org_id', mb.org_id).eq('id', targetId)
+    if (permErr) return NextResponse.json(dbError(permErr, 'team'), { status: 500 })
     return NextResponse.json({ success: true })
   }
 

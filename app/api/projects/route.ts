@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
   const mb = await getApiOrgMembership(supabase, user.id, request, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
   const admin = createAdminClient()
-  const projectCreateDenied = await assertCan(admin, mb.org_id, mb.role, 'projects.create')
+  const projectCreateDenied = await assertCan(admin, mb.org_id, user.id, mb.role, 'projects.create')
   if (projectCreateDenied) return NextResponse.json({ error: projectCreateDenied.error }, { status: projectCreateDenied.status })
 
   // Enforce project limit based on plan

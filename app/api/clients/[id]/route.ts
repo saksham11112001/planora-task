@@ -14,7 +14,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
   const admin = createAdminClient()
-  const clientEditDenied = await assertCan(admin, mb.org_id, mb.role, 'clients.edit')
+  const clientEditDenied = await assertCan(admin, mb.org_id, user.id, mb.role, 'clients.edit')
   if (clientEditDenied) return NextResponse.json({ error: clientEditDenied.error }, { status: clientEditDenied.status })
 
   const body = await req.json()
@@ -42,7 +42,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
   const admin = createAdminClient()
-  const clientDeleteDenied = await assertCan(admin, mb.org_id, mb.role, 'clients.delete')
+  const clientDeleteDenied = await assertCan(admin, mb.org_id, user.id, mb.role, 'clients.delete')
   if (clientDeleteDenied) return NextResponse.json({ error: clientDeleteDenied.error }, { status: clientDeleteDenied.status })
 
   const { error } = await admin.from('clients').delete().eq('id', id).eq('org_id', mb.org_id)

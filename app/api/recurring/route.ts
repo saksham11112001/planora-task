@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
   const mb = await getApiOrgMembership(supabase, user.id, request, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
   const admin = createAdminClient()
-  const recurringCreateDenied = await assertCan(admin, mb.org_id, mb.role, 'recurring.create')
+  const recurringCreateDenied = await assertCan(admin, mb.org_id, user.id, mb.role, 'recurring.create')
   if (recurringCreateDenied) return NextResponse.json({ error: recurringCreateDenied.error }, { status: recurringCreateDenied.status })
 
   const body = await request.json()

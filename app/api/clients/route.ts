@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
   const mb = await getApiOrgMembership(supabase, user.id, request, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
   const admin = createAdminClient()
-  const clientCreateDenied = await assertCan(admin, mb.org_id, mb.role, 'clients.create')
+  const clientCreateDenied = await assertCan(admin, mb.org_id, user.id, mb.role, 'clients.create')
   if (clientCreateDenied) return NextResponse.json({ error: clientCreateDenied.error }, { status: clientCreateDenied.status })
   const body = await request.json()
   if (!body.name?.trim()) return NextResponse.json({ error: 'Name required' }, { status: 400 })

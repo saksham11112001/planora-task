@@ -36,7 +36,7 @@ export async function MonitorFetcher() {
   ] = await Promise.all([
     isOwnerOrAdmin
       ? Promise.resolve(true)
-      : canDo(supabase, mb.org_id, mb.role, 'monitor.view'),
+      : canDo(supabase, mb.org_id, user.id, mb.role, 'monitor.view'),
     makeBase().not('due_date', 'is', null)
       .order('due_date', { ascending: true }).limit(10000),
     makeBase().is('due_date', null).limit(10000),

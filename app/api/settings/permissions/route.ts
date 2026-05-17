@@ -16,8 +16,19 @@ export async function GET(request: NextRequest) {
   const mb = await getApiOrgMembership(supabase, user.id, request, 'org_id')
   if (!mb) return NextResponse.json({ data: null })
   const admin = createAdminClient()
-  const { data: s } = await admin.from('org_settings').select('role_permissions').eq('org_id', mb.org_id).maybeSingle()
-  return NextResponse.json({ data: s?.role_permissions ?? null })
+
+  // Fetch both the org-wide role grid and the current user's personal overrides in parallel
+  const [{ data: s }, { data: m }] = await Promise.all([
+    admin.from('org_settings').select('role_permissions').eq('org_id', mb.org_id).maybeSingle(),
+    admin.from('org_members').select('permissions').eq('org_id', mb.org_id).eq('user_id', user.id).maybeSingle(),
+  ])
+
+  return NextResponse.json({
+    data: {
+      role_permissions:  s?.role_permissions  ?? null,
+      user_permissions:  m?.permissions       ?? null,
+    },
+  })
 }
 
 export async function POST(request: NextRequest) {

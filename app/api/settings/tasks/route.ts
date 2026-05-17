@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   const mb = await getApiOrgMembership(supabase, user.id, request, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
-  const taskSettingsDenied = await assertCan(supabase, mb.org_id, mb.role, 'settings.tasks')
+  const taskSettingsDenied = await assertCan(supabase, mb.org_id, user.id, mb.role, 'settings.tasks')
   if (taskSettingsDenied) return NextResponse.json({ error: taskSettingsDenied.error }, { status: taskSettingsDenied.status })
   const { task_fields } = await request.json()
   const admin = createAdminClient()

@@ -15,7 +15,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
   const admin = createAdminClient()
-  const projectEditDenied = await assertCan(admin, mb.org_id, mb.role, 'projects.edit')
+  const projectEditDenied = await assertCan(admin, mb.org_id, user.id, mb.role, 'projects.edit')
   if (projectEditDenied) return NextResponse.json({ error: projectEditDenied.error }, { status: projectEditDenied.status })
 
   // Fetch existing project first — needed for status-change notification and org verification
@@ -60,7 +60,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
   const admin = createAdminClient()
-  const projectDeleteDenied = await assertCan(admin, mb.org_id, mb.role, 'projects.delete')
+  const projectDeleteDenied = await assertCan(admin, mb.org_id, user.id, mb.role, 'projects.delete')
   if (projectDeleteDenied) return NextResponse.json({ error: projectDeleteDenied.error }, { status: projectDeleteDenied.status })
 
   // Soft delete (archive)

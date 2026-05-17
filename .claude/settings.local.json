@@ -31,7 +31,10 @@
       "Bash(xargs ls -la)",
       "Bash(xargs grep -l \"email\\\\|digest\\\\|notification\")",
       "Bash(xargs grep -l \"template\\\\|Template\")",
-      "Bash(xargs grep -l \"AttachTemplate\\\\|Template\")"
+      "Bash(xargs grep -l \"AttachTemplate\\\\|Template\")",
+      "Bash(xargs grep -l \"org_settings\")",
+      "Bash(ls supabase/migrations/)",
+      "Bash(ls supabase/)"
     ]
   }
 }

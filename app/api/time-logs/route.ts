@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
   const mb = await getApiOrgMembership(supabase, user.id, request, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
   const admin = createAdminClient()
-  const timeLogDenied = await assertCan(admin, mb.org_id, mb.role, 'time.log')
+  const timeLogDenied = await assertCan(admin, mb.org_id, user.id, mb.role, 'time.log')
   if (timeLogDenied) return NextResponse.json({ error: timeLogDenied.error }, { status: timeLogDenied.status })
 
   // Time tracking requires Starter+ plan

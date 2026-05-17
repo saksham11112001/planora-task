@@ -1,16 +1,46 @@
 'use client'
 import { useState, useTransition } from 'react'
 import { useRouter }  from 'next/navigation'
-import { UserPlus, X, Copy, Check, RefreshCw, Share2, Gift } from 'lucide-react'
+import { UserPlus, X, Copy, Check, RefreshCw, Share2, Gift, SlidersHorizontal } from 'lucide-react'
 import { Avatar, RoleBadge } from '@/components/ui/Badge'
 import { toast }      from '@/store/appStore'
+import { UserPermissionsPanel } from './UserPermissionsPanel'
+import type { RolePermissions } from '@/lib/hooks/useOrgSettings'
 
-interface Member { id: string; role: string; joined_at: string; user_id: string; can_view_all_tasks: boolean; can_view_monitor: boolean; users: { id: string; name: string; email: string; avatar_url: string | null } | null }
-interface Props { members: Member[]; currentUserId: string; isAdmin: boolean; joinCode?: string | null; referralCode?: string | null; referralExtensionDays?: number }
+interface Member {
+  id: string
+  role: string
+  joined_at: string
+  user_id: string
+  can_view_all_tasks: boolean
+  can_view_monitor: boolean
+  /** Saved per-user permission overrides from org_members.permissions */
+  permissions: Record<string, boolean> | null
+  users: { id: string; name: string; email: string; avatar_url: string | null } | null
+}
+
+interface Props {
+  members:          Member[]
+  currentUserId:    string
+  isAdmin:          boolean
+  joinCode?:        string | null
+  referralCode?:    string | null
+  referralExtensionDays?: number
+  /** Org-wide role permissions grid (from org_settings.role_permissions) */
+  rolePermissions?: RolePermissions | null
+}
 
 const ROLES = ['admin','manager','member','viewer']
 
-export function MembersView({ members, currentUserId, isAdmin, joinCode: initialJoinCode, referralCode, referralExtensionDays = 0 }: Props) {
+export function MembersView({
+  members: initialMembers,
+  currentUserId,
+  isAdmin,
+  joinCode: initialJoinCode,
+  referralCode,
+  referralExtensionDays = 0,
+  rolePermissions = null,
+}: Props) {
   const router = useRouter()
   const [isPending, startT] = useTransition()
   const [email,   setEmail]   = useState('')
@@ -20,6 +50,12 @@ export function MembersView({ members, currentUserId, isAdmin, joinCode: initial
   const [copiedJoin, setCopiedJoin]       = useState(false)
   const [copiedReferral, setCopiedReferral] = useState(false)
   const [rotating, setRotating] = useState(false)
+
+  // Local copy of members so we can update permissions immediately without a full refresh
+  const [members, setMembers] = useState<Member[]>(initialMembers)
+
+  // Which member's permissions panel is open (null = none)
+  const [permPanelMember, setPermPanelMember] = useState<Member | null>(null)
 
   async function invite(e: React.FormEvent) {
     e.preventDefault()
@@ -70,6 +106,10 @@ export function MembersView({ members, currentUserId, isAdmin, joinCode: initial
     })
     if (res.ok) { toast.success('Member removed'); startT(() => router.refresh()) }
     else toast.error('Failed to remove member')
+  }
+
+  function handlePermissionsSaved(memberId: string, newOverrides: Record<string, boolean> | null) {
+    setMembers(prev => prev.map(m => m.id === memberId ? { ...m, permissions: newOverrides } : m))
   }
 
   function fmtCode(code: string | null) {
@@ -187,6 +227,8 @@ export function MembersView({ members, currentUserId, isAdmin, joinCode: initial
         {members.map(m => {
           const profile = m.users
           const isMe    = m.user_id === currentUserId
+          const canOverride = isAdmin && !isMe && !['owner', 'admin'].includes(m.role)
+          const overrideCount = m.permissions ? Object.keys(m.permissions).length : 0
           return (
             <div key={m.id} className="flex items-center gap-4 px-5 py-4 border-b last:border-0" style={{ borderColor: 'var(--border)' }}>
               <Avatar name={profile?.name ?? 'U'} size="md"/>
@@ -223,7 +265,7 @@ export function MembersView({ members, currentUserId, isAdmin, joinCode: initial
                   View all tasks
                 </button>
               )}
-              {/* Monitor access toggle — grants access to the Monitor analytics page */}
+              {/* Monitor access toggle */}
               {isAdmin && !isMe && !['owner','admin'].includes(m.role) && (
                 <button
                   onClick={() => toggleMonitor(m.id, m.can_view_monitor)}
@@ -244,6 +286,23 @@ export function MembersView({ members, currentUserId, isAdmin, joinCode: initial
                   Monitor
                 </button>
               )}
+              {/* Per-user permission overrides button */}
+              {canOverride && (
+                <button
+                  onClick={() => setPermPanelMember(m)}
+                  title="Override individual permissions for this person"
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px',
+                    borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                    border: `1px solid ${overrideCount > 0 ? '#d97706' : '#e2e8f0'}`,
+                    background: overrideCount > 0 ? 'rgba(217,119,6,0.08)' : 'var(--surface-subtle, #f8fafc)',
+                    color: overrideCount > 0 ? '#b45309' : '#94a3b8',
+                    fontFamily: 'inherit', transition: 'all 0.12s', whiteSpace: 'nowrap',
+                  }}>
+                  <SlidersHorizontal size={11} style={{ flexShrink: 0 }}/>
+                  {overrideCount > 0 ? `${overrideCount} override${overrideCount !== 1 ? 's' : ''}` : 'Permissions'}
+                </button>
+              )}
               {isAdmin && !isMe && (
                 <button onClick={() => removeMember(m.id)} className="h-7 w-7 flex items-center justify-center rounded text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors">
                   <X className="h-4 w-4"/>
@@ -253,6 +312,19 @@ export function MembersView({ members, currentUserId, isAdmin, joinCode: initial
           )
         })}
       </div>
+
+      {/* Per-user permissions panel */}
+      {permPanelMember && (
+        <UserPermissionsPanel
+          memberId={permPanelMember.id}
+          memberName={permPanelMember.users?.name ?? 'this member'}
+          memberRole={permPanelMember.role}
+          savedOverrides={permPanelMember.permissions}
+          rolePermissions={rolePermissions}
+          onClose={() => setPermPanelMember(null)}
+          onSaved={newOverrides => handlePermissionsSaved(permPanelMember.id, newOverrides)}
+        />
+      )}
     </div>
   )
 }
