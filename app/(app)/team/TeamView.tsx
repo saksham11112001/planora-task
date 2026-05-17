@@ -1,10 +1,12 @@
 'use client'
 import { useState }   from 'react'
 import { useRouter }  from 'next/navigation'
-import { UserPlus, Mail, Crown, Shield, User, ChevronDown, Check, Plus, X, Send, Pencil, Activity } from 'lucide-react'
+import { UserPlus, Mail, Crown, Shield, User, ChevronDown, Check, Plus, X, Send, Pencil, Activity, SlidersHorizontal } from 'lucide-react'
 import { cn }         from '@/lib/utils/cn'
 import { toast }      from '@/store/appStore'
 import { fmtDate }    from '@/lib/utils/format'
+import { UserPermissionsPanel } from '../settings/members/UserPermissionsPanel'
+import type { RolePermissions } from '@/lib/hooks/useOrgSettings'
 
 const ROLES = ['admin','manager','member','viewer'] as const
 const ROLE_DESC: Record<string, string> = {
@@ -21,9 +23,10 @@ const ROLE_COLORS: Record<string, string> = {
 
 interface InviteRow { email: string; role: 'admin'|'manager'|'member'|'viewer' }
 interface Member {
-  id: string; name: string; email: string; avatar_url: string | null
+  id: string; memberId: string; name: string; email: string; avatar_url: string | null
   role: string; joined_at: string; tasks_30d: number; done_30d: number; inprog_30d?: number
   phone_number?: string | null
+  permissions: Record<string, boolean> | null
   heatmap: Record<string, number>
 }
 
@@ -71,10 +74,18 @@ function heatColor(count: number, isFuture: boolean): string {
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const MEDAL_COLORS = ['#ca8a04', '#94a3b8', '#cd7f32']
 
-export function TeamView({ members, canManage, currentUserId }: {
-  members: Member[]; canManage: boolean; currentUserId: string
+export function TeamView({ members: initialMembers, canManage, isAdmin = false, currentUserId, rolePermissions = null }: {
+  members: Member[]; canManage: boolean; isAdmin?: boolean; currentUserId: string
+  rolePermissions?: RolePermissions | null
 }) {
   const router = useRouter()
+
+  const [members, setMembers] = useState<Member[]>(initialMembers)
+  const [permPanelMember, setPermPanelMember] = useState<Member | null>(null)
+
+  function handlePermissionsSaved(memberId: string, newOverrides: Record<string, boolean> | null) {
+    setMembers(prev => prev.map(m => m.memberId === memberId ? { ...m, permissions: newOverrides } : m))
+  }
 
   const [showInvite,  setShowInvite]  = useState(false)
   const [showBulk,    setShowBulk]    = useState(false)
@@ -191,6 +202,7 @@ export function TeamView({ members, canManage, currentUserId }: {
   }
 
   return (
+    <>
     <div className="flex-1 overflow-y-auto p-6" style={{ background: 'var(--surface-subtle)' }}>
       <div className="max-w-3xl mx-auto">
 
@@ -598,6 +610,27 @@ export function TeamView({ members, canManage, currentUserId }: {
                   )}
                 </div>
 
+                {/* Per-user permission overrides (admin only) */}
+                {isAdmin && !isMe && !isOwner && (() => {
+                  const overrideCount = m.permissions ? Object.keys(m.permissions).length : 0
+                  return (
+                    <button
+                      onClick={() => setPermPanelMember(m)}
+                      title="Override individual permissions for this person"
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px',
+                        borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                        border: `1px solid ${overrideCount > 0 ? '#d97706' : 'var(--border)'}`,
+                        background: overrideCount > 0 ? 'rgba(217,119,6,0.08)' : 'var(--surface-subtle)',
+                        color: overrideCount > 0 ? '#b45309' : 'var(--text-muted)',
+                        fontFamily: 'inherit', transition: 'all 0.12s', whiteSpace: 'nowrap', flexShrink: 0,
+                      }}>
+                      <SlidersHorizontal style={{ width: 11, height: 11, flexShrink: 0 }}/>
+                      {overrideCount > 0 ? `${overrideCount} override${overrideCount !== 1 ? 's' : ''}` : 'Permissions'}
+                    </button>
+                  )
+                })()}
+
                 {/* Edit member info */}
                 {canManage && !isMe && !isOwner && (
                   <div style={{ marginLeft: 4, flexShrink: 0 }}>
@@ -764,5 +797,18 @@ export function TeamView({ members, canManage, currentUserId }: {
 
       </div>
     </div>
+
+    {permPanelMember && (
+      <UserPermissionsPanel
+        memberId={permPanelMember.memberId}
+        memberName={permPanelMember.name}
+        memberRole={permPanelMember.role}
+        savedOverrides={permPanelMember.permissions}
+        rolePermissions={rolePermissions}
+        onClose={() => setPermPanelMember(null)}
+        onSaved={newOverrides => handlePermissionsSaved(permPanelMember.memberId, newOverrides)}
+      />
+    )}
+    </>
   )
 }

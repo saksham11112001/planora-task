@@ -17,13 +17,17 @@ export default async function TeamPage() {
   const from30 = new Date(Date.now() - 30  * 86400000).toISOString()
   const from84 = new Date(Date.now() - 84  * 86400000).toISOString() // 12 weeks for heatmap
 
-  const [{ data: members }, { data: taskData }] = await Promise.all([
+  const [{ data: members }, { data: taskData }, { data: orgSettings }] = await Promise.all([
     supabase.from('org_members')
-      .select('user_id, role, joined_at, is_active, users(id, name, email, avatar_url, phone_number)')
+      .select('id, user_id, role, joined_at, is_active, permissions, users(id, name, email, avatar_url, phone_number)')
       .eq('org_id', mb.org_id).eq('is_active', true).order('joined_at'),
     supabase.from('tasks')
       .select('assignee_id, status, completed_at, created_at')
       .eq('org_id', mb.org_id).gte('created_at', from84),
+    supabase.from('org_settings')
+      .select('role_permissions')
+      .eq('org_id', mb.org_id)
+      .maybeSingle(),
   ])
 
   const countMap:   Record<string, { total: number; completed: number }> = {}
@@ -47,12 +51,14 @@ export default async function TeamPage() {
 
   const memberList = (members ?? []).map(m => ({
     id:           (m.users as any)?.id   ?? m.user_id,
+    memberId:     m.id,
     name:         (m.users as any)?.name ?? 'Unknown',
     email:        (m.users as any)?.email ?? '',
     avatar_url:   (m.users as any)?.avatar_url ?? null,
     phone_number: (m.users as any)?.phone_number ?? null,
     role:         m.role,
     joined_at:    m.joined_at,
+    permissions:  (m.permissions as Record<string, boolean> | null) ?? null,
     tasks_30d:    countMap[(m.users as any)?.id]?.total    ?? 0,
     done_30d:     countMap[(m.users as any)?.id]?.completed ?? 0,
     inprog_30d:   0,
@@ -60,5 +66,12 @@ export default async function TeamPage() {
   }))
 
   const canManage = ['owner','admin','manager'].includes(mb.role)
-  return <TeamView members={memberList} canManage={canManage} currentUserId={user.id}/>
+  const isAdmin   = ['owner','admin'].includes(mb.role)
+  return <TeamView
+    members={memberList}
+    canManage={canManage}
+    isAdmin={isAdmin}
+    currentUserId={user.id}
+    rolePermissions={(orgSettings?.role_permissions as any) ?? null}
+  />
 }

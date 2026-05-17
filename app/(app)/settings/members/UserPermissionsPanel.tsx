@@ -1,6 +1,7 @@
 'use client'
-import { useState } from 'react'
-import { X, Check, RotateCcw, Save, Info } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
+import { X, RotateCcw, Save, Info } from 'lucide-react'
 import { toast } from '@/store/appStore'
 import type { RolePermissions } from '@/lib/hooks/useOrgSettings'
 
@@ -140,6 +141,9 @@ interface Props {
 export function UserPermissionsPanel({
   memberId, memberName, memberRole, savedOverrides, rolePermissions, onClose, onSaved,
 }: Props) {
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
+
   // Local working copy: null means "use role default for this key"
   const [overrides, setOverrides] = useState<Record<string, boolean | null>>(() => {
     const init: Record<string, boolean | null> = {}
@@ -206,7 +210,9 @@ export function UserPermissionsPanel({
     } finally { setSaving(false) }
   }
 
-  return (
+  if (!mounted) return null
+
+  return createPortal(
     // Backdrop
     <div
       style={{ position: 'fixed', inset: 0, background: 'rgba(2,8,20,0.55)',
@@ -374,6 +380,7 @@ export function UserPermissionsPanel({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
