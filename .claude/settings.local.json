@@ -34,7 +34,9 @@
       "Bash(xargs grep -l \"AttachTemplate\\\\|Template\")",
       "Bash(xargs grep -l \"org_settings\")",
       "Bash(ls supabase/migrations/)",
-      "Bash(ls supabase/)"
+      "Bash(ls supabase/)",
+      "Bash(grep -r \"Templates\" app/\\\\\\(app\\\\\\)/compliance --include=\"*.tsx\" -l)",
+      "Bash(grep -r \"template\" app/\\\\\\(app\\\\\\)/compliance --include=\"*.tsx\" -l)"
     ]
   }
 }

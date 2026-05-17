@@ -1,6 +1,7 @@
 'use client'
-import { useState }   from 'react'
-import { useRouter }  from 'next/navigation'
+import { useState }        from 'react'
+import { createPortal }    from 'react-dom'
+import { useRouter }       from 'next/navigation'
 import { UserPlus, Mail, Crown, Shield, User, ChevronDown, Check, Plus, X, Send, Pencil, Activity, SlidersHorizontal } from 'lucide-react'
 import { cn }         from '@/lib/utils/cn'
 import { toast }      from '@/store/appStore'
@@ -96,6 +97,7 @@ export function TeamView({ members: initialMembers, canManage, isAdmin = false, 
   const [invRole,     setInvRole]     = useState<'manager'|'member'|'viewer'>('member')
   const [inviting,    setInviting]    = useState(false)
   const [roleEditing, setRoleEditing] = useState<string | null>(null)
+  const [roleDropPos, setRoleDropPos] = useState<{ top: number; right: number } | null>(null)
   const [saving,      setSaving]      = useState<string | null>(null)
   const [removingId,  setRemovingId]  = useState<string | null>(null)
   const [removeConfirm, setRemoveConfirm] = useState<string | null>(null)
@@ -179,7 +181,7 @@ export function TeamView({ members: initialMembers, canManage, isAdmin = false, 
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id: userId, role: newRole }),
     })
-    setSaving(null); setRoleEditing(null)
+    setSaving(null); setRoleEditing(null); setRoleDropPos(null)
     if (res.ok) { toast.success('Role updated'); router.refresh() }
     else { const d = await res.json(); toast.error(d.error ?? 'Failed to update role') }
   }
@@ -540,67 +542,32 @@ export function TeamView({ members: initialMembers, canManage, isAdmin = false, 
                 </div>
 
                 {/* Role badge / editable dropdown */}
-                <div style={{ position: 'relative', flexShrink: 0 }}>
+                <div style={{ flexShrink: 0 }}>
                   {canManage && !isMe && !isOwner ? (
-                    <>
-                      <button onClick={() => setRoleEditing(isEditing ? null : m.id)} disabled={isSaving}
-                        title="Click to change role"
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
-                        style={{
-                          border: isEditing ? `1.5px solid ${ROLE_COLORS[m.role]}` : '1.5px dashed var(--border)',
-                          color: isSaving ? 'var(--text-muted)' : ROLE_COLORS[m.role],
-                          background: isEditing ? `${ROLE_COLORS[m.role]}10` : 'transparent', cursor: 'pointer',
-                        }}
-                        onMouseEnter={e => { if (!isEditing) { (e.currentTarget as HTMLElement).style.borderColor = ROLE_COLORS[m.role]; (e.currentTarget as HTMLElement).style.background = `${ROLE_COLORS[m.role]}10` } }}
-                        onMouseLeave={e => { if (!isEditing) { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLElement).style.background = 'transparent' } }}
-                      >
-                        <RoleIcon className="h-3.5 w-3.5" />
-                        {isSaving ? 'Saving…' : m.role.charAt(0).toUpperCase() + m.role.slice(1)}
-                        <ChevronDown className="h-3 w-3 transition-transform" style={{ color: 'var(--text-muted)', transform: isEditing ? 'rotate(180deg)' : 'rotate(0deg)' }} />
-                      </button>
-
-                      {isEditing && (
-                        <>
-                          <div style={{ position: 'fixed', inset: 0, zIndex: 9998 }} onClick={() => setRoleEditing(null)} />
-                          <div style={{
-                            position: 'absolute', right: 0, top: '100%', marginTop: 6,
-                            borderRadius: 12, padding: '4px 0', minWidth: 240,
-                            background: 'var(--surface)', border: '1px solid var(--border)',
-                            boxShadow: '0 16px 40px rgba(0,0,0,0.18)', zIndex: 9999,
-                          }}>
-                            <p className="px-3 pb-1.5 pt-0.5 text-xs font-semibold uppercase tracking-wide"
-                              style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>
-                              Change role
-                            </p>
-                            {ROLES.map(r => {
-                              const Icon = ROLE_ICONS[r] ?? User
-                              const isCurrent = r === m.role
-                              return (
-                                <button key={r} onClick={() => changeRole(m.id, r)}
-                                  className="w-full flex items-start gap-2.5 px-3 py-2.5 transition-colors text-left"
-                                  style={{ background: isCurrent ? `${ROLE_COLORS[r]}10` : 'transparent', borderBottom: '1px solid var(--border-light)' }}
-                                  onMouseEnter={e => { if (!isCurrent) (e.currentTarget as HTMLElement).style.background = 'var(--surface-subtle)' }}
-                                  onMouseLeave={e => { if (!isCurrent) (e.currentTarget as HTMLElement).style.background = isCurrent ? `${ROLE_COLORS[r]}10` : 'transparent' }}
-                                >
-                                  <Icon className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" style={{ color: ROLE_COLORS[r] }} />
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-1.5">
-                                      <span className="text-xs font-semibold" style={{ color: isCurrent ? ROLE_COLORS[r] : 'var(--text-primary)' }}>
-                                        {r.charAt(0).toUpperCase() + r.slice(1)}
-                                      </span>
-                                      {isCurrent && <Check className="h-3 w-3" style={{ color: ROLE_COLORS[r] }} />}
-                                    </div>
-                                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)', fontSize: 10, lineHeight: 1.4 }}>
-                                      {ROLE_DESC[r]}
-                                    </p>
-                                  </div>
-                                </button>
-                              )
-                            })}
-                          </div>
-                        </>
-                      )}
-                    </>
+                    <button
+                      onClick={e => {
+                        if (isEditing) { setRoleEditing(null); setRoleDropPos(null) }
+                        else {
+                          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                          setRoleDropPos({ top: rect.bottom + 6, right: window.innerWidth - rect.right })
+                          setRoleEditing(m.id)
+                        }
+                      }}
+                      disabled={isSaving}
+                      title="Click to change role"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                      style={{
+                        border: isEditing ? `1.5px solid ${ROLE_COLORS[m.role]}` : '1.5px dashed var(--border)',
+                        color: isSaving ? 'var(--text-muted)' : ROLE_COLORS[m.role],
+                        background: isEditing ? `${ROLE_COLORS[m.role]}10` : 'transparent', cursor: 'pointer',
+                      }}
+                      onMouseEnter={e => { if (!isEditing) { (e.currentTarget as HTMLElement).style.borderColor = ROLE_COLORS[m.role]; (e.currentTarget as HTMLElement).style.background = `${ROLE_COLORS[m.role]}10` } }}
+                      onMouseLeave={e => { if (!isEditing) { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLElement).style.background = 'transparent' } }}
+                    >
+                      <RoleIcon className="h-3.5 w-3.5" />
+                      {isSaving ? 'Saving…' : m.role.charAt(0).toUpperCase() + m.role.slice(1)}
+                      <ChevronDown className="h-3 w-3 transition-transform" style={{ color: 'var(--text-muted)', transform: isEditing ? 'rotate(180deg)' : 'rotate(0deg)' }} />
+                    </button>
                   ) : (
                     <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold"
                       style={{ color: ROLE_COLORS[m.role], background: `${ROLE_COLORS[m.role]}15` }}>
@@ -808,6 +775,53 @@ export function TeamView({ members: initialMembers, canManage, isAdmin = false, 
         onClose={() => setPermPanelMember(null)}
         onSaved={newOverrides => handlePermissionsSaved(permPanelMember.memberId, newOverrides)}
       />
+    )}
+
+    {/* Role dropdown — portal-rendered so it's never clipped by overflow-y:auto */}
+    {roleEditing && roleDropPos && createPortal(
+      <>
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 9100 }}
+          onClick={() => { setRoleEditing(null); setRoleDropPos(null) }}
+        />
+        <div style={{
+          position: 'fixed', top: roleDropPos.top, right: roleDropPos.right,
+          borderRadius: 14, padding: '4px 0', minWidth: 260,
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          boxShadow: '0 20px 48px rgba(0,0,0,0.22)', zIndex: 9101,
+        }}>
+          <p className="px-4 pb-2 pt-1.5 text-xs font-bold uppercase tracking-widest"
+            style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>
+            Change role
+          </p>
+          {ROLES.map(r => {
+            const Icon     = ROLE_ICONS[r] ?? User
+            const isCurrent = r === members.find(m => m.id === roleEditing)?.role
+            return (
+              <button key={r} onClick={() => changeRole(roleEditing, r)}
+                className="w-full flex items-start gap-3 px-4 py-3 transition-colors text-left"
+                style={{ background: isCurrent ? `${ROLE_COLORS[r]}10` : 'transparent', borderBottom: '1px solid var(--border-light)' }}
+                onMouseEnter={e => { if (!isCurrent) (e.currentTarget as HTMLElement).style.background = 'var(--surface-subtle)' }}
+                onMouseLeave={e => { if (!isCurrent) (e.currentTarget as HTMLElement).style.background = isCurrent ? `${ROLE_COLORS[r]}10` : 'transparent' }}
+              >
+                <Icon className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: ROLE_COLORS[r] }} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-semibold" style={{ color: isCurrent ? ROLE_COLORS[r] : 'var(--text-primary)' }}>
+                      {r.charAt(0).toUpperCase() + r.slice(1)}
+                    </span>
+                    {isCurrent && <Check className="h-3.5 w-3.5" style={{ color: ROLE_COLORS[r] }} />}
+                  </div>
+                  <p style={{ color: 'var(--text-muted)', fontSize: 11, lineHeight: 1.4, marginTop: 1 }}>
+                    {ROLE_DESC[r]}
+                  </p>
+                </div>
+              </button>
+            )
+          })}
+        </div>
+      </>,
+      document.body
     )}
     </>
   )
