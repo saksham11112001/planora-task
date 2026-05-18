@@ -183,24 +183,24 @@ export function OnboardingChecklist({ userId, userCreatedAt }: Props) {
           position: 'fixed', bottom: 80, right: 20, zIndex: 999,
           display: 'flex', alignItems: 'center', gap: 8,
           padding: '10px 14px', borderRadius: 24,
-          background: 'var(--surface, #fff)',
-          border: '1.5px solid var(--border, #e2e8f0)',
-          boxShadow: '0 4px 16px rgba(0,0,0,0.10)',
+          background: 'var(--surface)',
+          border: '1.5px solid var(--border)',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
           cursor: 'pointer', fontFamily: 'inherit',
         }}
         aria-label="Open setup checklist"
       >
         {/* Arc progress ring */}
         <svg width="28" height="28" viewBox="0 0 28 28">
-          <circle cx="14" cy="14" r="11" fill="none" stroke="var(--border,#e2e8f0)" strokeWidth="2.5"/>
-          <circle cx="14" cy="14" r="11" fill="none" stroke="#0d9488" strokeWidth="2.5"
+          <circle cx="14" cy="14" r="11" fill="none" stroke="var(--border)" strokeWidth="2.5"/>
+          <circle cx="14" cy="14" r="11" fill="none" stroke="var(--brand)" strokeWidth="2.5"
             strokeDasharray={`${2 * Math.PI * 11 * pct / 100} 999`}
             strokeLinecap="round" transform="rotate(-90 14 14)"/>
-          <text x="14" y="18" textAnchor="middle" fontSize="7" fontWeight="700" fill="#0d9488">
+          <text x="14" y="18" textAnchor="middle" fontSize="7" fontWeight="700" fill="var(--brand)">
             {doneCount}/{total}
           </text>
         </svg>
-        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg,#0f172a)' }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
           Setup guide
         </span>
       </button>
@@ -215,10 +215,10 @@ export function OnboardingChecklist({ userId, userCreatedAt }: Props) {
       style={{
         position: 'fixed', bottom: 20, right: 20, zIndex: 999,
         width: 320, maxHeight: '80vh',
-        background: 'var(--surface, #fff)',
-        border: '1.5px solid var(--border, #e2e8f0)',
+        background: 'var(--surface)',
+        border: '1.5px solid var(--border)',
         borderRadius: 16,
-        boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
         display: 'flex', flexDirection: 'column',
         overflow: 'hidden', fontFamily: 'inherit',
       }}
@@ -226,26 +226,26 @@ export function OnboardingChecklist({ userId, userCreatedAt }: Props) {
       {/* Header */}
       <div style={{
         padding: '14px 16px 12px',
-        borderBottom: '1px solid var(--border,#e2e8f0)',
-        background: 'var(--surface-2,#f8fafc)',
+        borderBottom: '1px solid var(--border)',
+        background: 'var(--surface-subtle)',
         flexShrink: 0,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-          <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--fg,#0f172a)' }}>
+          <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
             {allDone ? '🎉 Setup complete!' : '🚀 Get started'}
           </span>
           <div style={{ display: 'flex', gap: 4 }}>
             <button
               onClick={() => setCollapsed(true)}
-              style={{ padding: '2px 6px', borderRadius: 6, border: '1px solid var(--border,#e2e8f0)',
-                background: 'transparent', cursor: 'pointer', fontSize: 14, color: 'var(--muted,#64748b)', fontFamily: 'inherit' }}
+              style={{ padding: '2px 6px', borderRadius: 6, border: '1px solid var(--border)',
+                background: 'transparent', cursor: 'pointer', fontSize: 14, color: 'var(--text-secondary)', fontFamily: 'inherit' }}
               title="Minimise"
               aria-label="Minimise checklist"
             >−</button>
             <button
               onClick={() => dismiss(false)}
-              style={{ padding: '2px 6px', borderRadius: 6, border: '1px solid var(--border,#e2e8f0)',
-                background: 'transparent', cursor: 'pointer', fontSize: 14, color: 'var(--muted,#64748b)', fontFamily: 'inherit' }}
+              style={{ padding: '2px 6px', borderRadius: 6, border: '1px solid var(--border)',
+                background: 'transparent', cursor: 'pointer', fontSize: 14, color: 'var(--text-secondary)', fontFamily: 'inherit' }}
               title="Close"
               aria-label="Close checklist"
             >×</button>
@@ -255,17 +255,17 @@ export function OnboardingChecklist({ userId, userCreatedAt }: Props) {
         {/* Progress bar */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{
-            flex: 1, height: 6, background: 'var(--border,#e2e8f0)',
+            flex: 1, height: 6, background: 'var(--border)',
             borderRadius: 3, overflow: 'hidden',
           }}>
             <div style={{
               height: '100%', borderRadius: 3,
               width: `${pct}%`,
-              background: allDone ? '#16a34a' : '#0d9488',
+              background: allDone ? '#16a34a' : 'var(--brand)',
               transition: 'width 0.4s ease',
             }}/>
           </div>
-          <span style={{ fontSize: 12, fontWeight: 600, color: allDone ? '#16a34a' : '#0d9488', flexShrink: 0 }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: allDone ? '#16a34a' : 'var(--brand)', flexShrink: 0 }}>
             {doneCount}/{total}
           </span>
         </div>
@@ -278,7 +278,7 @@ export function OnboardingChecklist({ userId, userCreatedAt }: Props) {
       </div>
 
       {/* Steps list */}
-      <div style={{ overflowY: 'auto', flex: 1 }}>
+      <div style={{ overflowY: 'auto', flex: 1, background: 'var(--surface)' }}>
         {STEPS.map((step, i) => {
           const done = !!completed[step.id]
           const isExpanding = expanding === step.id
@@ -286,7 +286,7 @@ export function OnboardingChecklist({ userId, userCreatedAt }: Props) {
             <div
               key={step.id}
               style={{
-                borderBottom: i < STEPS.length - 1 ? '1px solid var(--border,#f1f5f9)' : 'none',
+                borderBottom: i < STEPS.length - 1 ? '1px solid var(--border-light)' : 'none',
                 transition: 'background 0.15s',
               }}
             >
@@ -308,8 +308,8 @@ export function OnboardingChecklist({ userId, userCreatedAt }: Props) {
                 <div style={{
                   width: 20, height: 20, borderRadius: '50%', flexShrink: 0, marginTop: 1,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: done ? '#0d9488' : 'transparent',
-                  border: done ? '2px solid #0d9488' : '2px solid var(--border,#cbd5e1)',
+                  background: done ? 'var(--brand)' : 'transparent',
+                  border: done ? '2px solid var(--brand)' : '2px solid var(--border)',
                   transition: 'all 0.25s',
                 }}>
                   {done && (
@@ -325,7 +325,7 @@ export function OnboardingChecklist({ userId, userCreatedAt }: Props) {
                     <span style={{ fontSize: 14 }}>{step.emoji}</span>
                     <span style={{
                       fontSize: 13, fontWeight: 600,
-                      color: done ? 'var(--muted,#64748b)' : 'var(--fg,#0f172a)',
+                      color: done ? 'var(--text-muted)' : 'var(--text-primary)',
                       textDecoration: done ? 'line-through' : 'none',
                     }}>
                       {step.label}
@@ -333,7 +333,7 @@ export function OnboardingChecklist({ userId, userCreatedAt }: Props) {
                   </div>
                   {!done && (
                     <p style={{
-                      margin: 0, fontSize: 12, color: 'var(--muted,#94a3b8)',
+                      margin: 0, fontSize: 12, color: 'var(--text-muted)',
                       lineHeight: 1.4,
                     }}>
                       {step.detail}
@@ -344,7 +344,7 @@ export function OnboardingChecklist({ userId, userCreatedAt }: Props) {
                 {/* Arrow */}
                 {!done && (
                   <span style={{
-                    fontSize: 16, color: '#0d9488', flexShrink: 0, marginTop: 1,
+                    fontSize: 16, color: 'var(--brand)', flexShrink: 0, marginTop: 1,
                     opacity: isExpanding ? 0 : 1, transition: 'opacity 0.2s',
                   }}>→</span>
                 )}
@@ -357,15 +357,15 @@ export function OnboardingChecklist({ userId, userCreatedAt }: Props) {
       {/* Footer */}
       <div style={{
         padding: '10px 16px',
-        borderTop: '1px solid var(--border,#e2e8f0)',
-        background: 'var(--surface-2,#f8fafc)',
+        borderTop: '1px solid var(--border)',
+        background: 'var(--surface-subtle)',
         flexShrink: 0,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
         <button
           onClick={() => router.push('/walkthrough')}
           style={{
-            fontSize: 12, color: '#0d9488', background: 'transparent',
+            fontSize: 12, color: 'var(--brand)', background: 'transparent',
             border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit',
             textDecoration: 'underline',
           }}
@@ -375,7 +375,7 @@ export function OnboardingChecklist({ userId, userCreatedAt }: Props) {
         <button
           onClick={() => dismiss(true)}
           style={{
-            fontSize: 12, color: 'var(--muted,#94a3b8)', background: 'transparent',
+            fontSize: 12, color: 'var(--text-muted)', background: 'transparent',
             border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit',
           }}
           title="Dismiss this checklist permanently"

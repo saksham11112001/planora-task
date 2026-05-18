@@ -134,13 +134,13 @@ export function HelpButton() {
         onClick={() => setOpen(o => !o)}
         style={{
           width: 44, height: 44, borderRadius: '50%',
-          background: open ? '#0d9488' : 'var(--surface,#fff)',
-          border: '1.5px solid ' + (open ? '#0d9488' : 'var(--border,#e2e8f0)'),
+          background: open ? 'var(--brand)' : 'var(--surface)',
+          border: '1.5px solid ' + (open ? 'var(--brand)' : 'var(--border)'),
           boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
           cursor: 'pointer', fontFamily: 'inherit',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           transition: 'all 0.2s',
-          color: open ? '#fff' : 'var(--fg,#0f172a)',
+          color: open ? '#fff' : 'var(--text-primary)',
           fontSize: 18, fontWeight: 700,
         }}
         aria-label={open ? 'Close help' : 'Open help'}
@@ -155,10 +155,10 @@ export function HelpButton() {
           style={{
             position: 'absolute', bottom: 54, left: 0,
             width: 360, maxHeight: '75vh',
-            background: 'var(--surface,#fff)',
-            border: '1.5px solid var(--border,#e2e8f0)',
+            background: 'var(--surface)',
+            border: '1.5px solid var(--border)',
             borderRadius: 16,
-            boxShadow: '0 8px 40px rgba(0,0,0,0.15)',
+            boxShadow: '0 8px 40px rgba(0,0,0,0.20)',
             display: 'flex', flexDirection: 'column',
             overflow: 'hidden',
           }}
@@ -168,11 +168,11 @@ export function HelpButton() {
           {/* Header */}
           <div style={{
             padding: '16px 16px 12px',
-            borderBottom: '1px solid var(--border,#e2e8f0)',
-            background: 'var(--surface-2,#f8fafc)',
+            borderBottom: '1px solid var(--border)',
+            background: 'var(--surface-subtle)',
             flexShrink: 0,
           }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--fg,#0f172a)', marginBottom: 10 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 10 }}>
               Help Centre
             </div>
 
@@ -189,10 +189,10 @@ export function HelpButton() {
                   onClick={action}
                   style={{
                     padding: '5px 10px', borderRadius: 20,
-                    border: '1.5px solid var(--border,#e2e8f0)',
-                    background: 'var(--surface,#fff)',
+                    border: '1.5px solid var(--border)',
+                    background: 'var(--surface)',
                     fontSize: 12, fontWeight: 600,
-                    color: 'var(--fg,#374151)',
+                    color: 'var(--text-secondary)',
                     cursor: 'pointer', fontFamily: 'inherit',
                     transition: 'border-color 0.15s',
                   }}
@@ -210,10 +210,10 @@ export function HelpButton() {
               placeholder="Search 14 common questions…"
               style={{
                 width: '100%', padding: '9px 12px',
-                border: '1.5px solid var(--border,#e2e8f0)',
+                border: '1.5px solid var(--border)',
                 borderRadius: 8, fontSize: 13,
-                color: 'var(--fg,#0f172a)',
-                background: 'var(--surface,#fff)',
+                color: 'var(--text-primary)',
+                background: 'var(--surface)',
                 outline: 'none', boxSizing: 'border-box',
                 fontFamily: 'inherit',
               }}
@@ -222,9 +222,9 @@ export function HelpButton() {
           </div>
 
           {/* FAQ list */}
-          <div style={{ overflowY: 'auto', flex: 1 }}>
+          <div style={{ overflowY: 'auto', flex: 1, background: 'var(--surface)' }}>
             {filtered.length === 0 ? (
-              <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--muted,#94a3b8)', fontSize: 13 }}>
+              <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
                 No results for &ldquo;{search}&rdquo;
               </div>
             ) : (
@@ -233,14 +233,14 @@ export function HelpButton() {
                 return (
                   <div
                     key={i}
-                    style={{ borderBottom: i < filtered.length - 1 ? '1px solid var(--border,#f1f5f9)' : 'none' }}
+                    style={{ borderBottom: i < filtered.length - 1 ? '1px solid var(--border-light)' : 'none' }}
                   >
                     <button
                       onClick={() => setExpanded(isOpen ? null : i)}
                       style={{
                         width: '100%', textAlign: 'left',
                         padding: '13px 16px',
-                        background: isOpen ? 'rgba(13,148,136,0.04)' : 'transparent',
+                        background: isOpen ? 'rgba(13,148,136,0.08)' : 'transparent',
                         border: 'none', cursor: 'pointer',
                         display: 'flex', alignItems: 'flex-start', gap: 10,
                         fontFamily: 'inherit',
@@ -249,13 +249,13 @@ export function HelpButton() {
                       aria-expanded={isOpen}
                     >
                       <span style={{
-                        fontSize: 11, fontWeight: 700, color: '#0d9488',
+                        fontSize: 11, fontWeight: 700, color: 'var(--brand)',
                         flexShrink: 0, marginTop: 2,
                         transition: 'transform 0.2s',
                         display: 'inline-block',
                         transform: isOpen ? 'rotate(90deg)' : 'none',
                       }}>▶</span>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg,#0f172a)', lineHeight: 1.45 }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.45 }}>
                         {item.q}
                       </span>
                     </button>
@@ -263,9 +263,9 @@ export function HelpButton() {
                     {isOpen && (
                       <div style={{
                         padding: '0 16px 14px 38px',
-                        fontSize: 13, color: 'var(--muted,#475569)',
+                        fontSize: 13, color: 'var(--text-secondary)',
                         lineHeight: 1.6,
-                        background: 'rgba(13,148,136,0.04)',
+                        background: 'rgba(13,148,136,0.08)',
                       }}>
                         {item.a}
                       </div>
@@ -279,18 +279,18 @@ export function HelpButton() {
           {/* Footer — report issue link */}
           <div style={{
             padding: '10px 16px',
-            borderTop: '1px solid var(--border,#e2e8f0)',
-            background: 'var(--surface-2,#f8fafc)',
+            borderTop: '1px solid var(--border)',
+            background: 'var(--surface-subtle)',
             flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           }}>
-            <span style={{ fontSize: 12, color: 'var(--muted,#94a3b8)' }}>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
               Didn&apos;t find your answer?
             </span>
             <button
               onClick={() => { setOpen(false); router.push('/dashboard?report=1') }}
               style={{
-                fontSize: 12, fontWeight: 600, color: '#0d9488',
+                fontSize: 12, fontWeight: 600, color: 'var(--brand)',
                 background: 'transparent', border: 'none',
                 cursor: 'pointer', padding: 0, fontFamily: 'inherit',
                 textDecoration: 'underline',
