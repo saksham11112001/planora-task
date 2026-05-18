@@ -1113,12 +1113,12 @@ export function WalkthroughOverlay({ userId, userCreatedAt, tourCompletedAt, sta
         <div
           onClick={e => e.stopPropagation()}
           style={{ width:'100%', maxWidth:860, borderRadius:24,
-            background:'#fff', overflow:'hidden',
+            background:'var(--surface)', overflow:'hidden',
             boxShadow:'0 40px 100px rgba(0,0,0,0.4), 0 12px 32px rgba(0,0,0,0.2)',
             display:'flex', flexDirection:'column' }}>
 
           {/* Progress bar */}
-          <div style={{ height:3, background:'#f1f5f9', position:'relative', flexShrink:0 }}>
+          <div style={{ height:3, background:'var(--border-light)', position:'relative', flexShrink:0 }}>
             <div style={{ position:'absolute', inset:0, width:`${pct}%`,
               background:`linear-gradient(90deg,${cur.color},${cur.color}aa)`,
               transition:'width 0.4s cubic-bezier(0.65,0,0.35,1)', borderRadius:99 }}/>
@@ -1133,7 +1133,7 @@ export function WalkthroughOverlay({ userId, userCreatedAt, tourCompletedAt, sta
               style={{ width:'42%', flexShrink:0, display:'flex', alignItems:'center',
                 justifyContent:'center', padding:'28px 20px 24px 28px',
                 background:`linear-gradient(145deg, ${cur.accent}, ${cur.accent.replace('0.1','0.04')})`,
-                borderRight:'1px solid rgba(0,0,0,0.06)' }}>
+                borderRight:'1px solid var(--border)' }}>
               <Illustration/>
             </div>
 
@@ -1152,17 +1152,17 @@ export function WalkthroughOverlay({ userId, userCreatedAt, tourCompletedAt, sta
                     display:'flex', alignItems:'center', justifyContent:'center', fontSize:16 }}>
                     {cur.icon}
                   </div>
-                  <span style={{ fontSize:11, fontWeight:700, color:'#94a3b8',
+                  <span style={{ fontSize:11, fontWeight:700, color:'var(--text-muted)',
                     textTransform:'uppercase', letterSpacing:'0.08em' }}>
                     {isFirst ? 'Getting started' : isLast ? 'All done' : `Step ${step} of ${STEPS.length - 2}`}
                   </span>
                 </div>
                 <button onClick={dismiss} title="Skip tour"
                   style={{ width:28, height:28, borderRadius:8, border:'none',
-                    background:'#f8fafc', cursor:'pointer', display:'flex',
-                    alignItems:'center', justifyContent:'center', color:'#94a3b8' }}
-                  onMouseEnter={e => { const el=e.currentTarget as HTMLElement; el.style.background='#fee2e2'; el.style.color='#dc2626' }}
-                  onMouseLeave={e => { const el=e.currentTarget as HTMLElement; el.style.background='#f8fafc'; el.style.color='#94a3b8' }}>
+                    background:'var(--surface-subtle)', cursor:'pointer', display:'flex',
+                    alignItems:'center', justifyContent:'center', color:'var(--text-muted)' }}
+                  onMouseEnter={e => { const el=e.currentTarget as HTMLElement; el.style.background='rgba(220,38,38,0.12)'; el.style.color='#dc2626' }}
+                  onMouseLeave={e => { const el=e.currentTarget as HTMLElement; el.style.background='var(--surface-subtle)'; el.style.color='var(--text-muted)' }}>
                   <X size={13}/>
                 </button>
               </div>
@@ -1175,12 +1175,12 @@ export function WalkthroughOverlay({ userId, userCreatedAt, tourCompletedAt, sta
               </div>
 
               {/* Title */}
-              <h2 style={{ margin:'0 0 10px', fontSize:22, fontWeight:800, color:'#0f172a', lineHeight:1.2 }}>
+              <h2 style={{ margin:'0 0 10px', fontSize:22, fontWeight:800, color:'var(--text-primary)', lineHeight:1.2 }}>
                 {cur.title}
               </h2>
 
               {/* Body */}
-              <p style={{ margin:'0 0 18px', fontSize:13, color:'#475569', lineHeight:1.75 }}>
+              <p style={{ margin:'0 0 18px', fontSize:13, color:'var(--text-secondary)', lineHeight:1.75 }}>
                 {cur.body}
               </p>
 
@@ -1193,7 +1193,7 @@ export function WalkthroughOverlay({ userId, userCreatedAt, tourCompletedAt, sta
                     <span style={{ width:26, height:26, borderRadius:8, background:cur.accent,
                       display:'flex', alignItems:'center', justifyContent:'center',
                       fontSize:13, flexShrink:0 }}>{b.emoji}</span>
-                    <span style={{ fontSize:12.5, color:'#334155', lineHeight:1.55, paddingTop:4 }}>{b.text}</span>
+                    <span style={{ fontSize:12.5, color:'var(--text-primary)', lineHeight:1.55, paddingTop:4 }}>{b.text}</span>
                   </div>
                 ))}
               </div>
@@ -1219,28 +1219,28 @@ export function WalkthroughOverlay({ userId, userCreatedAt, tourCompletedAt, sta
                   <button key={i} className="wt-dot" onClick={() => goTo(i, i > step ? 'forward' : 'back')}
                     title={`Step ${i+1}`}
                     style={{ width: i===step ? 22 : 6, height:6, borderRadius:99, border:'none',
-                      background: i===step ? cur.color : i<step ? `${cur.color}55` : '#e2e8f0',
+                      background: i===step ? cur.color : i<step ? `${cur.color}55` : 'var(--border)',
                       boxShadow: i===step ? `0 0 6px ${cur.color}60` : 'none' }}/>
                 ))}
-                <span style={{ marginLeft:'auto', fontSize:10, color:'#cbd5e1' }}>← →</span>
+                <span style={{ marginLeft:'auto', fontSize:10, color:'var(--text-muted)' }}>← →</span>
               </div>
 
               {/* Navigation row */}
               <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                <button onClick={dismiss} style={{ fontSize:11, fontWeight:500, color:'#b0bec5',
+                <button onClick={dismiss} style={{ fontSize:11, fontWeight:500, color:'var(--text-muted)',
                   background:'none', border:'none', cursor:'pointer', padding:'6px 0', marginRight:'auto' }}
-                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.color='#64748b'}
-                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.color='#b0bec5'}>
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.color='var(--text-secondary)'}
+                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.color='var(--text-muted)'}>
                   Skip tour
                 </button>
 
                 {step > 0 && (
                   <button onClick={retreat} className="wt-nav-btn"
                     style={{ display:'flex', alignItems:'center', gap:4, padding:'8px 16px',
-                      borderRadius:10, border:'1.5px solid #e2e8f0', background:'#fff',
-                      color:'#475569', fontSize:13, fontWeight:600, cursor:'pointer' }}
-                    onMouseEnter={e => { const el=e.currentTarget as HTMLElement; el.style.borderColor='#cbd5e1'; el.style.background='#f8fafc' }}
-                    onMouseLeave={e => { const el=e.currentTarget as HTMLElement; el.style.borderColor='#e2e8f0'; el.style.background='#fff' }}>
+                      borderRadius:10, border:'1.5px solid var(--border)', background:'var(--surface)',
+                      color:'var(--text-secondary)', fontSize:13, fontWeight:600, cursor:'pointer' }}
+                    onMouseEnter={e => { const el=e.currentTarget as HTMLElement; el.style.borderColor='var(--brand)'; el.style.background='var(--surface-subtle)' }}
+                    onMouseLeave={e => { const el=e.currentTarget as HTMLElement; el.style.borderColor='var(--border)'; el.style.background='var(--surface)' }}>
                     <ChevronLeft size={14}/> Back
                   </button>
                 )}
