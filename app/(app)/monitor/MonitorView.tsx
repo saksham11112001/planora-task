@@ -984,6 +984,13 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
                         {task.client.name}
                       </span>
                     )}
+                    {task.project && (
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 10,
+                        color: '#7c3aed', flexShrink: 0 }}>
+                        <span style={{ fontSize: 9 }}>◈</span>
+                        {task.project.name}
+                      </span>
+                    )}
                   </div>
 
                   {/* Type */}
