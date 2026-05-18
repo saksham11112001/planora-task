@@ -1,0 +1,1062 @@
+{
+  "name": "03 · AI Community Operations",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 2 * * 1-5" }]
+        }
+      },
+      "id": "wa-trigger",
+      "name": "WA: Daily Trigger (Mon-Fri 7:30 IST)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 100]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/content_queue?status=eq.published&whatsapp_sent=is.null&order=scheduled_at.asc&limit=1",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_ROLE_KEY }}" },
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_ROLE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "wa-fetch-post",
+      "name": "WA: Fetch Today's Approved Post",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [240, 100]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [{
+            "leftValue": "={{ $json.length }}",
+            "rightValue": 0,
+            "operator": { "type": "number", "operation": "gt" }
+          }],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "wa-has-content",
+      "name": "WA: Has Content?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [480, 100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "={{ $env.ANTHROPIC_API_KEY }}" },
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-6\",\n  \"max_tokens\": 400,\n  \"messages\": [{\n    \"role\": \"user\",\n    \"content\": \"You are Saksham, founder of Planora — a CA-focused task management SaaS and AI community for CA firms in India.\\n\\nConvert this LinkedIn post into a WhatsApp community drop. Rules:\\n- Under 180 words\\n- Conversational, no jargon\\n- Start with a hook (question or bold statement)\\n- 1 key insight or tip\\n- End with a question to spark replies\\n- No bullet points — flowing text\\n- Max 2 emojis\\n\\nLinkedIn post:\\n{{ $('WA: Fetch Today\\'s Approved Post').item.json[0].linkedin_content }}\\n\\nTopic: {{ $('WA: Fetch Today\\'s Approved Post').item.json[0].idea_title }}\\n\\nReturn ONLY the WhatsApp message text, nothing else.\"\n  }]\n}",
+        "options": {}
+      },
+      "id": "wa-claude-repurpose",
+      "name": "WA: Claude Repurpose for WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [720, 60]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.item.json.content[0].text;\nconst postId = $('WA: Fetch Today\\'s Approved Post').item.json[0].id;\nreturn [{ json: { whatsapp_message: raw, post_id: postId } }];"
+      },
+      "id": "wa-parse",
+      "name": "WA: Parse Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [960, 60]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v18.0/{{ $env.WHATSAPP_PHONE_NUMBER_ID }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.WHATSAPP_TOKEN }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{ $env.WHATSAPP_COMMUNITY_GROUP_ID }}\",\n  \"type\": \"text\",\n  \"text\": { \"body\": \"{{ $json.whatsapp_message }}\" }\n}",
+        "options": {}
+      },
+      "id": "wa-post",
+      "name": "WA: Post to Community Group",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1200, 60]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/content_queue?id=eq.{{ $('WA: Parse Message').item.json.post_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_ROLE_KEY }}" },
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_ROLE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=minimal" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"whatsapp_sent\": true,\n  \"whatsapp_content\": \"{{ $('WA: Parse Message').item.json.whatsapp_message }}\"\n}",
+        "options": {}
+      },
+      "id": "wa-mark-sent",
+      "name": "WA: Mark Sent in Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1440, 60]
+    },
+    {
+      "parameters": {},
+      "id": "wa-skip",
+      "name": "WA: No Post Today (Skip)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [720, 180]
+    },
+
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "30 12 * * 0" }]
+        }
+      },
+      "id": "nl-trigger",
+      "name": "NL: Sunday 6pm IST Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 500]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/content_queue?status=eq.published&created_at=gte.{{ $now.minus({days:7}).toISODate() }}&order=li_impressions.desc&limit=5&select=idea_title,linkedin_content,instagram_caption,li_impressions,li_reactions,ig_likes,ig_comments",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_ROLE_KEY }}" },
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_ROLE_KEY }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "nl-fetch-posts",
+      "name": "NL: Fetch Week's Top Posts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [240, 500]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/community_members?created_at=gte.{{ $now.minus({days:7}).toISODate() }}&select=count",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_ROLE_KEY }}" },
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_ROLE_KEY }}" },
+            { "name": "Prefer", "value": "count=exact" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "nl-fetch-members",
+      "name": "NL: Fetch New Members This Week",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [240, 620]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "nl-merge",
+      "name": "NL: Merge Newsletter Data",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [480, 560]
+    },
+    {
+      "parameters": {
+        "jsCode": "const posts = $('NL: Fetch Week\\'s Top Posts').all().map(i => i.json);\nconst newMemberCount = parseInt($('NL: Fetch New Members This Week').item.json[0]?.count || '0');\nconst postsText = posts.map((p, i) =>\n  `${i+1}. \"${p.idea_title}\" — ${p.li_impressions || 0} impressions, ${p.li_reactions || 0} reactions`\n).join('\\n');\nconst topPost = posts[0] || {};\nreturn [{ json: { postsText, newMemberCount, topPostTitle: topPost.idea_title, topPostContent: topPost.linkedin_content } }];"
+      },
+      "id": "nl-prep",
+      "name": "NL: Prepare Newsletter Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 560]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "={{ $env.ANTHROPIC_API_KEY }}" },
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-6\",\n  \"max_tokens\": 2000,\n  \"messages\": [{\n    \"role\": \"user\",\n    \"content\": \"You are Saksham, founder of Planora and an AI community for CA firms in India (co-run with Sachit, a CA). Write a weekly newsletter.\\n\\nThis week's content performance:\\n{{ $json.postsText }}\\n\\nNew community members this week: {{ $json.newMemberCount }}\\nTop post: {{ $json.topPostTitle }}\\n\\nWrite in this format:\\n---SUBJECT---\\n[Punchy subject line, under 60 chars, no clickbait]\\n---HTML---\\n[Full HTML email body. Sections: (1) This week in AI for CAs — 2-3 sentences, (2) Top post of the week — excerpt + insight, (3) Tool tip of the week — one practical AI tip for CA firms, (4) Community highlight — celebrate new members, encourage engagement, (5) One thing to do this week — single actionable step. Sign off as Saksham. Footer with unsubscribe placeholder.]\\n---END---\\n\\nTone: direct, warm, no corporate fluff. Like a founder talking to early believers.\"\n  }]\n}",
+        "options": {}
+      },
+      "id": "nl-claude",
+      "name": "NL: Claude Draft Newsletter",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [960, 560]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.item.json.content[0].text;\nconst subjectMatch = raw.match(/---SUBJECT---\\n([\\s\\S]*?)\\n---HTML---/);\nconst htmlMatch = raw.match(/---HTML---\\n([\\s\\S]*?)\\n---END---/);\nconst subject = subjectMatch ? subjectMatch[1].trim() : 'Weekly AI for CAs digest';\nconst html = htmlMatch ? htmlMatch[1].trim() : raw;\nreturn [{ json: { subject, html, generated_at: new Date().toISOString() } }];"
+      },
+      "id": "nl-parse",
+      "name": "NL: Parse Subject + HTML",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1200, 560]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/newsletter_queue",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_ROLE_KEY }}" },
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_ROLE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=representation" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"subject\": \"{{ $json.subject }}\",\n  \"html_body\": {{ JSON.stringify($json.html) }},\n  \"status\": \"pending_review\",\n  \"week_of\": \"{{ $now.toISODate() }}\"\n}",
+        "options": {}
+      },
+      "id": "nl-save",
+      "name": "NL: Save Draft to Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1440, 560]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.RESEND_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"from\": \"Planora <{{ $env.FROM_EMAIL }}>\",\n  \"to\": [\"saksham.gpt2001@gmail.com\"],\n  \"subject\": \"[REVIEW] Newsletter draft: {{ $('NL: Parse Subject + HTML').item.json.subject }}\",\n  \"html\": \"<p><strong>Newsletter draft ready for review.</strong></p><p>Newsletter ID: {{ $('NL: Save Draft to Supabase').item.json[0].id }}</p><p>To publish, POST to your n8n webhook: <code>/webhook/newsletter-publish</code> with body <code>{newsletter_id: \\\"ID\\\"}</code></p><hr/>{{ $('NL: Parse Subject + HTML').item.json.html }}\"\n}",
+        "options": {}
+      },
+      "id": "nl-preview-email",
+      "name": "NL: Email Preview to Admin",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1680, 560]
+    },
+
+    {
+      "parameters": {
+        "path": "newsletter-publish",
+        "options": {}
+      },
+      "id": "nl-publish-webhook",
+      "name": "NL: Publish Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 800]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/newsletter_queue?id=eq.{{ $json.body.newsletter_id }}&select=subject,html_body",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_ROLE_KEY }}" },
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_ROLE_KEY }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "nl-fetch-draft",
+      "name": "NL: Fetch Approved Draft",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [240, 800]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/newsletter_subscribers?status=eq.active&select=email,name",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_ROLE_KEY }}" },
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_ROLE_KEY }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "nl-fetch-subs",
+      "name": "NL: Fetch Subscriber List",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 800]
+    },
+    {
+      "parameters": {
+        "batchSize": 50,
+        "options": {}
+      },
+      "id": "nl-batch-subs",
+      "name": "NL: Batch Subscribers 50 per batch",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [720, 800]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails/batch",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.RESEND_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $input.all().map(item => ({ from: `Saksham from Planora <${$env.FROM_EMAIL}>`, to: [item.json.email], subject: $('NL: Fetch Approved Draft').item.json[0].subject, html: $('NL: Fetch Approved Draft').item.json[0].html_body })) }}",
+        "options": {}
+      },
+      "id": "nl-send-batch",
+      "name": "NL: Send Batch via Resend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [960, 800]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/newsletter_queue?id=eq.{{ $('NL: Publish Webhook').item.json.body.newsletter_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_ROLE_KEY }}" },
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_ROLE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=minimal" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"status\": \"sent\", \"sent_at\": \"{{ $now.toISO() }}\" }",
+        "options": {}
+      },
+      "id": "nl-mark-sent",
+      "name": "NL: Mark Newsletter Sent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1200, 800]
+    },
+
+    {
+      "parameters": {
+        "path": "community-member-joined",
+        "options": {}
+      },
+      "id": "member-webhook",
+      "name": "Member: Join Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 1100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/community_members",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_ROLE_KEY }}" },
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_ROLE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=representation" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"name\": \"{{ $json.body.name }}\",\n  \"email\": \"{{ $json.body.email }}\",\n  \"phone\": \"{{ $json.body.phone }}\",\n  \"tier\": \"{{ $json.body.tier || 'free' }}\",\n  \"joined_at\": \"{{ $now.toISO() }}\"\n}",
+        "options": {}
+      },
+      "id": "member-save",
+      "name": "Member: Save to Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [240, 1100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.RESEND_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"from\": \"Saksham from Planora <{{ $env.FROM_EMAIL }}>\",\n  \"to\": [\"{{ $('Member: Join Webhook').item.json.body.email }}\"],\n  \"subject\": \"Welcome to the AI for CAs community\",\n  \"html\": \"<p>Hey {{ $('Member: Join Webhook').item.json.body.name }},</p><p>You're in. Welcome to the community.</p><p>Here's what happens next:</p><ul><li><strong>WhatsApp drop</strong> — every weekday morning, one practical AI tip for CA firms. Short, actionable, no fluff.</li><li><strong>Weekly newsletter</strong> — Sunday evenings, what worked this week plus a tool tip you can use Monday morning.</li><li><strong>Prompt library</strong> (Pro members) — 200+ CA-specific prompts, searchable and copy-paste ready.</li></ul><p>One thing to do right now: reply to this email and tell me the #1 thing eating your time as a CA firm. I read every reply.</p><p>— Saksham</p><p style='font-size:12px;color:#94a3b8;'>Planora · sng-adwisers.com</p>\"\n}",
+        "options": {}
+      },
+      "id": "member-welcome-email",
+      "name": "Member: Send Welcome Email Day 0",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 1060]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v18.0/{{ $env.WHATSAPP_PHONE_NUMBER_ID }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.WHATSAPP_TOKEN }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{ $('Member: Join Webhook').item.json.body.phone }}\",\n  \"type\": \"text\",\n  \"text\": { \"body\": \"Hey {{ $('Member: Join Webhook').item.json.body.name }}! Welcome to the AI for CAs community.\\n\\nYou'll get a daily morning drop — one AI tip for CA firms, straight to WhatsApp.\\n\\nIf you ever want to automate something specific in your firm, just message here and I'll look into it. — Saksham\" }\n}",
+        "options": {}
+      },
+      "id": "member-welcome-wa",
+      "name": "Member: Send WA Welcome Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 1180]
+    },
+    {
+      "parameters": {
+        "amount": 3,
+        "unit": "days"
+      },
+      "id": "member-wait-3d",
+      "name": "Member: Wait 3 Days",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [720, 1100]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/community_members?email=eq.{{ $('Member: Join Webhook').item.json.body.email }}&select=last_active_at,whatsapp_replies",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_ROLE_KEY }}" },
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_ROLE_KEY }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "member-check-activity",
+      "name": "Member: Check Day-3 Activity",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [960, 1100]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [{
+            "leftValue": "={{ $json[0].whatsapp_replies }}",
+            "rightValue": 0,
+            "operator": { "type": "number", "operation": "lte" }
+          }],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "member-is-silent",
+      "name": "Member: Is Silent?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1200, 1100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.RESEND_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"from\": \"Saksham from Planora <{{ $env.FROM_EMAIL }}>\",\n  \"to\": [\"{{ $('Member: Join Webhook').item.json.body.email }}\"],\n  \"subject\": \"Quick question for you\",\n  \"html\": \"<p>Hey {{ $('Member: Join Webhook').item.json.body.name }},</p><p>3 days in — how's it going?</p><p>I'm curious: what's the biggest compliance headache in your firm right now? GST reconciliation? TDS tracking? Client follow-ups?</p><p>I ask because I'm building tools specifically for CA firms, and I want to solve real problems, not imaginary ones.</p><p>Just hit reply — one sentence is enough.</p><p>— Saksham</p>\"\n}",
+        "options": {}
+      },
+      "id": "member-day3-nudge",
+      "name": "Member: Day-3 Re-engage Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1440, 1060]
+    },
+    {
+      "parameters": {},
+      "id": "member-active-skip",
+      "name": "Member: Already Engaged Skip",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1440, 1180]
+    },
+    {
+      "parameters": {
+        "amount": 4,
+        "unit": "days"
+      },
+      "id": "member-wait-day7",
+      "name": "Member: Wait 4 More Days Day 7",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1680, 1060]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.RESEND_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"from\": \"Saksham from Planora <{{ $env.FROM_EMAIL }}>\",\n  \"to\": [\"{{ $('Member: Join Webhook').item.json.body.email }}\"],\n  \"subject\": \"Your first AI automation for CA firms (ready to copy)\",\n  \"html\": \"<p>Hey {{ $('Member: Join Webhook').item.json.body.name }},</p><p>One week in. Here's something you can actually use today:</p><p><strong>The 5-minute GST reminder automation</strong><br/>Set up a recurring task in Planora for every GSTR-1 deadline. It emails your clients 7 days before and again 2 days before — automatically. Zero follow-up calls needed.</p><p>Takes 5 minutes to set up. Saves hours every quarter.</p><p>Try it: <a href='https://sng-adwisers.com/dashboard'>Open Planora</a> — first 30 days free, no credit card.</p><p>— Saksham</p>\"\n}",
+        "options": {}
+      },
+      "id": "member-day7-email",
+      "name": "Member: Day-7 Value Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1920, 1060]
+    },
+
+    {
+      "parameters": {
+        "path": "tool-launch",
+        "options": {}
+      },
+      "id": "launch-webhook",
+      "name": "Launch: Tool Launch Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 1500]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "={{ $env.ANTHROPIC_API_KEY }}" },
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-6\",\n  \"max_tokens\": 1500,\n  \"messages\": [{\n    \"role\": \"user\",\n    \"content\": \"You are Saksham, founder of Planora. You just launched a new AI tool for CA firms.\\n\\nTool details:\\nName: {{ $json.body.tool_name }}\\nTagline: {{ $json.body.tagline }}\\nDescription: {{ $json.body.description }}\\nPrice: Rs. {{ $json.body.price_inr }}\\nURL: {{ $json.body.url }}\\nCategory: {{ $json.body.category }}\\n\\nGenerate launch content in this EXACT format:\\n---LINKEDIN---\\n[Hook line. Story of why you built it. What problem it solves. 3 bullets on what it does. CTA to URL. 900-1100 chars. Founder voice — real, not corporate.]\\n---INSTAGRAM---\\n[Punchy caption, max 220 chars. 1 emoji. 15 relevant hashtags on new line.]\\n---WHATSAPP---\\n[Community announcement under 150 words. Conversational. Why it matters to CAs. Price or free mention. One question to spark replies.]\\n---END---\"\n  }]\n}",
+        "options": {}
+      },
+      "id": "launch-claude",
+      "name": "Launch: Claude Generate Content",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [240, 1500]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.item.json.content[0].text;\nconst liMatch = raw.match(/---LINKEDIN---\\n([\\s\\S]*?)\\n---INSTAGRAM---/);\nconst igMatch = raw.match(/---INSTAGRAM---\\n([\\s\\S]*?)\\n---WHATSAPP---/);\nconst waMatch = raw.match(/---WHATSAPP---\\n([\\s\\S]*?)\\n---END---/);\nconst tool = $('Launch: Tool Launch Webhook').item.json.body;\nreturn [{ json: {\n  linkedin: liMatch ? liMatch[1].trim() : '',\n  instagram: igMatch ? igMatch[1].trim() : '',\n  whatsapp: waMatch ? waMatch[1].trim() : '',\n  tool_name: tool.tool_name,\n  tool_url: tool.url,\n  price_inr: tool.price_inr\n}}];"
+      },
+      "id": "launch-parse",
+      "name": "Launch: Parse Content Sections",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 1500]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linkedin.com/v2/ugcPosts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.LINKEDIN_ACCESS_TOKEN }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Restli-Protocol-Version", "value": "2.0.0" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"author\": \"urn:li:person:{{ $env.LINKEDIN_PERSON_URN }}\",\n  \"lifecycleState\": \"PUBLISHED\",\n  \"specificContent\": {\n    \"com.linkedin.ugc.ShareContent\": {\n      \"shareCommentary\": { \"text\": \"{{ $json.linkedin }}\" },\n      \"shareMediaCategory\": \"NONE\"\n    }\n  },\n  \"visibility\": { \"com.linkedin.ugc.MemberNetworkVisibility\": \"PUBLIC\" }\n}",
+        "options": {}
+      },
+      "id": "launch-linkedin",
+      "name": "Launch: Post to LinkedIn",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [720, 1420]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v18.0/{{ $env.INSTAGRAM_ACCOUNT_ID }}/media",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"caption\": \"{{ $('Launch: Parse Content Sections').item.json.instagram }}\",\n  \"image_url\": \"{{ $env.DEFAULT_TOOL_LAUNCH_IMAGE_URL }}\",\n  \"access_token\": \"{{ $env.INSTAGRAM_ACCESS_TOKEN }}\"\n}",
+        "options": {}
+      },
+      "id": "launch-ig-container",
+      "name": "Launch: Instagram Create Container",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [720, 1540]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v18.0/{{ $env.INSTAGRAM_ACCOUNT_ID }}/media_publish",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"creation_id\": \"{{ $json.id }}\",\n  \"access_token\": \"{{ $env.INSTAGRAM_ACCESS_TOKEN }}\"\n}",
+        "options": {}
+      },
+      "id": "launch-ig-publish",
+      "name": "Launch: Instagram Publish",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [960, 1540]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v18.0/{{ $env.WHATSAPP_PHONE_NUMBER_ID }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.WHATSAPP_TOKEN }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{ $env.WHATSAPP_COMMUNITY_GROUP_ID }}\",\n  \"type\": \"text\",\n  \"text\": { \"body\": \"{{ $('Launch: Parse Content Sections').item.json.whatsapp }}\" }\n}",
+        "options": {}
+      },
+      "id": "launch-wa",
+      "name": "Launch: Post to WhatsApp Community",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [720, 1660]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "launch-merge",
+      "name": "Launch: Merge All Results",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [1200, 1540]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/content_queue",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_ROLE_KEY }}" },
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_ROLE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"idea_title\": \"Tool Launch: {{ $('Launch: Parse Content Sections').item.json.tool_name }}\",\n  \"linkedin_content\": \"{{ $('Launch: Parse Content Sections').item.json.linkedin }}\",\n  \"instagram_caption\": \"{{ $('Launch: Parse Content Sections').item.json.instagram }}\",\n  \"whatsapp_content\": \"{{ $('Launch: Parse Content Sections').item.json.whatsapp }}\",\n  \"status\": \"published\",\n  \"whatsapp_sent\": true,\n  \"topic_angle\": \"tool_launch\",\n  \"scheduled_at\": \"{{ $now.toISO() }}\"\n}",
+        "options": {}
+      },
+      "id": "launch-save",
+      "name": "Launch: Save to content_queue",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1440, 1540]
+    },
+
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "30 3 * * 1" }]
+        }
+      },
+      "id": "mrr-trigger",
+      "name": "MRR: Monday 9am IST Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 1900]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/organisations?created_at=gte.{{ $now.minus({days:7}).toISODate() }}&select=id,name,plan_tier,created_at",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_ROLE_KEY }}" },
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_ROLE_KEY }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "mrr-new-orgs",
+      "name": "MRR: Fetch New Orgs This Week",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [240, 1860]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/community_members?created_at=gte.{{ $now.minus({days:7}).toISODate() }}&select=name,tier",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_ROLE_KEY }}" },
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_ROLE_KEY }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "mrr-new-members",
+      "name": "MRR: Fetch New Community Members",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [240, 1980]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/newsletter_subscribers?status=eq.active&select=id",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_ROLE_KEY }}" },
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_ROLE_KEY }}" },
+            { "name": "Prefer", "value": "count=exact" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "mrr-subs-count",
+      "name": "MRR: Fetch Newsletter Sub Count",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [240, 2100]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "mrr-merge",
+      "name": "MRR: Merge Stats",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [480, 1980]
+    },
+    {
+      "parameters": {
+        "jsCode": "const newOrgs = $('MRR: Fetch New Orgs This Week').all().map(i => i.json);\nconst newMembers = $('MRR: Fetch New Community Members').all().map(i => i.json);\nconst nlSubs = $('MRR: Fetch Newsletter Sub Count').all().length;\n\nconst paidOrgs = newOrgs.filter(o => o.plan_tier !== 'free');\nconst newOrgsList = newOrgs.length > 0\n  ? newOrgs.map(o => `• ${o.name} (${o.plan_tier})`).join('\\n')\n  : 'None this week';\n\nconst weekDate = new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });\n\nreturn [{ json: {\n  newOrgCount: newOrgs.length,\n  paidOrgCount: paidOrgs.length,\n  newOrgsList,\n  newCommunityMemberCount: newMembers.length,\n  newsletterSubCount: nlSubs,\n  weekOf: weekDate\n}}];"
+      },
+      "id": "mrr-prep",
+      "name": "MRR: Prepare Digest Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 1980]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "={{ $env.ANTHROPIC_API_KEY }}" },
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-6\",\n  \"max_tokens\": 800,\n  \"messages\": [{\n    \"role\": \"user\",\n    \"content\": \"Write a concise weekly metrics digest for Saksham (founder of Planora + AI community for CA firms). No fluff. Just the numbers and one sentence of context per metric.\\n\\nWeek of: {{ $json.weekOf }}\\n\\nPlanora:\\n- New orgs signed up: {{ $json.newOrgCount }} ({{ $json.paidOrgCount }} paid)\\n- New orgs: {{ $json.newOrgsList }}\\n\\nAI Community:\\n- New community members: {{ $json.newCommunityMemberCount }}\\n- Newsletter subscribers total: {{ $json.newsletterSubCount }}\\n\\nFormat as clean HTML. Use a table for the numbers. Add a 'Focus this week' section with 1-2 suggested actions based on what the numbers indicate. Sign off as 'Your automation, not your VA'.\"\n  }]\n}",
+        "options": {}
+      },
+      "id": "mrr-claude",
+      "name": "MRR: Claude Format Digest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [960, 1980]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.RESEND_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"from\": \"Planora Metrics <{{ $env.FROM_EMAIL }}>\",\n  \"to\": [\"saksham.gpt2001@gmail.com\"],\n  \"subject\": \"Weekly digest — {{ $('MRR: Prepare Digest Context').item.json.weekOf }}\",\n  \"html\": \"{{ $json.content[0].text }}\"\n}",
+        "options": {}
+      },
+      "id": "mrr-send",
+      "name": "MRR: Send Digest Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1200, 1980]
+    }
+  ],
+
+  "connections": {
+    "WA: Daily Trigger (Mon-Fri 7:30 IST)": {
+      "main": [[{ "node": "WA: Fetch Today's Approved Post", "type": "main", "index": 0 }]]
+    },
+    "WA: Fetch Today's Approved Post": {
+      "main": [[{ "node": "WA: Has Content?", "type": "main", "index": 0 }]]
+    },
+    "WA: Has Content?": {
+      "main": [
+        [{ "node": "WA: Claude Repurpose for WhatsApp", "type": "main", "index": 0 }],
+        [{ "node": "WA: No Post Today (Skip)", "type": "main", "index": 0 }]
+      ]
+    },
+    "WA: Claude Repurpose for WhatsApp": {
+      "main": [[{ "node": "WA: Parse Message", "type": "main", "index": 0 }]]
+    },
+    "WA: Parse Message": {
+      "main": [[{ "node": "WA: Post to Community Group", "type": "main", "index": 0 }]]
+    },
+    "WA: Post to Community Group": {
+      "main": [[{ "node": "WA: Mark Sent in Supabase", "type": "main", "index": 0 }]]
+    },
+    "NL: Sunday 6pm IST Trigger": {
+      "main": [
+        [{ "node": "NL: Fetch Week's Top Posts", "type": "main", "index": 0 }],
+        [{ "node": "NL: Fetch New Members This Week", "type": "main", "index": 0 }]
+      ]
+    },
+    "NL: Fetch Week's Top Posts": {
+      "main": [[{ "node": "NL: Merge Newsletter Data", "type": "main", "index": 0 }]]
+    },
+    "NL: Fetch New Members This Week": {
+      "main": [[{ "node": "NL: Merge Newsletter Data", "type": "main", "index": 1 }]]
+    },
+    "NL: Merge Newsletter Data": {
+      "main": [[{ "node": "NL: Prepare Newsletter Context", "type": "main", "index": 0 }]]
+    },
+    "NL: Prepare Newsletter Context": {
+      "main": [[{ "node": "NL: Claude Draft Newsletter", "type": "main", "index": 0 }]]
+    },
+    "NL: Claude Draft Newsletter": {
+      "main": [[{ "node": "NL: Parse Subject + HTML", "type": "main", "index": 0 }]]
+    },
+    "NL: Parse Subject + HTML": {
+      "main": [[{ "node": "NL: Save Draft to Supabase", "type": "main", "index": 0 }]]
+    },
+    "NL: Save Draft to Supabase": {
+      "main": [[{ "node": "NL: Email Preview to Admin", "type": "main", "index": 0 }]]
+    },
+    "NL: Publish Webhook": {
+      "main": [[{ "node": "NL: Fetch Approved Draft", "type": "main", "index": 0 }]]
+    },
+    "NL: Fetch Approved Draft": {
+      "main": [[{ "node": "NL: Fetch Subscriber List", "type": "main", "index": 0 }]]
+    },
+    "NL: Fetch Subscriber List": {
+      "main": [[{ "node": "NL: Batch Subscribers 50 per batch", "type": "main", "index": 0 }]]
+    },
+    "NL: Batch Subscribers 50 per batch": {
+      "main": [[{ "node": "NL: Send Batch via Resend", "type": "main", "index": 0 }]]
+    },
+    "NL: Send Batch via Resend": {
+      "main": [[{ "node": "NL: Mark Newsletter Sent", "type": "main", "index": 0 }]]
+    },
+    "Member: Join Webhook": {
+      "main": [[{ "node": "Member: Save to Supabase", "type": "main", "index": 0 }]]
+    },
+    "Member: Save to Supabase": {
+      "main": [
+        [{ "node": "Member: Send Welcome Email Day 0", "type": "main", "index": 0 }],
+        [{ "node": "Member: Send WA Welcome Message", "type": "main", "index": 0 }]
+      ]
+    },
+    "Member: Send Welcome Email Day 0": {
+      "main": [[{ "node": "Member: Wait 3 Days", "type": "main", "index": 0 }]]
+    },
+    "Member: Send WA Welcome Message": {
+      "main": [[{ "node": "Member: Wait 3 Days", "type": "main", "index": 0 }]]
+    },
+    "Member: Wait 3 Days": {
+      "main": [[{ "node": "Member: Check Day-3 Activity", "type": "main", "index": 0 }]]
+    },
+    "Member: Check Day-3 Activity": {
+      "main": [[{ "node": "Member: Is Silent?", "type": "main", "index": 0 }]]
+    },
+    "Member: Is Silent?": {
+      "main": [
+        [{ "node": "Member: Day-3 Re-engage Email", "type": "main", "index": 0 }],
+        [{ "node": "Member: Already Engaged Skip", "type": "main", "index": 0 }]
+      ]
+    },
+    "Member: Day-3 Re-engage Email": {
+      "main": [[{ "node": "Member: Wait 4 More Days Day 7", "type": "main", "index": 0 }]]
+    },
+    "Member: Wait 4 More Days Day 7": {
+      "main": [[{ "node": "Member: Day-7 Value Email", "type": "main", "index": 0 }]]
+    },
+    "Launch: Tool Launch Webhook": {
+      "main": [[{ "node": "Launch: Claude Generate Content", "type": "main", "index": 0 }]]
+    },
+    "Launch: Claude Generate Content": {
+      "main": [[{ "node": "Launch: Parse Content Sections", "type": "main", "index": 0 }]]
+    },
+    "Launch: Parse Content Sections": {
+      "main": [
+        [{ "node": "Launch: Post to LinkedIn", "type": "main", "index": 0 }],
+        [{ "node": "Launch: Instagram Create Container", "type": "main", "index": 0 }],
+        [{ "node": "Launch: Post to WhatsApp Community", "type": "main", "index": 0 }]
+      ]
+    },
+    "Launch: Post to LinkedIn": {
+      "main": [[{ "node": "Launch: Merge All Results", "type": "main", "index": 0 }]]
+    },
+    "Launch: Instagram Create Container": {
+      "main": [[{ "node": "Launch: Instagram Publish", "type": "main", "index": 0 }]]
+    },
+    "Launch: Instagram Publish": {
+      "main": [[{ "node": "Launch: Merge All Results", "type": "main", "index": 1 }]]
+    },
+    "Launch: Post to WhatsApp Community": {
+      "main": [[{ "node": "Launch: Merge All Results", "type": "main", "index": 2 }]]
+    },
+    "Launch: Merge All Results": {
+      "main": [[{ "node": "Launch: Save to content_queue", "type": "main", "index": 0 }]]
+    },
+    "MRR: Monday 9am IST Trigger": {
+      "main": [
+        [{ "node": "MRR: Fetch New Orgs This Week", "type": "main", "index": 0 }],
+        [{ "node": "MRR: Fetch New Community Members", "type": "main", "index": 0 }],
+        [{ "node": "MRR: Fetch Newsletter Sub Count", "type": "main", "index": 0 }]
+      ]
+    },
+    "MRR: Fetch New Orgs This Week": {
+      "main": [[{ "node": "MRR: Merge Stats", "type": "main", "index": 0 }]]
+    },
+    "MRR: Fetch New Community Members": {
+      "main": [[{ "node": "MRR: Merge Stats", "type": "main", "index": 1 }]]
+    },
+    "MRR: Fetch Newsletter Sub Count": {
+      "main": [[{ "node": "MRR: Merge Stats", "type": "main", "index": 2 }]]
+    },
+    "MRR: Merge Stats": {
+      "main": [[{ "node": "MRR: Prepare Digest Context", "type": "main", "index": 0 }]]
+    },
+    "MRR: Prepare Digest Context": {
+      "main": [[{ "node": "MRR: Claude Format Digest", "type": "main", "index": 0 }]]
+    },
+    "MRR: Claude Format Digest": {
+      "main": [[{ "node": "MRR: Send Digest Email", "type": "main", "index": 0 }]]
+    }
+  },
+
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "id": "03-community-operations",
+  "tags": ["community", "newsletter", "whatsapp", "onboarding", "automation"]
+}

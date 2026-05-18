@@ -38,7 +38,8 @@
       "Bash(grep -r \"Templates\" app/\\\\\\(app\\\\\\)/compliance --include=\"*.tsx\" -l)",
       "Bash(grep -r \"template\" app/\\\\\\(app\\\\\\)/compliance --include=\"*.tsx\" -l)",
       "Bash(dir \"C:\\\\Users\\\\saksh\\\\Desktop\\\\planora-task\\\\app\\\\api\\\\onboarding\")",
-      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\saksh\\\\Desktop\\\\planora-task\" -Force | Select-Object Name, @{Name=\"Type\"; Expression={if\\($_.PSIsContainer\\){\"Directory\"}else{\"File\"}}} | Format-Table -AutoSize)"
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\saksh\\\\Desktop\\\\planora-task\" -Force | Select-Object Name, @{Name=\"Type\"; Expression={if\\($_.PSIsContainer\\){\"Directory\"}else{\"File\"}}} | Format-Table -AutoSize)",
+      "Bash(node -e \"const fs = require\\('fs'\\); try { JSON.parse\\(fs.readFileSync\\('C:/Users/saksh/Desktop/planora-task/n8n-flows/03-community-operations.json', 'utf8'\\)\\); console.log\\('VALID JSON'\\); } catch\\(e\\) { console.log\\('INVALID:', e.message\\); }\")"
     ]
   }
 }
