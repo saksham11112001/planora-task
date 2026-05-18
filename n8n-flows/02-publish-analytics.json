@@ -1,5 +1,5 @@
 {
-  "name": "02 — Publish + Analytics Pipeline",
+  "name": "02 — Publish + Analytics Pipeline (Instagram · LinkedIn · YouTube)",
   "nodes": [
     {
       "parameters": {
@@ -14,7 +14,7 @@
       "typeVersion": 2,
       "position": [240, 400],
       "webhookId": "approve-post-webhook",
-      "notes": "Approval dashboard POSTs here with {post_id, action: 'approve'|'reject', scheduled_at?}"
+      "notes": "Dashboard POSTs: { post_id, action: 'approve'|'reject', scheduled_at?, youtube_video_url? }"
     },
     {
       "parameters": {
@@ -27,8 +27,7 @@
       "name": "Respond to Webhook",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [480, 300],
-      "notes": "Immediately returns 200 so the dashboard doesn't wait"
+      "position": [480, 280]
     },
     {
       "parameters": {
@@ -37,7 +36,7 @@
           "conditions": [
             {
               "id": "check-action",
-              "leftValue": "={{$json.body.action}}",
+              "leftValue":  "={{$json.body.action}}",
               "rightValue": "approve",
               "operator": { "type": "string", "operation": "equals" }
             }
@@ -49,8 +48,7 @@
       "name": "Is Approved?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [480, 480],
-      "notes": "Only proceed if action is 'approve'. Rejects go to No Op."
+      "position": [480, 460]
     },
     {
       "parameters": {},
@@ -58,7 +56,7 @@
       "name": "Rejected — Skip",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
-      "position": [720, 600]
+      "position": [720, 580]
     },
     {
       "parameters": {
@@ -67,27 +65,26 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_KEY}}" },
+            { "name": "apikey",        "value": "={{$env.SUPABASE_SERVICE_KEY}}" },
             { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_KEY}}" },
-            { "name": "Content-Type", "value": "application/json" },
-            { "name": "Prefer", "value": "return=representation" }
+            { "name": "Content-Type",  "value": "application/json" },
+            { "name": "Prefer",        "value": "return=representation" }
           ]
         },
         "sendBody": true,
         "contentType": "raw",
-        "rawBody": "={{\nJSON.stringify({\n  status: 'approved',\n  scheduled_at: $json.body.scheduled_at || null\n})\n}}",
+        "rawBody": "={{\nJSON.stringify({\n  status: 'approved',\n  scheduled_at: $json.body.scheduled_at || null,\n  image_url: $json.body.image_url || null,\n  carousel_image_urls: $json.body.carousel_image_urls || null,\n  youtube_video_url: $json.body.youtube_video_url || null\n})\n}}",
         "options": {}
       },
       "id": "22222222-0004-0004-0004-000000000004",
       "name": "Supabase: Fetch + Update Approved",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [720, 420],
-      "notes": "Updates status to approved and returns full post row"
+      "position": [720, 420]
     },
     {
       "parameters": {
-        "jsCode": "// Calculate the optimal posting time in IST\nconst postData = $input.first().json;\nconst webhookData = $('Webhook: Receive Approval').first().json.body;\n\n// If the dashboard sent a specific scheduled_at, use it\nif (webhookData.scheduled_at) {\n  return [{ json: { ...postData, scheduled_at: webhookData.scheduled_at } }];\n}\n\n// Otherwise calculate the next optimal slot\n// IST = UTC + 5:30\nconst istOffset = 5.5 * 60 * 60 * 1000;\nconst nowUTC = new Date();\nconst nowIST = new Date(nowUTC.getTime() + istOffset);\n\nconst hourIST = nowIST.getUTCHours();\nconst minIST = nowIST.getUTCMinutes();\nconst dayIST = nowIST.getUTCDay(); // 0=Sun, 6=Sat\n\nconst isWeekday = dayIST >= 1 && dayIST <= 5;\nlet targetIST = new Date(nowIST);\n\nif (isWeekday && (hourIST < 8 || (hourIST === 7 && minIST < 55))) {\n  // Morning slot: today 8:00 AM IST\n  targetIST.setUTCHours(8, 0, 0, 0);\n} else if (isWeekday && hourIST < 18) {\n  // Evening slot: today 6:00 PM IST  \n  targetIST.setUTCHours(18, 0, 0, 0);\n} else {\n  // Next weekday morning\n  targetIST.setUTCDate(targetIST.getUTCDate() + 1);\n  while (targetIST.getUTCDay() === 0 || targetIST.getUTCDay() === 6) {\n    targetIST.setUTCDate(targetIST.getUTCDate() + 1);\n  }\n  targetIST.setUTCHours(8, 0, 0, 0);\n}\n\n// Convert back to UTC for n8n Wait node\nconst scheduledUTC = new Date(targetIST.getTime() - istOffset);\n\nconsole.log(`Post scheduled for: ${targetIST.toISOString()} IST (${scheduledUTC.toISOString()} UTC)`);\n\nreturn [{\n  json: {\n    post_id: postData[0]?.id || webhookData.post_id,\n    idea_title: postData[0]?.idea_title || 'AI Post',\n    linkedin_draft: postData[0]?.linkedin_draft || '',\n    instagram_draft: postData[0]?.instagram_draft || '',\n    whatsapp_draft: postData[0]?.whatsapp_draft || '',\n    image_url: postData[0]?.image_url || '',\n    scheduled_at: scheduledUTC.toISOString(),\n    scheduled_at_ist: `${targetIST.toISOString().substring(0,16).replace('T',' ')} IST`\n  }\n}];"
+        "jsCode": "const postData = $input.first().json;\nconst webhookData = $('Webhook: Receive Approval').first().json.body;\n\nif (webhookData.scheduled_at) {\n  return [{ json: { ...postData[0], scheduled_at: webhookData.scheduled_at } }];\n}\n\nconst istOffset = 5.5 * 60 * 60 * 1000;\nconst nowIST = new Date(Date.now() + istOffset);\nconst h = nowIST.getUTCHours(), day = nowIST.getUTCDay();\nconst isWeekday = day >= 1 && day <= 5;\nlet target = new Date(nowIST);\n\nif (isWeekday && h < 8)       target.setUTCHours(8, 0, 0, 0);\nelse if (isWeekday && h < 18) target.setUTCHours(18, 0, 0, 0);\nelse {\n  target.setUTCDate(target.getUTCDate() + 1);\n  while ([0,6].includes(target.getUTCDay())) target.setUTCDate(target.getUTCDate() + 1);\n  target.setUTCHours(8, 0, 0, 0);\n}\n\nconst scheduledUTC = new Date(target.getTime() - istOffset);\nconsole.log(`Scheduled: ${target.toISOString()} IST`);\n\nreturn [{\n  json: {\n    post_id:              postData[0]?.id || webhookData.post_id,\n    idea_title:           postData[0]?.idea_title || '',\n    linkedin_draft:       postData[0]?.linkedin_draft || '',\n    instagram_draft:      postData[0]?.instagram_draft || '',\n    carousel_slides:      postData[0]?.carousel_slides || [],\n    carousel_image_urls:  postData[0]?.carousel_image_urls || [],\n    youtube_script:       postData[0]?.youtube_script || '',\n    youtube_video_url:    postData[0]?.youtube_video_url || webhookData.youtube_video_url || '',\n    image_url:            postData[0]?.image_url || '',\n    scheduled_at:         scheduledUTC.toISOString()\n  }\n}];"
       },
       "id": "22222222-0005-0005-0005-000000000005",
       "name": "Code: Calculate Optimal Schedule Time",
@@ -106,7 +103,7 @@
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [1200, 420],
-      "notes": "Pauses execution until the calculated optimal posting time. n8n resumes automatically."
+      "notes": "Pauses until the optimal IST posting time. n8n resumes automatically."
     },
     {
       "parameters": {
@@ -115,22 +112,22 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "=Bearer {{$env.LINKEDIN_ACCESS_TOKEN}}" },
-            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Authorization",             "value": "=Bearer {{$env.LINKEDIN_ACCESS_TOKEN}}" },
+            { "name": "Content-Type",              "value": "application/json" },
             { "name": "X-Restli-Protocol-Version", "value": "2.0.0" }
           ]
         },
         "sendBody": true,
         "contentType": "raw",
-        "rawBody": "={{\nJSON.stringify({\n  author: `urn:li:person:${$env.LINKEDIN_PERSON_ID}`,\n  lifecycleState: 'PUBLISHED',\n  specificContent: {\n    'com.linkedin.ugc.ShareContent': {\n      shareCommentary: { text: $json.linkedin_draft },\n      shareMediaCategory: $json.image_url ? 'IMAGE' : 'NONE',\n      media: $json.image_url ? [{\n        status: 'READY',\n        description: { text: $json.idea_title },\n        media: $json.image_url,\n        title: { text: $json.idea_title.substring(0, 100) }\n      }] : []\n    }\n  },\n  visibility: {\n    'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC'\n  }\n})\n}}",
+        "rawBody": "={{\nJSON.stringify({\n  author: `urn:li:person:${$env.LINKEDIN_PERSON_ID}`,\n  lifecycleState: 'PUBLISHED',\n  specificContent: {\n    'com.linkedin.ugc.ShareContent': {\n      shareCommentary: { text: $json.linkedin_draft },\n      shareMediaCategory: $json.image_url ? 'IMAGE' : 'NONE',\n      media: $json.image_url ? [{\n        status: 'READY',\n        description: { text: $json.idea_title },\n        media: $json.image_url,\n        title: { text: ($json.idea_title || '').substring(0,100) }\n      }] : []\n    }\n  },\n  visibility: { 'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC' }\n})\n}}",
         "options": { "timeout": 20000 }
       },
       "id": "22222222-0007-0007-0007-000000000007",
       "name": "LinkedIn: Publish Post",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1440, 280],
-      "notes": "Set LINKEDIN_ACCESS_TOKEN and LINKEDIN_PERSON_ID in env vars. Get Person ID from LinkedIn API: GET https://api.linkedin.com/v2/me"
+      "position": [1440, 240],
+      "notes": "Set LINKEDIN_ACCESS_TOKEN and LINKEDIN_PERSON_ID env vars."
     },
     {
       "parameters": {
@@ -138,21 +135,19 @@
         "url": "=https://graph.facebook.com/v18.0/{{$env.INSTAGRAM_USER_ID}}/media",
         "sendHeaders": true,
         "headerParameters": {
-          "parameters": [
-            { "name": "Content-Type", "value": "application/json" }
-          ]
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
         },
         "sendBody": true,
         "contentType": "raw",
-        "rawBody": "={{\nJSON.stringify({\n  image_url: $json.image_url || 'https://via.placeholder.com/1080',\n  caption: $json.instagram_draft,\n  access_token: $env.INSTAGRAM_ACCESS_TOKEN\n})\n}}",
+        "rawBody": "={{\n// If carousel_image_urls has 2+ items publish as carousel; else single image\nconst urls = ($json.carousel_image_urls || []).filter(u => !!u);\nconst isSingle = urls.length < 2;\nJSON.stringify(\n  isSingle\n    ? { image_url: $json.image_url || urls[0] || 'https://via.placeholder.com/1080', caption: $json.instagram_draft, access_token: $env.INSTAGRAM_ACCESS_TOKEN }\n    : { media_type: 'CAROUSEL', caption: $json.instagram_draft, children: urls.map(u=>({image_url:u,media_type:'IMAGE',access_token:$env.INSTAGRAM_ACCESS_TOKEN})), access_token: $env.INSTAGRAM_ACCESS_TOKEN }\n)\n}}",
         "options": { "timeout": 20000 }
       },
       "id": "22222222-0008-0008-0008-000000000008",
       "name": "Instagram: Create Media Container",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1440, 420],
-      "notes": "Step 1 of 2 for Instagram. Creates a media container, returns a creation_id. Set INSTAGRAM_USER_ID and INSTAGRAM_ACCESS_TOKEN."
+      "position": [1440, 400],
+      "notes": "Handles both single image and carousel. carousel_image_urls must be public URLs of each slide image."
     },
     {
       "parameters": {
@@ -160,44 +155,70 @@
         "url": "=https://graph.facebook.com/v18.0/{{$env.INSTAGRAM_USER_ID}}/media_publish",
         "sendHeaders": true,
         "headerParameters": {
-          "parameters": [
-            { "name": "Content-Type", "value": "application/json" }
-          ]
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
         },
         "sendBody": true,
         "contentType": "raw",
-        "rawBody": "={{\nJSON.stringify({\n  creation_id: $json.id,\n  access_token: $env.INSTAGRAM_ACCESS_TOKEN\n})\n}}",
+        "rawBody": "={{\nJSON.stringify({ creation_id: $json.id, access_token: $env.INSTAGRAM_ACCESS_TOKEN })\n}}",
         "options": { "timeout": 20000 }
       },
       "id": "22222222-0009-0009-0009-000000000009",
       "name": "Instagram: Publish Container",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1680, 420],
-      "notes": "Step 2 of 2. Publishes the container created in previous step. Returns the post ID."
+      "position": [1680, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [{
+            "id": "has-yt-video",
+            "leftValue":  "={{$('Code: Calculate Optimal Schedule Time').first().json.youtube_video_url}}",
+            "rightValue": "",
+            "operator": { "type": "string", "operation": "notEmpty" }
+          }],
+          "combinator": "and"
+        }
+      },
+      "id": "22222222-0009b-0009-0009-00000000009b",
+      "name": "Has YouTube Video?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1440, 560],
+      "notes": "Only upload to YouTube if a video file URL was provided during approval"
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://graph.facebook.com/v18.0/{{$env.WHATSAPP_PHONE_ID}}/messages",
+        "url": "https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "=Bearer {{$env.WHATSAPP_TOKEN}}" },
-            { "name": "Content-Type", "value": "application/json" }
+            { "name": "Authorization",   "value": "=Bearer {{$env.YOUTUBE_ACCESS_TOKEN}}" },
+            { "name": "Content-Type",    "value": "application/json" },
+            { "name": "X-Upload-Source", "value": "={{$('Code: Calculate Optimal Schedule Time').first().json.youtube_video_url}}" }
           ]
         },
         "sendBody": true,
         "contentType": "raw",
-        "rawBody": "={{\nJSON.stringify({\n  messaging_product: 'whatsapp',\n  to: $env.WHATSAPP_COMMUNITY_NUMBER,\n  type: 'text',\n  text: { body: $('Code: Calculate Optimal Schedule Time').first().json.whatsapp_draft }\n})\n}}",
-        "options": { "timeout": 15000 }
+        "rawBody": "={{\nconst d = $('Code: Calculate Optimal Schedule Time').first().json;\nJSON.stringify({\n  snippet: {\n    title:       d.idea_title.substring(0,100),\n    description: d.youtube_script.substring(0,5000),\n    tags:        ['CA India','GST','Tax','AIForCA','SNG Advisors','Shorts'],\n    categoryId:  '22'\n  },\n  status: { privacyStatus: 'public', selfDeclaredMadeForKids: false }\n})\n}}",
+        "options": { "timeout": 60000 }
       },
       "id": "22222222-0010-0010-0010-000000000010",
-      "name": "WhatsApp: Send to Community",
+      "name": "YouTube: Upload Short",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1440, 560],
-      "notes": "Uses existing WhatsApp Business API. Set WHATSAPP_PHONE_ID, WHATSAPP_TOKEN, WHATSAPP_COMMUNITY_NUMBER in env vars. This matches lib/whatsapp/ already in Planora."
+      "position": [1680, 540],
+      "notes": "Set YOUTUBE_ACCESS_TOKEN env var. Obtain via OAuth2 in n8n credentials for Google. The video file must be a publicly accessible URL (upload to R2/Supabase first, then provide during approval)."
+    },
+    {
+      "parameters": {},
+      "id": "22222222-0010b-0010-0010-00000000010b",
+      "name": "YouTube: Skip (no video)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1680, 660]
     },
     {
       "parameters": {
@@ -212,7 +233,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Collect platform post IDs from all publishing steps\nconst items = $input.all();\nconst scheduled = $('Code: Calculate Optimal Schedule Time').first().json;\n\n// LinkedIn response has id field\nconst liResponse = items.find(i => i.json.id && typeof i.json.id === 'string' && i.json.id.startsWith('urn:li:'));\nconst liPostId = liResponse?.json?.id || '';\n\n// Instagram publish response has id field (numeric string)\nconst igResponse = items.find(i => i.json.id && !String(i.json.id).startsWith('urn:'));\nconst igPostId = igResponse?.json?.id || '';\n\n// WhatsApp response\nconst waResponse = items.find(i => i.json.messages);\nconst waMessageId = waResponse?.json?.messages?.[0]?.id || '';\n\nconsole.log(`Published - LinkedIn: ${liPostId}, Instagram: ${igPostId}, WhatsApp: ${waMessageId}`);\n\nreturn [{\n  json: {\n    post_id: scheduled.post_id,\n    linkedin_post_id: liPostId,\n    instagram_post_id: igPostId,\n    whatsapp_message_id: waMessageId,\n    published_at: new Date().toISOString(),\n    idea_title: scheduled.idea_title\n  }\n}];"
+        "jsCode": "const items = $input.all();\nconst scheduled = $('Code: Calculate Optimal Schedule Time').first().json;\n\nconst liItem  = items.find(i => typeof i.json.id === 'string' && String(i.json.id).startsWith('urn:li:'));\nconst igItem  = items.find(i => i.json.id && !String(i.json.id).startsWith('urn:'));\nconst ytItem  = items.find(i => i.json.kind === 'youtube#video' || i.json.id?.videoId);\n\nconst liPostId = liItem?.json?.id || '';\nconst igPostId = igItem?.json?.id || '';\nconst ytVideoId = ytItem?.json?.id?.videoId || ytItem?.json?.id || '';\n\nconsole.log(`Published — LI: ${liPostId} | IG: ${igPostId} | YT: ${ytVideoId}`);\n\nreturn [{\n  json: {\n    post_id:          scheduled.post_id,\n    linkedin_post_id: liPostId,\n    instagram_post_id: igPostId,\n    youtube_video_id:  ytVideoId,\n    published_at:     new Date().toISOString(),\n    idea_title:       scheduled.idea_title\n  }\n}];"
       },
       "id": "22222222-0012-0012-0012-000000000012",
       "name": "Code: Collect Post IDs",
@@ -227,14 +248,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_KEY}}" },
+            { "name": "apikey",        "value": "={{$env.SUPABASE_SERVICE_KEY}}" },
             { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_KEY}}" },
-            { "name": "Content-Type", "value": "application/json" }
+            { "name": "Content-Type",  "value": "application/json" }
           ]
         },
         "sendBody": true,
         "contentType": "raw",
-        "rawBody": "={{\nJSON.stringify({\n  status: 'published',\n  published_at: $json.published_at,\n  linkedin_post_id: $json.linkedin_post_id,\n  instagram_post_id: $json.instagram_post_id\n})\n}}",
+        "rawBody": "={{\nJSON.stringify({\n  status: 'published',\n  published_at: $json.published_at,\n  linkedin_post_id: $json.linkedin_post_id,\n  instagram_post_id: $json.instagram_post_id,\n  youtube_video_id: $json.youtube_video_id\n})\n}}",
         "options": {}
       },
       "id": "22222222-0013-0013-0013-000000000013",
@@ -254,8 +275,7 @@
       "name": "Wait: 48 Hours for Analytics",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
-      "position": [2640, 420],
-      "notes": "Waits 48 hours, then pulls performance data from LinkedIn + Instagram APIs"
+      "position": [2640, 420]
     },
     {
       "parameters": {
@@ -263,9 +283,7 @@
         "url": "=https://api.linkedin.com/v2/socialActions/{{$json.linkedin_post_id}}",
         "sendHeaders": true,
         "headerParameters": {
-          "parameters": [
-            { "name": "Authorization", "value": "=Bearer {{$env.LINKEDIN_ACCESS_TOKEN}}" }
-          ]
+          "parameters": [{ "name": "Authorization", "value": "=Bearer {{$env.LINKEDIN_ACCESS_TOKEN}}" }]
         },
         "options": { "timeout": 15000 }
       },
@@ -273,8 +291,7 @@
       "name": "LinkedIn: Get Analytics",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2880, 300],
-      "notes": "Pulls likes, comments, shares, impressions for the post. Uses LinkedIn v2 Social Actions API."
+      "position": [2880, 260]
     },
     {
       "parameters": {
@@ -286,8 +303,20 @@
       "name": "Instagram: Get Insights",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2880, 540],
-      "notes": "Pulls engagement metrics from Meta Insights API for the published post"
+      "position": [2880, 420]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://www.googleapis.com/youtube/v3/videos?id={{$json.youtube_video_id}}&part=statistics&key={{$env.YOUTUBE_API_KEY}}",
+        "options": { "timeout": 15000 }
+      },
+      "id": "22222222-0016b-0016-0016-00000000016b",
+      "name": "YouTube: Get Analytics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2880, 580],
+      "notes": "Set YOUTUBE_API_KEY (Google Cloud API key, separate from OAuth token)"
     },
     {
       "parameters": {
@@ -302,7 +331,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Calculate performance score from LinkedIn + Instagram analytics\nconst items = $input.all();\nconst publishedData = $('Supabase: Mark as Published').first().json;\nconst originalPost = $('Code: Calculate Optimal Schedule Time').first().json;\n\n// Parse LinkedIn metrics\nconst liData = items.find(i => i.json.likesSummary || i.json.totalSocialActivityCounts) || {};\nconst liLikes = liData.json?.likesSummary?.totalLikes || liData.json?.totalSocialActivityCounts?.numLikes || 0;\nconst liComments = liData.json?.commentsSummary?.totalFirstLevelComments || liData.json?.totalSocialActivityCounts?.numComments || 0;\nconst liShares = liData.json?.totalSocialActivityCounts?.numShares || 0;\nconst liImpressions = liData.json?.totalShareStatistics?.impressionCount || liLikes * 50; // estimate if not available\n\n// Parse Instagram metrics\nconst igRawData = items.find(i => i.json.data && Array.isArray(i.json.data));\nconst igMetrics = {};\n(igRawData?.json?.data || []).forEach(m => { igMetrics[m.name] = m.values?.[0]?.value || 0; });\nconst igLikes = igMetrics.likes || 0;\nconst igComments = igMetrics.comments || 0;\nconst igReach = igMetrics.reach || 0;\nconst igSaves = igMetrics.saved || 0;\n\n// Weighted score (0–100)\n// LinkedIn weight: 60%, Instagram weight: 40%\nconst liEngRate = liImpressions > 0 ? (liLikes + liComments * 3 + liShares * 5) / liImpressions * 100 : 0;\nconst igEngRate = igReach > 0 ? (igLikes + igComments * 3 + igSaves * 4) / igReach * 100 : 0;\nconst score = Math.min(100, Math.round((liEngRate * 60 + igEngRate * 40) * 10) / 10);\n\n// Label performance\nconst label = score >= 7 ? 'HIGH' : score >= 3 ? 'MEDIUM' : 'LOW';\n\nconsole.log(`Performance score: ${score}/100 (${label}) | LI: ${liLikes}👍 ${liComments}💬 | IG: ${igLikes}❤️ ${igReach} reach`);\n\nreturn [{\n  json: {\n    post_id: originalPost.post_id,\n    li_likes: liLikes,\n    li_comments: liComments,\n    li_shares: liShares,\n    li_impressions: liImpressions,\n    ig_likes: igLikes,\n    ig_comments: igComments,\n    ig_reach: igReach,\n    ig_saves: igSaves,\n    performance_score: score,\n    performance_label: label,\n    score_notes: `LI eng: ${liEngRate.toFixed(2)}% | IG eng: ${igEngRate.toFixed(2)}% | Combined: ${score}/100`,\n    analyzed_at: new Date().toISOString()\n  }\n}];"
+        "jsCode": "const items = $input.all();\nconst scheduled = $('Code: Calculate Optimal Schedule Time').first().json;\n\n// LinkedIn\nconst liData = items.find(i => i.json.likesSummary || i.json.totalSocialActivityCounts) || {};\nconst liLikes = liData.json?.likesSummary?.totalLikes || liData.json?.totalSocialActivityCounts?.numLikes || 0;\nconst liComments = liData.json?.commentsSummary?.totalFirstLevelComments || 0;\nconst liShares = liData.json?.totalSocialActivityCounts?.numShares || 0;\nconst liImpressions = liData.json?.totalShareStatistics?.impressionCount || liLikes * 50;\n\n// Instagram\nconst igRaw = items.find(i => i.json.data && Array.isArray(i.json.data));\nconst igMetrics = {};\n(igRaw?.json?.data || []).forEach(m => { igMetrics[m.name] = m.values?.[0]?.value || 0; });\nconst igLikes = igMetrics.likes || 0, igComments = igMetrics.comments || 0;\nconst igReach = igMetrics.reach || 0, igSaves = igMetrics.saved || 0;\n\n// YouTube\nconst ytRaw = items.find(i => i.json.items && Array.isArray(i.json.items));\nconst ytStats = ytRaw?.json?.items?.[0]?.statistics || {};\nconst ytViews = parseInt(ytStats.viewCount || '0');\nconst ytLikes = parseInt(ytStats.likeCount || '0');\nconst ytComments = parseInt(ytStats.commentCount || '0');\n\n// Weighted score: LI 45% + IG 35% + YT 20%\nconst liEng = liImpressions > 0 ? (liLikes + liComments*3 + liShares*5) / liImpressions * 100 : 0;\nconst igEng = igReach > 0 ? (igLikes + igComments*3 + igSaves*4) / igReach * 100 : 0;\nconst ytEng = ytViews > 0 ? (ytLikes + ytComments*3) / ytViews * 100 : 0;\nconst score = Math.min(100, Math.round((liEng*45 + igEng*35 + ytEng*20) * 10) / 10);\nconst label = score >= 7 ? 'HIGH' : score >= 3 ? 'MEDIUM' : 'LOW';\n\nconsole.log(`Score: ${score}/100 | LI:${liLikes} IG:${igLikes} YT:${ytViews}views`);\n\nreturn [{\n  json: {\n    post_id: scheduled.post_id,\n    li_likes: liLikes, li_comments: liComments, li_shares: liShares, li_impressions: liImpressions,\n    ig_likes: igLikes, ig_comments: igComments, ig_reach: igReach, ig_saves: igSaves,\n    yt_views: ytViews, yt_likes: ytLikes, yt_comments: ytComments,\n    performance_score: score, performance_label: label,\n    score_notes: `LI:${liEng.toFixed(1)}% IG:${igEng.toFixed(1)}% YT:${ytEng.toFixed(1)}% → ${score}/100`,\n    analyzed_at: new Date().toISOString()\n  }\n}];"
       },
       "id": "22222222-0018-0018-0018-000000000018",
       "name": "Code: Score Performance",
@@ -317,14 +346,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_KEY}}" },
+            { "name": "apikey",        "value": "={{$env.SUPABASE_SERVICE_KEY}}" },
             { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_KEY}}" },
-            { "name": "Content-Type", "value": "application/json" }
+            { "name": "Content-Type",  "value": "application/json" }
           ]
         },
         "sendBody": true,
         "contentType": "raw",
-        "rawBody": "={{\nJSON.stringify({\n  li_likes: $json.li_likes,\n  li_comments: $json.li_comments,\n  li_shares: $json.li_shares,\n  li_impressions: $json.li_impressions,\n  ig_likes: $json.ig_likes,\n  ig_comments: $json.ig_comments,\n  ig_reach: $json.ig_reach,\n  ig_saves: $json.ig_saves,\n  performance_score: $json.performance_score,\n  score_notes: $json.score_notes\n})\n}}",
+        "rawBody": "={{\nJSON.stringify({\n  li_likes: $json.li_likes, li_comments: $json.li_comments, li_shares: $json.li_shares, li_impressions: $json.li_impressions,\n  ig_likes: $json.ig_likes, ig_comments: $json.ig_comments, ig_reach: $json.ig_reach, ig_saves: $json.ig_saves,\n  yt_views: $json.yt_views, yt_likes: $json.yt_likes, yt_comments: $json.yt_comments,\n  performance_score: $json.performance_score, score_notes: $json.score_notes\n})\n}}",
         "options": {}
       },
       "id": "22222222-0019-0019-0019-000000000019",
@@ -340,22 +369,21 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-api-key", "value": "={{$env.ANTHROPIC_API_KEY}}" },
-            { "name": "anthropic-version", "value": "2023-06-01" },
-            { "name": "content-type", "value": "application/json" }
+            { "name": "x-api-key",         "value": "={{$env.ANTHROPIC_API_KEY}}" },
+            { "name": "anthropic-version",  "value": "2023-06-01" },
+            { "name": "content-type",       "value": "application/json" }
           ]
         },
         "sendBody": true,
         "contentType": "raw",
-        "rawBody": "={{\nJSON.stringify({\n  model: 'claude-opus-4-5',\n  max_tokens: 600,\n  messages: [{\n    role: 'user',\n    content: `A LinkedIn + Instagram post for Indian CA professionals just completed its 48-hour analytics window.\\n\\nPost topic: ${$('Code: Calculate Optimal Schedule Time').first().json.idea_title}\\nPerformance score: ${$json.performance_score}/100 (${$json.performance_label})\\nLinkedIn: ${$json.li_likes} likes, ${$json.li_comments} comments, ${$json.li_shares} shares, ${$json.li_impressions} impressions\\nInstagram: ${$json.ig_likes} likes, ${$json.ig_comments} comments, ${$json.ig_reach} reach, ${$json.ig_saves} saves\\n\\nIn 2-3 bullet points, briefly explain:\\n1. Why this post performed this way\\n2. What type of topics/hooks to prioritise next week\\n3. What to avoid\\n\\nBe direct. No fluff.`\n  }]\n})\n}}",
+        "rawBody": "={{\nconst s = $('Code: Score Performance').first().json;\nconst t = $('Code: Calculate Optimal Schedule Time').first().json;\nJSON.stringify({\n  model: 'claude-sonnet-4-6',\n  max_tokens: 600,\n  messages: [{\n    role: 'user',\n    content: `A post for Indian CA professionals completed its 48-hour analytics window.\\n\\nTopic: ${t.idea_title}\\nScore: ${s.performance_score}/100 (${s.performance_label})\\nLinkedIn: ${s.li_likes} likes · ${s.li_comments} comments · ${s.li_shares} shares · ${s.li_impressions} impressions\\nInstagram: ${s.ig_likes} likes · ${s.ig_comments} comments · ${s.ig_reach} reach · ${s.ig_saves} saves\\nYouTube: ${s.yt_views} views · ${s.yt_likes} likes · ${s.yt_comments} comments\\n\\nIn 3 bullet points:\\n• Why this performed this way\\n• What to prioritise next week (topic type / format / hook style)\\n• One specific format that underperformed and how to fix it\\n\\nBe direct. No fluff.`\n  }]\n})\n}}",
         "options": { "timeout": 20000 }
       },
       "id": "22222222-0020-0020-0020-000000000020",
       "name": "Claude: Generate Insight Note",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [3600, 280],
-      "notes": "Optional but powerful: Claude explains why the post performed the way it did, feeding next week's strategy"
+      "position": [3600, 260]
     },
     {
       "parameters": {},
@@ -368,81 +396,58 @@
   ],
   "connections": {
     "Webhook: Receive Approval": {
-      "main": [
-        [
-          { "node": "Respond to Webhook", "type": "main", "index": 0 },
-          { "node": "Is Approved?", "type": "main", "index": 0 }
-        ]
-      ]
+      "main": [[
+        { "node": "Respond to Webhook", "type": "main", "index": 0 },
+        { "node": "Is Approved?",       "type": "main", "index": 0 }
+      ]]
     },
     "Is Approved?": {
       "main": [
         [{ "node": "Supabase: Fetch + Update Approved", "type": "main", "index": 0 }],
-        [{ "node": "Rejected — Skip", "type": "main", "index": 0 }]
+        [{ "node": "Rejected — Skip",                   "type": "main", "index": 0 }]
       ]
     },
-    "Supabase: Fetch + Update Approved": {
-      "main": [[{ "node": "Code: Calculate Optimal Schedule Time", "type": "main", "index": 0 }]]
-    },
-    "Code: Calculate Optimal Schedule Time": {
-      "main": [[{ "node": "Wait: Until Scheduled Time", "type": "main", "index": 0 }]]
-    },
+    "Supabase: Fetch + Update Approved":  { "main": [[{ "node": "Code: Calculate Optimal Schedule Time", "type": "main", "index": 0 }]] },
+    "Code: Calculate Optimal Schedule Time": { "main": [[{ "node": "Wait: Until Scheduled Time", "type": "main", "index": 0 }]] },
     "Wait: Until Scheduled Time": {
+      "main": [[
+        { "node": "LinkedIn: Publish Post",          "type": "main", "index": 0 },
+        { "node": "Instagram: Create Media Container", "type": "main", "index": 0 },
+        { "node": "Has YouTube Video?",              "type": "main", "index": 0 }
+      ]]
+    },
+    "LinkedIn: Publish Post":             { "main": [[{ "node": "Merge: All Platforms Done", "type": "main", "index": 0 }]] },
+    "Instagram: Create Media Container":  { "main": [[{ "node": "Instagram: Publish Container", "type": "main", "index": 0 }]] },
+    "Instagram: Publish Container":       { "main": [[{ "node": "Merge: All Platforms Done", "type": "main", "index": 1 }]] },
+    "Has YouTube Video?": {
       "main": [
-        [
-          { "node": "LinkedIn: Publish Post", "type": "main", "index": 0 },
-          { "node": "Instagram: Create Media Container", "type": "main", "index": 0 },
-          { "node": "WhatsApp: Send to Community", "type": "main", "index": 0 }
-        ]
+        [{ "node": "YouTube: Upload Short",       "type": "main", "index": 0 }],
+        [{ "node": "YouTube: Skip (no video)",    "type": "main", "index": 0 }]
       ]
     },
-    "LinkedIn: Publish Post": {
-      "main": [[{ "node": "Merge: All Platforms Done", "type": "main", "index": 0 }]]
-    },
-    "Instagram: Create Media Container": {
-      "main": [[{ "node": "Instagram: Publish Container", "type": "main", "index": 0 }]]
-    },
-    "Instagram: Publish Container": {
-      "main": [[{ "node": "Merge: All Platforms Done", "type": "main", "index": 1 }]]
-    },
-    "WhatsApp: Send to Community": {
-      "main": [[{ "node": "Merge: All Platforms Done", "type": "main", "index": 2 }]]
-    },
-    "Merge: All Platforms Done": {
-      "main": [[{ "node": "Code: Collect Post IDs", "type": "main", "index": 0 }]]
-    },
-    "Code: Collect Post IDs": {
-      "main": [[{ "node": "Supabase: Mark as Published", "type": "main", "index": 0 }]]
-    },
-    "Supabase: Mark as Published": {
-      "main": [[{ "node": "Wait: 48 Hours for Analytics", "type": "main", "index": 0 }]]
-    },
+    "YouTube: Upload Short":              { "main": [[{ "node": "Merge: All Platforms Done", "type": "main", "index": 2 }]] },
+    "YouTube: Skip (no video)":           { "main": [[{ "node": "Merge: All Platforms Done", "type": "main", "index": 2 }]] },
+    "Merge: All Platforms Done":          { "main": [[{ "node": "Code: Collect Post IDs",    "type": "main", "index": 0 }]] },
+    "Code: Collect Post IDs":             { "main": [[{ "node": "Supabase: Mark as Published", "type": "main", "index": 0 }]] },
+    "Supabase: Mark as Published":        { "main": [[{ "node": "Wait: 48 Hours for Analytics", "type": "main", "index": 0 }]] },
     "Wait: 48 Hours for Analytics": {
-      "main": [
-        [
-          { "node": "LinkedIn: Get Analytics", "type": "main", "index": 0 },
-          { "node": "Instagram: Get Insights", "type": "main", "index": 0 }
-        ]
-      ]
+      "main": [[
+        { "node": "LinkedIn: Get Analytics",  "type": "main", "index": 0 },
+        { "node": "Instagram: Get Insights",  "type": "main", "index": 0 },
+        { "node": "YouTube: Get Analytics",   "type": "main", "index": 0 }
+      ]]
     },
-    "LinkedIn: Get Analytics": {
-      "main": [[{ "node": "Merge: Analytics Data", "type": "main", "index": 0 }]]
-    },
-    "Instagram: Get Insights": {
-      "main": [[{ "node": "Merge: Analytics Data", "type": "main", "index": 1 }]]
-    },
-    "Merge: Analytics Data": {
-      "main": [[{ "node": "Code: Score Performance", "type": "main", "index": 0 }]]
-    },
+    "LinkedIn: Get Analytics":  { "main": [[{ "node": "Merge: Analytics Data", "type": "main", "index": 0 }]] },
+    "Instagram: Get Insights":  { "main": [[{ "node": "Merge: Analytics Data", "type": "main", "index": 1 }]] },
+    "YouTube: Get Analytics":   { "main": [[{ "node": "Merge: Analytics Data", "type": "main", "index": 2 }]] },
+    "Merge: Analytics Data":    { "main": [[{ "node": "Code: Score Performance", "type": "main", "index": 0 }]] },
     "Code: Score Performance": {
       "main": [
-        [{ "node": "Supabase: Store Analytics", "type": "main", "index": 0 }],
+        [{ "node": "Supabase: Store Analytics",  "type": "main", "index": 0 }],
         [{ "node": "Claude: Generate Insight Note", "type": "main", "index": 0 }]
       ]
     },
-    "Supabase: Store Analytics": {
-      "main": [[{ "node": "Analytics Complete", "type": "main", "index": 0 }]]
-    }
+    "Supabase: Store Analytics": { "main": [[{ "node": "Analytics Complete", "type": "main", "index": 0 }]] }
   },
   "active": false,
   "settings": {
@@ -450,9 +455,7 @@
     "saveManualExecutions": true,
     "callerPolicy": "workflowsFromSameOwner"
   },
-  "versionId": "22222222-ffff-ffff-ffff-222222222222",
-  "id": "ai-publish-analytics-v1",
-  "meta": {
-    "templateCredsSetupCompleted": false
-  }
+  "versionId": "22222222-ffff-ffff-ffff-333333333333",
+  "id": "ai-publish-analytics-v2",
+  "meta": { "templateCredsSetupCompleted": false }
 }
