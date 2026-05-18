@@ -43,11 +43,18 @@ export async function GET(request: NextRequest) {
     }
   )
 
+  const isRecovery = url.searchParams.get('recovery') === '1'
+
   const { data: { user }, error } = await supabase.auth.exchangeCodeForSession(code)
 
   if (error || !user) {
     console.error('[auth/callback] exchangeCodeForSession failed:', error?.message)
     return NextResponse.redirect(new URL('/login?error=auth_failed&hint=try_again', request.url))
+  }
+
+  // Password-reset flow: user is now authenticated; send them to set their new password.
+  if (isRecovery) {
+    return NextResponse.redirect(new URL('/auth/reset-password', request.url))
   }
 
   await provisionUser(user)

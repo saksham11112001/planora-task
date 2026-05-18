@@ -30,7 +30,7 @@ function GoogleIcon() {
 
 export default function LoginPage() {
   const router = useRouter()
-  const [mode,     setMode]     = useState<Mode>('choose')
+  const [mode,     setMode]     = useState<Mode>('email_password')
   const [email,    setEmail]    = useState('')
   const [password, setPassword] = useState('')
   const [confirm,  setConfirm]  = useState('')
@@ -41,7 +41,7 @@ export default function LoginPage() {
     const params = new URLSearchParams(window.location.search)
     if (params.get('error') === 'auth_failed') {
       setError("Sign-in failed. Please try again — if the problem persists, try a different method.")
-      setMode('choose')
+      setMode('email_password')
     }
   }, [])
 
@@ -176,7 +176,7 @@ export default function LoginPage() {
     setLoading(true); setError('')
     const supabase = createClient()
     const { error: err } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: `${window.location.origin}/auth/confirm`,
+      redirectTo: `${window.location.origin}/auth/callback?recovery=1`,
     })
     setLoading(false)
     if (err) { setError(err.message); return }
@@ -242,7 +242,7 @@ export default function LoginPage() {
                 We sent a confirmation link to <strong style={{ color: '#0f172a' }}>{email}</strong>.<br/>
                 Click it to activate your account and sign in.
               </p>
-              <button onClick={() => resetForm('choose')} style={secondaryBtn}>
+              <button onClick={() => resetForm('email_password')} style={secondaryBtn}>
                 Back to sign in
               </button>
             </div>
@@ -289,7 +289,7 @@ export default function LoginPage() {
           {/* ── Magic link form ── */}
           {mode === 'magic' && (
             <>
-              <BackBtn onClick={() => resetForm('choose')} />
+              <BackBtn onClick={() => resetForm('email_password')} />
               <h1 style={h1}>Sign in with email</h1>
               <p style={subStyle}>We'll send you a magic link — no password needed</p>
 
@@ -310,14 +310,24 @@ export default function LoginPage() {
             </>
           )}
 
-          {/* ── Email + password sign-in ── */}
+          {/* ── Email + password sign-in (default / first screen) ── */}
           {mode === 'email_password' && (
             <>
-              <BackBtn onClick={() => resetForm('choose')} />
-              <h1 style={h1}>Sign in</h1>
-              <p style={subStyle}>Use your email and password</p>
+              <h1 style={h1}>Welcome to Floatup</h1>
+              <p style={subStyle}>Sign in to your workspace</p>
 
               {error && <ErrorBox msg={error} />}
+
+              <button onClick={handleGoogle} disabled={loading} style={{ ...primaryBtn, background: '#fff', color: '#374151', border: '1.5px solid #e2e8f0', marginBottom: 10 }}>
+                {loading ? <Spinner /> : <GoogleIcon />}
+                {loading ? 'Connecting...' : 'Continue with Google'}
+              </button>
+              <button onClick={handleMicrosoft} disabled={loading} style={{ ...primaryBtn, background: '#fff', color: '#374151', border: '1.5px solid #e2e8f0', marginBottom: 4 }}>
+                {loading ? <Spinner /> : <MicrosoftIcon />}
+                {loading ? 'Connecting...' : 'Continue with Microsoft'}
+              </button>
+
+              <Divider />
 
               <form onSubmit={handleSignIn}>
                 <EmailInput value={email} onChange={setEmail} />
@@ -325,23 +335,28 @@ export default function LoginPage() {
                   placeholder="Password"
                   value={password}
                   onChange={setPassword}
-                  style={{ marginBottom: 16 }}
+                  style={{ marginBottom: 6 }}
                 />
+                <p style={{ textAlign: 'right', marginBottom: 16, marginTop: 0 }}>
+                  <button type="button" onClick={() => resetForm('reset_password')}
+                    style={{ color: '#0d9488', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 500, padding: 0, fontFamily: 'inherit' }}>
+                    Forgot password?
+                  </button>
+                </p>
                 <SubmitBtn loading={loading} label="Sign in →" loadingLabel="Signing in..." />
               </form>
 
               <p style={{ marginTop: 16, textAlign: 'center', fontSize: 13, color: '#64748b' }}>
                 Don't have an account?{' '}
                 <button onClick={() => resetForm('email_signup')}
-                  style={{ color: '#0d9488', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                  style={{ color: '#0d9488', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
                   Create account
                 </button>
               </p>
-              <p style={{ marginTop: 8, textAlign: 'center', fontSize: 13, color: '#64748b' }}>
-                Forgot password?{' '}
-                <button onClick={() => resetForm('reset_password')}
-                  style={{ color: '#0d9488', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
-                  Reset it
+              <p style={{ marginTop: 8, textAlign: 'center', fontSize: 13, color: '#94a3b8' }}>
+                <button onClick={() => { setMode('magic'); setError('') }}
+                  style={{ color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit' }}>
+                  Sign in with email link instead
                 </button>
               </p>
             </>

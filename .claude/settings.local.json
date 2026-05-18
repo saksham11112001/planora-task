@@ -37,7 +37,8 @@
       "Bash(ls supabase/)",
       "Bash(grep -r \"Templates\" app/\\\\\\(app\\\\\\)/compliance --include=\"*.tsx\" -l)",
       "Bash(grep -r \"template\" app/\\\\\\(app\\\\\\)/compliance --include=\"*.tsx\" -l)",
-      "Bash(dir \"C:\\\\Users\\\\saksh\\\\Desktop\\\\planora-task\\\\app\\\\api\\\\onboarding\")"
+      "Bash(dir \"C:\\\\Users\\\\saksh\\\\Desktop\\\\planora-task\\\\app\\\\api\\\\onboarding\")",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\saksh\\\\Desktop\\\\planora-task\" -Force | Select-Object Name, @{Name=\"Type\"; Expression={if\\($_.PSIsContainer\\){\"Directory\"}else{\"File\"}}} | Format-Table -AutoSize)"
     ]
   }
 }
