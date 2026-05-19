@@ -1041,7 +1041,6 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
               t.id === panelTask.id ? { ...t, ...(fields as Partial<MonTask>) } : t
             ))
           }
-          setPanelTask(null)
         }}
       />
     </div>

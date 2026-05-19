@@ -135,7 +135,9 @@ export function SearchModal() {
         currentUserId={session?.user.id}
         userRole={session?.role}
         onClose={() => setPanelTask(null)}
-        onUpdated={() => setPanelTask(null)}
+        onUpdated={(fields) => {
+          if (fields && panelTask) setPanelTask(prev => prev ? { ...prev, ...(fields as Partial<Task>) } : prev)
+        }}
       />
 
       {!searchOpen ? null : (

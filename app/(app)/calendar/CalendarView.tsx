@@ -500,7 +500,9 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
       </div>
 
       <TaskDetailPanel task={panelTask} members={members} clients={clients} currentUserId={currentUserId} userRole={userRole}
-        onClose={() => setPanelTask(null)} onUpdated={() => setPanelTask(null)} />
+        onClose={() => setPanelTask(null)} onUpdated={(fields) => {
+          if (fields && panelTask) setPanelTask(prev => prev ? { ...prev, ...(fields as Partial<Task>) } : prev)
+        }} />
     </>)
   }
 
@@ -811,6 +813,8 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
     </div>{/* end height wrapper */}
 
     <TaskDetailPanel task={panelTask} members={members} clients={clients} currentUserId={currentUserId} userRole={userRole}
-      onClose={() => setPanelTask(null)} onUpdated={() => setPanelTask(null)} />
+      onClose={() => setPanelTask(null)} onUpdated={(fields) => {
+        if (fields && panelTask) setPanelTask(prev => prev ? { ...prev, ...(fields as Partial<Task>) } : prev)
+      }} />
   </>)
 }
