@@ -1,0 +1,579 @@
+{
+  "name": "04 — Video Generation (Reels + Shorts)",
+  "meta": {
+    "description": "Generates a 9:16 vertical video (Instagram Reel + YouTube Short) for any approved content_queue post. Pipeline: ElevenLabs TTS voiceover → DALL-E 3 slide images (one per carousel slide) → Shotstack MP4 assembly → save URL back to Supabase → notify via email.",
+    "cost_estimate": "~$0.29 per video (DALL-E 3: 5×$0.04=$0.20 + ElevenLabs Starter ~$0.04 + Shotstack $0.09). Monthly for 20 videos: ~$10.80 total.",
+    "new_env_vars": ["ELEVENLABS_API_KEY", "ELEVENLABS_VOICE_ID", "OPENAI_API_KEY", "SHOTSTACK_API_KEY"],
+    "trigger": "POST /generate-video  body: { post_id: '<uuid>' }. Call from your approval dashboard after approving a post, OR wire as a sub-call at the end of Flow 02's approval path."
+  },
+  "nodes": [
+
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "generate-video",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "44444444-0001-0001-0001-000000000001",
+      "name": "Webhook: Trigger Video Generation",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 400],
+      "webhookId": "generate-video-webhook",
+      "notes": "POST { post_id: '<uuid>' } to start video generation.\nCan be called manually from dashboard or auto-triggered at the end of Flow 02's approval path."
+    },
+
+    {
+      "parameters": {
+        "options": {
+          "responseCode": 200,
+          "responseBody": "{\"status\":\"queued\",\"message\":\"Video generation started. Takes ~4-6 min. Check content_queue.youtube_video_url when done.\"}"
+        }
+      },
+      "id": "44444444-0002-0002-0002-000000000002",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [480, 240],
+      "notes": "Immediately ACKs the caller. The rest of the flow runs async."
+    },
+
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/content_queue?id=eq.{{$json.body.post_id}}&select=id,idea_title,youtube_script,carousel_slides,image_prompt,instagram_draft",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey",        "value": "={{$env.SUPABASE_SERVICE_KEY}}" },
+            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_KEY}}" }
+          ]
+        },
+        "options": { "timeout": 10000 }
+      },
+      "id": "44444444-0003-0003-0003-000000000003",
+      "name": "Supabase: Fetch Post Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 460],
+      "notes": "Loads youtube_script (spoken content), carousel_slides (5 slide texts), and image_prompt (visual style) from content_queue."
+    },
+
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [{
+            "id": "has-script",
+            "leftValue":  "={{$json[0].youtube_script}}",
+            "rightValue": "",
+            "operator": { "type": "string", "operation": "notEmpty" }
+          }],
+          "combinator": "and"
+        }
+      },
+      "id": "44444444-0004-0004-0004-000000000004",
+      "name": "Has YouTube Script?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [720, 460],
+      "notes": "True  → generate video\nFalse → skip (post was drafted without a script — run Flow 01 first)"
+    },
+
+    {
+      "parameters": {},
+      "id": "44444444-0004b-0004-0004-00000000004b",
+      "name": "Skip: No Script Found",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [960, 620],
+      "notes": "This post has no youtube_script. Re-run content generation (Flow 01) first, then re-approve."
+    },
+
+    {
+      "parameters": {
+        "jsCode": "const row = $input.first().json[0];\nif (!row) throw new Error('Post not found in content_queue');\n\nconst script = row.youtube_script || '';\n\n// Extract spoken lines from the structured HOOK/POINT1.../CTA format\nconst spoken = [];\nconst sections = ['HOOK', 'POINT1', 'POINT2', 'POINT3', 'CTA'];\nfor (const label of sections) {\n  const m = script.match(new RegExp(`${label}\\\\s*\\\\([^)]*\\\\):\\\\s*\\\\[?([^\\\\[\\\\]\\\\n]+)`, 'i'));\n  if (m) spoken.push(m[1].trim().replace(/[\\[\\]]/g, ''));\n}\n\n// Fallback: strip all labels, use raw text\nconst scriptText = spoken.length >= 3\n  ? spoken.join(' ')\n  : script\n      .replace(/^(HOOK|POINT[123]|CTA)\\s*\\([^)]+\\):\\s*/gim, '')\n      .replace(/[\\[\\]]/g, '')\n      .replace(/\\n{2,}/g, ' ')\n      .trim();\n\nconst slides = Array.isArray(row.carousel_slides) ? row.carousel_slides : [];\nif (slides.length === 0) throw new Error('carousel_slides is empty — cannot build video without slide content');\n\nconsole.log(`[VideoGen] Post ${row.id} | ${slides.length} slides | script ${scriptText.length} chars`);\n\nreturn [{\n  json: {\n    post_id:      row.id,\n    idea_title:   row.idea_title || 'Untitled',\n    script_text:  scriptText.substring(0, 2500),\n    slides:       slides,\n    image_prompt: row.image_prompt || 'Dark navy background, teal and purple accents, modern SaaS aesthetic, bold white text',\n  }\n}];"
+      },
+      "id": "44444444-0005-0005-0005-000000000005",
+      "name": "Code: Parse Script + Extract Slides",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [960, 440],
+      "notes": "Strips timing labels from the HOOK/POINT1/CTA format to produce clean spoken text for TTS.\nAlso validates that carousel_slides array exists (needed for per-slide images)."
+    },
+
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.elevenlabs.io/v1/text-to-speech/{{$env.ELEVENLABS_VOICE_ID}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "xi-api-key",   "value": "={{$env.ELEVENLABS_API_KEY}}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Accept",       "value": "audio/mpeg" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawBody": "={{\nJSON.stringify({\n  text: $json.script_text,\n  model_id: 'eleven_turbo_v2',\n  voice_settings: {\n    stability: 0.72,\n    similarity_boost: 0.88,\n    style: 0.2,\n    use_speaker_boost: true\n  }\n})\n}}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "44444444-0006-0006-0006-000000000006",
+      "name": "ElevenLabs: Generate TTS Voiceover",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1200, 440],
+      "notes": "Generates MP3 voiceover from the script text.\n\nSETUP:\n  ELEVENLABS_API_KEY  — elevenlabs.io → Profile → API Keys\n  ELEVENLABS_VOICE_ID — elevenlabs.io → Voice Library → pick a voice → copy ID\n                        Recommended: 'EXAVITQu4vr4xnSDxMaL' (Bella, clear professional female)\n                        or 'VR6AewLTigWG4xSOukaG' (Arnold, authoritative male)\n\n  Free tier: 10,000 chars/mo (~10 videos/mo)\n  Starter: $5/mo for 30,000 chars (~30 videos/mo)\n\nOutput: binary MP3 stored in $binary.data"
+    },
+
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.SUPABASE_URL}}/storage/v1/object/content-audio/shorts/{{$('Code: Parse Script + Extract Slides').first().json.post_id}}.mp3",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey",        "value": "={{$env.SUPABASE_SERVICE_KEY}}" },
+            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_KEY}}" },
+            { "name": "Content-Type",  "value": "audio/mpeg" },
+            { "name": "x-upsert",      "value": "true" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": { "timeout": 30000 }
+      },
+      "id": "44444444-0007-0007-0007-000000000007",
+      "name": "Supabase Storage: Upload Audio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1440, 440],
+      "notes": "Uploads the ElevenLabs MP3 to Supabase Storage bucket 'content-audio/shorts/'.\n\nSETUP REQUIRED:\n  1. Supabase Dashboard → Storage → New bucket → Name: 'content-audio' → toggle PUBLIC ON\n  2. Shotstack (and DALL-E) need to fetch these URLs, so public access is required.\n\nx-upsert: true overwrites if the same post is regenerated."
+    },
+
+    {
+      "parameters": {
+        "jsCode": "const parsed  = $('Code: Parse Script + Extract Slides').first().json;\nconst postId  = parsed.post_id;\nconst slides  = parsed.slides;\nconst imgPr   = parsed.image_prompt;\n\nconst audioUrl = `${$env.SUPABASE_URL}/storage/v1/object/public/content-audio/shorts/${postId}.mp3`;\n\nconsole.log(`[VideoGen] Audio ready: ${audioUrl} | Building ${slides.length} slide image prompts`);\n\nreturn slides.map((slideText, i) => ({\n  json: {\n    post_id:      postId,\n    idea_title:   parsed.idea_title,\n    slide_index:  i,\n    slide_text:   slideText,\n    total_slides: slides.length,\n    audio_url:    audioUrl,\n    image_prompt: `${imgPr}. This slide displays the text: \"${slideText}\". Make the text LARGE and legible as a prominent overlay. Vertical 9:16 format. No people. Clean infographic layout.`.substring(0, 900),\n  }\n}));"
+      },
+      "id": "44444444-0008-0008-0008-000000000008",
+      "name": "Code: Build Slide Image Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1680, 440],
+      "notes": "Emits one item per carousel slide. Each item contains:\n  • slide_index  — position in video (0-4)\n  • slide_text   — text to display on screen\n  • image_prompt — DALL-E 3 prompt (base style + slide-specific copy)\n  • audio_url    — Supabase public URL for the full-length voiceover\n  • total_slides — used to calculate per-slide duration"
+    },
+
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "44444444-0009-0009-0009-000000000009",
+      "name": "Process Slides Loop",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1920, 440],
+      "notes": "Processes one slide at a time.\nOutput 0 → DALL-E 3 (current slide)\nOutput 1 → Code: Assemble Shotstack Timeline (all slides done)"
+    },
+
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/images/generations",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{$env.OPENAI_API_KEY}}" },
+            { "name": "Content-Type",  "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawBody": "={{\nJSON.stringify({\n  model: 'dall-e-3',\n  prompt: $json.image_prompt,\n  n: 1,\n  size: '1024x1792',\n  quality: 'standard',\n  style: 'vivid'\n})\n}}",
+        "options": { "timeout": 60000 }
+      },
+      "id": "44444444-0010-0010-0010-000000000010",
+      "name": "DALL-E 3: Generate Slide Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2160, 360],
+      "notes": "Generates a 1024×1792 (9:16) image for this slide using DALL-E 3.\n\nSETUP:\n  OPENAI_API_KEY — platform.openai.com → API Keys\n\nCost: $0.04 per image · 5 slides × $0.04 = $0.20 per video\n\nThe returned URL is valid for 1 hour — Shotstack downloads it during render\nso no need to re-host the images."
+    },
+
+    {
+      "parameters": {
+        "jsCode": "const dalleResponse = $input.first().json;\nconst imageUrl = dalleResponse.data?.[0]?.url || '';\n\nif (!imageUrl) {\n  console.error('[VideoGen] DALL-E returned no URL:', JSON.stringify(dalleResponse).substring(0, 200));\n  throw new Error('DALL-E 3 returned no image URL — check OPENAI_API_KEY and billing');\n}\n\nconst slide = $('Process Slides Loop').first().json;\nconsole.log(`[VideoGen] Slide ${slide.slide_index + 1}/${slide.total_slides} image ready`);\n\nreturn [{\n  json: {\n    post_id:      slide.post_id,\n    idea_title:   slide.idea_title,\n    slide_index:  slide.slide_index,\n    slide_text:   slide.slide_text,\n    total_slides: slide.total_slides,\n    audio_url:    slide.audio_url,\n    image_url:    imageUrl,\n  }\n}];"
+      },
+      "id": "44444444-0011-0011-0011-000000000011",
+      "name": "Code: Extract Image URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2400, 360],
+      "notes": "Extracts the DALL-E 3 hosted image URL and merges it with the slide metadata.\nCarries slide_index forward so images are sorted into correct order when collected."
+    },
+
+    {
+      "parameters": {
+        "jsCode": "// Collect all processed slide items in slide order\nconst allSlides = $('Code: Extract Image URL').all();\nif (allSlides.length === 0) throw new Error('No image URLs collected — DALL-E loop produced no output');\n\nconst sorted     = allSlides.map(i => i.json).sort((a, b) => a.slide_index - b.slide_index);\nconst imageUrls  = sorted.map(s => s.image_url);\nconst slideTexts = sorted.map(s => s.slide_text);\nconst first      = sorted[0];\n\nconst totalDuration = 75; // seconds\nconst slideDuration = totalDuration / imageUrls.length; // 15s each for 5 slides\n\n// ─── Build Shotstack timeline ────────────────────────────────────────────────\n// Track 0: Background images with Ken Burns zoom\nconst imageClips = imageUrls.map((url, i) => ({\n  asset: { type: 'image', src: url },\n  start:      parseFloat((i * slideDuration).toFixed(2)),\n  length:     slideDuration,\n  effect:     'zoomIn',\n  transition: { in: 'fade', out: 'fade' }\n}));\n\n// Track 1: Bottom-third text overlays (HTML clip for full style control)\nconst textClips = slideTexts.map((text, i) => ({\n  asset: {\n    type:   'html',\n    html:   `<p>${text.replace(/'/g, \"&#39;\").replace(/\"/g, '&quot;')}</p>`,\n    css:    'p { font-family: Arial Black, Arial, sans-serif; font-size: 52px; font-weight: 900; color: #ffffff; text-align: center; line-height: 1.3; margin: 0; padding: 20px 32px; background: rgba(0,0,0,0.68); border-radius: 12px; }',\n    width:  960,\n    height: 320\n  },\n  start:    parseFloat((i * slideDuration).toFixed(2)),\n  length:   slideDuration,\n  position: 'bottom',\n  offset:   { x: 0, y: 0.12 },\n  transition: { in: 'fade' }\n}));\n\n// Track 2: SNG Advisors branding pill (top-left, full duration)\nconst brandingClip = [{\n  asset: {\n    type:   'html',\n    html:   '<div>SNG Advisors</div>',\n    css:    'div { font-family: Arial, sans-serif; font-size: 36px; font-weight: 800; color: #ffffff; background: rgba(13,148,136,0.85); padding: 12px 28px; border-radius: 100px; white-space: nowrap; }',\n    width:  500,\n    height: 80\n  },\n  start:    0,\n  length:   totalDuration,\n  position: 'topLeft',\n  offset:   { x: 0.04, y: 0.04 }\n}];\n\nconst shotstack_payload = {\n  timeline: {\n    soundtrack: {\n      src:    first.audio_url,\n      effect: 'fadeOut',\n      volume: 1\n    },\n    tracks: [\n      { clips: brandingClip },\n      { clips: textClips },\n      { clips: imageClips }\n    ]\n  },\n  output: {\n    format:    'mp4',\n    size:      { width: 1080, height: 1920 },\n    fps:       30,\n    quality:   'high'\n  }\n};\n\nconsole.log(`[VideoGen] Shotstack payload built: ${imageUrls.length} slides, ${totalDuration}s`);\n\nreturn [{\n  json: {\n    post_id:           first.post_id,\n    idea_title:        first.idea_title,\n    audio_url:         first.audio_url,\n    image_urls:        imageUrls,\n    slide_texts:       slideTexts,\n    shotstack_payload: shotstack_payload\n  }\n}];"
+      },
+      "id": "44444444-0012-0012-0012-000000000012",
+      "name": "Code: Assemble Shotstack Timeline",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2160, 580],
+      "notes": "Collects ALL 5 slide images, sorts by slide_index, then builds the Shotstack timeline JSON:\n  • 1080×1920 @ 30fps (Reels/Shorts spec)\n  • Track 0 — full-bleed DALL-E images with Ken Burns zoomIn + fade transitions\n  • Track 1 — bold white HTML text overlay per slide (bottom-third, dark scrim bg)\n  • Track 2 — SNG Advisors teal branding pill (top-left, always visible)\n  • Soundtrack — ElevenLabs MP3 with fadeOut\n\nNo Shotstack template required — fully dynamic inline definition."
+    },
+
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.shotstack.io/v1/render",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key",    "value": "={{$env.SHOTSTACK_API_KEY}}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawBody": "={{\nJSON.stringify($json.shotstack_payload)\n}}",
+        "options": { "timeout": 30000 }
+      },
+      "id": "44444444-0013-0013-0013-000000000013",
+      "name": "Shotstack: Start Render",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2400, 580],
+      "notes": "Submits the render job to Shotstack. Returns immediately with a render ID.\n\nSETUP:\n  SHOTSTACK_API_KEY — shotstack.io → Dashboard → API Keys → copy Production key\n\nPricing:\n  Sandbox (free, watermarked): change URL to https://api.shotstack.io/stage/render\n  Production (pay-as-you-go):  $0.09/render → 20 videos/month = $1.80/month\n\nStart on sandbox, flip to /v1/ when happy with output."
+    },
+
+    {
+      "parameters": {
+        "jsCode": "const res = $input.first().json;\n\n// Shotstack success response: { success: true, message: '...', response: { id: '...', message: 'Queued' } }\nconst renderId = res?.response?.id || res?.data?.id || '';\n\nif (!renderId) {\n  console.error('[VideoGen] Shotstack response:', JSON.stringify(res).substring(0, 300));\n  throw new Error('Shotstack did not return a render ID — check SHOTSTACK_API_KEY and account status');\n}\n\nconsole.log(`[VideoGen] Shotstack render queued: ${renderId}`);\n\nconst prev = $('Code: Assemble Shotstack Timeline').first().json;\n\nreturn [{\n  json: {\n    render_id:  renderId,\n    post_id:    prev.post_id,\n    idea_title: prev.idea_title,\n    audio_url:  prev.audio_url,\n    image_urls: prev.image_urls,\n  }\n}];"
+      },
+      "id": "44444444-0013b-0013-0013-00000000013b",
+      "name": "Code: Store Render ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2640, 580],
+      "notes": "Extracts render_id from Shotstack's response and carries post metadata forward to the poll nodes."
+    },
+
+    {
+      "parameters": {
+        "resume": "timeInterval",
+        "unit": "seconds",
+        "value": 90,
+        "options": {}
+      },
+      "id": "44444444-0014-0014-0014-000000000014",
+      "name": "Wait: 90s (Render in Progress)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [2880, 580],
+      "notes": "A 1080×1920 MP4 at 75s typically renders in 60-120s on Shotstack.\n90s is a good first check. If not done, the flow retries after another 45s."
+    },
+
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.shotstack.io/v1/render/{{$json.render_id}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "={{$env.SHOTSTACK_API_KEY}}" }
+          ]
+        },
+        "options": { "timeout": 15000 }
+      },
+      "id": "44444444-0015-0015-0015-000000000015",
+      "name": "Shotstack: Poll Render Status (1)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3120, 580],
+      "notes": "Polls render status. Shotstack statuses:\n  'queued'    — waiting in queue\n  'fetching'  — downloading assets\n  'rendering' — encoding in progress\n  'saving'    — uploading to CDN\n  'done'      — complete, response.data.url has the video URL\n  'failed'    — check response.data.error for details"
+    },
+
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [{
+            "id": "render-done",
+            "leftValue":  "={{$json.response?.status}}",
+            "rightValue": "done",
+            "operator": { "type": "string", "operation": "equals" }
+          }],
+          "combinator": "and"
+        }
+      },
+      "id": "44444444-0015b-0015-0015-00000000015b",
+      "name": "Render Done? (1st Check)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [3360, 580],
+      "notes": "True  → render finished → extract video URL\nFalse → wait 45s more and poll again"
+    },
+
+    {
+      "parameters": {
+        "resume": "timeInterval",
+        "unit": "seconds",
+        "value": 45,
+        "options": {}
+      },
+      "id": "44444444-0016-0016-0016-000000000016",
+      "name": "Wait: 45s More (Still Rendering)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [3600, 700],
+      "notes": "Second wait if render wasn't done after 90s. Covers slower renders up to ~135s total."
+    },
+
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.shotstack.io/v1/render/{{$('Code: Store Render ID').first().json.render_id}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "={{$env.SHOTSTACK_API_KEY}}" }
+          ]
+        },
+        "options": { "timeout": 15000 }
+      },
+      "id": "44444444-0016b-0016-0016-00000000016b",
+      "name": "Shotstack: Poll Render Status (2)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3840, 700],
+      "notes": "Final poll. If status is still not 'done', check shotstack.io → Dashboard → Renders for the error message."
+    },
+
+    {
+      "parameters": {
+        "mode": "append",
+        "options": {}
+      },
+      "id": "44444444-0016c-0016-0016-00000000016c",
+      "name": "Merge: Render Status Paths",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [3600, 560],
+      "notes": "Merges the 'done on first check' and 'done on second check' paths into one stream."
+    },
+
+    {
+      "parameters": {
+        "jsCode": "const renderStatus = $input.first().json;\n\n// Shotstack success response: { success: true, message: '...', response: { id, status, url, ... } }\nconst status   = renderStatus?.response?.status || 'unknown';\nconst videoUrl = renderStatus?.response?.url    || '';\n\nif (!videoUrl || status !== 'done') {\n  const errDetail = renderStatus?.response?.error || renderStatus?.message || 'no error detail';\n  console.error(`[VideoGen] Render status: ${status}. Response:`, JSON.stringify(renderStatus).substring(0, 300));\n  throw new Error(`Shotstack render did not produce a video URL (status: ${status}, detail: ${errDetail}). Check shotstack.io Dashboard → Renders.`);\n}\n\nconst meta = $('Code: Store Render ID').first().json;\nconsole.log(`[VideoGen] ✅ Video ready: ${videoUrl}`);\n\nreturn [{\n  json: {\n    post_id:       meta.post_id,\n    idea_title:    meta.idea_title,\n    video_url:     videoUrl,\n    audio_url:     meta.audio_url,\n    image_urls:    meta.image_urls,\n    render_id:     meta.render_id,\n    render_status: status,\n  }\n}];"
+      },
+      "id": "44444444-0017-0017-0017-000000000017",
+      "name": "Code: Extract Final Video URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3840, 560],
+      "notes": "Extracts the Shotstack CDN video URL from response.url.\nThis URL is permanent — Shotstack hosts renders on their CDN indefinitely."
+    },
+
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/content_queue?id=eq.{{$json.post_id}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey",        "value": "={{$env.SUPABASE_SERVICE_KEY}}" },
+            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_KEY}}" },
+            { "name": "Content-Type",  "value": "application/json" },
+            { "name": "Prefer",        "value": "return=representation" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawBody": "={{\nJSON.stringify({\n  youtube_video_url:   $json.video_url,\n  instagram_reel_url:  $json.video_url,\n  video_generated_at:  new Date().toISOString(),\n  video_audio_url:     $json.audio_url,\n  video_image_urls:    $json.image_urls,\n  video_render_id:     $json.render_id,\n  status:              'video_ready'\n})\n}}",
+        "options": { "timeout": 10000 }
+      },
+      "id": "44444444-0018-0018-0018-000000000018",
+      "name": "Supabase: Save Video URLs to content_queue",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [4080, 560],
+      "notes": "Writes the final video URL back to content_queue:\n  youtube_video_url  — picked up by Flow 02's YouTube upload node\n  instagram_reel_url — same video, used for Instagram Reel\n  status             → 'video_ready'\n\nAfter this runs, re-POST to Flow 02's /approve-post webhook with the same post_id\nto trigger YouTube Shorts + Instagram Reels publishing automatically."
+    },
+
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{$env.RESEND_API_KEY}}" },
+            { "name": "Content-Type",  "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawBody": "={{\nconst d = $('Code: Extract Final Video URL').first().json;\nJSON.stringify({\n  from:    'Floatup Content <noreply@floatup.app>',\n  to:      ['saksham.gpt2001@gmail.com'],\n  subject: `🎬 Video ready: ${d.idea_title}`,\n  html: `\n<div style=\"font-family:-apple-system,sans-serif;max-width:560px;margin:0 auto;color:#0f172a\">\n  <h2 style=\"margin-bottom:4px\">🎬 Your Reel/Short is ready</h2>\n  <p style=\"color:#64748b;margin-top:0;font-size:13px\">Generated ${new Date().toLocaleString('en-IN',{timeZone:'Asia/Kolkata'})} IST</p>\n  <div style=\"border:1px solid #e2e8f0;border-radius:10px;padding:20px;margin-bottom:20px\">\n    <strong style=\"font-size:15px\">${d.idea_title}</strong>\n    <p style=\"font-size:13px;color:#475569;margin-top:8px\">1080×1920 · 75s · 5 slides · ElevenLabs voiceover · DALL-E 3 visuals · Shotstack render</p>\n    <a href=\"${d.video_url}\" style=\"display:inline-block;margin-top:12px;padding:10px 22px;background:#0d9488;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:13px\">▶ Preview Video</a>\n  </div>\n  <div style=\"background:#fef9c3;border:1px solid #fde68a;border-radius:8px;padding:12px 16px;font-size:13px;margin-bottom:20px\">\n    <strong>Next step:</strong> Review the video preview above, then re-approve the post in your dashboard.\n    Flow 02 will automatically upload it to YouTube Shorts + Instagram Reels.\n  </div>\n  <p style=\"font-size:12px;color:#94a3b8\">Render ID: ${d.render_id} · Cost: ~$0.29</p>\n</div>`\n})\n}}",
+        "options": { "timeout": 15000 }
+      },
+      "id": "44444444-0019-0019-0019-000000000019",
+      "name": "Resend: Notify Video Ready",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [4320, 560],
+      "notes": "Emails a preview link to the generated video.\nNext step: watch it → re-approve in dashboard → Flow 02 publishes to YouTube + Instagram."
+    },
+
+    {
+      "parameters": {},
+      "id": "44444444-0020-0020-0020-000000000020",
+      "name": "Done: Video Generated",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [4560, 560]
+    }
+
+  ],
+
+  "connections": {
+    "Webhook: Trigger Video Generation": {
+      "main": [[
+        { "node": "Respond to Webhook",       "type": "main", "index": 0 },
+        { "node": "Supabase: Fetch Post Data", "type": "main", "index": 0 }
+      ]]
+    },
+    "Supabase: Fetch Post Data": {
+      "main": [[{ "node": "Has YouTube Script?", "type": "main", "index": 0 }]]
+    },
+    "Has YouTube Script?": {
+      "main": [
+        [{ "node": "Code: Parse Script + Extract Slides", "type": "main", "index": 0 }],
+        [{ "node": "Skip: No Script Found",               "type": "main", "index": 0 }]
+      ]
+    },
+    "Code: Parse Script + Extract Slides": {
+      "main": [[{ "node": "ElevenLabs: Generate TTS Voiceover", "type": "main", "index": 0 }]]
+    },
+    "ElevenLabs: Generate TTS Voiceover": {
+      "main": [[{ "node": "Supabase Storage: Upload Audio", "type": "main", "index": 0 }]]
+    },
+    "Supabase Storage: Upload Audio": {
+      "main": [[{ "node": "Code: Build Slide Image Items", "type": "main", "index": 0 }]]
+    },
+    "Code: Build Slide Image Items": {
+      "main": [[{ "node": "Process Slides Loop", "type": "main", "index": 0 }]]
+    },
+    "Process Slides Loop": {
+      "main": [
+        [{ "node": "DALL-E 3: Generate Slide Image",   "type": "main", "index": 0 }],
+        [{ "node": "Code: Assemble Shotstack Timeline", "type": "main", "index": 0 }]
+      ]
+    },
+    "DALL-E 3: Generate Slide Image": {
+      "main": [[{ "node": "Code: Extract Image URL", "type": "main", "index": 0 }]]
+    },
+    "Code: Extract Image URL": {
+      "main": [[{ "node": "Process Slides Loop", "type": "main", "index": 0 }]]
+    },
+    "Code: Assemble Shotstack Timeline": {
+      "main": [[{ "node": "Shotstack: Start Render", "type": "main", "index": 0 }]]
+    },
+    "Shotstack: Start Render": {
+      "main": [[{ "node": "Code: Store Render ID", "type": "main", "index": 0 }]]
+    },
+    "Code: Store Render ID": {
+      "main": [[{ "node": "Wait: 90s (Render in Progress)", "type": "main", "index": 0 }]]
+    },
+    "Wait: 90s (Render in Progress)": {
+      "main": [[{ "node": "Shotstack: Poll Render Status (1)", "type": "main", "index": 0 }]]
+    },
+    "Shotstack: Poll Render Status (1)": {
+      "main": [[{ "node": "Render Done? (1st Check)", "type": "main", "index": 0 }]]
+    },
+    "Render Done? (1st Check)": {
+      "main": [
+        [{ "node": "Merge: Render Status Paths",      "type": "main", "index": 0 }],
+        [{ "node": "Wait: 45s More (Still Rendering)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Wait: 45s More (Still Rendering)": {
+      "main": [[{ "node": "Shotstack: Poll Render Status (2)", "type": "main", "index": 0 }]]
+    },
+    "Shotstack: Poll Render Status (2)": {
+      "main": [[{ "node": "Merge: Render Status Paths", "type": "main", "index": 1 }]]
+    },
+    "Merge: Render Status Paths": {
+      "main": [[{ "node": "Code: Extract Final Video URL", "type": "main", "index": 0 }]]
+    },
+    "Code: Extract Final Video URL": {
+      "main": [[{ "node": "Supabase: Save Video URLs to content_queue", "type": "main", "index": 0 }]]
+    },
+    "Supabase: Save Video URLs to content_queue": {
+      "main": [[{ "node": "Resend: Notify Video Ready", "type": "main", "index": 0 }]]
+    },
+    "Resend: Notify Video Ready": {
+      "main": [[{ "node": "Done: Video Generated", "type": "main", "index": 0 }]]
+    }
+  },
+
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+
+  "staticData": null,
+  "tags": [
+    { "name": "video-generation" },
+    { "name": "reels" },
+    { "name": "shorts" },
+    { "name": "ai" }
+  ],
+
+  "pinData": {},
+
+  "__setup_notes": {
+    "new_env_vars_required": {
+      "ELEVENLABS_API_KEY":  "elevenlabs.io → Profile (top-right) → API Keys → Generate",
+      "ELEVENLABS_VOICE_ID": "elevenlabs.io → Voice Library → pick voice → copy ID. Recommended: EXAVITQu4vr4xnSDxMaL (Bella) or VR6AewLTigWG4xSOukaG (Arnold)",
+      "OPENAI_API_KEY":      "platform.openai.com → API Keys. Needs DALL-E 3 access. Cost: $0.04/image × 5 = $0.20/video",
+      "SHOTSTACK_API_KEY":   "shotstack.io → Dashboard → API Keys → copy Production key. Sandbox key available for free watermarked testing."
+    },
+    "shotstack_sandbox_vs_production": {
+      "sandbox_url":    "https://api.shotstack.io/stage/render   (free, watermarked output, unlimited)",
+      "production_url": "https://api.shotstack.io/v1/render       ($0.09/render, clean output)",
+      "tip":            "Start with sandbox URL in the Shotstack: Start Render node. Swap to /v1/ when you're happy with the video."
+    },
+    "supabase_storage_setup": [
+      "Supabase Dashboard → Storage → New Bucket → Name: 'content-audio' → toggle PUBLIC ON",
+      "Shotstack needs to download the audio file, so the bucket must be publicly readable"
+    ],
+    "content_queue_migration": "ALTER TABLE content_queue ADD COLUMN IF NOT EXISTS instagram_reel_url text, ADD COLUMN IF NOT EXISTS video_generated_at timestamptz, ADD COLUMN IF NOT EXISTS video_audio_url text, ADD COLUMN IF NOT EXISTS video_image_urls jsonb, ADD COLUMN IF NOT EXISTS video_render_id text;",
+    "monthly_cost_at_20_videos": {
+      "DALL-E 3":    "$4.00  (5 images × $0.04 × 20 videos)",
+      "ElevenLabs":  "$5.00  (Starter plan, covers ~30 videos/mo)",
+      "Shotstack":   "$1.80  (20 renders × $0.09, pay-as-you-go)",
+      "Total":       "$10.80 / month"
+    },
+    "how_to_trigger": {
+      "manual":        "n8n → Test webhook → POST { post_id: '<uuid from content_queue>' }",
+      "from_dashboard": "POST https://<your-n8n>/webhook/generate-video  body: { post_id }",
+      "from_flow_02":  "Add an HTTP Request node at the end of Flow 02's approve path that POSTs to this webhook"
+    },
+    "total_time_per_video": "~4-6 minutes total (ElevenLabs ~5s + 5× DALL-E 3 ~8s each + Shotstack render ~90-135s)"
+  }
+}

@@ -98,6 +98,38 @@ export default async function LandingPage() {
           0%,100% { opacity: 0.55 }
           50%     { opacity: 1 }
         }
+        @keyframes diamond-spin {
+          from { transform: rotate(45deg) }
+          to   { transform: rotate(405deg) }
+        }
+        @keyframes diamond-spin-r {
+          from { transform: rotate(45deg) }
+          to   { transform: rotate(-315deg) }
+        }
+        @keyframes aurora-drift {
+          0%,100% { transform: translateX(-18%) rotate(-7deg); opacity: 0.55 }
+          50%     { transform: translateX(18%) rotate(-7deg);  opacity: 1    }
+        }
+        @keyframes aurora-drift-2 {
+          0%,100% { transform: translateX(14%) rotate(5deg); opacity: 0.4 }
+          50%     { transform: translateX(-22%) rotate(5deg); opacity: 0.8 }
+        }
+        @keyframes star-twinkle {
+          0%,100% { opacity: 0.1;  transform: scale(0.7) }
+          50%     { opacity: 0.95; transform: scale(1.7) }
+        }
+        @keyframes spotlight-sweep {
+          0%,100% { opacity: 0.18; transform: translateX(-12%) }
+          50%     { opacity: 0.32; transform: translateX(12%)  }
+        }
+        @keyframes word-in {
+          from { opacity: 0; filter: blur(14px); transform: translateY(18px) }
+          to   { opacity: 1; filter: blur(0px);  transform: translateY(0)    }
+        }
+        @keyframes ring-expand {
+          0%   { transform: scale(0.82); opacity: 0.7 }
+          100% { transform: scale(1.26); opacity: 0   }
+        }
 
         /* ── Utility ─────────────────────────────────────────────────────── */
         .fade-up   { animation: fade-up 0.65s cubic-bezier(0.16,1,0.3,1) both }
@@ -332,6 +364,112 @@ export default async function LandingPage() {
           animation: 'orb-drift-3 22s ease-in-out infinite', pointerEvents: 'none',
         }}/>
 
+        {/* ── Radial spotlight from top-center ── */}
+        <div style={{
+          position: 'absolute', top: -60, left: '30%', right: '30%', height: 420,
+          background: 'radial-gradient(ellipse 60% 100% at 50% 0%, rgba(13,148,136,0.18) 0%, rgba(56,189,248,0.10) 40%, transparent 75%)',
+          filter: 'blur(8px)',
+          animation: 'spotlight-sweep 14s ease-in-out infinite',
+          pointerEvents: 'none',
+        }}/>
+
+        {/* ── Spinning gradient diamond — large, back-left ── */}
+        <div style={{
+          position: 'absolute', top: '8%', left: '-7%',
+          width: 420, height: 420, borderRadius: 48,
+          background: 'conic-gradient(from 0deg at 50% 50%, #0d9488 0%, #38bdf8 18%, #818cf8 38%, #f97316 58%, #2dd4bf 78%, #0d9488 100%)',
+          opacity: 0.2,
+          filter: 'blur(3px)',
+          animation: 'diamond-spin 28s linear infinite',
+          pointerEvents: 'none',
+        }}/>
+        {/* pulse rings around diamond 1 */}
+        <div style={{
+          position: 'absolute', top: '8%', left: '-7%',
+          width: 420, height: 420, borderRadius: 48,
+          border: '1.5px solid rgba(13,148,136,0.22)',
+          animation: 'ring-expand 3.5s cubic-bezier(0,0,0.2,1) infinite',
+          pointerEvents: 'none',
+        }}/>
+        <div style={{
+          position: 'absolute', top: '8%', left: '-7%',
+          width: 420, height: 420, borderRadius: 48,
+          border: '1.5px solid rgba(56,189,248,0.18)',
+          animation: 'ring-expand 3.5s 1.2s cubic-bezier(0,0,0.2,1) infinite',
+          pointerEvents: 'none',
+        }}/>
+
+        {/* ── Spinning gradient diamond — medium, back-right ── */}
+        <div style={{
+          position: 'absolute', top: '28%', right: '-5%',
+          width: 300, height: 300, borderRadius: 36,
+          background: 'conic-gradient(from 180deg at 50% 50%, #818cf8 0%, #f97316 22%, #0d9488 48%, #38bdf8 72%, #818cf8 100%)',
+          opacity: 0.16,
+          filter: 'blur(2px)',
+          animation: 'diamond-spin-r 20s linear infinite',
+          pointerEvents: 'none',
+        }}/>
+        <div style={{
+          position: 'absolute', top: '28%', right: '-5%',
+          width: 300, height: 300, borderRadius: 36,
+          border: '1.5px solid rgba(124,58,237,0.2)',
+          animation: 'ring-expand 4s 0.6s cubic-bezier(0,0,0.2,1) infinite',
+          pointerEvents: 'none',
+        }}/>
+
+        {/* ── Small accent diamond — bottom-right ── */}
+        <div style={{
+          position: 'absolute', bottom: '12%', left: '28%',
+          width: 140, height: 140, borderRadius: 18,
+          background: 'conic-gradient(from 90deg at 50% 50%, #2dd4bf 0%, #818cf8 50%, #f97316 100%)',
+          opacity: 0.14,
+          animation: 'diamond-spin 16s linear infinite',
+          pointerEvents: 'none',
+        }}/>
+
+        {/* ── Aurora ribbon 1 ── */}
+        <div style={{
+          position: 'absolute', top: '32%', left: '-25%', right: '-25%', height: 90,
+          background: 'linear-gradient(90deg, transparent 5%, rgba(13,148,136,0.07) 25%, rgba(56,189,248,0.13) 50%, rgba(124,58,237,0.07) 75%, transparent 95%)',
+          filter: 'blur(28px)',
+          animation: 'aurora-drift 13s ease-in-out infinite',
+          pointerEvents: 'none',
+        }}/>
+
+        {/* ── Aurora ribbon 2 ── */}
+        <div style={{
+          position: 'absolute', top: '55%', left: '-25%', right: '-25%', height: 70,
+          background: 'linear-gradient(90deg, transparent 5%, rgba(249,115,22,0.06) 20%, rgba(56,189,248,0.10) 55%, rgba(13,148,136,0.07) 80%, transparent 95%)',
+          filter: 'blur(22px)',
+          animation: 'aurora-drift-2 17s ease-in-out infinite',
+          pointerEvents: 'none',
+        }}/>
+
+        {/* ── Twinkling star particles ── */}
+        {([
+          { top: '12%', left: '7%',  s: 3, d: '0s',    dur: 2.6 },
+          { top: '22%', left: '32%', s: 2, d: '0.7s',  dur: 3.1 },
+          { top: '48%', left: '12%', s: 2, d: '1.3s',  dur: 2.4 },
+          { top: '65%', left: '22%', s: 3, d: '0.4s',  dur: 3.6 },
+          { top: '18%', left: '62%', s: 2, d: '1.0s',  dur: 2.9 },
+          { top: '35%', left: '78%', s: 3, d: '0.2s',  dur: 3.3 },
+          { top: '72%', left: '70%', s: 2, d: '1.6s',  dur: 2.7 },
+          { top: '28%', left: '88%', s: 2, d: '0.9s',  dur: 3.8 },
+          { top: '58%', left: '50%', s: 3, d: '1.8s',  dur: 2.5 },
+          { top: '42%', left: '92%', s: 2, d: '0.5s',  dur: 3.0 },
+        ] as Array<{top:string,left:string,s:number,d:string,dur:number}>).map((p, i) => (
+          <div key={i} style={{
+            position: 'absolute',
+            top: p.top, left: p.left,
+            width: p.s, height: p.s,
+            borderRadius: '50%',
+            background: ['#2dd4bf','#818cf8','#38bdf8','#f97316','#fff'][i % 5],
+            boxShadow: `0 0 ${p.s * 3}px 1px ${['rgba(45,212,191,0.8)','rgba(129,140,248,0.8)','rgba(56,189,248,0.8)','rgba(249,115,22,0.8)','rgba(255,255,255,0.6)'][i % 5]}`,
+            animation: `star-twinkle ${p.dur}s ${p.d} ease-in-out infinite`,
+            pointerEvents: 'none',
+          }}/>
+        ))}
+
         <div className="hero-cols" style={{
           maxWidth: 1120, margin: '0 auto',
           display: 'flex', alignItems: 'flex-start', gap: 64,
@@ -359,13 +497,26 @@ export default async function LandingPage() {
               fontWeight: 900, lineHeight: 1.02,
               letterSpacing: '-3px', margin: '0 0 22px', color: '#fff',
             }}>
-              Task management<br/>
+              {['Task','management'].map((word, i) => (
+                <span key={word} style={{
+                  display: 'inline-block', marginRight: '0.22em',
+                  animation: `word-in 0.75s ${i * 0.13}s cubic-bezier(0.16,1,0.3,1) both`,
+                }}>{word}</span>
+              ))}<br/>
               <span style={{
                 background: 'linear-gradient(90deg, #2dd4bf 0%, #38bdf8 30%, #818cf8 65%, #2dd4bf 100%)',
                 backgroundSize: '200% auto',
                 WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
                 animation: 'shimmer 5s linear infinite',
-              }}>built for professionals.</span>
+                display: 'inline',
+              }}>
+                {['built','for','professionals.'].map((word, i) => (
+                  <span key={word} style={{
+                    display: 'inline-block', marginRight: i < 2 ? '0.22em' : 0,
+                    animation: `word-in 0.75s ${(i + 2) * 0.13}s cubic-bezier(0.16,1,0.3,1) both`,
+                  }}>{word}</span>
+                ))}
+              </span>
             </h1>
 
             <p style={{

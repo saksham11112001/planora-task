@@ -1,0 +1,485 @@
+{
+  "name": "05 — Launch Video Generator (Cinematic 16:9)",
+  "meta": {
+    "description": "Generates a polished ~90-second product launch video (1920×1080, 16:9) from scratch. Claude writes a 6-scene script, ElevenLabs narrates it, DALL-E 3 creates cinematic backgrounds, Shotstack assembles with animated CSS text reveals, gradient overlays, and background music.",
+    "output": "1920×1080 MP4, ~90 seconds — ready for YouTube, LinkedIn, and website hero section",
+    "cost_per_render": "~$0.78 (DALL-E 3: 6×$0.04=$0.24 + ElevenLabs ~$0.09 + Shotstack $0.09 render + Claude ~$0.04 input/output)",
+    "trigger": "POST /launch-video  body: see __setup_notes.webhook_params for all options"
+  },
+  "nodes": [
+
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "launch-video",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "55555555-0001-0001-0001-000000000001",
+      "name": "Webhook: Trigger Launch Video",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 400],
+      "webhookId": "launch-video-webhook",
+      "notes": "POST with product details. All fields are optional — defaults to SNG Advisors / Floatup.\nSee __setup_notes.webhook_params for the full list of customisable fields."
+    },
+
+    {
+      "parameters": {
+        "options": {
+          "responseCode": 200,
+          "responseBody": "{\"status\":\"queued\",\"message\":\"Launch video generation started. ~8-10 min. You'll get an email when ready.\"}"
+        }
+      },
+      "id": "55555555-0002-0002-0002-000000000002",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [480, 240]
+    },
+
+    {
+      "parameters": {
+        "jsCode": "const b = $input.first().json.body || {};\n\n// Merge caller params with SNG / Floatup defaults\nreturn [{\n  json: {\n    product_name:     b.product_name    || 'Floatup',\n    company_name:     b.company_name    || 'SNG Advisors',\n    tagline:          b.tagline         || 'India\\'s Compliance OS for CA Firms',\n    target_audience:  b.target_audience || 'Indian CA and CPA firms',\n    problem:          b.problem         || 'CA firms lose 40% of their time on manual compliance tracking, missed deadlines, and scattered client documents',\n    key_features:     b.key_features    || ['Automated compliance task generation', 'Team task & approval workflows', 'Client document portal with reminders'],\n    stat_1_number:    b.stat_1_number   || '100+',\n    stat_1_label:     b.stat_1_label    || 'CA firms onboarded',\n    stat_2_number:    b.stat_2_number   || '10,000+',\n    stat_2_label:     b.stat_2_label    || 'tasks automated monthly',\n    stat_3_number:    b.stat_3_number   || '15 hrs',\n    stat_3_label:     b.stat_3_label    || 'saved per firm per week',\n    testimonial:      b.testimonial     || 'Floatup eliminated our missed deadlines entirely. Every task, every client, every due date — all in one place.',\n    testimonial_by:   b.testimonial_by  || '— CA Practice Owner, Mumbai',\n    cta_text:         b.cta_text        || 'Start free at sng-adwisers.com',\n    website_url:      b.website_url     || 'https://sng-adwisers.com',\n    logo_url:         b.logo_url        || '',\n    screenshot_url:   b.screenshot_url  || '',\n    music_url:        b.music_url       || '',\n    brand_color:      b.brand_color     || '#0d9488',\n    duration_seconds: b.duration_seconds || 90,\n    visual_style:     b.visual_style    || 'cinematic dark navy and teal, modern SaaS aesthetic, professional, high contrast, no people'\n  }\n}];"
+      },
+      "id": "55555555-0003-0003-0003-000000000003",
+      "name": "Code: Set Product Parameters",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 460],
+      "notes": "Merges caller-provided params with SNG Advisors / Floatup defaults.\nPass any field in the webhook body to override the default.\nSee __setup_notes.webhook_params for full reference."
+    },
+
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key",         "value": "={{$env.ANTHROPIC_API_KEY}}" },
+            { "name": "anthropic-version",  "value": "2023-06-01" },
+            { "name": "content-type",       "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawBody": "={{\nconst p = $json;\nJSON.stringify({\n  model: 'claude-sonnet-4-5',\n  max_tokens: 2000,\n  messages: [{\n    role: 'user',\n    content: `You are a world-class product launch video scriptwriter. Write a compelling ${p.duration_seconds}-second launch video script for:\\n\\nProduct: ${p.product_name} by ${p.company_name}\\nTagline: ${p.tagline}\\nAudience: ${p.target_audience}\\nProblem solved: ${p.problem}\\nKey features: ${p.key_features.join(', ')}\\nStats: ${p.stat_1_number} ${p.stat_1_label} · ${p.stat_2_number} ${p.stat_2_label} · ${p.stat_3_number} ${p.stat_3_label}\\n\\nWrite exactly 6 scenes (each ~15 seconds). Use this EXACT format, nothing else:\\n\\nSCENE_1_TITLE: [scene name]\\nSCENE_1_NARRATION: [narrator spoken text, 2-3 sentences, punchy]\\nSCENE_1_HEADLINE: [large on-screen text, max 6 words]\\nSCENE_1_SUBTEXT: [supporting on-screen text, max 12 words]\\nSCENE_1_IMAGE_PROMPT: [DALL-E 3 prompt for cinematic background, ${p.visual_style}, no text in image, under 80 words]\\n\\nSCENE_2_TITLE: [scene name]\\nSCENE_2_NARRATION: [...]\\nSCENE_2_HEADLINE: [...]\\nSCENE_2_SUBTEXT: [...]\\nSCENE_2_IMAGE_PROMPT: [...]\\n\\n...repeat for SCENE_3 through SCENE_6.\\n\\nScene guide:\\n  Scene 1: Powerful brand/problem hook — grab attention in 3 seconds\\n  Scene 2: Agitate the problem with specific pain points\\n  Scene 3: Introduce the solution (product name reveal)\\n  Scene 4: Show 3 key features (one sentence each)\\n  Scene 5: Social proof — the stats and testimonial\\n  Scene 6: Clear CTA — ${p.cta_text}\\n\\nNarration tone: Confident, direct, no fluff. Think Apple keynote energy.`\n  }]\n})\n}}",
+        "options": { "timeout": 60000 }
+      },
+      "id": "55555555-0004-0004-0004-000000000004",
+      "name": "Claude: Write Launch Video Script",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [720, 460],
+      "notes": "Claude writes a 6-scene, 90-second launch video script with:\n  • Narrator spoken text per scene\n  • On-screen headline + subtext per scene\n  • DALL-E 3 image prompt per scene (cinematic background)\n\nUses ANTHROPIC_API_KEY (same key as Flow 01)."
+    },
+
+    {
+      "parameters": {
+        "jsCode": "const claudeResp = $input.first().json;\nconst content    = claudeResp.content?.[0]?.text || '';\nif (!content) throw new Error('Claude returned empty script. Check ANTHROPIC_API_KEY.');\n\nconst params = $('Code: Set Product Parameters').first().json;\n\nfunction extract(text, key) {\n  const m = text.match(new RegExp(`${key}:\\\\s*(.+)`));\n  return m ? m[1].trim() : '';\n}\n\nconst scenes = [];\nfor (let i = 1; i <= 6; i++) {\n  const title       = extract(content, `SCENE_${i}_TITLE`);\n  const narration   = extract(content, `SCENE_${i}_NARRATION`);\n  const headline    = extract(content, `SCENE_${i}_HEADLINE`);\n  const subtext     = extract(content, `SCENE_${i}_SUBTEXT`);\n  const imagePrompt = extract(content, `SCENE_${i}_IMAGE_PROMPT`);\n  if (!narration) { console.warn(`Scene ${i} narration missing`); continue; }\n  scenes.push({ index: i - 1, title, narration, headline, subtext, imagePrompt });\n}\n\nif (scenes.length < 4) throw new Error(`Only ${scenes.length} scenes parsed — check Claude output format`);\n\n// Full narration for TTS (all scenes joined)\nconst fullNarration = scenes.map(s => s.narration).join(' ');\n\nconsole.log(`[LaunchVideo] Parsed ${scenes.length} scenes | ${fullNarration.length} chars narration`);\n\nreturn [{\n  json: {\n    ...params,\n    scenes,\n    full_narration:    fullNarration.substring(0, 3000),\n    scene_duration:    params.duration_seconds / scenes.length,\n    total_duration:    params.duration_seconds,\n  }\n}];"
+      },
+      "id": "55555555-0005-0005-0005-000000000005",
+      "name": "Code: Parse Launch Script",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [960, 460],
+      "notes": "Parses Claude's structured output into 6 scene objects:\n  • index, title, narration, headline, subtext, imagePrompt\nAlso concatenates all narration into one string for ElevenLabs TTS."
+    },
+
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.elevenlabs.io/v1/text-to-speech/{{$env.ELEVENLABS_VOICE_ID}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "xi-api-key",   "value": "={{$env.ELEVENLABS_API_KEY}}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Accept",       "value": "audio/mpeg" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawBody": "={{\nJSON.stringify({\n  text: $json.full_narration,\n  model_id: 'eleven_turbo_v2',\n  voice_settings: { stability: 0.68, similarity_boost: 0.90, style: 0.15, use_speaker_boost: true }\n})\n}}",
+        "options": {
+          "response": { "response": { "responseFormat": "file", "outputPropertyName": "data" } },
+          "timeout": 90000
+        }
+      },
+      "id": "55555555-0006-0006-0006-000000000006",
+      "name": "ElevenLabs: Generate Narrator Voiceover",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1200, 460],
+      "notes": "Generates a single full-length MP3 narration track from all 6 scenes joined together.\nElevenLabs handles natural pauses between sentences.\n\nTip: For a launch video, use a deep confident male voice:\n  ELEVENLABS_VOICE_ID = VR6AewLTigWG4xSOukaG (Arnold)\nor a clear authoritative female:\n  ELEVENLABS_VOICE_ID = EXAVITQu4vr4xnSDxMaL (Bella)"
+    },
+
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.SUPABASE_URL}}/storage/v1/object/content-audio/launch/{{$('Code: Parse Launch Script').first().json.product_name.toLowerCase().replace(/ /g,'-')}}-launch.mp3",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey",        "value": "={{$env.SUPABASE_SERVICE_KEY}}" },
+            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_KEY}}" },
+            { "name": "Content-Type",  "value": "audio/mpeg" },
+            { "name": "x-upsert",      "value": "true" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": { "timeout": 30000 }
+      },
+      "id": "55555555-0007-0007-0007-000000000007",
+      "name": "Supabase Storage: Upload Narrator Audio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1440, 460],
+      "notes": "Uploads narration MP3 to Supabase Storage bucket 'content-audio/launch/'.\nBucket must be PUBLIC (same bucket used in Flow 04 — no additional setup needed)."
+    },
+
+    {
+      "parameters": {
+        "jsCode": "const parsed   = $('Code: Parse Launch Script').first().json;\nconst prodName = parsed.product_name.toLowerCase().replace(/ /g, '-');\nconst audioUrl = `${$env.SUPABASE_URL}/storage/v1/object/public/content-audio/launch/${prodName}-launch.mp3`;\n\nconsole.log(`[LaunchVideo] Audio uploaded. Building ${parsed.scenes.length} scene image prompts`);\n\n// Emit one item per scene for the DALL-E loop\nreturn parsed.scenes.map(scene => ({\n  json: {\n    // carry everything forward\n    ...parsed,\n    audio_url:          audioUrl,\n    // per-scene fields for DALL-E\n    scene_index:        scene.index,\n    scene_title:        scene.title,\n    scene_narration:    scene.narration,\n    scene_headline:     scene.headline,\n    scene_subtext:      scene.subtext,\n    scene_image_prompt: (scene.imagePrompt + '. Cinematic wide-shot, 16:9 ratio, high quality, no text or typography in the image.').substring(0, 900),\n  }\n}));"
+      },
+      "id": "55555555-0008-0008-0008-000000000008",
+      "name": "Code: Build Scene Image Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1680, 460],
+      "notes": "Emits one item per scene (6 items). Each carries the full product params + per-scene data:\n  • scene_index, scene_headline, scene_subtext — for Shotstack HTML overlays\n  • scene_image_prompt — for DALL-E 3 background generation\n  • audio_url — Supabase public URL for the narration track"
+    },
+
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "55555555-0009-0009-0009-000000000009",
+      "name": "Process Scenes Loop",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1920, 460],
+      "notes": "Output 0 → DALL-E 3 (current scene)\nOutput 1 → Code: Assemble Shotstack Timeline (all 6 scenes done)"
+    },
+
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/images/generations",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{$env.OPENAI_API_KEY}}" },
+            { "name": "Content-Type",  "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawBody": "={{\nJSON.stringify({\n  model: 'dall-e-3',\n  prompt: $json.scene_image_prompt,\n  n: 1,\n  size: '1792x1024',\n  quality: 'hd',\n  style: 'vivid'\n})\n}}",
+        "options": { "timeout": 90000 }
+      },
+      "id": "55555555-0010-0010-0010-000000000010",
+      "name": "DALL-E 3: Generate Scene Background",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2160, 380],
+      "notes": "Generates a 1792×1024 (16:9) HD cinematic background for each scene.\nUsing 'hd' quality (vs standard) for a launch video — sharper details, better composition.\nCost: $0.08/image × 6 scenes = $0.48 for the 6 backgrounds."
+    },
+
+    {
+      "parameters": {
+        "jsCode": "const dalleResp = $input.first().json;\nconst imageUrl  = dalleResp.data?.[0]?.url || '';\nif (!imageUrl) throw new Error('DALL-E 3 returned no URL for scene background');\n\nconst scene = $('Process Scenes Loop').first().json;\nconsole.log(`[LaunchVideo] Scene ${scene.scene_index + 1}/6 background ready`);\n\nreturn [{\n  json: {\n    scene_index:    scene.scene_index,\n    scene_title:    scene.scene_title,\n    scene_headline: scene.scene_headline,\n    scene_subtext:  scene.scene_subtext,\n    image_url:      imageUrl,\n    audio_url:      scene.audio_url,\n    // product params (only what's needed downstream)\n    product_name:   scene.product_name,\n    tagline:        scene.tagline,\n    stat_1_number:  scene.stat_1_number,\n    stat_1_label:   scene.stat_1_label,\n    stat_2_number:  scene.stat_2_number,\n    stat_2_label:   scene.stat_2_label,\n    stat_3_number:  scene.stat_3_number,\n    stat_3_label:   scene.stat_3_label,\n    testimonial:    scene.testimonial,\n    testimonial_by: scene.testimonial_by,\n    cta_text:       scene.cta_text,\n    website_url:    scene.website_url,\n    brand_color:    scene.brand_color,\n    logo_url:       scene.logo_url,\n    music_url:      scene.music_url,\n    total_duration: scene.total_duration,\n    scene_duration: scene.scene_duration,\n  }\n}];"
+      },
+      "id": "55555555-0011-0011-0011-000000000011",
+      "name": "Code: Extract Scene Image URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2400, 380],
+      "notes": "Extracts DALL-E URL and carries scene metadata forward.\nAll 6 scene items are collected by the Assemble node after the loop finishes."
+    },
+
+    {
+      "parameters": {
+        "jsCode": "// Collect all 6 scenes in order\nconst allScenes = $('Code: Extract Scene Image URL').all()\n  .map(i => i.json)\n  .sort((a, b) => a.scene_index - b.scene_index);\n\nif (allScenes.length < 4) throw new Error(`Only ${allScenes.length} scenes collected — loop may not have completed`);\n\nconst first         = allScenes[0];\nconst totalDuration = first.total_duration || 90;\nconst sceneDuration = parseFloat((totalDuration / allScenes.length).toFixed(2));\nconst brandColor    = first.brand_color || '#0d9488';\n\n// ─────────────────────────────────────────────────────────────────────────────\n// Helper: build CSS-animated HTML clip for each scene\n// ─────────────────────────────────────────────────────────────────────────────\nfunction sceneHTML(scene) {\n  const i     = scene.scene_index;\n  const hl    = (scene.scene_headline || '').replace(/\"/g, '&quot;').replace(/'/g, '&#39;');\n  const sub   = (scene.scene_subtext  || '').replace(/\"/g, '&quot;').replace(/'/g, '&#39;');\n\n  // Scene 0: Brand hero — product name + tagline center-stage\n  if (i === 0) {\n    return {\n      html: `<div class=\"c\"><div class=\"brand\">${first.product_name}</div><div class=\"tag\">${first.tagline}</div></div>`,\n      css:  `.c{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;padding:0 80px} .brand{font-family:'Arial Black',Arial,sans-serif;font-size:110px;font-weight:900;color:${brandColor};letter-spacing:-3px;animation:pop 0.9s cubic-bezier(0.34,1.56,0.64,1) both} .tag{font-size:38px;font-weight:600;color:rgba(255,255,255,0.88);margin-top:18px;animation:up 0.8s 0.7s ease both} @keyframes pop{from{transform:scale(0.6);opacity:0}to{transform:scale(1);opacity:1}} @keyframes up{from{transform:translateY(24px);opacity:0}to{transform:translateY(0);opacity:1}}`,\n      width: 1800, height: 900\n    };\n  }\n\n  // Scene 1: The Problem — bold headline left-aligned + red accent\n  if (i === 1) {\n    return {\n      html: `<div class=\"c\"><div class=\"label\">THE PROBLEM</div><div class=\"hl\">${hl}</div><div class=\"sub\">${sub}</div></div>`,\n      css:  `.c{display:flex;flex-direction:column;justify-content:center;height:100%;padding:0 120px} .label{font-size:22px;font-weight:700;color:#f97316;letter-spacing:4px;text-transform:uppercase;animation:fl 0.5s ease both} .hl{font-family:'Arial Black',Arial,sans-serif;font-size:72px;font-weight:900;color:#ffffff;line-height:1.1;margin-top:16px;animation:fl 0.6s 0.3s ease both} .sub{font-size:34px;color:rgba(255,255,255,0.75);margin-top:20px;line-height:1.4;animation:fl 0.6s 0.6s ease both} @keyframes fl{from{transform:translateX(-40px);opacity:0}to{transform:translateX(0);opacity:1}}`,\n      width: 1800, height: 900\n    };\n  }\n\n  // Scene 2: Solution reveal — product name with teal glow\n  if (i === 2) {\n    return {\n      html: `<div class=\"c\"><div class=\"eyebrow\">INTRODUCING</div><div class=\"name\">${first.product_name}</div><div class=\"sub\">${sub}</div></div>`,\n      css:  `.c{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center} .eyebrow{font-size:24px;font-weight:700;color:rgba(255,255,255,0.6);letter-spacing:6px;text-transform:uppercase;animation:fd 0.6s ease both} .name{font-family:'Arial Black',Arial,sans-serif;font-size:120px;font-weight:900;color:${brandColor};letter-spacing:-4px;margin-top:12px;text-shadow:0 0 80px ${brandColor};animation:glow 0.8s 0.4s ease both} .sub{font-size:36px;color:rgba(255,255,255,0.8);margin-top:20px;animation:fd 0.6s 0.9s ease both} @keyframes glow{from{opacity:0;text-shadow:0 0 0 ${brandColor}}to{opacity:1;text-shadow:0 0 80px ${brandColor}}} @keyframes fd{from{opacity:0}to{opacity:1}}`,\n      width: 1800, height: 900\n    };\n  }\n\n  // Scene 3: Features — 3 feature cards with staggered slide-in\n  if (i === 3) {\n    return {\n      html: `<div class=\"c\"><div class=\"heading\">${hl}</div><div class=\"sub\">${sub}</div></div>`,\n      css:  `.c{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;padding:0 100px} .heading{font-family:'Arial Black',Arial,sans-serif;font-size:68px;font-weight:900;color:#ffffff;line-height:1.15;animation:up 0.7s ease both} .sub{font-size:32px;color:rgba(255,255,255,0.75);margin-top:22px;line-height:1.5;animation:up 0.7s 0.4s ease both} @keyframes up{from{transform:translateY(30px);opacity:0}to{transform:translateY(0);opacity:1}}`,\n      width: 1800, height: 900\n    };\n  }\n\n  // Scene 4: Social proof — 3 stat blocks + testimonial\n  if (i === 4) {\n    return {\n      html: `<div class=\"c\"><div class=\"stats\"><div class=\"s\"><span class=\"n\">${first.stat_1_number}</span><span class=\"l\">${first.stat_1_label}</span></div><div class=\"div\"></div><div class=\"s\"><span class=\"n\">${first.stat_2_number}</span><span class=\"l\">${first.stat_2_label}</span></div><div class=\"div\"></div><div class=\"s\"><span class=\"n\">${first.stat_3_number}</span><span class=\"l\">${first.stat_3_label}</span></div></div><div class=\"quote\">&ldquo;${first.testimonial}&rdquo;</div><div class=\"by\">${first.testimonial_by}</div></div>`,\n      css:  `.c{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;padding:0 100px} .stats{display:flex;align-items:center;gap:32px;margin-bottom:36px;animation:pop 0.8s ease both} .s{display:flex;flex-direction:column;align-items:center} .n{font-family:'Arial Black',Arial,sans-serif;font-size:72px;font-weight:900;color:${brandColor};line-height:1} .l{font-size:20px;color:rgba(255,255,255,0.7);margin-top:6px;max-width:180px;line-height:1.3} .div{width:2px;height:80px;background:rgba(255,255,255,0.2)} .quote{font-size:30px;color:rgba(255,255,255,0.9);font-style:italic;line-height:1.5;animation:up 0.7s 0.5s ease both} .by{font-size:22px;color:${brandColor};margin-top:12px;animation:up 0.6s 0.8s ease both} @keyframes pop{from{transform:scale(0.9);opacity:0}to{transform:scale(1);opacity:1}} @keyframes up{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}`,\n      width: 1800, height: 900\n    };\n  }\n\n  // Scene 5 (last): CTA — website + sign-up prompt\n  return {\n    html: `<div class=\"c\"><div class=\"brand\">${first.product_name}</div><div class=\"cta\">${first.cta_text}</div><div class=\"url\">${first.website_url}</div></div>`,\n    css:  `.c{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center} .brand{font-family:'Arial Black',Arial,sans-serif;font-size:80px;font-weight:900;color:${brandColor};animation:pop 0.8s ease both} .cta{font-size:44px;font-weight:700;color:#ffffff;margin-top:20px;background:${brandColor};padding:18px 48px;border-radius:12px;animation:pop 0.8s 0.4s ease both} .url{font-size:28px;color:rgba(255,255,255,0.65);margin-top:20px;animation:fd 0.8s 0.9s ease both} @keyframes pop{from{transform:scale(0.8);opacity:0}to{transform:scale(1);opacity:1}} @keyframes fd{from{opacity:0}to{opacity:1}}`,\n    width: 1800, height: 900\n  };\n}\n\n// ─────────────────────────────────────────────────────────────────────────────\n// Build Shotstack timeline\n// ─────────────────────────────────────────────────────────────────────────────\nconst imageClips = allScenes.map((scene, i) => ({\n  asset: { type: 'image', src: scene.image_url },\n  start:      parseFloat((i * sceneDuration).toFixed(2)),\n  length:     sceneDuration,\n  effect:     i % 2 === 0 ? 'zoomIn' : 'zoomOut',\n  transition: { in: 'fade', out: 'fade' }\n}));\n\n// Dark overlay scrim on all scenes so text always reads\nconst scrimClip = [{\n  asset: { type: 'shape', shape: 'rectangle', fill_color: 'rgba(4,10,20,0.52)', width: '100%', height: '100%' },\n  start:  0,\n  length: totalDuration\n}];\n\n// Per-scene animated HTML text\nconst textClips = allScenes.map((scene, i) => {\n  const h = sceneHTML(scene);\n  return {\n    asset: { type: 'html', html: h.html, css: h.css, width: h.width, height: h.height },\n    start:      parseFloat((i * sceneDuration).toFixed(2)),\n    length:     sceneDuration,\n    position:   'center',\n    transition: { in: 'fade', out: 'fade' }\n  };\n});\n\n// Optional logo (top-left, full video)\nconst logoClips = first.logo_url ? [{\n  asset: { type: 'image', src: first.logo_url },\n  start:    0,\n  length:   totalDuration,\n  width:    '12%',\n  position: 'topLeft',\n  offset:   { x: 0.03, y: 0.04 },\n  opacity:  0.9\n}] : [];\n\n// Bottom progress bar (teal, animates over video duration)\nconst progressBar = [{\n  asset: {\n    type:       'html',\n    html:       '<div class=\"bar\"></div>',\n    css:        `.bar{width:100%;height:5px;background:${brandColor};transform-origin:left;animation:grow ${totalDuration}s linear both} @keyframes grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}`,\n    width:      1920,\n    height:     10\n  },\n  start:    0,\n  length:   totalDuration,\n  position: 'bottom',\n  offset:   { y: 0.005 }\n}];\n\n// Soundtrack\nconst soundtrack = {\n  src:    first.audio_url,\n  effect: 'fadeOut',\n  volume: 1\n};\n\n// Optional background music (lower volume mix)\nconst timeline = {\n  soundtrack,\n  tracks: [\n    { clips: logoClips.length ? logoClips : [{ asset: { type: 'shape', shape: 'rectangle', fill_color: 'rgba(0,0,0,0)', width: 1, height: 1 }, start: 0, length: 1 }] },\n    { clips: progressBar },\n    { clips: textClips },\n    { clips: scrimClip },\n    { clips: imageClips }\n  ]\n};\n\n// Add background music track if provided\nif (first.music_url) {\n  timeline.tracks.push({\n    clips: [{\n      asset: { type: 'audio', src: first.music_url, volume: 0.12, effect: 'fadeOut' },\n      start:  0,\n      length: totalDuration\n    }]\n  });\n}\n\nconst shotstack_payload = {\n  timeline,\n  output: {\n    format:  'mp4',\n    size:    { width: 1920, height: 1080 },\n    fps:     30,\n    quality: 'high'\n  }\n};\n\nconsole.log(`[LaunchVideo] Timeline built: ${allScenes.length} scenes, ${totalDuration}s, 1920×1080`);\n\nreturn [{\n  json: {\n    product_name:      first.product_name,\n    audio_url:         first.audio_url,\n    scene_image_urls:  allScenes.map(s => s.image_url),\n    shotstack_payload: shotstack_payload\n  }\n}];"
+      },
+      "id": "55555555-0012-0012-0012-000000000012",
+      "name": "Code: Assemble Shotstack Launch Timeline",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2160, 580],
+      "notes": "Builds a cinematic 1920×1080 Shotstack timeline with 6 scenes:\n\n  Scene 0 — Brand hero: product name scales in with teal glow\n  Scene 1 — Problem: headline slides in from left with orange accent\n  Scene 2 — Solution reveal: product name with teal glow pulse\n  Scene 3 — Features: headline + subtext slide up\n  Scene 4 — Social proof: 3 stat blocks + testimonial quote\n  Scene 5 — CTA: product name + teal CTA button + website URL\n\n  + Dark scrim over all scenes (text always readable)\n  + Optional logo top-left\n  + Teal progress bar (bottom edge, full video)\n  + Optional background music at 12% volume mix\n  + Alternate zoomIn/zoomOut Ken Burns on backgrounds\n  + Fade transitions between all scenes"
+    },
+
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.shotstack.io/v1/render",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key",    "value": "={{$env.SHOTSTACK_API_KEY}}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawBody": "={{\nJSON.stringify($json.shotstack_payload)\n}}",
+        "options": { "timeout": 30000 }
+      },
+      "id": "55555555-0013-0013-0013-000000000013",
+      "name": "Shotstack: Start Render",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2400, 580],
+      "notes": "Submits 1920×1080 render to Shotstack.\n\nSandbox (free, watermarked): https://api.shotstack.io/stage/render\nProduction ($0.09/render):    https://api.shotstack.io/v1/render\n\nRecommended: test on sandbox first, flip to /v1/ for final version."
+    },
+
+    {
+      "parameters": {
+        "jsCode": "const res      = $input.first().json;\nconst renderId = res?.response?.id || '';\nif (!renderId) throw new Error('Shotstack did not return render ID — check SHOTSTACK_API_KEY: ' + JSON.stringify(res).substring(0,200));\n\nconst prev = $('Code: Assemble Shotstack Launch Timeline').first().json;\nconsole.log(`[LaunchVideo] Render queued: ${renderId}`);\n\nreturn [{\n  json: {\n    render_id:        renderId,\n    product_name:     prev.product_name,\n    audio_url:        prev.audio_url,\n    scene_image_urls: prev.scene_image_urls,\n  }\n}];"
+      },
+      "id": "55555555-0013b-0013-0013-00000000013b",
+      "name": "Code: Store Render ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2640, 580]
+    },
+
+    {
+      "parameters": {
+        "resume": "timeInterval",
+        "unit": "seconds",
+        "value": 120,
+        "options": {}
+      },
+      "id": "55555555-0014-0014-0014-000000000014",
+      "name": "Wait: 2 Min (1920×1080 Render)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [2880, 580],
+      "notes": "1920×1080 HD renders take 90-180s on Shotstack. 2 minutes is a solid first check."
+    },
+
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.shotstack.io/v1/render/{{$json.render_id}}",
+        "sendHeaders": true,
+        "headerParameters": [{ "name": "x-api-key", "value": "={{$env.SHOTSTACK_API_KEY}}" }],
+        "options": { "timeout": 15000 }
+      },
+      "id": "55555555-0015-0015-0015-000000000015",
+      "name": "Shotstack: Poll Status (1)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3120, 580]
+    },
+
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [{
+            "id": "done-1",
+            "leftValue":  "={{$json.response?.status}}",
+            "rightValue": "done",
+            "operator": { "type": "string", "operation": "equals" }
+          }],
+          "combinator": "and"
+        }
+      },
+      "id": "55555555-0015b-0015-0015-00000000015b",
+      "name": "Render Done? (1st Check)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [3360, 580]
+    },
+
+    {
+      "parameters": {
+        "resume": "timeInterval",
+        "unit": "seconds",
+        "value": 60,
+        "options": {}
+      },
+      "id": "55555555-0016-0016-0016-000000000016",
+      "name": "Wait: 60s More",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [3600, 700]
+    },
+
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.shotstack.io/v1/render/{{$('Code: Store Render ID').first().json.render_id}}",
+        "sendHeaders": true,
+        "headerParameters": [{ "name": "x-api-key", "value": "={{$env.SHOTSTACK_API_KEY}}" }],
+        "options": { "timeout": 15000 }
+      },
+      "id": "55555555-0016b-0016-0016-00000000016b",
+      "name": "Shotstack: Poll Status (2)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3840, 700]
+    },
+
+    {
+      "parameters": { "mode": "append", "options": {} },
+      "id": "55555555-0016c-0016-0016-00000000016c",
+      "name": "Merge: Render Status Paths",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [3600, 560]
+    },
+
+    {
+      "parameters": {
+        "jsCode": "const r        = $input.first().json;\nconst status   = r?.response?.status || 'unknown';\nconst videoUrl = r?.response?.url    || '';\n\nif (!videoUrl || status !== 'done') {\n  const err = r?.response?.error || 'check shotstack.io → Dashboard → Renders';\n  throw new Error(`Launch video render not complete (status: ${status}). Detail: ${err}`);\n}\n\nconst meta = $('Code: Store Render ID').first().json;\nconsole.log(`[LaunchVideo] ✅ Ready: ${videoUrl}`);\n\nreturn [{\n  json: {\n    product_name:     meta.product_name,\n    video_url:        videoUrl,\n    audio_url:        meta.audio_url,\n    scene_image_urls: meta.scene_image_urls,\n    render_id:        meta.render_id,\n  }\n}];"
+      },
+      "id": "55555555-0017-0017-0017-000000000017",
+      "name": "Code: Extract Launch Video URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3840, 560]
+    },
+
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{$env.RESEND_API_KEY}}" },
+            { "name": "Content-Type",  "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawBody": "={{\nconst d = $input.first().json;\nJSON.stringify({\n  from:    'Floatup Content <noreply@floatup.app>',\n  to:      ['saksham.gpt2001@gmail.com'],\n  subject: `🚀 Launch video ready — ${d.product_name}`,\n  html: `\n<div style=\"font-family:-apple-system,sans-serif;max-width:600px;margin:0 auto;color:#0f172a\">\n  <div style=\"background:linear-gradient(135deg,#0d9488,#0891b2);padding:28px 32px;border-radius:12px 12px 0 0\">\n    <h1 style=\"margin:0;color:#fff;font-size:24px\">🚀 Your launch video is ready</h1>\n    <p style=\"margin:6px 0 0;color:rgba(255,255,255,0.8);font-size:13px\">1920×1080 · 90s · Cinematic · AI-generated</p>\n  </div>\n  <div style=\"border:1px solid #e2e8f0;border-top:none;border-radius:0 0 12px 12px;padding:28px 32px\">\n    <h2 style=\"margin:0 0 6px;font-size:17px\">${d.product_name} Launch Video</h2>\n    <p style=\"font-size:13px;color:#64748b;margin:0 0 20px\">6 scenes · ElevenLabs narration · DALL-E 3 HD backgrounds · CSS-animated text reveals · Shotstack render</p>\n    <a href=\"${d.video_url}\" style=\"display:inline-block;padding:13px 28px;background:#0d9488;color:#fff;text-decoration:none;border-radius:8px;font-weight:700;font-size:14px\">▶ Watch Launch Video</a>\n    <hr style=\"border:none;border-top:1px solid #e2e8f0;margin:24px 0\">\n    <h3 style=\"font-size:14px;color:#475569;margin:0 0 12px\">What to do next</h3>\n    <ol style=\"font-size:13px;color:#475569;padding-left:20px;line-height:1.8;margin:0\">\n      <li>Watch the video — check narration pacing, text legibility, scene order</li>\n      <li>If you want re-renders, tweak the webhook params and fire again (costs ~$0.78)</li>\n      <li>Add your own logo by passing <code>logo_url</code> in the webhook body</li>\n      <li>Add background music by passing <code>music_url</code> (royalty-free MP3 URL)</li>\n      <li>Upload to YouTube as a full video + also as a Short (crop to 9:16 in YouTube Studio)</li>\n    </ol>\n    <p style=\"font-size:11px;color:#94a3b8;margin:20px 0 0\">Render ID: ${d.render_id} · ${new Date().toLocaleString('en-IN',{timeZone:'Asia/Kolkata'})} IST</p>\n  </div>\n</div>`\n})\n}}",
+        "options": { "timeout": 15000 }
+      },
+      "id": "55555555-0018-0018-0018-000000000018",
+      "name": "Resend: Email Launch Video",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [4080, 560]
+    },
+
+    {
+      "parameters": {},
+      "id": "55555555-0019-0019-0019-000000000019",
+      "name": "Done: Launch Video Generated",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [4320, 560]
+    }
+
+  ],
+
+  "connections": {
+    "Webhook: Trigger Launch Video": {
+      "main": [[
+        { "node": "Respond to Webhook",          "type": "main", "index": 0 },
+        { "node": "Code: Set Product Parameters", "type": "main", "index": 0 }
+      ]]
+    },
+    "Code: Set Product Parameters":       { "main": [[{ "node": "Claude: Write Launch Video Script",     "type": "main", "index": 0 }]] },
+    "Claude: Write Launch Video Script":  { "main": [[{ "node": "Code: Parse Launch Script",             "type": "main", "index": 0 }]] },
+    "Code: Parse Launch Script":          { "main": [[{ "node": "ElevenLabs: Generate Narrator Voiceover","type": "main", "index": 0 }]] },
+    "ElevenLabs: Generate Narrator Voiceover": { "main": [[{ "node": "Supabase Storage: Upload Narrator Audio", "type": "main", "index": 0 }]] },
+    "Supabase Storage: Upload Narrator Audio":  { "main": [[{ "node": "Code: Build Scene Image Items",          "type": "main", "index": 0 }]] },
+    "Code: Build Scene Image Items":      { "main": [[{ "node": "Process Scenes Loop", "type": "main", "index": 0 }]] },
+    "Process Scenes Loop": {
+      "main": [
+        [{ "node": "DALL-E 3: Generate Scene Background",    "type": "main", "index": 0 }],
+        [{ "node": "Code: Assemble Shotstack Launch Timeline","type": "main", "index": 0 }]
+      ]
+    },
+    "DALL-E 3: Generate Scene Background": { "main": [[{ "node": "Code: Extract Scene Image URL",             "type": "main", "index": 0 }]] },
+    "Code: Extract Scene Image URL":       { "main": [[{ "node": "Process Scenes Loop",                       "type": "main", "index": 0 }]] },
+    "Code: Assemble Shotstack Launch Timeline": { "main": [[{ "node": "Shotstack: Start Render",              "type": "main", "index": 0 }]] },
+    "Shotstack: Start Render":             { "main": [[{ "node": "Code: Store Render ID",                     "type": "main", "index": 0 }]] },
+    "Code: Store Render ID":               { "main": [[{ "node": "Wait: 2 Min (1920×1080 Render)",            "type": "main", "index": 0 }]] },
+    "Wait: 2 Min (1920×1080 Render)":      { "main": [[{ "node": "Shotstack: Poll Status (1)",               "type": "main", "index": 0 }]] },
+    "Shotstack: Poll Status (1)":          { "main": [[{ "node": "Render Done? (1st Check)",                  "type": "main", "index": 0 }]] },
+    "Render Done? (1st Check)": {
+      "main": [
+        [{ "node": "Merge: Render Status Paths", "type": "main", "index": 0 }],
+        [{ "node": "Wait: 60s More",             "type": "main", "index": 0 }]
+      ]
+    },
+    "Wait: 60s More":                      { "main": [[{ "node": "Shotstack: Poll Status (2)",    "type": "main", "index": 0 }]] },
+    "Shotstack: Poll Status (2)":          { "main": [[{ "node": "Merge: Render Status Paths",    "type": "main", "index": 1 }]] },
+    "Merge: Render Status Paths":          { "main": [[{ "node": "Code: Extract Launch Video URL","type": "main", "index": 0 }]] },
+    "Code: Extract Launch Video URL":      { "main": [[{ "node": "Resend: Email Launch Video",    "type": "main", "index": 0 }]] },
+    "Resend: Email Launch Video":          { "main": [[{ "node": "Done: Launch Video Generated",  "type": "main", "index": 0 }]] }
+  },
+
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+
+  "staticData": null,
+  "tags": [{ "name": "launch-video" }, { "name": "cinematic" }, { "name": "ai" }],
+  "pinData": {},
+
+  "__setup_notes": {
+    "env_vars": {
+      "ANTHROPIC_API_KEY":  "Same key used in Flow 01 — no new setup",
+      "ELEVENLABS_API_KEY": "Same key used in Flow 04 — no new setup",
+      "ELEVENLABS_VOICE_ID":"For a launch video use a confident voice. Arnold: VR6AewLTigWG4xSOukaG (deep male) or Bella: EXAVITQu4vr4xnSDxMaL (professional female)",
+      "OPENAI_API_KEY":     "Same key used in Flow 04 — no new setup",
+      "SHOTSTACK_API_KEY":  "Same key used in Flow 04 — no new setup",
+      "RESEND_API_KEY":     "Same key used in all flows — no new setup"
+    },
+    "webhook_params": {
+      "product_name":     "string  — default: 'Floatup'",
+      "company_name":     "string  — default: 'SNG Advisors'",
+      "tagline":          "string  — default: 'India's Compliance OS for CA Firms'",
+      "target_audience":  "string  — who the video is for",
+      "problem":          "string  — the pain point your product solves",
+      "key_features":     "array   — ['feature 1', 'feature 2', 'feature 3']",
+      "stat_1_number":    "string  — e.g. '100+'",
+      "stat_1_label":     "string  — e.g. 'CA firms onboarded'",
+      "stat_2_number":    "string",
+      "stat_2_label":     "string",
+      "stat_3_number":    "string",
+      "stat_3_label":     "string",
+      "testimonial":      "string  — customer quote",
+      "testimonial_by":   "string  — attribution e.g. '— CA Practice Owner, Mumbai'",
+      "cta_text":         "string  — e.g. 'Start free at sng-adwisers.com'",
+      "website_url":      "string  — e.g. 'https://sng-adwisers.com'",
+      "logo_url":         "string  — (optional) public URL to your logo PNG/SVG — overlaid top-left",
+      "screenshot_url":   "string  — (optional) product screenshot URL — passed to Claude for context",
+      "music_url":        "string  — (optional) royalty-free background music MP3 URL at 12% volume mix. Royalty-free sources: pixabay.com/music, freemusicarchive.org",
+      "brand_color":      "string  — hex e.g. '#0d9488' — used for all text accents, CTA button, progress bar",
+      "duration_seconds": "number  — default: 90",
+      "visual_style":     "string  — DALL-E style guidance for backgrounds"
+    },
+    "output_spec": {
+      "resolution":  "1920×1080 (16:9)",
+      "fps":         30,
+      "duration":    "~90 seconds",
+      "format":      "MP4",
+      "scenes":      6,
+      "cdn_url":     "Permanent Shotstack CDN URL in the notification email"
+    },
+    "cost_breakdown": {
+      "Claude script":    "~$0.04 (input + output tokens)",
+      "ElevenLabs TTS":   "~$0.09 (600 chars narration on Starter plan)",
+      "DALL-E 3 HD x6":  "$0.48 (6 scenes × $0.08 HD 1792×1024)",
+      "Shotstack render": "$0.09",
+      "Total":            "~$0.70 per launch video"
+    },
+    "total_time": "~8-10 minutes (Claude ~10s + ElevenLabs ~10s + 6× DALL-E 3 HD ~15s each + Shotstack render ~2-3 min)",
+    "rerender_tip": "To change just one scene, tweak the webhook params and fire again — the whole pipeline re-runs for $0.70. Much cheaper than a human editor."
+  }
+}
