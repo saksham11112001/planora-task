@@ -18,7 +18,7 @@ const STEPS: ChecklistStep[] = [
     id:        'tour',
     emoji:     '🎬',
     label:     'Watch the product tour',
-    detail:    'A 90-second walkthrough of every feature in Planora.',
+    detail:    'A 90-second walkthrough of every feature in Floatup.',
     href:      '/walkthrough',
   },
   {
@@ -33,7 +33,7 @@ const STEPS: ChecklistStep[] = [
     id:        'compliance',
     emoji:     '⚖️',
     label:     'Generate compliance tasks',
-    detail:    'Select tasks (GSTR, TDS, ITR…), pick clients, and Planora creates everything on the right due dates.',
+    detail:    'Select tasks (GSTR, TDS, ITR…), pick clients, and Floatup creates everything on the right due dates.',
     href:      '/compliance',
     pageVisit: '/compliance',
   },
@@ -272,7 +272,7 @@ export function OnboardingChecklist({ userId, userCreatedAt }: Props) {
 
         {allDone && (
           <p style={{ fontSize: 12, color: '#16a34a', margin: '8px 0 0', lineHeight: 1.4 }}>
-            You&apos;ve set up everything. Your firm is ready to run on Planora.
+            You&apos;ve set up everything. Your firm is ready to run on Floatup.
           </p>
         )}
       </div>

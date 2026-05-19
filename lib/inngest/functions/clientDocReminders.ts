@@ -1,8 +1,11 @@
-import { inngest }                        from '../client'
-import { createAdminClient }              from '@/lib/supabase/admin'
-import { sendClientDocReminderEmail }     from '@/lib/email/send'
-import { sendClientUploadNotifyEmail }    from '@/lib/email/send'
-import { fmtDate }                        from '@/lib/utils/format'
+import { inngest }                                from '../client'
+import { createAdminClient }                      from '@/lib/supabase/admin'
+import { sendBatchedClientDocReminderEmail }      from '@/lib/email/send'
+import { sendClientDocReminderEmail }             from '@/lib/email/send'
+import { sendClientUploadNotifyEmail }            from '@/lib/email/send'
+import { fmtDate }                                from '@/lib/utils/format'
+import { getOrgNotifMode, queueNotification }     from '@/lib/email/queue'
+import type { BatchTaskEntry }                    from '@/lib/email/templates/clientDocReminder'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://taska.in'
 
@@ -16,6 +19,9 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://taska.in'
  *     - 2  → email client "Deadline approaching"
  *     - 0  → email client + CA assignee "Today is the deadline"
  *     - -1 → email CA assignee only "Deadline passed, docs missing"
+ *
+ * Emails to the same recipient (client or CA) are BATCHED into one email
+ * per day to avoid spam and stay within Resend's daily quota.
  *
  * Also handles 'client/document-uploaded' event → email CA assignee immediately.
  */
@@ -36,15 +42,12 @@ export const clientDocReminders = inngest.createFunction(
         const { org_id, client_id, doc_type_name, period_key, task_ids, upload_id } = event.data as any
         const admin = createAdminClient()
 
-        // Get org name
-        const { data: org } = await admin.from('organisations').select('name').eq('id', org_id).maybeSingle()
+        const { data: org }    = await admin.from('organisations').select('name').eq('id', org_id).maybeSingle()
         const { data: client } = await admin.from('clients').select('name').eq('id', client_id).maybeSingle()
-        // Get upload filename
         const { data: upload } = await admin.from('client_document_uploads').select('file_name').eq('id', upload_id).maybeSingle()
 
         if (!org || !client) return { skipped: true }
 
-        // Notify assignee for each task
         for (const taskId of (task_ids ?? [])) {
           const { data: task } = await admin
             .from('tasks')
@@ -74,8 +77,8 @@ export const clientDocReminders = inngest.createFunction(
     // ── Branch: daily reminder cron ─────────────────────────────────────────
     const admin = createAdminClient()
 
-    const nowIST    = new Date(Date.now() + 5.5 * 60 * 60 * 1000)
-    const today     = nowIST.toISOString().split('T')[0]
+    const nowIST = new Date(Date.now() + 5.5 * 60 * 60 * 1000)
+    const today  = nowIST.toISOString().split('T')[0]
 
     // Fetch all non-completed ca_task_instances with task + assignment data
     const instances = await step.run('fetch-active-instances', async () => {
@@ -149,8 +152,24 @@ export const clientDocReminders = inngest.createFunction(
       })
     }
 
-    let remindersClient   = 0
-    let remindersAssignee = 0
+    // ── Build reminder buckets (group BEFORE sending) ────────────────────────
+    // Key: `${clientEmail}::${orgId}` → all task entries to include in one email
+    type ClientBucket = {
+      email:     string
+      name:      string
+      orgName:   string
+      portalUrl: string
+      tasks:     BatchTaskEntry[]
+    }
+
+    type AssigneeBucket = {
+      email:     string
+      orgName:   string
+      entries:   Array<{ clientName: string } & BatchTaskEntry & { portalUrl: string }>
+    }
+
+    const clientBuckets  = new Map<string, ClientBucket>()
+    const assigneeBuckets = new Map<string, AssigneeBucket>()
 
     for (const inst of instances) {
       const task     = (inst as any).task
@@ -158,7 +177,6 @@ export const clientDocReminders = inngest.createFunction(
       const clientId = asgn?.client_id
       if (!task || !clientId) continue
 
-      // Skip if docs already complete
       if (task.custom_fields?._docs_complete) continue
 
       const dueDate            = inst.due_date as string
@@ -190,10 +208,8 @@ export const clientDocReminders = inngest.createFunction(
         )
       })
 
-      // Skip if no missing docs
       if (missingDocs.length === 0) continue
 
-      // portal_url is stored at token generation time (hash is irreversible)
       const { data: tokenRow } = await admin
         .from('client_portal_tokens')
         .select('portal_url, expires_at')
@@ -204,47 +220,145 @@ export const clientDocReminders = inngest.createFunction(
         ? tokenRow.portal_url
         : APP_URL
 
-      // Email client (days 7, 2, 0)
-      if (daysLeft >= 0 && client.email) {
-        await step.run(`remind-client-${inst.id}-d${daysLeft}`, async () => {
-          await sendClientDocReminderEmail({
-            to:                  client.email!,
-            clientName:          client.name,
-            orgName,
-            taskTitle:           task.title ?? asgn?.master_task?.name,
-            dueDate:             fmtDate(dueDate),
-            collectionDeadline:  fmtDate(collectionDeadline),
-            daysLeft,
-            portalUrl,
-            missingDocs,
-          })
-          remindersClient++
-        })
+      const taskEntry: BatchTaskEntry = {
+        taskTitle:          task.title ?? asgn?.master_task?.name,
+        dueDate:            fmtDate(dueDate),
+        collectionDeadline: fmtDate(collectionDeadline),
+        daysLeft,
+        missingDocs,
       }
 
-      // Email CA assignee (days 0 and -1)
+      // ── Client bucket (days 7, 2, 0 only) ────────────────────────────────
+      if (daysLeft >= 0 && client.email) {
+        const bucketKey = `${client.email}::${inst.org_id}`
+        if (!clientBuckets.has(bucketKey)) {
+          clientBuckets.set(bucketKey, {
+            email:     client.email,
+            name:      client.name,
+            orgName,
+            portalUrl,
+            tasks:     [],
+          })
+        }
+        clientBuckets.get(bucketKey)!.tasks.push(taskEntry)
+      }
+
+      // ── Assignee bucket (days 0 and -1) ──────────────────────────────────
       if (daysLeft <= 0) {
         const assignee = task.assignee
         if (assignee?.email) {
-          await step.run(`remind-assignee-${inst.id}-d${daysLeft}`, async () => {
-            await sendClientDocReminderEmail({
-              to:                  assignee.email,
-              clientName:          client.name,
+          const bucketKey = `${assignee.email}::${inst.org_id}`
+          if (!assigneeBuckets.has(bucketKey)) {
+            assigneeBuckets.set(bucketKey, {
+              email:   assignee.email,
               orgName,
-              taskTitle:           task.title ?? asgn?.master_task?.name,
-              dueDate:             fmtDate(dueDate),
-              collectionDeadline:  fmtDate(collectionDeadline),
-              daysLeft,
-              portalUrl:           `${APP_URL}/compliance`, // internal link for CA
-              missingDocs,
+              entries: [],
             })
-            remindersAssignee++
+          }
+          assigneeBuckets.get(bucketKey)!.entries.push({
+            ...taskEntry,
+            clientName: client.name,
+            portalUrl: `${APP_URL}/compliance`,
           })
         }
       }
     }
 
-    return { date_checked: today, reminders_client: remindersClient, reminders_assignee: remindersAssignee }
+    // ── Send one batched email per client ────────────────────────────────────
+    let remindersClient   = 0
+    let remindersAssignee = 0
+
+    for (const [bucketKey, bucket] of clientBuckets) {
+      if (bucket.tasks.length === 0) continue
+      await step.run(`remind-client-${bucketKey}`, async () => {
+        if (bucket.tasks.length === 1) {
+          // Single task — use the original single-task email (more personal)
+          const t = bucket.tasks[0]
+          await sendClientDocReminderEmail({
+            to:                 bucket.email,
+            clientName:         bucket.name,
+            orgName:            bucket.orgName,
+            taskTitle:          t.taskTitle,
+            dueDate:            t.dueDate,
+            collectionDeadline: t.collectionDeadline,
+            daysLeft:           t.daysLeft,
+            portalUrl:          bucket.portalUrl,
+            missingDocs:        t.missingDocs,
+          })
+        } else {
+          // Multiple tasks — send one batched email
+          await sendBatchedClientDocReminderEmail({
+            to:         bucket.email,
+            clientName: bucket.name,
+            orgName:    bucket.orgName,
+            portalUrl:  bucket.portalUrl,
+            tasks:      bucket.tasks,
+          })
+        }
+        remindersClient++
+      })
+    }
+
+    // ── Queue assignee notifications into 2x/day digest ─────────────────────
+    for (const [bucketKey, bucket] of assigneeBuckets) {
+      if (bucket.entries.length === 0) continue
+      await step.run(`queue-assignee-${bucketKey}`, async () => {
+        const [email, orgId] = bucketKey.split('::')
+
+        // Look up the assignee's user_id (needed for the queue row)
+        const { data: userRow } = await admin
+          .from('users').select('id').eq('email', email).maybeSingle()
+        if (!userRow?.id) return
+
+        const orgMode = await getOrgNotifMode(orgId)
+
+        if (orgMode === 'digest') {
+          // One digest entry per assignee summarising all affected clients
+          const subject = bucket.entries.length === 1
+            ? `Missing docs: ${bucket.entries[0].clientName} — ${bucket.entries[0].taskTitle} (deadline ${bucket.entries[0].daysLeft === 0 ? 'today' : 'passed'})`
+            : `${bucket.entries.length} clients have documents missing (deadline today or passed)`
+
+          await queueNotification({
+            orgId,
+            userId:    userRow.id,
+            userEmail: email,
+            eventType: 'client_docs_missing',
+            subject,
+          })
+        } else {
+          // Immediate mode — send email directly (same batched logic as before)
+          if (bucket.entries.length === 1) {
+            const e = bucket.entries[0]
+            await sendClientDocReminderEmail({
+              to:                 bucket.email,
+              clientName:         e.clientName,
+              orgName:            bucket.orgName,
+              taskTitle:          e.taskTitle,
+              dueDate:            e.dueDate,
+              collectionDeadline: e.collectionDeadline,
+              daysLeft:           e.daysLeft,
+              portalUrl:          e.portalUrl,
+              missingDocs:        e.missingDocs,
+            })
+          } else {
+            await sendBatchedClientDocReminderEmail({
+              to:         bucket.email,
+              clientName: `${bucket.entries.length} client documents`,
+              orgName:    bucket.orgName,
+              portalUrl:  `${APP_URL}/compliance`,
+              tasks:      bucket.entries,
+            })
+          }
+        }
+        remindersAssignee++
+      })
+    }
+
+    return {
+      date_checked:       today,
+      reminders_client:   remindersClient,
+      reminders_assignee: remindersAssignee,
+    }
   }
 )
 
@@ -257,4 +371,3 @@ function subtractDays(dateStr: string, days: number): string {
 function daysBetween(from: string, to: string): number {
   return Math.floor((new Date(to).getTime() - new Date(from).getTime()) / (1000 * 60 * 60 * 24))
 }
-

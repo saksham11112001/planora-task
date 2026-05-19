@@ -6,7 +6,10 @@ const EVENT_LABELS: Record<string, string> = {
   project_updated:      '📁 Project Update',
   member_invited:       '👋 New Team Member',
   due_soon:             '⏰ Due Soon',
+  task_due_soon:        '⏰ Due Soon',
   escalation:           '🚨 Overdue Alert',
+  escalation_alert:     '🚨 Overdue Alert',
+  client_docs_missing:  '📂 Client Documents Missing',
 }
 
 interface DigestItem {

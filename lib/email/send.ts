@@ -7,7 +7,7 @@ import { taskCommentedHtml }  from './templates/taskCommented'
 import { projectUpdatedHtml }  from './templates/projectUpdated'
 import { memberInvitedHtml }   from './templates/memberInvited'
 import { escalationAlertHtml } from './templates/escalationAlert'
-import { clientDocReminderHtml, clientDocReminderSubject } from './templates/clientDocReminder'
+import { clientDocReminderHtml, clientDocReminderSubject, clientDocReminderBatchHtml, clientDocReminderBatchSubject, type BatchProps } from './templates/clientDocReminder'
 import { clientUploadNotifyHtml, clientUploadNotifySubject } from './templates/clientUploadNotify'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://floatup.app'
@@ -137,6 +137,15 @@ export async function sendClientDocReminderEmail(p: {
     from: FROM, to: p.to,
     subject: clientDocReminderSubject(p),
     html:    clientDocReminderHtml(p),
+  })
+}
+
+// ── Client document reminder — batched (one email, multiple tasks) ───────────
+export async function sendBatchedClientDocReminderEmail(p: BatchProps & { to: string }) {
+  return resend.emails.send({
+    from: FROM, to: p.to,
+    subject: clientDocReminderBatchSubject(p),
+    html:    clientDocReminderBatchHtml(p),
   })
 }
 

@@ -725,7 +725,7 @@ const STEPS: Step[] = [
   {
     id: 'welcome',
     icon: '🏢', color: '#0d9488', accent: 'rgba(13,148,136,0.1)',
-    title: 'Welcome to Planora',
+    title: 'Welcome to Floatup',
     subtitle: 'Your CA & CPA Practice Management Platform',
     body: "Everything your firm needs — compliance, tasks, clients, approvals, and team — in one place. This 90-second tour will show you exactly where everything lives.",
     bullets: [
@@ -789,7 +789,7 @@ const STEPS: Step[] = [
     icon: '⚖️', color: '#b45309', accent: 'rgba(180,83,9,0.1)',
     title: 'CA Compliance Calendar',
     subtitle: 'Sidebar → CA Compliance',
-    body: "The heart of the platform. Select the financial year, pick your clients, and Planora auto-generates all statutory filing tasks on their correct due dates — for every client, every month.",
+    body: "The heart of the platform. Select the financial year, pick your clients, and Floatup auto-generates all statutory filing tasks on their correct due dates — for every client, every month.",
     bullets: [
       { emoji: '📋', text: 'GST · TDS · ITR · ROC · PF · ESI · PT and more' },
       { emoji: '📅', text: 'Step 1 – Select tasks  ›  Step 2 – Add clients  ›  Step 3 – Track on Kanban' },
@@ -835,7 +835,7 @@ const STEPS: Step[] = [
     icon: '🔁', color: '#0d9488', accent: 'rgba(13,148,136,0.1)',
     title: 'Recurring Tasks',
     subtitle: 'Sidebar → Repeat Tasks',
-    body: "Set any task as recurring and Planora auto-spawns a fresh copy on schedule. Each instance tracks its own status, assignee, and attachments — the template stays clean for the next cycle.",
+    body: "Set any task as recurring and Floatup auto-spawns a fresh copy on schedule. Each instance tracks its own status, assignee, and attachments — the template stays clean for the next cycle.",
     bullets: [
       { emoji: '🔁', text: 'Daily, weekly, monthly, quarterly, or custom frequency' },
       { emoji: '📅', text: 'Instances auto-spawn before the due date — never miss a cycle' },
@@ -942,7 +942,7 @@ const STEPS: Step[] = [
     icon: '🚀', color: '#16a34a', accent: 'rgba(22,163,74,0.1)',
     title: "You're Ready to Go!",
     subtitle: 'Start by adding your first client',
-    body: "Everything is set up. Add your clients and Planora will auto-generate all their compliance tasks. Your firm runs on auto-pilot from here.",
+    body: "Everything is set up. Add your clients and Floatup will auto-generate all their compliance tasks. Your firm runs on auto-pilot from here.",
     bullets: [
       { emoji: '1️⃣', text: 'Add clients → compliance tasks generate automatically' },
       { emoji: '2️⃣', text: 'Assign tasks to team members' },

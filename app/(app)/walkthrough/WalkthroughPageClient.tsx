@@ -38,7 +38,7 @@ export function WalkthroughPageClient({ userId, userCreatedAt, tourCompletedAt }
             Onboarding Tour
           </h1>
           <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>
-            Learn how to get the most out of Planora — step by step
+            Learn how to get the most out of Floatup — step by step
           </p>
         </div>
       </div>
