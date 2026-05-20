@@ -117,6 +117,8 @@ export const dailyReminders = inngest.createFunction(
         .select(`
           id, title, due_date, project_id,
           assignee:users!tasks_assignee_id_fkey(id, name, email),
+          creator:users!tasks_created_by_fkey(id, name, email),
+          approver:users!tasks_approver_id_fkey(id, name, email),
           project:projects(name),
           org:organisations!inner(name),
           org_id
@@ -133,33 +135,32 @@ export const dailyReminders = inngest.createFunction(
     for (const task of escalationTasks) {
       await step.run(`escalate-${task.id}`, async () => {
         const assignee = task.assignee as any
+        const creator  = (task as any).creator as any
+        const approver = (task as any).approver as any
 
-        // Find managers/owners in this org to notify
-        const { data: managers } = await admin.from('org_members')
-          .select('user_id, users(id, name, email)')
-          .eq('org_id', (task as any).org_id)
-          .in('role', ['owner', 'admin', 'manager'])
-          .eq('is_active', true)
+        // Notify the task's creator and approver only (assignee is notified separately below)
+        const seenIds = new Set<string>()
+        if (assignee?.id) seenIds.add(assignee.id)
+        const stakeholders: Array<{ id: string; name: string; email: string }> = []
 
-        if (!managers?.length) return
+        const addStakeholder = (u: any) => {
+          if (!u?.id || !u?.email || seenIds.has(u.id)) return
+          seenIds.add(u.id)
+          stakeholders.push(u)
+        }
+        addStakeholder(creator)
+        addStakeholder(approver)
 
-        for (const mgr of managers) {
-          const mgrUser = (mgr.users as any)
-          if (!mgrUser?.email) continue
-
-          // Don't escalate to themselves if manager is also the assignee
-          if (mgrUser.id === assignee?.id) continue
-
-          // Respect manager's email preference
-          const { data: mgrPrefs } = await admin.from('notification_preferences')
+        for (const recipient of stakeholders) {
+          const { data: recipientPrefs } = await admin.from('notification_preferences')
             .select('via_email')
-            .eq('user_id', mgrUser.id).eq('event_type', 'task_overdue').maybeSingle()
-          if ((mgrPrefs?.via_email ?? true) === false) continue
+            .eq('user_id', recipient.id).eq('event_type', 'task_overdue').maybeSingle()
+          if ((recipientPrefs?.via_email ?? true) === false) continue
 
           const orgMode = await getOrgNotifMode((task as any).org_id)
           if (orgMode === 'digest') {
             await queueNotification({
-              orgId: (task as any).org_id, userId: mgrUser.id, userEmail: mgrUser.email,
+              orgId: (task as any).org_id, userId: recipient.id, userEmail: recipient.email,
               eventType: 'escalation_alert',
               subject: `Overdue: "${task.title}" (assigned to ${assignee?.name ?? 'team member'})`,
             })
@@ -167,10 +168,10 @@ export const dailyReminders = inngest.createFunction(
             continue
           }
 
-          if (!(await acquireEmailSlot(mgrUser.id, `escalation_${task.id}`))) continue
+          if (!(await acquireEmailSlot(recipient.id, `escalation_${task.id}`))) continue
           await sendEscalationEmail({
-            to:           mgrUser.email,
-            managerName:  mgrUser.name,
+            to:           recipient.email,
+            managerName:  recipient.name,
             assigneeName: assignee?.name ?? 'Team member',
             taskId:       task.id,
             taskTitle:    task.title,
