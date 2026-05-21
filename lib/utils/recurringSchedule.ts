@@ -4,7 +4,7 @@
  */
 
 // ── Granular → DB-column mapping ─────────────────────────────────────────────
-// The `tasks.frequency` column only allows: daily | weekly | bi_weekly | monthly | quarterly | annual
+// The `tasks.frequency` column only allows: daily | weekly | bi_weekly | monthly | quarterly | half_yearly | annual
 export function normalizeFrequency(freq: string): string {
   if (freq.startsWith('weekly_'))    return 'weekly'
   if (freq.startsWith('monthly_'))   return 'monthly'
@@ -133,8 +133,9 @@ export function nextOccurrence(freq: string, from: string): string {
     case 'weekly':    d.setDate(d.getDate() + 7);          break
     case 'bi_weekly': d.setDate(d.getDate() + 14);         break
     case 'monthly':   d.setMonth(d.getMonth() + 1);        break
-    case 'quarterly': d.setMonth(d.getMonth() + 3);        break
-    case 'annual':    d.setFullYear(d.getFullYear() + 1);  break
+    case 'quarterly':   d.setMonth(d.getMonth() + 3);        break
+    case 'half_yearly': d.setMonth(d.getMonth() + 6);        break
+    case 'annual':      d.setFullYear(d.getFullYear() + 1);  break
     default:          d.setDate(d.getDate() + 7);          break
   }
   return d.toISOString().split('T')[0]

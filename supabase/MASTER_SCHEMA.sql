@@ -173,7 +173,7 @@ CREATE TABLE tasks (
   sort_order       INTEGER DEFAULT 0,
   -- Recurring task fields
   is_recurring         BOOLEAN NOT NULL DEFAULT false,
-  frequency            TEXT CHECK (frequency IN ('daily','weekly','bi_weekly','monthly','quarterly','annual')),
+  frequency            TEXT CHECK (frequency IN ('daily','weekly','bi_weekly','monthly','quarterly','half_yearly','annual')),
   recurrence_rule      TEXT,
   recurrence_end_date  DATE,
   next_occurrence_date DATE,

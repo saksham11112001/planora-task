@@ -11,7 +11,7 @@ const DATA_END   = 202  // supports up to 200 data rows per sheet
 
 // ── Static dropdown strings ──────────────────────────────────────────────────
 const L_PRIORITY  = '"none,low,medium,high,urgent"'
-const L_FREQUENCY = '"daily,weekly,bi_weekly,monthly,quarterly,annual"'
+const L_FREQUENCY = '"daily,weekly,bi_weekly,monthly,quarterly,half_yearly,annual"'
 const L_TASK_ST   = '"todo,completed,blocked"'
 const L_PROJ_ST   = '"active,on_hold,completed"'
 const L_CLIENT_ST = '"active,inactive,lead"'

@@ -35,6 +35,7 @@ export const FREQUENCIES = [
   { group: 'Quarterly', v: 'quarterly_last',   l: 'Last day of quarter' },
   { group: 'Quarterly', v: 'quarterly',        l: 'Quarterly (same date)' },
   { group: 'Quarterly', v: 'quarterly_custom', l: 'Custom date…' },
+  { group: 'Half-Yearly', v: 'half_yearly',    l: 'Every 6 months' },
   { group: 'Annual',    v: 'annual_31jul',     l: '31st July (annual)' },
   { group: 'Annual',    v: 'annual_30sep',     l: '30th September (annual)' },
   { group: 'Annual',    v: 'annual_31dec',     l: '31st December (annual)' },
