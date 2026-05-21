@@ -31,9 +31,10 @@ interface Props {
   showDueDate?:      boolean
   showAssignee?:     boolean
   showAssignor?:     boolean
-  showCreatedDate?:  boolean
-  showUpdatedDate?:  boolean
-  className?:        string
+  showCreatedDate?:   boolean
+  showUpdatedDate?:   boolean
+  searchPlaceholder?: string
+  className?:         string
 }
 
 
@@ -42,6 +43,7 @@ export function UniversalFilterBar({
   showSearch = false, showPriority = true, showStatus = true,
   showDueDate = false, showAssignee = false, showAssignor = false,
   showCreatedDate = false, showUpdatedDate = false,
+  searchPlaceholder = 'Search…',
 }: Props) {
   const {
     search, clientId, priority, status, assigneeId, creatorId,
@@ -112,7 +114,7 @@ export function UniversalFilterBar({
             style={{ color:'var(--text-muted)', flexShrink:0 }}>
             <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
           </svg>
-          <input value={search} onChange={e => setFilter('search', e.target.value)} placeholder="Search…"
+          <input value={search} onChange={e => setFilter('search', e.target.value)} placeholder={searchPlaceholder}
             style={{ flex:1, fontSize:12, border:'none', outline:'none',
               background:'transparent', color:'var(--text-primary)', fontFamily:'inherit' }}/>
           {search && (

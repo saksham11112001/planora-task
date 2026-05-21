@@ -219,7 +219,7 @@ export function MyTasksView({
     if (filterClient.length > 0   && !filterClient.includes((t as any).client?.id ?? ''))   return false
     if (filterPriority.length > 0 && !filterPriority.includes(t.priority))                 return false
     if (filterStatus.length > 0   && !filterStatus.includes(t.status))                     return false
-    if (filterSearch   && !t.title.toLowerCase().includes(filterSearch.toLowerCase()))      return false
+    if (filterSearch   && !t.title.toLowerCase().includes(filterSearch.toLowerCase()) && !((t as any).client?.name ?? '').toLowerCase().includes(filterSearch.toLowerCase()))  return false
     if (dueDateFrom    && (!t.due_date   || t.due_date < dueDateFrom))                      return false
     if (dueDateTo      && (!t.due_date   || t.due_date > dueDateTo))                        return false
     if (createdFrom    && (!t.created_at || t.created_at.slice(0,10) < createdFrom))        return false
@@ -1025,7 +1025,7 @@ export function MyTasksView({
         )}
 
         {/* Universal filter bar */}
-        <UniversalFilterBar clients={clients} members={members} showSearch showPriority showStatus showDueDate showAssignor showCreatedDate showUpdatedDate/>
+        <UniversalFilterBar clients={clients} members={members} showSearch showPriority showStatus showDueDate showAssignor showCreatedDate showUpdatedDate searchPlaceholder="Search tasks or clients…"/>
         {/* Sort bar */}
         <div style={{ display:'flex', alignItems:'center', gap:6, padding:'5px 18px', borderBottom:'1px solid var(--border-light)', background:'var(--surface)', flexShrink:0 }}>
           <span style={{ fontSize:11, color:'var(--text-muted)', marginLeft:'auto' }}>Sort:</span>
@@ -1058,16 +1058,16 @@ export function MyTasksView({
             )}
           </div>
         </div>
-        {/* Column headers — 8 cols: checkbox | circle | expand | title | assignee | client | due | actions */}
-        <div style={{ display:'grid', gridTemplateColumns:'28px 22px 18px 1fr 90px 90px 72px 40px',
+        {/* Column headers — 8 cols: checkbox | circle | expand | title | client | due | assignee | actions */}
+        <div style={{ display:'grid', gridTemplateColumns:'28px 22px 18px 1fr 150px 80px 90px 40px',
           alignItems:'center', padding:'5px 18px', borderBottom:`1px solid var(--border)`,
           background:'var(--surface-subtle)', flexShrink:0, fontSize:10, fontWeight:700,
           color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.06em' }}>
           <div/><div/><div/>
           <div>Task name</div>
-          <div>{showAssignedByMe ? 'Assignee' : 'Assigned by'}</div>
           <div>Client</div>
           <div style={{textAlign:'center'}}>Due date</div>
+          <div>{showAssignedByMe ? 'Assignee' : 'Assigned by'}</div>
           <div/>
         </div>
 
@@ -1150,7 +1150,7 @@ export function MyTasksView({
                   return (
                     <React.Fragment key={task.id}>
                     <div
-                      className="mytasks-row" style={{ display:'grid', gridTemplateColumns:'28px 22px 18px 1fr 90px 90px 72px 40px',
+                      className="mytasks-row" style={{ display:'grid', gridTemplateColumns:'28px 22px 18px 1fr 150px 80px 90px 40px',
                         alignItems:'center', padding:'0 18px', minHeight:38,
                         borderBottom:`1px solid var(--border-light)`,
                         borderLeft:`3px solid ${typeAccent}`,
@@ -1267,6 +1267,48 @@ export function MyTasksView({
                           </span>}
                         </div>
                       </div>
+                      {/* Client column — inline editable for managers */}
+                      <div className="hide-mobile" style={{ display:'flex', alignItems:'center', gap:4, overflow:'hidden', paddingRight:4 }}
+                        onClick={e => { e.stopPropagation(); if (canManage) setInlineEdit({taskId:task.id,field:'client_id'}) }}>
+                        {inlineEdit?.taskId===task.id && inlineEdit.field==='client_id' ? (
+                          <select autoFocus defaultValue={task.client_id ?? ''}
+                            onChange={e => patchTaskField(task.id,'client_id',e.target.value||null)}
+                            onBlur={() => setInlineEdit(null)}
+                            onClick={e => e.stopPropagation()}
+                            style={{ fontSize:11, padding:'2px 5px', borderRadius:6, border:'1px solid var(--brand)',
+                              background:'var(--surface)', color:'var(--text-primary)', outline:'none',
+                              fontFamily:'inherit', maxWidth:144, cursor:'pointer' }}>
+                            <option value="">No client</option>
+                            {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                          </select>
+                        ) : client ? (
+                          <>
+                            <span style={{ width:7, height:7, borderRadius:2, background:client.color, flexShrink:0, display:'inline-block' }}/>
+                            <span title={client.name + (canManage ? ' — click to change' : '')}
+                              style={{ fontSize:12, color:'var(--text-muted)', overflow:'hidden', whiteSpace:'nowrap',
+                                textOverflow:'ellipsis', cursor: canManage?'pointer':'default' }}>{client.name}</span>
+                          </>
+                        ) : <span style={{ fontSize:12, color:'var(--text-muted)', cursor: canManage?'pointer':'default' }}>—</span>}
+                      </div>
+                      {/* Due date — inline editable for managers */}
+                      <div className="hide-mobile" style={{ textAlign:'center', fontSize:12,
+                        color: task.due_date===today?'var(--brand)':ov?'#dc2626':'var(--text-muted)',
+                        fontWeight: (task.due_date===today||ov)?600:400,
+                        cursor: canManage ? 'pointer' : 'default' }}
+                        onClick={e => { e.stopPropagation(); if (canManage) setInlineEdit({taskId:task.id,field:'due_date'}) }}>
+                        {inlineEdit?.taskId===task.id && inlineEdit.field==='due_date' ? (
+                          <input autoFocus type="date" defaultValue={task.due_date ?? ''}
+                            onChange={e => patchTaskField(task.id,'due_date',e.target.value||null)}
+                            onBlur={() => setInlineEdit(null)}
+                            onClick={e => e.stopPropagation()}
+                            style={{ fontSize:11, padding:'1px 4px', borderRadius:5, border:'1px solid var(--brand)',
+                              background:'var(--surface)', outline:'none', colorScheme:'light dark', fontFamily:'inherit' }}/>
+                        ) : (
+                          <span title={canManage ? 'Click to change due date' : undefined}>
+                            {task.due_date ? fmtDate(task.due_date) : '—'}
+                          </span>
+                        )}
+                      </div>
                       {/* Assignee column — inline editable for managers */}
                       <div className="hide-mobile" style={{ display:'flex', alignItems:'center', gap:5, overflow:'hidden' }}
                         onClick={e => { e.stopPropagation(); if (canManage) setInlineEdit({taskId:task.id,field:'assignee_id'}) }}>
@@ -1304,48 +1346,6 @@ export function MyTasksView({
                               {creator.name.split(' ')[0]}
                             </span>
                           ) : <span style={{ fontSize:12, color:'var(--text-muted)' }}>—</span>
-                        )}
-                      </div>
-                      {/* Client column — inline editable for managers */}
-                      <div className="hide-mobile" style={{ display:'flex', alignItems:'center', gap:4, overflow:'hidden', paddingRight:4 }}
-                        onClick={e => { e.stopPropagation(); if (canManage) setInlineEdit({taskId:task.id,field:'client_id'}) }}>
-                        {inlineEdit?.taskId===task.id && inlineEdit.field==='client_id' ? (
-                          <select autoFocus defaultValue={task.client_id ?? ''}
-                            onChange={e => patchTaskField(task.id,'client_id',e.target.value||null)}
-                            onBlur={() => setInlineEdit(null)}
-                            onClick={e => e.stopPropagation()}
-                            style={{ fontSize:11, padding:'2px 5px', borderRadius:6, border:'1px solid var(--brand)',
-                              background:'var(--surface)', color:'var(--text-primary)', outline:'none',
-                              fontFamily:'inherit', maxWidth:84, cursor:'pointer' }}>
-                            <option value="">No client</option>
-                            {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                          </select>
-                        ) : client ? (
-                          <>
-                            <span style={{ width:7, height:7, borderRadius:2, background:client.color, flexShrink:0, display:'inline-block' }}/>
-                            <span title={canManage ? 'Click to change client' : undefined}
-                              style={{ fontSize:12, color:'var(--text-muted)', overflow:'hidden', whiteSpace:'nowrap',
-                                textOverflow:'ellipsis', cursor: canManage?'pointer':'default' }}>{client.name}</span>
-                          </>
-                        ) : <span style={{ fontSize:12, color:'var(--text-muted)', cursor: canManage?'pointer':'default' }}>—</span>}
-                      </div>
-                      {/* Due date — inline editable for managers */}
-                      <div className="hide-mobile" style={{ textAlign:'center', fontSize:12,
-                        color: task.due_date===today?'var(--brand)':ov?'#dc2626':'var(--text-muted)',
-                        fontWeight: (task.due_date===today||ov)?600:400,
-                        cursor: canManage ? 'pointer' : 'default' }}
-                        onClick={e => { e.stopPropagation(); if (canManage) setInlineEdit({taskId:task.id,field:'due_date'}) }}>
-                        {inlineEdit?.taskId===task.id && inlineEdit.field==='due_date' ? (
-                          <input autoFocus type="date" defaultValue={task.due_date ?? ''}
-                            onChange={e => patchTaskField(task.id,'due_date',e.target.value||null)}
-                            onBlur={() => setInlineEdit(null)}
-                            onClick={e => e.stopPropagation()}
-                            style={{ fontSize:11, padding:'1px 4px', borderRadius:5, border:'1px solid var(--brand)',
-                              background:'var(--surface)', outline:'none', colorScheme:'light dark', fontFamily:'inherit' }}/>
-                        ) : (
-                          <span title={canManage ? 'Click to change due date' : undefined}>
-                            {task.due_date ? fmtDate(task.due_date) : '—'}
-                          </span>
                         )}
                       </div>
                       {/* Actions — last grid cell: priority dot + clone + delete (hidden for context tasks) */}
@@ -1581,7 +1581,7 @@ export function MyTasksView({
                   return (
                     <React.Fragment key={task.id}>
                     <div
-                      className="mytasks-row" style={{ display:'grid', gridTemplateColumns:'28px 22px 18px 1fr 90px 90px 72px 40px',
+                      className="mytasks-row" style={{ display:'grid', gridTemplateColumns:'28px 22px 18px 1fr 150px 80px 90px 40px',
                         alignItems:'center', padding:'0 18px', minHeight:38,
                         borderBottom:`1px solid var(--border-light)`,
                         background:'var(--surface)', cursor:'pointer', opacity:0.7 }}
@@ -1595,6 +1595,17 @@ export function MyTasksView({
                         overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis', paddingRight:8 }}>
                         {task.title}
                       </div>
+                      <div className="hide-mobile" style={{ display:'flex', alignItems:'center', gap:4, overflow:'hidden', paddingRight:4 }}>
+                        {client ? (
+                          <>
+                            <span style={{ width:7, height:7, borderRadius:2, background:client.color, flexShrink:0, display:'inline-block' }}/>
+                            <span title={client.name} style={{ fontSize:12, color:'var(--text-muted)', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{client.name}</span>
+                          </>
+                        ) : <span style={{ fontSize:12, color:'var(--text-muted)' }}>—</span>}
+                      </div>
+                      <div style={{ textAlign:'center', fontSize:12, color:'var(--text-muted)' }}>
+                        {task.due_date ? fmtDate(task.due_date) : '—'}
+                      </div>
                       <div className="hide-mobile" style={{ display:'flex', alignItems:'center', gap:5, overflow:'hidden' }}>
                         {creator ? (
                           <span style={{ display:'inline-flex', alignItems:'center', padding:'2px 7px', borderRadius:99,
@@ -1604,17 +1615,6 @@ export function MyTasksView({
                             {creator.name.split(' ')[0]}
                           </span>
                         ) : <span style={{ fontSize:12, color:'var(--text-muted)' }}>—</span>}
-                      </div>
-                      <div className="hide-mobile" style={{ display:'flex', alignItems:'center', gap:4, overflow:'hidden', paddingRight:4 }}>
-                        {client ? (
-                          <>
-                            <span style={{ width:7, height:7, borderRadius:2, background:client.color, flexShrink:0, display:'inline-block' }}/>
-                            <span style={{ fontSize:12, color:'var(--text-muted)', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{client.name}</span>
-                          </>
-                        ) : <span style={{ fontSize:12, color:'var(--text-muted)' }}>—</span>}
-                      </div>
-                      <div style={{ textAlign:'center', fontSize:12, color:'var(--text-muted)' }}>
-                        {task.due_date ? fmtDate(task.due_date) : '—'}
                       </div>
                       <div style={{ display:'flex', alignItems:'center', justifyContent:'flex-end', gap:4 }}
                         onClick={e => e.stopPropagation()}>
@@ -1784,7 +1784,7 @@ export function MyTasksView({
           // Apply global filters
           if (filterClient.length > 0)   colTasks = colTasks.filter(t => filterClient.includes((t as any).client?.id ?? ''))
           if (filterPriority.length > 0) colTasks = colTasks.filter(t => filterPriority.includes(t.priority))
-          if (filterSearch)   colTasks = colTasks.filter(t => t.title.toLowerCase().includes(filterSearch.toLowerCase()))
+          if (filterSearch)   colTasks = colTasks.filter(t => t.title.toLowerCase().includes(filterSearch.toLowerCase()) || ((t as any).client?.name ?? '').toLowerCase().includes(filterSearch.toLowerCase()))
           if (dueDateFrom)    colTasks = colTasks.filter(t => t.due_date && t.due_date >= dueDateFrom)
           if (dueDateTo)      colTasks = colTasks.filter(t => t.due_date && t.due_date <= dueDateTo)
           if (createdFrom)    colTasks = colTasks.filter(t => t.created_at && t.created_at.slice(0,10) >= createdFrom)
