@@ -23,7 +23,10 @@ export default async function TeamPage() {
       .eq('org_id', mb.org_id).eq('is_active', true).order('joined_at'),
     supabase.from('tasks')
       .select('assignee_id, status, completed_at, created_at')
-      .eq('org_id', mb.org_id).gte('created_at', from84),
+      .eq('org_id', mb.org_id).gte('created_at', from84)
+      .neq('is_archived', true)
+      .is('parent_task_id', null)
+      .or('is_recurring.is.null,is_recurring.eq.false'),
     supabase.from('org_settings')
       .select('role_permissions')
       .eq('org_id', mb.org_id)
