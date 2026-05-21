@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
 
   const VALID_ROLES      = new Set(['owner', 'admin', 'manager', 'member', 'viewer'])
   const VALID_PRIORITIES = new Set(['none', 'low', 'medium', 'high', 'urgent'])
-  const VALID_FREQS      = new Set(['daily', 'weekly', 'bi_weekly', 'monthly', 'quarterly', 'annual'])
+  const VALID_FREQS      = new Set(['daily', 'weekly', 'bi_weekly', 'monthly', 'quarterly', 'half_yearly', 'annual'])
 
   const report: Record<string, SheetReport> = {
     members:    makeSheet(),
@@ -289,7 +289,7 @@ export async function POST(request: NextRequest) {
         if (!title) { r.errors.push('Row with empty task title — title is required'); continue }
         const freq = norm(cell(row, iFreq))
         if (freq && !VALID_FREQS.has(freq))
-          r.errors.push(`"${title}": invalid frequency "${freq}" — use daily | weekly | bi_weekly | monthly | quarterly | annual`)
+          r.errors.push(`"${title}": invalid frequency "${freq}" — use daily | weekly | bi_weekly | monthly | quarterly | half_yearly | annual`)
         const priority = cell(row, iPriority) || 'medium'
         if (!VALID_PRIORITIES.has(priority))
           r.errors.push(`"${title}": invalid priority "${priority}" — use none | low | medium | high | urgent`)

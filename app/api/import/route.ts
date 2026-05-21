@@ -1301,7 +1301,7 @@ export async function POST(request: NextRequest) {
         const iStart    = findCol(headers, 'startdate', 'start')
         const iDesc     = findCol(headers, 'description', 'desc')
 
-        const VALID_FREQS = ['daily', 'weekly', 'bi_weekly', 'monthly', 'quarterly', 'annual']
+        const VALID_FREQS = ['daily', 'weekly', 'bi_weekly', 'monthly', 'quarterly', 'half_yearly', 'annual']
 
         const toInsertRecurring: any[] = []
         const allRecurringRows = dataRows(rows, hdrIdx).filter(r => !isSampleRow(r))

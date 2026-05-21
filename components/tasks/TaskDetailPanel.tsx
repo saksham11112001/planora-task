@@ -270,11 +270,11 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
   /* convert one-time task to recurring */
   async function convertToRecurring() {
     if (!task || converting) return
-    const freq = prompt('Frequency? (daily / weekly / monthly / quarterly / annual)', 'weekly')
+    const freq = prompt('Frequency? (daily / weekly / monthly / quarterly / half_yearly / annual)', 'weekly')
     if (!freq) return
-    const allowed = ['daily','weekly','bi_weekly','monthly','quarterly','annual']
+    const allowed = ['daily','weekly','bi_weekly','monthly','quarterly','half_yearly','annual']
     if (!allowed.includes(freq.trim().toLowerCase())) {
-      toast.error('Invalid frequency. Use: daily, weekly, monthly, quarterly, annual')
+      toast.error('Invalid frequency. Use: daily, weekly, monthly, quarterly, half_yearly, annual')
       return
     }
     setConverting(true)
