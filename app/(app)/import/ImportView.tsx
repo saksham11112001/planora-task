@@ -6,7 +6,7 @@ import {
   Upload, FileSpreadsheet, Download, CheckCircle2,
   AlertCircle, Users, FolderOpen, CheckSquare, X,
   ChevronDown, ChevronRight, Loader2, ArrowRight,
-  Building2, RefreshCw, ListTodo,
+  Building2, RefreshCw, ListTodo, ShieldCheck,
 } from 'lucide-react'
 import { toast } from '@/store/appStore'
 
@@ -22,6 +22,20 @@ interface ImportResults {
 
 type UploadState = 'idle' | 'dragging' | 'uploading' | 'done' | 'error'
 
+interface SheetReport {
+  found: boolean
+  rowCount: number
+  errors: string[]
+  warnings: string[]
+  info: string[]
+}
+
+interface ValidationReport {
+  ok: boolean
+  report: Record<string, SheetReport>
+  summary: { sheetsFound: string[]; totalRows: number; errorCount: number; warningCount: number }
+}
+
 export function ImportView() {
   const router  = useRouter()
   const fileRef = useRef<HTMLInputElement>(null)
@@ -32,6 +46,8 @@ export function ImportView() {
   const [errMsg,  setErrMsg]  = useState('')
   const [expanded,setExpanded]= useState<Record<string, boolean>>({})
   const [progress, setProgress] = useState<{step: string; done: boolean; count?: number}[]>([])
+  const [isValidating,     setIsValidating]     = useState(false)
+  const [validationReport, setValidationReport] = useState<ValidationReport | null>(null)
 
   /* ── drag & drop ──────────────────────────────────────────────── */
   const onDragOver = useCallback((e: React.DragEvent) => {
@@ -53,6 +69,7 @@ export function ImportView() {
     setResults(null)
     setErrMsg('')
     setState('idle')
+    setValidationReport(null)
   }
 
   /* ── upload ───────────────────────────────────────────────────── */
@@ -130,6 +147,25 @@ export function ImportView() {
       }
       setState('error')
       setProgress([])
+    }
+  }
+
+  /* ── validate ────────────────────────────────────────────────── */
+  async function validate() {
+    if (!file) return
+    setIsValidating(true)
+    setValidationReport(null)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await fetch('/api/import/validate', { method: 'POST', body: fd })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) { toast.error(d.error ?? 'Validation failed'); return }
+      setValidationReport(d)
+    } catch {
+      toast.error('Validation failed — please try again')
+    } finally {
+      setIsValidating(false)
     }
   }
 
@@ -369,26 +405,127 @@ export function ImportView() {
             </div>
           )}
 
-          {/* Upload button */}
+          {/* Validate + Import buttons */}
           {file && !isDone && (
-            <button
-              onClick={upload}
-              disabled={isUploading}
-              style={{
-                marginTop: 14, width: '100%', padding: '11px',
-                borderRadius: 9, border: 'none', cursor: isUploading ? 'default' : 'pointer',
-                background: 'var(--brand)', color: '#fff',
-                fontSize: 14, fontWeight: 600,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                opacity: isUploading ? 0.7 : 1, transition: 'opacity 0.15s',
-              }}
-            >
-              {isUploading
-                ? <><Loader2 style={{ width: 16, height: 16, animation: 'spin 1s linear infinite' }} /> Importing…</>
-                : <><ArrowRight style={{ width: 16, height: 16 }} /> Start Import</>
-              }
-            </button>
+            <div style={{ marginTop: 14, display: 'flex', gap: 8 }}>
+              <button
+                onClick={validate}
+                disabled={isUploading || isValidating}
+                style={{
+                  flex: 1, padding: '11px', borderRadius: 9,
+                  cursor: (isUploading || isValidating) ? 'default' : 'pointer',
+                  background: 'transparent', color: 'var(--brand)',
+                  border: '1.5px solid var(--brand)', fontSize: 14, fontWeight: 600,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  opacity: (isUploading || isValidating) ? 0.6 : 1, transition: 'opacity 0.15s',
+                }}
+              >
+                {isValidating
+                  ? <><Loader2 style={{ width: 16, height: 16, animation: 'spin 1s linear infinite' }} /> Validating…</>
+                  : <><ShieldCheck style={{ width: 16, height: 16 }} /> Validate</>
+                }
+              </button>
+              <button
+                onClick={upload}
+                disabled={isUploading || isValidating}
+                style={{
+                  flex: 1, padding: '11px', borderRadius: 9,
+                  border: 'none', cursor: (isUploading || isValidating) ? 'default' : 'pointer',
+                  background: 'var(--brand)', color: '#fff',
+                  fontSize: 14, fontWeight: 600,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  opacity: (isUploading || isValidating) ? 0.7 : 1, transition: 'opacity 0.15s',
+                }}
+              >
+                {isUploading
+                  ? <><Loader2 style={{ width: 16, height: 16, animation: 'spin 1s linear infinite' }} /> Importing…</>
+                  : <><ArrowRight style={{ width: 16, height: 16 }} /> Start Import</>
+                }
+              </button>
+            </div>
           )}
+
+          {/* ── Validation results panel ────────────────────────── */}
+          {validationReport && !isDone && !isUploading && (() => {
+            const { ok, report: vr, summary } = validationReport
+            const SHEET_LABELS: Record<string, string> = {
+              members: 'Team Members', clients: 'Clients', projects: 'Projects',
+              tasks: 'Tasks', onetasks: 'One-Time Tasks', recurring: 'Recurring Tasks',
+              compliance: 'CA Compliance',
+            }
+            return (
+              <div style={{
+                marginTop: 14, padding: '16px 18px', borderRadius: 12,
+                border: `1.5px solid ${ok ? '#86efac' : '#fca5a5'}`,
+                background: ok ? '#f0fdf4' : '#fef2f2',
+              }}>
+                {/* Header */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+                  {ok
+                    ? <CheckCircle2 style={{ width: 17, height: 17, color: '#16a34a', flexShrink: 0 }} />
+                    : <AlertCircle   style={{ width: 17, height: 17, color: '#dc2626', flexShrink: 0 }} />
+                  }
+                  <span style={{ fontSize: 13, fontWeight: 700, color: ok ? '#15803d' : '#dc2626' }}>
+                    {ok
+                      ? `All clear — ${summary.totalRows} row${summary.totalRows !== 1 ? 's' : ''} ready to import`
+                      : `${summary.errorCount} error${summary.errorCount !== 1 ? 's' : ''} found — fix before importing`
+                    }
+                  </span>
+                  {summary.warningCount > 0 && (
+                    <span style={{
+                      marginLeft: 4, fontSize: 11, fontWeight: 600, color: '#b45309',
+                      background: '#fef3c7', padding: '1px 8px', borderRadius: 99,
+                      border: '1px solid #fde68a', flexShrink: 0,
+                    }}>
+                      {summary.warningCount} warning{summary.warningCount !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                </div>
+
+                {/* Per-sheet rows */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {(['members', 'clients', 'projects', 'tasks', 'onetasks', 'recurring', 'compliance'] as const).map(key => {
+                    const s = vr[key]
+                    if (!s?.found) return null
+                    const label = SHEET_LABELS[key]
+                    const hasErrors   = s.errors.length > 0
+                    const hasWarnings = s.warnings.length > 0
+                    return (
+                      <div key={key} style={{
+                        padding: '10px 12px', borderRadius: 9,
+                        background: hasErrors ? '#fff5f5' : hasWarnings ? '#fffbeb' : '#f0fdf4',
+                        border: `1px solid ${hasErrors ? '#fecaca' : hasWarnings ? '#fde68a' : '#bbf7d0'}`,
+                      }}>
+                        {/* Sheet name + count */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: (s.errors.length + s.warnings.length + s.info.length) > 0 ? 8 : 0 }}>
+                          {hasErrors
+                            ? <AlertCircle   style={{ width: 13, height: 13, color: '#dc2626', flexShrink: 0 }} />
+                            : hasWarnings
+                              ? <AlertCircle style={{ width: 13, height: 13, color: '#d97706', flexShrink: 0 }} />
+                              : <CheckCircle2 style={{ width: 13, height: 13, color: '#16a34a', flexShrink: 0 }} />
+                          }
+                          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>{label}</span>
+                          <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 2 }}>
+                            {s.rowCount} row{s.rowCount !== 1 ? 's' : ''}
+                          </span>
+                        </div>
+                        {/* Messages */}
+                        {[
+                          ...s.errors.map(m => ({ m, color: '#b91c1c', prefix: '✗' })),
+                          ...s.warnings.map(m => ({ m, color: '#b45309', prefix: '⚠' })),
+                          ...s.info.map(m => ({ m, color: '#0369a1', prefix: 'ℹ' })),
+                        ].map(({ m, color, prefix }, i) => (
+                          <p key={i} style={{ fontSize: 11, color, margin: '2px 0 0', paddingLeft: 19, lineHeight: 1.5 }}>
+                            <span style={{ marginLeft: -15, marginRight: 4 }}>{prefix}</span>{m}
+                          </p>
+                        ))}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })()}
         </div>
 
         {/* ── Results ──────────────────────────────────────────── */}
