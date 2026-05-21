@@ -49,6 +49,11 @@ const FAQ: FAQItem[] = [
   },
   {
     category: 'CA Compliance',
+    q: 'I imported successfully but my compliance tasks are not showing up on the board — why?',
+    a: 'Import only brings in your client and task data — it does not automatically create task instances on the Kanban board. You need to spawn them manually. Go to CA Compliance → click "Spawn tasks now". Floatup will generate a task for every client and filing type whose trigger date has already passed. Tasks appear on the board within a few seconds. If they still do not appear, check two things: (1) the client\'s status is Active (not Paused or Inactive), and (2) the filing types you expect are enabled in CA Compliance → Manage Templates. The nightly cron also runs at 7 AM IST every day and will spawn any remaining tasks automatically.',
+  },
+  {
+    category: 'CA Compliance',
     q: 'What is the DSC Tracker?',
     a: 'DSC Tracker (CA Compliance → DSC Tracker tab) lets you record each client\'s Digital Signature Certificate expiry date. Floatup shows a colour-coded status: green (valid), amber (expiring within 30 days), red (expired). You can filter by status and export the list. No reminders are sent automatically — it is a reference dashboard only.',
   },
