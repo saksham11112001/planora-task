@@ -498,8 +498,10 @@ export async function POST(request: NextRequest) {
         const authUser = authUsers.find(u => u.email?.toLowerCase() === e)
         if (authUser?.id) { emailCache[key] = authUser.id; return authUser.id }
 
-        emailCache[key] = null
-        return null
+        // 4) not found anywhere — auto-invite and add to org as member
+        const autoId = await autoInviteMember(e)
+        emailCache[key] = autoId
+        return autoId
       }
 
       // ── Name path (non-technical users who type names instead of emails) ─
@@ -559,6 +561,50 @@ export async function POST(request: NextRequest) {
       return uid
     }
 
+    // Auto-invite an email address as a 'member' when it cannot be resolved to an existing user.
+    // Used by resolveEmail so that assignees listed in the import are created on the fly.
+    async function autoInviteMember(email: string): Promise<string | null> {
+      const { data: invData, error: invErr } = await admin.auth.admin.inviteUserByEmail(email, {
+        data: { invited_to_org: orgId, invited_role: 'member' },
+        redirectTo: `${APP_URL}/auth/callback`,
+      })
+      if (invErr) {
+        // User already exists in auth but not in this org — look them up and add them
+        if (invErr.message?.toLowerCase().includes('already') || invErr.message?.toLowerCase().includes('registered')) {
+          const authUsers = await loadAuthUsers()
+          const existing = (authUsers ?? []).find(u => u.email?.toLowerCase() === email.toLowerCase())
+          if (existing?.id) {
+            await admin.from('users').upsert(
+              { id: existing.id, email, name: email.split('@')[0] },
+              { onConflict: 'id', ignoreDuplicates: true }
+            )
+            await admin.from('org_members').upsert(
+              { org_id: orgId, user_id: existing.id, role: 'member', is_active: true },
+              { onConflict: 'org_id,user_id', ignoreDuplicates: false }
+            )
+            emailCache[email.toLowerCase()] = existing.id
+            roleCache[existing.id] = 'member'
+            return existing.id
+          }
+        }
+        return null
+      }
+      if (invData?.user?.id) {
+        const invitedId = invData.user.id
+        await admin.from('users').upsert(
+          { id: invitedId, email, name: email.split('@')[0] },
+          { onConflict: 'id', ignoreDuplicates: true }
+        )
+        await admin.from('org_members').insert(
+          { org_id: orgId, user_id: invitedId, role: 'member', is_active: true }
+        ).maybeSingle()
+        emailCache[email.toLowerCase()] = invitedId
+        roleCache[invitedId] = 'member'
+        return invitedId
+      }
+      return null
+    }
+
     async function resolveAssignees(raw: string): Promise<{ primary: string | null; extra: string[] }> {
       // Ignore template placeholder text
       const rawLower = raw.toLowerCase().trim()
@@ -611,7 +657,7 @@ export async function POST(request: NextRequest) {
       }
 
       // 4. Auto-create with just the name so downstream rows don't fail
-      const { data: created } = await admin
+      const { data: created, error: createErr } = await admin
         .from('clients')
         .insert({ org_id: orgId, name: rawName.trim(), color: '#0d9488', status: 'active', created_by: user.id })
         .select('id')
@@ -620,6 +666,20 @@ export async function POST(request: NextRequest) {
         clientNameToId[n] = created.id
         results.clients.created++
         return created.id
+      }
+      // Insert may fail when a concurrent row in the same batch just created the same client
+      // (race condition) — do a final DB lookup before giving up
+      if (createErr) {
+        const { data: raceMatch } = await admin
+          .from('clients')
+          .select('id, name')
+          .eq('org_id', orgId)
+          .ilike('name', rawName.trim())
+          .maybeSingle()
+        if (raceMatch?.id) {
+          clientNameToId[n] = raceMatch.id
+          return raceMatch.id
+        }
       }
 
       return null
