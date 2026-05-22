@@ -132,7 +132,9 @@ export async function TasksFetcher() {
   // incorrectly treated as duplicates.
   const seenCAKeys = new Set<string>()
   const displayTaskList = taskList.filter((t: any) => {
-    if (t.parent_task_id) return false
+    // Show subtasks that are directly assigned to the current user.
+    // Only drop subtasks that arrived as context (shouldn't happen, but guard anyway).
+    if (t.parent_task_id && t.custom_fields?._context_task === true) return false
     if (t.custom_fields?._ca_compliance === true) {
       const assignmentId = t.custom_fields._assignment_id ?? ''
       const key = assignmentId
