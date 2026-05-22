@@ -21,14 +21,16 @@ export async function CalendarFetcher() {
   const dateFrom = from.toISOString().split('T')[0]
   const dateTo   = to.toISOString().split('T')[0]
 
-  const base = supabase.from('tasks')
+  const baseQuery = supabase.from('tasks')
     .select(TASK_SELECT)
-    .eq('org_id', mb.org_id).not('due_date', 'is', null).neq('is_archived', true).is('parent_task_id', null)
+    .eq('org_id', mb.org_id).not('due_date', 'is', null).neq('is_archived', true)
     .gte('due_date', dateFrom).lte('due_date', dateTo)
 
+  // Org-wide view (managers/admins): top-level tasks only to avoid subtask flooding.
+  // Personal view: include subtasks the user is directly assigned to or approving.
   const taskQuery = canViewAll
-    ? base
-    : base.or(`assignee_id.eq.${user.id},approver_id.eq.${user.id}`)
+    ? baseQuery.is('parent_task_id', null)
+    : baseQuery.or(`assignee_id.eq.${user.id},approver_id.eq.${user.id}`)
 
   const [{ data: tasks }, { data: clients }, { data: members }, { data: caAssignments }, { data: caInstances }] = await Promise.all([
     taskQuery.limit(10000),
