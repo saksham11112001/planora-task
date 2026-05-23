@@ -99,13 +99,16 @@ export default function LoginPage() {
     e.preventDefault()
     if (!email.trim()) { setError('Enter your email address'); return }
     setLoading(true); setError('')
-    const supabase = createClient()
-    const { error: err } = await supabase.auth.signInWithOtp({
-      email: email.trim(),
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+    // Use server-side admin link generation to bypass Supabase client-side
+    // email domain validation, which rejects some valid corporate domains.
+    const res  = await fetch('/api/auth/magic-link', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.trim() }),
     })
+    const json = await res.json().catch(() => ({}))
     setLoading(false)
-    if (err) { setError(err.message); return }
+    if (!res.ok || json.error) { setError(json.error ?? 'Failed to send magic link'); return }
     setMode('magic_sent')
   }
 
