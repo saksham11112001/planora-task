@@ -114,8 +114,11 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
   )
   const today = todayStr()
 
-  // ── Current-month label ──────────────────────────────────────────────────
+  // ── Current-month boundaries + label ────────────────────────────────────
   const _now       = new Date()
+  const monthStart = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-01`
+  const _lastDay   = new Date(_now.getFullYear(), _now.getMonth() + 1, 0)
+  const monthEnd   = _lastDay.toISOString().slice(0, 10)
   const monthLabel = _now.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
 
   // ── Filter state ──
@@ -331,11 +334,24 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
   }, [tasks, search, filterStatus, filterPrio, filterClient, filterMember, filterType.join(','),
       dueDateFrom, dueDateTo, createdFrom, createdTo, updatedFrom, updatedTo])
 
-  // ── Stats — scoped to the currently visible (filtered) tasks ───────────────
+  // ── Current-month task slice ──────────────────────────────────────────────
+  const monthTasks = useMemo(
+    () => tasks.filter(t => !!t.due_date && t.due_date >= monthStart && t.due_date <= monthEnd),
+    [tasks, monthStart, monthEnd],
+  )
+
+  // ── Stats ─────────────────────────────────────────────────────────────────
+  // Default: tasks due in the current month (clean, predictable baseline).
+  // When any filter is active: switches to the filtered visible set so the KPI
+  // numbers stay in sync with whatever the user is looking at.
   // All four status buckets (todo + inReview + completed + cancelled) sum to total.
   // Overdue and Unassigned are subsets of the above (annotation stats).
+  const hasFilters = !!(search || filterStatus.length || filterPrio.length || filterClient.length ||
+    filterMember.length || filterType.length || duePreset || dueDateFrom ||
+    createdPreset || createdFrom || updatedPreset || updatedFrom)
+
   const stats = useMemo(() => {
-    const m = visible
+    const m = hasFilters ? visible : monthTasks
     return {
       total:      m.length,
       todo:       m.filter(t => t.status === 'todo').length,
@@ -347,7 +363,7 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
       recurring:  m.filter(t => t.is_recurring).length,
       unassigned: m.filter(t => !t.assignee_id && !['completed', 'cancelled'].includes(t.status)).length,
     }
-  }, [visible, today])
+  }, [hasFilters, visible, monthTasks, today])
 
   // ── Trend data (last 14 days, derived from full task list) ──
   const trendData = useMemo(() => {
@@ -488,7 +504,7 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
             <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
               {monthLabel}
             </span>
-            <span style={{ fontSize: 10, color: 'var(--text-muted)', opacity: 0.5 }}>{activeFilters > 0 ? '· filtered view' : '· all tasks'}</span>
+            <span style={{ fontSize: 10, color: 'var(--text-muted)', opacity: 0.5 }}>{hasFilters ? '· filtered view' : '· tasks due this month'}</span>
           </div>
 
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -554,8 +570,8 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
                   <BarChart data={[
                     { name: 'CA',      value: stats.ca,        fill: '#d97706' },
                     { name: 'Repeat',  value: stats.recurring, fill: '#0d9488' },
-                    { name: 'Project', value: visible.filter(t => !!t.project_id && !t.is_recurring && !t.custom_fields?._ca_compliance).length, fill: '#7c3aed' },
-                    { name: 'Quick',   value: visible.filter(t => !t.project_id && !t.is_recurring && !t.custom_fields?._ca_compliance).length,  fill: '#0891b2' },
+                    { name: 'Project', value: (hasFilters ? visible : monthTasks).filter(t => !!t.project_id && !t.is_recurring && !t.custom_fields?._ca_compliance).length, fill: '#7c3aed' },
+                    { name: 'Quick',   value: (hasFilters ? visible : monthTasks).filter(t => !t.project_id && !t.is_recurring && !t.custom_fields?._ca_compliance).length,  fill: '#0891b2' },
                     { name: 'Overdue', value: stats.overdue,   fill: '#dc2626' },
                   ]} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                     <XAxis dataKey="name" tick={{ fontSize: 9 }}/>
