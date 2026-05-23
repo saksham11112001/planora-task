@@ -99,13 +99,16 @@ export default function LoginPage() {
     e.preventDefault()
     if (!email.trim()) { setError('Enter your email address'); return }
     setLoading(true); setError('')
-    const supabase = createClient()
-    const { error: err } = await supabase.auth.signInWithOtp({
-      email: email.trim(),
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+    // Use server-side admin link generation to bypass Supabase client-side
+    // email domain validation, which rejects some valid corporate domains.
+    const res  = await fetch('/api/auth/magic-link', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.trim() }),
     })
+    const json = await res.json().catch(() => ({}))
     setLoading(false)
-    if (err) { setError(err.message); return }
+    if (!res.ok || json.error) { setError(json.error ?? 'Failed to send magic link'); return }
     setMode('magic_sent')
   }
 
@@ -179,7 +182,15 @@ export default function LoginPage() {
       redirectTo: `${window.location.origin}/auth/callback?recovery=1`,
     })
     setLoading(false)
-    if (err) { setError(err.message); return }
+    if (err) {
+      // Supabase rejects resetPasswordForEmail for invited-but-unconfirmed users.
+      // Guide them to use the magic link (OTP) flow instead.
+      setError(
+        err.message +
+        ' — your account may not have a password set yet. Use the magic link option below to sign in without a password.'
+      )
+      return
+    }
     setMode('reset_sent')
   }
 
@@ -375,6 +386,15 @@ export default function LoginPage() {
                 <EmailInput value={email} onChange={setEmail} />
                 <SubmitBtn loading={loading} label="Send reset link →" loadingLabel="Sending..." />
               </form>
+
+              <div style={{ marginTop: 16, textAlign: 'center' }}>
+                <span style={{ fontSize: 13, color: '#64748b' }}>Or sign in without a password — </span>
+                <button type="button" onClick={() => resetForm('magic')}
+                  style={{ color: '#0d9488', background: 'none', border: 'none', cursor: 'pointer',
+                    fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
+                  use magic link
+                </button>
+              </div>
             </>
           )}
 
