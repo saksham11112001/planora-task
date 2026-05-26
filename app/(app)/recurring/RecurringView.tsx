@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { RefreshCw, X, Pencil, User, Trash2, SortAsc, Copy } from 'lucide-react'
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
 import { InlineRecurringTask, FREQ_LABEL } from '@/components/tasks/InlineRecurringTask'
+import { inferGranularFrequency } from '@/lib/utils/recurringSchedule'
 import { fmtDate } from '@/lib/utils/format'
 import { toast, useFilterStore } from '@/store/appStore'
 import { UniversalFilterBar } from '@/components/filters/UniversalFilterBar'
@@ -524,7 +525,7 @@ export function RecurringView({
                               fontWeight: 600,
                             }}
                           >
-                            {FREQ_LABEL[task.frequency ?? ''] ?? task.frequency ?? '—'}
+                            {FREQ_LABEL[task.custom_fields?._granular_frequency || inferGranularFrequency(task.frequency ?? '', task.next_occurrence_date ?? '')] ?? task.frequency ?? '—'}
                           </span>
                           {task.next_occurrence_date && (
                             <span style={{ fontSize: 10, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -849,7 +850,7 @@ export function RecurringView({
                         cursor: canManage ? 'pointer' : 'default',
                       }}
                     >
-                      {FREQ_LABEL[task.frequency ?? ''] ?? task.frequency ?? '—'}
+                      {FREQ_LABEL[task.custom_fields?._granular_frequency || inferGranularFrequency(task.frequency ?? '', task.next_occurrence_date ?? '')] ?? task.frequency ?? '—'}
                     </span>
                     {formatRecurrenceDetail(task.frequency, task.next_occurrence_date) && (
                       <span style={{ fontSize: 10, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>

@@ -141,11 +141,13 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     setDueDate(task.due_date ?? '')
     setIsBillable((task as any).is_billable ?? false)
     setBillableAmount((task as any).billable_amount != null ? String((task as any).billable_amount) : '')
-    // Sync recurring fields — infer the granular frequency (e.g. weekly_wed) from the
-    // normalised DB value + next_occurrence_date so the picker shows the correct day/date.
-    const rawFreq    = (task as any).frequency            ?? ''
-    const rawNextDate = (task as any).next_occurrence_date ?? ''
-    setRecurFreq(rawFreq ? inferGranularFrequency(rawFreq, rawNextDate) : '')
+    // Sync recurring fields. Prefer the persisted granular value (stored in custom_fields
+    // when frequency is changed) — it preserves multi-day variants like weekly_days:sat,sun
+    // that cannot be recovered from next_occurrence_date alone. Fall back to inference.
+    const rawFreq     = (task as any).frequency                          ?? ''
+    const rawNextDate = (task as any).next_occurrence_date               ?? ''
+    const storedGranular = (task as any).custom_fields?._granular_frequency as string | undefined
+    setRecurFreq(storedGranular || (rawFreq ? inferGranularFrequency(rawFreq, rawNextDate) : ''))
     setRecurNextDate(rawNextDate)
     setTab('details')
     setActivityLog([])

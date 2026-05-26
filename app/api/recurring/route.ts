@@ -42,6 +42,7 @@ export async function POST(request: NextRequest) {
     project_id:           project_id   || null,
     client_id:            client_id    || null,
     created_by:           user.id,
+    custom_fields:        { _granular_frequency: frequency },
   }).select('*').single()
 
   if (error) return NextResponse.json(dbError(error, 'recurring'), { status: 500 })
@@ -90,6 +91,15 @@ export async function PATCH(request: NextRequest) {
   const nextDate    = frequency ? nextOccurrence(frequency, today) : undefined
 
   const admin = createAdminClient()
+
+  // Merge _granular_frequency into existing custom_fields when frequency changes.
+  let customFieldsUpdate: Record<string, unknown> | undefined
+  if (frequency) {
+    const { data: existing } = await admin.from('tasks')
+      .select('custom_fields').eq('id', id).eq('org_id', mb.org_id).maybeSingle()
+    customFieldsUpdate = { ...((existing as any)?.custom_fields ?? {}), _granular_frequency: frequency }
+  }
+
   const { data, error } = await admin.from('tasks')
     .update({
       title,
@@ -99,6 +109,7 @@ export async function PATCH(request: NextRequest) {
       assignee_id:          assignee_id || null,
       project_id:           project_id  || null,
       client_id:            client_id   || null,
+      ...(customFieldsUpdate ? { custom_fields: customFieldsUpdate } : {}),
     })
     .eq('id', id).eq('org_id', mb.org_id).select('*').single()
 

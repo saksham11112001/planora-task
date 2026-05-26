@@ -199,6 +199,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       const today = new Date().toISOString().split('T')[0]
       updates.next_occurrence_date = nextOccurrence(granularFreq, today)
     }
+    // Persist granular value so multi-day variants (weekly_days:sat,sun) survive round-trips.
+    // inferGranularFrequency can only recover a single day from next_occurrence_date.
+    updates.custom_fields = {
+      ...((updates.custom_fields as Record<string, unknown>) ?? {}),
+      _granular_frequency: granularFreq,
+    }
     updates.frequency = normalizeFrequency(granularFreq)
   }
 

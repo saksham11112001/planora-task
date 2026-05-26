@@ -17,6 +17,8 @@ export const FREQUENCIES = [
   { group: 'Weekly',    v: 'weekly_wed',       l: 'Every Wednesday' },
   { group: 'Weekly',    v: 'weekly_thu',       l: 'Every Thursday' },
   { group: 'Weekly',    v: 'weekly_fri',       l: 'Every Friday' },
+  { group: 'Weekly',    v: 'weekly_sat',       l: 'Every Saturday' },
+  { group: 'Weekly',    v: 'weekly_sun',       l: 'Every Sunday' },
   { group: 'Weekly',    v: 'bi_weekly',        l: 'Every 2 weeks' },
   { group: 'Monthly',   v: 'monthly_1',        l: '1st of every month' },
   { group: 'Monthly',   v: 'monthly_7',        l: '7th of every month' },
