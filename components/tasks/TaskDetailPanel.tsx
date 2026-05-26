@@ -5,7 +5,7 @@ import type { CustomFieldDef } from '@/components/tasks/CustomFieldsPanel'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { X, ThumbsUp, ThumbsDown, Flag, Calendar, User, Briefcase, Send, Clock, Sparkles, ShieldCheck, RefreshCw, FolderPlus, ArrowRightLeft, ExternalLink, Link2, Repeat2, DollarSign } from 'lucide-react'
 import { FREQ_LABEL, FrequencyPickerButton } from '@/components/tasks/InlineRecurringTask'
-import { nextOccurrence } from '@/lib/utils/recurringSchedule'
+import { nextOccurrence, inferGranularFrequency } from '@/lib/utils/recurringSchedule'
 import { cn }             from '@/lib/utils/cn'
 import { PRIORITY_CONFIG, STATUS_CONFIG } from '@/types'
 import type { Task }      from '@/types'
@@ -141,10 +141,12 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     setDueDate(task.due_date ?? '')
     setIsBillable((task as any).is_billable ?? false)
     setBillableAmount((task as any).billable_amount != null ? String((task as any).billable_amount) : '')
-    // Sync recurring fields — store the raw effective frequency; FrequencyPickerButton handles all parsing internally
-    const rawFreq = (task as any).frequency ?? ''
-    setRecurFreq(rawFreq)
-    setRecurNextDate((task as any).next_occurrence_date ?? '')
+    // Sync recurring fields — infer the granular frequency (e.g. weekly_wed) from the
+    // normalised DB value + next_occurrence_date so the picker shows the correct day/date.
+    const rawFreq    = (task as any).frequency            ?? ''
+    const rawNextDate = (task as any).next_occurrence_date ?? ''
+    setRecurFreq(rawFreq ? inferGranularFrequency(rawFreq, rawNextDate) : '')
+    setRecurNextDate(rawNextDate)
     setTab('details')
     setActivityLog([])
     setActivityLoaded(false)

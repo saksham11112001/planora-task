@@ -39,6 +39,42 @@ function toDateStr(d: Date): string {
 }
 
 /**
+ * Given a normalised DB frequency ('weekly', 'monthly', …) and the task's
+ * stored next_occurrence_date, infers the granular frequency string that
+ * FrequencyPickerButton expects ('weekly_wed', 'monthly_15', …).
+ *
+ * The inference is reliable for weekly (day of week is unambiguous) and
+ * monthly (day of month). Falls back to the base frequency for anything
+ * that cannot be inferred.
+ */
+export function inferGranularFrequency(frequency: string, nextDate: string): string {
+  if (!nextDate || !frequency) return frequency
+  const [y, m, d] = nextDate.split('-').map(Number)
+
+  if (frequency === 'weekly') {
+    const DAY_NAMES = ['weekly_sun', 'weekly_mon', 'weekly_tue', 'weekly_wed', 'weekly_thu', 'weekly_fri', 'weekly_sat']
+    return DAY_NAMES[new Date(y, m - 1, d).getDay()] ?? frequency
+  }
+
+  if (frequency === 'monthly') {
+    const lastDay = new Date(y, m, 0).getDate()
+    return d === lastDay ? 'monthly_last' : `monthly_${d}`
+  }
+
+  if (frequency === 'quarterly') {
+    const lastDay = new Date(y, m, 0).getDate()
+    return d === lastDay ? 'quarterly_last' : `quarterly_${d}`
+  }
+
+  if (frequency === 'annual') {
+    const MONTH_SHORT = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec']
+    return `annual_${d}${MONTH_SHORT[m - 1]}`
+  }
+
+  return frequency
+}
+
+/**
  * Given a granular frequency value and a reference date string (YYYY-MM-DD),
  * returns the nearest NEXT occurrence date as YYYY-MM-DD.
  *

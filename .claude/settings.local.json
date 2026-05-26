@@ -47,7 +47,10 @@
       "Bash(echo \"---is-git: $?\")",
       "Bash(git mv *)",
       "Bash(xargs grep -l \"Planora\\\\|planora\")",
-      "Bash(xargs grep -l \"digest\\\\|queue\\\\|notification\")"
+      "Bash(xargs grep -l \"digest\\\\|queue\\\\|notification\")",
+      "Bash(New-Item -ItemType Directory -Force \"C:\\\\Users\\\\saksh\\\\Desktop\\\\planora-task\\\\app\\\\api\\\\recurring\\\\recalculate\")",
+      "Bash(Out-Null)",
+      "Bash(Write-Output \"ok\")"
     ]
   }
 }
