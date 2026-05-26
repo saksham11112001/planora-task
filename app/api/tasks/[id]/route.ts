@@ -5,7 +5,7 @@ import { NextResponse }       from 'next/server'
 import type { NextRequest }   from 'next/server'
 import { assertCan }          from '@/lib/utils/permissionGate'
 import { dbError }             from '@/lib/api-error'
-import { nextOccurrence }      from '@/lib/utils/recurringSchedule'
+import { nextOccurrence, normalizeFrequency } from '@/lib/utils/recurringSchedule'
 import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -188,11 +188,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!Object.keys(updates).length)
     return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
 
-  // When frequency changes, always recalculate next_occurrence_date from today
-  // unless the caller explicitly supplied a new date (e.g. user edited it manually).
-  if (updates.frequency && typeof updates.frequency === 'string' && !('next_occurrence_date' in updates)) {
-    const today = new Date().toISOString().split('T')[0]
-    updates.next_occurrence_date = nextOccurrence(updates.frequency as string, today)
+  // When frequency changes, normalize the granular value (e.g. weekly_fri → weekly)
+  // before writing to the DB column, which only accepts the base enum values.
+  // Recalculate next_occurrence_date from today using the granular value (so the
+  // correct weekday / day-of-month is respected) unless the caller explicitly
+  // supplied a new date (e.g. the panel pre-computed it or the user edited it).
+  if (updates.frequency && typeof updates.frequency === 'string') {
+    const granularFreq = updates.frequency as string
+    if (!('next_occurrence_date' in updates)) {
+      const today = new Date().toISOString().split('T')[0]
+      updates.next_occurrence_date = nextOccurrence(granularFreq, today)
+    }
+    updates.frequency = normalizeFrequency(granularFreq)
   }
 
   // Merge custom_fields rather than overwrite — preserve existing flags (_ca_compliance, etc.)
