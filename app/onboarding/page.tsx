@@ -1,11 +1,13 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Zap, Building2, Users, Phone, ChevronRight, CheckCircle, UserCircle2, KeyRound, PlusCircle } from 'lucide-react'
+import { Zap, Building2, Users, Phone, ChevronRight, CheckCircle, UserCircle2, KeyRound, PlusCircle, Megaphone } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 const INDUSTRIES = ['Technology','Finance','Healthcare','Education','E-commerce','Marketing','Consulting','Real Estate','Manufacturing','Legal','Non-profit','Other']
 const TEAM_SIZES = ['Just me','2–5','6–15','16–50','51–200','200+']
+const HOW_DID_YOU_HEAR = ['Google Search','LinkedIn','Friend / Colleague','Social Media (Instagram / Facebook)','YouTube / Podcast','Product Hunt','Other']
+const ROLE_OPTIONS = ['Owner / Founder','CA / CPA / Tax Professional','Manager','Team Member / Employee','Other']
 
 type Phase = 'checking' | 'entry' | 'join-code' | 'form' | 'joining' | 'joined'
 
@@ -23,13 +25,15 @@ export default function OnboardingPage() {
   const [joinCode,   setJoinCode]   = useState('')
 
   const [form, setForm] = useState({
-    name:          '',
-    email:         '',
-    phone:         '',
-    org_name:      '',
-    industry:      '',
-    team_size:     '',
-    referral_code: '',
+    name:              '',
+    email:             '',
+    phone:             '',
+    org_name:          '',
+    industry:          '',
+    team_size:         '',
+    referral_code:     '',
+    how_did_you_hear:  '',
+    role_title:        '',
   })
 
   function set(k: string, v: string) { setForm(f => ({ ...f, [k]: v })) }
@@ -140,12 +144,14 @@ export default function OnboardingPage() {
       const res = await fetch('/api/onboarding', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name:          form.name.trim(),
-          org_name:      form.org_name,
-          industry:      form.industry,
-          team_size:     form.team_size,
-          phone:         form.phone || null,
-          referral_code: form.referral_code.trim() || null,
+          name:             form.name.trim(),
+          org_name:         form.org_name,
+          industry:         form.industry,
+          team_size:        form.team_size,
+          phone:            form.phone || null,
+          referral_code:    form.referral_code.trim() || null,
+          how_did_you_hear: form.how_did_you_hear || null,
+          role_title:       form.role_title || null,
         }),
       })
       const data = await res.json()
@@ -308,8 +314,8 @@ export default function OnboardingPage() {
   }
 
   /* ── Main onboarding form ───────────────────────────────────────── */
-  // Invited users only see step 0; fresh signup sees steps 0–3
-  const totalSteps = inviteData ? 1 : 4
+  // Invited users only see step 0; fresh signup sees steps 0–4
+  const totalSteps = inviteData ? 1 : 5
   const progressStep = inviteData ? 1 : step + 1
 
   return (
@@ -495,27 +501,63 @@ export default function OnboardingPage() {
             </>
           )}
 
-          {/* ── Step 3: Phone (fresh signup only — org phone preference) ── */}
+          {/* ── Step 3: Marketing questions ── */}
           {step === 3 && (
+            <>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="h-10 w-10 rounded-xl bg-teal-50 flex items-center justify-center">
+                  <Megaphone className="h-5 w-5 text-teal-600"/>
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">Almost there!</h2>
+                  <p className="text-sm text-gray-500">Help us understand you better</p>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">How did you hear about Floatup?</label>
+                  <select value={form.how_did_you_hear} onChange={e => set('how_did_you_hear', e.target.value)} className="input">
+                    <option value="">Select an option</option>
+                    {HOW_DID_YOU_HEAR.map(o => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">What best describes your role?</label>
+                  <select value={form.role_title} onChange={e => set('role_title', e.target.value)} className="input">
+                    <option value="">Select your role</option>
+                    {ROLE_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="flex gap-3 mt-6">
+                <button onClick={() => setStep(2)} className="btn btn-outline flex-1">Back</button>
+                <button onClick={() => setStep(4)} className="btn btn-brand flex-1 flex items-center justify-center gap-2">
+                  Continue <ChevronRight className="h-4 w-4"/>
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* ── Step 4: Summary / confirm ── */}
+          {step === 4 && (
             <>
               <div className="flex items-center gap-3 mb-6">
                 <div className="h-10 w-10 rounded-xl bg-teal-50 flex items-center justify-center">
                   <Phone className="h-5 w-5 text-teal-600"/>
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-gray-900">Almost done!</h2>
+                  <h2 className="text-lg font-bold text-gray-900">All set!</h2>
                   <p className="text-sm text-gray-500">Confirm your details before we launch</p>
                 </div>
               </div>
               {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>}
-              {/* Summary of collected profile */}
               <div className="mb-5 p-3 bg-gray-50 rounded-xl space-y-1.5 text-sm">
                 <div className="flex gap-2"><span className="text-gray-400 w-12 shrink-0">Name</span><span className="font-medium text-gray-800 truncate">{form.name}</span></div>
                 <div className="flex gap-2"><span className="text-gray-400 w-12 shrink-0">Email</span><span className="text-gray-600 truncate">{form.email}</span></div>
                 {form.phone && <div className="flex gap-2"><span className="text-gray-400 w-12 shrink-0">Phone</span><span className="text-gray-600">{form.phone}</span></div>}
               </div>
               <div className="flex gap-3 mt-2">
-                <button onClick={() => setStep(2)} className="btn btn-outline flex-1">Back</button>
+                <button onClick={() => setStep(3)} className="btn btn-outline flex-1">Back</button>
                 <button onClick={handleSubmit} disabled={saving} className="btn btn-brand flex-1">
                   {saving ? 'Setting up…' : 'Launch Floatup 🚀'}
                 </button>

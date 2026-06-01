@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
     const body = await request.json()
-    const { name, org_name, industry, team_size, phone, referral_code: rawReferralCode } = body
+    const { name, org_name, industry, team_size, phone, referral_code: rawReferralCode, how_did_you_hear, role_title } = body
     if (!org_name?.trim()) return NextResponse.json({ error: 'Organisation name required' }, { status: 400 })
 
     // ── Phone validation (required for org creators — identity anchor) ────────
@@ -121,6 +121,9 @@ export async function POST(request: NextRequest) {
       referral_code: orgReferralCode,
       join_code: orgJoinCode,
       industry: industry || null, team_size: team_size || null,
+      marketing_data: (how_did_you_hear || role_title)
+        ? { how_did_you_hear: how_did_you_hear || null, role_title: role_title || null }
+        : null,
     }).select('id').single()
     if (orgErr) return NextResponse.json(dbError(orgErr, 'onboarding'), { status: 500 })
 
