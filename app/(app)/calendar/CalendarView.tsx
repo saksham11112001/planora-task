@@ -8,7 +8,8 @@ import type { Task } from '@/types'
 
 interface CalTask {
   id: string; title: string; status: string; priority: string
-  due_date: string; is_recurring: boolean; project_id: string | null
+  due_date: string; is_recurring: boolean; parent_task_id?: string | null
+  project_id: string | null
   assignee_id: string | null; frequency: string | null; client_id?: string | null
   custom_fields?: Record<string, any> | null
   projects: { id: string; name: string; color: string } | null
@@ -47,21 +48,24 @@ const MONTH_NAMES = ['January','February','March','April','May','June','July','A
 const DAY_HEAT = ['','rgba(13,148,136,0.08)','rgba(13,148,136,0.16)','rgba(13,148,136,0.24)','rgba(13,148,136,0.34)']
 
 /* ── Type-based color coding (matches InboxView / MyTasksView) ── */
+function isRecurringRelated(t: CalTask): boolean {
+  return t.is_recurring || !!t.parent_task_id
+}
 function taskTypeBorder(t: CalTask): string {
   if (t.custom_fields?._ca_compliance) return '#d97706'   // amber — compliance
-  if (t.is_recurring)                  return '#0d9488'   // teal  — recurring
+  if (isRecurringRelated(t))           return '#0d9488'   // teal  — recurring / spawned instance
   if (t.project_id)                    return '#7c3aed'   // purple — project
   return '#0891b2'                                        // cyan  — one-time
 }
 function taskTypeBg(t: CalTask): string {
   if (t.custom_fields?._ca_compliance) return 'rgba(234,179,8,0.10)'
-  if (t.is_recurring)                  return 'rgba(13,148,136,0.08)'
+  if (isRecurringRelated(t))           return 'rgba(13,148,136,0.08)'
   if (t.project_id)                    return 'rgba(124,58,237,0.08)'
   return 'rgba(8,145,178,0.07)'
 }
 function taskTypeDot(t: CalTask): string {
   if (t.custom_fields?._ca_compliance) return '#d97706'
-  if (t.is_recurring)                  return '#0d9488'
+  if (isRecurringRelated(t))           return '#0d9488'
   if (t.project_id)                    return t.projects?.color ?? '#7c3aed'
   return '#0891b2'
 }
@@ -148,7 +152,7 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
     if (filter==='compliance') return !!t.custom_fields?._ca_compliance
     if (filter==='project')    return !!t.project_id && !t.is_recurring
     if (filter==='one-time')   return !t.project_id && !t.is_recurring && !t.custom_fields?._ca_compliance
-    if (filter==='recurring')  return t.is_recurring && !t.custom_fields?._ca_compliance
+    if (filter==='recurring')  return isRecurringRelated(t) && !t.custom_fields?._ca_compliance
     return true
   }).filter(t => {
     if (clientFilter.length > 0 && !clientFilter.includes((t as any).client?.id ?? '')) return false
@@ -358,7 +362,7 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
         Compliance
       </span>
       <span style={{ display:'flex',alignItems:'center',gap:4 }}>
-        <RefreshCw style={{ width:10,height:10,color:'#ea580c' }}/> Recurring
+        <RefreshCw style={{ width:10,height:10,color:'#0d9488' }}/> Recurring (dashed = upcoming)
       </span>
       <span style={{ display:'flex',alignItems:'center',gap:4 }}>
         <AlertTriangle style={{ width:10,height:10,color:'#dc2626' }}/> Overdue
@@ -419,17 +423,18 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
                     {dayTasks.length === 0 ? (
                       <div style={{ fontSize:11, color:'var(--text-muted)', textAlign:'center', padding:'12px 0', opacity:0.5 }}>—</div>
                     ) : dayTasks.map(t => {
-                      const borderClr = taskTypeBorder(t)
-                      const bgClr     = taskTypeBg(t)
-                      const isDone    = t.status === 'completed'
+                      const borderClr  = taskTypeBorder(t)
+                      const bgClr      = taskTypeBg(t)
+                      const isDone     = t.status === 'completed'
+                      const isFutureRecurring = t.is_recurring && !t.parent_task_id && dateStr > todayStr
                       return (
                         <button key={t.id} onClick={() => openTask(t)}
                           style={{ display:'block', textAlign:'left', width:'100%', padding:'6px 8px',
                             borderRadius:6, cursor:'pointer', fontFamily:'inherit',
-                            background: bgClr,
-                            border:`1px solid ${borderClr}55`,
-                            borderLeft:`3px solid ${borderClr}`,
-                            opacity: isDone ? 0.72 : 1,
+                            background: isFutureRecurring ? `${bgClr}` : bgClr,
+                            border: isFutureRecurring ? `1px dashed ${borderClr}88` : `1px solid ${borderClr}55`,
+                            borderLeft: isFutureRecurring ? `3px dashed ${borderClr}` : `3px solid ${borderClr}`,
+                            opacity: isDone ? 0.72 : isFutureRecurring ? 0.7 : 1,
                             transition:'all 0.1s' }}
                           onMouseEnter={e => { (e.currentTarget as any).style.boxShadow='0 2px 8px rgba(0,0,0,0.1)' }}
                           onMouseLeave={e => { (e.currentTarget as any).style.boxShadow='' }}>
@@ -451,7 +456,8 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
                                 {t.projects.name.length > 10 ? t.projects.name.slice(0,10)+'…' : t.projects.name}
                               </span>
                             )}
-                            {t.is_recurring && <RefreshCw style={{ width:8,height:8,color:'#0d9488',flexShrink:0 }}/>}
+                            {isRecurringRelated(t) && <RefreshCw style={{ width:8,height:8,color:'#0d9488',flexShrink:0 }}/>}
+                            {isFutureRecurring && <span style={{ fontSize:8, color:'#0d9488', fontWeight:600 }}>upcoming</span>}
                             {t.custom_fields?._ca_compliance && (
                               <span style={{ fontSize:9, fontWeight:700, color:'#d97706' }}>CA</span>
                             )}
@@ -546,8 +552,8 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
             <span style={{ width:8,height:8,borderRadius:2,background:'rgba(234,179,8,0.25)',border:'1px solid rgba(234,179,8,0.3)',display:'inline-block' }}/>Compliance
           </span>
           <span style={{ display:'flex', alignItems:'center', gap:3 }}>
-            <span style={{ width:8,height:8,borderRadius:2,background:'rgba(13,148,136,0.25)',border:'1px solid rgba(13,148,136,0.3)',display:'inline-block' }}/>
-            <RefreshCw style={{ width:9,height:9,color:'#0d9488' }}/> Recurring
+            <span style={{ width:8,height:8,borderRadius:2,background:'rgba(13,148,136,0.25)',border:'1px dashed rgba(13,148,136,0.5)',display:'inline-block' }}/>
+            <RefreshCw style={{ width:9,height:9,color:'#0d9488' }}/> Recurring (dashed = upcoming)
           </span>
         </div>
       </div>
@@ -625,13 +631,14 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
                   const dotClr = taskTypeDot(t)
                   const bgClr  = taskTypeBg(t)
                   const isDone = t.status==='completed'
+                  const isFutureRec = t.is_recurring && !t.parent_task_id && dateStr > todayStr
                   return (
                     <div key={t.id} style={{ display:'flex',alignItems:'center',gap:3,
                       padding:'2px 5px',borderRadius:5,marginBottom:2,
                       background: bgClr,
-                      border:`1px solid ${dotClr}44`,
-                      borderLeft:`2px solid ${dotClr}`,
-                      opacity: isDone ? 0.68 : 1,
+                      border: isFutureRec ? `1px dashed ${dotClr}66` : `1px solid ${dotClr}44`,
+                      borderLeft: isFutureRec ? `2px dashed ${dotClr}` : `2px solid ${dotClr}`,
+                      opacity: isDone ? 0.68 : isFutureRec ? 0.65 : 1,
                       overflow:'hidden' }}>
                       <span style={{ width:5,height:5,borderRadius:'50%',background:dotClr,flexShrink:0 }}/>
                       <span style={{ fontSize:9,fontWeight:500,
@@ -640,7 +647,7 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
                         textDecoration:isDone?'line-through':undefined }}>
                         {t.title}
                       </span>
-                      {t.is_recurring&&<RefreshCw style={{width:7,height:7,color:'#0d9488',flexShrink:0}}/>}
+                      {isRecurringRelated(t)&&<RefreshCw style={{width:7,height:7,color:'#0d9488',flexShrink:0}}/>}
                       {t.custom_fields?._ca_compliance&&<span style={{fontSize:7,fontWeight:700,color:'#d97706',flexShrink:0}}>CA</span>}
                     </div>
                   )
@@ -743,9 +750,10 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
                             <span style={{ width:5,height:5,borderRadius:'50%',background:STATUS_DOT[t.status]??'#94a3b8',display:'inline-block' }}/>
                             {t.status.replace('_',' ')}
                           </span>
-                          {t.is_recurring&&(
+                          {isRecurringRelated(t)&&(
                             <span style={{ display:'inline-flex',alignItems:'center',gap:3,fontSize:10,color:'#0d9488' }}>
-                              <RefreshCw style={{ width:9,height:9 }}/> Recurring
+                              <RefreshCw style={{ width:9,height:9 }}/>
+                              {t.is_recurring && !t.parent_task_id && selected > todayStr ? 'Upcoming' : 'Recurring'}
                             </span>
                           )}
                           {t.assignee&&(
