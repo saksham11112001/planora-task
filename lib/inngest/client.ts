@@ -42,6 +42,16 @@ export type FloatupEvents = {
       assignee_email: string; assignee_phone?: string | null; org_name: string
     }
   }
+  'user/welcome': {
+    data: {
+      userId:    string
+      userEmail: string
+      userName:  string
+      orgName:   string
+      orgId:     string
+      trialDays: number
+    }
+  }
   'reminders/daily-check': { data: { triggered_at: string } }
   'recurring/daily-spawn':  { data: { triggered_at: string } }
   'client/document-uploaded': {
