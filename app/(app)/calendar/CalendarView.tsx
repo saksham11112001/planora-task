@@ -8,7 +8,9 @@ import type { Task } from '@/types'
 
 interface CalTask {
   id: string; title: string; status: string; priority: string
-  due_date: string; is_recurring: boolean; parent_task_id?: string | null
+  due_date: string; is_recurring: boolean
+  parent_task_id?: string | null
+  parent_recurring_id?: string | null   // set by recurringSpawn on spawned instances
   project_id: string | null
   assignee_id: string | null; frequency: string | null; client_id?: string | null
   custom_fields?: Record<string, any> | null
@@ -49,7 +51,9 @@ const DAY_HEAT = ['','rgba(13,148,136,0.08)','rgba(13,148,136,0.16)','rgba(13,14
 
 /* ── Type-based color coding (matches InboxView / MyTasksView) ── */
 function isRecurringRelated(t: CalTask): boolean {
-  return t.is_recurring || !!t.parent_task_id
+  // is_recurring=true  → it's a recurring template
+  // parent_recurring_id set → it's a spawned instance (set by recurringSpawn)
+  return t.is_recurring || !!t.parent_recurring_id
 }
 function taskTypeBorder(t: CalTask): string {
   if (t.custom_fields?._ca_compliance) return '#d97706'   // amber — compliance
