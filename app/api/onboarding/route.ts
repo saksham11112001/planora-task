@@ -212,6 +212,25 @@ export async function POST(request: NextRequest) {
     // Create default workspace
     await admin.from('workspaces').insert({ org_id: org.id, name: 'My workspace', color: '#0d9488', is_default: true, created_by: user.id })
 
+    // Fire welcome email sequence (welcome now + day-2 follow-up via Inngest)
+    try {
+      const { inngest: inngestClient } = await import('@/lib/inngest/client')
+      await inngestClient.send({
+        name: 'user/welcome',
+        data: {
+          userId:    user.id,
+          userEmail: user.email ?? '',
+          userName:  resolvedName,
+          orgName:   org_name.trim(),
+          orgId:     org.id,
+          trialDays: isFirstOrg ? 14 : 0,
+        },
+      })
+    } catch (e) {
+      // Non-fatal — don't fail org creation if Inngest is unavailable
+      console.error('[onboarding] Failed to fire user/welcome event:', e)
+    }
+
     return NextResponse.json({ success: true, org_id: org.id }, { status: 201 })
   } catch (err: any) {
     return NextResponse.json(dbError(err, 'onboarding'), { status: 500 })

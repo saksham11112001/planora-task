@@ -1,4 +1,6 @@
 import { resend, FROM }           from './resend'
+import { welcomeEmailHtml, welcomeEmailSubject, day2EmailHtml, day2EmailSubject } from './templates/welcomeEmail'
+import { trialExpiringSoonHtml, trialExpiringSoonSubject, trialExpiredHtml, trialExpiredSubject } from './templates/trialEmail'
 import { taskAssignedHtml, taskAssignedText }     from './templates/taskAssigned'
 import { taskDueSoonHtml, taskDueSoonText }       from './templates/taskDueSoon'
 import { approvalRequestedHtml, approvalResultHtml } from './templates/approvalEmail'
@@ -175,5 +177,49 @@ export async function sendEscalationEmail(p: {
     from: FROM, to: p.to,
     subject: `🚨 Escalation: "${p.taskTitle}" is ${p.daysOverdue} day${p.daysOverdue===1?'':'s'} overdue`,
     html: escalationAlertHtml({ ...p, taskUrl: url }),
+  })
+}
+// ── Welcome email (sent on org creation) ─────────────────────────────────
+export async function sendWelcomeEmail(p: {
+  to: string; userName: string; orgName: string; trialDays?: number
+}) {
+  return resend.emails.send({
+    from: FROM, to: p.to,
+    subject: welcomeEmailSubject({ userName: p.userName }),
+    html:    welcomeEmailHtml({ ...p, appUrl: APP_URL }),
+  })
+}
+
+// ── Day-2 follow-up email ─────────────────────────────────────────────────
+export async function sendDay2Email(p: {
+  to: string; userName: string; orgName: string
+}) {
+  return resend.emails.send({
+    from: FROM, to: p.to,
+    subject: day2EmailSubject(),
+    html:    day2EmailHtml({ ...p, appUrl: APP_URL }),
+  })
+}
+
+// ── Trial expiring soon email ─────────────────────────────────────────────
+export async function sendTrialExpiringSoonEmail(p: {
+  to: string; userName: string; orgName: string
+  trialEndsAt: string; daysLeft: number
+}) {
+  return resend.emails.send({
+    from: FROM, to: p.to,
+    subject: trialExpiringSoonSubject({ daysLeft: p.daysLeft }),
+    html:    trialExpiringSoonHtml({ ...p, appUrl: APP_URL }),
+  })
+}
+
+// ── Trial expired email ───────────────────────────────────────────────────
+export async function sendTrialExpiredEmail(p: {
+  to: string; userName: string; orgName: string
+}) {
+  return resend.emails.send({
+    from: FROM, to: p.to,
+    subject: trialExpiredSubject(),
+    html:    trialExpiredHtml({ ...p, appUrl: APP_URL }),
   })
 }
