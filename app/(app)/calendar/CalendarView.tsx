@@ -429,8 +429,9 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
                     ) : dayTasks.map(t => {
                       const borderClr  = taskTypeBorder(t)
                       const bgClr      = taskTypeBg(t)
-                      const isDone     = t.status === 'completed'
                       const isFutureRecurring = t.is_recurring && !t.parent_task_id && dateStr > todayStr
+                      const displayStatus = isFutureRecurring ? 'todo' : t.status
+                      const isDone     = displayStatus === 'completed'
                       return (
                         <button key={t.id} onClick={() => openTask(t)}
                           style={{ display:'block', textAlign:'left', width:'100%', padding:'6px 8px',
@@ -472,8 +473,8 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
                             )}
                             <span style={{ marginLeft:'auto', fontSize:9, padding:'1px 5px', borderRadius:4,
                               background: isDone ? 'rgba(22,163,74,0.15)' : 'var(--surface-subtle)',
-                              color: STATUS_DOT[t.status] ?? '#94a3b8', fontWeight:500 }}>
-                              {t.status.replace('_',' ')}
+                              color: STATUS_DOT[displayStatus] ?? '#94a3b8', fontWeight:500 }}>
+                              {displayStatus.replace('_',' ')}
                             </span>
                           </div>
                         </button>
@@ -634,8 +635,8 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
                 {dayTasks.slice(0,3).map((t) => {
                   const dotClr = taskTypeDot(t)
                   const bgClr  = taskTypeBg(t)
-                  const isDone = t.status==='completed'
                   const isFutureRec = t.is_recurring && !t.parent_task_id && dateStr > todayStr
+                  const isDone = (isFutureRec ? 'todo' : t.status) === 'completed'
                   return (
                     <div key={t.id} style={{ display:'flex',alignItems:'center',gap:3,
                       padding:'2px 5px',borderRadius:5,marginBottom:2,
@@ -709,6 +710,8 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
                     const bgClr     = taskTypeBg(t)
                     const priClr    = PRIORITY_COLORS[t.priority]??'#94a3b8'
                     const priBg     = PRIORITY_BG[t.priority]??'#f8fafc'
+                    const isFutureRecurring = t.is_recurring && !t.parent_task_id && selected > todayStr
+                    const displayStatus = isFutureRecurring ? 'todo' : t.status
                     return (
                       <button key={t.id} onClick={() => openTask(t)}
                         style={{ display:'block',textAlign:'left',width:'100%',padding:'12px 14px',
@@ -721,8 +724,8 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
                         onMouseLeave={e=>{(e.currentTarget as any).style.boxShadow='';(e.currentTarget as any).style.transform=''}}>
                         <div style={{ display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:8,marginBottom:6 }}>
                           <p style={{ fontSize:13,fontWeight:500,
-                            color:t.status==='completed'?'var(--text-muted)':'var(--text-primary)',
-                            textDecoration:t.status==='completed'?'line-through':undefined,flex:1,lineHeight:1.4,margin:0 }}>
+                            color:displayStatus==='completed'?'var(--text-muted)':'var(--text-primary)',
+                            textDecoration:displayStatus==='completed'?'line-through':undefined,flex:1,lineHeight:1.4,margin:0 }}>
                             {t.title}
                           </p>
                           <span style={{ fontSize:10,padding:'2px 7px',borderRadius:99,flexShrink:0,
@@ -749,10 +752,10 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
                           )}
                           <span style={{ display:'inline-flex',alignItems:'center',gap:3,fontSize:10,
                             padding:'1px 6px',borderRadius:4,
-                            background:t.status==='completed'?'rgba(22,163,74,0.1)':t.status==='in_review'?'rgba(124,58,237,0.1)':'var(--surface-subtle)',
-                            color:STATUS_DOT[t.status]??'#94a3b8',fontWeight:500 }}>
-                            <span style={{ width:5,height:5,borderRadius:'50%',background:STATUS_DOT[t.status]??'#94a3b8',display:'inline-block' }}/>
-                            {t.status.replace('_',' ')}
+                            background:displayStatus==='completed'?'rgba(22,163,74,0.1)':displayStatus==='in_review'?'rgba(124,58,237,0.1)':'var(--surface-subtle)',
+                            color:STATUS_DOT[displayStatus]??'#94a3b8',fontWeight:500 }}>
+                            <span style={{ width:5,height:5,borderRadius:'50%',background:STATUS_DOT[displayStatus]??'#94a3b8',display:'inline-block' }}/>
+                            {displayStatus.replace('_',' ')}
                           </span>
                           {isRecurringRelated(t)&&(
                             <span style={{ display:'inline-flex',alignItems:'center',gap:3,fontSize:10,color:'#0d9488' }}>
