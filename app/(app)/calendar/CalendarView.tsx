@@ -150,8 +150,8 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
 
   const filtered = tasks.filter(t => {
     if (filter==='compliance') return !!t.custom_fields?._ca_compliance
-    if (filter==='project')    return !!t.project_id && !t.is_recurring
-    if (filter==='one-time')   return !t.project_id && !t.is_recurring && !t.custom_fields?._ca_compliance
+    if (filter==='project')    return !!t.project_id && !isRecurringRelated(t)
+    if (filter==='one-time')   return !t.project_id && !isRecurringRelated(t) && !t.custom_fields?._ca_compliance
     if (filter==='recurring')  return isRecurringRelated(t) && !t.custom_fields?._ca_compliance
     return true
   }).filter(t => {
