@@ -168,6 +168,15 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
   const winStart = `${year}-${String(month + 1).padStart(2, '0')}-01`
   const winEnd   = `${year}-${String(month + 1).padStart(2, '0')}-${String(new Date(year, month + 1, 0).getDate()).padStart(2, '0')}`
 
+  // Build a set of "templateId__dateStr" for every spawned instance so we can
+  // skip template expansions that are already represented by a real instance.
+  const spawnedCoverage = new Set<string>()
+  filtered.forEach(t => {
+    if (t.parent_recurring_id && t.due_date) {
+      spawnedCoverage.add(`${t.parent_recurring_id}__${t.due_date}`)
+    }
+  })
+
   const byDate: Record<string,CalTask[]> = {}
   filtered.forEach(t => {
     if (!t.due_date) return
@@ -191,10 +200,14 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
       let placed = false
       while (cursor <= winEnd && safety++ < 500) {
         if (cursor >= winStart) {
-          if (!byDate[cursor]) byDate[cursor] = []
-          if (!byDate[cursor].find(x => x.id === t.id)) {
-            byDate[cursor].push(t)
-            placed = true
+          if (!spawnedCoverage.has(`${t.id}__${cursor}`)) {
+            if (!byDate[cursor]) byDate[cursor] = []
+            if (!byDate[cursor].find(x => x.id === t.id)) {
+              byDate[cursor].push(t)
+              placed = true
+            }
+          } else {
+            placed = true // spawned instance covers this date, count as placed
           }
         }
         cursor = nextOccurrence(t.frequency, cursor)
@@ -203,8 +216,10 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
       // Fallback: next_occurrence_date itself lands in the window but the loop somehow
       // missed it (edge-case with large period frequencies like annual/quarterly).
       if (!placed && t.due_date >= winStart && t.due_date <= winEnd) {
-        if (!byDate[t.due_date]) byDate[t.due_date] = []
-        if (!byDate[t.due_date].find(x => x.id === t.id)) byDate[t.due_date].push(t)
+        if (!spawnedCoverage.has(`${t.id}__${t.due_date}`)) {
+          if (!byDate[t.due_date]) byDate[t.due_date] = []
+          if (!byDate[t.due_date].find(x => x.id === t.id)) byDate[t.due_date].push(t)
+        }
       }
     } else {
       if (!byDate[t.due_date]) byDate[t.due_date] = []
