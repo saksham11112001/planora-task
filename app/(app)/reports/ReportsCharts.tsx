@@ -15,6 +15,21 @@ interface EmployeeStat {
   weeklyTrend: { week: string; completed: number; assigned: number }[]
 }
 
+interface ComplianceDayData {
+  date: string
+  addedC: number; completedC: number; noDueDateC: number; overdueC: number
+  addedNC: number; completedNC: number; noDueDateNC: number; overdueNC: number
+}
+
+interface ComplianceSummary {
+  date: string
+  overdueC: number; overdueNC: number
+  noDueDateC: number; noDueDateNC: number
+  addedTodayC: number; addedTodayNC: number
+  completedTodayC: number; completedTodayNC: number
+  pendingC: number; pendingNC: number
+}
+
 interface Props {
   clients?:       { id: string; name: string; color: string }[]
   currentUserId?: string
@@ -25,6 +40,8 @@ interface Props {
   projectData:     { name: string; done: number; total: number; pct: number }[]
   timeByProject:   { name: string; hours: number; color: string }[]
   employeeStats:   EmployeeStat[]
+  complianceDailyData?: ComplianceDayData[]
+  complianceSummary?:   ComplianceSummary
 }
 
 const COLORS = ['#0d9488','#7c3aed','#dc2626','#ca8a04','#0891b2','#16a34a']
@@ -217,8 +234,36 @@ function MetricRow({ label, value, color, bar, barColor }: {
   )
 }
 
-export function ReportsCharts({ dailyData, memberData, priorityData, projectData, timeByProject, employeeStats, currentUserId, userRole, clients = [] }: Props) {
-  const [activeTab,    setActiveTab]    = useState<'overview' | 'team'>('overview')
+function ComplianceTrendChart({ data, title, addedKey, completedKey, noDueDateKey, overdueKey }: {
+  data: ComplianceDayData[]
+  title: string
+  addedKey: 'addedC' | 'addedNC'
+  completedKey: 'completedC' | 'completedNC'
+  noDueDateKey: 'noDueDateC' | 'noDueDateNC'
+  overdueKey: 'overdueC' | 'overdueNC'
+}) {
+  return (
+    <div className="card-elevated p-5">
+      <h3 style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>{title}</h3>
+      <ResponsiveContainer width="100%" height={200}>
+        <LineChart data={data} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9"/>
+          <XAxis dataKey="date" tick={{ fontSize: 9, fill: '#94a3b8' }} tickLine={false} axisLine={false}/>
+          <YAxis tick={{ fontSize: 9, fill: '#94a3b8' }} tickLine={false} axisLine={false} allowDecimals={false}/>
+          <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid var(--border)' }}/>
+          <Legend wrapperStyle={{ fontSize: 11 }}/>
+          <Line type="monotone" dataKey={addedKey}      stroke="#0891b2" strokeWidth={2} dot={false} name="Added Today"/>
+          <Line type="monotone" dataKey={completedKey}  stroke="#dc2626" strokeWidth={2} dot={false} name="Completed Today"/>
+          <Line type="monotone" dataKey={noDueDateKey}  stroke="#16a34a" strokeWidth={2} dot={false} name="No Due Date"/>
+          <Line type="monotone" dataKey={overdueKey}    stroke="#7c3aed" strokeWidth={2} dot={false} name="Overdue"/>
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+export function ReportsCharts({ dailyData, memberData, priorityData, projectData, timeByProject, employeeStats, currentUserId, userRole, clients = [], complianceDailyData = [], complianceSummary }: Props) {
+  const [activeTab,    setActiveTab]    = useState<'overview' | 'team' | 'compliance'>('overview')
   const [clientFilter, setClientFilter] = useState('')
   const [timeline,     setTimeline]     = useState<'30' | '60' | '90' | '365'>('90')
   const [empFilter,    setEmpFilter]    = useState('')
@@ -275,16 +320,19 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
       )}
       {/* Tab bar */}
       <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 20, background: 'var(--surface)', borderRadius: '8px 8px 0 0' }}>
-        {(['overview', 'team'] as const).map(tab => (
-          <button key={tab} onClick={() => setActiveTab(tab)}
+        {([
+          { v: 'overview',   label: '📊 Overview' },
+          { v: 'team',       label: '👤 Team Performance' },
+          { v: 'compliance', label: '📋 Compliance Report' },
+        ] as const).map(({ v, label }) => (
+          <button key={v} onClick={() => setActiveTab(v)}
             style={{
               padding: '10px 20px', fontSize: 13, fontWeight: 500, border: 'none',
               background: 'transparent', cursor: 'pointer', marginBottom: -1,
-              borderBottom: `2px solid ${activeTab === tab ? 'var(--brand)' : 'transparent'}`,
-              color: activeTab === tab ? 'var(--brand)' : 'var(--text-muted)',
-              textTransform: 'capitalize',
+              borderBottom: `2px solid ${activeTab === v ? 'var(--brand)' : 'transparent'}`,
+              color: activeTab === v ? 'var(--brand)' : 'var(--text-muted)',
             }}>
-            {tab === 'team' ? '👤 Team Performance' : '📊 Overview'}
+            {label}
           </button>
         ))}
       </div>
@@ -380,6 +428,91 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
               }
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── COMPLIANCE REPORT TAB ─────────────────────────── */}
+      {activeTab === 'compliance' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {/* Two trend charts side by side */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <ComplianceTrendChart
+              data={complianceDailyData}
+              title="Compliance — last 14 days"
+              addedKey="addedC" completedKey="completedC"
+              noDueDateKey="noDueDateC" overdueKey="overdueC"
+            />
+            <ComplianceTrendChart
+              data={complianceDailyData}
+              title="Non-Compliance — last 14 days"
+              addedKey="addedNC" completedKey="completedNC"
+              noDueDateKey="noDueDateNC" overdueKey="overdueNC"
+            />
+          </div>
+
+          {/* Today summary */}
+          {complianceSummary && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 16, alignItems: 'start' }}>
+              {/* Summary table */}
+              <div className="card-elevated p-5">
+                <h3 style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 14 }}>
+                  Today's snapshot — {complianceSummary.date}
+                </h3>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ background: 'var(--surface-subtle)' }}>
+                      {['Date', 'Status', 'Compliance', 'Non-Compliance'].map(h => (
+                        <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600,
+                          color: 'var(--text-secondary)', borderBottom: '1px solid var(--border)',
+                          fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      { label: 'Overdue',         color: '#dc2626', bg: '#fef2f2', c: complianceSummary.overdueC,        nc: complianceSummary.overdueNC },
+                      { label: 'No Due Date',      color: '#16a34a', bg: '#f0fdf4', c: complianceSummary.noDueDateC,      nc: complianceSummary.noDueDateNC },
+                      { label: 'Added Today',      color: '#0891b2', bg: '#f0f9ff', c: complianceSummary.addedTodayC,     nc: complianceSummary.addedTodayNC },
+                      { label: 'Completed Today',  color: '#7c3aed', bg: '#f5f3ff', c: complianceSummary.completedTodayC, nc: complianceSummary.completedTodayNC },
+                    ].map((row, i) => (
+                      <tr key={i} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                        <td style={{ padding: '9px 12px', color: 'var(--text-secondary)' }}>{complianceSummary.date}</td>
+                        <td style={{ padding: '9px 12px' }}>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6,
+                            padding: '2px 10px', borderRadius: 99, fontSize: 11, fontWeight: 600,
+                            color: row.color, background: row.bg }}>
+                            {row.label}
+                          </span>
+                        </td>
+                        <td style={{ padding: '9px 12px', fontWeight: 700, color: row.c > 0 ? row.color : 'var(--text-muted)', fontSize: 14, textAlign: 'center' }}>
+                          {row.c}
+                        </td>
+                        <td style={{ padding: '9px 12px', fontWeight: 700, color: row.nc > 0 ? row.color : 'var(--text-muted)', fontSize: 14, textAlign: 'center' }}>
+                          {row.nc}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pending totals box */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 200 }}>
+                <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 12, padding: '20px 24px', textAlign: 'center' }}>
+                  <p style={{ fontSize: 11, fontWeight: 600, color: '#dc2626', textTransform: 'uppercase',
+                    letterSpacing: '0.05em', marginBottom: 6 }}>Compliance Pending</p>
+                  <p style={{ fontSize: 40, fontWeight: 900, color: '#dc2626', lineHeight: 1 }}>{complianceSummary.pendingC}</p>
+                </div>
+                <div style={{ background: '#fff7ed', border: '1px solid #fdba74', borderRadius: 12, padding: '20px 24px', textAlign: 'center' }}>
+                  <p style={{ fontSize: 11, fontWeight: 600, color: '#ea580c', textTransform: 'uppercase',
+                    letterSpacing: '0.05em', marginBottom: 6 }}>Non-Compliance Pending</p>
+                  <p style={{ fontSize: 40, fontWeight: 900, color: '#ea580c', lineHeight: 1 }}>{complianceSummary.pendingNC}</p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
