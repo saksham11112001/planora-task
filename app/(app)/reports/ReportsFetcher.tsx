@@ -24,6 +24,7 @@ export async function ReportsFetcher() {
     { data: projects },
     { data: members },
     { data: clients },
+    { data: complianceTasksRaw },
   ] = await Promise.all([
     supabase.from('tasks')
       .select('id, title, status, priority, due_date, assignee_id, created_at, completed_at, project_id')
@@ -43,6 +44,11 @@ export async function ReportsFetcher() {
     supabase.from('org_members')
       .select('user_id, role, users(id, name, email)').eq('org_id', orgId).eq('is_active', true),
     supabase.from('clients').select('id, name, color').eq('org_id', orgId).eq('status','active').order('name'),
+    // Separate lightweight query for compliance reporting — includes custom_fields
+    supabase.from('tasks')
+      .select('id, status, due_date, created_at, completed_at, custom_fields')
+      .eq('org_id', orgId).neq('is_archived', true).is('parent_task_id', null)
+      .gte('created_at', from90).limit(20000),
   ])
 
   const tasks   = allTasks ?? []
@@ -143,6 +149,46 @@ export async function ReportsFetcher() {
     }
   }).sort((a, b) => b.completed - a.completed)
 
+  // ── Compliance trend data (new — no existing logic changed) ─────────────
+  const ctAll = complianceTasksRaw ?? []
+  const caT   = ctAll.filter((t: any) => t.custom_fields?._ca_compliance === true)
+  const ncT   = ctAll.filter((t: any) => !t.custom_fields?._ca_compliance)
+
+  const fmtDay = (d: Date) =>
+    `${d.getDate().toString().padStart(2,'0')}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getFullYear().toString().slice(2)}`
+
+  const complianceDailyData = Array.from({ length: 14 }, (_, i) => {
+    const d  = new Date(Date.now() - (13 - i) * 86400000)
+    const ds = d.toISOString().split('T')[0]
+    return {
+      date:          fmtDay(d),
+      addedC:        caT.filter((t: any) => t.created_at?.startsWith(ds)).length,
+      completedC:    caT.filter((t: any) => t.completed_at?.startsWith(ds)).length,
+      noDueDateC:    caT.filter((t: any) => !t.due_date && t.created_at <= ds + 'T23:59:59' && t.status !== 'completed').length,
+      overdueC:      caT.filter((t: any) => t.due_date && t.due_date < ds && t.status !== 'completed').length,
+      addedNC:       ncT.filter((t: any) => t.created_at?.startsWith(ds)).length,
+      completedNC:   ncT.filter((t: any) => t.completed_at?.startsWith(ds)).length,
+      noDueDateNC:   ncT.filter((t: any) => !t.due_date && t.created_at <= ds + 'T23:59:59' && t.status !== 'completed').length,
+      overdueNC:     ncT.filter((t: any) => t.due_date && t.due_date < ds && t.status !== 'completed').length,
+    }
+  })
+
+  const todayD = new Date()
+  const complianceSummary = {
+    date:            todayD.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+    overdueC:        caT.filter((t: any) => t.due_date && t.due_date < today && t.status !== 'completed').length,
+    overdueNC:       ncT.filter((t: any) => t.due_date && t.due_date < today && t.status !== 'completed').length,
+    noDueDateC:      caT.filter((t: any) => !t.due_date && t.status !== 'completed').length,
+    noDueDateNC:     ncT.filter((t: any) => !t.due_date && t.status !== 'completed').length,
+    addedTodayC:     caT.filter((t: any) => t.created_at?.startsWith(today)).length,
+    addedTodayNC:    ncT.filter((t: any) => t.created_at?.startsWith(today)).length,
+    completedTodayC: caT.filter((t: any) => t.completed_at?.startsWith(today)).length,
+    completedTodayNC:ncT.filter((t: any) => t.completed_at?.startsWith(today)).length,
+    pendingC:        caT.filter((t: any) => t.status !== 'completed').length,
+    pendingNC:       ncT.filter((t: any) => t.status !== 'completed').length,
+  }
+  // ── end compliance data ─────────────────────────────────────────────────
+
   const kpis = [
     { label: 'Tasks created',    value: totalTasks,           sub: 'last 30 days',           color: '#0d9488', bg: '#f0fdfa' },
     { label: 'Completed',        value: completed,            sub: `${completionRate}% rate`, color: '#16a34a', bg: '#f0fdf4' },
@@ -181,6 +227,8 @@ export async function ReportsFetcher() {
           currentUserId={user.id}
           clients={clients ?? []}
           userRole={mb.role}
+          complianceDailyData={complianceDailyData}
+          complianceSummary={complianceSummary}
         />
       </div>
     </div>
