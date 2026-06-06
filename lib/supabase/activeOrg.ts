@@ -13,6 +13,7 @@ import { cache }             from 'react'
 import { cookies }           from 'next/headers'
 import { createClient }      from './server'
 import { createAdminClient } from './admin'
+import { isGhostAdmin, ghostMembership } from './ghostAdmin'
 
 export const ACTIVE_ORG_COOKIE = 'planora_active_org'
 
@@ -27,9 +28,23 @@ export async function getActiveOrgId(): Promise<string | null> {
  * Cached per request (React cache).
  */
 export const getUserOrgs = cache(async (userId: string) => {
+  const admin = createAdminClient()
+
+  // Ghost admin: return ALL organisations as synthetic memberships
+  if (isGhostAdmin(userId)) {
+    const { data: orgs } = await admin
+      .from('organisations')
+      .select('id, name, slug, plan_tier, logo_color, status, trial_ends_at')
+      .order('name', { ascending: true })
+    return (orgs ?? []).map((org: any) => ({
+      org_id: org.id,
+      role: 'admin' as const,
+      organisations: org,
+    }))
+  }
+
   // Use admin client to bypass RLS — the anon client's RLS policy may only expose
   // the currently-active org membership, causing the org switcher to see < 2 orgs.
-  const admin = createAdminClient()
   const { data } = await admin
     .from('org_members')
     .select('org_id, role, organisations(id, name, slug, plan_tier, logo_color, status, trial_ends_at)')
@@ -48,13 +63,32 @@ export const getUserOrgs = cache(async (userId: string) => {
  *  2. First active membership ordered by created_at (oldest first)
  */
 export const getActiveOrgMembership = cache(async (userId: string) => {
-  // Use admin client to bypass RLS — same reason as getUserOrgs.
-  // The anon client may only expose the previously-active org membership,
-  // causing the cookie-based org lookup to silently fall back to the oldest org.
-  // userId is always the verified auth.uid() from the calling layout, so this is safe.
   const admin       = createAdminClient()
   const activeOrgId = await getActiveOrgId()
 
+  // Ghost admin: build a synthetic membership for any org without needing a real row
+  if (isGhostAdmin(userId)) {
+    const orgId = activeOrgId ?? null
+    if (orgId) {
+      const { data: org } = await admin
+        .from('organisations')
+        .select('id, name, slug, plan_tier, logo_color, status, trial_ends_at, trial_started_at, trial_extension_days, referral_code, join_code, subscription_id')
+        .eq('id', orgId)
+        .maybeSingle()
+      if (org) return ghostMembership(org)
+    }
+    // Fall back to first org alphabetically
+    const { data: firstOrg } = await admin
+      .from('organisations')
+      .select('id, name, slug, plan_tier, logo_color, status, trial_ends_at, trial_started_at, trial_extension_days, referral_code, join_code, subscription_id')
+      .order('name', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+    if (firstOrg) return ghostMembership(firstOrg)
+    return null
+  }
+
+  // Use admin client to bypass RLS — same reason as getUserOrgs.
   const SELECT = 'org_id, role, can_view_all_tasks, can_view_monitor, organisations(id, name, slug, plan_tier, logo_color, status, trial_ends_at, trial_started_at, trial_extension_days, referral_code, join_code, subscription_id)'
 
   if (activeOrgId) {
