@@ -16,7 +16,7 @@ interface EmployeeStat {
 }
 
 interface ComplianceDayData {
-  date: string
+  date: string; dateKey: string
   addedC: number; completedC: number; noDueDateC: number; overdueC: number
   addedNC: number; completedNC: number; noDueDateNC: number; overdueNC: number
 }
@@ -30,6 +30,12 @@ interface ComplianceSummary {
   pendingC: number; pendingNC: number
 }
 
+interface ComplianceRawTask {
+  id: string; status: string; due_date: string | null
+  created_at: string; completed_at: string | null
+  custom_fields: Record<string, any> | null; assignee_id: string | null
+}
+
 interface Props {
   clients?:       { id: string; name: string; color: string }[]
   currentUserId?: string
@@ -40,8 +46,8 @@ interface Props {
   projectData:     { name: string; done: number; total: number; pct: number }[]
   timeByProject:   { name: string; hours: number; color: string }[]
   employeeStats:   EmployeeStat[]
-  complianceDailyData?: ComplianceDayData[]
-  complianceSummary?:   ComplianceSummary
+  complianceRawTasks?:   ComplianceRawTask[]
+  complianceMemberList?: { id: string; name: string }[]
 }
 
 const COLORS = ['#0d9488','#7c3aed','#dc2626','#ca8a04','#0891b2','#16a34a']
@@ -253,21 +259,93 @@ function ComplianceTrendChart({ data, title, addedKey, completedKey, noDueDateKe
           <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid var(--border)' }}/>
           <Legend wrapperStyle={{ fontSize: 11 }}/>
           <Line type="monotone" dataKey={addedKey}      stroke="#0891b2" strokeWidth={2} dot={false} name="Added Today"/>
-          <Line type="monotone" dataKey={completedKey}  stroke="#dc2626" strokeWidth={2} dot={false} name="Completed Today"/>
-          <Line type="monotone" dataKey={noDueDateKey}  stroke="#16a34a" strokeWidth={2} dot={false} name="No Due Date"/>
-          <Line type="monotone" dataKey={overdueKey}    stroke="#7c3aed" strokeWidth={2} dot={false} name="Overdue"/>
+          <Line type="monotone" dataKey={completedKey}  stroke="#16a34a" strokeWidth={2} dot={false} name="Completed Today"/>
+          <Line type="monotone" dataKey={noDueDateKey}  stroke="#64748b" strokeWidth={2} dot={false} name="No Due Date"/>
+          <Line type="monotone" dataKey={overdueKey}    stroke="#dc2626" strokeWidth={2} dot={false} name="Overdue"/>
         </LineChart>
       </ResponsiveContainer>
     </div>
   )
 }
 
-export function ReportsCharts({ dailyData, memberData, priorityData, projectData, timeByProject, employeeStats, currentUserId, userRole, clients = [], complianceDailyData = [], complianceSummary }: Props) {
+// ── Client-side compliance aggregation ──────────────────────────────────────
+function fmtDay(d: Date) {
+  return `${d.getDate().toString().padStart(2,'0')}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getFullYear().toString().slice(2)}`
+}
+
+function buildComplianceData(
+  rawTasks: ComplianceRawTask[],
+  days: number,
+  memberFilter: string,
+): { daily: ComplianceDayData[]; summary: ComplianceSummary } {
+  const filtered = memberFilter
+    ? rawTasks.filter(t => t.assignee_id === memberFilter)
+    : rawTasks
+  const today = new Date().toISOString().split('T')[0]
+  const caT = filtered.filter(t => t.custom_fields?._ca_compliance === true)
+  const ncT = filtered.filter(t => !t.custom_fields?._ca_compliance)
+
+  const daily = Array.from({ length: days }, (_, i) => {
+    const d  = new Date(Date.now() - (days - 1 - i) * 86400000)
+    const ds = d.toISOString().split('T')[0]
+    return {
+      date:       fmtDay(d),
+      dateKey:    ds,
+      addedC:     caT.filter(t => t.created_at?.startsWith(ds)).length,
+      completedC: caT.filter(t => t.completed_at?.startsWith(ds)).length,
+      noDueDateC: caT.filter(t => !t.due_date && t.created_at <= ds+'T23:59:59' && t.status !== 'completed').length,
+      overdueC:   caT.filter(t => t.due_date && t.due_date < ds && t.status !== 'completed').length,
+      addedNC:    ncT.filter(t => t.created_at?.startsWith(ds)).length,
+      completedNC:ncT.filter(t => t.completed_at?.startsWith(ds)).length,
+      noDueDateNC:ncT.filter(t => !t.due_date && t.created_at <= ds+'T23:59:59' && t.status !== 'completed').length,
+      overdueNC:  ncT.filter(t => t.due_date && t.due_date < ds && t.status !== 'completed').length,
+    }
+  })
+
+  const todayD = new Date()
+  const summary: ComplianceSummary = {
+    date:             todayD.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+    overdueC:         caT.filter(t => t.due_date && t.due_date < today && t.status !== 'completed').length,
+    overdueNC:        ncT.filter(t => t.due_date && t.due_date < today && t.status !== 'completed').length,
+    noDueDateC:       caT.filter(t => !t.due_date && t.status !== 'completed').length,
+    noDueDateNC:      ncT.filter(t => !t.due_date && t.status !== 'completed').length,
+    addedTodayC:      caT.filter(t => t.created_at?.startsWith(today)).length,
+    addedTodayNC:     ncT.filter(t => t.created_at?.startsWith(today)).length,
+    completedTodayC:  caT.filter(t => t.completed_at?.startsWith(today)).length,
+    completedTodayNC: ncT.filter(t => t.completed_at?.startsWith(today)).length,
+    pendingC:         caT.filter(t => t.status !== 'completed').length,
+    pendingNC:        ncT.filter(t => t.status !== 'completed').length,
+  }
+  return { daily, summary }
+}
+// ────────────────────────────────────────────────────────────────────────────
+
+export function ReportsCharts({ dailyData, memberData, priorityData, projectData, timeByProject, employeeStats, currentUserId, userRole, clients = [], complianceRawTasks = [], complianceMemberList = [] }: Props) {
   const [activeTab,    setActiveTab]    = useState<'overview' | 'team' | 'compliance'>('overview')
   const [clientFilter, setClientFilter] = useState('')
   const [timeline,     setTimeline]     = useState<'30' | '60' | '90' | '365'>('90')
   const [empFilter,    setEmpFilter]    = useState('')
+
+  // Compliance filters
+  const today90From = new Date(Date.now() - 89 * 86400000).toISOString().split('T')[0]
+  const todayStr    = new Date().toISOString().split('T')[0]
+  const [compDateFrom,   setCompDateFrom]   = useState(today90From)
+  const [compDateTo,     setCompDateTo]     = useState(todayStr)
+  const [compMember,     setCompMember]     = useState('')
+
   const canViewAll = !userRole || ['owner','admin','manager'].includes(userRole)
+
+  // Compute compliance data reactively based on filters
+  const compDays = Math.max(1, Math.round(
+    (new Date(compDateTo).getTime() - new Date(compDateFrom).getTime()) / 86400000
+  ) + 1)
+  const { daily: rawCompDaily, summary: complianceSummary } = buildComplianceData(
+    complianceRawTasks, compDays, compMember
+  )
+  // Slice to requested date window
+  const complianceDailyData = rawCompDaily.filter(
+    d => d.dateKey >= compDateFrom && d.dateKey <= compDateTo
+  )
 
   // Role-based member list: members/viewers see only themselves
   // Timeline filter: slice weeklyTrend to match selected days
@@ -434,25 +512,102 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
       {/* ── COMPLIANCE REPORT TAB ─────────────────────────── */}
       {activeTab === 'compliance' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+          {/* Filter toolbar */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+            background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10,
+            padding: '12px 16px' }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>Filter:</span>
+
+            {/* Date from */}
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
+              From
+              <input type="date" value={compDateFrom} max={compDateTo}
+                onChange={e => setCompDateFrom(e.target.value)}
+                style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)',
+                  fontSize: 12, fontFamily: 'inherit', background: 'var(--surface-subtle)',
+                  color: 'var(--text-primary)', cursor: 'pointer', outline: 'none' }}/>
+            </label>
+
+            {/* Date to */}
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
+              To
+              <input type="date" value={compDateTo} min={compDateFrom}
+                onChange={e => setCompDateTo(e.target.value)}
+                style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)',
+                  fontSize: 12, fontFamily: 'inherit', background: 'var(--surface-subtle)',
+                  color: 'var(--text-primary)', cursor: 'pointer', outline: 'none' }}/>
+            </label>
+
+            {/* Quick range buttons */}
+            <div style={{ display: 'flex', gap: 4 }}>
+              {([
+                { label: '14d', days: 14 },
+                { label: '30d', days: 30 },
+                { label: '90d', days: 90 },
+              ] as const).map(({ label, days }) => {
+                const from = new Date(Date.now() - (days - 1) * 86400000).toISOString().split('T')[0]
+                const active = compDateFrom === from && compDateTo === todayStr
+                return (
+                  <button key={label}
+                    onClick={() => { setCompDateFrom(from); setCompDateTo(todayStr) }}
+                    style={{ padding: '4px 10px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                      fontSize: 11, fontWeight: 500, fontFamily: 'inherit',
+                      background: active ? 'var(--brand)' : 'var(--surface-subtle)',
+                      color: active ? '#fff' : 'var(--text-secondary)' }}>
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Separator */}
+            <div style={{ width: 1, height: 20, background: 'var(--border)', flexShrink: 0 }}/>
+
+            {/* Team member filter */}
+            {complianceMemberList.length > 0 && (
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
+                Member
+                <select value={compMember} onChange={e => setCompMember(e.target.value)}
+                  style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border)',
+                    fontSize: 12, fontFamily: 'inherit', background: 'var(--surface-subtle)',
+                    color: compMember ? 'var(--brand)' : 'var(--text-secondary)',
+                    fontWeight: compMember ? 600 : 400, cursor: 'pointer', outline: 'none',
+                    appearance: 'none', paddingRight: 18 }}>
+                  <option value=''>All members</option>
+                  {complianceMemberList.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+              </label>
+            )}
+
+            {/* Clear */}
+            {(compMember || compDateFrom !== today90From || compDateTo !== todayStr) && (
+              <button onClick={() => { setCompMember(''); setCompDateFrom(today90From); setCompDateTo(todayStr) }}
+                style={{ fontSize: 11, color: 'var(--text-muted)', background: 'none', border: 'none',
+                  cursor: 'pointer', marginLeft: 4 }}>
+                ✕ Reset
+              </button>
+            )}
+          </div>
+
           {/* Two trend charts side by side */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             <ComplianceTrendChart
               data={complianceDailyData}
-              title="Compliance — last 14 days"
+              title={`Compliance${compMember ? ` — ${complianceMemberList.find(m=>m.id===compMember)?.name ?? ''}` : ''}`}
               addedKey="addedC" completedKey="completedC"
               noDueDateKey="noDueDateC" overdueKey="overdueC"
             />
             <ComplianceTrendChart
               data={complianceDailyData}
-              title="Non-Compliance — last 14 days"
+              title={`Non-Compliance${compMember ? ` — ${complianceMemberList.find(m=>m.id===compMember)?.name ?? ''}` : ''}`}
               addedKey="addedNC" completedKey="completedNC"
               noDueDateKey="noDueDateNC" overdueKey="overdueNC"
             />
           </div>
 
           {/* Today summary */}
-          {complianceSummary && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 16, alignItems: 'start' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 16, alignItems: 'start' }}>
               {/* Summary table */}
               <div className="card-elevated p-5">
                 <h3 style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 14 }}>
@@ -473,9 +628,9 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
                   <tbody>
                     {[
                       { label: 'Overdue',         color: '#dc2626', bg: '#fef2f2', c: complianceSummary.overdueC,        nc: complianceSummary.overdueNC },
-                      { label: 'No Due Date',      color: '#16a34a', bg: '#f0fdf4', c: complianceSummary.noDueDateC,      nc: complianceSummary.noDueDateNC },
+                      { label: 'No Due Date',      color: '#64748b', bg: '#f8fafc', c: complianceSummary.noDueDateC,      nc: complianceSummary.noDueDateNC },
                       { label: 'Added Today',      color: '#0891b2', bg: '#f0f9ff', c: complianceSummary.addedTodayC,     nc: complianceSummary.addedTodayNC },
-                      { label: 'Completed Today',  color: '#7c3aed', bg: '#f5f3ff', c: complianceSummary.completedTodayC, nc: complianceSummary.completedTodayNC },
+                      { label: 'Completed Today',  color: '#16a34a', bg: '#f0fdf4', c: complianceSummary.completedTodayC, nc: complianceSummary.completedTodayNC },
                     ].map((row, i) => (
                       <tr key={i} style={{ borderBottom: '1px solid var(--border-light)' }}>
                         <td style={{ padding: '9px 12px', color: 'var(--text-secondary)' }}>{complianceSummary.date}</td>
@@ -512,7 +667,6 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
                 </div>
               </div>
             </div>
-          )}
         </div>
       )}
 
