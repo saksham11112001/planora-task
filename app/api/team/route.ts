@@ -6,6 +6,7 @@ import { assertCan }         from '@/lib/utils/permissionGate'
 import { effectivePlan, isAtMemberLimit, memberLimit } from '@/lib/utils/planGate'
 import { dbError } from '@/lib/api-error'
 import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
+import { isGhostAdmin }      from '@/lib/supabase/ghostAdmin'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://floatup.app'
 
@@ -21,7 +22,9 @@ export async function GET(request: NextRequest) {
     .select('id, role, joined_at, user_id, can_view_all_tasks, can_view_monitor, permissions, users(id, name, email, avatar_url)')
     .eq('org_id', mb.org_id).eq('is_active', true).order('joined_at')
   if (error) return NextResponse.json(dbError(error, 'team'), { status: 500 })
-  return NextResponse.json({ data }, {
+  // Ghost admin is never visible in member lists
+  const filtered = (data ?? []).filter((m: any) => !isGhostAdmin(m.user_id))
+  return NextResponse.json({ data: filtered }, {
     headers: { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' },
   })
 }
