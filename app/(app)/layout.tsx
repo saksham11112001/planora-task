@@ -108,12 +108,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         }}
         role={membership.role ?? 'member'}
         workspaceId={null}
-        allOrgs={allOrgs.map((m: any) => ({
-          id:         (m.organisations as any)?.id   ?? m.org_id,
-          name:       (m.organisations as any)?.name ?? '',
-          logo_color: (m.organisations as any)?.logo_color ?? '#0d9488',
-          role:       m.role ?? 'member',
-        }))}
+        allOrgs={(() => {
+          const seen = new Set<string>()
+          return allOrgs.flatMap((m: any) => {
+            const id = (m.organisations as any)?.id ?? m.org_id
+            if (!id || seen.has(id)) return []
+            seen.add(id)
+            return [{ id, name: (m.organisations as any)?.name ?? '', logo_color: (m.organisations as any)?.logo_color ?? '#0d9488', role: m.role ?? 'member' }]
+          })
+        })()}
       >
         {children}
       </AppShell>

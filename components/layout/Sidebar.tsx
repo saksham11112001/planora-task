@@ -205,11 +205,15 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
             borderTop: 'none', borderRadius: '0 0 10px 10px',
             boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
             overflow: 'hidden',
+            display: 'flex', flexDirection: 'column',
+            maxHeight: '70vh',
           }}>
             <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase',
-              color: 'rgba(255,255,255,0.3)', padding: '8px 12px 4px' }}>
+              color: 'rgba(255,255,255,0.3)', padding: '8px 12px 4px', flexShrink: 0 }}>
               My workspaces
             </p>
+            <div style={{ overflowY: 'auto', flex: 1, scrollbarWidth: 'thin',
+              scrollbarColor: 'rgba(255,255,255,0.15) transparent' }}>
             {(session?.allOrgs ?? []).map(org => {
               const isCurrent = org.id === session?.org.id
               return (
@@ -246,9 +250,10 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
                 </button>
               )
             })}
+            </div>{/* end scrollable org list */}
 
             {/* Divider */}
-            <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '4px 12px' }}/>
+            <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '4px 12px', flexShrink: 0 }}/>
 
             {/* New organisation — navigates to onboarding entry screen */}
             <button
