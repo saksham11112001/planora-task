@@ -1,9 +1,11 @@
 'use client'
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   LineChart, Line, PieChart, Pie, Cell, Legend, AreaChart, Area,
 } from 'recharts'
+import { useFilterStore } from '@/store/appStore'
+import { UniversalFilterBar } from '@/components/filters/UniversalFilterBar'
 
 interface EmployeeStat {
   uid: string; name: string; email: string; role: string
@@ -31,9 +33,10 @@ interface ComplianceSummary {
 }
 
 interface ComplianceRawTask {
-  id: string; status: string; due_date: string | null
-  created_at: string; completed_at: string | null
-  custom_fields: Record<string, any> | null; assignee_id: string | null
+  id: string; title: string; status: string; priority: string
+  due_date: string | null; created_at: string; completed_at: string | null
+  custom_fields: Record<string, any> | null
+  assignee_id: string | null; client_id: string | null
 }
 
 interface Props {
@@ -326,23 +329,39 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
   const [timeline,     setTimeline]     = useState<'30' | '60' | '90' | '365'>('90')
   const [empFilter,    setEmpFilter]    = useState('')
 
-  // Compliance filters
+  // Compliance chart date-window filters (separate from universal task filters)
   const today90From = new Date(Date.now() - 89 * 86400000).toISOString().split('T')[0]
   const todayStr    = new Date().toISOString().split('T')[0]
-  const [compDateFrom,   setCompDateFrom]   = useState(today90From)
-  const [compDateTo,     setCompDateTo]     = useState(todayStr)
-  const [compMember,     setCompMember]     = useState('')
+  const [compDateFrom, setCompDateFrom] = useState(today90From)
+  const [compDateTo,   setCompDateTo]   = useState(todayStr)
 
   const canViewAll = !userRole || ['owner','admin','manager'].includes(userRole)
 
-  // Compute compliance data reactively based on filters
+  // Universal filter store — used to pre-filter compliance raw tasks
+  const {
+    search: uSearch, clientId: uClientId, priority: uPriority, status: uStatus,
+    assigneeId: uAssigneeId, dueDateFrom: uDueDateFrom, dueDateTo: uDueDateTo,
+  } = useFilterStore()
+
+  // Pre-filter compliance raw tasks by universal filter state
+  const filteredCompRaw = useMemo(() => complianceRawTasks.filter(t => {
+    if (uSearch      && !t.title?.toLowerCase().includes(uSearch.toLowerCase())) return false
+    if (uClientId.length  > 0 && !uClientId.includes(t.client_id ?? ''))        return false
+    if (uPriority.length  > 0 && !uPriority.includes(t.priority))               return false
+    if (uStatus.length    > 0 && !uStatus.includes(t.status))                   return false
+    if (uAssigneeId.length > 0 && !uAssigneeId.includes(t.assignee_id ?? ''))   return false
+    if (uDueDateFrom && t.due_date && t.due_date < uDueDateFrom)                 return false
+    if (uDueDateTo   && t.due_date && t.due_date > uDueDateTo)                   return false
+    return true
+  }), [complianceRawTasks, uSearch, uClientId, uPriority, uStatus, uAssigneeId, uDueDateFrom, uDueDateTo])
+
+  // Compute compliance chart data from filtered tasks + date window
   const compDays = Math.max(1, Math.round(
     (new Date(compDateTo).getTime() - new Date(compDateFrom).getTime()) / 86400000
   ) + 1)
   const { daily: rawCompDaily, summary: complianceSummary } = buildComplianceData(
-    complianceRawTasks, compDays, compMember
+    filteredCompRaw, compDays, ''
   )
-  // Slice to requested date window
   const complianceDailyData = rawCompDaily.filter(
     d => d.dateKey >= compDateFrom && d.dateKey <= compDateTo
   )
@@ -513,31 +532,23 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
       {activeTab === 'compliance' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-          {/* Filter toolbar */}
+          {/* Universal filter bar — client, priority, status, assignee, search, due date */}
+          <UniversalFilterBar
+            clients={clients}
+            members={complianceMemberList}
+            showSearch
+            showPriority
+            showStatus
+            showAssignee
+            showDueDate
+            searchPlaceholder="Search compliance tasks…"
+          />
+
+          {/* Chart date-window picker (controls the trend period shown in charts) */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
             background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10,
-            padding: '12px 16px' }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>Filter:</span>
-
-            {/* Date from */}
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
-              From
-              <input type="date" value={compDateFrom} max={compDateTo}
-                onChange={e => setCompDateFrom(e.target.value)}
-                style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)',
-                  fontSize: 12, fontFamily: 'inherit', background: 'var(--surface-subtle)',
-                  color: 'var(--text-primary)', cursor: 'pointer', outline: 'none' }}/>
-            </label>
-
-            {/* Date to */}
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
-              To
-              <input type="date" value={compDateTo} min={compDateFrom}
-                onChange={e => setCompDateTo(e.target.value)}
-                style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)',
-                  fontSize: 12, fontFamily: 'inherit', background: 'var(--surface-subtle)',
-                  color: 'var(--text-primary)', cursor: 'pointer', outline: 'none' }}/>
-            </label>
+            padding: '10px 16px' }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', flexShrink: 0 }}>Chart period:</span>
 
             {/* Quick range buttons */}
             <div style={{ display: 'flex', gap: 4 }}>
@@ -561,30 +572,27 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
               })}
             </div>
 
-            {/* Separator */}
-            <div style={{ width: 1, height: 20, background: 'var(--border)', flexShrink: 0 }}/>
+            {/* Custom date from/to */}
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
+              From
+              <input type="date" value={compDateFrom} max={compDateTo}
+                onChange={e => setCompDateFrom(e.target.value)}
+                style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)',
+                  fontSize: 12, fontFamily: 'inherit', background: 'var(--surface-subtle)',
+                  color: 'var(--text-primary)', cursor: 'pointer', outline: 'none' }}/>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
+              To
+              <input type="date" value={compDateTo} min={compDateFrom}
+                onChange={e => setCompDateTo(e.target.value)}
+                style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)',
+                  fontSize: 12, fontFamily: 'inherit', background: 'var(--surface-subtle)',
+                  color: 'var(--text-primary)', cursor: 'pointer', outline: 'none' }}/>
+            </label>
 
-            {/* Team member filter */}
-            {complianceMemberList.length > 0 && (
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
-                Member
-                <select value={compMember} onChange={e => setCompMember(e.target.value)}
-                  style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border)',
-                    fontSize: 12, fontFamily: 'inherit', background: 'var(--surface-subtle)',
-                    color: compMember ? 'var(--brand)' : 'var(--text-secondary)',
-                    fontWeight: compMember ? 600 : 400, cursor: 'pointer', outline: 'none',
-                    appearance: 'none', paddingRight: 18 }}>
-                  <option value=''>All members</option>
-                  {complianceMemberList.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                </select>
-              </label>
-            )}
-
-            {/* Clear */}
-            {(compMember || compDateFrom !== today90From || compDateTo !== todayStr) && (
-              <button onClick={() => { setCompMember(''); setCompDateFrom(today90From); setCompDateTo(todayStr) }}
-                style={{ fontSize: 11, color: 'var(--text-muted)', background: 'none', border: 'none',
-                  cursor: 'pointer', marginLeft: 4 }}>
+            {(compDateFrom !== today90From || compDateTo !== todayStr) && (
+              <button onClick={() => { setCompDateFrom(today90From); setCompDateTo(todayStr) }}
+                style={{ fontSize: 11, color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}>
                 ✕ Reset
               </button>
             )}
@@ -594,13 +602,13 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             <ComplianceTrendChart
               data={complianceDailyData}
-              title={`Compliance${compMember ? ` — ${complianceMemberList.find(m=>m.id===compMember)?.name ?? ''}` : ''}`}
+              title={`Compliance${uAssigneeId.length === 1 ? ` — ${complianceMemberList.find(m=>m.id===uAssigneeId[0])?.name ?? ''}` : ''}`}
               addedKey="addedC" completedKey="completedC"
               noDueDateKey="noDueDateC" overdueKey="overdueC"
             />
             <ComplianceTrendChart
               data={complianceDailyData}
-              title={`Non-Compliance${compMember ? ` — ${complianceMemberList.find(m=>m.id===compMember)?.name ?? ''}` : ''}`}
+              title={`Non-Compliance${uAssigneeId.length === 1 ? ` — ${complianceMemberList.find(m=>m.id===uAssigneeId[0])?.name ?? ''}` : ''}`}
               addedKey="addedNC" completedKey="completedNC"
               noDueDateKey="noDueDateNC" overdueKey="overdueNC"
             />
