@@ -46,7 +46,7 @@ export async function ReportsFetcher() {
     supabase.from('clients').select('id, name, color').eq('org_id', orgId).eq('status','active').order('name'),
     // Separate lightweight query for compliance reporting — includes custom_fields + assignee_id
     supabase.from('tasks')
-      .select('id, status, due_date, created_at, completed_at, custom_fields, assignee_id')
+      .select('id, title, status, priority, due_date, created_at, completed_at, custom_fields, assignee_id, client_id')
       .eq('org_id', orgId).neq('is_archived', true).is('parent_task_id', null)
       .gte('created_at', from90).limit(20000),
   ])
@@ -151,9 +151,10 @@ export async function ReportsFetcher() {
 
   // ── Compliance raw tasks — aggregation done client-side for filtering ──
   const complianceRawTasks = (complianceTasksRaw ?? []) as {
-    id: string; status: string; due_date: string | null
-    created_at: string; completed_at: string | null
-    custom_fields: Record<string, any> | null; assignee_id: string | null
+    id: string; title: string; status: string; priority: string
+    due_date: string | null; created_at: string; completed_at: string | null
+    custom_fields: Record<string, any> | null
+    assignee_id: string | null; client_id: string | null
   }[]
   const complianceMemberList = (members ?? []).map((m: any) => ({
     id:   (m.users as any)?.id   ?? m.user_id,
