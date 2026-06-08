@@ -24,7 +24,6 @@ export default async function ClientHealthPage() {
     supabase.from('clients')
       .select('id, name, color, status, dsc_expiry_date, email, phone')
       .eq('org_id', mb.org_id)
-      .not('status', 'eq', 'inactive')
       .order('name'),
     supabase.from('tasks')
       .select('client_id')
