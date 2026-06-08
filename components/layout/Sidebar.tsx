@@ -8,7 +8,7 @@ import {
   RefreshCw, Users, BarChart2, Settings, Plus,
   ChevronDown, ChevronRight, Clock, Zap, X, Upload,
   Calendar, Shield, LogOut, FileCheck, ArrowRight, Eye, Receipt, Copy, Check, Activity, BookOpen, ShieldAlert,
-  ChevronsUpDown,
+  ChevronsUpDown, FileQuestion, CalendarDays,
 } from 'lucide-react'
 import { cn }            from '@/lib/utils/cn'
 import { createClient }  from '@/lib/supabase/client'
@@ -425,6 +425,8 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
         {nav.clients && <SI href="/clients/health" active={isActive('/clients/health')} icon={<Activity className="h-4 w-4"/>} label="Client Health"/>}
         {nav.ca_compliance_mode && <SI href="/compliance" active={isActive('/compliance')} icon={<FileCheck className="h-4 w-4"/>} label="CA Compliance"/>}
         {nav.ca_compliance_mode && <SI href="/clients/dsc-expiry" active={isActive('/clients/dsc-expiry')} icon={<ShieldAlert className="h-4 w-4"/>} label="DSC Expiry"/>}
+        {nav.ca_compliance_mode && <SI href="/compliance/pending-docs" active={isActive('/compliance/pending-docs')} icon={<FileQuestion className="h-4 w-4"/>} label="Pending Docs"/>}
+        {nav.ca_compliance_mode && <SI href="/compliance/annual-calendar" active={isActive('/compliance/annual-calendar')} icon={<CalendarDays className="h-4 w-4"/>} label="Annual Calendar"/>}
         <Div/>
 
         {/* ORGANISATION */}

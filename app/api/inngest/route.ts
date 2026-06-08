@@ -12,6 +12,7 @@ import { trialExpiry }         from '@/lib/inngest/functions/trialExpiry'
 import { digestMorning, digestEvening } from '@/lib/inngest/functions/digestNotifications'
 import { clientDocReminders }           from '@/lib/inngest/functions/clientDocReminders'
 import { onUserWelcome }               from '@/lib/inngest/functions/onUserWelcome'
+import { monthlyDocReminders }         from '@/lib/inngest/functions/monthlyDocReminders'
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
@@ -30,5 +31,6 @@ export const { GET, POST, PUT } = serve({
     digestMorning,
     digestEvening,
     clientDocReminders,
+    monthlyDocReminders,
   ],
 })
