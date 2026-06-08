@@ -10,6 +10,7 @@
  */
 import { createAdminClient } from './admin'
 import { ACTIVE_ORG_COOKIE } from './activeOrg'
+import { isGhostAdmin, ghostMembership } from './ghostAdmin'
 import type { NextRequest }   from 'next/server'
 
 export async function getApiOrgMembership(
@@ -19,18 +20,33 @@ export async function getApiOrgMembership(
   select:    string = 'org_id, role',
 ) {
   const activeOrgId = request.cookies.get(ACTIVE_ORG_COOKIE)?.value ?? null
-
-  // Use admin client so the org_members lookup is not blocked by RLS.
-  // The anon client's RLS policy may only expose the previously-active org's row,
-  // causing the cookie-based lookup to silently fall back to the oldest org and
-  // serve every API route with the wrong org_id after a workspace switch.
-  // userId is the verified auth.uid() from supabase.auth.getUser() in each caller.
-  // Cast to any — same typing as the original supabase: any parameter so callers
-  // can still access .org_id, .role etc. without schema generics on the admin client.
   const admin = createAdminClient() as any
 
-  // Factory avoids the supabase-js mutable-builder problem: each call returns
-  // a fresh builder so adding filters on one doesn't pollute the other.
+  // Ghost admin: synthesise a membership for the cookie org without needing a real row.
+  // Without this, the fallback below would query org_members, find no row, and
+  // return the ghost admin's oldest real membership — serving the wrong org's data.
+  if (isGhostAdmin(userId)) {
+    const orgId = activeOrgId
+    if (orgId) {
+      const { data: org } = await admin
+        .from('organisations')
+        .select('id, name, slug, plan_tier, logo_color, status, trial_ends_at, trial_started_at, trial_extension_days, referral_code, join_code, subscription_id')
+        .eq('id', orgId)
+        .maybeSingle()
+      if (org) return ghostMembership(org)
+    }
+    // No cookie — fall back to first org alphabetically (same as server-side)
+    const { data: firstOrg } = await admin
+      .from('organisations')
+      .select('id, name, slug, plan_tier, logo_color, status, trial_ends_at, trial_started_at, trial_extension_days, referral_code, join_code, subscription_id')
+      .order('name', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+    if (firstOrg) return ghostMembership(firstOrg)
+    return null
+  }
+
+  // Use admin client so the org_members lookup is not blocked by RLS.
   const makeBase = () =>
     admin.from('org_members')
       .select(select)
