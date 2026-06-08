@@ -702,6 +702,142 @@ function IllustrationMultiOrg() {
   )
 }
 
+function IllustrationImport() {
+  return (
+    <svg viewBox="0 0 320 260" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width:'100%', height:'100%' }}>
+      <rect x="15" y="10" width="290" height="240" rx="12" fill="#f8fafc" stroke="#e2e8f0" strokeWidth="1.5"/>
+      <rect x="15" y="10" width="290" height="32" rx="12" fill="#0891b2" fillOpacity="0.08"/>
+      <text x="30" y="30" fontSize="10" fontWeight="700" fill="#0891b2">Import Clients</text>
+      {/* Upload zone */}
+      <rect x="22" y="50" width="276" height="72" rx="10" fill="#f0f9ff" stroke="#0891b2" strokeWidth="1.5" strokeDasharray="5 3"/>
+      <text x="160" y="78" textAnchor="middle" fontSize="20">📥</text>
+      <text x="160" y="96" textAnchor="middle" fontSize="9" fontWeight="700" fill="#0891b2">Drop your Excel / CSV file here</text>
+      <text x="160" y="110" textAnchor="middle" fontSize="8" fill="#64748b">or click to browse · .xlsx .csv supported</text>
+      {/* Template download */}
+      <rect x="22" y="132" width="276" height="28" rx="7" fill="#fef3c7" stroke="#d97706" strokeWidth="0.8"/>
+      <text x="35" y="149" fontSize="8.5" fontWeight="700" fill="#b45309">⬇  Download starter template → fill GSTIN, Name, Group, DSC date</text>
+      {/* Preview rows */}
+      {[
+        { name:'Shanti Chemicals', gstin:'27AABC5432N1Z8', group:'Manufacturing' },
+        { name:'Mehta & Sons LLP',  gstin:'06XXYZ1234M1Z2', group:'Service' },
+        { name:'Sunrise Exports',   gstin:'29PQRS9876K1Z5', group:'Manufacturing' },
+      ].map((r, i) => (
+        <g key={r.name}>
+          <rect x="22" y={168+i*22} width="276" height="19" rx="4" fill={i%2===0?'white':'#f8fafc'} stroke="#f1f5f9" strokeWidth="0.8"/>
+          <circle cx="33" cy={177+i*22} r="5" fill="#0891b2" fillOpacity="0.2"/>
+          <text x="33" y={180+i*22} textAnchor="middle" fontSize="6" fontWeight="700" fill="#0891b2">{r.name[0]}</text>
+          <text x="43" y={180+i*22} fontSize="7.5" fill="#1e293b">{r.name}</text>
+          <text x="160" y={180+i*22} fontSize="7" fill="#64748b">{r.gstin}</text>
+          <rect x="244" y={171+i*22} width="46" height="12" rx="3" fill="#0891b2" fillOpacity="0.1"/>
+          <text x="267" y={180+i*22} textAnchor="middle" fontSize="6.5" fontWeight="600" fill="#0891b2">{r.group}</text>
+        </g>
+      ))}
+      <rect x="22" y="237" width="276" height="5" rx="2.5" fill="#e2e8f0"/>
+      <rect x="22" y="237" width="196" height="5" rx="2.5" fill="#0891b2"/>
+      <text x="30" y="250" fontSize="7" fill="#64748b">3 of 3 clients ready to import</text>
+      <rect x="248" y="240" width="50" height="14" rx="4" fill="#0891b2"/>
+      <text x="273" y="250" textAnchor="middle" fontSize="7.5" fontWeight="700" fill="white">Import All</text>
+    </svg>
+  )
+}
+
+function IllustrationUploads() {
+  return (
+    <svg viewBox="0 0 320 260" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width:'100%', height:'100%' }}>
+      <rect x="10" y="8" width="300" height="244" rx="12" fill="#f8fafc" stroke="#e2e8f0" strokeWidth="1.5"/>
+      <rect x="10" y="8" width="300" height="30" rx="12" fill="#0d9488" fillOpacity="0.08"/>
+      <text x="22" y="27" fontSize="9.5" fontWeight="700" fill="#0d9488">ITR Filing — Ramesh Gupta · Attachments</text>
+      {/* Upload button row */}
+      <rect x="18" y="46" width="90" height="20" rx="6" fill="#0d9488"/>
+      <text x="63" y="59" textAnchor="middle" fontSize="8.5" fontWeight="700" fill="white">📎  Upload File</text>
+      <rect x="116" y="46" width="90" height="20" rx="6" fill="#4285f4" fillOpacity="0.15" stroke="#4285f4" strokeWidth="0.8"/>
+      <text x="161" y="59" textAnchor="middle" fontSize="8.5" fontWeight="700" fill="#4285f4">🔗  Drive Link</text>
+      <rect x="214" y="46" width="90" height="20" rx="6" fill="#6b7280" fillOpacity="0.1" stroke="#6b7280" strokeWidth="0.8"/>
+      <text x="259" y="59" textAnchor="middle" fontSize="8" fontWeight="700" fill="#6b7280">📦  Dropbox Link</text>
+      {/* Attachment slots */}
+      {[
+        { label:'Acknowledgement', file:'ITR_Ack_Gupta.pdf', color:'#dc2626', uploaded:true },
+        { label:'Computation',     file:'Comp_2025-26.xlsx', color:'#16a34a', uploaded:true },
+        { label:'Form 26AS',       file:null,                color:'#d97706', uploaded:false },
+        { label:'AIS Report',      file:null,                color:'#94a3b8', uploaded:false },
+      ].map((s, i) => (
+        <g key={s.label}>
+          <rect x="18" y={74+i*38} width="284" height="32" rx="7" fill="white" stroke={s.uploaded?s.color:'#e2e8f0'} strokeWidth={s.uploaded?1.2:0.8}/>
+          <text x="30" y={87+i*38} fontSize="8" fontWeight="700" fill="#475569">{s.label}</text>
+          {s.uploaded
+            ? <>
+                <rect x="160" y={80+i*38} width="110" height="18" rx="4" fill={s.color} fillOpacity="0.1"/>
+                <text x="215" y={92+i*38} textAnchor="middle" fontSize="7.5" fontWeight="600" fill={s.color}>✓ {s.file}</text>
+              </>
+            : <text x="165" y={92+i*38} textAnchor="middle" fontSize="7.5" fill="#94a3b8">— not uploaded yet</text>
+          }
+        </g>
+      ))}
+      {/* Drive link paste area */}
+      <rect x="18" y="230" width="284" height="18" rx="5" fill="#f0f9ff" stroke="#4285f4" strokeWidth="0.8" strokeDasharray="4 2"/>
+      <text x="30" y="242" fontSize="7.5" fill="#4285f4">🔗 Paste Google Drive / Dropbox URL here and press Enter</text>
+    </svg>
+  )
+}
+
+function IllustrationReports() {
+  const months = ['Nov','Dec','Jan','Feb','Mar','Apr','May']
+  const completedData = [18,22,19,26,24,28,31]
+  const overdueData   = [5,4,6,3,4,2,1]
+  const maxVal = 35
+  const barW = 24, gap = 14, startX = 38
+  return (
+    <svg viewBox="0 0 320 260" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width:'100%', height:'100%' }}>
+      <rect x="10" y="8" width="300" height="244" rx="12" fill="#f8fafc" stroke="#e2e8f0" strokeWidth="1.5"/>
+      <rect x="10" y="8" width="300" height="30" rx="12" fill="#7c3aed" fillOpacity="0.08"/>
+      <text x="22" y="27" fontSize="10" fontWeight="700" fill="#7c3aed">Reports</text>
+      {/* Tabs */}
+      {['Overview','Team','Compliance'].map((t,i) => (
+        <g key={t}>
+          <rect x={18+i*92} y="44" width="86" height="16" rx="4"
+            fill={i===0?'#7c3aed':'transparent'} fillOpacity={i===0?1:0}
+            stroke={i===0?'#7c3aed':'#e2e8f0'} strokeWidth={i===0?0:1}/>
+          <text x={61+i*92} y="55" textAnchor="middle" fontSize="8" fontWeight={i===0?'700':'500'} fill={i===0?'white':'#94a3b8'}>{t}</text>
+        </g>
+      ))}
+      {/* KPI tiles */}
+      {[
+        { label:'Tasks Created', val:'84', color:'#0d9488' },
+        { label:'Completed',     val:'71', color:'#16a34a' },
+        { label:'Overdue',       val:'3',  color:'#dc2626' },
+        { label:'Hours Logged',  val:'142h',color:'#7c3aed' },
+      ].map((k,i) => (
+        <g key={k.label}>
+          <rect x={18+i*70} y="68" width="64" height="36" rx="7" fill={k.color} fillOpacity="0.08" stroke={k.color} strokeWidth="0.6" strokeOpacity="0.4"/>
+          <text x={50+i*70} y="84" textAnchor="middle" fontSize="13" fontWeight="800" fill={k.color}>{k.val}</text>
+          <text x={50+i*70} y="95" textAnchor="middle" fontSize="5.5" fontWeight="600" fill={k.color} fillOpacity="0.75">{k.label}</text>
+        </g>
+      ))}
+      {/* Bar chart */}
+      <text x="18" y="118" fontSize="7.5" fontWeight="700" fill="#475569">TASKS — LAST 7 MONTHS</text>
+      {months.map((m, i) => {
+        const x = startX + i*(barW+gap)
+        const hComp = (completedData[i]/maxVal)*80
+        const hOver = (overdueData[i]/maxVal)*80
+        return (
+          <g key={m}>
+            <rect x={x} y={200-hComp} width={barW*0.55} height={hComp} rx="3" fill="#16a34a" fillOpacity="0.7"/>
+            <rect x={x+barW*0.6} y={200-hOver} width={barW*0.4} height={hOver} rx="3" fill="#dc2626" fillOpacity="0.7"/>
+            <text x={x+barW*0.5} y="212" textAnchor="middle" fontSize="6.5" fill="#94a3b8">{m}</text>
+          </g>
+        )
+      })}
+      <line x1="18" y1="200" x2="302" y2="200" stroke="#e2e8f0" strokeWidth="1"/>
+      {/* Legend */}
+      <circle cx="26" cy="228" r="4" fill="#16a34a"/>
+      <text x="34" y="232" fontSize="7" fill="#64748b">Completed</text>
+      <circle cx="100" cy="228" r="4" fill="#dc2626"/>
+      <text x="108" y="232" fontSize="7" fill="#64748b">Overdue</text>
+      <text x="180" y="232" fontSize="7" fill="#64748b">Team · Compliance Report tabs →</text>
+    </svg>
+  )
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Step definitions
 // ─────────────────────────────────────────────────────────────────────────────
@@ -725,45 +861,28 @@ const STEPS: Step[] = [
   {
     id: 'welcome',
     icon: '🏢', color: '#0d9488', accent: 'rgba(13,148,136,0.1)',
-    title: 'Welcome to Floatup',
-    subtitle: 'Your complete CA & CPA practice management platform',
-    body: "Floatup is built specifically for Indian CA and CPA firms. It replaces spreadsheets, WhatsApp reminders, and manual follow-ups with one organised platform. This tour walks you through every feature — take 3 minutes now and save hours every week.",
+    title: 'Welcome to Floatup — Built for CA Firms',
+    subtitle: 'The only practice management tool designed for Indian CA & CPA firms',
+    body: "If your team is still tracking filings in Excel, sending deadline reminders on WhatsApp, or wondering who is working on what — Floatup fixes all of that. This 3-minute tour covers every feature so you never need to ask us how anything works.",
     bullets: [
-      { emoji: '⚖️', text: '69+ statutory tasks (GST, TDS, ITR, ROC…) auto-generated per client' },
-      { emoji: '👥', text: 'Unlimited clients with GSTIN auto-fill and DSC expiry alerts' },
-      { emoji: '✅', text: 'Approval workflow with full audit trail — who approved what, when' },
-      { emoji: '🔔', text: 'Email & in-app reminders so nothing ever slips through the cracks' },
+      { emoji: '📋', text: '69+ statutory tasks — GSTR, TDS, ITR, ROC, PF, ESI, PT — auto-generated with correct due dates' },
+      { emoji: '👥', text: 'Unlimited clients with GSTIN auto-fill, DSC expiry tracker, and group organisation' },
+      { emoji: '✅', text: 'Approval workflow with timestamped audit trail — replaces WhatsApp "please check" messages' },
+      { emoji: '📊', text: 'Reports & Monitor give you firm-wide visibility without asking anyone anything' },
     ],
     Illustration: IllustrationWelcome,
   },
   {
-    id: 'team',
-    icon: '👥', color: '#0d9488', accent: 'rgba(13,148,136,0.1)',
-    title: 'Set Up Your Team First',
-    subtitle: 'Settings → Team → + Invite Member',
-    body: "Before anything else, invite your staff. Go to Settings → Team, enter their email, choose a role, and click Send Invite. They receive a magic-link email and can log in immediately — no password setup needed.",
-    bullets: [
-      { emoji: '👑', text: 'Owner — full access, billing, can delete the org' },
-      { emoji: '🛡️', text: 'Admin — same as owner except billing and org deletion' },
-      { emoji: '📋', text: 'Manager — can view all tasks, approve work, manage clients' },
-      { emoji: '👤', text: 'Member — sees only tasks assigned to them; cannot view others\' work' },
-    ],
-    path: '/settings',
-    actionLabel: 'Go to Team Settings',
-    actionHref: '/settings',
-    Illustration: IllustrationTeam,
-  },
-  {
     id: 'clients',
     icon: '👤', color: '#0891b2', accent: 'rgba(8,145,178,0.1)',
-    title: 'Add Your Clients',
-    subtitle: 'Sidebar → Clients → + Add Client',
-    body: "Every client you add becomes the central hub for all their compliance filings, ad-hoc tasks, and documents. Just type the GSTIN — Floatup fetches the business name and state automatically from the GST portal.",
+    title: 'Add Your Clients — One by One or in Bulk',
+    subtitle: 'Sidebar → Clients → + Add Client  or  Import',
+    body: "Every client becomes a complete workspace in Floatup — their compliance filings, ad-hoc tasks, documents, and team notes all in one place. Add them manually (GSTIN auto-fills everything) or import your entire client list from an Excel or CSV file in under 5 minutes.",
     bullets: [
-      { emoji: '🆔', text: 'Enter GSTIN → business name, state, and type auto-fill instantly' },
-      { emoji: '🔒', text: 'DSC expiry date stored — colour-coded warning 30 days before expiry' },
-      { emoji: '📂', text: 'Every task, project, and compliance filing is linked to the client' },
-      { emoji: '📋', text: 'Use the Import button to bulk-upload clients from an Excel/CSV file' },
+      { emoji: '🆔', text: 'Type the GSTIN → business name, state, and entity type fill in automatically from the GST portal' },
+      { emoji: '🔒', text: 'DSC expiry date: stored per client, colour-coded red when within 30 days of expiry' },
+      { emoji: '📥', text: 'Import button: download the starter template, fill in your clients, and upload — done in minutes' },
+      { emoji: '📂', text: 'Every compliance task, project, and document is linked to the client automatically' },
     ],
     path: '/clients',
     actionLabel: 'Add your first client',
@@ -771,30 +890,47 @@ const STEPS: Step[] = [
     Illustration: IllustrationClients,
   },
   {
+    id: 'import',
+    icon: '📥', color: '#0891b2', accent: 'rgba(8,145,178,0.1)',
+    title: 'Import All Your Clients in Minutes',
+    subtitle: 'Clients → Import button → Upload Excel / CSV',
+    body: "Already have a client list in Excel? Don't add them one by one. Download the Floatup import template, paste your client data (GSTIN, name, group, DSC date), and upload. All clients are created instantly — with groups, GSTIN, and DSC dates intact.",
+    bullets: [
+      { emoji: '⬇️', text: 'Download the ready-made Excel template — columns match exactly what Floatup needs' },
+      { emoji: '📋', text: 'Fill in: Client Name, GSTIN, Group, DSC Expiry Date — all other fields are optional' },
+      { emoji: '📤', text: 'Upload the file — Floatup validates each row and shows a preview before importing' },
+      { emoji: '✅', text: 'All clients created in one go: groups, DSC dates, and GSTIN all carried across' },
+    ],
+    path: '/clients',
+    actionLabel: 'Go to Clients',
+    actionHref: '/clients',
+    Illustration: IllustrationImport,
+  },
+  {
     id: 'client-groups',
     icon: '📁', color: '#0891b2', accent: 'rgba(8,145,178,0.1)',
     title: 'Organise Clients into Groups',
     subtitle: 'Clients → Groups tab → + New Group',
-    body: "With dozens of clients, groups keep everything structured. Create groups like 'GST Clients', 'Audit Clients', 'Individual ITR', or 'Manufacturing'. You can then filter tasks, assign work, and pull reports by group.",
+    body: "With 50 or 500 clients, groups are what keep the work organised. Create groups like 'GST Clients', 'Audit Clients', 'Individual ITR', or 'Manufacturing'. Assign filings, filter Kanban views, and pull compliance reports — all filtered by group.",
     bullets: [
-      { emoji: '📁', text: 'Create unlimited groups — drag clients in or assign via the client form' },
-      { emoji: '⚡', text: 'Assign a compliance task type to the entire group in one step' },
-      { emoji: '🔍', text: 'Filter Kanban, Calendar, and Monitor by a specific group instantly' },
-      { emoji: '📊', text: 'Reports break down completion rates by group for easy review' },
+      { emoji: '📁', text: 'Create unlimited groups — assign clients during import or directly from the client form' },
+      { emoji: '⚡', text: 'Generate all compliance tasks for an entire group in one step — not one by one' },
+      { emoji: '🔍', text: 'Filter Kanban board, Calendar, and Monitor by group to focus on one segment' },
+      { emoji: '📊', text: 'Compliance Reports tab shows filing status broken down by group and client' },
     ],
     Illustration: IllustrationClientGroups,
   },
   {
     id: 'compliance',
     icon: '⚖️', color: '#b45309', accent: 'rgba(180,83,9,0.1)',
-    title: 'CA Compliance — Auto-Generate Filings',
-    subtitle: 'Sidebar → CA Compliance',
-    body: "This is the core module. In 3 steps: select the statutory task types you handle (GST, TDS, ITR…), pick the clients it applies to, and click Generate. Floatup creates individual tasks for every client with the correct statutory due date — automatically.",
+    title: 'CA Compliance — 69+ Filings, Auto-Generated',
+    subtitle: 'Sidebar → CA Compliance → Generate Tasks',
+    body: "This is the heart of Floatup. In exactly 3 clicks: (1) select the statutory task types your firm handles, (2) pick the clients it applies to, (3) click Generate. Floatup creates one task per client with the correct statutory due date. No manual entry, no missed filings.",
     bullets: [
-      { emoji: '📋', text: 'Step 1 — Pick task types: GSTR-1, GSTR-3B, TDS Q1–Q4, ITR, ROC, PF, ESI, PT…' },
-      { emoji: '🧑‍💼', text: 'Step 2 — Select clients (individual, by group, or all at once)' },
-      { emoji: '⏰', text: 'Step 3 — Tasks auto-spawn on your Kanban N days before each due date' },
-      { emoji: '📅', text: 'All 69+ statutory task types come pre-loaded with correct statutory deadlines' },
+      { emoji: '📋', text: 'Step 1 — Choose task types: GSTR-1, GSTR-3B, TDS Q1–Q4, ITR, ROC Annual Return, PF, ESI, PT…' },
+      { emoji: '🧑‍💼', text: 'Step 2 — Select clients: individually, by group, or all clients at once' },
+      { emoji: '⏰', text: 'Step 3 — Click Generate: tasks appear on your Kanban, pre-dated N days before the statutory deadline' },
+      { emoji: '📅', text: 'All 69+ task types have correct Indian statutory deadlines pre-loaded — no configuration needed' },
     ],
     path: '/compliance',
     actionLabel: 'Open CA Compliance',
@@ -803,58 +939,72 @@ const STEPS: Step[] = [
   },
   {
     id: 'ca-advanced',
-    icon: '📎', color: '#b45309', accent: 'rgba(180,83,9,0.1)',
-    title: 'NIL Returns, Attachments & Bulk Actions',
-    subtitle: 'CA Compliance → click any task card',
-    body: "Click any compliance task to open the detail panel. Every document type (Acknowledgement, Computation, Challan) has its own attachment slot. Mark NIL returns with a single checkbox. Select multiple tasks and bulk-assign them to a team member at once.",
+    icon: '0️⃣', color: '#b45309', accent: 'rgba(180,83,9,0.1)',
+    title: 'NIL Returns, Bulk Assign & Compliance Filings',
+    subtitle: 'CA Compliance → click any task to open detail panel',
+    body: "Each compliance task has its own filing checklist. Mark NIL returns in one click. Attach acknowledgement, computation, and challans to the correct slot. Select 50 tasks at once and assign them all to a team member — instead of doing it one by one.",
     bullets: [
-      { emoji: '0️⃣', text: 'NIL Return checkbox — marks task as filed with zero values, no docs needed' },
-      { emoji: '📎', text: 'Custom columns per task type: Acknowledgement, Challan, Computation, etc.' },
-      { emoji: '🔗', text: 'Paste a Google Drive or Dropbox link as the attachment — no upload needed' },
-      { emoji: '⚡', text: 'Select 50 tasks → Assign All to a team member in one click' },
+      { emoji: '0️⃣', text: 'NIL Return: tick one checkbox — task is marked filed with nil values, no documents required' },
+      { emoji: '📎', text: 'Per-task attachment slots: Acknowledgement · Computation · Challan · Others — each filed separately' },
+      { emoji: '🔗', text: 'No file upload needed: paste a Google Drive or Dropbox URL and it attaches instantly' },
+      { emoji: '⚡', text: 'Multi-select tasks → Bulk Assign: send all to one team member in a single action' },
     ],
     Illustration: IllustrationCAAdvanced,
   },
   {
+    id: 'uploads',
+    icon: '📎', color: '#0d9488', accent: 'rgba(13,148,136,0.1)',
+    title: 'Upload & Share Documents on Any Task',
+    subtitle: 'Click any task → Attachments section',
+    body: "Every task — compliance filing, ad-hoc work, or project — has a dedicated attachments section. Upload PDFs and Excel files directly, or paste a Google Drive / Dropbox link. No more emailing files back and forth or hunting for documents in chat threads.",
+    bullets: [
+      { emoji: '📤', text: 'Upload files directly: PDFs, images, Excel, Word — stored securely in Floatup' },
+      { emoji: '🔗', text: 'Paste a Google Drive or Dropbox link — it attaches in one click, no login required from the viewer' },
+      { emoji: '📂', text: 'Compliance tasks have per-type slots: Acknowledgement, Computation, Challan, Form 26AS, etc.' },
+      { emoji: '👁️', text: 'All attachments are visible to the assignee, approver, and managers — no extra sharing needed' },
+    ],
+    Illustration: IllustrationUploads,
+  },
+  {
+    id: 'task-detail',
+    icon: '📋', color: '#0d9488', accent: 'rgba(13,148,136,0.1)',
+    title: 'Everything About a Task — In One Panel',
+    subtitle: 'Click any task card to open the detail panel',
+    body: "Every task in Floatup has a rich side panel. Attachments, threaded comments, blocked-by links, due date, priority, assignee, and approver — all in one place. Your team stops using WhatsApp for task updates because everything they need is already here.",
+    bullets: [
+      { emoji: '💬', text: 'Threaded comments on every task — tag a teammate with @name to notify them instantly' },
+      { emoji: '🔗', text: '"Blocked by" field: mark that this task is waiting on another — shown as a warning badge' },
+      { emoji: '👤', text: 'Assignee does the work · Approver reviews it — two separate fields, both notified automatically' },
+      { emoji: '📎', text: 'Attach files or Drive/Dropbox links — visible to everyone with access to the task' },
+    ],
+    Illustration: IllustrationTaskDetail,
+  },
+  {
     id: 'kanban',
     icon: '📊', color: '#7c3aed', accent: 'rgba(124,58,237,0.1)',
-    title: 'Kanban Board — Visual Task Tracking',
+    title: 'Kanban Board — See Every Task at a Glance',
     subtitle: 'Sidebar → My Tasks → Board tab',
-    body: "The Kanban board gives your team a visual overview of all work in progress. Drag cards between columns as work moves forward. Each column is a status: To Do → In Progress → In Review → Done. Filter by client, priority, or team member.",
+    body: "The Kanban board is your firm's visual command centre. Every task sits in a column matching its status: To Do, In Progress, In Review, Done. Overdue tasks are highlighted automatically. Drag a card to the next column and the status updates instantly.",
     bullets: [
-      { emoji: '🟠', text: 'Overdue column is highlighted in red — nothing stays forgotten' },
-      { emoji: '🖱️', text: 'Drag & drop any card to change its status — no forms, instant update' },
-      { emoji: '🔍', text: 'Filter bar: narrow by client, date range, priority, or assignee simultaneously' },
-      { emoji: '📋', text: 'Switch to List view for a sortable table — same filters apply' },
+      { emoji: '🔴', text: 'Overdue column turns red automatically — no task can hide in the wrong status' },
+      { emoji: '🖱️', text: 'Drag any card between columns to change status — no form, no button, instant update' },
+      { emoji: '🔍', text: 'Filter bar: narrow by client, assignee, priority, or date range — all filters work together' },
+      { emoji: '📋', text: 'Switch to List view for a sortable table of all tasks — same filters apply in both views' },
     ],
     path: '/tasks',
     Illustration: IllustrationKanban,
   },
   {
-    id: 'task-detail',
-    icon: '📋', color: '#0d9488', accent: 'rgba(13,148,136,0.1)',
-    title: 'Inside Every Task',
-    subtitle: 'Click any task card to open the detail panel',
-    body: "Every task has a rich detail panel — accessible with a single click. This is where your team does the real work: attach documents, discuss in threaded comments, mark blockers, and set ownership. Nothing needs to go to WhatsApp.",
-    bullets: [
-      { emoji: '📎', text: 'Attach PDFs, images, Excel files — or paste a Drive/Dropbox URL' },
-      { emoji: '💬', text: 'Threaded comments: discuss inline, tag a teammate with @name' },
-      { emoji: '🔗', text: '"Blocked by" field: link another task that must finish first' },
-      { emoji: '👤', text: 'Separate Assignee (does the work) and Approver (reviews it) per task' },
-    ],
-    Illustration: IllustrationTaskDetail,
-  },
-  {
     id: 'approvals',
     icon: '✅', color: '#7c3aed', accent: 'rgba(124,58,237,0.1)',
-    title: 'Approval Workflow',
+    title: 'Built-In Approval Workflow',
     subtitle: 'My Tasks → Needs Approval tab',
-    body: "When a team member finishes a task they click 'Submit for Review'. The task moves to Pending Review and the designated approver gets a notification. The approver can approve (closes the task) or return it with a comment (resets to To Do).",
+    body: "Floatup has a two-step approval process baked in. The assignee completes the work and clicks 'Submit for Review'. The task goes into Pending Review. The approver gets an email notification and can approve (closes the task) or return it with a comment (sends it back for revision).",
     bullets: [
-      { emoji: '📤', text: 'Assignee clicks Submit → task enters "Pending Review" status automatically' },
-      { emoji: '🔔', text: 'Approver receives an email + in-app notification immediately' },
-      { emoji: '✓', text: 'Approve → task closes with timestamp · Return → task reopens with feedback' },
-      { emoji: '🗂️', text: 'Full audit trail: every status change is logged with user + timestamp' },
+      { emoji: '📤', text: 'Assignee clicks Submit → task status changes to Pending Review automatically' },
+      { emoji: '🔔', text: 'Approver gets an email + in-app notification the moment it is submitted' },
+      { emoji: '✓', text: 'Approve → task closes with a timestamp · Return → reopens to assignee with the reviewer\'s comment' },
+      { emoji: '🗂️', text: 'Every status change is logged: who did what and when — permanent, tamper-proof audit trail' },
     ],
     path: '/tasks',
     Illustration: IllustrationApproval,
@@ -862,14 +1012,14 @@ const STEPS: Step[] = [
   {
     id: 'my-tasks',
     icon: '📋', color: '#059669', accent: 'rgba(5,150,105,0.1)',
-    title: 'My Tasks — Your Daily Command Centre',
+    title: 'My Tasks — Start Every Day Here',
     subtitle: 'Sidebar → My Tasks',
-    body: "My Tasks is where every team member starts their day. The stats bar shows exactly what needs attention right now. Three tabs give complete visibility: your own tasks, things waiting for your approval, and tasks you've assigned to others.",
+    body: "My Tasks is the personal dashboard every team member opens at the start of their day. The stats bar at the top tells them exactly what needs attention: overdue items, today's tasks, tasks pending their approval, and completed count. No briefing call needed.",
     bullets: [
-      { emoji: '⚠️', text: 'Stats strip at the top: Overdue · Due Today · Needs Approval · Completed' },
-      { emoji: '📋', text: 'My Tasks tab — Board view (Kanban) or List view, toggled top-right' },
-      { emoji: '⏳', text: 'Needs Approval tab — all tasks waiting for your sign-off in one place' },
-      { emoji: '📤', text: 'Assigned by Me tab — track every task you\'ve delegated and its current status' },
+      { emoji: '⚠️', text: 'Stats strip: Overdue (red) · Due Today · Needs Approval · Completed — always up to date' },
+      { emoji: '📋', text: 'My Tasks tab — toggle between Kanban board view and flat List view from the top-right corner' },
+      { emoji: '⏳', text: 'Needs Approval tab — every task waiting for your sign-off, sorted by submission date' },
+      { emoji: '📤', text: 'Assigned by Me tab — track every task you have delegated and its current live status' },
     ],
     path: '/tasks',
     actionLabel: 'Open My Tasks',
@@ -879,14 +1029,14 @@ const STEPS: Step[] = [
   {
     id: 'recurring',
     icon: '🔁', color: '#0d9488', accent: 'rgba(13,148,136,0.1)',
-    title: 'Recurring Tasks — Never Set Up Twice',
+    title: 'Recurring Tasks — Set Once, Run Forever',
     subtitle: 'Sidebar → Repeat Tasks → + New Recurring Task',
-    body: "For any task that repeats — monthly billing, weekly calls, quarterly reviews — create it once as a recurring template. Floatup automatically spawns a fresh copy on the due schedule. Each instance is independent with its own status and attachments.",
+    body: "Monthly GST filings, weekly client calls, quarterly reviews — set these up once as recurring templates and never think about them again. Floatup spawns a new independent task automatically before each due date, with the assignee already set.",
     bullets: [
-      { emoji: '🔁', text: 'Frequencies: daily, every N days, weekly (Mon–Sun), bi-weekly, monthly, quarterly, annual' },
-      { emoji: '📅', text: 'Instances auto-spawn N days before the due date so work starts on time' },
-      { emoji: '👤', text: 'Spawned instances inherit the assignee and approver from the template' },
-      { emoji: '📊', text: 'Repeat Tasks page shows all templates with next occurrence date and status' },
+      { emoji: '🔁', text: 'Frequencies: daily · every N days · weekly on specific days · bi-weekly · monthly · quarterly · annual' },
+      { emoji: '📅', text: 'Each task spawns N days before the due date so work starts on time — not on the deadline day' },
+      { emoji: '👤', text: 'Every spawned instance inherits the assignee and approver from the master template automatically' },
+      { emoji: '📊', text: 'Repeat Tasks page lists all templates with last and next occurrence dates at a glance' },
     ],
     path: '/recurring',
     Illustration: IllustrationRecurring,
@@ -894,14 +1044,14 @@ const STEPS: Step[] = [
   {
     id: 'calendar',
     icon: '📅', color: '#d97706', accent: 'rgba(217,119,6,0.1)',
-    title: 'Calendar — Every Deadline in One View',
+    title: 'Calendar — Every Filing Deadline Visible',
     subtitle: 'Sidebar → Calendar',
-    body: "The Calendar shows all task due dates across your entire firm — compliance, ad-hoc, and recurring — plotted on a month view. Use it for weekly planning meetings: filter to a client or a team member to see their personal workload.",
+    body: "The Calendar plots every task due date across your entire firm on a single month view — compliance, ad-hoc, recurring, and projects. Use it in weekly planning meetings to filter down to one client or one team member and see their exact workload for the month.",
     bullets: [
-      { emoji: '📆', text: 'All deadlines on one calendar — compliance, projects, ad-hoc, and recurring' },
-      { emoji: '🎨', text: 'Colour-coded by type: CA (amber) · Project (violet) · Recurring (teal) · One-time (cyan)' },
-      { emoji: '👤', text: 'Filter by team member to see one person\'s schedule for a planning conversation' },
-      { emoji: '⏰', text: 'Upcoming CA compliance triggers shown 7 days before they spawn — plan ahead' },
+      { emoji: '📆', text: 'One calendar for everything: CA compliance, project tasks, recurring tasks, and one-off tasks' },
+      { emoji: '🎨', text: 'Colour-coded: CA filings (amber) · Projects (violet) · Recurring (teal) · One-off (cyan)' },
+      { emoji: '👤', text: 'Filter to a single team member\'s tasks — ideal for workload planning conversations' },
+      { emoji: '⏰', text: 'CA compliance tasks appear 7 days before they are due so the team can plan in advance' },
     ],
     path: '/calendar',
     Illustration: IllustrationCalendar,
@@ -909,14 +1059,14 @@ const STEPS: Step[] = [
   {
     id: 'monitor',
     icon: '📡', color: '#7c3aed', accent: 'rgba(124,58,237,0.1)',
-    title: 'Monitor — Firm-Wide Dashboard',
-    subtitle: 'Sidebar → Monitor (managers & admins)',
-    body: "Monitor is the management view. It shows every team member's task load, overdue count, and activity — in real time. No more asking 'what are you working on?' — the answer is always on screen. Available to Manager, Admin, and Owner roles.",
+    title: 'Monitor — Know Without Asking',
+    subtitle: 'Sidebar → Monitor  (Manager, Admin & Owner only)',
+    body: "Monitor is the management layer. It shows every team member's current workload, overdue count, in-review tasks, and live activity feed — without you having to ask anyone anything. Stop the daily 'what's the status?' WhatsApp message — open Monitor instead.",
     bullets: [
-      { emoji: '📊', text: 'Workload bars per person — see instantly who has capacity and who is buried' },
-      { emoji: '🔴', text: 'Overdue counter per person highlights issues before they become client problems' },
-      { emoji: '🔔', text: 'Live activity feed: every task update, comment, and status change timestamped' },
-      { emoji: '🎯', text: 'Filter by date range, client, or team member for a focused view' },
+      { emoji: '📊', text: 'Workload progress bars per person — see who has capacity and who is buried at a glance' },
+      { emoji: '🔴', text: 'Per-person overdue counter — surface problems before they become client escalations' },
+      { emoji: '🔔', text: 'Live activity feed: every task update, comment, and status change with timestamp' },
+      { emoji: '🎯', text: 'Filter by date range, client group, or individual team member for a focused view' },
     ],
     path: '/monitor',
     actionLabel: 'Open Monitor',
@@ -924,32 +1074,66 @@ const STEPS: Step[] = [
     Illustration: IllustrationMonitor,
   },
   {
+    id: 'reports',
+    icon: '📈', color: '#7c3aed', accent: 'rgba(124,58,237,0.1)',
+    title: 'Reports — Compliance & Performance Analytics',
+    subtitle: 'Sidebar → Reports',
+    body: "Reports gives you three powerful dashboards in one page. Overview shows KPIs and task trends. Team Performance shows each member's completion rate, overdue count, and hours logged. Compliance Report shows filing status across every client — filter by date range, team member, priority, or client.",
+    bullets: [
+      { emoji: '📊', text: 'Overview tab: Tasks created · Completed · Overdue · Hours logged — all with 30-day trends' },
+      { emoji: '👥', text: 'Team Performance tab: per-member completion rate, on-time %, average days to close, hours logged' },
+      { emoji: '⚖️', text: 'Compliance Report tab: see overdue, due today, and upcoming filings across all clients at once' },
+      { emoji: '🔍', text: 'Universal filter bar: narrow by date range, client, team member, priority, or status instantly' },
+    ],
+    path: '/reports',
+    actionLabel: 'Open Reports',
+    actionHref: '/reports',
+    Illustration: IllustrationReports,
+  },
+  {
+    id: 'team',
+    icon: '👥', color: '#0d9488', accent: 'rgba(13,148,136,0.1)',
+    title: 'Set Up Your Team',
+    subtitle: 'Settings → Team → + Invite Member',
+    body: "Add your entire staff before you start assigning tasks. Go to Settings → Team, enter their email address, choose their role, and click Send Invite. They get a magic-link email and can log in immediately — no password setup, no app download required.",
+    bullets: [
+      { emoji: '👑', text: 'Owner — full access including billing and the ability to delete the organisation' },
+      { emoji: '🛡️', text: 'Admin — same as Owner except billing and org deletion' },
+      { emoji: '📋', text: 'Manager — can view all tasks, approve work, and manage clients across the whole team' },
+      { emoji: '👤', text: 'Member — sees only tasks assigned to them; their work stays private from other members' },
+    ],
+    path: '/settings',
+    actionLabel: 'Go to Team Settings',
+    actionHref: '/settings',
+    Illustration: IllustrationTeam,
+  },
+  {
     id: 'multi-org',
     icon: '🏢', color: '#0d9488', accent: 'rgba(13,148,136,0.1)',
-    title: 'Multiple Organisations',
-    subtitle: 'Click the org name at the top of the sidebar',
-    body: "If you manage multiple firms, partnerships, or entities, each can have its own independent organisation on Floatup — separate clients, separate team, separate settings. Switch between them instantly using the org switcher at the top of the sidebar.",
+    title: 'Run Multiple Firms from One Login',
+    subtitle: 'Click the org name at the top of the sidebar to switch',
+    body: "If you run multiple practices, partnerships, or entities — each gets its own completely isolated organisation in Floatup. One login covers all of them. Switch between organisations instantly from the org switcher at the top of the sidebar — no re-login, no confusion.",
     bullets: [
-      { emoji: '🏢', text: 'One login — unlimited organisations, switch in one click with no re-login' },
-      { emoji: '🔒', text: 'Fully isolated: clients, tasks, and team members never cross between orgs' },
-      { emoji: '👥', text: 'Each org has its own roles — you can be Owner in one and Member in another' },
-      { emoji: '➕', text: 'Create a new org anytime from the switcher dropdown → "New organisation"' },
+      { emoji: '🏢', text: 'One Floatup account — unlimited organisations, switch in one click with zero re-login' },
+      { emoji: '🔒', text: 'Fully isolated: clients, tasks, team, and settings never mix between organisations' },
+      { emoji: '👥', text: 'Different roles per org — you can be Owner of one firm and a Manager in another' },
+      { emoji: '➕', text: 'Create a new organisation any time from the switcher → "New organisation" button' },
     ],
     Illustration: IllustrationMultiOrg,
   },
   {
     id: 'done',
     icon: '🚀', color: '#16a34a', accent: 'rgba(22,163,74,0.1)',
-    title: "You're All Set — Start in 4 Steps",
-    subtitle: 'Your firm is ready for auto-pilot',
-    body: "You've seen everything. Here's the fastest path to getting real value today. Most firms are fully operational within 30 minutes of completing these four steps — and saving hours every single week from that point forward.",
+    title: "Your Firm is Ready — 4 Steps to Full Value",
+    subtitle: 'Most firms are operational within 30 minutes',
+    body: "You have seen every feature. Here is the fastest path to getting real value today — most CA firms complete these four steps in under 30 minutes and start saving hours every single week from that moment forward.",
     bullets: [
-      { emoji: '1️⃣', text: 'Add clients (or import from Excel) — takes 5 minutes' },
-      { emoji: '2️⃣', text: 'Open CA Compliance → generate filings for all clients in 3 clicks' },
-      { emoji: '3️⃣', text: 'Invite your team from Settings → Team' },
-      { emoji: '4️⃣', text: 'Assign tasks on the Kanban board and track progress daily' },
+      { emoji: '1️⃣', text: 'Import all clients from Excel using the starter template — takes 5 minutes for any size list' },
+      { emoji: '2️⃣', text: 'Go to CA Compliance → pick your task types → select clients → Generate — done in 3 clicks' },
+      { emoji: '3️⃣', text: 'Settings → Team: invite every staff member with their email and assign their role' },
+      { emoji: '4️⃣', text: 'Open the Kanban board, assign tasks, and check Monitor daily — your firm runs on auto-pilot' },
     ],
-    actionLabel: '+ Add your first client',
+    actionLabel: '+ Import or add your first client',
     actionHref: '/clients',
     Illustration: IllustrationDone,
   },

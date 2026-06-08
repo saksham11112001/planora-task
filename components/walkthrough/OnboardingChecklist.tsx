@@ -5,27 +5,51 @@ import { useRouter, usePathname } from 'next/navigation'
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface ChecklistStep {
-  id:       string
-  emoji:    string
-  label:    string
-  detail:   string
-  href:     string
-  pageVisit?: string   // pathname that auto-completes this step
+  id:        string
+  emoji:     string
+  label:     string
+  detail:    string
+  substeps:  string[]   // numbered action steps shown when expanded
+  href:      string
+  pageVisit?: string    // pathname that auto-completes this step
 }
 
 const STEPS: ChecklistStep[] = [
   {
-    id:        'tour',
-    emoji:     '🎬',
-    label:     'Watch the product tour',
-    detail:    'A 90-second walkthrough of every feature in Floatup.',
-    href:      '/walkthrough',
+    id:    'tour',
+    emoji: '🎬',
+    label: 'Watch the product tour',
+    detail: 'A full walkthrough of every Floatup feature — clients, compliance, tasks, approvals, reports, and more. Takes about 3 minutes and answers most questions before you even ask them.',
+    substeps: [
+      'Click the arrow to open the tour in full-screen',
+      'Use arrow keys or the Next button to move between slides',
+      'Each slide shows the exact menu path to find the feature',
+    ],
+    href: '/walkthrough',
   },
   {
     id:        'client',
     emoji:     '👤',
-    label:     'Add your first client',
-    detail:    'Enter GSTIN and business details auto-fill. Compliance tasks generate automatically.',
+    label:     'Add or import your clients',
+    detail:    'Every client gets their own workspace — compliance tasks, documents, and team notes all in one place. Add manually (GSTIN auto-fills the name and state) or bulk-import from an Excel file.',
+    substeps: [
+      'Sidebar → Clients → click + Add Client',
+      'Type the GSTIN — name, state, and entity type fill automatically',
+      'To import many clients: click Import, download the template, fill it, upload',
+    ],
+    href:      '/clients',
+    pageVisit: '/clients',
+  },
+  {
+    id:    'groups',
+    emoji: '📁',
+    label: 'Organise clients into groups',
+    detail: 'Groups let you manage clients by category — GST Clients, Audit Clients, Individual ITR, Manufacturing, etc. Once grouped, you can generate filings, filter Kanban, and pull reports for an entire group at once.',
+    substeps: [
+      'Sidebar → Clients → Groups tab → + New Group',
+      'Give the group a name (e.g. "GST Clients" or "Audit Clients")',
+      'Assign existing clients to the group from the client form or drag-and-drop',
+    ],
     href:      '/clients',
     pageVisit: '/clients',
   },
@@ -33,31 +57,96 @@ const STEPS: ChecklistStep[] = [
     id:        'compliance',
     emoji:     '⚖️',
     label:     'Generate compliance tasks',
-    detail:    'Select tasks (GSTR, TDS, ITR…), pick clients, and Floatup creates everything on the right due dates.',
+    detail:    'In 3 clicks, Floatup creates one task per client with the correct statutory due date for every filing type you select. No manual entry, no missed deadlines — 69+ task types come pre-loaded.',
+    substeps: [
+      'Sidebar → CA Compliance → click Generate Tasks',
+      'Step 1: tick the filing types — GSTR-1, GSTR-3B, TDS Q1-Q4, ITR, ROC, PF, ESI, PT…',
+      'Step 2: choose clients (individual, by group, or select all)',
+      'Step 3: click Generate — all tasks appear on your Kanban instantly',
+    ],
+    href:      '/compliance',
+    pageVisit: '/compliance',
+  },
+  {
+    id:    'nil-attach',
+    emoji: '📎',
+    label: 'File a return and attach documents',
+    detail: 'Click any compliance task to open its detail panel. Attach the acknowledgement, computation sheet, and challan to the correct slots. For clients with no transactions this period, tick the NIL Return checkbox — no documents needed.',
+    substeps: [
+      'CA Compliance (or Kanban) → click any task card to open the panel',
+      'To mark NIL: tick the "Mark as NIL Return" checkbox — task closes automatically',
+      'To attach: click Upload File, or paste a Google Drive / Dropbox link',
+      'Each task type has its own slots: Acknowledgement, Computation, Challan, Others',
+    ],
     href:      '/compliance',
     pageVisit: '/compliance',
   },
   {
     id:        'team',
     emoji:     '👥',
-    label:     'Invite a team member',
-    detail:    'Settings → Team → Invite. They get an email link and can log in immediately.',
+    label:     'Invite your team members',
+    detail:    'Add every staff member before assigning tasks. They receive a magic-link email and can log in immediately — no password setup, no app download. Choose a role that controls what each person can see and do.',
+    substeps: [
+      'Sidebar → Settings → Team tab → + Invite Member',
+      'Enter their email address and choose a role: Owner / Admin / Manager / Member',
+      'Member: sees only their own assigned tasks · Manager: sees all tasks, can approve work',
+      'They get an email with a one-click login link',
+    ],
     href:      '/settings',
     pageVisit: '/settings',
   },
   {
-    id:        'task',
-    emoji:     '✅',
-    label:     'Create a quick task',
-    detail:    'Quick Tasks are for ad-hoc work outside compliance — calls, drafts, follow-ups.',
+    id:    'task',
+    emoji: '✅',
+    label: 'Create a task and assign it',
+    detail: 'Ad-hoc tasks are for work that is not a compliance filing — client calls, document drafts, follow-ups, internal work. Create one, set a due date and priority, and assign it to a team member. They will see it in My Tasks immediately.',
+    substeps: [
+      'Sidebar → My Tasks → + New Task button (top right)',
+      'Enter a title, set the due date, and choose a priority (Urgent / High / Medium / Low)',
+      'Assign to a team member — they get an in-app notification',
+      'Optional: set an Approver — the assigned person must submit for their review when done',
+    ],
     href:      '/tasks',
     pageVisit: '/tasks',
+  },
+  {
+    id:    'kanban',
+    emoji: '📊',
+    label: 'Use the Kanban board to track work',
+    detail: 'The Kanban board is your firm\'s visual task tracker. Every task sits in a column matching its status. Drag cards to change status. Overdue tasks are highlighted in red automatically — nothing hides in the wrong column.',
+    substeps: [
+      'Sidebar → My Tasks → Board tab (default view)',
+      'Drag any card left or right to change its status — To Do → In Progress → In Review → Done',
+      'Use the filter bar to narrow by client, assignee, priority, or date range',
+      'Switch to List view (top-right toggle) for a sortable table of all tasks',
+    ],
+    href:      '/tasks',
+    pageVisit: '/tasks',
+  },
+  {
+    id:        'approval',
+    emoji:     '✔️',
+    label:     'Try the approval workflow',
+    detail:    'When a team member finishes a task, they submit it for review. You get an email notification and it appears in your Needs Approval tab. Approve it (task closes with a timestamp) or return it with a comment (sends it back for revision).',
+    substeps: [
+      'My Tasks → Needs Approval tab — all pending reviews appear here',
+      'Assignee side: open the task → click Submit for Review',
+      'Approver side: click Approve to close the task, or Return with a comment to reopen it',
+      'Every action is logged: who approved what and when — permanent audit trail',
+    ],
+    href:      '/tasks',
   },
   {
     id:        'recurring',
     emoji:     '🔁',
     label:     'Set up a recurring task',
-    detail:    'Repeat Tasks auto-spawn a fresh copy on schedule. Monthly, quarterly, or custom.',
+    detail:    'For work that repeats on a schedule — monthly billing, weekly calls, quarterly reports — create it once as a template. Floatup spawns a fresh independent copy automatically before each due date. The assignee is inherited from the template.',
+    substeps: [
+      'Sidebar → Repeat Tasks → + New Recurring Task',
+      'Choose frequency: daily / weekly on specific days / monthly / quarterly / annual',
+      'Set assignee and approver — every spawned instance inherits these automatically',
+      'Each instance is independent: its own status, attachments, and comments',
+    ],
     href:      '/recurring',
     pageVisit: '/recurring',
   },
@@ -65,16 +154,56 @@ const STEPS: ChecklistStep[] = [
     id:        'calendar',
     emoji:     '📅',
     label:     'Check the deadline calendar',
-    detail:    'Every task due date for all clients and team members in one view.',
+    detail:    'The Calendar plots every due date — compliance, recurring, and ad-hoc — on one month view. Use it for weekly planning meetings. Filter to a single team member or client to see their exact workload for the month.',
+    substeps: [
+      'Sidebar → Calendar',
+      'Colour codes: Amber = CA filings · Violet = projects · Teal = recurring · Cyan = one-off',
+      'Click any dot to open that task directly',
+      'Use the filter bar to narrow to one team member\'s schedule or one client\'s deadlines',
+    ],
     href:      '/calendar',
     pageVisit: '/calendar',
   },
   {
-    id:        'approval',
-    emoji:     '✔️',
-    label:     'Review the approval workflow',
-    detail:    'My Tasks → Needs Approval. When a team member submits work, you approve or return it here.',
-    href:      '/tasks',
+    id:    'monitor',
+    emoji: '📡',
+    label: 'Open Monitor to see team workload',
+    detail: 'Monitor is the management dashboard — visible to Managers, Admins, and Owners. It shows every team member\'s task count, overdue items, and in-review tasks in real time. Stop asking "what\'s the status?" — the answer is always here.',
+    substeps: [
+      'Sidebar → Monitor (only visible to Manager / Admin / Owner roles)',
+      'Workload bars show each person\'s completion rate at a glance',
+      'Overdue count per person turns red — surface problems before they escalate',
+      'Live activity feed shows every task update and comment with a timestamp',
+    ],
+    href:      '/monitor',
+    pageVisit: '/monitor',
+  },
+  {
+    id:    'reports',
+    emoji: '📈',
+    label: 'Explore the Reports dashboard',
+    detail: 'Reports has three tabs: Overview (KPIs and 14-day task trends), Team Performance (per-member stats, on-time rate, hours logged), and Compliance Report (filing status across every client with date and member filters).',
+    substeps: [
+      'Sidebar → Reports',
+      'Overview tab: Tasks created · Completed · Overdue · Hours logged — last 30 days',
+      'Team tab: click any team member\'s row to expand their weekly trend chart',
+      'Compliance tab: use the filter bar to narrow by client, member, priority, or date range',
+    ],
+    href:      '/reports',
+    pageVisit: '/reports',
+  },
+  {
+    id:    'multi-org',
+    emoji: '🏢',
+    label: 'Create or switch organisations',
+    detail: 'If you manage multiple firms, partnerships, or entities — each gets its own completely isolated organisation. One login covers all of them. Switch instantly from the org switcher at the top of the sidebar with no re-login.',
+    substeps: [
+      'Click the organisation name at the very top of the sidebar',
+      'Switch: click any other org in the dropdown — you move there instantly',
+      'Create new: scroll to the bottom of the switcher → New organisation',
+      'Each org has its own clients, tasks, team, and settings — nothing crosses over',
+    ],
+    href:      '/dashboard',
   },
 ]
 
@@ -332,12 +461,20 @@ export function OnboardingChecklist({ userId, userCreatedAt }: Props) {
                     </span>
                   </div>
                   {!done && (
-                    <p style={{
-                      margin: 0, fontSize: 12, color: 'var(--text-muted)',
-                      lineHeight: 1.4,
-                    }}>
-                      {step.detail}
-                    </p>
+                    <>
+                      <p style={{ margin: '0 0 6px', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.45 }}>
+                        {step.detail}
+                      </p>
+                      {step.substeps.length > 0 && (
+                        <ol style={{ margin: 0, paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                          {step.substeps.map((s, si) => (
+                            <li key={si} style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                              {s}
+                            </li>
+                          ))}
+                        </ol>
+                      )}
+                    </>
                   )}
                 </div>
 
