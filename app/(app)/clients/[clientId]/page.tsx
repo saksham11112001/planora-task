@@ -6,7 +6,10 @@ import Link                   from 'next/link'
 import { ArrowLeft, FolderOpen, ExternalLink, Pencil, Clock, CheckSquare, AlertCircle } from 'lucide-react'
 import { ProjectStatusBadge }   from '@/components/ui/Badge'
 import { fmtDate, fmtHours }    from '@/lib/utils/format'
-import { ClientPortalSection }  from './ClientPortalSection'
+import { ClientPortalSection }      from './ClientPortalSection'
+import { ClientNoticesSection }     from './ClientNoticesSection'
+import { ClientCredentialsSection } from './ClientCredentialsSection'
+import ClientOnboardingChecklist from './ClientOnboardingChecklist'
 import { createAdminClient }    from '@/lib/supabase/admin'
 import type { Metadata }        from 'next'
 export const metadata: Metadata = { title: 'Client' }
@@ -151,6 +154,10 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
           </div>
         </div>
 
+        {canManage && (
+          <ClientOnboardingChecklist clientId={client.id} clientName={client.name} canManage={canManage} />
+        )}
+
         {/* Client Portal — visible to owners/admins/managers only */}
         {canManage && (
           <div className="mb-6">
@@ -200,6 +207,18 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
                 </Link>
               )
             })}
+          </div>
+        )}
+
+        {/* Notice Tracker */}
+        <div className="mb-6">
+          <ClientNoticesSection clientId={client.id} canManage={canManage} />
+        </div>
+
+        {/* Credentials Vault — manager+ only */}
+        {canManage && (
+          <div className="mb-6">
+            <ClientCredentialsSection clientId={client.id} canManage={canManage} />
           </div>
         )}
       </div>

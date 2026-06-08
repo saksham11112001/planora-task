@@ -3,6 +3,7 @@
 import { CustomFieldsPanel } from '@/components/tasks/CustomFieldsPanel'
 import type { CustomFieldDef } from '@/components/tasks/CustomFieldsPanel'
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { X, ThumbsUp, ThumbsDown, Flag, Calendar, User, Briefcase, Send, Clock, Sparkles, ShieldCheck, RefreshCw, FolderPlus, ArrowRightLeft, ExternalLink, Link2, Repeat2, DollarSign } from 'lucide-react'
 import { FREQ_LABEL, FrequencyPickerButton } from '@/components/tasks/InlineRecurringTask'
 import { nextOccurrence, inferGranularFrequency } from '@/lib/utils/recurringSchedule'
@@ -40,6 +41,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
   // isContextTask: this parent task was surfaced because the current user is assigned
   // to one of its subtasks, not to the task itself — show read-only with a banner.
   const isContextTask = !!(task as any)?.custom_fields?._context_task
+  const router = useRouter()
 
   /* local editable state */
   const [title,       setTitle]       = useState('')
@@ -958,7 +960,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                   display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <ThumbsUp style={{ width: 14, height: 14, color: '#fff' }}/>
                 </div>
-                <div>
+                <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#15803d' }}>Approved & Completed ✓</p>
                   {(task as any).completed_at && (
                     <p style={{ margin: '2px 0 0', fontSize: 11, color: '#16a34a' }}>
@@ -969,6 +971,23 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                     </p>
                   )}
                 </div>
+                {task.status === 'completed' && task.client_id && (
+                  <button
+                    onClick={() => router.push(`/invoices?from_task=${task.id}&client=${task.client_id}&title=${encodeURIComponent(task.title ?? '')}`)}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 5,
+                      padding: '5px 12px', borderRadius: 7,
+                      background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.25)',
+                      color: '#7c3aed', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                      fontFamily: 'inherit', flexShrink: 0,
+                    }}
+                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(124,58,237,0.15)'}
+                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'rgba(124,58,237,0.08)'}
+                    title="Create an invoice for this task"
+                  >
+                    🧾 Bill this task
+                  </button>
+                )}
               </div>
             )}
 

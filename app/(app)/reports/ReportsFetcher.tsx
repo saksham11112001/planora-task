@@ -25,6 +25,7 @@ export async function ReportsFetcher() {
     { data: members },
     { data: clients },
     { data: complianceTasksRaw },
+    { data: wipTasksRaw },
   ] = await Promise.all([
     supabase.from('tasks')
       .select('id, title, status, priority, due_date, assignee_id, created_at, completed_at, project_id')
@@ -49,6 +50,14 @@ export async function ReportsFetcher() {
       .select('id, title, status, priority, due_date, created_at, completed_at, custom_fields, assignee_id, client_id')
       .eq('org_id', orgId).neq('is_archived', true).is('parent_task_id', null)
       .gte('created_at', from90).limit(20000),
+    supabase.from('tasks')
+      .select('id, title, status, priority, due_date, assignee_id, project_id, client_id, is_billable, billable_amount, created_at')
+      .eq('org_id', orgId)
+      .in('status', ['todo', 'in_progress', 'in_review'])
+      .neq('is_archived', true)
+      .is('parent_task_id', null)
+      .eq('is_recurring', false)
+      .limit(2000),
   ])
 
   const tasks   = allTasks ?? []
@@ -149,6 +158,27 @@ export async function ReportsFetcher() {
     }
   }).sort((a, b) => b.completed - a.completed)
 
+  // ── WIP data ────────────────────────────────────────────────────────────
+  const wipData = (wipTasksRaw ?? []).map(t => {
+    const memberHours = (timeLogs ?? []).filter(l => l.project_id === t.project_id).reduce((s, l) => s + (l.hours ?? 0), 0)
+    const member = (members ?? []).find((m: any) => ((m.users as any)?.id ?? m.user_id) === t.assignee_id)
+    const clientObj = (clients ?? []).find(c => c.id === t.client_id)
+    return {
+      id: t.id,
+      title: t.title,
+      status: t.status,
+      priority: t.priority,
+      due_date: t.due_date,
+      assignee_name: (member?.users as any)?.name ?? null,
+      client_id: t.client_id,
+      client_name: clientObj?.name ?? null,
+      client_color: clientObj?.color ?? '#94a3b8',
+      hours_logged: Math.round(memberHours * 10) / 10,
+      is_billable: t.is_billable,
+    }
+  })
+  // ── end WIP data ────────────────────────────────────────────────────────
+
   // ── Compliance raw tasks — aggregation done client-side for filtering ──
   const complianceRawTasks = (complianceTasksRaw ?? []) as {
     id: string; title: string; status: string; priority: string
@@ -202,6 +232,7 @@ export async function ReportsFetcher() {
           userRole={mb.role}
           complianceRawTasks={complianceRawTasks}
           complianceMemberList={complianceMemberList}
+          wipData={wipData}
         />
       </div>
     </div>

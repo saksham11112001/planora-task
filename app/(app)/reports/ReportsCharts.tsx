@@ -51,6 +51,12 @@ interface Props {
   employeeStats:   EmployeeStat[]
   complianceRawTasks?:   ComplianceRawTask[]
   complianceMemberList?: { id: string; name: string }[]
+  wipData?: {
+    id: string; title: string; status: string; priority: string
+    due_date: string | null; assignee_name: string | null
+    client_id: string | null; client_name: string | null; client_color: string
+    hours_logged: number; is_billable: boolean
+  }[]
 }
 
 const COLORS = ['#0d9488','#7c3aed','#dc2626','#ca8a04','#0891b2','#16a34a']
@@ -323,8 +329,8 @@ function buildComplianceData(
 }
 // ────────────────────────────────────────────────────────────────────────────
 
-export function ReportsCharts({ dailyData, memberData, priorityData, projectData, timeByProject, employeeStats, currentUserId, userRole, clients = [], complianceRawTasks = [], complianceMemberList = [] }: Props) {
-  const [activeTab,    setActiveTab]    = useState<'overview' | 'team' | 'compliance'>('overview')
+export function ReportsCharts({ dailyData, memberData, priorityData, projectData, timeByProject, employeeStats, currentUserId, userRole, clients = [], complianceRawTasks = [], complianceMemberList = [], wipData = [] }: Props) {
+  const [activeTab,    setActiveTab]    = useState<'overview' | 'team' | 'compliance' | 'wip'>('overview')
   const [clientFilter, setClientFilter] = useState('')
   const [timeline,     setTimeline]     = useState<'30' | '60' | '90' | '365'>('90')
   const [empFilter,    setEmpFilter]    = useState('')
@@ -421,6 +427,7 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
           { v: 'overview',   label: '📊 Overview' },
           { v: 'team',       label: '👤 Team Performance' },
           { v: 'compliance', label: '📋 Compliance Report' },
+          { v: 'wip',        label: '🔄 WIP Report' },
         ] as const).map(({ v, label }) => (
           <button key={v} onClick={() => setActiveTab(v)}
             style={{
@@ -677,6 +684,180 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
             </div>
         </div>
       )}
+
+      {/* ── WIP REPORT TAB ───────────────────────────────── */}
+      {activeTab === 'wip' && (() => {
+        const PRIORITY_COLOR: Record<string, string> = {
+          urgent: '#dc2626', high: '#ea580c', medium: '#ca8a04', low: '#16a34a',
+        }
+        const STATUS_COLOR: Record<string, string> = {
+          todo: '#64748b', in_progress: '#0891b2', in_review: '#7c3aed',
+        }
+        const STATUS_LABEL: Record<string, string> = {
+          todo: 'To Do', in_progress: 'In Progress', in_review: 'In Review',
+        }
+
+        // Group by client
+        const grouped: Record<string, typeof wipData> = {}
+        wipData.forEach(t => {
+          const key = t.client_name ?? '(No Client)'
+          if (!grouped[key]) grouped[key] = []
+          grouped[key].push(t)
+        })
+        const groups = Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b))
+
+        const totalTasks    = wipData.length
+        const totalHours    = Math.round(wipData.reduce((s, t) => s + t.hours_logged, 0) * 10) / 10
+        const unbilledHours = Math.round(wipData.filter(t => !t.is_billable).reduce((s, t) => s + t.hours_logged, 0) * 10) / 10
+
+        const thStyle = {
+          padding: '9px 12px', textAlign: 'left' as const, fontWeight: 600,
+          color: 'var(--text-secondary)', borderBottom: '1px solid var(--border)',
+          fontSize: 11, textTransform: 'uppercase' as const, letterSpacing: '0.04em',
+          background: 'var(--surface-subtle)', whiteSpace: 'nowrap' as const,
+        }
+        const tdStyle = {
+          padding: '9px 12px', fontSize: 12, color: 'var(--text-primary)',
+          borderBottom: '1px solid var(--border-light)', verticalAlign: 'middle' as const,
+        }
+
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {wipData.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '60px 24px', color: 'var(--text-muted)',
+                background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)' }}>
+                <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 6 }}>No in-progress tasks</p>
+                <p style={{ fontSize: 13 }}>Tasks with status todo, in_progress, or in_review will appear here</p>
+              </div>
+            ) : (
+              <>
+                {groups.map(([clientName, tasks]) => {
+                  const clientColor = tasks[0].client_color ?? '#94a3b8'
+                  const clientHours = Math.round(tasks.reduce((s, t) => s + t.hours_logged, 0) * 10) / 10
+                  const hasUnbilled = tasks.some(t => !t.is_billable)
+                  return (
+                    <div key={clientName} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+                      {/* Client header */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '12px 16px', background: clientColor + '12', borderBottom: '1px solid var(--border)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: clientColor, flexShrink: 0 }}/>
+                          <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{clientName}</span>
+                          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{tasks.length} task{tasks.length !== 1 ? 's' : ''} · {clientHours}h</span>
+                        </div>
+                        {hasUnbilled && (
+                          <button style={{
+                            padding: '5px 14px', borderRadius: 20, border: 'none', cursor: 'pointer',
+                            fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                            background: '#0891b2', color: '#fff',
+                          }}>
+                            Create Invoice
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Task table */}
+                      <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                          <thead>
+                            <tr>
+                              <th style={thStyle}>Task</th>
+                              <th style={thStyle}>Status</th>
+                              <th style={thStyle}>Priority</th>
+                              <th style={thStyle}>Assignee</th>
+                              <th style={thStyle}>Due Date</th>
+                              <th style={{ ...thStyle, textAlign: 'right' }}>Hours</th>
+                              <th style={thStyle}>Billing</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {tasks.map(t => {
+                              const prColor = PRIORITY_COLOR[t.priority] ?? '#94a3b8'
+                              const stColor = STATUS_COLOR[t.status] ?? '#94a3b8'
+                              const isOverdue = t.due_date && t.due_date < new Date().toISOString().split('T')[0]
+                              return (
+                                <tr key={t.id} style={{ transition: 'background 0.1s' }}>
+                                  <td style={{ ...tdStyle, maxWidth: 280 }}>
+                                    <span style={{ display: 'block', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', fontWeight: 500 }}>
+                                      {t.title}
+                                    </span>
+                                  </td>
+                                  <td style={tdStyle}>
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', padding: '2px 8px',
+                                      borderRadius: 99, fontSize: 10, fontWeight: 600,
+                                      color: stColor, background: stColor + '18' }}>
+                                      {STATUS_LABEL[t.status] ?? t.status}
+                                    </span>
+                                  </td>
+                                  <td style={tdStyle}>
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', padding: '2px 8px',
+                                      borderRadius: 99, fontSize: 10, fontWeight: 600,
+                                      color: prColor, background: prColor + '18' }}>
+                                      {t.priority ? t.priority.charAt(0).toUpperCase() + t.priority.slice(1) : 'None'}
+                                    </span>
+                                  </td>
+                                  <td style={{ ...tdStyle, color: t.assignee_name ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                                    {t.assignee_name ?? '—'}
+                                  </td>
+                                  <td style={{ ...tdStyle, color: isOverdue ? '#dc2626' : 'var(--text-primary)', fontWeight: isOverdue ? 600 : 400 }}>
+                                    {t.due_date ? new Date(t.due_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                                    {isOverdue && <span style={{ fontSize: 10, marginLeft: 4, color: '#dc2626' }}>Overdue</span>}
+                                  </td>
+                                  <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600, color: '#7c3aed' }}>
+                                    {t.hours_logged}h
+                                  </td>
+                                  <td style={tdStyle}>
+                                    {t.is_billable
+                                      ? <span style={{ display: 'inline-flex', alignItems: 'center', padding: '2px 8px', borderRadius: 99, fontSize: 10, fontWeight: 600, color: '#16a34a', background: '#f0fdf4' }}>Billable</span>
+                                      : <span style={{ display: 'inline-flex', alignItems: 'center', padding: '2px 8px', borderRadius: 99, fontSize: 10, fontWeight: 600, color: '#64748b', background: '#f1f5f9' }}>Unbilled</span>
+                                    }
+                                  </td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                          <tfoot>
+                            <tr style={{ background: 'var(--surface-subtle)' }}>
+                              <td colSpan={5} style={{ ...tdStyle, fontWeight: 600, color: 'var(--text-secondary)' }}>
+                                Subtotal — {tasks.length} task{tasks.length !== 1 ? 's' : ''}
+                              </td>
+                              <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: '#7c3aed' }}>
+                                {clientHours}h
+                              </td>
+                              <td style={tdStyle}/>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
+                  )
+                })}
+
+                {/* Bottom summary card */}
+                <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '20px 24px' }}>
+                  <h3 style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
+                    Summary
+                  </h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+                    <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 10, padding: '16px 18px', textAlign: 'center' }}>
+                      <p style={{ fontSize: 11, fontWeight: 600, color: '#0891b2', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>In-Progress Tasks</p>
+                      <p style={{ fontSize: 32, fontWeight: 900, color: '#0891b2', lineHeight: 1 }}>{totalTasks}</p>
+                    </div>
+                    <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 10, padding: '16px 18px', textAlign: 'center' }}>
+                      <p style={{ fontSize: 11, fontWeight: 600, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Total Hours</p>
+                      <p style={{ fontSize: 32, fontWeight: 900, color: '#7c3aed', lineHeight: 1 }}>{totalHours}h</p>
+                    </div>
+                    <div style={{ background: '#fff7ed', border: '1px solid #fdba74', borderRadius: 10, padding: '16px 18px', textAlign: 'center' }}>
+                      <p style={{ fontSize: 11, fontWeight: 600, color: '#ea580c', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Unbilled Hours</p>
+                      <p style={{ fontSize: 32, fontWeight: 900, color: '#ea580c', lineHeight: 1 }}>{unbilledHours}h</p>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )
+      })()}
 
       {/* ── TEAM PERFORMANCE TAB ──────────────────────────── */}
       {activeTab === 'team' && (
