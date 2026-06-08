@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
+import { useAppStore } from '@/store/appStore'
 
 export interface CustomFieldDef {
   key: string; label: string; type: 'text' | 'date' | 'number' | 'textarea' | 'select'; placeholder?: string; options?: string[]
@@ -61,10 +62,12 @@ const DEFAULT_NAV: NavFeatures = {
 
 // Global state shared across all hook instances
 let _cache: OrgSettings | null = null
+let _cacheOrgId: string | null = null
 let _listeners: Array<(s: OrgSettings) => void> = []
 
-function notifyAll(s: OrgSettings) {
+function notifyAll(s: OrgSettings, orgId?: string) {
   _cache = s
+  if (orgId) _cacheOrgId = orgId
   _listeners.forEach(fn => fn(s))
 }
 
@@ -116,6 +119,7 @@ async function fetchSettings(): Promise<OrgSettings> {
 }
 
 export function useOrgSettings(): OrgSettings {
+  const orgId = useAppStore(s => s.session?.org.id ?? null)
   const [state, setState] = useState<OrgSettings>(
     _cache ?? { customFields: [], taskFields: DEFAULT_TASK_FIELDS, caComplianceMode: false, navFeatures: DEFAULT_NAV, rolePermissions: null, userPermissions: null, loading: true }
   )
@@ -124,17 +128,23 @@ export function useOrgSettings(): OrgSettings {
     // Register as listener so we get notified when any instance refreshes
     _listeners.push(setState)
 
+    // Clear cache if the org has changed since last fetch
+    if (orgId && _cacheOrgId && _cacheOrgId !== orgId) {
+      _cache = null
+      _cacheOrgId = null
+    }
+
     // If we have cache use it, otherwise fetch
     if (_cache) {
       setState(_cache)
     } else {
-      fetchSettings().then(s => notifyAll(s))
+      fetchSettings().then(s => notifyAll(s, orgId ?? undefined))
     }
 
     return () => {
       _listeners = _listeners.filter(fn => fn !== setState)
     }
-  }, [])
+  }, [orgId])
 
   return state
 }
