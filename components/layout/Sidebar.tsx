@@ -421,7 +421,8 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
             )}
           </div>
         )}
-        {nav.clients && <SI href="/clients"    active={isActive('/clients')}    icon={<Users2    className="h-4 w-4"/>} label="Clients"/>}
+        {nav.clients && <SI href="/clients"    active={isActive('/clients', true)} icon={<Users2    className="h-4 w-4"/>} label="Clients"/>}
+        {nav.clients && <SI href="/clients/health" active={isActive('/clients/health')} icon={<Activity className="h-4 w-4"/>} label="Client Health"/>}
         {nav.ca_compliance_mode && <SI href="/compliance" active={isActive('/compliance')} icon={<FileCheck className="h-4 w-4"/>} label="CA Compliance"/>}
         {nav.ca_compliance_mode && <SI href="/clients/dsc-expiry" active={isActive('/clients/dsc-expiry')} icon={<ShieldAlert className="h-4 w-4"/>} label="DSC Expiry"/>}
         <Div/>
