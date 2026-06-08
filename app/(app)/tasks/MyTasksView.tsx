@@ -2,7 +2,7 @@
 import React from 'react'
 import { useState, useTransition, useRef, useEffect, useMemo } from 'react'
 import { useRouter }    from 'next/navigation'
-import { RefreshCw, CheckCheck, CheckCircle2, Clock, FolderOpen, Trash2, User, SortAsc, Copy } from 'lucide-react'
+import { RefreshCw, CheckCheck, CheckCircle2, Clock, FolderOpen, Trash2, User, SortAsc, Copy, ArrowUpDown } from 'lucide-react'
 import { PriorityBadge, Avatar } from '@/components/ui/Badge'
 import { TaskDetailPanel }       from '@/components/tasks/TaskDetailPanel'
 import { InlineOneTimeTask }     from '@/components/tasks/InlineOneTimeTask'
@@ -199,6 +199,7 @@ export function MyTasksView({
   const [sortBy, setSortBy] = useState<'due_date'|'created_at'|'updated_at'>('due_date')
   const [sortDir, setSortDir] = useState<'asc'|'desc'>('asc')
   const [sortOpen, setSortOpen] = useState(false)
+  const [statusMenuOpen, setStatusMenuOpen] = useState(false)
   // Inline editing: maps taskId → field name being edited
   const [inlineEdit,    setInlineEdit]    = useState<{taskId:string;field:string}|null>(null)
   // Inline editing for subtask rows
@@ -511,6 +512,28 @@ export function MyTasksView({
       setTasks(prev => [...prev, ...failedTasks])
       setAssignedByMeList(prev => [...prev, ...failedABMTasks])
       toast.error(`${failedIds.length} task(s) could not be deleted`)
+    }
+  }
+
+  async function bulkChangeStatus(newStatus: string) {
+    const ids = [...checked]
+    if (!ids.length) return
+    setStatusMenuOpen(false)
+    setChecked(new Set())
+    const snapshot = new Map(tasks.filter(t => ids.includes(t.id)).map(t => [t.id, t.status]))
+    setTasks(prev => prev.map(t => ids.includes(t.id) ? { ...t, status: newStatus } : t))
+    const results = await Promise.all(ids.map(id =>
+      fetch(`/api/tasks/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: newStatus }) })
+    ))
+    const failedIds = ids.filter((_, i) => !results[i].ok)
+    const successCount = ids.length - failedIds.length
+    if (successCount > 0) toast.success(`${successCount} task(s) moved to ${newStatus.replace('_', ' ')}`)
+    if (failedIds.length > 0) {
+      setTasks(prev => prev.map(t => {
+        const old = snapshot.get(t.id)
+        return old !== undefined ? { ...t, status: old } : t
+      }))
+      toast.error(`${failedIds.length} task(s) could not be updated`)
     }
   }
 
@@ -991,6 +1014,37 @@ export function MyTasksView({
                 borderRadius:7, fontSize:13, fontWeight:500, cursor:'pointer', display:'flex', alignItems:'center', gap:6 }}>
               <CheckCheck style={{width:13,height:13}}/> Submit for approval
             </button>
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => setStatusMenuOpen(m => !m)}
+                style={{ background: 'var(--surface)', color: 'var(--text-primary)', border: '1px solid var(--border)', padding: '6px 14px',
+                  borderRadius: 7, fontSize: 13, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <ArrowUpDown style={{width:13,height:13}}/> Change Status
+              </button>
+              {statusMenuOpen && (
+                <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 50,
+                  background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8,
+                  boxShadow: '0 4px 16px rgba(0,0,0,0.12)', minWidth: 160, overflow: 'hidden' }}>
+                  {[
+                    { value: 'todo',        label: 'To Do',       color: '#64748b' },
+                    { value: 'in_progress', label: 'In Progress', color: '#0891b2' },
+                    { value: 'in_review',   label: 'In Review',   color: '#7c3aed' },
+                    { value: 'completed',   label: 'Completed',   color: '#16a34a' },
+                    { value: 'cancelled',   label: 'Cancelled',   color: '#94a3b8' },
+                  ].map(s => (
+                    <button key={s.value} onClick={() => bulkChangeStatus(s.value)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 14px', width: '100%',
+                        background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, textAlign: 'left',
+                        color: 'var(--text-primary)', fontFamily: 'inherit' }}
+                      onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--surface-subtle)'}
+                      onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'none'}>
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: s.color, flexShrink: 0 }}/>
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             {canManage && (
               <button onClick={bulkDelete}
                 style={{ background:'#dc2626', color:'#fff', border:'none', padding:'6px 14px',
@@ -1003,7 +1057,7 @@ export function MyTasksView({
                 borderRadius:7, fontSize:12, fontWeight:500, color:'var(--text-secondary)', cursor:'pointer' }}>
               Select all
             </button>
-            <button onClick={() => setChecked(new Set())}
+            <button onClick={() => { setChecked(new Set()); setStatusMenuOpen(false) }}
               style={{ background:'none', border:'none', fontSize:12, color:'var(--text-muted)', cursor:'pointer' }}>
               Cancel
             </button>
