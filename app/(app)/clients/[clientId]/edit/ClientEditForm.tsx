@@ -12,15 +12,19 @@ export function ClientEditForm({ client }: { client: any }) {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({
-    name:     client.name     ?? '',
-    email:    client.email    ?? '',
-    phone:    client.phone    ?? '',
-    company:  client.company  ?? '',
-    website:  client.website  ?? '',
-    industry: client.industry ?? '',
-    notes:    client.notes    ?? '',
-    status:   client.status   ?? 'active',
-    color:    client.color    ?? '#0d9488',
+    name:             client.name             ?? '',
+    email:            client.email            ?? '',
+    phone:            client.phone            ?? '',
+    company:          client.company          ?? '',
+    website:          client.website          ?? '',
+    industry:         client.industry         ?? '',
+    notes:            client.notes            ?? '',
+    status:           client.status           ?? 'active',
+    color:            client.color            ?? '#0d9488',
+    gstin:            client.gstin            ?? '',
+    pan:              client.pan              ?? '',
+    dsc_holder_name:  client.dsc_holder_name  ?? '',
+    dsc_expiry_date:  client.dsc_expiry_date  ?? '',
   })
 
   const initialForm = useRef(form)
@@ -93,6 +97,8 @@ export function ClientEditForm({ client }: { client: any }) {
               { k: 'phone',    l: 'Phone',           type: 'tel' },
               { k: 'website',  l: 'Website',         type: 'url' },
               { k: 'industry', l: 'Industry',        type: 'text' },
+              { k: 'gstin',    l: 'GSTIN',           type: 'text' },
+              { k: 'pan',      l: 'PAN',             type: 'text' },
             ].map(({ k, l, type, required }) => (
               <div key={k}>
                 <label style={{ fontSize: 12, fontWeight: 600, color:'var(--text-secondary)', display: 'block', marginBottom: 5 }}>{l}</label>
@@ -103,6 +109,32 @@ export function ClientEditForm({ client }: { client: any }) {
                 />
               </div>
             ))}
+
+            {/* DSC section */}
+            <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 16 }}>
+              <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 12, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                DSC (Digital Signature Certificate)
+              </p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color:'var(--text-secondary)', display: 'block', marginBottom: 5 }}>DSC Holder Name</label>
+                  <input type="text" value={form.dsc_holder_name} onChange={e => set('dsc_holder_name', e.target.value)}
+                    placeholder="e.g. Ramesh Kumar"
+                    style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+                    onFocus={e => e.target.style.borderColor = '#0d9488'}
+                    onBlur={e  => e.target.style.borderColor = '#e2e8f0'}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color:'var(--text-secondary)', display: 'block', marginBottom: 5 }}>DSC Expiry Date</label>
+                  <input type="date" value={form.dsc_expiry_date} onChange={e => set('dsc_expiry_date', e.target.value)}
+                    style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+                    onFocus={e => e.target.style.borderColor = '#0d9488'}
+                    onBlur={e  => e.target.style.borderColor = '#e2e8f0'}
+                  />
+                </div>
+              </div>
+            </div>
 
             <div>
               <label style={{ fontSize: 12, fontWeight: 600, color:'var(--text-secondary)', display: 'block', marginBottom: 5 }}>Status</label>
