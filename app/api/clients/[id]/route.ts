@@ -18,7 +18,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (clientEditDenied) return NextResponse.json({ error: clientEditDenied.error }, { status: clientEditDenied.status })
 
   const body = await req.json()
-  const ALLOWED = ['name','email','phone','company','website','industry','notes','status','color','group_id']
+  const ALLOWED = ['name','email','phone','company','website','industry','notes','status','color','group_id','dsc_expiry_date','dsc_holder_name','gstin','pan']
   const updates: Record<string, unknown> = {}
   for (const k of ALLOWED) { if (k in body) updates[k] = body[k] }
 
