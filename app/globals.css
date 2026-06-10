@@ -2136,6 +2136,48 @@ html.dark [style*="borderLeft: '3px solid var(--brand)'"] {
   text-underline-offset: 2px;
 }
 
+/* ── Micro-interactions (app-wide) ─────────────────────────────── */
+/* Gentle press feedback on every button — inline-styled ones included.
+   Element-level selector keeps lower specificity than .btn/.toolbar-btn,
+   so component classes keep their own richer transitions. */
+button:not(:disabled) { transition: transform 0.1s ease; }
+button:not(:disabled):active { transform: scale(0.98); }
+
+/* Subtle lift on elevated cards (1px — felt, not seen) */
+.card-elevated {
+  transition: box-shadow 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+.card-elevated:hover { transform: translateY(-1px); }
+
+/* Smooth in-page anchor scrolling (only when navigating via keyboard/links) */
+html:focus-within { scroll-behavior: smooth; }
+
+/* Accessibility: honour the user's reduced-motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── Responsive stat grids (dashboard / reports / complaints) ──── */
+@media (max-width: 1100px) {
+  .stat-grid-6 { grid-template-columns: repeat(3, 1fr) !important; }
+  .stat-grid-5 { grid-template-columns: repeat(3, 1fr) !important; }
+}
+@media (max-width: 900px) {
+  .dash-cols   { grid-template-columns: 1fr !important; }
+  .stat-grid-4 { grid-template-columns: repeat(2, 1fr) !important; }
+}
+@media (max-width: 640px) {
+  .stat-grid-6, .stat-grid-5, .stat-grid-3 { grid-template-columns: repeat(2, 1fr) !important; }
+}
+@media (max-width: 400px) {
+  .stat-grid-6, .stat-grid-5, .stat-grid-4, .stat-grid-3 { grid-template-columns: 1fr !important; }
+}
+
 /* ── Mobile polish (app-wide) ──────────────────────────────────── */
 /* Prevent iOS Safari from auto-inflating font sizes in landscape */
 html { -webkit-text-size-adjust: 100%; }

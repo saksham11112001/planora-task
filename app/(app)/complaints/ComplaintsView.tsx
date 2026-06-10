@@ -92,7 +92,7 @@ export default function ComplaintsView() {
       </div>
 
       {/* Stat cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 24 }}>
+      <div className="stat-grid-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 24 }}>
         {([
           { key: 'open',        label: 'Open',        color: '#dc2626', bg: '#fef2f2' },
           { key: 'in_progress', label: 'In Progress',  color: '#d97706', bg: '#fffbeb' },

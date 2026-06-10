@@ -159,7 +159,7 @@ function EmployeeCard({ emp, rank }: { emp: EmployeeStat; rank: number }) {
       {expanded && (
         <div style={{ borderTop: '1px solid var(--border-light)', padding: '16px 16px 14px' }}>
           {/* Stat boxes row */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8, marginBottom: 16 }}>
+          <div className="stat-grid-5" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8, marginBottom: 16 }}>
             <StatBox label="Total assigned" value={emp.total} />
             <StatBox label="Completed" value={emp.completed} color="#16a34a" bg="#f0fdf4" />
             <StatBox label="Overdue" value={emp.overdue}
@@ -838,7 +838,7 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
                   <h3 style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
                     Summary
                   </h3>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+                  <div className="stat-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
                     <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 10, padding: '16px 18px', textAlign: 'center' }}>
                       <p style={{ fontSize: 11, fontWeight: 600, color: '#0891b2', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>In-Progress Tasks</p>
                       <p style={{ fontSize: 32, fontWeight: 900, color: '#0891b2', lineHeight: 1 }}>{totalTasks}</p>
@@ -891,7 +891,7 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
             )}
           </div>
           {/* Header summary */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
+          <div className="stat-grid-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
             {[
               { label: canViewAll ? 'Team members' : 'Your stats', value: visibleStats.length, color: '#0d9488', bg: '#f0fdfa' },
               { label: 'Avg completion rate', value: visibleStats.length ? `${Math.round(visibleStats.reduce((s, e) => s + e.completionRate, 0) / visibleStats.length)}%` : '—', color: '#16a34a', bg: '#f0fdf4' },
