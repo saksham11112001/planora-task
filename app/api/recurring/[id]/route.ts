@@ -23,8 +23,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const dbFrequency = frequency ? normalizeFrequency(frequency) : undefined
   const nextDate    = frequency ? nextOccurrence(frequency, today) : undefined
 
+  // Merge _granular_frequency into existing custom_fields so the display label stays in sync.
+  let customFieldsUpdate: Record<string, unknown> | undefined
+  if (frequency) {
+    const { data: existing } = await admin.from('tasks').select('custom_fields').eq('id', id).eq('org_id', mb.org_id).maybeSingle()
+    customFieldsUpdate = { ...((existing as any)?.custom_fields ?? {}), _granular_frequency: frequency }
+  }
+
   const { data, error } = await admin.from('tasks')
-    .update({ title, frequency: dbFrequency, next_occurrence_date: nextDate, priority, assignee_id: assignee_id || null, project_id: project_id || null, client_id: client_id || null })
+    .update({
+      title, frequency: dbFrequency, next_occurrence_date: nextDate, priority,
+      assignee_id: assignee_id || null, project_id: project_id || null, client_id: client_id || null,
+      ...(customFieldsUpdate ? { custom_fields: customFieldsUpdate } : {}),
+    })
     .eq('id', id).eq('org_id', mb.org_id).select('*').single()
 
   if (error) return NextResponse.json(dbError(error, 'recurring/[id]'), { status: 500 })
