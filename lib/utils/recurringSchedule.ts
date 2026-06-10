@@ -3,6 +3,22 @@
  * Used by /api/recurring (POST + PATCH) and /api/recurring/[id] (PATCH).
  */
 
+// ── Valid granular frequency validator ───────────────────────────────────────
+// Returns true only for known frequency patterns accepted by the app.
+export function isValidGranularFrequency(freq: string): boolean {
+  if (!freq || typeof freq !== 'string') return false
+  if (['daily','weekly','bi_weekly','monthly','quarterly','half_yearly','annual'].includes(freq)) return true
+  if (/^every_\d+_days$/.test(freq)) return true
+  if (/^weekly_(mon|tue|wed|thu|fri|sat|sun)$/.test(freq)) return true
+  if (/^weekly_days:(mon|tue|wed|thu|fri|sat|sun)(,(mon|tue|wed|thu|fri|sat|sun))*$/.test(freq)) return true
+  if (/^monthly_(\d{1,2}|last)$/.test(freq)) return true
+  if (/^monthly_days:\d+(,\d+)*$/.test(freq)) return true
+  if (/^quarterly_(\d{1,2}|last)$/.test(freq)) return true
+  if (/^annual_(31jul|30sep|31dec|31mar)$/.test(freq)) return true
+  if (/^annual_\d{1,2}(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)$/.test(freq)) return true
+  return false
+}
+
 // ── Granular → DB-column mapping ─────────────────────────────────────────────
 // The `tasks.frequency` column only allows: daily | weekly | bi_weekly | monthly | quarterly | half_yearly | annual
 export function normalizeFrequency(freq: string): string {

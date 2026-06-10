@@ -21,7 +21,7 @@ export const recurringSpawn = inngest.createFunction(
 
     const templates = await step.run('fetch-due-recurring-templates', async () => {
       const { data } = await admin.from('tasks')
-        .select('id, title, priority, assignee_id, project_id, client_id, org_id, frequency, next_occurrence_date, approval_required')
+        .select('id, title, priority, assignee_id, project_id, client_id, org_id, frequency, next_occurrence_date, approval_required, custom_fields')
         .eq('is_recurring', true)
         .lte('next_occurrence_date', today)
         .neq('is_archived', true)
@@ -50,8 +50,11 @@ export const recurringSpawn = inngest.createFunction(
         })
 
         if (!error) {
-          // Advance next occurrence on the template
-          const nextDate = nextOccurrence(tmpl.frequency, tmpl.next_occurrence_date)
+          // Use granular frequency (e.g. weekly_days:mon,tue,wed,fri) for accurate advancement.
+          // The DB column stores normalized values (weekly/monthly/etc.) which lose multi-day
+          // and specific-day information; the granular value is preserved in custom_fields.
+          const granularFreq = (tmpl as any).custom_fields?._granular_frequency || tmpl.frequency
+          const nextDate = nextOccurrence(granularFreq, tmpl.next_occurrence_date)
           await admin.from('tasks')
             .update({ next_occurrence_date: nextDate })
             .eq('id', tmpl.id)

@@ -46,6 +46,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const body = await req.json()
   const qty   = Number(body.quantity  ?? 1)
   const price = Number(body.unit_price ?? 0)
+  if (isNaN(qty)   || qty   <= 0)   return NextResponse.json({ error: 'Quantity must be a positive number' }, { status: 400 })
+  if (isNaN(price) || price <  0)   return NextResponse.json({ error: 'Unit price must be a non-negative number' }, { status: 400 })
+  if (qty   > 1_000_000)            return NextResponse.json({ error: 'Quantity is unreasonably large' }, { status: 400 })
+  if (price > 100_000_000)          return NextResponse.json({ error: 'Unit price is unreasonably large' }, { status: 400 })
   const amount = Math.round(qty * price * 100) / 100
 
   const { data: item, error } = await admin.from('invoice_items').insert({

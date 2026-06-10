@@ -17,7 +17,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const clientEditDenied = await assertCan(admin, mb.org_id, user.id, mb.role, 'clients.edit')
   if (clientEditDenied) return NextResponse.json({ error: clientEditDenied.error }, { status: clientEditDenied.status })
 
+  const VALID_CLIENT_STATUSES = ['active', 'inactive', 'prospect']
   const body = await req.json()
+  if (body.status && !VALID_CLIENT_STATUSES.includes(body.status)) return NextResponse.json({ error: `Invalid status "${body.status}". Must be one of: active, inactive, prospect` }, { status: 400 })
   const ALLOWED = ['name','email','phone','company','website','industry','notes','status','color','group_id','dsc_expiry_date','dsc_holder_name','gstin','pan']
   const updates: Record<string, unknown> = {}
   for (const k of ALLOWED) { if (k in body) updates[k] = body[k] }
