@@ -111,6 +111,8 @@ export function RecurringView({
   const [freqEditId, setFreqEditId] = useState<string | null>(null)
 
   const [checked,     setChecked]     = useState<Set<string>>(new Set())
+  const [freqPickerOpen, setFreqPickerOpen] = useState(false)
+  const [bulkFreqSaving,  setBulkFreqSaving]  = useState(false)
   const [subtaskMap, setSubtaskMap] = useState<Record<string, any[]>>({})
   const [expandedSubs, setExpandedSubs] = useState<Set<string>>(new Set())
   const [newSubInputs, setNewSubInputs] = useState<Record<string, string>>({})
@@ -354,6 +356,36 @@ export function RecurringView({
     if (failed > 0) { toast.error(`${failed} could not be deleted`); startT(() => router.refresh()) }
   }
 
+  async function bulkChangeFrequency(granularFreq: string) {
+    const ids = [...checked]
+    if (!ids.length || !granularFreq) return
+    setBulkFreqSaving(true)
+    setFreqPickerOpen(false)
+    const today    = new Date().toISOString().split('T')[0]
+    const { normalizeFrequency, nextOccurrence: calcNext } = await import('@/lib/utils/recurringSchedule')
+    const dbFreq   = normalizeFrequency(granularFreq)
+    const nextDate = calcNext(granularFreq, today)
+    const results  = await Promise.all(ids.map(id =>
+      fetch(`/api/recurring/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ frequency: granularFreq, next_occurrence_date: nextDate }),
+      })
+    ))
+    const failed = results.filter(r => !r.ok).length
+    const ok     = ids.length - failed
+    setLocalTasks(prev => prev.map(t =>
+      ids.includes(t.id)
+        ? { ...t, frequency: dbFreq, next_occurrence_date: nextDate,
+            custom_fields: { ...(t as any).custom_fields, _granular_frequency: granularFreq } }
+        : t
+    ))
+    setBulkFreqSaving(false)
+    setChecked(new Set())
+    if (ok > 0) toast.success(`${ok} task${ok !== 1 ? 's' : ''} updated to ${FREQ_LABEL[granularFreq] ?? granularFreq}`)
+    if (failed > 0) toast.error(`${failed} could not be updated`)
+  }
+
   return (
     <div className="page-container">
       <div
@@ -575,8 +607,50 @@ export function RecurringView({
           {/* ── Bulk action bar ── */}
           {checked.size > 0 ? (
             <div style={{ display:'flex', alignItems:'center', gap:12, padding:'8px 20px',
-              background:'#fef2f2', borderBottom:'1px solid #fecaca', flexShrink:0 }}>
+              background:'#fef2f2', borderBottom:'1px solid #fecaca', flexShrink:0, position:'relative' }}>
               <span style={{ fontSize:13, fontWeight:500, color:'#991b1b' }}>{checked.size} selected</span>
+
+              {/* Change Frequency dropdown */}
+              <div style={{ position:'relative' }}>
+                <button
+                  disabled={bulkFreqSaving}
+                  onClick={() => setFreqPickerOpen(p => !p)}
+                  style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 12px',
+                    background:'#0d9488', color:'#fff', border:'none', borderRadius:6,
+                    fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit', opacity: bulkFreqSaving ? 0.6 : 1 }}>
+                  {bulkFreqSaving ? 'Saving…' : '⟳ Change Frequency'}
+                </button>
+                {freqPickerOpen && (
+                  <div style={{ position:'absolute', top:'calc(100% + 4px)', left:0, zIndex:200,
+                    background:'var(--surface)', border:'1px solid var(--border)', borderRadius:8,
+                    boxShadow:'0 4px 16px rgba(0,0,0,0.12)', padding:'6px 0', minWidth:180 }}>
+                    {[
+                      { v:'daily',       l:'Every day' },
+                      { v:'weekly_mon',  l:'Every Monday' },
+                      { v:'weekly_tue',  l:'Every Tuesday' },
+                      { v:'weekly_wed',  l:'Every Wednesday' },
+                      { v:'weekly_thu',  l:'Every Thursday' },
+                      { v:'weekly_fri',  l:'Every Friday' },
+                      { v:'bi_weekly',   l:'Every 2 weeks' },
+                      { v:'monthly_1',   l:'Monthly (1st)' },
+                      { v:'monthly_15',  l:'Monthly (15th)' },
+                      { v:'monthly_last',l:'Monthly (last day)' },
+                      { v:'quarterly_last', l:'Quarterly' },
+                      { v:'annual_31mar',l:'Annual (31 Mar)' },
+                    ].map(({ v, l }) => (
+                      <button key={v} onClick={() => bulkChangeFrequency(v)}
+                        style={{ display:'block', width:'100%', textAlign:'left',
+                          padding:'7px 16px', fontSize:13, background:'none', border:'none',
+                          cursor:'pointer', color:'var(--fg)', fontFamily:'inherit' }}
+                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--surface-subtle)'}
+                        onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'none'}>
+                        {l}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <button onClick={bulkDelete}
                 style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 14px',
                   background:'#dc2626', color:'#fff', border:'none', borderRadius:6,
