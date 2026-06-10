@@ -143,10 +143,10 @@ export function SearchModal() {
       {!searchOpen ? null : (
         <div className="fixed inset-0 z-50 flex items-start justify-center pt-[14vh]"
           onClick={() => setSearchOpen(false)}>
-          <div className="absolute inset-0" style={{ background: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)' }}/>
+          <div className="absolute inset-0 modal-backdrop-fade" style={{ background: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)' }}/>
 
           <div onClick={e => e.stopPropagation()} onKeyDown={onKeyDown}
-            className="relative w-full max-w-xl mx-4 rounded-2xl shadow-2xl overflow-hidden" style={{background:'var(--surface)'}}>
+            className="relative w-full max-w-xl mx-4 rounded-2xl shadow-2xl overflow-hidden modal-pop" style={{background:'var(--surface)'}}>
 
             {/* Input */}
             <div style={{display:'flex',alignItems:'center',gap:12,padding:'16px 20px',borderBottom:'1px solid var(--border)'}}>

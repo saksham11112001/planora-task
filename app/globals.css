@@ -2136,6 +2136,41 @@ html.dark [style*="borderLeft: '3px solid var(--brand)'"] {
   text-underline-offset: 2px;
 }
 
+/* ── Entrance animation utilities ──────────────────────────────── */
+/* Dropdown / popover menus: quick pop from their anchor */
+@keyframes menuIn {
+  from { opacity: 0; transform: translateY(-5px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
+.menu-in { animation: menuIn 0.16s cubic-bezier(0.16, 1, 0.3, 1) both; transform-origin: top right; }
+
+/* Centered modals: gentle pop-in */
+@keyframes modalPop {
+  from { opacity: 0; transform: translateY(10px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
+.modal-pop { animation: modalPop 0.22s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* Modal backdrops: fade in */
+@keyframes backdropFade { from { opacity: 0; } to { opacity: 1; } }
+.modal-backdrop-fade { animation: backdropFade 0.18s ease both; }
+
+/* ── Subtle interaction transitions ────────────────────────────── */
+/* Sidebar nav links glide 2px right on hover */
+.sidebar-wrapper a {
+  transition: background-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+.sidebar-wrapper a:hover { transform: translateX(2px); }
+
+/* Form fields ease their focus ring in instead of snapping */
+input, select, textarea {
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+/* Active tab settles in with a quick fade */
+@keyframes tabActiveIn { from { opacity: 0.55; } to { opacity: 1; } }
+.tab-item.active { animation: tabActiveIn 0.18s ease; }
+
 /* ── Micro-interactions (app-wide) ─────────────────────────────── */
 /* Gentle press feedback on every button — inline-styled ones included.
    Element-level selector keeps lower specificity than .btn/.toolbar-btn,
