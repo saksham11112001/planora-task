@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { RefreshCw, X, Pencil, User, Trash2, SortAsc, Copy } from 'lucide-react'
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
 import { InlineRecurringTask, FREQ_LABEL } from '@/components/tasks/InlineRecurringTask'
-import { inferGranularFrequency, normalizeFrequency, nextOccurrence } from '@/lib/utils/recurringSchedule'
+import { inferGranularFrequency, nextOccurrence } from '@/lib/utils/recurringSchedule'
 import { fmtDate } from '@/lib/utils/format'
 import { toast, useFilterStore } from '@/store/appStore'
 import { UniversalFilterBar } from '@/components/filters/UniversalFilterBar'
@@ -1234,24 +1234,25 @@ export function RecurringView({
             ⏰ New instances are created each morning at 7:00 AM IST
           </p>
 
-          <TaskDetailPanel
-            task={selectedTask as any}
-            members={members}
-            clients={clients}
-            currentUserId={currentUserId}
-            userRole={userRole}
-            onClose={() => {
-              if (panelHasUpdates.current) {
-                if (selectedTask) setLocalTasks(prev => prev.map(t => t.id === panelTaskIdRef.current ? { ...t, ...selectedTask as unknown as Task } : t))
-                toast.success('Task updated')
-                panelHasUpdates.current = false
-              }
-              setSelectedTask(null)
-            }}
-            onUpdated={handleTaskUpdated}
-          />
         </div>
       )}
+
+      <TaskDetailPanel
+        task={selectedTask as any}
+        members={members}
+        clients={clients}
+        currentUserId={currentUserId}
+        userRole={userRole}
+        onClose={() => {
+          if (panelHasUpdates.current) {
+            if (selectedTask) setLocalTasks(prev => prev.map(t => t.id === panelTaskIdRef.current ? { ...t, ...selectedTask as unknown as Task } : t))
+            toast.success('Task updated')
+            panelHasUpdates.current = false
+          }
+          setSelectedTask(null)
+        }}
+        onUpdated={handleTaskUpdated}
+      />
     </div>
   )
 }

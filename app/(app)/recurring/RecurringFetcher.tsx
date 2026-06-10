@@ -3,7 +3,7 @@ import { getSessionUser } from '@/lib/supabase/cached'
 import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { RecurringView } from './RecurringView'
 
-const TASK_SELECT = 'id, title, status, priority, frequency, next_occurrence_date, assignee_id, approver_id, client_id, created_by, created_at, updated_at, is_billable, billable_amount, assignee:users!tasks_assignee_id_fkey(id, name), approver:users!tasks_approver_id_fkey(id, name), creator:users!tasks_created_by_fkey(id, name), projects(id, name, color), clients(id, name, color)'
+const TASK_SELECT = 'id, title, status, priority, frequency, next_occurrence_date, assignee_id, approver_id, client_id, created_by, created_at, updated_at, is_billable, billable_amount, custom_fields, assignee:users!tasks_assignee_id_fkey(id, name), approver:users!tasks_approver_id_fkey(id, name), creator:users!tasks_created_by_fkey(id, name), projects(id, name, color), clients(id, name, color)'
 
 export async function RecurringFetcher() {
   const user = await getSessionUser()
