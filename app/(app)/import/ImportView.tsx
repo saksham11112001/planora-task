@@ -542,7 +542,7 @@ export function ImportView() {
             </div>
 
             {/* Summary cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 12 }}>
+            <div className="stat-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 12 }}>
               <SummaryCard
                 icon={<Users style={{ width: 16, height: 16 }} />}
                 label="Members"

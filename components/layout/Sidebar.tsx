@@ -199,7 +199,7 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
 
         {/* Org switcher dropdown — always available */}
         {orgSwitcherOpen && (
-          <div style={{
+          <div className="menu-in" style={{
             position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200,
             background: '#1e293b', border: '1px solid rgba(255,255,255,0.12)',
             borderTop: 'none', borderRadius: '0 0 10px 10px',

@@ -2135,3 +2135,96 @@ html.dark [style*="borderLeft: '3px solid var(--brand)'"] {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+
+/* ── Entrance animation utilities ──────────────────────────────── */
+/* Dropdown / popover menus: quick pop from their anchor */
+@keyframes menuIn {
+  from { opacity: 0; transform: translateY(-5px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
+.menu-in { animation: menuIn 0.16s cubic-bezier(0.16, 1, 0.3, 1) both; transform-origin: top right; }
+
+/* Centered modals: gentle pop-in */
+@keyframes modalPop {
+  from { opacity: 0; transform: translateY(10px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
+.modal-pop { animation: modalPop 0.22s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* Modal backdrops: fade in */
+@keyframes backdropFade { from { opacity: 0; } to { opacity: 1; } }
+.modal-backdrop-fade { animation: backdropFade 0.18s ease both; }
+
+/* ── Subtle interaction transitions ────────────────────────────── */
+/* Sidebar nav links glide 2px right on hover */
+.sidebar-wrapper a {
+  transition: background-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+.sidebar-wrapper a:hover { transform: translateX(2px); }
+
+/* Form fields ease their focus ring in instead of snapping */
+input, select, textarea {
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+/* Active tab settles in with a quick fade */
+@keyframes tabActiveIn { from { opacity: 0.55; } to { opacity: 1; } }
+.tab-item.active { animation: tabActiveIn 0.18s ease; }
+
+/* ── Micro-interactions (app-wide) ─────────────────────────────── */
+/* Gentle press feedback on every button — inline-styled ones included.
+   Element-level selector keeps lower specificity than .btn/.toolbar-btn,
+   so component classes keep their own richer transitions. */
+button:not(:disabled) { transition: transform 0.1s ease; }
+button:not(:disabled):active { transform: scale(0.98); }
+
+/* Subtle lift on elevated cards (1px — felt, not seen) */
+.card-elevated {
+  transition: box-shadow 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+.card-elevated:hover { transform: translateY(-1px); }
+
+/* Smooth in-page anchor scrolling (only when navigating via keyboard/links) */
+html:focus-within { scroll-behavior: smooth; }
+
+/* Accessibility: honour the user's reduced-motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── Responsive stat grids (dashboard / reports / complaints) ──── */
+@media (max-width: 1100px) {
+  .stat-grid-6 { grid-template-columns: repeat(3, 1fr) !important; }
+  .stat-grid-5 { grid-template-columns: repeat(3, 1fr) !important; }
+}
+@media (max-width: 900px) {
+  .dash-cols   { grid-template-columns: 1fr !important; }
+  .stat-grid-4 { grid-template-columns: repeat(2, 1fr) !important; }
+}
+@media (max-width: 640px) {
+  .stat-grid-6, .stat-grid-5, .stat-grid-3 { grid-template-columns: repeat(2, 1fr) !important; }
+}
+@media (max-width: 400px) {
+  .stat-grid-6, .stat-grid-5, .stat-grid-4, .stat-grid-3 { grid-template-columns: 1fr !important; }
+}
+
+/* ── Mobile polish (app-wide) ──────────────────────────────────── */
+/* Prevent iOS Safari from auto-inflating font sizes in landscape */
+html { -webkit-text-size-adjust: 100%; }
+
+@media (max-width: 768px) {
+  /* Remove the grey tap-highlight flash on iOS/Android */
+  * { -webkit-tap-highlight-color: transparent; }
+  /* Momentum scrolling for the main content area */
+  .app-content { -webkit-overflow-scrolling: touch; }
+}
+
+@media (max-width: 640px) {
+  /* Kanban columns sized so the next column peeks in on phone screens */
+  .kanban-col { width: 262px; }
+}

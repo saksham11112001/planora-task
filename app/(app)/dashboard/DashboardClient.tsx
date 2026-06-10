@@ -131,7 +131,7 @@ export function DashboardClient({
       </div>
 
       {/* ── Quick actions ─────────────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 10, marginBottom: 24 }}>
+      <div className="stat-grid-6" style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 10, marginBottom: 24 }}>
         {QUICK_ACTIONS.map(({ icon: Icon, label, href, color }) => (
           <Link key={href} href={href} style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
@@ -152,7 +152,7 @@ export function DashboardClient({
       </div>
 
       {/* ── Main content ──────────────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 0.7fr', gap: 20 }}>
+      <div className="dash-cols" style={{ display: 'grid', gridTemplateColumns: '1.3fr 0.7fr', gap: 20 }}>
 
         {/* My tasks */}
         <div>

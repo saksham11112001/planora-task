@@ -210,7 +210,7 @@ export async function ReportsFetcher() {
           <ReportsExport/>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 22 }}>
+        <div className="stat-grid-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 22 }}>
           {kpis.map(k => (
             <div key={k.label} style={{ background: k.bg, borderRadius: 10, padding: '16px 18px', border: `1px solid ${k.color}22` }}>
               <p style={{ fontSize: 12, color: k.color, fontWeight: 500, marginBottom: 6 }}>{k.label}</p>

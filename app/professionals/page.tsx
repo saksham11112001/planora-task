@@ -122,21 +122,80 @@ export default async function ProfessionalsPage() {
         .footer-link { transition: color 0.14s }
         .footer-link:hover { color: rgba(255,255,255,0.75) !important }
 
+        /* ── Mobile nav (CSS-only, no JS) ───────────────────────────────── */
+        .mnav { display: none; position: relative; margin-left: 4px; flex-shrink: 0 }
+        .mnav summary {
+          list-style: none; cursor: pointer; user-select: none;
+          display: flex; align-items: center; justify-content: center;
+          width: 40px; height: 40px; border-radius: 10px;
+          border: 1px solid #e2e8f0; background: #fff;
+          transition: background 0.15s, border-color 0.15s;
+        }
+        .mnav summary::-webkit-details-marker { display: none }
+        .mnav[open] summary { background: #faf5ff; border-color: #ddd6fe }
+        .mnav-bars { display: flex; flex-direction: column; gap: 4px }
+        .mnav-bars span {
+          display: block; width: 17px; height: 2px; border-radius: 2px;
+          background: #334155; transition: transform 0.2s, opacity 0.2s;
+        }
+        .mnav[open] .mnav-bars span:nth-child(1) { transform: translateY(6px) rotate(45deg) }
+        .mnav[open] .mnav-bars span:nth-child(2) { opacity: 0 }
+        .mnav[open] .mnav-bars span:nth-child(3) { transform: translateY(-6px) rotate(-45deg) }
+        .mnav-menu {
+          position: absolute; right: 0; top: 50px; width: 240px;
+          background: #fff; border: 1px solid #e2e8f0; border-radius: 16px;
+          box-shadow: 0 20px 56px rgba(0,0,0,0.16);
+          padding: 8px; display: flex; flex-direction: column; gap: 1px; z-index: 200;
+          animation: fade-up 0.22s ease both;
+        }
+        .mnav-menu a {
+          padding: 12px 14px; font-size: 14px; font-weight: 600;
+          color: #334155; text-decoration: none; border-radius: 10px;
+          display: flex; align-items: center; gap: 8px;
+        }
+        .mnav-menu a:hover, .mnav-menu a:active { background: #f8fafc; color: #7c3aed }
+        .mnav-menu .mnav-cta {
+          margin-top: 6px; background: #7c3aed;
+          color: #fff !important; justify-content: center; font-weight: 800;
+          box-shadow: 0 2px 12px rgba(124,58,237,0.32);
+        }
+
         @media (max-width: 960px) {
           .hero-cols { flex-direction: column !important }
           .grid-3 { grid-template-columns: 1fr !important }
           .grid-2 { grid-template-columns: 1fr !important }
           .country-grid { grid-template-columns: 1fr 1fr !important }
-          .pricing-grid { grid-template-columns: 1fr !important }
+          .pricing-grid { grid-template-columns: 1fr !important; max-width: 460px; margin: 0 auto }
+          .lp-sec { padding-top: 72px !important; padding-bottom: 72px !important }
+        }
+        @media (max-width: 760px) {
+          .nav-mid    { display: none !important }
+          .nav-signin { display: none !important }
+          .mnav       { display: block }
+          .lp-nav     { gap: 12px !important; padding: 0 20px !important }
         }
         @media (max-width: 640px) {
-          .nav-mid { display: none !important }
           .country-grid { grid-template-columns: 1fr !important }
+          .lp-sec  { padding: 60px 20px !important }
+          .lp-hero { padding: 60px 20px 56px !important }
+          .lp-cta  { padding: 72px 20px !important }
+          .hero-h1 { letter-spacing: -1.4px !important }
+          .addon-card { padding: 26px 22px !important; gap: 20px !important }
+          .step-row { gap: 16px !important; padding: 24px 0 !important }
+          .step-row > div:first-child { width: 44px !important; height: 44px !important; font-size: 14px !important }
+        }
+        @media (max-width: 480px) {
+          .lp-sec  { padding: 52px 16px !important }
+          .lp-hero { padding: 52px 16px 48px !important }
+          .lp-cta  { padding: 60px 16px !important }
+          .lp-nav  { padding: 0 14px !important }
+          .hero-ctas a, .cta-buttons a { display: block !important; width: 100% !important; text-align: center !important }
+          .nav-cta { padding: 8px 14px !important; font-size: 13px !important }
         }
       `}</style>
 
       {/* ━━━ NAV ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <nav style={{
+      <nav className="lp-nav" style={{
         position: 'sticky', top: 0, zIndex: 100,
         background: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(20px)',
         borderBottom: '1px solid #f1f5f9',
@@ -164,9 +223,9 @@ export default async function ProfessionalsPage() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-          <Link href="/" style={{ color: '#64748b', fontSize: 13, textDecoration: 'none', fontWeight: 500 }}>← Back to Floatup</Link>
-          <Link href="/login" className="nav-link" style={{ color: '#64748b', fontSize: 14, textDecoration: 'none', fontWeight: 500 }}>Sign in</Link>
-          <Link href="/login" className="btn-primary"
+          <Link href="/" className="nav-signin" style={{ color: '#64748b', fontSize: 13, textDecoration: 'none', fontWeight: 500 }}>← Back to Floatup</Link>
+          <Link href="/login" className="nav-link nav-signin" style={{ color: '#64748b', fontSize: 14, textDecoration: 'none', fontWeight: 500 }}>Sign in</Link>
+          <Link href="/login" className="btn-primary nav-cta"
             style={{
               background: '#7c3aed', color: '#fff', padding: '9px 20px', borderRadius: 9,
               fontSize: 14, fontWeight: 600, textDecoration: 'none',
@@ -174,11 +233,25 @@ export default async function ProfessionalsPage() {
             }}>
             Start free →
           </Link>
+          {/* Mobile hamburger — CSS-only, shown ≤760px */}
+          <details className="mnav">
+            <summary aria-label="Open menu">
+              <span className="mnav-bars"><span/><span/><span/></span>
+            </summary>
+            <div className="mnav-menu">
+              {[['Compliance','#compliance'],['Pricing','#pricing'],['Countries','#countries'],['How it works','#how']].map(([l,h]) => (
+                <a key={l} href={h}>{l}</a>
+              ))}
+              <a href="/">← Back to Floatup</a>
+              <a href="/login">Sign in</a>
+              <a href="/login" className="mnav-cta">Start free →</a>
+            </div>
+          </details>
         </div>
       </nav>
 
       {/* ━━━ HERO ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <section style={{
+      <section className="lp-hero" style={{
         background: 'linear-gradient(170deg, #0f0a1e 0%, #1e0a4a 55%, #0d0a2e 100%)',
         padding: '88px 6% 80px', position: 'relative', overflow: 'hidden',
       }}>
@@ -206,7 +279,7 @@ export default async function ProfessionalsPage() {
             </span>
           </div>
 
-          <h1 style={{
+          <h1 className="hero-h1" style={{
             fontSize: 'clamp(36px, 5vw, 64px)',
             fontWeight: 800, lineHeight: 1.06,
             letterSpacing: '-2.5px', margin: '0 0 22px', color: '#fff',
@@ -224,7 +297,7 @@ export default async function ProfessionalsPage() {
             Pre-built compliance task templates for every country you serve. Load them in one click, assign to clients in bulk, and track every deadline — all in one platform.
           </p>
 
-          <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 28 }}>
+          <div className="hero-ctas" style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 28 }}>
             <Link href="/login" className="btn-primary"
               style={{
                 background: '#7c3aed', color: '#fff', padding: '15px 36px', borderRadius: 11,
@@ -256,7 +329,7 @@ export default async function ProfessionalsPage() {
       </section>
 
       {/* ━━━ COMPLIANCE MODULE OVERVIEW ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <section id="compliance" style={{ padding: '92px 6%', background: '#fff' }}>
+      <section id="compliance" className="lp-sec" style={{ padding: '92px 6%', background: '#fff' }}>
         <div style={{ maxWidth: 1120, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 56 }}>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
@@ -330,7 +403,7 @@ export default async function ProfessionalsPage() {
           </div>
 
           {/* Multi-country callout */}
-          <div style={{
+          <div className="addon-card" style={{
             borderRadius: 18, padding: '32px 36px',
             background: 'linear-gradient(135deg, #0f0a1e 0%, #1e0a4a 100%)',
             border: '1px solid rgba(124,58,237,0.25)',
@@ -369,7 +442,7 @@ export default async function ProfessionalsPage() {
       </section>
 
       {/* ━━━ COUNTRIES ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <section id="countries" style={{ padding: '92px 6%', background: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>
+      <section id="countries" className="lp-sec" style={{ padding: '92px 6%', background: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>
         <div style={{ maxWidth: 1120, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 52 }}>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
@@ -448,7 +521,7 @@ export default async function ProfessionalsPage() {
       </section>
 
       {/* ━━━ HOW IT WORKS (professional workflow) ━━━━━━━━━━━━━━━━━━━━━ */}
-      <section id="how" style={{ padding: '92px 6%', background: '#fff', borderTop: '1px solid #f1f5f9' }}>
+      <section id="how" className="lp-sec" style={{ padding: '92px 6%', background: '#fff', borderTop: '1px solid #f1f5f9' }}>
         <div style={{ maxWidth: 960, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 52 }}>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
@@ -488,7 +561,7 @@ export default async function ProfessionalsPage() {
                 tag: 'Ongoing autopilot',
               },
             ].map((step, i) => (
-              <div key={i} style={{
+              <div key={i} className="step-row" style={{
                 display: 'flex', gap: 28, padding: '28px 0',
                 borderBottom: i < 3 ? '1px solid #f1f5f9' : 'none',
                 alignItems: 'flex-start',
@@ -513,7 +586,7 @@ export default async function ProfessionalsPage() {
       </section>
 
       {/* ━━━ PRICING ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <section id="pricing" style={{ padding: '92px 6%', background: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>
+      <section id="pricing" className="lp-sec" style={{ padding: '92px 6%', background: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>
         <div style={{ maxWidth: 860, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 44 }}>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
@@ -594,7 +667,7 @@ export default async function ProfessionalsPage() {
       </section>
 
       {/* ━━━ FINAL CTA ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <section style={{
+      <section className="lp-cta" style={{
         padding: '100px 6%',
         background: 'linear-gradient(160deg, #0f0a1e 0%, #1e0a4a 55%, #0d0a2e 100%)',
         position: 'relative', overflow: 'hidden',
@@ -607,7 +680,7 @@ export default async function ProfessionalsPage() {
           <p style={{ fontSize: 17, color: 'rgba(255,255,255,0.46)', marginBottom: 36, lineHeight: 1.75 }}>
             Pre-built compliance templates for every jurisdiction you serve.<br/>Free to start — no credit card needed.
           </p>
-          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+          <div className="cta-buttons" style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
             <Link href="/login" className="btn-primary"
               style={{
                 background: '#7c3aed', color: '#fff', padding: '15px 36px', borderRadius: 11,
