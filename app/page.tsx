@@ -247,29 +247,105 @@ export default async function LandingPage() {
         .footer-link { transition: color 0.14s }
         .footer-link:hover { color: rgba(255,255,255,0.85) !important }
 
+        /* ── Mobile nav (CSS-only, no JS) ───────────────────────────────── */
+        .mnav { display: none; position: relative; margin-left: 4px; flex-shrink: 0 }
+        .mnav summary {
+          list-style: none; cursor: pointer; user-select: none;
+          display: flex; align-items: center; justify-content: center;
+          width: 40px; height: 40px; border-radius: 10px;
+          border: 1px solid #e2e8f0; background: #fff;
+          transition: background 0.15s, border-color 0.15s;
+        }
+        .mnav summary::-webkit-details-marker { display: none }
+        .mnav[open] summary { background: #f0fdfa; border-color: #99f6e4 }
+        .mnav-bars { display: flex; flex-direction: column; gap: 4px }
+        .mnav-bars span {
+          display: block; width: 17px; height: 2px; border-radius: 2px;
+          background: #334155; transition: transform 0.2s, opacity 0.2s;
+        }
+        .mnav[open] .mnav-bars span:nth-child(1) { transform: translateY(6px) rotate(45deg) }
+        .mnav[open] .mnav-bars span:nth-child(2) { opacity: 0 }
+        .mnav[open] .mnav-bars span:nth-child(3) { transform: translateY(-6px) rotate(-45deg) }
+        .mnav-menu {
+          position: absolute; right: 0; top: 50px; width: 240px;
+          background: #fff; border: 1px solid #e2e8f0; border-radius: 16px;
+          box-shadow: 0 20px 56px rgba(0,0,0,0.16);
+          padding: 8px; display: flex; flex-direction: column; gap: 1px; z-index: 200;
+          animation: fade-up 0.22s cubic-bezier(0.16,1,0.3,1) both;
+        }
+        .mnav-menu a {
+          padding: 12px 14px; font-size: 14px; font-weight: 600;
+          color: #334155; text-decoration: none; border-radius: 10px;
+          display: flex; align-items: center; gap: 8px;
+        }
+        .mnav-menu a:hover, .mnav-menu a:active { background: #f8fafc; color: #0d9488 }
+        .mnav-menu .mnav-cta {
+          margin-top: 6px; background: linear-gradient(135deg, #0d9488, #0891b2);
+          color: #fff !important; justify-content: center; font-weight: 800;
+          box-shadow: 0 2px 12px rgba(13,148,136,0.32);
+        }
+        .mnav-menu .mnav-cta:hover { background: linear-gradient(135deg, #0d9488, #0891b2); color: #fff }
+
         /* ── Responsive ──────────────────────────────────────────────────── */
         @media (max-width: 960px) {
-          .hero-cols    { flex-direction: column !important }
-          .hero-visual  { display: none !important }
+          .hero-cols    { flex-direction: column !important; gap: 44px !important }
+          .hero-visual  { align-self: auto !important; justify-content: center !important; width: 100% }
+          .hero-visual > div { margin: 0 auto }
+          .hero-left    { padding-bottom: 0 !important }
           .grid-3       { grid-template-columns: 1fr !important }
           .grid-4       { grid-template-columns: 1fr 1fr !important }
           .grid-2       { grid-template-columns: 1fr !important }
-          .pricing-grid { grid-template-columns: 1fr !important }
-          .footer-grid  { grid-template-columns: 1fr 1fr !important }
+          .pricing-grid { grid-template-columns: 1fr !important; max-width: 460px; margin: 0 auto }
+          .footer-grid  { grid-template-columns: 1fr 1fr !important; gap: 36px !important }
+          .lp-sec       { padding-top: 76px !important; padding-bottom: 76px !important }
+        }
+        @media (max-width: 760px) {
+          .nav-mid     { display: none !important }
+          .nav-signin  { display: none !important }
+          .btn-pro     { display: none !important }
+          .mnav        { display: block }
+          .lp-nav      { gap: 12px !important; padding: 0 20px !important }
         }
         @media (max-width: 640px) {
-          .nav-mid    { display: none !important }
-          .nav-pro-btn{ display: none !important }
-          .grid-4     { grid-template-columns: 1fr !important }
-          .footer-grid{ grid-template-columns: 1fr !important }
-          .stats-row  { flex-wrap: wrap !important; gap: 20px !important }
-          .steps-row  { grid-template-columns: 1fr !important }
+          .lp-sec      { padding: 64px 20px !important }
+          .lp-hero     { padding: 56px 20px 0 !important }
+          .lp-cta      { padding: 76px 20px !important }
+          .lp-security { padding: 72px 20px 0 !important }
+          .lp-footer   { padding: 48px 20px 24px !important }
+          .lp-testimonials { padding: 64px 0 !important }
+          .lp-strip    { padding: 24px 20px !important }
+          .hero-h1     { letter-spacing: -1.6px !important }
+          .grid-4      { grid-template-columns: 1fr !important }
+          .footer-grid { grid-template-columns: 1fr !important }
+          .stats-row   { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 18px !important; width: 100% }
+          .stats-row > div { padding: 0 !important; border-right: none !important }
+          .steps-row   { grid-template-columns: 1fr !important; gap: 44px !important }
           .step-connector { display: none !important }
+          .feature-hero-card { padding: 32px 24px !important }
+          .sec-card    { padding: 28px 22px !important }
+          .addon-card  { flex-direction: column !important; align-items: flex-start !important; gap: 18px !important; padding: 26px 22px !important }
+          .addon-right { text-align: left !important }
+          .addon-right > div:first-child { justify-content: flex-start !important }
+          .compliance-grid { grid-template-columns: 1fr 1fr !important; min-width: 0 !important }
+          .marquee-card { width: 272px !important; padding: 24px 20px !important }
+        }
+        @media (max-width: 480px) {
+          .lp-sec      { padding: 56px 16px !important }
+          .lp-hero     { padding: 48px 16px 0 !important }
+          .lp-cta      { padding: 64px 16px !important }
+          .lp-security { padding: 60px 16px 0 !important }
+          .lp-footer   { padding: 44px 16px 24px !important }
+          .lp-strip    { padding: 22px 16px !important }
+          .hero-ctas a, .cta-buttons a { display: block !important; width: 100% !important; text-align: center !important }
+          .compliance-grid { grid-template-columns: 1fr !important }
+          .hero-h1     { letter-spacing: -1.2px !important }
+          .lp-nav      { padding: 0 14px !important }
+          .nav-cta     { padding: 8px 14px !important; font-size: 13px !important }
         }
       `}</style>
 
       {/* ━━━ NAV ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <nav style={{
+      <nav className="lp-nav" style={{
         position: 'sticky', top: 0, zIndex: 100,
         background: 'rgba(255,255,255,0.96)', backdropFilter: 'blur(24px)',
         borderBottom: '1px solid rgba(0,0,0,0.06)',
@@ -316,11 +392,11 @@ export default async function LandingPage() {
             <span style={{ fontSize: 14 }}>🏛️</span>
             <span className="nav-pro-btn">For Professionals</span>
           </Link>
-          <Link href="/login" className="nav-link"
+          <Link href="/login" className="nav-link nav-signin"
             style={{ color: '#64748b', fontSize: 14, textDecoration: 'none', fontWeight: 500 }}>
             Sign in
           </Link>
-          <Link href="/login" className="btn-cta btn-cta-teal"
+          <Link href="/login" className="btn-cta btn-cta-teal nav-cta"
             style={{
               background: 'linear-gradient(135deg, #0d9488 0%, #0891b2 100%)',
               color: '#fff', padding: '9px 20px', borderRadius: 9,
@@ -330,11 +406,25 @@ export default async function LandingPage() {
             }}>
             Start free →
           </Link>
+          {/* Mobile hamburger — CSS-only, shown ≤760px */}
+          <details className="mnav">
+            <summary aria-label="Open menu">
+              <span className="mnav-bars"><span/><span/><span/></span>
+            </summary>
+            <div className="mnav-menu">
+              {[['Features','#features'],['Solutions','#solutions'],['Security','#security'],['Pricing','#pricing'],['Compare','#compare']].map(([l,h]) => (
+                <a key={l} href={h}>{l}</a>
+              ))}
+              <a href="/professionals">🏛️ For Professionals</a>
+              <a href="/login">Sign in</a>
+              <a href="/login" className="mnav-cta">Start free →</a>
+            </div>
+          </details>
         </div>
       </nav>
 
       {/* ━━━ HERO ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <section style={{
+      <section className="lp-hero" style={{
         background: 'linear-gradient(168deg, #05080f 0%, #0b1528 50%, #080d1a 100%)',
         padding: '96px 6% 0', position: 'relative', overflow: 'hidden',
       }}>
@@ -476,7 +566,7 @@ export default async function LandingPage() {
           position: 'relative', zIndex: 1,
         }}>
           {/* ── Left copy ── */}
-          <div style={{ flex: '1 1 480px', paddingBottom: 96 }} className="fade-up">
+          <div style={{ flex: '1 1 480px', paddingBottom: 96 }} className="fade-up hero-left">
             {/* Eyebrow chip */}
             <div style={{
               display: 'inline-flex', alignItems: 'center', gap: 8, marginBottom: 30,
@@ -492,7 +582,7 @@ export default async function LandingPage() {
               </span>
             </div>
 
-            <h1 style={{
+            <h1 className="hero-h1" style={{
               fontSize: 'clamp(38px, 5.2vw, 66px)',
               fontWeight: 900, lineHeight: 1.02,
               letterSpacing: '-3px', margin: '0 0 22px', color: '#fff',
@@ -527,7 +617,7 @@ export default async function LandingPage() {
               Tasks, approvals, recurring checklists, smart reminders, and professional compliance tools — in one platform designed for how accounting and advisory teams actually work.
             </p>
 
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 24 }}>
+            <div className="hero-ctas" style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 24 }}>
               <Link href="/login" className="btn-cta btn-cta-orange"
                 style={{
                   background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
@@ -706,7 +796,7 @@ export default async function LandingPage() {
       </section>
 
       {/* ━━━ TRUST STRIP ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <section style={{ background: '#fff', borderBottom: '1px solid #f1f5f9', padding: '28px 6%' }}>
+      <section className="lp-strip" style={{ background: '#fff', borderBottom: '1px solid #f1f5f9', padding: '28px 6%' }}>
         <div style={{ maxWidth: 1120, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 28, flexWrap: 'wrap' }}>
           <div className="stats-row" style={{ display: 'flex', gap: 0 }}>
             {[
@@ -740,7 +830,7 @@ export default async function LandingPage() {
       </section>
 
       {/* ━━━ COUNTRY BADGES ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <section style={{ background: '#fff', padding: '20px 6%' }}>
+      <section className="lp-strip" style={{ background: '#fff', padding: '20px 6%' }}>
         <div style={{ maxWidth: 1120, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
           <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600, marginRight: 4 }}>Serving professionals in</span>
           {[['🇺🇸','United States'],['🇬🇧','United Kingdom'],['🇨🇦','Canada'],['🇦🇺','Australia'],['🇪🇺','Europe']].map(([flag, name]) => (
@@ -757,7 +847,7 @@ export default async function LandingPage() {
       </section>
 
       {/* ━━━ 3 KEY DIFFERENTIATORS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <section style={{ padding: '96px 6%', background: '#fff' }}>
+      <section className="lp-sec" style={{ padding: '96px 6%', background: '#fff' }}>
         <div style={{ maxWidth: 1120, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 60 }}>
             <div className="chip chip-teal">
@@ -822,7 +912,7 @@ export default async function LandingPage() {
       </section>
 
       {/* ━━━ FEATURES ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <section id="features" style={{ padding: '96px 6%', background: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>
+      <section id="features" className="lp-sec" style={{ padding: '96px 6%', background: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>
         <div style={{ maxWidth: 1120, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 60 }}>
             <div className="chip chip-orange">
@@ -839,7 +929,7 @@ export default async function LandingPage() {
 
           {/* 2 large hero feature cards */}
           <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
-            <div style={{
+            <div className="feature-hero-card" style={{
               background: 'linear-gradient(135deg, #0d9488 0%, #0891b2 100%)',
               borderRadius: 22, padding: '44px 38px', color: '#fff', position: 'relative', overflow: 'hidden',
             }}>
@@ -857,7 +947,7 @@ export default async function LandingPage() {
               </div>
             </div>
 
-            <div style={{
+            <div className="feature-hero-card" style={{
               background: 'linear-gradient(135deg, #1e1b4b 0%, #2e1065 100%)',
               borderRadius: 22, padding: '44px 38px', color: '#fff', position: 'relative', overflow: 'hidden',
             }}>
@@ -897,7 +987,7 @@ export default async function LandingPage() {
       </section>
 
       {/* ━━━ HOW IT WORKS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <section style={{ padding: '96px 6%', background: '#fff', borderTop: '1px solid #f1f5f9' }}>
+      <section className="lp-sec" style={{ padding: '96px 6%', background: '#fff', borderTop: '1px solid #f1f5f9' }}>
         <div style={{ maxWidth: 1120, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 64 }}>
             <div className="chip chip-teal">
@@ -951,7 +1041,7 @@ export default async function LandingPage() {
       </section>
 
       {/* ━━━ SOLUTIONS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <section id="solutions" style={{ padding: '96px 6%', background: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>
+      <section id="solutions" className="lp-sec" style={{ padding: '96px 6%', background: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>
         <div style={{ maxWidth: 1120, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 56 }}>
             <div className="chip chip-orange">
@@ -1013,7 +1103,7 @@ export default async function LandingPage() {
       </section>
 
       {/* ━━━ COMPARE ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <section id="compare" style={{ padding: '96px 6%', background: '#fff', borderTop: '1px solid #f1f5f9' }}>
+      <section id="compare" className="lp-sec" style={{ padding: '96px 6%', background: '#fff', borderTop: '1px solid #f1f5f9' }}>
         <div style={{ maxWidth: 1060, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 56 }}>
             <div className="chip chip-slate">
@@ -1093,7 +1183,7 @@ export default async function LandingPage() {
       </section>
 
       {/* ━━━ PRICING ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <section id="pricing" style={{ padding: '96px 6%', background: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>
+      <section id="pricing" className="lp-sec" style={{ padding: '96px 6%', background: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>
         <div style={{ maxWidth: 960, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 56 }}>
             <div className="chip chip-violet">
@@ -1167,7 +1257,7 @@ export default async function LandingPage() {
           </p>
 
           {/* Professional Setup */}
-          <div style={{
+          <div className="addon-card" style={{
             marginTop: 36, borderRadius: 18, padding: '30px 34px',
             background: '#fff', border: '1px solid #e2e8f0',
             boxShadow: '0 2px 14px rgba(0,0,0,0.05)',
@@ -1197,7 +1287,7 @@ export default async function LandingPage() {
                 ))}
               </div>
             </div>
-            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+            <div className="addon-right" style={{ textAlign: 'right', flexShrink: 0 }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 2, justifyContent: 'flex-end' }}>
                 <span style={{ fontSize: 13, color: '#94a3b8' }}>$</span>
                 <span style={{ fontSize: 40, fontWeight: 900, color: '#0f172a', letterSpacing: '-2px' }}>499</span>
@@ -1215,7 +1305,7 @@ export default async function LandingPage() {
           </div>
 
           {/* Enterprise */}
-          <div style={{
+          <div className="addon-card" style={{
             marginTop: 16, borderRadius: 18, padding: '30px 34px',
             background: 'linear-gradient(135deg, #080c18 0%, #0b1528 100%)',
             border: '1px solid rgba(13,148,136,0.24)',
@@ -1239,7 +1329,7 @@ export default async function LandingPage() {
                 ))}
               </div>
             </div>
-            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+            <div className="addon-right" style={{ textAlign: 'right', flexShrink: 0 }}>
               <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.32)', marginBottom: 4 }}>Custom pricing</div>
               <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)', marginBottom: 14 }}>based on team size &amp; infra</div>
               <a href="mailto:hello@floatup.app?subject=Enterprise%20Inquiry" className="btn-cta btn-cta-teal" style={{
@@ -1256,7 +1346,7 @@ export default async function LandingPage() {
       </section>
 
       {/* ━━━ TESTIMONIALS — auto-scroll marquee ━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <section id="testimonials" style={{ padding: '96px 0', background: '#fff', borderTop: '1px solid #f1f5f9', overflow: 'hidden' }}>
+      <section id="testimonials" className="lp-testimonials" style={{ padding: '96px 0', background: '#fff', borderTop: '1px solid #f1f5f9', overflow: 'hidden' }}>
         <div style={{ maxWidth: 960, margin: '0 auto', textAlign: 'center', padding: '0 6%', marginBottom: 52 }}>
           <h2 style={{ fontSize: 'clamp(24px, 3.5vw, 38px)', fontWeight: 900, letterSpacing: '-1.2px', margin: '0 0 12px', color: '#0f172a' }}>
             Teams who made the switch
@@ -1276,7 +1366,7 @@ export default async function LandingPage() {
                 { init:'AM', color:'#0891b2', name:'Ananya M.', role:'Partner', co:'CA firm, Mumbai', quote:'The Indian compliance templates saved us days of setup. GST, TDS, ITR all pre-built. Our team went from spreadsheets to a fully organised system in under a week.', metric:'Week 1 payback' },
                 { init:'PW', color:'#16a34a', name:'Paul W.', role:'COO', co:'Operations, Sydney', quote:'We run 60+ recurring checklists across 5 departments. Floatup handles every spawn, every reminder, every escalation — without a single Slack chase message from me anymore.', metric:'60 checklists automated' },
               ].map((t, i) => (
-                <div key={`${pass}-${i}`} style={{
+                <div key={`${pass}-${i}`} className="marquee-card" style={{
                   background: '#f8fafc', border: '1px solid #f1f5f9', borderRadius: 18,
                   padding: '28px 26px', width: 320, flexShrink: 0,
                   boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
@@ -1301,7 +1391,7 @@ export default async function LandingPage() {
       </section>
 
       {/* ━━━ SECURITY ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <section id="security" style={{ padding: '100px 6% 0', background: '#07090f', position: 'relative', overflow: 'hidden' }}>
+      <section id="security" className="lp-security" style={{ padding: '100px 6% 0', background: '#07090f', position: 'relative', overflow: 'hidden' }}>
         <div style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(16,185,129,0.05) 1px,transparent 1px),linear-gradient(90deg,rgba(16,185,129,0.05) 1px,transparent 1px)', backgroundSize: '60px 60px', pointerEvents: 'none' }}/>
         <div style={{ position: 'absolute', top: -120, right: '10%', width: 520, height: 520, borderRadius: '50%', background: 'radial-gradient(circle, rgba(16,185,129,0.08) 0%, transparent 65%)', animation: 'orb-drift 20s ease-in-out infinite', pointerEvents: 'none' }}/>
         <div style={{ position: 'absolute', bottom: 0, left: '5%', width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(circle, rgba(56,189,248,0.06) 0%, transparent 65%)', animation: 'orb-drift-2 25s ease-in-out infinite', pointerEvents: 'none' }}/>
@@ -1325,7 +1415,7 @@ export default async function LandingPage() {
           </div>
 
           <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
-            <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 22, padding: '38px 34px' }}>
+            <div className="sec-card" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 22, padding: '38px 34px' }}>
               <div style={{ fontSize: 11, fontWeight: 800, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 22 }}>Architecture</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
                 {[
@@ -1344,7 +1434,7 @@ export default async function LandingPage() {
               </div>
             </div>
 
-            <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 22, padding: '38px 34px' }}>
+            <div className="sec-card" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 22, padding: '38px 34px' }}>
               <div style={{ fontSize: 11, fontWeight: 800, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 22 }}>Accountability</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
                 {[
@@ -1365,7 +1455,7 @@ export default async function LandingPage() {
           </div>
 
           {/* Compliance standards */}
-          <div style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.18)', borderRadius: 22, padding: '34px 38px', marginBottom: 16 }}>
+          <div className="sec-card" style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.18)', borderRadius: 22, padding: '34px 38px', marginBottom: 16 }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 44, flexWrap: 'wrap' }}>
               <div style={{ flex: '0 0 auto' }}>
                 <div style={{ fontSize: 11, fontWeight: 800, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 10 }}>International standards</div>
@@ -1373,7 +1463,7 @@ export default async function LandingPage() {
                   Floatup is designed to operate in compliance with privacy regulations across every jurisdiction we serve.
                 </div>
               </div>
-              <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, minWidth: 300 }}>
+              <div className="compliance-grid" style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, minWidth: 300 }}>
                 {[
                   { label: 'GDPR',        sub: 'EU / EEA',       color: '#60a5fa' },
                   { label: 'CCPA',        sub: 'California, USA', color: '#f97316' },
@@ -1417,7 +1507,7 @@ export default async function LandingPage() {
       </section>
 
       {/* ━━━ FAQ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <section style={{ padding: '96px 6%', background: '#fff', borderTop: '1px solid #f1f5f9' }}>
+      <section className="lp-sec" style={{ padding: '96px 6%', background: '#fff', borderTop: '1px solid #f1f5f9' }}>
         <div style={{ maxWidth: 720, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 56 }}>
             <h2 style={{ fontSize: 'clamp(24px, 3.5vw, 38px)', fontWeight: 900, letterSpacing: '-1.2px', margin: '0 0 12px', color: '#0f172a' }}>Questions we always get</h2>
@@ -1451,7 +1541,7 @@ export default async function LandingPage() {
       </section>
 
       {/* ━━━ FINAL CTA ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <section style={{
+      <section className="lp-cta" style={{
         padding: '108px 6%',
         background: 'linear-gradient(160deg, #05080f 0%, #0b1528 50%, #070a12 100%)',
         position: 'relative', overflow: 'hidden',
@@ -1490,7 +1580,7 @@ export default async function LandingPage() {
           <p style={{ fontSize: 17, color: 'rgba(255,255,255,0.44)', marginBottom: 40, lineHeight: 1.78 }}>
             Join hundreds of professional teams running their work on Floatup.<br/>Free to start — no credit card needed.
           </p>
-          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+          <div className="cta-buttons" style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
             <Link href="/login" className="btn-cta btn-cta-orange"
               style={{
                 background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
@@ -1518,7 +1608,7 @@ export default async function LandingPage() {
       </section>
 
       {/* ━━━ FOOTER ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <footer style={{ background: '#07090f', padding: '56px 6% 30px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+      <footer className="lp-footer" style={{ background: '#07090f', padding: '56px 6% 30px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
         <div style={{ maxWidth: 1120, margin: '0 auto' }}>
           <div className="footer-grid" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 44, marginBottom: 48 }}>
             <div>
