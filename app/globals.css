@@ -2135,3 +2135,19 @@ html.dark [style*="borderLeft: '3px solid var(--brand)'"] {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+
+/* ── Mobile polish (app-wide) ──────────────────────────────────── */
+/* Prevent iOS Safari from auto-inflating font sizes in landscape */
+html { -webkit-text-size-adjust: 100%; }
+
+@media (max-width: 768px) {
+  /* Remove the grey tap-highlight flash on iOS/Android */
+  * { -webkit-tap-highlight-color: transparent; }
+  /* Momentum scrolling for the main content area */
+  .app-content { -webkit-overflow-scrolling: touch; }
+}
+
+@media (max-width: 640px) {
+  /* Kanban columns sized so the next column peeks in on phone screens */
+  .kanban-col { width: 262px; }
+}
