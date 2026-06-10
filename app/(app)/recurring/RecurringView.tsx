@@ -786,10 +786,10 @@ export function RecurringView({
                   editTask={{
                     id: task.id,
                     title: task.title,
-                    frequency: task.custom_fields?._granular_frequency
+                    frequency: (task.custom_fields?._granular_frequency
                       || inferGranularFrequency(task.frequency ?? '', task.next_occurrence_date ?? '')
                       || task.frequency
-                      ?? 'weekly_mon',
+                      || 'weekly_mon'),
                     priority: task.priority,
                     assignee_id: task.assignee_id,
                     client_id: task.client_id,
