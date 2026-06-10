@@ -39,7 +39,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!['owner', 'admin', 'manager'].includes(mb.role))
     return NextResponse.json({ error: 'Only managers can edit invoices' }, { status: 403 })
 
+  const VALID_INVOICE_STATUSES = ['draft', 'sent', 'paid', 'overdue', 'cancelled']
   const body = await req.json()
+  if (body.status && !VALID_INVOICE_STATUSES.includes(body.status)) return NextResponse.json({ error: `Invalid status "${body.status}". Must be one of: draft, sent, paid, overdue, cancelled` }, { status: 400 })
+  if ('gst_rate' in body && (isNaN(Number(body.gst_rate)) || Number(body.gst_rate) < 0 || Number(body.gst_rate) > 100)) return NextResponse.json({ error: 'GST rate must be a number between 0 and 100' }, { status: 400 })
+  if ('discount_amount' in body && (isNaN(Number(body.discount_amount)) || Number(body.discount_amount) < 0)) return NextResponse.json({ error: 'Discount amount must be a non-negative number' }, { status: 400 })
   const ALLOWED = ['client_id','group_id','title','issue_date','due_date','status','notes','gstin','gst_rate','discount_amount','subtotal','gst_amount','total']
   const updates: Record<string, unknown> = {}
   for (const k of ALLOWED) { if (k in body) updates[k] = body[k] }

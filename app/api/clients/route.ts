@@ -36,9 +36,11 @@ export async function POST(request: NextRequest) {
   const admin = createAdminClient()
   const clientCreateDenied = await assertCan(admin, mb.org_id, user.id, mb.role, 'clients.create')
   if (clientCreateDenied) return NextResponse.json({ error: clientCreateDenied.error }, { status: clientCreateDenied.status })
+  const VALID_CLIENT_STATUSES = ['active', 'inactive', 'prospect']
   const body = await request.json()
   if (!body.name?.trim()) return NextResponse.json({ error: 'Name required' }, { status: 400 })
   if (body.name.trim().length > 200) return NextResponse.json({ error: 'Name too long (max 200 chars)' }, { status: 400 })
+  if (body.status && !VALID_CLIENT_STATUSES.includes(body.status)) return NextResponse.json({ error: `Invalid status "${body.status}". Must be one of: active, inactive, prospect` }, { status: 400 })
   // Validate email format if provided
   if (body.email) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/

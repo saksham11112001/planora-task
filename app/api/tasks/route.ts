@@ -6,6 +6,10 @@ import { inngest }           from '@/lib/inngest/client'
 import { assertCan }         from '@/lib/utils/permissionGate'
 import { dbError }           from '@/lib/api-error'
 import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
+import { isValidGranularFrequency } from '@/lib/utils/recurringSchedule'
+
+const VALID_PRIORITIES    = ['low', 'medium', 'high', 'urgent']
+const VALID_TASK_STATUSES = ['todo', 'in_progress', 'in_review', 'completed', 'cancelled']
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
@@ -77,6 +81,9 @@ export async function POST(request: NextRequest) {
           custom_fields, is_billable = false, billable_amount } = body
   if (!title?.trim()) return NextResponse.json({ error: 'Title required' }, { status: 400 })
   if (title.trim().length > 500) return NextResponse.json({ error: 'Title too long (max 500 chars)' }, { status: 400 })
+  if (priority && !VALID_PRIORITIES.includes(priority)) return NextResponse.json({ error: `Invalid priority "${priority}". Must be one of: low, medium, high, urgent` }, { status: 400 })
+  if (status && !VALID_TASK_STATUSES.includes(status)) return NextResponse.json({ error: `Invalid status "${status}". Must be one of: todo, in_progress, in_review, completed, cancelled` }, { status: 400 })
+  if (is_recurring && frequency && !isValidGranularFrequency(frequency)) return NextResponse.json({ error: `Invalid frequency "${frequency}". Use a valid frequency like daily, weekly_mon, monthly_15, etc.` }, { status: 400 })
 
   // If attaching to a parent task, verify it belongs to the same org
   if (parent_task_id) {

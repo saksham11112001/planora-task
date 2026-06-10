@@ -5,8 +5,11 @@ import { NextResponse }       from 'next/server'
 import type { NextRequest }   from 'next/server'
 import { assertCan }          from '@/lib/utils/permissionGate'
 import { dbError }             from '@/lib/api-error'
-import { nextOccurrence, normalizeFrequency } from '@/lib/utils/recurringSchedule'
+import { nextOccurrence, normalizeFrequency, isValidGranularFrequency } from '@/lib/utils/recurringSchedule'
 import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
+
+const VALID_PRIORITIES    = ['low', 'medium', 'high', 'urgent']
+const VALID_TASK_STATUSES = ['todo', 'in_progress', 'in_review', 'completed', 'cancelled']
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -187,6 +190,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
   if (!Object.keys(updates).length)
     return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
+
+  if (updates.priority && !VALID_PRIORITIES.includes(updates.priority as string))
+    return NextResponse.json({ error: `Invalid priority "${updates.priority}". Must be one of: low, medium, high, urgent` }, { status: 400 })
+  if (updates.status && !VALID_TASK_STATUSES.includes(updates.status as string))
+    return NextResponse.json({ error: `Invalid status "${updates.status}". Must be one of: todo, in_progress, in_review, completed, cancelled` }, { status: 400 })
+  if (updates.frequency && !isValidGranularFrequency(updates.frequency as string))
+    return NextResponse.json({ error: `Invalid frequency "${updates.frequency}". Use a valid frequency like daily, weekly_mon, monthly_15, etc.` }, { status: 400 })
 
   // When frequency changes, normalize the granular value (e.g. weekly_fri → weekly)
   // before writing to the DB column, which only accepts the base enum values.
