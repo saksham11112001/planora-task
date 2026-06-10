@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { RefreshCw, X, Pencil, User, Trash2, SortAsc, Copy } from 'lucide-react'
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
 import { InlineRecurringTask, FREQ_LABEL } from '@/components/tasks/InlineRecurringTask'
-import { inferGranularFrequency } from '@/lib/utils/recurringSchedule'
+import { inferGranularFrequency, normalizeFrequency, nextOccurrence } from '@/lib/utils/recurringSchedule'
 import { fmtDate } from '@/lib/utils/format'
 import { toast, useFilterStore } from '@/store/appStore'
 import { UniversalFilterBar } from '@/components/filters/UniversalFilterBar'
@@ -362,9 +362,8 @@ export function RecurringView({
     setBulkFreqSaving(true)
     setFreqPickerOpen(false)
     const today    = new Date().toISOString().split('T')[0]
-    const { normalizeFrequency, nextOccurrence: calcNext } = await import('@/lib/utils/recurringSchedule')
     const dbFreq   = normalizeFrequency(granularFreq)
-    const nextDate = calcNext(granularFreq, today)
+    const nextDate = nextOccurrence(granularFreq, today)
     const results  = await Promise.all(ids.map(id =>
       fetch(`/api/recurring/${id}`, {
         method: 'PATCH',
