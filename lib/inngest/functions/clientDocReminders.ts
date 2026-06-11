@@ -363,9 +363,12 @@ export const clientDocReminders = inngest.createFunction(
 )
 
 function subtractDays(dateStr: string, days: number): string {
-  const d = new Date(dateStr)
+  // Parse as local date and format with local fields — avoids the UTC
+  // round-trip that returns the previous calendar day on non-UTC servers.
+  const [y, m, dd] = dateStr.split('-').map(Number)
+  const d = new Date(y, m - 1, dd)
   d.setDate(d.getDate() - days)
-  return d.toISOString().split('T')[0]
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 function daysBetween(from: string, to: string): number {

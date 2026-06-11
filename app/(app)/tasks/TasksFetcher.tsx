@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getSessionUser } from '@/lib/supabase/cached'
 import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { MyTasksView } from './MyTasksView'
+import { shiftDays } from '@/lib/utils/recurringSchedule'
 
 const TASK_COLS = 'id, title, description, status, priority, due_date, assignee_id, approver_id, client_id, project_id, parent_task_id, approval_status, approval_required, estimated_hours, is_recurring, custom_fields, created_at, updated_at, is_billable, billable_amount, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), approver:users!tasks_approver_id_fkey(id, name), creator:users!tasks_created_by_fkey(id, name), projects(id, name, color)'
 
@@ -164,10 +165,7 @@ export async function TasksFetcher() {
       for (const [, dueDateStr] of Object.entries(mt.dates as Record<string, string>)) {
         if (typeof dueDateStr !== 'string') continue
         const daysBeforeDue = (mt.days_before_due as number) ?? 7
-        const dueD = new Date(dueDateStr + 'T00:00:00')
-        const triggerD = new Date(dueD)
-        triggerD.setDate(dueD.getDate() - daysBeforeDue)
-        const triggerS = triggerD.toISOString().slice(0, 10)
+        const triggerS = shiftDays(dueDateStr, -daysBeforeDue)
         if (triggerS > todayS && triggerS <= limitS && !existingSet.has(`${asgn.id}__${dueDateStr}`)) {
           upcomingCATriggers.push({
             id: `upcoming-${asgn.id}-${dueDateStr}`,

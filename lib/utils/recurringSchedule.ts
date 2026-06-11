@@ -55,6 +55,16 @@ function toDateStr(d: Date): string {
 }
 
 /**
+ * Shift a YYYY-MM-DD date string by N days (negative = backward) without any
+ * UTC round-trip. Safe regardless of server/browser timezone.
+ */
+export function shiftDays(yyyy_mm_dd: string, days: number): string {
+  const d = localDate(yyyy_mm_dd)
+  d.setDate(d.getDate() + days)
+  return toDateStr(d)
+}
+
+/**
  * Given a normalised DB frequency ('weekly', 'monthly', …) and the task's
  * stored next_occurrence_date, infers the granular frequency string that
  * FrequencyPickerButton expects ('weekly_wed', 'monthly_15', …).
