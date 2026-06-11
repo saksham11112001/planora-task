@@ -74,28 +74,43 @@ function taskTypeDot(t: CalTask): string {
   return '#0891b2'
 }
 
+/* ── Format a local Date as YYYY-MM-DD without UTC conversion ── */
+function toLocalDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 /* ── Step one period backward — used to seed the forward expansion from a
-   point guaranteed to be before the viewed window start ── */
+   point guaranteed to be before the viewed window start.
+   Uses local-date parsing (new Date(y, m-1, d)) to avoid the UTC offset bug
+   where new Date('YYYY-MM-DDT00:00:00').toISOString() returns the previous
+   calendar day for UTC+ users (e.g. IST = UTC+5:30). ── */
 function prevOccurrence(freq: string, dateStr: string): string {
-  const d = new Date(dateStr + 'T00:00:00')
-  if (freq.startsWith('weekly_days:'))  { d.setDate(d.getDate() - 7);    return d.toISOString().split('T')[0] }
-  if (freq.startsWith('monthly_days:')) { d.setMonth(d.getMonth() - 1);  return d.toISOString().split('T')[0] }
-  const everyNMatch = freq.match(/^every_(\d+)_days$/)
-  if (everyNMatch) {
-    const n = Math.max(1, parseInt(everyNMatch[1]))
-    d.setDate(d.getDate() - n)
-    return d.toISOString().split('T')[0]
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const dt = new Date(y, m - 1, d)  // local midnight, no UTC shift
+  if (freq.startsWith('weekly_days:') || freq.startsWith('weekly_')) {
+    dt.setDate(dt.getDate() - 7)
+  } else if (freq.startsWith('monthly_days:') || freq.startsWith('monthly_')) {
+    dt.setMonth(dt.getMonth() - 1)
+  } else if (freq.startsWith('quarterly_')) {
+    dt.setMonth(dt.getMonth() - 3)
+  } else if (freq.startsWith('annual_') || freq === 'annual') {
+    dt.setFullYear(dt.getFullYear() - 1)
+  } else {
+    const everyNMatch = freq.match(/^every_(\d+)_days$/)
+    if (everyNMatch) {
+      dt.setDate(dt.getDate() - Math.max(1, parseInt(everyNMatch[1])))
+    } else switch (freq) {
+      case 'daily':      dt.setDate(dt.getDate() - 1);          break
+      case 'weekly':     dt.setDate(dt.getDate() - 7);          break
+      case 'bi_weekly':  dt.setDate(dt.getDate() - 14);         break
+      case 'monthly':    dt.setMonth(dt.getMonth() - 1);        break
+      case 'quarterly':  dt.setMonth(dt.getMonth() - 3);        break
+      case 'half_yearly':dt.setMonth(dt.getMonth() - 6);        break
+      case 'annual':     dt.setFullYear(dt.getFullYear() - 1);  break
+      default:           dt.setDate(dt.getDate() - 7);          break
+    }
   }
-  switch (freq) {
-    case 'daily':     d.setDate(d.getDate() - 1);         break
-    case 'weekly':    d.setDate(d.getDate() - 7);         break
-    case 'bi_weekly': d.setDate(d.getDate() - 14);        break
-    case 'monthly':   d.setMonth(d.getMonth() - 1);       break
-    case 'quarterly': d.setMonth(d.getMonth() - 3);       break
-    case 'annual':    d.setFullYear(d.getFullYear() - 1); break
-    default:          d.setDate(d.getDate() - 7);         break
-  }
-  return d.toISOString().split('T')[0]
+  return toLocalDateStr(dt)
 }
 
 export function CalendarView({ tasks, clients = [], members = [], canViewAll, currentUserId, userRole, upcomingCATriggers = [] }: Props) {
@@ -181,7 +196,10 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
   filtered.forEach(t => {
     if (!t.due_date) return
 
-    if (t.is_recurring && t.frequency) {
+    // Use granular frequency (e.g. weekly_days:mon,wed,fri) so multi-day patterns
+    // expand to all matching days. Fall back to the DB enum value for older tasks.
+    const granularFreq = (t as any).custom_fields?._granular_frequency || t.frequency
+    if (t.is_recurring && granularFreq) {
       // Expand the recurring template to every occurrence date within the viewed month.
       // Strategy: step BACKWARD from t.due_date (= next_occurrence_date) until the cursor
       // is at or before winStart, then iterate FORWARD through the window.
@@ -191,7 +209,7 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
 
       // Step backward until cursor <= winStart
       while (cursor > winStart && safety++ < 500) {
-        cursor = prevOccurrence(t.frequency, cursor)
+        cursor = prevOccurrence(granularFreq, cursor)
       }
 
       // Now cursor is the last occurrence on or before winStart.
@@ -210,7 +228,7 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
             placed = true // spawned instance covers this date, count as placed
           }
         }
-        cursor = nextOccurrence(t.frequency, cursor)
+        cursor = nextOccurrence(granularFreq, cursor)
       }
 
       // Fallback: next_occurrence_date itself lands in the window but the loop somehow
