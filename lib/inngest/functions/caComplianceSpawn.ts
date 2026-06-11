@@ -1,5 +1,6 @@
 import { inngest }           from '../client'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { shiftDays }         from '@/lib/utils/recurringSchedule'
 
 /**
  * Runs every day at 7:00 AM IST (1:30 AM UTC).
@@ -88,11 +89,8 @@ export const caComplianceSpawn = inngest.createFunction(
         // Skip dates before the client's configured start date
         if (dueDateStr < startDateStr) continue
 
-        // Compute trigger date
-        const dueDate     = new Date(dueDateStr)
-        const triggerDate = new Date(dueDate)
-        triggerDate.setDate(triggerDate.getDate() - daysBeforeDue)
-        const triggerStr = triggerDate.toISOString().split('T')[0]
+        // Compute trigger date (timezone-safe: no UTC round-trip)
+        const triggerStr = shiftDays(dueDateStr, -daysBeforeDue)
 
         // Only spawn when trigger date has arrived
         if (triggerStr > today) continue

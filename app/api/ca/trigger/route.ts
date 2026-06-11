@@ -4,6 +4,7 @@ import { createAdminClient }   from '@/lib/supabase/admin'
 import { dbError } from '@/lib/api-error'
 import type { NextRequest }    from 'next/server'
 import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
+import { shiftDays }           from '@/lib/utils/recurringSchedule'
 
 /**
  * POST /api/ca/trigger
@@ -116,11 +117,8 @@ export async function POST(request: NextRequest) {
         continue
       }
 
-      // Compute trigger date
-      const dueDate     = new Date(dueDateStr)
-      const triggerDate = new Date(dueDate)
-      triggerDate.setDate(triggerDate.getDate() - daysBeforeDue)
-      const triggerStr  = triggerDate.toISOString().split('T')[0]
+      // Compute trigger date (timezone-safe: no UTC round-trip)
+      const triggerStr = shiftDays(dueDateStr, -daysBeforeDue)
 
       // Only spawn when trigger window has arrived (future tasks not yet due)
       if (triggerStr > today) {
