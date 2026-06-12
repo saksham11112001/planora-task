@@ -2,7 +2,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter }  from 'next/navigation'
 import { Clock, Plus, DollarSign, Trash2, Pencil } from 'lucide-react'
-import { fmtDate, fmtHours } from '@/lib/utils/format'
+import { fmtDate, fmtHours, localDayStr } from '@/lib/utils/format'
 import { toast }             from '@/store/appStore'
 
 interface Log {
@@ -71,8 +71,8 @@ export function TimeView({ logs, projects, tasks, clients, members, currentUserI
   function setLast30() {
     const now    = new Date()
     const from30 = new Date(Date.now() - 30 * 86400000)
-    const f      = from30.toISOString().split('T')[0]
-    const t      = now.toISOString().split('T')[0]
+    const f      = localDayStr(from30)
+    const t      = localDayStr(now)
     router.push('/time?from=' + f + '&to=' + t)
   }
 

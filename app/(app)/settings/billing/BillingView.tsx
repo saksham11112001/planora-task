@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { Check, Zap, Clock, Server, Package } from 'lucide-react'
 import { toast } from '@/store/appStore'
+import { useCountry } from '@/lib/hooks/useOrgSettings'
 
 const PLANS = [
   {
@@ -10,7 +11,7 @@ const PLANS = [
     color: '#64748b',
   },
   {
-    key: 'starter', name: 'Starter', monthly: 29, annual: 23,
+    key: 'starter', name: 'Starter', monthly: 29, annual: 23,  // fallback (US) — overridden per-country below
     features: ['Up to 15 members','15 projects','Time tracking','Recurring tasks','Approval workflow','20 GB storage','Priority support'],
     color: '#0d9488', popular: false,
   },
@@ -36,6 +37,7 @@ interface Props {
 }
 
 export function BillingView({ orgName, currentPlan, status, subscriptionId, trialEndsAt, setupFeePaid = false }: Props) {
+  const countryProfile = useCountry()
   const [loading,  setLoading]  = useState<string | null>(null)
   const [annual,    setAnnual]    = useState(false)
   const [couponCode, setCouponCode] = useState('')
@@ -273,7 +275,12 @@ export function BillingView({ orgName, currentPlan, status, subscriptionId, tria
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
           {PLANS.map(plan => {
             const isCurrent = plan.key === currentPlan
-            const price     = annual && plan.annual > 0 ? plan.annual : plan.monthly
+            // Per-country pricing from the org's country profile (free stays 0 everywhere)
+            const cp        = (countryProfile.pricing as any)[plan.key] as { monthly: number; annual: number } | undefined
+            const monthlyP  = cp?.monthly ?? plan.monthly
+            const annualP   = cp?.annual ?? plan.annual
+            const price     = annual && annualP > 0 ? annualP : monthlyP
+            const sym       = countryProfile.currencySymbol
             const isLoading = loading === plan.key
 
             return (
@@ -309,17 +316,17 @@ export function BillingView({ orgName, currentPlan, status, subscriptionId, tria
                     ) : (
                       <>
                         <span style={{ fontSize: 28, fontWeight: 800, color: 'var(--text-primary)' }}>
-                          ${price}
+                          {sym}{price.toLocaleString(countryProfile.locale)}
                         </span>
                         <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>/mo</span>
                         {annual && (
                           <div style={{ fontSize: 11, color: '#16a34a', fontWeight: 600, marginTop: 2 }}>
-                            Billed ${price * 12}/yr · Save ${(plan.monthly - plan.annual) * 12}
+                            Billed {sym}{(price * 12).toLocaleString(countryProfile.locale)}/yr · Save {sym}{((monthlyP - annualP) * 12).toLocaleString(countryProfile.locale)}
                           </div>
                         )}
                         {!annual && (
                           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                            or ${plan.annual}/mo billed annually
+                            or {sym}{annualP.toLocaleString(countryProfile.locale)}/mo billed annually
                           </div>
                         )}
                       </>

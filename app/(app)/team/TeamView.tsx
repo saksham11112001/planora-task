@@ -5,7 +5,7 @@ import { useRouter }       from 'next/navigation'
 import { UserPlus, Mail, Crown, Shield, User, ChevronDown, Check, Plus, X, Send, Pencil, Activity, SlidersHorizontal } from 'lucide-react'
 import { cn }         from '@/lib/utils/cn'
 import { toast }      from '@/store/appStore'
-import { fmtDate }    from '@/lib/utils/format'
+import { fmtDate, localDayStr } from '@/lib/utils/format'
 import { UserPermissionsPanel } from '../settings/members/UserPermissionsPanel'
 import type { RolePermissions } from '@/lib/hooks/useOrgSettings'
 
@@ -35,7 +35,7 @@ interface Member {
 
 function buildHeatmapWeeks(heatmap: Record<string, number>) {
   const today      = new Date()
-  const todayStr   = today.toISOString().slice(0, 10)
+  const todayStr   = localDayStr(today)
   const dayOfWeek  = today.getDay() // 0=Sun … 6=Sat
   const sinceMonday = (dayOfWeek + 6) % 7  // days since last Monday
 
@@ -50,7 +50,7 @@ function buildHeatmapWeeks(heatmap: Record<string, number>) {
     for (let w = 0; w < 12; w++) {
       const cell = new Date(startDate)
       cell.setDate(startDate.getDate() + w * 7 + d)
-      const dateStr = cell.toISOString().slice(0, 10)
+      const dateStr = localDayStr(cell)
       row.push({
         date:     dateStr,
         count:    heatmap[dateStr] ?? 0,

@@ -4,7 +4,7 @@ import { Search, Filter, BarChart2, Download, Calendar } from 'lucide-react'
 import { MultiPillSelect } from '@/components/filters/MultiPillSelect'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LineChart, Line, Legend, PieChart, Pie } from 'recharts'
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
-import { isOverdue, fmtDate } from '@/lib/utils/format'
+import { isOverdue, fmtDate, localDayStr } from '@/lib/utils/format'
 import type { Task } from '@/types'
 
 interface MonTask {
@@ -118,7 +118,7 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
   const _now       = new Date()
   const monthStart = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-01`
   const _lastDay   = new Date(_now.getFullYear(), _now.getMonth() + 1, 0)
-  const monthEnd   = _lastDay.toISOString().slice(0, 10)
+  const monthEnd   = localDayStr(_lastDay)
   const monthLabel = _now.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
 
   // ── Filter state ──
@@ -372,7 +372,7 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
     for (let i = DAYS - 1; i >= 0; i--) {
       const d = new Date()
       d.setDate(d.getDate() - i)
-      const dateStr = d.toISOString().slice(0, 10)
+      const dateStr = localDayStr(d)
       const label   = d.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })
       result.push({
         date:      label,

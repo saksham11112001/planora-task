@@ -1,7 +1,9 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from '@/store/appStore'
+import { COUNTRIES, getCountry, DEFAULT_COUNTRY } from '@/lib/locale/countries'
+import { refreshOrgSettings } from '@/lib/hooks/useOrgSettings'
 
 const INDUSTRIES = ['Technology','Finance','Healthcare','Education','E-commerce','Marketing','Consulting','Real Estate','Manufacturing','Legal','Non-profit','Other']
 const TEAM_SIZES = ['Just me','2–5','6–15','16–50','51–200','200+']
@@ -14,6 +16,14 @@ export function OrgForm({ org }: { org: { name: string; industry?: string; team_
   const [industry, setIndustry] = useState(org.industry ?? '')
   const [teamSize, setTeamSize] = useState(org.team_size ?? '')
   const [color,  setColor]  = useState(org.logo_color ?? '#0d9488')
+  const [country, setCountry] = useState(DEFAULT_COUNTRY)
+  const [savedCountry, setSavedCountry] = useState(DEFAULT_COUNTRY)
+
+  useEffect(() => {
+    fetch('/api/settings/locale').then(r => r.json())
+      .then(d => { const c = d?.data?.country ?? DEFAULT_COUNTRY; setCountry(c); setSavedCountry(c) })
+      .catch(() => {})
+  }, [])
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
@@ -23,9 +33,18 @@ export function OrgForm({ org }: { org: { name: string; industry?: string; team_
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: name.trim(), industry: industry || null, team_size: teamSize || null, logo_color: color }),
     })
+    let ok = res.ok
+    if (ok && country !== savedCountry) {
+      const lr = await fetch('/api/settings/locale', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ country }),
+      })
+      if (lr.ok) { setSavedCountry(country); refreshOrgSettings() }
+      else ok = false
+    }
     setSaving(false)
-    if (res.ok) { toast.success('Saved!'); router.refresh() }
-    else { const d = await res.json(); toast.error(d.error ?? 'Failed') }
+    if (ok) { toast.success('Saved!'); router.refresh() }
+    else { const d = await res.json().catch(() => ({})); toast.error(d.error ?? 'Failed') }
   }
 
   return (
@@ -48,6 +67,19 @@ export function OrgForm({ org }: { org: { name: string; industry?: string; team_
             </button>
           ))}
         </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">Country &amp; region</label>
+        <select value={country} onChange={e => setCountry(e.target.value)} className="input">
+          {Object.values(COUNTRIES).map(c => (
+            <option key={c.code} value={c.code}>{c.flag} {c.name} — {c.currencySymbol} {c.currency}</option>
+          ))}
+        </select>
+        <p className="text-xs text-gray-400 mt-1.5">
+          Sets your workspace currency ({getCountry(country).currencySymbol}), timezone ({getCountry(country).timezone}) and plan pricing.
+          {getCountry(country).complianceCatalogue === 'icai' && ' Includes the ICAI statutory compliance catalogue.'}
+        </p>
       </div>
 
       <div className="grid grid-cols-2 gap-4">

@@ -3,6 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, CartesianGrid, Legend,
 } from 'recharts'
+import { localDayStr } from '@/lib/utils/format'
 
 interface Task { id:string; status:string; priority:string; due_date:string|null; created_at:string; completed_at:string|null; assignee_id:string|null; assignee?:any }
 interface Log  { id:string; hours:number; is_billable:boolean; logged_date:string; user_id:string; project_id:string|null; projects?:any }
@@ -34,7 +35,7 @@ export function ReportsView({ tasks, timeLogs, members, projects }: Props) {
   const dayMap: Record<string, { date:string; created:number; completed:number }> = {}
   const days14 = [...Array(14)].map((_,i) => {
     const d = new Date(); d.setDate(d.getDate() - (13 - i))
-    const k = d.toISOString().split('T')[0]
+    const k = localDayStr(d)
     dayMap[k] = { date: d.toLocaleDateString('en-IN', { day:'numeric', month:'short' }), created:0, completed:0 }
     return k
   })
