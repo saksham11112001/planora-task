@@ -13,6 +13,9 @@ import { digestMorning, digestEvening } from '@/lib/inngest/functions/digestNoti
 import { clientDocReminders }           from '@/lib/inngest/functions/clientDocReminders'
 import { onUserWelcome }               from '@/lib/inngest/functions/onUserWelcome'
 import { monthlyDocReminders }         from '@/lib/inngest/functions/monthlyDocReminders'
+import { reEngagement }                from '@/lib/inngest/functions/reEngagement'
+import { onboardingNudge }             from '@/lib/inngest/functions/onboardingNudge'
+import { upgradePush }                 from '@/lib/inngest/functions/upgradePush'
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
@@ -32,5 +35,8 @@ export const { GET, POST, PUT } = serve({
     digestEvening,
     clientDocReminders,
     monthlyDocReminders,
+    reEngagement,
+    onboardingNudge,
+    upgradePush,
   ],
 })

@@ -11,6 +11,9 @@ import { memberInvitedHtml }   from './templates/memberInvited'
 import { escalationAlertHtml } from './templates/escalationAlert'
 import { clientDocReminderHtml, clientDocReminderSubject, clientDocReminderBatchHtml, clientDocReminderBatchSubject, type BatchProps } from './templates/clientDocReminder'
 import { clientUploadNotifyHtml, clientUploadNotifySubject } from './templates/clientUploadNotify'
+import { reEngagementHtml, reEngagementSubject } from './templates/reEngagementEmail'
+import { onboardingNudgeHtml, onboardingNudgeSubject } from './templates/onboardingNudgeEmail'
+import { upgradePushHtml, upgradePushSubject } from './templates/upgradePushEmail'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://floatup.app'
 
@@ -221,5 +224,41 @@ export async function sendTrialExpiredEmail(p: {
     from: FROM, to: p.to,
     subject: trialExpiredSubject(),
     html:    trialExpiredHtml({ ...p, appUrl: APP_URL }),
+  })
+}
+
+// ── Re-engagement email ───────────────────────────────────────────────────
+export async function sendReEngagementEmail(p: {
+  to: string; userName: string; orgName: string; daysSince: number
+  overdueCount: number; pendingCount: number
+}) {
+  return resend.emails.send({
+    from: FROM, to: p.to,
+    subject: reEngagementSubject({ userName: p.userName, overdueCount: p.overdueCount }),
+    html:    reEngagementHtml({ ...p, appUrl: APP_URL }),
+  })
+}
+
+// ── Onboarding nudge (setup checklist) ────────────────────────────────────
+export async function sendOnboardingNudgeEmail(p: {
+  to: string; userName: string; orgName: string
+  hasClient: boolean; hasTask: boolean; hasTeam: boolean; hasCa: boolean
+}) {
+  return resend.emails.send({
+    from: FROM, to: p.to,
+    subject: onboardingNudgeSubject({ userName: p.userName }),
+    html:    onboardingNudgeHtml({ ...p, appUrl: APP_URL }),
+  })
+}
+
+// ── Upgrade push (plan limit hit) ─────────────────────────────────────────
+export async function sendUpgradePushEmail(p: {
+  to: string; userName: string; orgName: string
+  currentPlan: 'free' | 'starter' | 'pro'; limitHit: 'tasks' | 'members' | 'clients' | 'storage' | 'ai'
+}) {
+  return resend.emails.send({
+    from: FROM, to: p.to,
+    subject: upgradePushSubject({ orgName: p.orgName, limitHit: p.limitHit }),
+    html:    upgradePushHtml({ ...p, appUrl: APP_URL }),
   })
 }
