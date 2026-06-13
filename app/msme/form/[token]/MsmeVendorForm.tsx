@@ -216,12 +216,12 @@ export function MsmeVendorForm({ token }: { token: string }) {
           )}
         </div>
 
-        <p style={{ color: '#64748b', fontSize: 12, textAlign: 'center', lineHeight: 1.6, margin: '0 0 16px' }}>
+        <p style={{ color: '#475569', fontSize: 12, textAlign: 'center', lineHeight: 1.6, margin: '0 0 16px' }}>
           Please save this page as a record of your submission.<br/>
           If you need to make any corrections, contact {info.org_name} directly.
         </p>
 
-        <p style={{ color: '#94a3b8', fontSize: 11, textAlign: 'center', margin: 0 }}>Powered by Floatup</p>
+        <p style={{ color: '#64748b', fontSize: 11, textAlign: 'center', margin: 0 }}>Powered by Floatup</p>
       </div>
     </div>
   )
@@ -273,7 +273,7 @@ export function MsmeVendorForm({ token }: { token: string }) {
               onChange={e => setIsNotMsme(e.target.checked)}
               style={{ marginTop: 2, width: 16, height: 16, accentColor: ACCENT, flexShrink: 0 }}
             />
-            <span style={{ fontSize: 13, color: '#374151', lineHeight: 1.5 }}>
+            <span style={{ fontSize: 13, color: '#1e293b', lineHeight: 1.5 }}>
               <strong>We are NOT an MSME</strong> — we are not registered under the Micro, Small and
               Medium Enterprises Development Act. I want to submit a declaration instead.
             </span>
@@ -323,8 +323,8 @@ export function MsmeVendorForm({ token }: { token: string }) {
                     </span>
                   )}
                 </div>
-                <div style={{ marginTop: 6, padding: '8px 12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6 }}>
-                  <p style={{ margin: 0, fontSize: 11, color: '#64748b', lineHeight: 1.6 }}>
+                <div style={{ marginTop: 6, padding: '8px 12px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: 6 }}>
+                  <p style={{ margin: 0, fontSize: 11, color: '#334155', lineHeight: 1.6 }}>
                     <strong>Where to find it:</strong> Your Udyam Registration Certificate (downloaded from{' '}
                     <span style={{ color: ACCENT }}>udyamregistration.gov.in</span>) shows the number at the top.
                     It looks like: <strong>UDYAM-MH-15-0012345</strong>
@@ -341,7 +341,7 @@ export function MsmeVendorForm({ token }: { token: string }) {
               {/* MSME Category */}
               <div style={{ marginBottom: 20 }}>
                 <label style={labelStyle}>MSME Category <span style={{ color: '#dc2626' }}>*</span></label>
-                <p style={{ margin: '0 0 10px', fontSize: 12, color: '#64748b' }}>Select the category shown on your Udyam certificate.</p>
+                <p style={{ margin: '0 0 10px', fontSize: 12, color: '#475569' }}>Select the category shown on your Udyam certificate.</p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {CATEGORIES.map(c => (
                     <label
@@ -360,8 +360,8 @@ export function MsmeVendorForm({ token }: { token: string }) {
                         style={{ marginTop: 2, accentColor: ACCENT }}
                       />
                       <div>
-                        <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#0f172a' }}>{c.label}</p>
-                        <p style={{ margin: '2px 0 0', fontSize: 11, color: '#64748b' }}>{c.hint}</p>
+                        <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#1e293b' }}>{c.label}</p>
+                        <p style={{ margin: '2px 0 0', fontSize: 11, color: '#475569' }}>{c.hint}</p>
                       </div>
                     </label>
                   ))}
@@ -389,8 +389,8 @@ export function MsmeVendorForm({ token }: { token: string }) {
                         style={{ marginTop: 2, accentColor: ACCENT }}
                       />
                       <div>
-                        <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#0f172a' }}>{n.label}</p>
-                        <p style={{ margin: '2px 0 0', fontSize: 11, color: '#64748b' }}>{n.hint}</p>
+                        <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#1e293b' }}>{n.label}</p>
+                        <p style={{ margin: '2px 0 0', fontSize: 11, color: '#475569' }}>{n.hint}</p>
                       </div>
                     </label>
                   ))}
@@ -401,7 +401,7 @@ export function MsmeVendorForm({ token }: { token: string }) {
               <div style={{ marginBottom: 20 }}>
                 <label style={labelStyle}>
                   Last outstanding amount as on 31st March (₹)
-                  <span style={{ marginLeft: 6, fontSize: 11, color: '#64748b', fontWeight: 400 }}>optional</span>
+                  <span style={{ marginLeft: 6, fontSize: 11, color: '#64748b', fontWeight: 400, background: '#fff' }}>optional</span>
                 </label>
                 <input
                   style={inputStyle}
@@ -412,8 +412,8 @@ export function MsmeVendorForm({ token }: { token: string }) {
                   value={outstandingAmount}
                   onChange={e => setOutstandingAmount(e.target.value)}
                 />
-                <div style={{ marginTop: 6, padding: '8px 12px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 6 }}>
-                  <p style={{ margin: 0, fontSize: 11, color: '#92400e', lineHeight: 1.6 }}>
+                <div style={{ marginTop: 6, padding: '8px 12px', background: '#fef9c3', border: '1px solid #fde047', borderRadius: 6 }}>
+                  <p style={{ margin: 0, fontSize: 11, color: '#713f12', lineHeight: 1.6 }}>
                     <strong>What this means:</strong> The amount <em>your firm is owed</em> (money {info?.org_name} owes you)
                     that was unpaid as of 31st March of the last financial year. Enter <strong>0</strong> if fully paid up.
                     Leave blank if you don't have this figure.
@@ -438,7 +438,7 @@ export function MsmeVendorForm({ token }: { token: string }) {
                   {uploading ? (
                     <>
                       <div style={{ fontSize: 24 }}>⏳</div>
-                      <span style={{ fontSize: 13, color: '#64748b' }}>Uploading…</span>
+                      <span style={{ fontSize: 13, color: '#334155' }}>Uploading…</span>
                     </>
                   ) : certUrl ? (
                     <>
@@ -446,19 +446,19 @@ export function MsmeVendorForm({ token }: { token: string }) {
                       <span style={{ fontSize: 13, color: ACCENT, fontWeight: 700 }}>
                         {certFile?.name ?? 'Certificate uploaded successfully'}
                       </span>
-                      <span style={{ fontSize: 11, color: '#64748b' }}>{isMobile ? 'Tap' : 'Click'} to replace</span>
+                      <span style={{ fontSize: 11, color: '#475569' }}>{isMobile ? 'Tap' : 'Click'} to replace</span>
                     </>
                   ) : (
                     <>
                       <div style={{ fontSize: 28 }}>📄</div>
-                      <span style={{ fontSize: 13, color: '#374151', fontWeight: 600 }}>
+                      <span style={{ fontSize: 13, color: '#1e293b', fontWeight: 600 }}>
                         {isMobile ? 'Tap to upload' : 'Click to upload'} your Udyam certificate
                       </span>
-                      <span style={{ fontSize: 11, color: '#94a3b8' }}>PDF, JPG or PNG · max 5 MB</span>
+                      <span style={{ fontSize: 11, color: '#64748b' }}>PDF, JPG or PNG · max 5 MB</span>
                     </>
                   )}
                 </label>
-                <p style={{ margin: '6px 0 0', fontSize: 11, color: '#64748b' }}>
+                <p style={{ margin: '6px 0 0', fontSize: 11, color: '#475569' }}>
                   This is the certificate downloaded from udyamregistration.gov.in or Udyam Assist portal.
                 </p>
               </div>
@@ -486,7 +486,7 @@ export function MsmeVendorForm({ token }: { token: string }) {
           </button>
         </form>
 
-        <p style={{ color: '#94a3b8', fontSize: 11, textAlign: 'center', marginTop: 20, lineHeight: 1.6 }}>
+        <p style={{ color: '#64748b', fontSize: 11, textAlign: 'center', marginTop: 20, lineHeight: 1.6 }}>
           Your information is shared only with {info?.org_name} for MSME compliance purposes.<br/>
           Powered by Floatup
         </p>
@@ -505,20 +505,24 @@ function ReceiptRow({ label, value }: { label: string; value: string }) {
 }
 
 // ── Styles ─────────────────────────────────────────────────────────────────────
+// colorScheme: 'light' forces the browser to always render this public page in
+// light mode, regardless of the user's system dark-mode preference.
 const pageStyle: React.CSSProperties = {
+  colorScheme: 'light',
   minHeight: '100vh', background: '#f8fafc', display: 'flex',
   alignItems: 'flex-start', justifyContent: 'center', padding: '32px 16px',
   fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+  color: '#0f172a',
 }
 const cardStyle: React.CSSProperties = {
-  background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0',
+  background: '#ffffff', borderRadius: 12, border: '1px solid #e2e8f0',
   padding: 32, width: '100%', maxWidth: 560,
 }
 const h1: React.CSSProperties = { margin: '0 0 6px', color: '#0f172a', fontSize: 20, fontWeight: 700 }
-const sub: React.CSSProperties = { color: '#64748b', fontSize: 14, margin: 0, lineHeight: 1.6 }
-const labelStyle: React.CSSProperties = { display: 'block', fontSize: 13, fontWeight: 600, color: '#0f172a', marginBottom: 6 }
+const sub: React.CSSProperties = { color: '#475569', fontSize: 14, margin: 0, lineHeight: 1.6 }
+const labelStyle: React.CSSProperties = { display: 'block', fontSize: 13, fontWeight: 600, color: '#1e293b', marginBottom: 6 }
 const inputStyle: React.CSSProperties = {
-  width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 8,
-  fontSize: 14, color: '#0f172a', outline: 'none', boxSizing: 'border-box',
+  width: '100%', padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: 8,
+  fontSize: 14, color: '#0f172a', background: '#ffffff', outline: 'none', boxSizing: 'border-box',
   transition: 'border-color 0.15s',
 }
