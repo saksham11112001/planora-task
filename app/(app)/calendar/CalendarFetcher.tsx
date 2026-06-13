@@ -15,7 +15,7 @@ export async function CalendarFetcher() {
   const supabase = createAdminClient()
   const isOwnerAdmin = ['owner', 'admin'].includes(mb.role)
   const isManager    = ['owner', 'admin', 'manager'].includes(mb.role)
-  const canViewAll   = isManager || (mb as any).can_view_all_tasks === true
+  const canViewAll   = isOwnerAdmin || (mb as any).can_view_all_tasks === true
 
   const from = new Date(); from.setMonth(from.getMonth() - 6)
   const to   = new Date(); to.setMonth(to.getMonth() + 6)
@@ -35,13 +35,17 @@ export async function CalendarFetcher() {
 
   // Second query: fetch recurring templates by next_occurrence_date so future
   // occurrences appear on the calendar even when due_date is null on the template.
-  const recurringTemplateQuery = supabase.from('tasks')
+  const recurringTemplateBaseQuery = supabase.from('tasks')
     .select(TASK_SELECT)
     .eq('org_id', mb.org_id).eq('is_recurring', true).neq('is_archived', true)
     .not('next_occurrence_date', 'is', null)
     .gte('next_occurrence_date', dateFrom).lte('next_occurrence_date', dateTo)
     .is('parent_task_id', null)
     .limit(2000)
+
+  const recurringTemplateQuery = canViewAll
+    ? recurringTemplateBaseQuery
+    : recurringTemplateBaseQuery.or(`assignee_id.eq.${user.id},approver_id.eq.${user.id}`)
 
   const [{ data: tasks }, { data: recurringTemplates }, { data: clients }, { data: members }, { data: caAssignments }, { data: caInstances }] = await Promise.all([
     taskQuery.limit(10000),
