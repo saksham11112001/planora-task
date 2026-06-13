@@ -349,6 +349,12 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
   /* complete / reopen toggle — all completions go through approval (no direct complete) */
   async function handleComplete() {
     if (!task) return
+    // Recurring templates are never directly completable — guard defensively in case
+    // the toggle is reached through any path. Only spawned occurrences can be completed.
+    if ((task as any).is_recurring === true && !task.parent_task_id) {
+      toast.info('Recurring tasks are completed per occurrence, not on the template.')
+      return
+    }
     setCompleting(true)
 
     // Reopen: completed or in_review → todo
@@ -802,7 +808,12 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     }
   }
 
-  const isCompleted = status === 'completed'
+  // A recurring template (is_recurring=true, no parent) is never itself completable —
+  // completion applies only to its spawned instances. Suppress the completion toggle and
+  // any "done" styling on the template so its internal status can't be acted on or shown
+  // as struck-through.
+  const isRecurringTemplate = (task as any)?.is_recurring === true && !task?.parent_task_id
+  const isCompleted = status === 'completed' && !isRecurringTemplate
   const isInReview  = status === 'in_review'
   const isPending   = task?.approval_status === 'pending' || isInReview
   const overdue     = isOverdue(task?.due_date, status)
@@ -1025,8 +1036,9 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
 
             {/* ── Title + description + submit toggle ── */}
             <div style={{ padding: '16px 20px 12px', borderBottom: '1px solid var(--border-light)' }}>
-              {/* Submit for approval / completion toggle row */}
-              {canEdit && (
+              {/* Submit for approval / completion toggle row.
+                  Hidden for recurring templates — only spawned occurrences are completable. */}
+              {canEdit && !isRecurringTemplate && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                   <button
                     onClick={handleComplete}

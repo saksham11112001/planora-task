@@ -968,8 +968,13 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
             {!collapsedGroups.has(grp.key) && grp.tasks.map(task => {
               const accent = typeAccent(task)
               const bg     = typeBg(task)
-              const sc     = STATUS_CONFIG[task.status] ?? STATUS_CONFIG.todo
-              const ov     = isOverdue(task.due_date, task.status)
+              // Recurring templates have no completable status of their own — per-occurrence
+              // status lives on spawned instances. Display them as 'todo' so a stale template
+              // status never renders as Done in the monitor.
+              const isRecurringTemplate = !!task.is_recurring && !task.parent_task_id
+              const displayStatus = isRecurringTemplate ? 'todo' : task.status
+              const sc     = STATUS_CONFIG[displayStatus] ?? STATUS_CONFIG.todo
+              const ov     = isOverdue(task.due_date, displayStatus)
               return (
                 <div key={task.id}
                   onClick={() => openTask(task.id)}
