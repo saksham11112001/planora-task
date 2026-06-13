@@ -615,184 +615,229 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
         </div>
       )}
 
-      {/* ── ACTION ITEMS TAB ─────────────────────────────── */}
+      {/* ── ACTION ITEMS TAB — smart executive summary ────── */}
       {activeTab === 'actions' && canViewAll && (() => {
         const ai = actionItems ?? { overdue: [], pending_approval: [], unassigned_urgent: [] }
         const PRIORITY_COLOR: Record<string, string> = {
           urgent: '#dc2626', high: '#ea580c', medium: '#ca8a04', low: '#16a34a', none: '#94a3b8',
         }
-        const thS = {
-          padding: '9px 12px', textAlign: 'left' as const, fontWeight: 600,
-          color: 'var(--text-secondary)', borderBottom: '1px solid var(--border)',
-          fontSize: 11, textTransform: 'uppercase' as const, letterSpacing: '0.04em',
-          background: 'var(--surface-subtle)', whiteSpace: 'nowrap' as const,
+
+        const totalIssues = ai.overdue.length + ai.pending_approval.length + ai.unassigned_urgent.length
+
+        // Group overdue by assignee
+        const overdueByPerson: Record<string, { name: string; tasks: typeof ai.overdue }> = {}
+        ai.overdue.forEach(t => {
+          const key  = t.assignee_name ?? '__unassigned__'
+          const name = t.assignee_name ?? 'Unassigned'
+          if (!overdueByPerson[key]) overdueByPerson[key] = { name, tasks: [] }
+          overdueByPerson[key].tasks.push(t)
+        })
+        const overdueGroups = Object.values(overdueByPerson).sort((a, b) => b.tasks.length - a.tasks.length)
+
+        // Group pending approvals by urgency
+        const urgentPending  = ai.pending_approval.filter(t => ['urgent', 'high'].includes(t.priority))
+        const normalPending  = ai.pending_approval.filter(t => !['urgent', 'high'].includes(t.priority))
+        const oldestPending  = ai.pending_approval.reduce((max, t) => t.days_waiting > max ? t.days_waiting : max, 0)
+
+        // Team capacity snapshot from employeeStats
+        const atCapacity  = employeeStats.filter(e => e.overdue > 2 || e.completionRate < 40)
+        const hasCapacity = employeeStats.filter(e => e.overdue === 0 && e.total < 5)
+
+        if (totalIssues === 0 && atCapacity.length === 0) {
+          return (
+            <div style={{ textAlign: 'center', padding: '70px 24px', color: 'var(--text-muted)', background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)' }}>
+              <p style={{ fontSize: 40, marginBottom: 10 }}>✅</p>
+              <p style={{ fontSize: 16, fontWeight: 700, marginBottom: 6, color: 'var(--text-primary)' }}>All clear — great work!</p>
+              <p style={{ fontSize: 13 }}>No overdue tasks, no pending approvals, and no unassigned urgent work right now.</p>
+            </div>
+          )
         }
-        const tdS = { padding: '9px 12px', fontSize: 12, color: 'var(--text-primary)', borderBottom: '1px solid var(--border-light)', verticalAlign: 'middle' as const }
 
         return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
 
-            {/* Summary banners */}
+            {/* ── Top alert strip ── */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
               {[
-                { label: 'Overdue tasks',       value: ai.overdue.length,           color: '#dc2626', bg: '#fef2f2', border: '#fca5a5', note: 'Require immediate action' },
-                { label: 'Pending approval',     value: ai.pending_approval.length,  color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe', note: 'Awaiting review / sign-off' },
-                { label: 'Urgent & unassigned',  value: ai.unassigned_urgent.length, color: '#ea580c', bg: '#fff7ed', border: '#fdba74', note: 'High-priority, no owner' },
+                {
+                  count: ai.overdue.length,
+                  label: 'Tasks Overdue',
+                  sub:   ai.overdue.length > 0 ? `${overdueGroups.length} team member${overdueGroups.length !== 1 ? 's' : ''} affected` : 'All tasks on track',
+                  color: '#dc2626', bg: '#fef2f2', border: '#fca5a5',
+                  action: ai.overdue.length > 0 ? 'Reassign or extend deadlines below' : null,
+                },
+                {
+                  count: ai.pending_approval.length,
+                  label: 'Awaiting Your Approval',
+                  sub:   urgentPending.length > 0 ? `${urgentPending.length} urgent/high priority` : oldestPending > 0 ? `Oldest: ${oldestPending} days waiting` : 'No approvals pending',
+                  color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe',
+                  action: ai.pending_approval.length > 0 ? 'Review and approve or return below' : null,
+                },
+                {
+                  count: ai.unassigned_urgent.length,
+                  label: 'Urgent & Unassigned',
+                  sub:   hasCapacity.length > 0 ? `${hasCapacity.length} team member${hasCapacity.length !== 1 ? 's' : ''} have capacity` : 'Assign to available team member',
+                  color: '#ea580c', bg: '#fff7ed', border: '#fdba74',
+                  action: ai.unassigned_urgent.length > 0 ? 'Assign ownership immediately' : null,
+                },
               ].map(s => (
-                <div key={s.label} style={{ background: s.bg, border: `1px solid ${s.border}`, borderRadius: 10, padding: '16px 20px' }}>
-                  <p style={{ fontSize: 11, fontWeight: 600, color: s.color, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>{s.label}</p>
-                  <p style={{ fontSize: 36, fontWeight: 900, color: s.color, lineHeight: 1, marginBottom: 4 }}>{s.value}</p>
-                  <p style={{ fontSize: 11, color: s.color + 'aa' }}>{s.note}</p>
+                <div key={s.label} style={{ background: s.bg, border: `1px solid ${s.border}`, borderRadius: 12, padding: '18px 20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 4 }}>
+                    <span style={{ fontSize: 40, fontWeight: 900, color: s.color, lineHeight: 1 }}>{s.count}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: s.color, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{s.label}</span>
+                  </div>
+                  <p style={{ fontSize: 12, color: s.color + 'cc', marginBottom: s.action ? 8 : 0 }}>{s.sub}</p>
+                  {s.action && (
+                    <p style={{ fontSize: 11, color: s.color, fontWeight: 600, padding: '4px 8px', background: s.color + '15', borderRadius: 6, display: 'inline-block' }}>
+                      → {s.action}
+                    </p>
+                  )}
                 </div>
               ))}
             </div>
 
-            {/* Overdue tasks */}
-            {ai.overdue.length > 0 && (
-              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
-                <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', background: '#fef2f2', display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#dc2626', display: 'inline-block' }}/>
-                  <span style={{ fontWeight: 700, fontSize: 13, color: '#dc2626' }}>Overdue Tasks ({ai.overdue.length})</span>
-                  <span style={{ fontSize: 11, color: '#dc262688', marginLeft: 4 }}>— sorted by most days overdue</span>
+            {/* ── Overdue by team member (grouped) ── */}
+            {overdueGroups.length > 0 && (
+              <div style={{ background: 'var(--surface)', border: '1px solid #fca5a5', borderRadius: 12, overflow: 'hidden' }}>
+                <div style={{ padding: '12px 18px', background: '#fef2f2', borderBottom: '1px solid #fca5a5', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontWeight: 700, fontSize: 13, color: '#dc2626' }}>🔴 Overdue — by Team Member</span>
+                  <span style={{ fontSize: 11, color: '#dc262688', marginLeft: 4 }}>Click a name in Team Performance tab to see full task history</span>
                 </div>
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr>
-                        <th style={thS}>Task</th>
-                        <th style={thS}>Assignee</th>
-                        <th style={thS}>Priority</th>
-                        <th style={thS}>Due Date</th>
-                        <th style={{ ...thS, color: '#dc2626' }}>Days Overdue</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {ai.overdue.map(t => (
-                        <tr key={t.id}>
-                          <td style={{ ...tdS, fontWeight: 500, maxWidth: 320 }}>
-                            <span style={{ display: 'block', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{t.title}</span>
-                          </td>
-                          <td style={{ ...tdS, color: t.assignee_name ? 'var(--text-primary)' : 'var(--text-muted)' }}>
-                            {t.assignee_name ?? '— Unassigned'}
-                          </td>
-                          <td style={tdS}>
-                            <span style={{ padding: '2px 8px', borderRadius: 99, fontSize: 10, fontWeight: 600,
-                              color: PRIORITY_COLOR[t.priority] ?? '#94a3b8',
-                              background: (PRIORITY_COLOR[t.priority] ?? '#94a3b8') + '18' }}>
-                              {t.priority ? t.priority.charAt(0).toUpperCase() + t.priority.slice(1) : 'None'}
-                            </span>
-                          </td>
-                          <td style={{ ...tdS, color: '#dc2626' }}>
-                            {new Date(t.due_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                          </td>
-                          <td style={{ ...tdS, fontWeight: 700, color: '#dc2626', textAlign: 'center' }}>
-                            {t.days_overdue}d
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div style={{ padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {overdueGroups.map(group => {
+                    const urgentCount  = group.tasks.filter(t => t.priority === 'urgent').length
+                    const highCount    = group.tasks.filter(t => t.priority === 'high').length
+                    const maxOverdue   = Math.max(...group.tasks.map(t => t.days_overdue))
+                    const criticalFlag = urgentCount > 0 || maxOverdue > 7
+                    return (
+                      <div key={group.name} style={{
+                        display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
+                        background: criticalFlag ? '#fef2f2' : 'var(--surface-subtle)',
+                        border: `1px solid ${criticalFlag ? '#fca5a5' : 'var(--border)'}`,
+                        borderRadius: 10,
+                      }}>
+                        {/* Avatar */}
+                        <div style={{ width: 38, height: 38, borderRadius: '50%', background: '#dc262618', border: '2px solid #fca5a5',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 14, fontWeight: 700, color: '#dc2626', flexShrink: 0 }}>
+                          {group.name[0]?.toUpperCase() ?? '?'}
+                        </div>
+                        {/* Info */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{group.name}</span>
+                            <span style={{ fontSize: 12, fontWeight: 600, color: '#dc2626' }}>{group.tasks.length} overdue task{group.tasks.length !== 1 ? 's' : ''}</span>
+                            {urgentCount > 0 && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 99, background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5' }}>{urgentCount} urgent</span>}
+                            {highCount > 0 && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 99, background: '#fff7ed', color: '#ea580c', border: '1px solid #fdba74' }}>{highCount} high</span>}
+                          </div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>
+                            Oldest overdue: <strong style={{ color: maxOverdue > 7 ? '#dc2626' : 'var(--text-secondary)' }}>{maxOverdue} day{maxOverdue !== 1 ? 's' : ''}</strong>
+                            {group.tasks.slice(0, 2).map(t => ` · ${t.title.slice(0, 30)}${t.title.length > 30 ? '…' : ''}`).join('')}
+                            {group.tasks.length > 2 && ` · +${group.tasks.length - 2} more`}
+                          </div>
+                        </div>
+                        {/* Action hint */}
+                        <div style={{ fontSize: 11, color: '#dc2626', fontWeight: 600, textAlign: 'right', flexShrink: 0 }}>
+                          {criticalFlag ? '⚠ Escalate' : '📋 Review'}
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             )}
 
-            {/* Pending approval */}
+            {/* ── Pending approvals — grouped by urgency ── */}
             {ai.pending_approval.length > 0 && (
-              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
-                <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', background: '#f5f3ff', display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#7c3aed', display: 'inline-block' }}/>
-                  <span style={{ fontWeight: 700, fontSize: 13, color: '#7c3aed' }}>Pending Approval ({ai.pending_approval.length})</span>
-                  <span style={{ fontSize: 11, color: '#7c3aed88', marginLeft: 4 }}>— submitted by team, awaiting your review</span>
+              <div style={{ background: 'var(--surface)', border: '1px solid #ddd6fe', borderRadius: 12, overflow: 'hidden' }}>
+                <div style={{ padding: '12px 18px', background: '#f5f3ff', borderBottom: '1px solid #ddd6fe', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontWeight: 700, fontSize: 13, color: '#7c3aed' }}>🟣 Pending Your Approval</span>
+                  <span style={{ fontSize: 11, color: '#7c3aed88', marginLeft: 4 }}>Review these in My Tasks → Needs Approval tab</span>
                 </div>
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr>
-                        <th style={thS}>Task</th>
-                        <th style={thS}>Submitted by</th>
-                        <th style={thS}>Priority</th>
-                        <th style={thS}>Due Date</th>
-                        <th style={{ ...thS, color: '#7c3aed' }}>Days Waiting</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {ai.pending_approval.map(t => (
-                        <tr key={t.id}>
-                          <td style={{ ...tdS, fontWeight: 500, maxWidth: 320 }}>
-                            <span style={{ display: 'block', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{t.title}</span>
-                          </td>
-                          <td style={{ ...tdS, color: t.assignee_name ? 'var(--text-primary)' : 'var(--text-muted)' }}>
-                            {t.assignee_name ?? '— Unassigned'}
-                          </td>
-                          <td style={tdS}>
-                            <span style={{ padding: '2px 8px', borderRadius: 99, fontSize: 10, fontWeight: 600,
-                              color: PRIORITY_COLOR[t.priority] ?? '#94a3b8',
-                              background: (PRIORITY_COLOR[t.priority] ?? '#94a3b8') + '18' }}>
-                              {t.priority ? t.priority.charAt(0).toUpperCase() + t.priority.slice(1) : 'None'}
-                            </span>
-                          </td>
-                          <td style={tdS}>
-                            {t.due_date ? new Date(t.due_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
-                          </td>
-                          <td style={{ ...tdS, fontWeight: 700, color: '#7c3aed', textAlign: 'center' }}>
-                            {t.days_waiting}d
-                          </td>
-                        </tr>
+                <div style={{ padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {urgentPending.length > 0 && (
+                    <div style={{ marginBottom: 6 }}>
+                      <p style={{ fontSize: 11, fontWeight: 700, color: '#ea580c', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Urgent / High Priority — review first</p>
+                      {urgentPending.slice(0, 5).map(t => (
+                        <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', background: '#fff7ed', border: '1px solid #fdba74', borderRadius: 8, marginBottom: 5 }}>
+                          <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 99,
+                            color: PRIORITY_COLOR[t.priority] ?? '#94a3b8', background: (PRIORITY_COLOR[t.priority] ?? '#94a3b8') + '18', flexShrink: 0 }}>
+                            {t.priority.toUpperCase()}
+                          </span>
+                          <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{t.title}</span>
+                          <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>by {t.assignee_name ?? '—'}</span>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', flexShrink: 0 }}>{t.days_waiting}d waiting</span>
+                        </div>
                       ))}
-                    </tbody>
-                  </table>
+                      {urgentPending.length > 5 && <p style={{ fontSize: 11, color: 'var(--text-muted)', paddingLeft: 4 }}>+{urgentPending.length - 5} more urgent/high — open Needs Approval tab</p>}
+                    </div>
+                  )}
+                  {normalPending.length > 0 && (
+                    <div>
+                      {urgentPending.length > 0 && <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Other Pending</p>}
+                      {normalPending.slice(0, 4).map(t => (
+                        <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: 'var(--surface-subtle)', border: '1px solid var(--border)', borderRadius: 8, marginBottom: 5 }}>
+                          <span style={{ flex: 1, fontSize: 12, color: 'var(--text-primary)', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{t.title}</span>
+                          <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>by {t.assignee_name ?? '—'}</span>
+                          <span style={{ fontSize: 11, color: '#7c3aed', flexShrink: 0 }}>{t.days_waiting}d</span>
+                        </div>
+                      ))}
+                      {normalPending.length > 4 && <p style={{ fontSize: 11, color: 'var(--text-muted)', paddingLeft: 4 }}>+{normalPending.length - 4} more in Needs Approval tab</p>}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
 
-            {/* Unassigned urgent */}
-            {ai.unassigned_urgent.length > 0 && (
-              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
-                <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', background: '#fff7ed', display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#ea580c', display: 'inline-block' }}/>
-                  <span style={{ fontWeight: 700, fontSize: 13, color: '#ea580c' }}>Urgent & Unassigned ({ai.unassigned_urgent.length})</span>
-                  <span style={{ fontSize: 11, color: '#ea580c88', marginLeft: 4 }}>— high-priority tasks with no owner</span>
-                </div>
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr>
-                        <th style={thS}>Task</th>
-                        <th style={thS}>Priority</th>
-                        <th style={thS}>Due Date</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {ai.unassigned_urgent.map(t => (
-                        <tr key={t.id}>
-                          <td style={{ ...tdS, fontWeight: 500, maxWidth: 400 }}>
-                            <span style={{ display: 'block', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{t.title}</span>
-                          </td>
-                          <td style={tdS}>
-                            <span style={{ padding: '2px 8px', borderRadius: 99, fontSize: 10, fontWeight: 600,
-                              color: PRIORITY_COLOR[t.priority] ?? '#94a3b8',
-                              background: (PRIORITY_COLOR[t.priority] ?? '#94a3b8') + '18' }}>
-                              {t.priority ? t.priority.charAt(0).toUpperCase() + t.priority.slice(1) : 'None'}
-                            </span>
-                          </td>
-                          <td style={{ ...tdS, color: t.due_date && t.due_date < new Date().toISOString().split('T')[0] ? '#dc2626' : 'var(--text-primary)' }}>
-                            {t.due_date ? new Date(t.due_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '— No due date'}
-                          </td>
-                        </tr>
+            {/* ── Unassigned urgent + capacity hint ── */}
+            {(ai.unassigned_urgent.length > 0 || hasCapacity.length > 0) && (
+              <div style={{ display: 'grid', gridTemplateColumns: ai.unassigned_urgent.length > 0 && hasCapacity.length > 0 ? '1fr 1fr' : '1fr', gap: 14 }}>
+
+                {ai.unassigned_urgent.length > 0 && (
+                  <div style={{ background: 'var(--surface)', border: '1px solid #fdba74', borderRadius: 12, overflow: 'hidden' }}>
+                    <div style={{ padding: '12px 16px', background: '#fff7ed', borderBottom: '1px solid #fdba74' }}>
+                      <span style={{ fontWeight: 700, fontSize: 13, color: '#ea580c' }}>🟠 Urgent & Unassigned ({ai.unassigned_urgent.length})</span>
+                    </div>
+                    <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {ai.unassigned_urgent.slice(0, 5).map(t => (
+                        <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: 'var(--surface-subtle)', borderRadius: 8, border: '1px solid var(--border)' }}>
+                          <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 99,
+                            color: PRIORITY_COLOR[t.priority] ?? '#94a3b8', background: (PRIORITY_COLOR[t.priority] ?? '#94a3b8') + '18', flexShrink: 0 }}>
+                            {t.priority.toUpperCase()}
+                          </span>
+                          <span style={{ flex: 1, fontSize: 12, fontWeight: 500, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', color: 'var(--text-primary)' }}>{t.title}</span>
+                          {t.due_date && <span style={{ fontSize: 10, color: t.due_date < new Date().toISOString().split('T')[0] ? '#dc2626' : 'var(--text-muted)', flexShrink: 0 }}>
+                            {new Date(t.due_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                          </span>}
+                        </div>
                       ))}
-                    </tbody>
-                  </table>
-                </div>
+                      {ai.unassigned_urgent.length > 5 && <p style={{ fontSize: 11, color: 'var(--text-muted)', paddingLeft: 4 }}>+{ai.unassigned_urgent.length - 5} more unassigned</p>}
+                    </div>
+                  </div>
+                )}
+
+                {hasCapacity.length > 0 && (
+                  <div style={{ background: 'var(--surface)', border: '1px solid #bbf7d0', borderRadius: 12, overflow: 'hidden' }}>
+                    <div style={{ padding: '12px 16px', background: '#f0fdf4', borderBottom: '1px solid #bbf7d0' }}>
+                      <span style={{ fontWeight: 700, fontSize: 13, color: '#15803d' }}>✅ Available to Take Work ({hasCapacity.length})</span>
+                    </div>
+                    <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {hasCapacity.slice(0, 5).map(emp => (
+                        <div key={emp.uid} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', background: 'var(--surface-subtle)', borderRadius: 8, border: '1px solid var(--border)' }}>
+                          <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#16a34a18', border: '1.5px solid #16a34a',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#16a34a', flexShrink: 0 }}>
+                            {emp.name[0]?.toUpperCase()}
+                          </div>
+                          <span style={{ flex: 1, fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>{emp.name}</span>
+                          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{emp.total} task{emp.total !== 1 ? 's' : ''} assigned</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
-            {ai.overdue.length === 0 && ai.pending_approval.length === 0 && ai.unassigned_urgent.length === 0 && (
-              <div style={{ textAlign: 'center', padding: '60px 24px', color: 'var(--text-muted)', background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)' }}>
-                <p style={{ fontSize: 36, marginBottom: 8 }}>✅</p>
-                <p style={{ fontSize: 15, fontWeight: 600, marginBottom: 4, color: 'var(--text-primary)' }}>All clear!</p>
-                <p style={{ fontSize: 13 }}>No overdue tasks, no pending approvals, and no unassigned urgent work.</p>
-              </div>
-            )}
           </div>
         )
       })()}

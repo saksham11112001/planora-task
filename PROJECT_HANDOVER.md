@@ -2,7 +2,7 @@
 **GitHub:** saksham11112001/planora-task  
 **Live URL:** sng-adwisers.com  
 **Stack:** Next.js 15.5 · Supabase (xjaybcthnneppfdgmtaq) · Tailwind v4 · Inngest · Resend · Vercel  
-**Last Updated:** 2026-05-17 (Sessions 14–17)
+**Last Updated:** 2026-06-13 (Sessions 18–19)
 
 ---
 
@@ -29,12 +29,16 @@
 18. **NEW (Sessions 14–17):** Phone number is the identity anchor for trials — one phone = one account = one trial. Phone is required at org creation (`app/api/onboarding`). `users.phone_number` has a unique partial index (NULLs allowed). Never skip phone validation in onboarding.
 19. **NEW (Sessions 14–17):** Referral anti-abuse has 7 guards including org age gate (48h), user-ID overlap, phone overlap, circular ring, and network ring. Constants: `MAX_EXTENSION_DAYS=42`, `EXTENSION_PER_REFERRAL=7`, `MIN_ORG_AGE_HOURS=48`. All guard failures return a single generic error (no enumeration).
 20. **NEW (Sessions 14–17):** Digest email mode is the default for ALL orgs (when no `org_feature_settings.notification_frequency` record exists, `getOrgNotifMode` returns `'digest'`). Every notification handler MUST check `getOrgNotifMode` or `getOrgNotifModeForUser` before calling a direct send function.
+21. **NEW (Sessions 18–19):** MSME Vendor Compliance Tracker — separate module at `/msme`. Vendors added via form; owner/admin/manager only. Razorpay payment gate for vendor reports (₹99/vendor). Bulk email via Resend (`POST /api/msme/shoot`). Magic-link share for client-facing vendor list. Tables: `msme_vendors`, `msme_payments`. SQL: `supabase/migrations/create_msme_tracker.sql` + `add_msme_payment_status.sql`.
+22. **NEW (Sessions 18–19):** Partner Portal — `/partner` (owner only). CAs earn commissions (Bronze 10% 1–4 referrals / Silver 15% 5–9 / Gold 20% 10+) when orgs join via their referral link. Tables: `partner_commissions`, `partner_payouts`. API: `GET /api/partner` (tier + stats + referred list), `POST /api/partner/payout` (min ₹500, no double-payout guard). Sidebar shows Handshake icon for owners only.
+23. **NEW (Sessions 18–19):** Reports revamp — `ReportsFetcher.tsx` now computes trajectory (12-week AreaChart), status breakdown (PieChart donut), action items (overdue by assignee / pending approvals / unassigned urgent), and top/bottom 3 performers — all from the existing 90-day tasks query (zero extra DB hits). `ReportsCharts.tsx` has 4 tabs: Overview, Team Performance, Action Items (executive summarized view for owners/admins), Time.
+24. **NEW (Sessions 18–19):** Walkthrough enhanced — now 20 slides. Added `msme-tracker` and `partner-portal` slides with SVG illustrations. Updated `welcome`, `reports`, `done` slides with richer detail. Storage key: `planora_wt_v3_${userId}`. Shows to accounts < 14 days old. `standalone` prop renders as full page.
 
 ---
 
 ## 2. SUPABASE TABLES
 
-### ✅ KEEP (22 core tables)
+### ✅ KEEP (28 core tables)
 ```
 billing_events, clients, email_daily_log, organisations, org_members,
 org_settings, org_feature_settings, product_subscriptions, projects,
@@ -43,7 +47,9 @@ notification_preferences, user_profiles,
 invoices, invoice_items,                  ← Session 13 (add_billable_invoices.sql)
 referral_redemptions,                     ← Session 13 (add_org_codes_trial.sql) + Sessions 14–17 (redeemer_owner_phone column)
 notification_queue,                       ← digest email system
-ca_master_tasks, ca_client_assignments, ca_task_instances
+ca_master_tasks, ca_client_assignments, ca_task_instances,
+msme_vendors, msme_payments,              ← Sessions 18–19 (create_msme_tracker.sql + add_msme_payment_status.sql)
+partner_commissions, partner_payouts      ← Sessions 18–19 (add_partner_portal.sql)
 ```
 
 ### ❌ DELETE (legacy merged tables)
@@ -58,6 +64,51 @@ workspaces
 -- Projects member visibility (run this if not done)
 ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS member_ids uuid[] DEFAULT NULL;
 CREATE INDEX IF NOT EXISTS idx_projects_member_ids ON public.projects USING GIN (member_ids);
+```
+
+### Schema additions — Sessions 18–19
+```sql
+-- MSME Vendor Compliance Tracker (supabase/migrations/create_msme_tracker.sql)
+CREATE TABLE msme_vendors (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id uuid NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
+  name text NOT NULL, udyam_number text, gstin text, pan text,
+  email text, phone text, address text, category text,
+  registration_date date, status text DEFAULT 'active',
+  notes text, custom_fields jsonb DEFAULT '{}',
+  created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now()
+);
+-- RLS: org members read own org's vendors; managers+ write
+
+-- MSME Payment Gate (supabase/migrations/add_msme_payment_status.sql)
+CREATE TABLE msme_payments (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id uuid NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
+  vendor_id uuid REFERENCES msme_vendors(id),
+  razorpay_order_id text, razorpay_payment_id text,
+  amount_paise int NOT NULL, status text DEFAULT 'pending',
+  created_at timestamptz DEFAULT now()
+);
+
+-- Partner Portal (supabase/migrations/add_partner_portal.sql)
+CREATE TABLE partner_commissions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  partner_org_id uuid NOT NULL REFERENCES organisations(id),
+  referred_org_id uuid NOT NULL REFERENCES organisations(id),
+  event text NOT NULL, plan_tier text,
+  commission_paise int NOT NULL DEFAULT 0,
+  status text NOT NULL DEFAULT 'pending',  -- pending | approved | paid
+  payout_id uuid, created_at timestamptz DEFAULT now()
+);
+CREATE TABLE partner_payouts (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  partner_org_id uuid NOT NULL REFERENCES organisations(id),
+  amount_paise int NOT NULL,
+  status text NOT NULL DEFAULT 'requested',  -- requested | processing | paid | rejected
+  bank_details jsonb, note text,
+  created_at timestamptz DEFAULT now(), processed_at timestamptz
+);
+-- RLS: partner org owner reads/writes own rows
 ```
 
 ### Schema additions — Sessions 13–17
@@ -237,10 +288,37 @@ app/(app)/settings/organisation/OrgForm.tsx
 
 **Reports, Time, Import**
 ```
-app/(app)/reports/page.tsx    – Plan gated (starter+). UpgradeWall shown on free.
-app/(app)/time/page.tsx       – Plan gated (starter+). UpgradeWall shown on free.
-app/(app)/import/page.tsx     – Bulk Excel import UI
+app/(app)/reports/page.tsx             – Plan gated (starter+). UpgradeWall shown on free.
+app/(app)/reports/ReportsFetcher.tsx   – Server component: computes trajectoryData (12 weeks), statusBreakdown,
+                                         actionItems (overdue/pending_approval/unassigned_urgent), top/bottom performers.
+                                         All from existing 90-day tasks query — zero extra DB hits.
+app/(app)/reports/ReportsCharts.tsx    – Client: 4 tabs — Overview (trajectory AreaChart + status PieChart),
+                                         Team Performance (top/bottom 3 cards + BarChart), 
+                                         Action Items (executive summarized view: grouped by assignee, urgency split, unassigned panel),
+                                         Time (existing time log).
+app/(app)/time/page.tsx                – Plan gated (starter+). UpgradeWall shown on free.
+app/(app)/import/page.tsx              – Bulk Excel import UI
 app/(app)/import/ImportView.tsx
+```
+
+**MSME Vendor Compliance Tracker**
+```
+app/(app)/msme/page.tsx        – owner/admin/manager only; redirects others to /dashboard
+app/(app)/msme/MsmeView.tsx    – Client: vendor table (add/edit/remove), Udyam form, bulk email button,
+                                  magic-link share, payment gate (Razorpay ₹99/vendor)
+app/api/msme/route.ts          – GET/POST/PATCH/DELETE vendors (org-scoped)
+app/api/msme/shoot/route.ts    – POST: bulk email to all vendors via Resend
+app/api/msme/pay/route.ts      – POST: Razorpay order creation for vendor report unlock
+```
+
+**Partner Portal**
+```
+app/(app)/partner/page.tsx        – owner only; redirects non-owners to /dashboard
+app/(app)/partner/PartnerView.tsx – Client: tier badge + progress bar, referral link copy,
+                                    5 stat cards, payout request form (min ₹500),
+                                    payout history, referred clients table, "How It Works" section
+app/api/partner/route.ts          – GET: tier, rate, stats, referred[], commissions[], payouts[]
+app/api/partner/payout/route.ts   – POST: create payout request (guard: min ₹500, no double-payout)
 ```
 
 ### API Routes
@@ -344,9 +422,12 @@ components/layout/Header.tsx      – Search, notifications (rgba bg fixed), use
 components/auth/AuthErrorBoundary.tsx
 components/search/SearchModal.tsx
 components/clients/QuickAddClientModal.tsx
-components/walkthrough/WalkthroughOverlay.tsx – First-time user tour (accounts < 7 days old)
-  Shows 12-card walkthrough; navigates to each feature page on Next; Quick Tasks step has
-  "Create your first task" CTA. localStorage key: planora_wt_v1_${userId}. SSR-safe.
+components/walkthrough/WalkthroughOverlay.tsx – First-time user tour (accounts < 14 days old)
+  20-slide PPT-style walkthrough with SVG illustrations per slide. Navigates to each
+  feature page on Next. `standalone` prop renders as full page instead of modal.
+  localStorage key: planora_wt_v3_${userId}. SSR-safe.
+  Slides: welcome, tasks, board, recurring, inbox, projects, clients, calendar,
+  approvals, team, compliance, reports, msme-tracker, partner-portal, done.
 components/theme/ThemeProvider.tsx – light/dark/system. Uses localStorage.
 components/theme/ThemeToggle.tsx
 ```
@@ -514,6 +595,9 @@ setAll(toSet) {
 | Digest emails sent individually per event | Assignee escalation + approver approval-digest paths called direct send functions bypassing queue | Added getOrgNotifMode check; digest → queueNotification |
 | Morning digest missed items queued by dailyReminders | Both ran at 8:00 AM IST — race condition | digestMorning shifted to 8:15 AM IST |
 | Multi-account referral farming | No phone identity anchor; multiple Google accounts = multiple trials | Phone required at signup; unique partial index on users.phone_number; 7-guard referral API |
+| Reports Action Items was raw task table (slow to scan) | Per-task list rows with no grouping | Replaced with executive grouped view: overdue by assignee (count + urgency), approval urgency split, unassigned side-by-side capacity panel |
+| Walkthrough showed generic slides with no product depth | Slides had minimal text/no illustrations | Rewrote all slides with SVG illustrations, expanded bullets, specific numbers; added MSME and Partner Portal slides |
+| MSME dark-mode form inputs | Hardcoded light bg on form fields | Replaced with rgba() and CSS vars throughout MsmeView |
 
 ---
 
@@ -528,6 +612,16 @@ RESEND_API_KEY=re_...
 FROM_EMAIL=Planora <noreply@planora.in>
 INNGEST_EVENT_KEY=...
 INNGEST_SIGNING_KEY=...
+# Sessions 18–19 additions (required for MSME + Partner Portal):
+RAZORPAY_KEY_ID=rzp_live_...
+RAZORPAY_KEY_SECRET=...
+# Cloudflare R2 for file storage (falls back to Supabase Storage if not set):
+R2_ACCOUNT_ID=...
+R2_ACCESS_KEY_ID=...
+R2_SECRET_ACCESS_KEY=...
+R2_BUCKET_NAME=...
+# AI features (optional — used for smart action suggestions in reports):
+ANTHROPIC_API_KEY=sk-ant-...
 ```
 
 ---

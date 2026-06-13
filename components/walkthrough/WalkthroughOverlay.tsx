@@ -838,6 +838,103 @@ function IllustrationReports() {
   )
 }
 
+
+// ── MSME Tracker illustration ──────────────────────────────────────────────
+function IllustrationMsme() {
+  return (
+    <svg viewBox="0 0 320 260" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width:'100%', height:'100%' }}>
+      <rect x="20" y="16" width="280" height="228" rx="12" fill="#f8fafc" stroke="#e2e8f0" strokeWidth="1.5"/>
+      {/* Header */}
+      <rect x="20" y="16" width="280" height="34" rx="12" fill="#0891b2" fillOpacity="0.1"/>
+      <text x="36" y="36" fontSize="11" fontWeight="700" fill="#0891b2">MSME Vendor Tracker</text>
+      <rect x="232" y="24" width="56" height="18" rx="5" fill="#0891b2"/>
+      <text x="260" y="36" textAnchor="middle" fontSize="8" fontWeight="700" fill="white">+ Add Vendor</text>
+      {/* Stats row */}
+      {[
+        { x:50,  val:'12', label:'Total', color:'#0891b2' },
+        { x:120, val:'7',  label:'Submitted', color:'#16a34a' },
+        { x:190, val:'3',  label:'Pending', color:'#ca8a04' },
+        { x:260, val:'2',  label:'Locked', color:'#dc2626' },
+      ].map(s => (
+        <g key={s.label}>
+          <rect x={s.x-28} y="58" width="56" height="28" rx="6" fill={s.color} fillOpacity="0.1" stroke={s.color} strokeWidth="0.8" strokeOpacity="0.3"/>
+          <text x={s.x} y="73" textAnchor="middle" fontSize="13" fontWeight="800" fill={s.color}>{s.val}</text>
+          <text x={s.x} y="82" textAnchor="middle" fontSize="7" fill={s.color} fillOpacity="0.7">{s.label}</text>
+        </g>
+      ))}
+      {/* Vendor rows */}
+      {[
+        { name:'Shanti Traders', gstin:'27AABC…', status:'Submitted', color:'#16a34a', paid: true },
+        { name:'Mehta Industries', gstin:'06XXYZ…', status:'Emailed', color:'#ca8a04', paid: true },
+        { name:'Sunrise Exports', gstin:'—', status:'Pending', color:'#64748b', paid: false },
+      ].map((v, i) => (
+        <g key={v.name}>
+          <rect x="28" y={98+i*46} width="264" height="38" rx="7" fill="white" stroke="#e2e8f0" strokeWidth="1"/>
+          {!v.paid && <text x="38" y={98+i*46+22} fontSize="12">🔒</text>}
+          <text x={v.paid ? 44 : 58} y={98+i*46+16} fontSize="10" fontWeight="600" fill="#1e293b">{v.name}</text>
+          <text x={v.paid ? 44 : 58} y={98+i*46+28} fontSize="8" fill="#94a3b8">GSTIN: {v.gstin}</text>
+          <rect x="200" y={98+i*46+10} width="56" height="16" rx="5" fill={v.color} fillOpacity="0.12"/>
+          <text x="228" y={98+i*46+21} textAnchor="middle" fontSize="7.5" fontWeight="700" fill={v.color}>{v.status}</text>
+          {!v.paid && (
+            <>
+              <rect x="210" y={98+i*46+10} width="72" height="16" rx="5" fill="#ea580c" fillOpacity="0.12"/>
+              <text x="246" y={98+i*46+21} textAnchor="middle" fontSize="7.5" fontWeight="700" fill="#ea580c">Pay ₹99</text>
+            </>
+          )}
+        </g>
+      ))}
+      {/* Magic link form arrow */}
+      <text x="160" y="240" textAnchor="middle" fontSize="8" fill="#64748b">Vendor receives magic-link → fills Udyam form → you get notified ✅</text>
+    </svg>
+  )
+}
+
+// ── Partner Portal illustration ────────────────────────────────────────────
+function IllustrationPartner() {
+  return (
+    <svg viewBox="0 0 320 260" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width:'100%', height:'100%' }}>
+      <rect x="20" y="16" width="280" height="228" rx="12" fill="#f8fafc" stroke="#e2e8f0" strokeWidth="1.5"/>
+      <rect x="20" y="16" width="280" height="34" rx="12" fill="#16a34a" fillOpacity="0.1"/>
+      <text x="36" y="36" fontSize="11" fontWeight="700" fill="#16a34a">Partner Portal</text>
+      <rect x="222" y="22" width="66" height="20" rx="5" fill="#f59e0b" fillOpacity="0.15" stroke="#f59e0b" strokeWidth="1"/>
+      <text x="255" y="35" textAnchor="middle" fontSize="8.5" fontWeight="700" fill="#b45309">🥇 GOLD TIER</text>
+      {/* Referral link */}
+      <rect x="28" y="58" width="182" height="22" rx="6" fill="white" stroke="#e2e8f0" strokeWidth="1"/>
+      <text x="38" y="73" fontSize="8" fill="#94a3b8">floatup.app/signup?ref=SNGCA08</text>
+      <rect x="216" y="58" width="76" height="22" rx="6" fill="#0d9488"/>
+      <text x="254" y="73" textAnchor="middle" fontSize="8.5" fontWeight="700" fill="white">Copy Link</text>
+      {/* Stat boxes */}
+      {[
+        { x:50,  val:'18', label:'Referred', color:'#0891b2' },
+        { x:130, val:'11', label:'Paying', color:'#16a34a' },
+        { x:210, val:'₹6,732', label:'Earned', color:'#7c3aed' },
+        { x:280, val:'20%', label:'Rate', color:'#f59e0b' },
+      ].map(s => (
+        <g key={s.label}>
+          <rect x={s.x-32} y="90" width="64" height="30" rx="6" fill={s.color} fillOpacity="0.08" stroke={s.color} strokeWidth="0.8" strokeOpacity="0.3"/>
+          <text x={s.x} y="107" textAnchor="middle" fontSize="11" fontWeight="800" fill={s.color}>{s.val}</text>
+          <text x={s.x} y="115" textAnchor="middle" fontSize="7" fill={s.color} fillOpacity="0.7">{s.label}</text>
+        </g>
+      ))}
+      {/* Referred clients */}
+      {[
+        { name:'Kapoor & Associates', plan:'Pro', paid: true, commission: '₹990' },
+        { name:'Ravi GST Consultants', plan:'Starter', paid: true, commission: '₹297' },
+        { name:'Nirmala Tax Services', plan:'Free', paid: false, commission: '—' },
+      ].map((c, i) => (
+        <g key={c.name}>
+          <rect x="28" y={132+i*36} width="264" height="28" rx="6" fill="white" stroke="#e2e8f0" strokeWidth="1"/>
+          <text x="40" y={132+i*36+17} fontSize="10" fontWeight="600" fill="#1e293b">{c.name}</text>
+          <rect x="198" y={132+i*36+6} width="38" height="14" rx="4" fill={c.paid ? '#dbeafe' : '#f1f5f9'}/>
+          <text x="217" y={132+i*36+16} textAnchor="middle" fontSize="7.5" fontWeight="600" fill={c.paid ? '#1d4ed8' : '#64748b'}>{c.plan}</text>
+          <text x="264" y={132+i*36+17} textAnchor="middle" fontSize="10" fontWeight="700" fill={c.paid ? '#16a34a' : '#94a3b8'}>{c.commission}</text>
+        </g>
+      ))}
+      <text x="160" y="246" textAnchor="middle" fontSize="8" fill="#64748b">Request payout when balance ≥ ₹500 · Processed within 3–5 business days</text>
+    </svg>
+  )
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Step definitions
 // ─────────────────────────────────────────────────────────────────────────────
@@ -854,7 +951,7 @@ interface Step {
   path?:       string
   actionLabel?: string
   actionHref?: string
-  Illustration: () => JSX.Element
+  Illustration: () => React.ReactElement
 }
 
 const STEPS: Step[] = [
@@ -863,12 +960,13 @@ const STEPS: Step[] = [
     icon: '🏢', color: '#0d9488', accent: 'rgba(13,148,136,0.1)',
     title: 'Welcome to Floatup — Built for CA Firms',
     subtitle: 'The only practice management tool designed for Indian CA & CPA firms',
-    body: "If your team is still tracking filings in Excel, sending deadline reminders on WhatsApp, or wondering who is working on what — Floatup fixes all of that. This 3-minute tour covers every feature so you never need to ask us how anything works.",
+    body: "If your team is still tracking filings in Excel, sending deadline reminders on WhatsApp, or wondering who is working on what — Floatup fixes all of that. This 5-minute tour covers every feature so you know exactly where to click on day one. Use the arrows to go at your own pace, or jump to any slide from the dots below.",
     bullets: [
-      { emoji: '📋', text: '69+ statutory tasks — GSTR, TDS, ITR, ROC, PF, ESI, PT — auto-generated with correct due dates' },
-      { emoji: '👥', text: 'Unlimited clients with GSTIN auto-fill, DSC expiry tracker, and group organisation' },
-      { emoji: '✅', text: 'Approval workflow with timestamped audit trail — replaces WhatsApp "please check" messages' },
-      { emoji: '📊', text: 'Reports & Monitor give you firm-wide visibility without asking anyone anything' },
+      { emoji: '📋', text: '69+ statutory tasks — GSTR-1, GSTR-3B, TDS Q1–Q4, ITR, ROC, PF, ESI, PT — auto-generated with correct Indian due dates, no configuration needed' },
+      { emoji: '👥', text: 'Unlimited clients: GSTIN auto-fills name and state, DSC expiry tracker with colour-coded alerts, import from Excel in minutes' },
+      { emoji: '✅', text: 'Built-in approval workflow: assignee submits → you review → approve or return with comments. Full audit trail with timestamps.' },
+      { emoji: '📊', text: 'Reports & Monitor give you firm-wide visibility in 5 seconds — no status meetings, no WhatsApp "kya hua?" messages' },
+      { emoji: '🏭', text: 'NEW: MSME Vendor Compliance Tracker — collect Udyam certificates from vendors automatically via magic-link emails' },
     ],
     Illustration: IllustrationWelcome,
   },
@@ -1076,14 +1174,15 @@ const STEPS: Step[] = [
   {
     id: 'reports',
     icon: '📈', color: '#7c3aed', accent: 'rgba(124,58,237,0.1)',
-    title: 'Reports — Compliance & Performance Analytics',
-    subtitle: 'Sidebar → Reports',
-    body: "Reports gives you three powerful dashboards in one page. Overview shows KPIs and task trends. Team Performance shows each member's completion rate, overdue count, and hours logged. Compliance Report shows filing status across every client — filter by date range, team member, priority, or client.",
+    title: 'Reports — Analytics & Actionable Insights',
+    subtitle: 'Sidebar → Reports  (Starter plan and above)',
+    body: "Reports has five tabs. Overview shows firm-wide KPIs and a 12-week trajectory chart. Action Items (⚡) shows exactly what needs your decision right now — grouped by person, not task. Team Performance shows top and bottom 3 performers. Compliance Report and WIP Report round out the picture.",
     bullets: [
-      { emoji: '📊', text: 'Overview tab: Tasks created · Completed · Overdue · Hours logged — all with 30-day trends' },
-      { emoji: '👥', text: 'Team Performance tab: per-member completion rate, on-time %, average days to close, hours logged' },
-      { emoji: '⚖️', text: 'Compliance Report tab: see overdue, due today, and upcoming filings across all clients at once' },
-      { emoji: '🔍', text: 'Universal filter bar: narrow by date range, client, team member, priority, or status instantly' },
+      { emoji: '⚡', text: 'Action Items tab: overdue tasks grouped by team member, pending approvals by urgency, unassigned urgent tasks — all at a glance, no scrolling through lists' },
+      { emoji: '📈', text: 'Company Trajectory chart: 12-week view of tasks added vs completed — a widening gap means growing backlog, take action immediately' },
+      { emoji: '🏆', text: 'Team Performance: Star Performers (top 3) vs Needs Attention (bottom 3) — completion rate, on-time %, hours logged per person' },
+      { emoji: '⚖️', text: 'Compliance Report tab: overdue and pending filings across all clients with date range and team member filters' },
+      { emoji: '🔄', text: 'WIP Report: every in-progress task grouped by client with hours logged and a one-click invoice creation button' },
     ],
     path: '/reports',
     actionLabel: 'Open Reports',
@@ -1122,18 +1221,54 @@ const STEPS: Step[] = [
     Illustration: IllustrationMultiOrg,
   },
   {
+    id: 'msme-tracker',
+    icon: '🏭', color: '#0891b2', accent: 'rgba(8,145,178,0.1)',
+    title: 'MSME Vendor Compliance Tracker',
+    subtitle: 'Sidebar → MSME Tracker (Manager, Admin & Owner only)',
+    body: "Under the MSME Act, your clients are legally required to collect Udyam Registration Numbers from their MSME vendors and report outstanding amounts. Floatup automates this entirely: send magic-link emails to vendors, they fill the form online, you get notified when done.",
+    bullets: [
+      { emoji: '📧', text: 'Add vendor name + email → Floatup sends a branded magic-link email on your behalf (up to 3 reminders)' },
+      { emoji: '📋', text: 'Vendor opens the link (no login needed) and fills: Udyam number, MSME category, nature of business, outstanding amount as on 31 March' },
+      { emoji: '📎', text: 'Vendor uploads their Udyam certificate (PDF/JPG) — you can download it anytime from the dashboard' },
+      { emoji: '🆓', text: 'First 5 vendors are free. After that, ₹99/vendor/year — a tiny fraction of the compliance fine risk' },
+      { emoji: '📊', text: 'Bulk import vendors from Excel, export all data to Excel, and share WhatsApp links as an alternative to email' },
+    ],
+    path: '/msme',
+    actionLabel: 'Open MSME Tracker',
+    actionHref: '/msme',
+    Illustration: IllustrationMsme,
+  },
+  {
+    id: 'partner-portal',
+    icon: '🤝', color: '#16a34a', accent: 'rgba(22,163,74,0.1)',
+    title: 'Partner Portal — Earn by Referring Floatup',
+    subtitle: 'Sidebar → Partner Portal (Org Owner only)',
+    body: "Every CA firm owner has a personal referral link. When you refer another CA or business owner to Floatup and they sign up and pay — you earn a commission on their subscription, every year, for as long as they stay. No cap, no expiry.",
+    bullets: [
+      { emoji: '🔗', text: 'Your unique referral link is one click to copy — share on WhatsApp, email, or LinkedIn' },
+      { emoji: '💰', text: 'Bronze (1–4 referrals): 10% · Silver (5–9): 15% · Gold (10+): 20% — commission grows with your network' },
+      { emoji: '👁️', text: 'Dashboard shows: who joined, their plan tier, whether they are paying, and your commission status' },
+      { emoji: '🏦', text: 'Request a payout once your balance hits ₹500 — enter your bank account details and we transfer within 3–5 days' },
+      { emoji: '🔒', text: 'What stays private: exact subscription amount your referral pays — you see your commission, not their invoice' },
+    ],
+    path: '/partner',
+    actionLabel: 'Open Partner Portal',
+    actionHref: '/partner',
+    Illustration: IllustrationPartner,
+  },
+  {
     id: 'done',
     icon: '🚀', color: '#16a34a', accent: 'rgba(22,163,74,0.1)',
-    title: "Your Firm is Ready — 4 Steps to Full Value",
-    subtitle: 'Most firms are operational within 30 minutes',
-    body: "You have seen every feature. Here is the fastest path to getting real value today — most CA firms complete these four steps in under 30 minutes and start saving hours every single week from that moment forward.",
+    title: "Your Firm is Ready — First 30 Minutes Action Plan",
+    subtitle: 'Follow this sequence to be fully operational today',
+    body: "You have seen every feature. Here is the exact sequence that most CA firms follow — they complete all four steps in under 30 minutes and start saving hours every single week from that day forward. Each step unlocks the next.",
     bullets: [
-      { emoji: '1️⃣', text: 'Import all clients from Excel using the starter template — takes 5 minutes for any size list' },
-      { emoji: '2️⃣', text: 'Go to CA Compliance → pick your task types → select clients → Generate — done in 3 clicks' },
-      { emoji: '3️⃣', text: 'Settings → Team: invite every staff member with their email and assign their role' },
-      { emoji: '4️⃣', text: 'Open the Kanban board, assign tasks, and check Monitor daily — your firm runs on auto-pilot' },
+      { emoji: '1️⃣', text: 'Clients → Import: download the starter template, paste your client list, upload. All clients created in one go with GSTIN, DSC dates, and groups.' },
+      { emoji: '2️⃣', text: 'CA Compliance → Generate Tasks: select task types (GSTR-1, TDS, ITR, etc.), pick clients or entire groups, click Generate. Filing tasks appear instantly with correct due dates.' },
+      { emoji: '3️⃣', text: 'Settings → Team → Invite: add every team member with their email and role. They get a magic-link, no password needed. Assign tasks to them immediately.' },
+      { emoji: '4️⃣', text: 'Check Monitor daily (5 seconds): who has overdue work, who submitted for approval, who has capacity. No more WhatsApp status messages needed.' },
     ],
-    actionLabel: '+ Import or add your first client',
+    actionLabel: '→ Start: Import your clients now',
     actionHref: '/clients',
     Illustration: IllustrationDone,
   },
