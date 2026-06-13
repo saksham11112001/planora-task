@@ -16,6 +16,7 @@ import { monthlyDocReminders }         from '@/lib/inngest/functions/monthlyDocR
 import { reEngagement }                from '@/lib/inngest/functions/reEngagement'
 import { onboardingNudge }             from '@/lib/inngest/functions/onboardingNudge'
 import { upgradePush }                 from '@/lib/inngest/functions/upgradePush'
+import { msmeReminders }               from '@/lib/inngest/functions/msmeReminders'
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
@@ -38,5 +39,6 @@ export const { GET, POST, PUT } = serve({
     reEngagement,
     onboardingNudge,
     upgradePush,
+    msmeReminders,
   ],
 })

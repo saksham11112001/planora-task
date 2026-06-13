@@ -14,6 +14,7 @@ import { clientUploadNotifyHtml, clientUploadNotifySubject } from './templates/c
 import { reEngagementHtml, reEngagementSubject } from './templates/reEngagementEmail'
 import { onboardingNudgeHtml, onboardingNudgeSubject } from './templates/onboardingNudgeEmail'
 import { upgradePushHtml, upgradePushSubject } from './templates/upgradePushEmail'
+import { msmeVendorEmailHtml, msmeVendorEmailSubject } from './templates/msmeVendorEmail'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://floatup.app'
 
@@ -248,6 +249,18 @@ export async function sendOnboardingNudgeEmail(p: {
     from: FROM, to: p.to,
     subject: onboardingNudgeSubject({ userName: p.userName }),
     html:    onboardingNudgeHtml({ ...p, appUrl: APP_URL }),
+  })
+}
+
+// ── MSME vendor form invitation ───────────────────────────────────────────
+export async function sendMsmeVendorEmail(p: {
+  to: string; vendorName: string; orgName: string
+  formUrl: string; attemptNo: 1 | 2 | 3
+}) {
+  return resend.emails.send({
+    from: FROM, to: p.to,
+    subject: msmeVendorEmailSubject(p),
+    html:    msmeVendorEmailHtml(p),
   })
 }
 

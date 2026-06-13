@@ -38,7 +38,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const { data: task } = await admin
     .from('tasks')
-    .select('id, assignee_id, approver_id, org_id, approval_required, approval_status, status, parent_task_id, custom_fields')
+    .select('id, assignee_id, approver_id, org_id, approval_required, approval_status, status, parent_task_id, is_recurring, custom_fields')
     .eq('id', id).eq('org_id', mb.org_id).single()
   if (!task) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
@@ -63,6 +63,23 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
 
   const body = await req.json()
+
+  // ── RECURRING TEMPLATE GUARD ───────────────────────────────────────────────
+  // A recurring template (is_recurring=true, no parent) is never directly completable.
+  // Completion only applies to its spawned occurrences (parent_recurring_id set,
+  // is_recurring=false). Completing the template poisons its status and makes every
+  // calendar/monitor expansion render as done. Block any forward status move here so no
+  // entry point (project board drag, detail panel, kanban) can corrupt it. Other field
+  // edits (title, frequency, assignee, etc.) on the template are still allowed.
+  if (
+    (task as any).is_recurring === true && !task.parent_task_id &&
+    (body.status === 'completed' || body.status === 'in_review')
+  ) {
+    return NextResponse.json({
+      error: 'Recurring tasks cannot be completed directly. Each occurrence is completed individually once it is generated.',
+      code:  'RECURRING_TEMPLATE_NOT_COMPLETABLE',
+    }, { status: 422 })
+  }
 
   // ── PERMISSION GATE ────────────────────────────────────────────────────────
   // Complete task

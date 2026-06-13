@@ -19,13 +19,25 @@ export async function POST(
 
   const { data: task } = await admin
     .from('tasks')
-    .select('id, title, status, approval_status, approval_required, assignee_id, approver_id, org_id, parent_task_id, custom_fields')
+    .select('id, title, status, approval_status, approval_required, assignee_id, approver_id, org_id, parent_task_id, is_recurring, custom_fields')
     .eq('id', id).eq('org_id', mb.org_id).single()
   if (!task) return NextResponse.json({ error: 'Task not found' }, { status: 404 })
 
   const { decision, comment } = await req.json()
   if (!['submit', 'approve', 'reject'].includes(decision)) {
     return NextResponse.json({ error: 'Invalid decision' }, { status: 400 })
+  }
+
+  // A recurring TEMPLATE (is_recurring=true, no parent) is never itself completable —
+  // completion only ever applies to its spawned instances (parent_recurring_id set,
+  // is_recurring=false). Completing the template would poison its status and cause
+  // every calendar/monitor expansion of it to render as done. Block it here so no
+  // entry point can corrupt the template.
+  if ((task as any).is_recurring === true && !task.parent_task_id) {
+    return NextResponse.json({
+      error: 'Recurring tasks cannot be completed directly. Each occurrence is completed individually once it is generated.',
+      code:  'RECURRING_TEMPLATE_NOT_COMPLETABLE',
+    }, { status: 422 })
   }
   const isAssignee    = task.assignee_id === user.id
   const isOwnerOrAdmin = ['owner', 'admin'].includes(mb.role)
