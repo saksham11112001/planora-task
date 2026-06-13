@@ -192,6 +192,73 @@ export async function ReportsFetcher() {
   }))
   // ── end compliance data ─────────────────────────────────────────────────
 
+  // ── Company trajectory — 12-week weekly task cadence ───────────────────────
+  const trajectoryData = Array.from({ length: 12 }, (_, i) => {
+    const weekEndMs   = Date.now() - (11 - i) * 7 * 86400000
+    const weekStartMs = weekEndMs - 7 * 86400000
+    const ws = new Date(weekStartMs).toISOString().split('T')[0]
+    const we = new Date(weekEndMs).toISOString().split('T')[0]
+    const d  = new Date(weekStartMs)
+    return {
+      week:      `${d.getDate()}/${d.getMonth() + 1}`,
+      added:     tasks.filter(t => t.created_at >= ws && t.created_at <= we + 'T23:59:59').length,
+      completed: tasks.filter(t => t.completed_at && t.completed_at >= ws && t.completed_at <= we + 'T23:59:59').length,
+    }
+  })
+
+  // ── Task status breakdown (across 90-day window) ─────────────────────────
+  const statusBreakdown = [
+    { name: 'To Do',       value: tasks.filter(t => t.status === 'todo').length,        color: '#64748b' },
+    { name: 'In Progress', value: tasks.filter(t => t.status === 'in_progress').length,  color: '#0891b2' },
+    { name: 'In Review',   value: tasks.filter(t => t.status === 'in_review').length,    color: '#7c3aed' },
+    { name: 'Completed',   value: tasks.filter(t => t.status === 'completed').length,    color: '#16a34a' },
+    { name: 'Cancelled',   value: tasks.filter(t => t.status === 'cancelled').length,    color: '#f87171' },
+  ].filter(s => s.value > 0)
+
+  // ── Action items — overdue, pending approval, unassigned urgent ───────────
+  const memberMap: Record<string, string> = {}
+  ;(members ?? []).forEach((m: any) => {
+    const uid  = (m.users as any)?.id ?? m.user_id
+    const name = (m.users as any)?.name ?? 'Unknown'
+    memberMap[uid] = name
+  })
+
+  const actionItems = {
+    overdue: tasks
+      .filter(t => t.due_date && t.due_date < today && t.status !== 'completed' && t.status !== 'cancelled')
+      .map(t => ({
+        id:            t.id,
+        title:         t.title,
+        priority:      t.priority,
+        due_date:      t.due_date!,
+        assignee_name: t.assignee_id ? (memberMap[t.assignee_id] ?? 'Unknown') : null,
+        days_overdue:  Math.floor((Date.now() - new Date(t.due_date!).getTime()) / 86400000),
+      }))
+      .sort((a, b) => b.days_overdue - a.days_overdue)
+      .slice(0, 25),
+    pending_approval: tasks
+      .filter(t => t.status === 'in_review')
+      .map(t => ({
+        id:            t.id,
+        title:         t.title,
+        priority:      t.priority,
+        assignee_name: t.assignee_id ? (memberMap[t.assignee_id] ?? 'Unknown') : null,
+        days_waiting:  Math.floor((Date.now() - new Date(t.created_at).getTime()) / 86400000),
+        due_date:      t.due_date ?? null,
+      }))
+      .sort((a, b) => b.days_waiting - a.days_waiting)
+      .slice(0, 25),
+    unassigned_urgent: tasks
+      .filter(t => !t.assignee_id && ['urgent', 'high'].includes(t.priority) && t.status !== 'completed' && t.status !== 'cancelled')
+      .map(t => ({
+        id:       t.id,
+        title:    t.title,
+        priority: t.priority,
+        due_date: t.due_date ?? null,
+      }))
+      .slice(0, 15),
+  }
+
   const kpis = [
     { label: 'Tasks created',    value: totalTasks,           sub: 'last 30 days',           color: '#0d9488', bg: '#f0fdfa' },
     { label: 'Completed',        value: completed,            sub: `${completionRate}% rate`, color: '#16a34a', bg: '#f0fdf4' },
@@ -233,6 +300,9 @@ export async function ReportsFetcher() {
           complianceRawTasks={complianceRawTasks}
           complianceMemberList={complianceMemberList}
           wipData={wipData}
+          trajectoryData={trajectoryData}
+          statusBreakdown={statusBreakdown}
+          actionItems={actionItems}
         />
       </div>
     </div>
