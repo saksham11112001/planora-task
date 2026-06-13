@@ -462,8 +462,13 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
                     ) : dayTasks.map(t => {
                       const borderClr  = taskTypeBorder(t)
                       const bgClr      = taskTypeBg(t)
-                      const isFutureRecurring = t.is_recurring && !t.parent_task_id && dateStr > todayStr
-                      const displayStatus = isFutureRecurring ? 'todo' : t.status
+                      // Recurring templates always show as todo — the template's own status
+                      // is irrelevant for calendar display. Real per-day status lives on
+                      // spawned instances (parent_recurring_id set), which replace templates
+                      // via the spawnedCoverage check above.
+                      const isRecurringTemplate = t.is_recurring && !t.parent_task_id
+                      const isFutureRecurring = isRecurringTemplate && dateStr > todayStr
+                      const displayStatus = isRecurringTemplate ? 'todo' : t.status
                       const isDone     = displayStatus === 'completed'
                       return (
                         <button key={t.id} onClick={() => openTask(t)}
@@ -744,7 +749,7 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
                     const priClr    = PRIORITY_COLORS[t.priority]??'#94a3b8'
                     const priBg     = PRIORITY_BG[t.priority]??'#f8fafc'
                     const isFutureRecurring = t.is_recurring && !t.parent_task_id && selected > todayStr
-                    const displayStatus = isFutureRecurring ? 'todo' : t.status
+                    const displayStatus = (t.is_recurring && !t.parent_task_id) ? 'todo' : t.status
                     return (
                       <button key={t.id} onClick={() => openTask(t)}
                         style={{ display:'block',textAlign:'left',width:'100%',padding:'12px 14px',
