@@ -65,6 +65,8 @@ export function MsmeView({ userRole }: Props) {
   const [editEmailVal,  setEditEmailVal]  = useState('')
   const [savingEmail,   setSavingEmail]   = useState(false)
   const [payingId,      setPayingId]      = useState<string | null>(null)
+  const [checkedIds,    setCheckedIds]    = useState<Set<string>>(new Set())
+  const [bulkShooting,  setBulkShooting]  = useState(false)
   const toastRef = useRef(0)
 
   // Add vendor form
@@ -129,6 +131,28 @@ export function MsmeView({ userRole }: Props) {
     if (res.status === 402) { showToast('Pay ₹99 to unlock email sending for this vendor', 'info'); return }
     if (!res.ok) { showToast(data.error ?? 'Failed to send email', 'error'); return }
     showToast(`Email sent to ${vendorName} (attempt ${data.attempt}/3)`)
+    fetchVendors()
+  }
+
+  // ── Bulk shoot email ──────────────────────────────────────────────────────
+  async function handleBulkShoot() {
+    const ids = Array.from(checkedIds)
+    if (ids.length === 0) return
+    setBulkShooting(true)
+    let sent = 0, failed = 0, locked = 0
+    for (const id of ids) {
+      const res  = await fetch(`/api/msme/vendors/${id}/shoot-email`, { method: 'POST' })
+      if (res.status === 402) { locked++; continue }
+      if (!res.ok) { failed++; continue }
+      sent++
+    }
+    setBulkShooting(false)
+    setCheckedIds(new Set())
+    const parts: string[] = []
+    if (sent)   parts.push(`${sent} email${sent > 1 ? 's' : ''} sent`)
+    if (locked) parts.push(`${locked} locked (payment required)`)
+    if (failed) parts.push(`${failed} failed`)
+    showToast(parts.join(' · '), failed > 0 || locked > 0 ? 'info' : 'success')
     fetchVendors()
   }
 
@@ -445,10 +469,38 @@ export function MsmeView({ userRole }: Props) {
           ) : filtered.length === 0 ? (
             <EmptyState search={search} onAdd={canManage ? () => setShowAdd(true) : undefined} onImport={canManage ? () => setShowImport(true) : undefined} />
           ) : (
+            <div>
+            {/* Bulk action bar */}
+            {checkedIds.size > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', background: `${ACCENT}12`, border: `1.5px solid ${ACCENT}40`, borderRadius: 10, marginBottom: 10 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{checkedIds.size} vendor{checkedIds.size > 1 ? 's' : ''} selected</span>
+                <button
+                  onClick={handleBulkShoot}
+                  disabled={bulkShooting}
+                  style={{ ...primaryBtn, padding: '7px 16px', fontSize: 13 }}
+                >
+                  {bulkShooting ? 'Sending…' : `✉ Shoot email to ${checkedIds.size} selected`}
+                </button>
+                <button onClick={() => setCheckedIds(new Set())} style={{ ...ghostBtn, padding: '7px 12px', fontSize: 12 }}>Clear</button>
+              </div>
+            )}
+
             <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: 'var(--surface-secondary)', borderBottom: '1px solid var(--border)' }}>
+                    <th style={{ padding: '10px 14px', width: 36 }}>
+                      <input
+                        type="checkbox"
+                        style={{ accentColor: ACCENT, cursor: 'pointer' }}
+                        checked={checkedIds.size > 0 && filtered.filter(v => v.payment_status !== 'unpaid' && v.status !== 'submitted' && v.status !== 'not_msme' && v.email_count < 3).every(v => checkedIds.has(v.id))}
+                        onChange={e => {
+                          const eligible = filtered.filter(v => v.payment_status !== 'unpaid' && v.status !== 'submitted' && v.status !== 'not_msme' && v.email_count < 3)
+                          if (e.target.checked) setCheckedIds(new Set(eligible.map(v => v.id)))
+                          else setCheckedIds(new Set())
+                        }}
+                      />
+                    </th>
                     {['Vendor', 'Status', 'Category', 'Emails', 'Action'].map(h => (
                       <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
@@ -460,16 +512,32 @@ export function MsmeView({ userRole }: Props) {
                     const sel       = selectedId === v.id
                     const exhausted = v.email_count >= 3 && v.status === 'emailed'
                     const locked    = v.payment_status === 'unpaid'
+                    const isEligible = !locked && v.status !== 'submitted' && v.status !== 'not_msme' && v.email_count < 3
                     return (
                       <tr
                         key={v.id}
                         onClick={() => setSelectedId(sel ? null : v.id)}
                         style={{
                           borderBottom: i < filtered.length - 1 ? '1px solid var(--border)' : undefined,
-                          background: locked ? '#fffbeb' : sel ? `${ACCENT}08` : 'var(--surface)',
+                          background: locked ? '#fffbeb' : checkedIds.has(v.id) ? `${ACCENT}08` : sel ? `${ACCENT}05` : 'var(--surface)',
                           cursor: 'pointer',
                         }}
                       >
+                        <td style={{ padding: '12px 14px', width: 36 }} onClick={e => e.stopPropagation()}>
+                          {isEligible && (
+                            <input
+                              type="checkbox"
+                              style={{ accentColor: ACCENT, cursor: 'pointer' }}
+                              checked={checkedIds.has(v.id)}
+                              onChange={e => {
+                                const next = new Set(checkedIds)
+                                if (e.target.checked) next.add(v.id)
+                                else next.delete(v.id)
+                                setCheckedIds(next)
+                              }}
+                            />
+                          )}
+                        </td>
                         <td style={{ padding: '12px 14px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                             {locked && <span title="Payment required" style={{ fontSize: 13 }}>🔒</span>}
@@ -529,6 +597,7 @@ export function MsmeView({ userRole }: Props) {
                   })}
                 </tbody>
               </table>
+            </div>
             </div>
           )}
         </div>
