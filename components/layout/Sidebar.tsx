@@ -8,7 +8,7 @@ import {
   RefreshCw, Users, BarChart2, Settings, Plus,
   ChevronDown, ChevronRight, Clock, Zap, X, Upload,
   Calendar, Shield, LogOut, FileCheck, ArrowRight, Eye, Receipt, Copy, Check, Activity, BookOpen, ShieldAlert,
-  ChevronsUpDown, FileQuestion, CalendarDays,
+  ChevronsUpDown, FileQuestion, CalendarDays, Building2,
 } from 'lucide-react'
 import { cn }            from '@/lib/utils/cn'
 import { createClient }  from '@/lib/supabase/client'
@@ -442,6 +442,7 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
 
         {/* TOOLS */}
         <GL>Tools</GL>
+        {canManage && <SI href="/msme" active={isActive('/msme')} icon={<Building2 className="h-4 w-4"/>} label="MSME Tracker"/>}
         {nav.import_data && <SI href="/import" active={isActive('/import')} icon={<Upload className="h-4 w-4"/>} label="Import data"/>}
         {canManage && (
           <SI href="/settings/permissions" active={isActive('/settings/permissions')} icon={<Shield className="h-4 w-4"/>} label="Permissions"/>
