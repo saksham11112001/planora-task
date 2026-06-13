@@ -77,6 +77,7 @@ export default async function DashboardPage() {
       myTasks={(myTasks ?? []) as any}
       activeProjects={(activeProjects ?? []) as any}
       recentClients={recentClients ?? []}
+      isAdmin={['owner','admin'].includes(mb.role)}
     />
   )
 }
