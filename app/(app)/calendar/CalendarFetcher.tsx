@@ -15,7 +15,7 @@ export async function CalendarFetcher() {
   const supabase = createAdminClient()
   const isOwnerAdmin = ['owner', 'admin'].includes(mb.role)
   const isManager    = ['owner', 'admin', 'manager'].includes(mb.role)
-  const canViewAll   = isManager || (mb as any).can_view_all_tasks === true
+  const canViewAll   = isOwnerAdmin || (mb as any).can_view_all_tasks === true
 
   const from = new Date(); from.setMonth(from.getMonth() - 6)
   const to   = new Date(); to.setMonth(to.getMonth() + 6)
