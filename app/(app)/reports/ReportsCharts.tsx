@@ -5,6 +5,7 @@ import {
   LineChart, Line, PieChart, Pie, Cell, Legend, AreaChart, Area,
 } from 'recharts'
 import { useFilterStore } from '@/store/appStore'
+import { localDayStr } from '@/lib/utils/format'
 import { UniversalFilterBar } from '@/components/filters/UniversalFilterBar'
 
 interface EmployeeStat {
@@ -296,7 +297,7 @@ function buildComplianceData(
 
   const daily = Array.from({ length: days }, (_, i) => {
     const d  = new Date(Date.now() - (days - 1 - i) * 86400000)
-    const ds = d.toISOString().split('T')[0]
+    const ds = localDayStr(d)
     return {
       date:       fmtDay(d),
       dateKey:    ds,
@@ -336,8 +337,8 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
   const [empFilter,    setEmpFilter]    = useState('')
 
   // Compliance chart date-window filters (separate from universal task filters)
-  const today90From = new Date(Date.now() - 89 * 86400000).toISOString().split('T')[0]
-  const todayStr    = new Date().toISOString().split('T')[0]
+  const today90From = localDayStr(new Date(Date.now() - 89 * 86400000))
+  const todayStr    = localDayStr(new Date())
   const [compDateFrom, setCompDateFrom] = useState(today90From)
   const [compDateTo,   setCompDateTo]   = useState(todayStr)
 
@@ -564,7 +565,7 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
                 { label: '30d', days: 30 },
                 { label: '90d', days: 90 },
               ] as const).map(({ label, days }) => {
-                const from = new Date(Date.now() - (days - 1) * 86400000).toISOString().split('T')[0]
+                const from = localDayStr(new Date(Date.now() - (days - 1) * 86400000))
                 const active = compDateFrom === from && compDateTo === todayStr
                 return (
                   <button key={label}

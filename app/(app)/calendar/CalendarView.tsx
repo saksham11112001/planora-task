@@ -254,7 +254,7 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
 
   const firstDay    = new Date(year, month, 1).getDay()
   const daysInMonth = new Date(year, month+1, 0).getDate()
-  const todayStr    = now.toISOString().split('T')[0]
+  const todayStr    = toLocalDateStr(now)
 
   const cells: (number|null)[] = []
   for (let i=0; i<firstDay; i++) cells.push(null)

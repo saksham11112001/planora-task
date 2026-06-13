@@ -3,7 +3,7 @@ import { useState, useEffect, useTransition, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Search, RefreshCw, Trash2, SortAsc, MessageCircle } from 'lucide-react'
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
-import { fmtDate, isOverdue } from '@/lib/utils/format'
+import { fmtDate, isOverdue, localDayStr } from '@/lib/utils/format'
 import { toast } from '@/store/appStore'
 import { MultiPillSelect } from '@/components/filters/MultiPillSelect'
 
@@ -329,7 +329,7 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
   const today = todayStr()
 
   /* ── Health stats (across all tasks, ignoring current filters) ── */
-  const weekFromNow = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)
+  const weekFromNow = localDayStr(new Date(Date.now() + 7 * 86400000))
   const healthStats = {
     total:           tasks.length,
     overdue:         tasks.filter(t => t.due_date && t.due_date < today && !['completed', 'cancelled'].includes(t.status)).length,

@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { useAppStore } from '@/store/appStore'
+import { getCountry, DEFAULT_COUNTRY, type CountryProfile } from '@/lib/locale/countries'
 
 export interface CustomFieldDef {
   key: string; label: string; type: 'text' | 'date' | 'number' | 'textarea' | 'select'; placeholder?: string; options?: string[]
@@ -31,6 +32,8 @@ interface OrgSettings {
   /** Flat per-user permission overrides for the currently signed-in user.
    *  Only contains keys that have been explicitly set; unset keys fall back to rolePermissions. */
   userPermissions:  Record<string, boolean> | null
+  /** ISO country code for the org (drives currency, timezone, pricing). Default 'IN'. */
+  country:          string
   loading:          boolean
 }
 
@@ -73,11 +76,12 @@ function notifyAll(s: OrgSettings, orgId?: string) {
 
 async function fetchSettings(): Promise<OrgSettings> {
   try {
-    const [customRes, fieldsRes, featuresRes, permissionsRes] = await Promise.all([
+    const [customRes, fieldsRes, featuresRes, permissionsRes, localeRes] = await Promise.all([
       fetch('/api/settings/custom-fields').then(r => r.json()).catch(() => ({ data: [] })),
       fetch('/api/settings/fields').then(r => r.json()).catch(() => ({ data: null })),
       fetch('/api/settings/features').then(r => r.json()).catch(() => ({ data: {} })),
       fetch('/api/settings/permissions').then(r => r.json()).catch(() => ({ data: null })),
+      fetch('/api/settings/locale').then(r => r.json()).catch(() => ({ data: null })),
     ])
     const raw = featuresRes.data ?? {}
     const nav: NavFeatures = {
@@ -111,17 +115,18 @@ async function fetchSettings(): Promise<OrgSettings> {
       navFeatures:      nav,
       rolePermissions,
       userPermissions,
+      country:          localeRes?.data?.country ?? DEFAULT_COUNTRY,
       loading:          false,
     }
   } catch {
-    return { customFields: [], taskFields: DEFAULT_TASK_FIELDS, caComplianceMode: false, navFeatures: DEFAULT_NAV, rolePermissions: null, userPermissions: null, loading: false }
+    return { customFields: [], taskFields: DEFAULT_TASK_FIELDS, caComplianceMode: false, navFeatures: DEFAULT_NAV, rolePermissions: null, userPermissions: null, country: DEFAULT_COUNTRY, loading: false }
   }
 }
 
 export function useOrgSettings(): OrgSettings {
   const orgId = useAppStore(s => s.session?.org.id ?? null)
   const [state, setState] = useState<OrgSettings>(
-    _cache ?? { customFields: [], taskFields: DEFAULT_TASK_FIELDS, caComplianceMode: false, navFeatures: DEFAULT_NAV, rolePermissions: null, userPermissions: null, loading: true }
+    _cache ?? { customFields: [], taskFields: DEFAULT_TASK_FIELDS, caComplianceMode: false, navFeatures: DEFAULT_NAV, rolePermissions: null, userPermissions: null, country: DEFAULT_COUNTRY, loading: true }
   )
 
   useEffect(() => {
@@ -147,6 +152,12 @@ export function useOrgSettings(): OrgSettings {
   }, [orgId])
 
   return state
+}
+
+/** Convenience hook: full country profile (currency, timezone, locale, pricing) for the org. */
+export function useCountry(): CountryProfile {
+  const { country } = useOrgSettings()
+  return getCountry(country)
 }
 
 // Call this after saving a feature toggle - refreshes ALL hook instances immediately

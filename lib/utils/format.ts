@@ -20,17 +20,25 @@ export function fmtHours(h: number | null | undefined) {
   return mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`
 }
 
-export function fmtCurrency(amount: number, currency = 'USD') {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 0 }).format(amount)
+export function fmtCurrency(amount: number, currency = 'INR', locale = 'en-IN') {
+  return new Intl.NumberFormat(locale, { style: 'currency', currency, maximumFractionDigits: 0 }).format(amount)
+}
+
+/** Format a Date as YYYY-MM-DD using LOCAL calendar fields — no UTC round-trip.
+ *  toISOString() returns the previous day for UTC+ timezones (e.g. IST) between
+ *  local midnight and the UTC offset, which breaks "today" highlighting and
+ *  overdue checks in the browser. */
+export function localDayStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 export function isOverdue(dueDate: string | null | undefined, status: string) {
   if (!dueDate || status === 'completed' || status === 'cancelled') return false
-  return dueDate < new Date().toISOString().split('T')[0]
+  return dueDate < localDayStr(new Date())
 }
 
 export function todayStr() {
-  return new Date().toISOString().split('T')[0]
+  return localDayStr(new Date())
 }
 
 export function initials(name: string) {
