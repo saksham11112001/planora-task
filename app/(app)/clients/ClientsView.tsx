@@ -38,6 +38,14 @@ export function ClientsView({ initialClients, initialGroups, canManage }: Props)
   const router = useRouter()
   const [clients, setClients]       = useState<Client[]>(initialClients)
   const [deleting, setDeleting]     = useState<Set<string>>(new Set())
+  const [riskMap, setRiskMap]       = useState<Record<string, number>>({})
+
+  useEffect(() => {
+    fetch('/api/ai/client-risks')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.data) setRiskMap(d.data) })
+      .catch(() => {})
+  }, [])
   const [search, setSearch]         = useState('')
   const [statusTab, setStatusTab]   = useState<StatusTab>('all')
   const [jumpLetter, setJumpLetter] = useState<string | null>(null)
@@ -377,6 +385,15 @@ export function ClientsView({ initialClients, initialGroups, canManage }: Props)
                                 <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                   {c.name}
                                 </span>
+                                {riskMap[c.id] && (
+                                  <span title={`${riskMap[c.id]} task${riskMap[c.id] > 1 ? 's' : ''} due within 7 days — not started`}
+                                    style={{ display: 'inline-flex', alignItems: 'center', gap: 3,
+                                      fontSize: 10, padding: '1px 6px', borderRadius: 99, fontWeight: 700,
+                                      background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a',
+                                      flexShrink: 0, cursor: 'default' }}>
+                                    ⚠ {riskMap[c.id]}
+                                  </span>
+                                )}
                                 {/* Status dot + label */}
                                 <span style={{
                                   display: 'inline-flex', alignItems: 'center', gap: 3,

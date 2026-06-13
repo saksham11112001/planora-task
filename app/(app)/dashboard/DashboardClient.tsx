@@ -1,8 +1,9 @@
 'use client'
 import Link from 'next/link'
 import { ArrowRight, CheckSquare, FolderOpen, Users2, BarChart2,
-         Calendar, CheckCircle2, TrendingUp, RefreshCw, Plus } from 'lucide-react'
+         Calendar, CheckCircle2, TrendingUp, RefreshCw, Plus, Sparkles } from 'lucide-react'
 import { fmtDate } from '@/lib/utils/format'
+import { useState, useEffect } from 'react'
 
 interface Props {
   greeting: string; name: string; today: string
@@ -11,6 +12,38 @@ interface Props {
   myTasks: { id:string; title:string; status:string; due_date:string|null; project_id:string|null; is_recurring?:boolean; projects: any }[]
   activeProjects: { id:string; name:string; color:string; due_date:string|null; clients: any }[]
   recentClients: { id:string; name:string; color:string }[]
+  isAdmin?: boolean
+}
+
+function AiBriefCard() {
+  const [summary, setSummary] = useState('')
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/ai/org-summary')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.summary) setSummary(d.summary) })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
+
+  if (!loading && !summary) return null
+
+  return (
+    <div style={{ borderRadius: 12, border: '1px solid var(--brand-border)',
+      background: 'var(--brand-light)', padding: '14px 16px', marginBottom: 18 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+        <Sparkles style={{ width: 14, height: 14, color: 'var(--brand)' }}/>
+        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--brand)', letterSpacing: '0.04em' }}>
+          AI BRIEF
+        </span>
+      </div>
+      {loading
+        ? <div style={{ height: 36, borderRadius: 6, background: 'rgba(13,148,136,0.15)', animation: 'pulse 1.5s infinite' }}/>
+        : <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0 }}>{summary}</p>
+      }
+    </div>
+  )
 }
 
 const QUICK_ACTIONS = [
@@ -27,7 +60,7 @@ export function DashboardClient({
   greeting, name, today,
   overdueCount, todayCount, pendingCount,
   completedThisMonth, totalThisMonth, completionRate,
-  myTasks, activeProjects, recentClients,
+  myTasks, activeProjects, recentClients, isAdmin,
 }: Props) {
 
   const statusMsg = overdueCount > 0
@@ -217,6 +250,9 @@ export function DashboardClient({
 
         {/* Right column */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+
+          {/* AI brief — admins only */}
+          {isAdmin && <AiBriefCard />}
 
           {/* Progress ring card */}
           <div className="card-elevated" style={{ padding: '18px' }}>

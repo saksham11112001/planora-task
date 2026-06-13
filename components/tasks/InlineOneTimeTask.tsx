@@ -1,7 +1,7 @@
 'use client'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, X, User, Flag, Calendar, Shield, Briefcase, Paperclip, AlertCircle, ToggleLeft, ToggleRight, ListPlus, Trash2, DollarSign } from 'lucide-react'
+import { Plus, X, User, Flag, Calendar, Shield, Briefcase, Paperclip, AlertCircle, ToggleLeft, ToggleRight, ListPlus, Trash2, DollarSign, Sparkles } from 'lucide-react'
 import { toast } from '@/store/appStore'
 import { useOrgSettings } from '@/lib/hooks/useOrgSettings'
 import { InlineCustomFields }    from '@/components/tasks/InlineCustomFields'
@@ -61,6 +61,8 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated, 
   const [moreOpen, setMoreOpen] = useState(false)
   const [isBillable, setIsBillable] = useState(false)
   const [billableAmount, setBillableAmount] = useState('')
+  const [description, setDescription] = useState('')
+  const [aiSuggesting, setAiSuggesting] = useState(false)
 
   const approvers = members.filter(m => m.role && ['owner','admin','manager'].includes(m.role))
   const priConf   = PRIORITY_OPTIONS.find(p => p.value === priority) ?? PRIORITY_OPTIONS[2]
@@ -72,6 +74,7 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated, 
     setCoAssignees([]); setMakeRecurring(false); setRecurringFreq('weekly'); setAddToProjectId('')
     setRequireAttachment(false); setCompSubtasks([])
     setShowAddClient(false); setIsBillable(false); setBillableAmount('')
+    setDescription(''); setAiSuggesting(false)
   }
 
   const handleClickOutside = useCallback((e: MouseEvent) => {
@@ -126,6 +129,7 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated, 
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title:             title.trim(),
+          description:       description.trim() || undefined,
           assignee_id:       assignee     || null,
           priority,
           due_date:          dueDate      || null,
@@ -237,6 +241,32 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated, 
           className="iot-title-input"
           style={{ flex: 1, fontSize: 15, fontWeight: 600, border: 'none', outline: 'none',
             background: 'transparent', color: 'var(--text-primary)', fontFamily: 'inherit' }}/>
+        {title.trim().length >= 3 && (
+          <button type="button" disabled={aiSuggesting} onClick={async () => {
+            setAiSuggesting(true)
+            try {
+              const r = await fetch('/api/ai/suggest-task', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: title.trim() }),
+              })
+              if (r.ok) {
+                const d = await r.json()
+                if (d.description) setDescription(d.description)
+                if (d.priority)    setPriority(d.priority)
+                if (d.frequency)   { setMakeRecurring(true); setRecurringFreq(d.frequency) }
+                if (d.subtasks?.length) {
+                  setCompSubtasks(d.subtasks.map((t: string) => ({ title: t, required: false })))
+                }
+              }
+            } finally { setAiSuggesting(false) }
+          }}
+          title="AI Suggest"
+          style={{ background: 'none', border: 'none', cursor: aiSuggesting ? 'wait' : 'pointer',
+            color: 'var(--brand)', display: 'flex', padding: '2px 4px', borderRadius: 4,
+            opacity: aiSuggesting ? 0.5 : 0.75, transition: 'opacity 0.15s', flexShrink: 0 }}>
+            <Sparkles style={{ width: 14, height: 14 }}/>
+          </button>
+        )}
         <button onClick={reset} style={{ background: 'none', border: 'none', cursor: 'pointer',
           color: 'var(--text-muted)', display: 'flex', padding: 2, borderRadius: 4 }}>
           <X style={{ width: 13, height: 13 }} />
@@ -244,6 +274,15 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated, 
       </div>
 
       <div style={{ height: title ? 1 : 2, background: title ? 'var(--border-light)' : 'rgba(13,148,136,0.2)', margin: '0 14px', transition: 'height 0.25s, background 0.25s' }} />
+
+      {description !== '' && (
+        <div style={{ padding: '6px 14px 2px' }}>
+          <textarea value={description} onChange={e => setDescription(e.target.value)}
+            placeholder="Description…" rows={2}
+            style={{ width: '100%', fontSize: 12, color: 'var(--text-muted)', background: 'transparent',
+              border: 'none', outline: 'none', resize: 'none', fontFamily: 'inherit', lineHeight: 1.5 }}/>
+        </div>
+      )}
 
       {/* Pills row */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px 4px', flexWrap: 'wrap' }}>

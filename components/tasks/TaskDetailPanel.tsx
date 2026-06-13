@@ -89,6 +89,8 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
   const [attachments,   setAttachments]   = useState<any[]>([])
   const [attLoaded,     setAttLoaded]     = useState(false)
   const [uploading,     setUploading]     = useState(false)
+  const [chaserDraft,   setChaserDraft]   = useState<{email:string;whatsapp:string}|null>(null)
+  const [chaserLoading, setChaserLoading] = useState(false)
   const [attachMode,    setAttachMode]    = useState<'file'|'link'>('file')
   const [driveUrl,      setDriveUrl]      = useState('')
   const [driveTitle,    setDriveTitle]    = useState('')
@@ -132,6 +134,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     if (!task) return
     setSubtasksLoaded(false); setAttLoaded(false)
     setSubtasks([]); setAttachments([]); setCaHeaders([])
+    setChaserDraft(null); setChaserLoading(false)
     setComments([]); setCommentsLoaded(false)
     setTitle(task.title)
     setDescription(task.description ?? '')
@@ -1057,16 +1060,46 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                 style={{ color: isCompleted ? 'var(--text-muted)' : 'var(--text-primary)' }}
               />
               {/* Description — compact, small font, max 2 rows visible */}
-              <textarea
-                value={description}
-                onChange={e => { if (!canEdit) return; setDescription(e.target.value); patchDebounced({ description: e.target.value || null }, 800) }}
-                onBlur={() => { if (!canEdit) return; if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; } if (task && description !== (task.description ?? '')) patch({ description: description || null }) }}
-                placeholder={canEdit ? 'Add a description…' : ''}
-                rows={2}
-                readOnly={!canEdit}
-                className="w-full mt-1.5 text-xs resize-none outline-none bg-transparent leading-relaxed"
-                style={{ color: 'var(--text-muted)', caretColor: 'var(--brand)', cursor: canEdit ? undefined : 'default' }}
-              />
+              <div style={{ position: 'relative' }}>
+                <textarea
+                  value={description}
+                  onChange={e => { if (!canEdit) return; setDescription(e.target.value); patchDebounced({ description: e.target.value || null }, 800) }}
+                  onBlur={() => { if (!canEdit) return; if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; } if (task && description !== (task.description ?? '')) patch({ description: description || null }) }}
+                  placeholder={canEdit ? 'Add a description…' : ''}
+                  rows={2}
+                  readOnly={!canEdit}
+                  className="w-full mt-1.5 text-xs resize-none outline-none bg-transparent leading-relaxed"
+                  style={{ color: 'var(--text-muted)', caretColor: 'var(--brand)', cursor: canEdit ? undefined : 'default', paddingRight: canEdit ? 22 : 0 }}
+                />
+                {canEdit && (
+                  <button
+                    type="button"
+                    disabled={aiLoading}
+                    title="Generate description with AI"
+                    onClick={async () => {
+                      if (!task) return
+                      setAiLoading(true)
+                      try {
+                        const r = await fetch('/api/ai/describe-task', {
+                          method: 'POST', headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ title: task.title }),
+                        })
+                        if (r.ok) {
+                          const d = await r.json()
+                          if (d.description) {
+                            setDescription(d.description)
+                            patch({ description: d.description })
+                          }
+                        }
+                      } finally { setAiLoading(false) }
+                    }}
+                    style={{ position: 'absolute', top: 6, right: 0, background: 'none', border: 'none',
+                      cursor: aiLoading ? 'wait' : 'pointer', padding: 2, borderRadius: 4,
+                      color: 'var(--brand)', opacity: aiLoading ? 0.4 : 0.6, transition: 'opacity 0.15s' }}>
+                    <Sparkles style={{ width: 12, height: 12 }}/>
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* ── Subtasks (always-visible inline section) ── */}
@@ -1787,6 +1820,61 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                     </div>
                   </div>
                 )}
+                {/* Chase client docs button — shown when task has a client and needs docs */}
+                {clientId && (caHeaders.length > attachments.length || attachments.length === 0) && (
+                  <div className="mb-3">
+                    {!chaserDraft && (
+                      <button
+                        type="button"
+                        disabled={chaserLoading}
+                        onClick={async () => {
+                          if (!task) return
+                          setChaserLoading(true)
+                          try {
+                            const r = await fetch('/api/ai/draft-chaser', {
+                              method: 'POST', headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ taskId: task.id }),
+                            })
+                            if (r.ok) { const d = await r.json(); setChaserDraft(d) }
+                          } finally { setChaserLoading(false) }
+                        }}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6,
+                          fontSize: 12, fontWeight: 600, padding: '6px 14px', borderRadius: 8,
+                          border: '1px solid var(--brand-border)', background: 'var(--brand-light)',
+                          color: 'var(--brand)', cursor: chaserLoading ? 'wait' : 'pointer',
+                          opacity: chaserLoading ? 0.6 : 1 }}>
+                        <Sparkles style={{ width: 13, height: 13 }}/>
+                        {chaserLoading ? 'Drafting…' : 'Draft client follow-up'}
+                      </button>
+                    )}
+                    {chaserDraft && (
+                      <div style={{ borderRadius: 10, border: '1px solid var(--border)', overflow: 'hidden' }}>
+                        <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--border)' }}>
+                          {(['email','whatsapp'] as const).map(ch => (
+                            <button key={ch} type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(chaserDraft[ch])
+                                  .then(() => toast.success(`${ch === 'email' ? 'Email' : 'WhatsApp'} draft copied`))
+                              }}
+                              style={{ flex: 1, padding: '7px 10px', fontSize: 11, fontWeight: 600,
+                                background: 'var(--surface-subtle)', border: 'none', cursor: 'pointer',
+                                color: 'var(--brand)', borderRight: ch === 'email' ? '1px solid var(--border)' : 'none' }}>
+                              {ch === 'email' ? '📧 Copy email' : '💬 Copy WhatsApp'}
+                            </button>
+                          ))}
+                          <button type="button" onClick={() => setChaserDraft(null)}
+                            style={{ padding: '7px 10px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+                            <X style={{ width: 12, height: 12 }}/>
+                          </button>
+                        </div>
+                        <p style={{ fontSize: 11, color: 'var(--text-muted)', padding: '8px 12px', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                          {chaserDraft.email}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Mode toggle */}
                 <div className="flex gap-1 mb-3 p-1 rounded-lg" style={{ background: 'var(--surface-subtle)', border: '1px solid var(--border-light)', width: 'fit-content' }}>
                   <button
