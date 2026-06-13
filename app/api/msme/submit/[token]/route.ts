@@ -26,19 +26,32 @@ export async function GET(
 
   const { data: vendor } = await admin
     .from('msme_vendors')
-    .select('id, vendor_name, vendor_email, status, organisations(name)')
+    .select('id, vendor_name, vendor_email, status, udyam_number, msme_category, nature_of_business, outstanding_amount, cert_url, is_not_msme, declarant_name, submitted_at, organisations(name)')
     .eq('id', tokenRow.vendor_id)
     .maybeSingle()
 
   if (!vendor) return NextResponse.json({ error: 'Vendor not found' }, { status: 404 })
 
+  const isSubmitted = vendor.status === 'submitted' || vendor.status === 'not_msme'
+
   return NextResponse.json({
     vendor_id:   vendor.id,
     vendor_name: vendor.vendor_name,
     org_name:    (vendor.organisations as any)?.name ?? '',
-    already_submitted: vendor.status === 'submitted' || vendor.status === 'not_msme',
+    already_submitted: isSubmitted,
     already_declared:  vendor.status === 'not_msme',
     token_used: !!tokenRow.used_at,
+    // Return submission details so vendor can see a receipt on re-open
+    ...(isSubmitted ? {
+      udyam_number:       vendor.udyam_number,
+      msme_category:      vendor.msme_category,
+      nature_of_business: vendor.nature_of_business,
+      outstanding_amount: vendor.outstanding_amount,
+      cert_url:           vendor.cert_url,
+      is_not_msme:        vendor.is_not_msme,
+      declarant_name:     vendor.declarant_name,
+      submitted_at:       vendor.submitted_at,
+    } : {}),
   })
 }
 

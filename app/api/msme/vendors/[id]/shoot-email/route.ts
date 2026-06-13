@@ -32,11 +32,17 @@ export async function POST(
     .maybeSingle()
 
   if (!vendor) return NextResponse.json({ error: 'Vendor not found' }, { status: 404 })
-  if (vendor.status === 'submitted' || vendor.status === 'not_msme') {
-    return NextResponse.json({ error: 'Vendor has already submitted their details' }, { status: 422 })
-  }
-  if (vendor.email_count >= MAX_EMAILS) {
-    return NextResponse.json({ error: 'Maximum 3 emails already sent to this vendor' }, { status: 422 })
+
+  // x-copy-only: generate link without sending email (for "share via WhatsApp" use case)
+  const copyOnly = req.headers.get('x-copy-only') === '1'
+
+  if (!copyOnly) {
+    if (vendor.status === 'submitted' || vendor.status === 'not_msme') {
+      return NextResponse.json({ error: 'Vendor has already submitted their details' }, { status: 422 })
+    }
+    if (vendor.email_count >= MAX_EMAILS) {
+      return NextResponse.json({ error: 'Maximum 3 emails already sent to this vendor' }, { status: 422 })
+    }
   }
 
   // Generate a magic-link token (30-day expiry)
@@ -51,9 +57,15 @@ export async function POST(
     expires_at: expiresAt,
   })
 
-  const formUrl  = `${APP_URL}/msme/form/${rawToken}`
-  const orgName  = (mb.organisations as any)?.name ?? 'Your firm'
-  const attempt  = (vendor.email_count + 1) as 1 | 2 | 3
+  const formUrl = `${APP_URL}/msme/form/${rawToken}`
+
+  if (copyOnly) {
+    // Return link only — no email sent, no email_count increment
+    return NextResponse.json({ ok: true, formUrl })
+  }
+
+  const orgName = (mb.organisations as any)?.name ?? 'Your firm'
+  const attempt = (vendor.email_count + 1) as 1 | 2 | 3
 
   await sendMsmeVendorEmail({
     to: vendor.vendor_email,
