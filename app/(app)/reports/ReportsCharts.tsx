@@ -40,6 +40,12 @@ interface ComplianceRawTask {
   assignee_id: string | null; client_id: string | null
 }
 
+interface ActionItems {
+  overdue:           { id: string; title: string; priority: string; due_date: string; assignee_name: string | null; days_overdue: number }[]
+  pending_approval:  { id: string; title: string; priority: string; assignee_name: string | null; days_waiting: number; due_date: string | null }[]
+  unassigned_urgent: { id: string; title: string; priority: string; due_date: string | null }[]
+}
+
 interface Props {
   clients?:       { id: string; name: string; color: string }[]
   currentUserId?: string
@@ -58,6 +64,9 @@ interface Props {
     client_id: string | null; client_name: string | null; client_color: string
     hours_logged: number; is_billable: boolean
   }[]
+  trajectoryData?:  { week: string; added: number; completed: number }[]
+  statusBreakdown?: { name: string; value: number; color: string }[]
+  actionItems?:     ActionItems
 }
 
 const COLORS = ['#0d9488','#7c3aed','#dc2626','#ca8a04','#0891b2','#16a34a']
@@ -330,8 +339,8 @@ function buildComplianceData(
 }
 // ────────────────────────────────────────────────────────────────────────────
 
-export function ReportsCharts({ dailyData, memberData, priorityData, projectData, timeByProject, employeeStats, currentUserId, userRole, clients = [], complianceRawTasks = [], complianceMemberList = [], wipData = [] }: Props) {
-  const [activeTab,    setActiveTab]    = useState<'overview' | 'team' | 'compliance' | 'wip'>('overview')
+export function ReportsCharts({ dailyData, memberData, priorityData, projectData, timeByProject, employeeStats, currentUserId, userRole, clients = [], complianceRawTasks = [], complianceMemberList = [], wipData = [], trajectoryData = [], statusBreakdown = [], actionItems }: Props) {
+  const [activeTab,    setActiveTab]    = useState<'overview' | 'actions' | 'team' | 'compliance' | 'wip'>('overview')
   const [clientFilter, setClientFilter] = useState('')
   const [timeline,     setTimeline]     = useState<'30' | '60' | '90' | '365'>('90')
   const [empFilter,    setEmpFilter]    = useState('')
@@ -423,21 +432,30 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
         </div>
       )}
       {/* Tab bar */}
-      <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 20, background: 'var(--surface)', borderRadius: '8px 8px 0 0' }}>
+      <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 20, background: 'var(--surface)', borderRadius: '8px 8px 0 0', flexWrap: 'wrap' }}>
         {([
-          { v: 'overview',   label: '📊 Overview' },
-          { v: 'team',       label: '👤 Team Performance' },
-          { v: 'compliance', label: '📋 Compliance Report' },
-          { v: 'wip',        label: '🔄 WIP Report' },
-        ] as const).map(({ v, label }) => (
+          { v: 'overview',   label: '📊 Overview',        show: true },
+          { v: 'actions',    label: '⚡ Action Items',     show: canViewAll },
+          { v: 'team',       label: '👤 Team Performance', show: true },
+          { v: 'compliance', label: '📋 Compliance Report',show: true },
+          { v: 'wip',        label: '🔄 WIP Report',       show: true },
+        ] as const).filter(t => t.show).map(({ v, label }) => (
           <button key={v} onClick={() => setActiveTab(v)}
             style={{
               padding: '10px 20px', fontSize: 13, fontWeight: 500, border: 'none',
               background: 'transparent', cursor: 'pointer', marginBottom: -1,
               borderBottom: `2px solid ${activeTab === v ? 'var(--brand)' : 'transparent'}`,
               color: activeTab === v ? 'var(--brand)' : 'var(--text-muted)',
+              position: 'relative',
             }}>
             {label}
+            {v === 'actions' && actionItems && (actionItems.overdue.length + actionItems.pending_approval.length) > 0 && (
+              <span style={{ position: 'absolute', top: 6, right: 6, minWidth: 16, height: 16, borderRadius: 99,
+                background: '#dc2626', color: '#fff', fontSize: 9, fontWeight: 700,
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px' }}>
+                {actionItems.overdue.length + actionItems.pending_approval.length}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -473,6 +491,67 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
                   <Legend wrapperStyle={{ fontSize: 11 }}/>
                 </PieChart>
               </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Row 1b: Company trajectory + Status breakdown */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 16 }}>
+            <div className="card-elevated p-5">
+              <h3 style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>Company trajectory — last 12 weeks</h3>
+              <p style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 14 }}>
+                Tasks added vs completed per week. A rising gap means workload is growing faster than output.
+              </p>
+              <ResponsiveContainer width="100%" height={200}>
+                <AreaChart data={trajectoryData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="grad-traj-added" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%"  stopColor="#7c3aed" stopOpacity={0.25}/>
+                      <stop offset="95%" stopColor="#7c3aed" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="grad-traj-done" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%"  stopColor="#0d9488" stopOpacity={0.25}/>
+                      <stop offset="95%" stopColor="#0d9488" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9"/>
+                  <XAxis dataKey="week" tick={{ fontSize: 9, fill: '#94a3b8' }} tickLine={false} axisLine={false}/>
+                  <YAxis tick={{ fontSize: 9, fill: '#94a3b8' }} tickLine={false} axisLine={false} allowDecimals={false}/>
+                  <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid var(--border)' }}/>
+                  <Legend wrapperStyle={{ fontSize: 11 }}/>
+                  <Area type="monotone" dataKey="added"     stroke="#7c3aed" strokeWidth={2} fill="url(#grad-traj-added)" name="Tasks added"    dot={false}/>
+                  <Area type="monotone" dataKey="completed" stroke="#0d9488" strokeWidth={2} fill="url(#grad-traj-done)"  name="Tasks completed" dot={false}/>
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="card-elevated p-5">
+              <h3 style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>Task status breakdown</h3>
+              {statusBreakdown.length === 0
+                ? <p style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', padding: '32px 0' }}>No task data</p>
+                : (
+                  <>
+                    <ResponsiveContainer width="100%" height={150}>
+                      <PieChart>
+                        <Pie data={statusBreakdown} cx="50%" cy="50%" innerRadius={40} outerRadius={65} dataKey="value" paddingAngle={2}>
+                          {statusBreakdown.map((s, i) => <Cell key={i} fill={s.color}/>)}
+                        </Pie>
+                        <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid var(--border)' }}/>
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginTop: 6 }}>
+                      {statusBreakdown.map(s => (
+                        <div key={s.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ width: 8, height: 8, borderRadius: '50%', background: s.color, flexShrink: 0, display: 'inline-block' }}/>
+                            <span style={{ color: 'var(--text-secondary)' }}>{s.name}</span>
+                          </div>
+                          <span style={{ fontWeight: 600, color: s.color }}>{s.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )
+              }
             </div>
           </div>
 
@@ -535,6 +614,188 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
           </div>
         </div>
       )}
+
+      {/* ── ACTION ITEMS TAB ─────────────────────────────── */}
+      {activeTab === 'actions' && canViewAll && (() => {
+        const ai = actionItems ?? { overdue: [], pending_approval: [], unassigned_urgent: [] }
+        const PRIORITY_COLOR: Record<string, string> = {
+          urgent: '#dc2626', high: '#ea580c', medium: '#ca8a04', low: '#16a34a', none: '#94a3b8',
+        }
+        const thS = {
+          padding: '9px 12px', textAlign: 'left' as const, fontWeight: 600,
+          color: 'var(--text-secondary)', borderBottom: '1px solid var(--border)',
+          fontSize: 11, textTransform: 'uppercase' as const, letterSpacing: '0.04em',
+          background: 'var(--surface-subtle)', whiteSpace: 'nowrap' as const,
+        }
+        const tdS = { padding: '9px 12px', fontSize: 12, color: 'var(--text-primary)', borderBottom: '1px solid var(--border-light)', verticalAlign: 'middle' as const }
+
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+            {/* Summary banners */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+              {[
+                { label: 'Overdue tasks',       value: ai.overdue.length,           color: '#dc2626', bg: '#fef2f2', border: '#fca5a5', note: 'Require immediate action' },
+                { label: 'Pending approval',     value: ai.pending_approval.length,  color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe', note: 'Awaiting review / sign-off' },
+                { label: 'Urgent & unassigned',  value: ai.unassigned_urgent.length, color: '#ea580c', bg: '#fff7ed', border: '#fdba74', note: 'High-priority, no owner' },
+              ].map(s => (
+                <div key={s.label} style={{ background: s.bg, border: `1px solid ${s.border}`, borderRadius: 10, padding: '16px 20px' }}>
+                  <p style={{ fontSize: 11, fontWeight: 600, color: s.color, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>{s.label}</p>
+                  <p style={{ fontSize: 36, fontWeight: 900, color: s.color, lineHeight: 1, marginBottom: 4 }}>{s.value}</p>
+                  <p style={{ fontSize: 11, color: s.color + 'aa' }}>{s.note}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Overdue tasks */}
+            {ai.overdue.length > 0 && (
+              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+                <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', background: '#fef2f2', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#dc2626', display: 'inline-block' }}/>
+                  <span style={{ fontWeight: 700, fontSize: 13, color: '#dc2626' }}>Overdue Tasks ({ai.overdue.length})</span>
+                  <span style={{ fontSize: 11, color: '#dc262688', marginLeft: 4 }}>— sorted by most days overdue</span>
+                </div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr>
+                        <th style={thS}>Task</th>
+                        <th style={thS}>Assignee</th>
+                        <th style={thS}>Priority</th>
+                        <th style={thS}>Due Date</th>
+                        <th style={{ ...thS, color: '#dc2626' }}>Days Overdue</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ai.overdue.map(t => (
+                        <tr key={t.id}>
+                          <td style={{ ...tdS, fontWeight: 500, maxWidth: 320 }}>
+                            <span style={{ display: 'block', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{t.title}</span>
+                          </td>
+                          <td style={{ ...tdS, color: t.assignee_name ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                            {t.assignee_name ?? '— Unassigned'}
+                          </td>
+                          <td style={tdS}>
+                            <span style={{ padding: '2px 8px', borderRadius: 99, fontSize: 10, fontWeight: 600,
+                              color: PRIORITY_COLOR[t.priority] ?? '#94a3b8',
+                              background: (PRIORITY_COLOR[t.priority] ?? '#94a3b8') + '18' }}>
+                              {t.priority ? t.priority.charAt(0).toUpperCase() + t.priority.slice(1) : 'None'}
+                            </span>
+                          </td>
+                          <td style={{ ...tdS, color: '#dc2626' }}>
+                            {new Date(t.due_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </td>
+                          <td style={{ ...tdS, fontWeight: 700, color: '#dc2626', textAlign: 'center' }}>
+                            {t.days_overdue}d
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Pending approval */}
+            {ai.pending_approval.length > 0 && (
+              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+                <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', background: '#f5f3ff', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#7c3aed', display: 'inline-block' }}/>
+                  <span style={{ fontWeight: 700, fontSize: 13, color: '#7c3aed' }}>Pending Approval ({ai.pending_approval.length})</span>
+                  <span style={{ fontSize: 11, color: '#7c3aed88', marginLeft: 4 }}>— submitted by team, awaiting your review</span>
+                </div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr>
+                        <th style={thS}>Task</th>
+                        <th style={thS}>Submitted by</th>
+                        <th style={thS}>Priority</th>
+                        <th style={thS}>Due Date</th>
+                        <th style={{ ...thS, color: '#7c3aed' }}>Days Waiting</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ai.pending_approval.map(t => (
+                        <tr key={t.id}>
+                          <td style={{ ...tdS, fontWeight: 500, maxWidth: 320 }}>
+                            <span style={{ display: 'block', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{t.title}</span>
+                          </td>
+                          <td style={{ ...tdS, color: t.assignee_name ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                            {t.assignee_name ?? '— Unassigned'}
+                          </td>
+                          <td style={tdS}>
+                            <span style={{ padding: '2px 8px', borderRadius: 99, fontSize: 10, fontWeight: 600,
+                              color: PRIORITY_COLOR[t.priority] ?? '#94a3b8',
+                              background: (PRIORITY_COLOR[t.priority] ?? '#94a3b8') + '18' }}>
+                              {t.priority ? t.priority.charAt(0).toUpperCase() + t.priority.slice(1) : 'None'}
+                            </span>
+                          </td>
+                          <td style={tdS}>
+                            {t.due_date ? new Date(t.due_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                          </td>
+                          <td style={{ ...tdS, fontWeight: 700, color: '#7c3aed', textAlign: 'center' }}>
+                            {t.days_waiting}d
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Unassigned urgent */}
+            {ai.unassigned_urgent.length > 0 && (
+              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+                <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', background: '#fff7ed', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#ea580c', display: 'inline-block' }}/>
+                  <span style={{ fontWeight: 700, fontSize: 13, color: '#ea580c' }}>Urgent & Unassigned ({ai.unassigned_urgent.length})</span>
+                  <span style={{ fontSize: 11, color: '#ea580c88', marginLeft: 4 }}>— high-priority tasks with no owner</span>
+                </div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr>
+                        <th style={thS}>Task</th>
+                        <th style={thS}>Priority</th>
+                        <th style={thS}>Due Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ai.unassigned_urgent.map(t => (
+                        <tr key={t.id}>
+                          <td style={{ ...tdS, fontWeight: 500, maxWidth: 400 }}>
+                            <span style={{ display: 'block', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{t.title}</span>
+                          </td>
+                          <td style={tdS}>
+                            <span style={{ padding: '2px 8px', borderRadius: 99, fontSize: 10, fontWeight: 600,
+                              color: PRIORITY_COLOR[t.priority] ?? '#94a3b8',
+                              background: (PRIORITY_COLOR[t.priority] ?? '#94a3b8') + '18' }}>
+                              {t.priority ? t.priority.charAt(0).toUpperCase() + t.priority.slice(1) : 'None'}
+                            </span>
+                          </td>
+                          <td style={{ ...tdS, color: t.due_date && t.due_date < new Date().toISOString().split('T')[0] ? '#dc2626' : 'var(--text-primary)' }}>
+                            {t.due_date ? new Date(t.due_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '— No due date'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {ai.overdue.length === 0 && ai.pending_approval.length === 0 && ai.unassigned_urgent.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '60px 24px', color: 'var(--text-muted)', background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)' }}>
+                <p style={{ fontSize: 36, marginBottom: 8 }}>✅</p>
+                <p style={{ fontSize: 15, fontWeight: 600, marginBottom: 4, color: 'var(--text-primary)' }}>All clear!</p>
+                <p style={{ fontSize: 13 }}>No overdue tasks, no pending approvals, and no unassigned urgent work.</p>
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       {/* ── COMPLIANCE REPORT TAB ─────────────────────────── */}
       {activeTab === 'compliance' && (
@@ -905,6 +1166,70 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
               </div>
             ))}
           </div>
+
+          {/* Top 3 / Bottom 3 performer spotlight — only for managers+ with 4+ team members */}
+          {canViewAll && visibleStats.length >= 4 && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+              {/* Star Performers */}
+              <div style={{ background: 'var(--surface)', border: '1px solid #bbf7d0', borderRadius: 12, overflow: 'hidden' }}>
+                <div style={{ padding: '10px 16px', background: '#f0fdf4', borderBottom: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 16 }}>🏆</span>
+                  <span style={{ fontWeight: 700, fontSize: 13, color: '#15803d' }}>Star Performers — Top 3</span>
+                </div>
+                <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {[...visibleStats].sort((a, b) => b.completionRate - a.completionRate).slice(0, 3).map((emp, i) => (
+                    <div key={emp.uid} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ width: 24, height: 24, borderRadius: '50%', background: ['#f59e0b','#94a3b8','#b45309'][i] + '22',
+                        border: `2px solid ${['#f59e0b','#94a3b8','#b45309'][i]}`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 11, fontWeight: 800, color: ['#b45309','#64748b','#78350f'][i], flexShrink: 0 }}>
+                        {['🥇','🥈','🥉'][i]}
+                      </span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{emp.name}</span>
+                          <span style={{ fontSize: 14, fontWeight: 800, color: '#16a34a', flexShrink: 0, marginLeft: 8 }}>{emp.completionRate}%</span>
+                        </div>
+                        <div style={{ height: 4, background: 'var(--border-light)', borderRadius: 99, marginTop: 4, overflow: 'hidden' }}>
+                          <div style={{ height: 4, width: `${emp.completionRate}%`, background: '#16a34a', borderRadius: 99 }}/>
+                        </div>
+                        <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{emp.completed} tasks · {emp.onTimeRate !== null ? `${emp.onTimeRate}% on-time` : 'no due dates'}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Needs Attention */}
+              <div style={{ background: 'var(--surface)', border: '1px solid #fecaca', borderRadius: 12, overflow: 'hidden' }}>
+                <div style={{ padding: '10px 16px', background: '#fef2f2', borderBottom: '1px solid #fecaca', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 16 }}>⚠️</span>
+                  <span style={{ fontWeight: 700, fontSize: 13, color: '#dc2626' }}>Needs Attention — Bottom 3</span>
+                </div>
+                <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {[...visibleStats].sort((a, b) => a.completionRate - b.completionRate).slice(0, 3).map((emp, i) => (
+                    <div key={emp.uid} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#dc262615', border: '2px solid #fca5a5',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 10, fontWeight: 700, color: '#dc2626', flexShrink: 0 }}>
+                        {i + 1}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{emp.name}</span>
+                          <span style={{ fontSize: 14, fontWeight: 800, color: emp.completionRate < 50 ? '#dc2626' : '#ca8a04', flexShrink: 0, marginLeft: 8 }}>{emp.completionRate}%</span>
+                        </div>
+                        <div style={{ height: 4, background: 'var(--border-light)', borderRadius: 99, marginTop: 4, overflow: 'hidden' }}>
+                          <div style={{ height: 4, width: `${emp.completionRate}%`, background: emp.completionRate < 50 ? '#dc2626' : '#ca8a04', borderRadius: 99 }}/>
+                        </div>
+                        <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{emp.overdue > 0 ? `${emp.overdue} overdue · ` : ''}{emp.completed} completed · {emp.total} assigned</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Legend */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '10px 14px', marginBottom: 14,
