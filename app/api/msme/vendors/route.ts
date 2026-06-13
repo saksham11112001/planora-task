@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   const admin = createAdminClient()
   const { data: vendors, error } = await admin
     .from('msme_vendors')
-    .select('id, vendor_name, vendor_email, gstin, status, udyam_number, msme_category, nature_of_business, outstanding_amount, cert_url, is_not_msme, declarant_name, declared_at, submitted_at, email_count, last_emailed_at, is_paid, created_at')
+    .select('id, vendor_name, vendor_email, gstin, status, payment_status, udyam_number, msme_category, nature_of_business, outstanding_amount, cert_url, is_not_msme, declarant_name, declared_at, submitted_at, email_count, last_emailed_at, is_paid, created_at')
     .eq('org_id', mb.org_id)
     .order('created_at', { ascending: false })
 
@@ -50,15 +50,15 @@ export async function POST(req: NextRequest) {
 
   const admin = createAdminClient()
 
-  // Check current vendor count to determine if this is a paid slot
+  // Check current vendor count to determine slot type
   const { count } = await admin
     .from('msme_vendors')
     .select('id', { count: 'exact', head: true })
     .eq('org_id', mb.org_id)
 
-  const currentCount = count ?? 0
-  const isPaid = currentCount >= FREE_VENDOR_LIMIT
-  // TODO: when Razorpay is integrated, gate paid slots behind payment here
+  const currentCount  = count ?? 0
+  const isPaid        = currentCount >= FREE_VENDOR_LIMIT
+  const paymentStatus = isPaid ? 'unpaid' : 'free'
 
   const { data: vendor, error } = await admin
     .from('msme_vendors')
@@ -68,6 +68,7 @@ export async function POST(req: NextRequest) {
       vendor_email: vendor_email.trim().toLowerCase(),
       gstin: gstin?.trim() || null,
       is_paid: isPaid,
+      payment_status: paymentStatus,
       created_by: user.id,
     })
     .select()
@@ -75,5 +76,5 @@ export async function POST(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  return NextResponse.json({ vendor, isPaid }, { status: 201 })
+  return NextResponse.json({ vendor, isPaid, paymentStatus }, { status: 201 })
 }
