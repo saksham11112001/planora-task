@@ -762,7 +762,7 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
                           const sc = STATUS_CONFIG[task.status] ?? STATUS_CONFIG.todo
                           const pc = PRIORITY_COLOR[task.priority] ?? PRIORITY_COLOR.none
                           return (
-                            <div key={task.id} className="group"
+                            <div key={task.id} className="group" data-tour="compliance-task-row"
                               style={{
                                 display: 'grid', gridTemplateColumns: '28px 1fr 80px 80px 80px 80px 60px',
                                 alignItems: 'center', padding: '0 18px', minHeight: 38,
