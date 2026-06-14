@@ -1,61 +1,178 @@
 {
-  "name": "06 — LinkedIn Lead Generation (Comment Monitoring · Scoring · DM Drafts)",
+  "name": "06 — LinkedIn Lead Generation (Standalone · Daily Auto + Manual)",
   "nodes": [
 
     {
       "parameters": {
-        "httpMethod": "POST",
-        "path": "linkedin-lead-scan",
-        "responseMode": "responseNode",
-        "options": {}
-      },
-      "id": "06000001-0001-0001-0001-000000000001",
-      "name": "Webhook: New Post Published",
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2,
-      "position": [200, 400],
-      "webhookId": "linkedin-lead-scan-webhook",
-      "notes": "Call from workflow 02 after publishing, or manually.\nBody: { post_urn, post_content, post_url, post_topic }"
-    },
-
-    {
-      "parameters": {
-        "options": {
-          "responseCode": 200,
-          "responseBody": "{\"status\":\"received\",\"message\":\"Lead scan queued\"}"
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "30 15 * * 1-5"
+            }
+          ]
         }
       },
+      "id": "06000001-0001-0001-0001-000000000001",
+      "name": "Schedule: Daily 9 PM IST (Mon-Fri)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 340],
+      "notes": "Runs Mon-Fri at 15:30 UTC = 9:00 PM IST. Posts from the past 48h are scanned for leads."
+    },
+
+    {
+      "parameters": {},
       "id": "06000002-0002-0002-0002-000000000002",
-      "name": "Respond to Webhook",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.1,
-      "position": [440, 280]
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [200, 480],
+      "notes": "Click 'Execute workflow' in n8n to run immediately on demand."
     },
 
     {
       "parameters": {
-        "jsCode": "const body = $input.first().json.body;\nreturn [{\n  json: {\n    post_urn:     body.post_urn     || '',\n    post_content: body.post_content || '',\n    post_url:     body.post_url     || '',\n    post_topic:   body.post_topic   || 'accounting automation',\n    scanned_at:   new Date().toISOString()\n  }\n}];"
-      },
-      "id": "06000003-0003-0003-0003-000000000003",
-      "name": "Code: Store Post Context",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [440, 460]
-    },
-
-    {
-      "parameters": {
-        "resume": "timeInterval",
-        "waitAmount": 3,
-        "waitUnit": "hours",
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
         "options": {}
       },
+      "id": "06000003-0003-0003-0003-000000000003",
+      "name": "Merge Triggers",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [440, 400]
+    },
+
+    {
+      "parameters": {
+        "jsCode": "// Calculate the timestamp for 48 hours ago in ISO format\nconst since = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();\nreturn [{ json: { since, ran_at: new Date().toISOString() } }];"
+      },
       "id": "06000004-0004-0004-0004-000000000004",
-      "name": "Wait: 3 Hours",
-      "type": "n8n-nodes-base.wait",
-      "typeVersion": 1.1,
-      "position": [680, 460],
-      "notes": "Give the post time to gather real comments and reactions"
+      "name": "Code: Set Time Window",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 400]
+    },
+
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=={{$env.SUPABASE_URL}}/rest/v1/content_queue?status=eq.published&published_at=gte.{{$json.since}}&select=id,idea_title,linkedin_draft,linkedin_post_id,source_post_url&order=published_at.desc&limit=10",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey",        "value": "={{$env.SUPABASE_SERVICE_KEY}}" },
+            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_KEY}}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "06000005-0005-0005-0005-000000000005",
+      "name": "Supabase: Fetch Recent Published Posts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 400],
+      "notes": "Fetches posts published in the last 48h. linkedin_post_id must be saved by workflow 02.\nIf you store the URN under a different column name, update the select param."
+    },
+
+    {
+      "parameters": {
+        "jsCode": "const posts = $input.first().json;\nconst since = $('Code: Set Time Window').first().json.since;\n\nif (!Array.isArray(posts) || posts.length === 0) {\n  return [{ json: { _no_posts: true, since } }];\n}\n\nreturn posts.map(p => ({\n  json: {\n    post_id:      p.id              || '',\n    post_urn:     p.linkedin_post_id || '',\n    post_content: p.linkedin_draft  || '',\n    post_url:     p.source_post_url || '',\n    post_topic:   p.idea_title      || 'accounting automation',\n    _no_posts:    false\n  }\n}));"
+      },
+      "id": "06000006-0006-0006-0006-000000000006",
+      "name": "Code: Prepare Post List",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1140, 400]
+    },
+
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "id": "check-no-posts",
+              "leftValue": "={{$json._no_posts}}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "06000007-0007-0007-0007-000000000007",
+      "name": "Any Published Posts?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1380, 400]
+    },
+
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/bot{{$env.TELEGRAM_BOT_TOKEN}}/sendMessage",
+        "sendBody": true,
+        "contentType": "json",
+        "body": {
+          "chat_id": "={{$env.TELEGRAM_CHAT_ID}}",
+          "text": "LinkedIn Lead Scan: No published posts found in the last 48 hours. Publish a post first via workflow 02.",
+          "parse_mode": "Markdown"
+        },
+        "options": {}
+      },
+      "id": "06000008-0008-0008-0008-000000000008",
+      "name": "Telegram: No Posts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1620, 280]
+    },
+
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "06000009-0009-0009-0009-000000000009",
+      "name": "Process Each Post",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1620, 520],
+      "notes": "Outer loop: one LinkedIn post at a time"
+    },
+
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "id": "check-urn",
+              "leftValue": "={{$json.post_urn}}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEquals" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "0600000a-000a-000a-000a-00000000000a",
+      "name": "Has LinkedIn Post URN?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1860, 520],
+      "notes": "Skip posts where we don't have the LinkedIn URN stored"
+    },
+
+    {
+      "parameters": {},
+      "id": "0600000b-000b-000b-000b-00000000000b",
+      "name": "Skip: No URN Stored",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [2100, 420],
+      "notes": "If post_urn is missing, ensure workflow 02 saves linkedin_post_id to content_queue after publishing"
     },
 
     {
@@ -71,17 +188,17 @@
         },
         "options": {}
       },
-      "id": "06000005-0005-0005-0005-000000000005",
+      "id": "0600000c-000c-000c-000c-00000000000c",
       "name": "LinkedIn: Fetch Comments",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [920, 360]
+      "position": [2100, 580]
     },
 
     {
       "parameters": {
         "method": "GET",
-        "url": "=https://api.linkedin.com/v2/socialActions/{{encodeURIComponent($('Code: Store Post Context').first().json.post_urn)}}/likes?projection=(elements*(actor~(id,firstName,lastName,headline,publicProfileUrl,location)))&count=100",
+        "url": "=https://api.linkedin.com/v2/socialActions/{{encodeURIComponent($('Process Each Post').first().json.post_urn)}}/likes?projection=(elements*(actor~(id,firstName,lastName,headline,publicProfileUrl,location)))&count=100",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -91,11 +208,11 @@
         },
         "options": {}
       },
-      "id": "06000006-0006-0006-0006-000000000006",
+      "id": "0600000d-000d-000d-000d-00000000000d",
       "name": "LinkedIn: Fetch Reactions",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [920, 560]
+      "position": [2100, 720]
     },
 
     {
@@ -104,22 +221,22 @@
         "combinationMode": "mergeByPosition",
         "options": {}
       },
-      "id": "06000007-0007-0007-0007-000000000007",
+      "id": "0600000e-000e-000e-000e-00000000000e",
       "name": "Merge: Comments + Reactions",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3,
-      "position": [1160, 460]
+      "position": [2340, 640]
     },
 
     {
       "parameters": {
-        "jsCode": "const commentsData  = $input.all()[0]?.json?.elements || [];\nconst reactionsData = $input.all()[1]?.json?.elements || [];\nconst postContext   = $('Code: Store Post Context').first().json;\n\nconst people = new Map();\n\nfor (const el of commentsData) {\n  const actor = el['actor~'] || el.actor || {};\n  if (!actor.id) continue;\n  const firstName = actor.firstName?.localized?.en_US || actor.firstName || '';\n  const lastName  = actor.lastName?.localized?.en_US  || actor.lastName  || '';\n  const name = (firstName + ' ' + lastName).trim();\n  if (!name) continue;\n  people.set(actor.id, {\n    linkedin_id:      actor.id,\n    name,\n    headline:         actor.headline?.localized?.en_US || actor.headline || '',\n    profile_url:      actor.publicProfileUrl || '',\n    location:         actor.location?.name || '',\n    engagement_type:  'comment',\n    comment_text:     el.message?.text || '',\n    engagement_bonus: 10,\n    post_urn:         postContext.post_urn,\n    post_content:     postContext.post_content,\n    post_url:         postContext.post_url,\n    post_topic:       postContext.post_topic\n  });\n}\n\nfor (const el of reactionsData) {\n  const actor = el['actor~'] || el.actor || {};\n  if (!actor.id || people.has(actor.id)) continue;\n  const firstName = actor.firstName?.localized?.en_US || actor.firstName || '';\n  const lastName  = actor.lastName?.localized?.en_US  || actor.lastName  || '';\n  const name = (firstName + ' ' + lastName).trim();\n  if (!name) continue;\n  people.set(actor.id, {\n    linkedin_id:      actor.id,\n    name,\n    headline:         actor.headline?.localized?.en_US || actor.headline || '',\n    profile_url:      actor.publicProfileUrl || '',\n    location:         actor.location?.name || '',\n    engagement_type:  'reaction',\n    comment_text:     '',\n    engagement_bonus: 0,\n    post_urn:         postContext.post_urn,\n    post_content:     postContext.post_content,\n    post_url:         postContext.post_url,\n    post_topic:       postContext.post_topic\n  });\n}\n\nconsole.log('Unique people found:', people.size);\nif (people.size === 0) return [{ json: { _empty: true } }];\nreturn Array.from(people.values()).map(p => ({ json: p }));"
+        "jsCode": "const commentsData  = $input.all()[0]?.json?.elements || [];\nconst reactionsData = $input.all()[1]?.json?.elements || [];\nconst post          = $('Process Each Post').first().json;\n\nconst people = new Map();\n\nfor (const el of commentsData) {\n  const actor = el['actor~'] || el.actor || {};\n  if (!actor.id) continue;\n  const firstName = actor.firstName?.localized?.en_US || actor.firstName || '';\n  const lastName  = actor.lastName?.localized?.en_US  || actor.lastName  || '';\n  const name = (firstName + ' ' + lastName).trim();\n  if (!name) continue;\n  people.set(actor.id, {\n    linkedin_id:      actor.id,\n    name,\n    headline:         actor.headline?.localized?.en_US || actor.headline || '',\n    profile_url:      actor.publicProfileUrl || '',\n    location:         actor.location?.name || '',\n    engagement_type:  'comment',\n    comment_text:     el.message?.text || '',\n    engagement_bonus: 10,\n    post_urn:         post.post_urn,\n    post_content:     post.post_content,\n    post_url:         post.post_url,\n    post_topic:       post.post_topic\n  });\n}\n\nfor (const el of reactionsData) {\n  const actor = el['actor~'] || el.actor || {};\n  if (!actor.id || people.has(actor.id)) continue;\n  const firstName = actor.firstName?.localized?.en_US || actor.firstName || '';\n  const lastName  = actor.lastName?.localized?.en_US  || actor.lastName  || '';\n  const name = (firstName + ' ' + lastName).trim();\n  if (!name) continue;\n  people.set(actor.id, {\n    linkedin_id:      actor.id,\n    name,\n    headline:         actor.headline?.localized?.en_US || actor.headline || '',\n    profile_url:      actor.publicProfileUrl || '',\n    location:         actor.location?.name || '',\n    engagement_type:  'reaction',\n    comment_text:     '',\n    engagement_bonus: 0,\n    post_urn:         post.post_urn,\n    post_content:     post.post_content,\n    post_url:         post.post_url,\n    post_topic:       post.post_topic\n  });\n}\n\nconsole.log('Post:', post.post_urn, '| Unique people:', people.size);\nif (people.size === 0) return [{ json: { _empty: true, post_urn: post.post_urn } }];\nreturn Array.from(people.values()).map(p => ({ json: p }));"
       },
-      "id": "06000008-0008-0008-0008-000000000008",
+      "id": "0600000f-000f-000f-000f-00000000000f",
       "name": "Code: Deduplicate Profiles",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1400, 460]
+      "position": [2580, 640]
     },
 
     {
@@ -137,31 +254,20 @@
           "combinator": "and"
         }
       },
-      "id": "06000009-0009-0009-0009-000000000009",
+      "id": "06000010-0010-0010-0010-000000000010",
       "name": "Any Engagements?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1640, 460]
+      "position": [2820, 640]
     },
 
     {
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.telegram.org/bot{{$env.TELEGRAM_BOT_TOKEN}}/sendMessage",
-        "sendBody": true,
-        "contentType": "json",
-        "body": {
-          "chat_id": "={{$env.TELEGRAM_CHAT_ID}}",
-          "text": "LinkedIn Lead Scan: No engagements on this post yet. Try again after more reach.",
-          "parse_mode": "Markdown"
-        },
-        "options": {}
-      },
-      "id": "0600000a-000a-000a-000a-00000000000a",
-      "name": "Telegram: No Engagements",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [1880, 340]
+      "parameters": {},
+      "id": "06000011-0011-0011-0011-000000000011",
+      "name": "Skip: No Engagements on Post",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [3060, 520]
     },
 
     {
@@ -169,11 +275,12 @@
         "batchSize": 1,
         "options": {}
       },
-      "id": "0600000b-000b-000b-000b-00000000000b",
+      "id": "06000012-0012-0012-0012-000000000012",
       "name": "Process Each Person",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
-      "position": [1880, 560]
+      "position": [3060, 740],
+      "notes": "Inner loop: one person at a time"
     },
 
     {
@@ -189,22 +296,22 @@
         },
         "options": {}
       },
-      "id": "0600000c-000c-000c-000c-00000000000c",
+      "id": "06000013-0013-0013-0013-000000000013",
       "name": "Supabase: Check Lead Exists",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2120, 560]
+      "position": [3300, 740]
     },
 
     {
       "parameters": {
         "jsCode": "const person   = $('Process Each Person').first().json;\nconst existing = $input.first().json;\nconst alreadyIn = Array.isArray(existing) && existing.length > 0;\nreturn [{ json: { ...person, _already_exists: alreadyIn } }];"
       },
-      "id": "0600000d-000d-000d-000d-00000000000d",
+      "id": "06000014-0014-0014-0014-000000000014",
       "name": "Code: Merge Existence Check",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2360, 560]
+      "position": [3540, 740]
     },
 
     {
@@ -222,20 +329,20 @@
           "combinator": "and"
         }
       },
-      "id": "0600000e-000e-000e-000e-00000000000e",
+      "id": "06000015-0015-0015-0015-000000000015",
       "name": "Is New Lead?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [2600, 560]
+      "position": [3780, 740]
     },
 
     {
       "parameters": {},
-      "id": "0600000f-000f-000f-000f-00000000000f",
+      "id": "06000016-0016-0016-0016-000000000016",
       "name": "Skip: Already in CRM",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
-      "position": [2840, 700]
+      "position": [4020, 880]
     },
 
     {
@@ -258,34 +365,34 @@
         },
         "options": {}
       },
-      "id": "06000010-0010-0010-0010-000000000010",
+      "id": "06000017-0017-0017-0017-000000000017",
       "name": "Apollo: Enrich Prospect",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2840, 520],
-      "notes": "Apollo free tier: 50 enrichments/month. Gets email, company size, industry, tech stack."
+      "position": [4020, 680],
+      "notes": "Free tier: 50 enrichments/month. Gets email, company size, industry, tech stack."
     },
 
     {
       "parameters": {
-        "jsCode": "const person = $('Code: Merge Existence Check').first().json;\nconst apollo = $input.first().json?.person || {};\n\nconst apolloOrg = apollo.organization || {};\nconst headlineParts = person.headline || '';\nconst parsedCompany = headlineParts.includes(' at ')\n  ? headlineParts.split(' at ').pop().trim()\n  : headlineParts.includes(' | ')\n    ? headlineParts.split(' | ').pop().trim()\n    : '';\n\nreturn [{\n  json: {\n    ...person,\n    email:         apollo.email           || '',\n    company_name:  apolloOrg.name         || parsedCompany,\n    job_title:     apollo.title           || person.headline,\n    company_size:  apolloOrg.estimated_num_employees || null,\n    country:       apollo.country         || person.location,\n    industry:      apolloOrg.industry     || '',\n    tech_keywords: (apolloOrg.keywords    || []).join(', ')\n  }\n}];"
+        "jsCode": "const person = $('Code: Merge Existence Check').first().json;\nconst apollo = $input.first().json?.person || {};\nconst apolloOrg = apollo.organization || {};\n\nconst headlineParts = person.headline || '';\nconst parsedCompany = headlineParts.includes(' at ')\n  ? headlineParts.split(' at ').pop().trim()\n  : headlineParts.includes(' | ')\n    ? headlineParts.split(' | ').pop().trim()\n    : '';\n\nreturn [{\n  json: {\n    ...person,\n    email:         apollo.email           || '',\n    company_name:  apolloOrg.name         || parsedCompany,\n    job_title:     apollo.title           || person.headline,\n    company_size:  apolloOrg.estimated_num_employees || null,\n    country:       apollo.country         || person.location,\n    industry:      apolloOrg.industry     || '',\n    tech_keywords: (apolloOrg.keywords    || []).join(', ')\n  }\n}];"
       },
-      "id": "06000011-0011-0011-0011-000000000011",
+      "id": "06000018-0018-0018-0018-000000000018",
       "name": "Code: Merge Apollo Data",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [3080, 520]
+      "position": [4260, 680]
     },
 
     {
       "parameters": {
-        "jsCode": "const p = $input.first().json;\n\nconst engagementNote = p.engagement_type === 'comment'\n  ? 'Commented: ' + (p.comment_text || '(no text)')\n  : 'Liked the post about ' + p.post_topic;\n\nconst prompt = [\n  'Score this LinkedIn prospect for SNG Advisors (Indian CA firm offering offshore accounting teams to AU/UK/US CPA firms).',\n  '',\n  'Name: ' + p.name,\n  'Headline: ' + p.headline,\n  'Job Title: ' + p.job_title,\n  'Company: ' + p.company_name,\n  'Company Size: ' + (p.company_size ? p.company_size + ' employees' : 'unknown'),\n  'Location: ' + p.country,\n  'Industry: ' + p.industry,\n  'Tech Keywords: ' + p.tech_keywords,\n  'Engagement: ' + engagementNote,\n  'Post Topic: ' + p.post_topic,\n  '',\n  'Scoring (0-100):',\n  '+25 if located in Australia, UK, USA, Canada, Singapore, UAE',\n  '+25 if CPA / CA / accounting / bookkeeping firm',\n  '+20 if title includes CFO, Finance Director, Controller, Partner, Director',\n  '+15 if company size 10-100 employees',\n  '+15 if comment/headline mentions outsourcing, offshore, Xero, MYOB, QuickBooks, hiring, overwhelmed',\n  '+10 if engagement_type is comment',\n  '+10 if industry is Accounting or Financial Services',\n  '-20 if located in India',\n  '-15 if student or intern',\n  '-10 if company size over 500',\n  '',\n  'Reply ONLY with valid JSON no markdown:',\n  '{\"score\":0,\"tier\":\"HOT or WARM or COLD\",\"qualification_reasons\":[\"r1\"],\"red_flags\":[\"f1\"],\"ideal_outreach_angle\":\"one sentence hook\"}'\n].join('\\n');\n\nreturn [{\n  json: {\n    ...p,\n    _score_prompt: prompt\n  }\n}];"
+        "jsCode": "const p = $input.first().json;\n\nconst engagementNote = p.engagement_type === 'comment'\n  ? 'Commented: ' + (p.comment_text || '(no text)')\n  : 'Liked the post about ' + p.post_topic;\n\nconst prompt = [\n  'Score this LinkedIn prospect for SNG Advisors (Indian CA firm offering offshore accounting teams to AU/UK/US CPA firms).',\n  '',\n  'Name: ' + p.name,\n  'Headline: ' + p.headline,\n  'Job Title: ' + p.job_title,\n  'Company: ' + p.company_name,\n  'Company Size: ' + (p.company_size ? p.company_size + ' employees' : 'unknown'),\n  'Location: ' + p.country,\n  'Industry: ' + p.industry,\n  'Tech Keywords: ' + p.tech_keywords,\n  'Engagement: ' + engagementNote,\n  'Post Topic: ' + p.post_topic,\n  '',\n  'Scoring (0-100):',\n  '+25 if located in Australia, UK, USA, Canada, Singapore, UAE',\n  '+25 if CPA / CA / accounting / bookkeeping firm',\n  '+20 if title includes CFO, Finance Director, Controller, Partner, Director',\n  '+15 if company size 10-100 employees',\n  '+15 if comment/headline mentions outsourcing, offshore, Xero, MYOB, QuickBooks, hiring, overwhelmed',\n  '+10 if engagement_type is comment',\n  '+10 if industry is Accounting or Financial Services',\n  '-20 if located in India',\n  '-15 if student or intern',\n  '-10 if company size over 500',\n  '',\n  'Reply ONLY with valid JSON, no markdown:',\n  '{\"score\":0,\"tier\":\"HOT or WARM or COLD\",\"qualification_reasons\":[\"r1\"],\"red_flags\":[\"f1\"],\"ideal_outreach_angle\":\"one sentence hook\"}'\n].join('\\n');\n\nreturn [{ json: { ...p, _score_prompt: prompt } }];"
       },
-      "id": "06000012-0012-0012-0012-000000000012",
+      "id": "06000019-0019-0019-0019-000000000019",
       "name": "Code: Build Score Prompt",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [3320, 520]
+      "position": [4500, 680]
     },
 
     {
@@ -303,35 +410,30 @@
         "sendBody": true,
         "contentType": "json",
         "body": {
-          "model":      "claude-sonnet-4-6",
-          "max_tokens": 400,
+          "model":       "claude-sonnet-4-6",
+          "max_tokens":  400,
           "temperature": 0.1,
-          "system": "You are a B2B lead qualification expert. Reply only with valid compact JSON, no markdown.",
-          "messages": [
-            {
-              "role":    "user",
-              "content": "={{$json._score_prompt}}"
-            }
-          ]
+          "system":      "You are a B2B lead qualification expert. Reply only with valid compact JSON, no markdown.",
+          "messages": [{ "role": "user", "content": "={{$json._score_prompt}}" }]
         },
         "options": {}
       },
-      "id": "06000013-0013-0013-0013-000000000013",
+      "id": "0600001a-001a-001a-001a-00000000001a",
       "name": "Claude: Score Lead",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [3560, 520]
+      "position": [4740, 680]
     },
 
     {
       "parameters": {
-        "jsCode": "const person   = $('Code: Build Score Prompt').first().json;\nconst response = $input.first().json;\n\nlet scoreData = { score: 0, tier: 'COLD', qualification_reasons: [], red_flags: [], ideal_outreach_angle: '' };\ntry {\n  const raw = response?.content?.[0]?.text || '{}';\n  scoreData = JSON.parse(raw.replace(/```json?\\n?/g, '').replace(/```/g, '').trim());\n} catch(e) {\n  console.error('Score parse error:', e.message);\n}\n\nconst totalScore = (scoreData.score || 0) + (person.engagement_bonus || 0);\nreturn [{\n  json: {\n    ...person,\n    score:                 scoreData.score || 0,\n    tier:                  scoreData.tier  || 'COLD',\n    qualification_reasons: scoreData.qualification_reasons || [],\n    red_flags:             scoreData.red_flags || [],\n    ideal_outreach_angle:  scoreData.ideal_outreach_angle || '',\n    total_score:           totalScore\n  }\n}];"
+        "jsCode": "const person   = $('Code: Build Score Prompt').first().json;\nconst response = $input.first().json;\n\nlet scoreData = { score: 0, tier: 'COLD', qualification_reasons: [], red_flags: [], ideal_outreach_angle: '' };\ntry {\n  const raw = response?.content?.[0]?.text || '{}';\n  scoreData = JSON.parse(raw.replace(/```json?\\n?/g, '').replace(/```/g, '').trim());\n} catch(e) {\n  console.error('Score parse error:', e.message);\n}\n\nconst totalScore = (scoreData.score || 0) + (person.engagement_bonus || 0);\nreturn [{\n  json: {\n    ...person,\n    score:                 scoreData.score || 0,\n    tier:                  totalScore >= 75 ? 'HOT' : totalScore >= 60 ? 'WARM' : 'COLD',\n    qualification_reasons: scoreData.qualification_reasons || [],\n    red_flags:             scoreData.red_flags || [],\n    ideal_outreach_angle:  scoreData.ideal_outreach_angle || '',\n    total_score:           totalScore\n  }\n}];"
       },
-      "id": "06000014-0014-0014-0014-000000000014",
+      "id": "0600001b-001b-001b-001b-00000000001b",
       "name": "Code: Parse Score",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [3800, 520]
+      "position": [4980, 680]
     },
 
     {
@@ -349,31 +451,31 @@
           "combinator": "and"
         }
       },
-      "id": "06000015-0015-0015-0015-000000000015",
+      "id": "0600001c-001c-001c-001c-00000000001c",
       "name": "Score >= 60?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [4040, 520]
+      "position": [5220, 680]
     },
 
     {
       "parameters": {},
-      "id": "06000016-0016-0016-0016-000000000016",
+      "id": "0600001d-001d-001d-001d-00000000001d",
       "name": "Skip: Below Threshold",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
-      "position": [4280, 660]
+      "position": [5460, 820]
     },
 
     {
       "parameters": {
-        "jsCode": "const p = $input.first().json;\n\nconst engagementNote = p.engagement_type === 'comment'\n  ? 'They commented: ' + (p.comment_text || '')\n  : 'They liked our post about ' + p.post_topic;\n\nconst prompt = [\n  'Write a LinkedIn connection request note for Saksham Garg at SNG Advisors.',\n  'SNG Advisors helps AU/UK/US CPA firms build offshore accounting teams from India, saving 40-60% on costs.',\n  '',\n  'Prospect:',\n  'First name: ' + p.name.split(' ')[0],\n  'Title: ' + p.job_title,\n  'Company: ' + p.company_name,\n  'Location: ' + p.country,\n  'Headline: ' + p.headline,\n  'How they engaged: ' + engagementNote,\n  'Best outreach angle: ' + p.ideal_outreach_angle,\n  '',\n  'Rules:',\n  '- Max 280 characters (LinkedIn limit)',\n  '- Reference something specific from their engagement or profile',\n  '- Mention their pain point, not your solution',\n  '- End with a soft open — curiosity not a pitch',\n  '- No emojis. Professional but human.',\n  '- Do NOT say: book a call, let us connect, I noticed you',\n  '',\n  'Reply with ONLY the message text. No quotes, no explanation.'\n].join('\\n');\n\nreturn [{ json: { ...p, _dm_prompt: prompt } }];"
+        "jsCode": "const p = $input.first().json;\n\nconst engagementNote = p.engagement_type === 'comment'\n  ? 'They commented: ' + (p.comment_text || '')\n  : 'They liked our post about ' + p.post_topic;\n\nconst prompt = [\n  'Write a LinkedIn connection request note for Saksham Garg at SNG Advisors.',\n  'SNG Advisors helps AU/UK/US CPA firms build offshore accounting teams from India, saving 40-60% on costs.',\n  '',\n  'Prospect:',\n  'First name: ' + p.name.split(' ')[0],\n  'Title: ' + p.job_title,\n  'Company: ' + p.company_name,\n  'Location: ' + p.country,\n  'Headline: ' + p.headline,\n  'How they engaged: ' + engagementNote,\n  'Best outreach angle: ' + p.ideal_outreach_angle,\n  '',\n  'Rules:',\n  '- Max 280 characters (hard LinkedIn limit)',\n  '- Reference something specific from their profile or engagement',\n  '- Mention their pain point, not our solution',\n  '- End with curiosity not a pitch',\n  '- No emojis. Professional but warm.',\n  '- Do NOT say: book a call, let us connect, I noticed you',\n  '',\n  'Reply with ONLY the message text. No quotes, no explanation.'\n].join('\\n');\n\nreturn [{ json: { ...p, _dm_prompt: prompt } }];"
       },
-      "id": "06000017-0017-0017-0017-000000000017",
+      "id": "0600001e-001e-001e-001e-00000000001e",
       "name": "Code: Build DM Prompt",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [4280, 420]
+      "position": [5460, 600]
     },
 
     {
@@ -391,35 +493,30 @@
         "sendBody": true,
         "contentType": "json",
         "body": {
-          "model":      "claude-sonnet-4-6",
-          "max_tokens": 200,
+          "model":       "claude-sonnet-4-6",
+          "max_tokens":  200,
           "temperature": 0.75,
-          "system": "You write short, specific, non-generic LinkedIn connection request messages. Reply with ONLY the message text, nothing else.",
-          "messages": [
-            {
-              "role":    "user",
-              "content": "={{$json._dm_prompt}}"
-            }
-          ]
+          "system":      "You write short, specific, non-generic LinkedIn connection request messages. Reply with ONLY the message text, nothing else.",
+          "messages": [{ "role": "user", "content": "={{$json._dm_prompt}}" }]
         },
         "options": {}
       },
-      "id": "06000018-0018-0018-0018-000000000018",
+      "id": "0600001f-001f-001f-001f-00000000001f",
       "name": "Claude: Write DM Draft",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [4520, 420]
+      "position": [5700, 600]
     },
 
     {
       "parameters": {
         "jsCode": "const person   = $('Code: Build DM Prompt').first().json;\nconst response = $input.first().json;\nlet dm = (response?.content?.[0]?.text || '').trim();\nif (dm.length > 280) dm = dm.slice(0, 277) + '...';\nreturn [{ json: { ...person, dm_draft: dm, dm_char_count: dm.length } }];"
       },
-      "id": "06000019-0019-0019-0019-000000000019",
+      "id": "06000020-0020-0020-0020-000000000020",
       "name": "Code: Parse DM",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [4760, 420]
+      "position": [5940, 600]
     },
 
     {
@@ -465,22 +562,22 @@
         },
         "options": {}
       },
-      "id": "0600001a-001a-001a-001a-00000000001a",
+      "id": "06000021-0021-0021-0021-000000000021",
       "name": "Supabase: Save Lead",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [5000, 420]
+      "position": [6180, 600]
     },
 
     {
       "parameters": {
-        "jsCode": "const allItems = $input.all();\nconst saved = allItems.filter(i => i.json && !i.json.error && i.json.id);\nconst hot  = saved.filter(i => i.json.tier === 'HOT');\nconst warm = saved.filter(i => i.json.tier === 'WARM');\n\nconst hotLines = hot.map(i =>\n  '* ' + i.json.name + ' — ' + (i.json.company_name || '') + ' (' + i.json.score + '/100)\\n  DM: ' + (i.json.dm_draft || '')\n).join('\\n\\n');\n\nconst warmLines = warm.map(i =>\n  '* ' + i.json.name + ' — ' + (i.json.company_name || '') + ' (' + i.json.score + '/100)\\n  DM: ' + (i.json.dm_draft || '')\n).join('\\n\\n');\n\nlet msg = 'LinkedIn Lead Scan Complete\\n';\nmsg += saved.length + ' qualified leads saved\\n';\nmsg += 'HOT: ' + hot.length + '  |  WARM: ' + warm.length + '\\n\\n';\nif (hot.length  > 0) msg += 'HOT LEADS (send DM today):\\n' + hotLines + '\\n\\n';\nif (warm.length > 0) msg += 'WARM LEADS (review and send):\\n' + warmLines + '\\n\\n';\nmsg += 'All leads saved in Supabase with status: pending_outreach';\n\nreturn [{ json: { message: msg, total_saved: saved.length } }];"
+        "jsCode": "const allItems = $input.all();\nconst saved = allItems.filter(i => i.json && !i.json.error && i.json.id);\nconst hot  = saved.filter(i => i.json.tier === 'HOT');\nconst warm = saved.filter(i => i.json.tier === 'WARM');\n\nif (saved.length === 0) {\n  return [{ json: { _no_leads: true, total_saved: 0, hot_count: 0, warm_count: 0, message: '' } }];\n}\n\nconst hotLines = hot.map(i =>\n  '* ' + i.json.name + ' — ' + (i.json.company_name || '') + ' (' + i.json.score + '/100)\\n  DM: ' + (i.json.dm_draft || '')\n).join('\\n\\n');\n\nconst warmLines = warm.map(i =>\n  '* ' + i.json.name + ' — ' + (i.json.company_name || '') + ' (' + i.json.score + '/100)\\n  DM: ' + (i.json.dm_draft || '')\n).join('\\n\\n');\n\nlet msg = 'LinkedIn Lead Scan Complete\\n';\nmsg += saved.length + ' qualified leads saved\\n';\nmsg += 'HOT: ' + hot.length + '  |  WARM: ' + warm.length + '\\n\\n';\nif (hot.length  > 0) msg += 'HOT (send today):\\n'    + hotLines  + '\\n\\n';\nif (warm.length > 0) msg += 'WARM (send within 48h):\\n' + warmLines + '\\n\\n';\nmsg += 'All leads saved in Supabase (status: pending_outreach)';\n\nreturn [{ json: { _no_leads: false, total_saved: saved.length, hot_count: hot.length, warm_count: warm.length, message: msg } }];"
       },
-      "id": "0600001b-001b-001b-001b-00000000001b",
+      "id": "06000022-0022-0022-0022-000000000022",
       "name": "Code: Aggregate Results",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [5240, 420]
+      "position": [6420, 600]
     },
 
     {
@@ -498,11 +595,11 @@
           "combinator": "and"
         }
       },
-      "id": "0600001c-001c-001c-001c-00000000001c",
+      "id": "06000023-0023-0023-0023-000000000023",
       "name": "Any Qualified Leads?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [5480, 420]
+      "position": [6660, 600]
     },
 
     {
@@ -518,11 +615,11 @@
         },
         "options": {}
       },
-      "id": "0600001d-001d-001d-001d-00000000001d",
+      "id": "06000024-0024-0024-0024-000000000024",
       "name": "Telegram: Send Lead Alert",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [5720, 320]
+      "position": [6900, 500]
     },
 
     {
@@ -533,44 +630,63 @@
         "contentType": "json",
         "body": {
           "chat_id":    "={{$env.TELEGRAM_CHAT_ID}}",
-          "text":       "LinkedIn Lead Scan: Post had engagements but no prospects scored 60+. Try more targeted post topics: outsourcing pain, hiring accountants, Xero/MYOB migration.",
+          "text":       "LinkedIn Lead Scan: Posts found but no prospects scored 60+. Try more targeted post topics: outsourcing pain, hiring accountants, Xero/MYOB migration.",
           "parse_mode": "Markdown"
         },
         "options": {}
       },
-      "id": "0600001e-001e-001e-001e-00000000001e",
+      "id": "06000025-0025-0025-0025-000000000025",
       "name": "Telegram: No Qualified Leads",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [5720, 520]
+      "position": [6900, 700]
     },
 
     {
       "parameters": {},
-      "id": "0600001f-001f-001f-001f-00000000001f",
+      "id": "06000026-0026-0026-0026-000000000026",
       "name": "Done",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
-      "position": [5960, 320]
+      "position": [7140, 500]
     }
 
   ],
 
   "connections": {
-    "Webhook: New Post Published": {
-      "main": [[
-        { "node": "Respond to Webhook",       "type": "main", "index": 0 },
-        { "node": "Code: Store Post Context", "type": "main", "index": 0 }
-      ]]
+    "Schedule: Daily 9 PM IST (Mon-Fri)": {
+      "main": [[{ "node": "Merge Triggers", "type": "main", "index": 0 }]]
     },
-    "Code: Store Post Context": {
-      "main": [[{ "node": "Wait: 3 Hours", "type": "main", "index": 0 }]]
+    "Manual Trigger": {
+      "main": [[{ "node": "Merge Triggers", "type": "main", "index": 1 }]]
     },
-    "Wait: 3 Hours": {
-      "main": [[
-        { "node": "LinkedIn: Fetch Comments",  "type": "main", "index": 0 },
-        { "node": "LinkedIn: Fetch Reactions", "type": "main", "index": 0 }
-      ]]
+    "Merge Triggers": {
+      "main": [[{ "node": "Code: Set Time Window", "type": "main", "index": 0 }]]
+    },
+    "Code: Set Time Window": {
+      "main": [[{ "node": "Supabase: Fetch Recent Published Posts", "type": "main", "index": 0 }]]
+    },
+    "Supabase: Fetch Recent Published Posts": {
+      "main": [[{ "node": "Code: Prepare Post List", "type": "main", "index": 0 }]]
+    },
+    "Code: Prepare Post List": {
+      "main": [[{ "node": "Any Published Posts?", "type": "main", "index": 0 }]]
+    },
+    "Any Published Posts?": {
+      "main": [
+        [{ "node": "Telegram: No Posts",  "type": "main", "index": 0 }],
+        [{ "node": "Process Each Post",   "type": "main", "index": 0 }]
+      ]
+    },
+    "Process Each Post": {
+      "main": [[{ "node": "Has LinkedIn Post URN?", "type": "main", "index": 0 }]]
+    },
+    "Has LinkedIn Post URN?": {
+      "main": [
+        [{ "node": "Skip: No URN Stored",      "type": "main", "index": 0 }],
+        [{ "node": "LinkedIn: Fetch Comments",  "type": "main", "index": 0 },
+         { "node": "LinkedIn: Fetch Reactions", "type": "main", "index": 0 }]
+      ]
     },
     "LinkedIn: Fetch Comments": {
       "main": [[{ "node": "Merge: Comments + Reactions", "type": "main", "index": 0 }]]
@@ -586,8 +702,8 @@
     },
     "Any Engagements?": {
       "main": [
-        [{ "node": "Telegram: No Engagements", "type": "main", "index": 0 }],
-        [{ "node": "Process Each Person",       "type": "main", "index": 0 }]
+        [{ "node": "Skip: No Engagements on Post", "type": "main", "index": 0 }],
+        [{ "node": "Process Each Person",           "type": "main", "index": 0 }]
       ]
     },
     "Process Each Person": {
@@ -622,8 +738,8 @@
     },
     "Score >= 60?": {
       "main": [
-        [{ "node": "Skip: Below Threshold",  "type": "main", "index": 0 }],
-        [{ "node": "Code: Build DM Prompt",  "type": "main", "index": 0 }]
+        [{ "node": "Skip: Below Threshold", "type": "main", "index": 0 }],
+        [{ "node": "Code: Build DM Prompt", "type": "main", "index": 0 }]
       ]
     },
     "Code: Build DM Prompt": {
@@ -659,6 +775,6 @@
     "callerPolicy": "workflowsFromSameOwner",
     "errorWorkflow": ""
   },
-  "tags": ["lead-generation", "linkedin", "outreach"],
-  "notes": "REQUIRED ENV VARS:\n  LINKEDIN_ACCESS_TOKEN — from workflow 02 setup\n  APOLLO_API_KEY        — apollo.io (free: 50/month)\n  ANTHROPIC_API_KEY     — Claude API\n  SUPABASE_URL          — Supabase project URL\n  SUPABASE_SERVICE_KEY  — Supabase service role key\n  TELEGRAM_BOT_TOKEN    — Telegram bot\n  TELEGRAM_CHAT_ID      — your Telegram chat ID\n\nSUPABASE TABLE (run once):\n  CREATE TABLE leads (\n    id                    uuid PRIMARY KEY DEFAULT gen_random_uuid(),\n    linkedin_id           text UNIQUE,\n    name                  text,\n    email                 text,\n    job_title             text,\n    company_name          text,\n    company_size          int,\n    country               text,\n    industry              text,\n    linkedin_url          text,\n    headline              text,\n    tech_keywords         text,\n    score                 int,\n    tier                  text,\n    qualification_reasons jsonb,\n    red_flags             jsonb,\n    ideal_outreach_angle  text,\n    engagement_type       text,\n    comment_text          text,\n    source_post_urn       text,\n    source_post_url       text,\n    dm_draft              text,\n    dm_char_count         int,\n    status                text DEFAULT 'pending_outreach',\n    dm_sent_at            timestamptz,\n    replied_at            timestamptz,\n    meeting_booked_at     timestamptz,\n    notes                 text,\n    created_at            timestamptz DEFAULT now()\n  );\n\nHOW TO TRIGGER:\n  Automatic: In workflow 02, after Mark as Published node, add HTTP POST to\n  this webhook URL with body: { post_urn, post_content, post_url, post_topic }\n\n  Manual: POST to /webhook/linkedin-lead-scan with same body.\n\nLEAD TIERS:\n  HOT  (>=75) — send DM same day\n  WARM (60-74) — review and send within 48h\n  COLD (<60)  — not saved"
+  "tags": ["lead-generation", "linkedin", "outreach", "standalone"],
+  "notes": "FULLY STANDALONE — no dependency on any other workflow.\n\nTRIGGERS:\n  Auto: Mon-Fri 9 PM IST (scans last 48h of published posts)\n  Manual: click Execute in n8n UI anytime\n\nREQUIRED ENV VARS:\n  LINKEDIN_ACCESS_TOKEN  — LinkedIn OAuth token\n  APOLLO_API_KEY         — apollo.io free tier (50 enrichments/month)\n  ANTHROPIC_API_KEY      — Claude API\n  SUPABASE_URL           — Supabase project URL\n  SUPABASE_SERVICE_KEY   — Supabase service role key\n  TELEGRAM_BOT_TOKEN     — Telegram bot\n  TELEGRAM_CHAT_ID       — your Telegram chat ID\n\nONE-TIME SETUP — run this SQL in Supabase:\n  ALTER TABLE content_queue ADD COLUMN IF NOT EXISTS linkedin_post_id text;\n  ALTER TABLE content_queue ADD COLUMN IF NOT EXISTS published_at timestamptz;\n  ALTER TABLE content_queue ADD COLUMN IF NOT EXISTS source_post_url text;\n\n  CREATE TABLE IF NOT EXISTS leads (\n    id                    uuid PRIMARY KEY DEFAULT gen_random_uuid(),\n    linkedin_id           text UNIQUE,\n    name                  text,\n    email                 text,\n    job_title             text,\n    company_name          text,\n    company_size          int,\n    country               text,\n    industry              text,\n    linkedin_url          text,\n    headline              text,\n    tech_keywords         text,\n    score                 int,\n    tier                  text,\n    qualification_reasons jsonb,\n    red_flags             jsonb,\n    ideal_outreach_angle  text,\n    engagement_type       text,\n    comment_text          text,\n    source_post_urn       text,\n    source_post_url       text,\n    dm_draft              text,\n    dm_char_count         int,\n    status                text DEFAULT 'pending_outreach',\n    dm_sent_at            timestamptz,\n    replied_at            timestamptz,\n    meeting_booked_at     timestamptz,\n    notes                 text,\n    created_at            timestamptz DEFAULT now()\n  );\n\nOPTIONAL — make workflow 02 save the LinkedIn URN after publishing:\n  In workflow 02, after the LinkedIn publish node, add a PATCH to:\n  /rest/v1/content_queue?id=eq.{post_id}\n  Body: { linkedin_post_id: '<urn from LinkedIn response>', published_at: '<now>', source_post_url: '<url>' }\n  Without this, the workflow skips posts where URN is missing.\n\nLEAD TIERS:\n  HOT  (>=75) — send DM same day\n  WARM (60-74) — review and send within 48h\n  COLD (<60)  — not saved"
 }
