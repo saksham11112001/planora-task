@@ -37,11 +37,19 @@ export default function LoginPage() {
   const [loading,  setLoading]  = useState(false)
   const [error,    setError]    = useState('')
 
+  // Destination to redirect to after a successful login.
+  // Populated from ?redirect= param (set by middleware on MSME subdomain or protected route).
+  const [postLoginPath, setPostLoginPath] = useState('/dashboard')
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     if (params.get('error') === 'auth_failed') {
       setError("Sign-in failed. Please try again — if the problem persists, try a different method.")
       setMode('email_password')
+    }
+    const redir = params.get('redirect')
+    if (redir && redir.startsWith('/') && !redir.startsWith('//')) {
+      setPostLoginPath(redir)
     }
   }, [])
 
@@ -61,7 +69,7 @@ export default function LoginPage() {
       const { error: e } = await supabase.auth.signInWithOAuth({
         provider: 'azure',
         options: {
-          redirectTo: `${window.location.origin}/auth/confirm`,
+          redirectTo: `${window.location.origin}/auth/confirm?next=${encodeURIComponent(postLoginPath)}`,
           scopes: 'email profile openid',
         },
       })
@@ -83,7 +91,7 @@ export default function LoginPage() {
         options: {
           // Point directly at the client-side confirm page so the URL hash
           // (#access_token=…) is preserved — server redirects strip the hash.
-          redirectTo: `${window.location.origin}/auth/confirm`,
+          redirectTo: `${window.location.origin}/auth/confirm?next=${encodeURIComponent(postLoginPath)}`,
           queryParams: { access_type: 'offline', prompt: 'consent' },
         },
       })
@@ -132,7 +140,7 @@ export default function LoginPage() {
 
     // Provision user row then navigate
     await provisionUser()
-    router.replace('/dashboard')
+    router.replace(postLoginPath)
   }
 
   // ── Email + password sign-up ──────────────────────────────────────────────

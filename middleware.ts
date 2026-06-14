@@ -99,18 +99,24 @@ export async function middleware(request: NextRequest) {
   // getUser() validates the JWT AND triggers a token refresh if needed
   const { data: { user }, error } = await supabase.auth.getUser()
 
+  // Detect MSME subdomain (msme.sng-adwisers.com or msme.localhost for dev)
+  const host         = request.headers.get('host') ?? ''
+  const isMsmeDomain = host.startsWith('msme.')
+  const defaultRoute = isMsmeDomain ? '/msme' : '/dashboard'
+
   if (error || !user) {
     if (pathname === '/') return NextResponse.next({ request })
     const loginUrl = new URL('/login', request.url)
-    // Only pass same-origin paths — never redirect to external URLs
-    if (pathname.startsWith('/') && !pathname.startsWith('//')) {
-      loginUrl.searchParams.set('redirect', pathname)
-    }
+    // On MSME subdomain, always land on /msme after login
+    const redirectTarget = isMsmeDomain ? '/msme' : (
+      pathname.startsWith('/') && !pathname.startsWith('//') ? pathname : '/dashboard'
+    )
+    loginUrl.searchParams.set('redirect', redirectTarget)
     return NextResponse.redirect(loginUrl)
   }
 
   if (pathname === '/') {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+    return NextResponse.redirect(new URL(defaultRoute, request.url))
   }
 
   return response
