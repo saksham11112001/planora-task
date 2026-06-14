@@ -178,7 +178,7 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated, 
   if (!open) {
     return (
       <>
-        <div onClick={openRow} style={{
+        <div onClick={openRow} data-tour="quick-add-task" style={{
           display: 'flex', alignItems: 'center', gap: 8, padding: '9px 20px',
           cursor: 'pointer', borderTop: '1px dashed var(--border)', color: 'var(--text-muted)',
           transition: 'all 0.15s', userSelect: 'none',
