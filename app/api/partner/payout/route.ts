@@ -13,8 +13,8 @@ export async function POST(req: NextRequest) {
 
   const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'Not a member' }, { status: 403 })
-  if (mb.role !== 'owner') {
-    return NextResponse.json({ error: 'Only the org owner can request payouts' }, { status: 403 })
+  if (!['owner', 'admin'].includes(mb.role)) {
+    return NextResponse.json({ error: 'Only the org owner or admin can request payouts' }, { status: 403 })
   }
 
   const { account_no, ifsc, account_name } = await req.json()

@@ -443,7 +443,7 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
         {/* TOOLS */}
         <GL>Tools</GL>
         {canManage && <SI href="/msme" active={isActive('/msme')} icon={<Building2 className="h-4 w-4"/>} label="MSME Tracker"/>}
-        {role === 'owner' && <SI href="/partner" active={isActive('/partner')} icon={<Handshake className="h-4 w-4"/>} label="Partner Portal"/>}
+        {['owner','admin'].includes(role) && <SI href="/partner" active={isActive('/partner')} icon={<Handshake className="h-4 w-4"/>} label="Partner Portal"/>}
         {nav.import_data && <SI href="/import" active={isActive('/import')} icon={<Upload className="h-4 w-4"/>} label="Import data"/>}
         {canManage && (
           <SI href="/settings/permissions" active={isActive('/settings/permissions')} icon={<Shield className="h-4 w-4"/>} label="Permissions"/>

@@ -23,8 +23,8 @@ export async function GET(req: NextRequest) {
 
   const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role, organisations(id, name, referral_code)')
   if (!mb) return NextResponse.json({ error: 'Not a member' }, { status: 403 })
-  if (mb.role !== 'owner') {
-    return NextResponse.json({ error: 'Only the org owner can access the Partner Portal' }, { status: 403 })
+  if (!['owner', 'admin'].includes(mb.role)) {
+    return NextResponse.json({ error: 'Only the org owner or admin can access the Partner Portal' }, { status: 403 })
   }
 
   const admin    = createAdminClient()
