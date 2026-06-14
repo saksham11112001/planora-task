@@ -1,7 +1,8 @@
 'use client'
 import Link from 'next/link'
 import { ArrowRight, CheckSquare, FolderOpen, Users2, BarChart2,
-         Calendar, CheckCircle2, TrendingUp, RefreshCw, Plus, Sparkles } from 'lucide-react'
+         Calendar, CheckCircle2, TrendingUp, RefreshCw, Plus, Sparkles,
+         FileCheck, ChevronRight as ChevRight } from 'lucide-react'
 import { fmtDate } from '@/lib/utils/format'
 import { useState, useEffect } from 'react'
 
@@ -183,6 +184,86 @@ export function DashboardClient({
           </Link>
         ))}
       </div>
+
+      {/* ── First-time setup guide (shown when workspace is empty) ── */}
+      {myTasks.length === 0 && recentClients.length === 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#0d9488', animation: 'pulse 2s infinite' }}/>
+            <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '0.05em' }}>
+              🚀 YOUR SETUP GUIDE — Complete these 4 steps to get the most out of Floatup
+            </p>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
+            {[
+              {
+                step: '1', color: '#0891b2', bg: 'rgba(8,145,178,0.08)',
+                icon: Users2, href: '/clients/new',
+                title: 'Add your first client',
+                desc: 'Add one client (e.g. Rajesh Traders). All tasks and compliance work will be linked to clients.',
+                cta: 'Add client →',
+              },
+              {
+                step: '2', color: '#0d9488', bg: 'rgba(13,148,136,0.08)',
+                icon: FileCheck, href: '/compliance',
+                title: 'Set up CA Compliance',
+                desc: 'GST, ITR, TDS deadlines are pre-loaded for you. Assign them to your team in one click.',
+                cta: 'Open Compliance →',
+                highlight: true,
+              },
+              {
+                step: '3', color: '#7c3aed', bg: 'rgba(124,58,237,0.08)',
+                icon: CheckSquare, href: '/inbox',
+                title: 'Create your first task',
+                desc: 'Add any ad-hoc task — a client call, a document to review, anything that needs to be done.',
+                cta: 'Create task →',
+              },
+              {
+                step: '4', color: '#ca8a04', bg: 'rgba(202,138,4,0.08)',
+                icon: Users2, href: '/team',
+                title: 'Invite your team',
+                desc: 'Invite your juniors, articleship staff, or co-CAs. Assign work and track in one place.',
+                cta: 'Invite team →',
+              },
+            ].map(({ step, color, bg, icon: Icon, href, title, desc, cta, highlight }) => (
+              <Link key={step} href={href} style={{
+                textDecoration: 'none', borderRadius: 14, padding: '18px 16px',
+                background: highlight ? `rgba(13,148,136,0.12)` : bg,
+                border: `1.5px solid ${highlight ? color : color + '30'}`,
+                display: 'flex', flexDirection: 'column', gap: 10,
+                transition: 'all 0.15s', position: 'relative', overflow: 'hidden',
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLElement).style.boxShadow = `0 8px 24px ${color}20` }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ''; (e.currentTarget as HTMLElement).style.boxShadow = '' }}>
+                {highlight && (
+                  <div style={{ position: 'absolute', top: 10, right: 10, fontSize: 10, fontWeight: 700,
+                    background: color, color: '#fff', padding: '2px 8px', borderRadius: 99, letterSpacing: '0.04em' }}>
+                    START HERE
+                  </div>
+                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, background: `${color}20`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Icon style={{ width: 15, height: 15, color }}/>
+                  </div>
+                  <div style={{ width: 20, height: 20, borderRadius: '50%', background: color,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: '#fff' }}>{step}</span>
+                  </div>
+                </div>
+                <div>
+                  <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 5 }}>{title}</p>
+                  <p style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.55 }}>{desc}</p>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4,
+                  fontSize: 12, fontWeight: 600, color, marginTop: 'auto' }}>
+                  {cta} <ChevRight style={{ width: 12, height: 12 }}/>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── Main content ──────────────────────────────────────────── */}
       <div className="dash-cols" style={{ display: 'grid', gridTemplateColumns: '1.3fr 0.7fr', gap: 20 }}>

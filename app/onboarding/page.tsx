@@ -1,13 +1,34 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Zap, Building2, Users, Phone, ChevronRight, CheckCircle, UserCircle2, KeyRound, PlusCircle, Megaphone } from 'lucide-react'
+import { Zap, Building2, Users, ChevronRight, CheckCircle, UserCircle2, KeyRound, PlusCircle, Megaphone, Phone } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
-const INDUSTRIES = ['Technology','Finance','Healthcare','Education','E-commerce','Marketing','Consulting','Real Estate','Manufacturing','Legal','Non-profit','Other']
+const COUNTRIES = [
+  'India','United States','United Kingdom','Canada','Australia','Singapore','UAE','South Africa','Other',
+]
+const PRACTICE_TYPES = [
+  'Sole Practitioner (Proprietorship)',
+  'Partnership Firm',
+  'LLP (Limited Liability Partnership)',
+  'Private Limited Company',
+  'Other',
+]
+const YEARS_OPTIONS = ['Less than 1 year','1–3 years','3–5 years','5–10 years','10–20 years','20+ years']
+const INDUSTRIES = ['CA / Accounting Firm','Technology','Finance','Healthcare','Education','E-commerce','Marketing','Consulting','Real Estate','Manufacturing','Legal','Non-profit','Other']
 const TEAM_SIZES = ['Just me','2–5','6–15','16–50','51–200','200+']
-const HOW_DID_YOU_HEAR = ['Google Search','LinkedIn','Friend / Colleague','Social Media (Instagram / Facebook)','YouTube / Podcast','Product Hunt','Other']
-const ROLE_OPTIONS = ['Owner / Founder','CA / CPA / Tax Professional','Manager','Team Member / Employee','Other']
+const HOW_DID_YOU_HEAR = ['Google Search','LinkedIn','Friend / Colleague','WhatsApp / Referral','Social Media (Instagram / Facebook)','YouTube / Podcast','CA Association / ICAI','Product Hunt','Other']
+const ROLE_OPTIONS = ['CA / Chartered Accountant','CPA / Tax Professional','Owner / Founder','Firm Manager','Team Member / Employee','Other']
+const CURRENT_TOOLS = ['Excel / Google Sheets','Tally','Zoho','QuickBooks','Paper / Manual','Nothing yet','Other']
+const PAIN_POINTS = [
+  'Missing statutory deadlines (GST, ITR, TDS)',
+  'Tracking which client work is pending',
+  'Managing my team\'s workload',
+  'Client communication and follow-ups',
+  'MSME / Udyam compliance tracking',
+  'Billing and invoicing clients',
+  'All of the above',
+]
 
 type Phase = 'checking' | 'entry' | 'join-code' | 'form' | 'joining' | 'joined'
 
@@ -28,12 +49,17 @@ export default function OnboardingPage() {
     name:              '',
     email:             '',
     phone:             '',
+    country:           'India',
     org_name:          '',
+    practice_type:     '',
     industry:          '',
     team_size:         '',
+    years_in_practice: '',
     referral_code:     '',
     how_did_you_hear:  '',
     role_title:        '',
+    current_tool:      '',
+    pain_point:        '',
   })
 
   function set(k: string, v: string) { setForm(f => ({ ...f, [k]: v })) }
@@ -144,14 +170,19 @@ export default function OnboardingPage() {
       const res = await fetch('/api/onboarding', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name:             form.name.trim(),
-          org_name:         form.org_name,
-          industry:         form.industry,
-          team_size:        form.team_size,
-          phone:            form.phone || null,
-          referral_code:    form.referral_code.trim() || null,
-          how_did_you_hear: form.how_did_you_hear || null,
-          role_title:       form.role_title || null,
+          name:              form.name.trim(),
+          org_name:          form.org_name,
+          industry:          form.industry,
+          team_size:         form.team_size,
+          phone:             form.phone || null,
+          referral_code:     form.referral_code.trim() || null,
+          how_did_you_hear:  form.how_did_you_hear || null,
+          role_title:        form.role_title || null,
+          country:           form.country || null,
+          practice_type:     form.practice_type || null,
+          years_in_practice: form.years_in_practice || null,
+          current_tool:      form.current_tool || null,
+          pain_point:        form.pain_point || null,
         }),
       })
       const data = await res.json()
@@ -315,8 +346,9 @@ export default function OnboardingPage() {
 
   /* ── Main onboarding form ───────────────────────────────────────── */
   // Invited users only see step 0; fresh signup sees steps 0–4
-  const totalSteps = inviteData ? 1 : 5
+  const totalSteps   = inviteData ? 1 : 5
   const progressStep = inviteData ? 1 : step + 1
+  const stepLabels   = ['You', 'Your Firm', 'Team', 'Your Situation', 'Done']
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4"
@@ -336,12 +368,26 @@ export default function OnboardingPage() {
           </p>
         </div>
 
-        {/* Progress bar */}
-        <div className="flex items-center gap-2 mb-6">
-          {Array.from({ length: totalSteps }).map((_, i) => (
-            <div key={i} className={`flex-1 h-1.5 rounded-full transition-all ${i < progressStep ? 'bg-white' : 'bg-white/30'}`}/>
-          ))}
-        </div>
+        {/* Step indicator */}
+        {!inviteData && (
+          <div className="flex items-center gap-1 mb-6">
+            {stepLabels.map((label, i) => (
+              <div key={i} className="flex items-center flex-1">
+                <div className="flex flex-col items-center flex-1">
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                    i < step ? 'bg-white text-teal-700' : i === step ? 'bg-teal-400 text-white ring-2 ring-white ring-offset-2 ring-offset-transparent' : 'bg-white/20 text-white/50'
+                  }`}>
+                    {i < step ? '✓' : i + 1}
+                  </div>
+                  <span className={`text-[10px] mt-1 font-medium transition-all ${i <= step ? 'text-white' : 'text-white/40'}`}>{label}</span>
+                </div>
+                {i < stepLabels.length - 1 && (
+                  <div className={`h-0.5 flex-1 mb-4 transition-all ${i < step ? 'bg-white' : 'bg-white/20'}`}/>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
 
         <div className="bg-white rounded-2xl p-8 shadow-2xl">
 
@@ -353,31 +399,27 @@ export default function OnboardingPage() {
                   <UserCircle2 className="h-5 w-5 text-teal-600"/>
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-gray-900">Your profile</h2>
-                  <p className="text-sm text-gray-500">Let us know who you are</p>
+                  <h2 className="text-lg font-bold text-gray-900">Tell us about yourself</h2>
+                  <p className="text-sm text-gray-500">Just the basics to set up your workspace</p>
                 </div>
               </div>
               {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>}
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">Full name *</label>
-                  <input
-                    value={form.name}
-                    onChange={e => set('name', e.target.value)}
-                    className="input"
-                    placeholder="Your full name"
-                    autoFocus
-                    onKeyDown={e => e.key === 'Enter' && handleProfileNext()}
-                  />
+                  <input value={form.name} onChange={e => set('name', e.target.value)}
+                    className="input" placeholder="e.g. Rajesh Sharma" autoFocus
+                    onKeyDown={e => e.key === 'Enter' && handleProfileNext()}/>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
-                  <input
-                    value={form.email}
-                    readOnly
-                    className="input bg-gray-50 text-gray-500 cursor-default select-none"
-                    tabIndex={-1}
-                  />
+                  <input value={form.email} readOnly className="input bg-gray-50 text-gray-500 cursor-default select-none" tabIndex={-1}/>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Country *</label>
+                  <select value={form.country} onChange={e => set('country', e.target.value)} className="input">
+                    {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -386,32 +428,23 @@ export default function OnboardingPage() {
                       ? <span className="ml-2 text-xs text-gray-400 font-normal">optional</span>
                       : <span className="ml-2 text-xs text-red-400 font-normal">required</span>}
                   </label>
-                  <input
-                    type="tel"
-                    value={form.phone}
-                    onChange={e => set('phone', e.target.value)}
-                    className="input"
-                    placeholder="+91 98765 43210"
-                    required={!inviteData}
-                    onKeyDown={e => e.key === 'Enter' && handleProfileNext()}
-                  />
+                  <input type="tel" value={form.phone} onChange={e => set('phone', e.target.value)}
+                    className="input" placeholder="+91 98765 43210" required={!inviteData}
+                    onKeyDown={e => e.key === 'Enter' && handleProfileNext()}/>
                   <p className="mt-1.5 text-xs text-gray-400">
                     Include country code.{!inviteData && ' Required to activate your trial — one trial per phone number.'}
                   </p>
                 </div>
               </div>
-              <button
-                onClick={handleProfileNext}
-                disabled={saving}
-                className="w-full mt-6 btn btn-brand flex items-center justify-center gap-2"
-              >
+              <button onClick={handleProfileNext} disabled={saving}
+                className="w-full mt-6 btn btn-brand flex items-center justify-center gap-2">
                 {saving ? 'Saving…' : inviteData ? 'Join workspace' : 'Continue'}
                 {!saving && <ChevronRight className="h-4 w-4"/>}
               </button>
             </>
           )}
 
-          {/* ── Step 1: Organisation ── */}
+          {/* ── Step 1: Firm details ── */}
           {step === 1 && (
             <>
               <div className="flex items-center gap-3 mb-6">
@@ -419,49 +452,52 @@ export default function OnboardingPage() {
                   <Building2 className="h-5 w-5 text-teal-600"/>
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-gray-900">Your organisation</h2>
-                  <p className="text-sm text-gray-500">What&apos;s the name of your company or team?</p>
+                  <h2 className="text-lg font-bold text-gray-900">About your firm</h2>
+                  <p className="text-sm text-gray-500">Help us personalise Floatup for your practice</p>
                 </div>
               </div>
               {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>}
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Organisation name *</label>
-                  <input
-                    value={form.org_name}
-                    onChange={e => set('org_name', e.target.value)}
-                    className="input" placeholder="e.g. Acme Corp"
-                    autoFocus
-                    onKeyDown={e => e.key === 'Enter' && form.org_name.trim() && (setError(''), setStep(2))}
-                  />
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Firm / Organisation name *</label>
+                  <input value={form.org_name} onChange={e => set('org_name', e.target.value)}
+                    className="input" placeholder="e.g. Sharma & Associates" autoFocus
+                    onKeyDown={e => e.key === 'Enter' && form.org_name.trim() && (setError(''), setStep(2))}/>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Industry</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Type of practice</label>
+                  <select value={form.practice_type} onChange={e => set('practice_type', e.target.value)} className="input">
+                    <option value="">Select practice type</option>
+                    {PRACTICE_TYPES.map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Industry / Sector</label>
                   <select value={form.industry} onChange={e => set('industry', e.target.value)} className="input">
                     <option value="">Select industry</option>
                     {INDUSTRIES.map(i => <option key={i} value={i}>{i}</option>)}
                   </select>
                 </div>
                 <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Years in practice</label>
+                  <select value={form.years_in_practice} onChange={e => set('years_in_practice', e.target.value)} className="input">
+                    <option value="">Select experience</option>
+                    {YEARS_OPTIONS.map(y => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                </div>
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
                     Referral code
-                    <span className="ml-2 text-xs text-gray-400 font-normal">optional — extends your referrer's trial</span>
+                    <span className="ml-2 text-xs text-gray-400 font-normal">optional</span>
                   </label>
-                  <input
-                    value={form.referral_code}
-                    onChange={e => set('referral_code', e.target.value.toUpperCase())}
-                    className="input font-mono tracking-widest"
-                    placeholder="XXXX-XXXX"
-                    maxLength={9}
-                  />
+                  <input value={form.referral_code} onChange={e => set('referral_code', e.target.value.toUpperCase())}
+                    className="input font-mono tracking-widest" placeholder="XXXX-XXXX" maxLength={9}/>
                 </div>
               </div>
               <div className="flex gap-3 mt-6">
                 <button onClick={() => { setError(''); setStep(0) }} className="btn btn-outline flex-1">Back</button>
-                <button
-                  onClick={() => { if (!form.org_name.trim()) { setError('Name required'); return } setError(''); setStep(2) }}
-                  className="btn btn-brand flex-1 flex items-center justify-center gap-2"
-                >
+                <button onClick={() => { if (!form.org_name.trim()) { setError('Firm name is required'); return } setError(''); setStep(2) }}
+                  className="btn btn-brand flex-1 flex items-center justify-center gap-2">
                   Continue <ChevronRight className="h-4 w-4"/>
                 </button>
               </div>
@@ -501,7 +537,7 @@ export default function OnboardingPage() {
             </>
           )}
 
-          {/* ── Step 3: Marketing questions ── */}
+          {/* ── Step 3: Your situation ── */}
           {step === 3 && (
             <>
               <div className="flex items-center gap-3 mb-6">
@@ -509,18 +545,11 @@ export default function OnboardingPage() {
                   <Megaphone className="h-5 w-5 text-teal-600"/>
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-gray-900">Almost there!</h2>
-                  <p className="text-sm text-gray-500">Help us understand you better</p>
+                  <h2 className="text-lg font-bold text-gray-900">Your current situation</h2>
+                  <p className="text-sm text-gray-500">Helps us set up the right features for you</p>
                 </div>
               </div>
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">How did you hear about Floatup?</label>
-                  <select value={form.how_did_you_hear} onChange={e => set('how_did_you_hear', e.target.value)} className="input">
-                    <option value="">Select an option</option>
-                    {HOW_DID_YOU_HEAR.map(o => <option key={o} value={o}>{o}</option>)}
-                  </select>
-                </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">What best describes your role?</label>
                   <select value={form.role_title} onChange={e => set('role_title', e.target.value)} className="input">
@@ -528,11 +557,32 @@ export default function OnboardingPage() {
                     {ROLE_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
                   </select>
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">What are you currently using to manage work?</label>
+                  <select value={form.current_tool} onChange={e => set('current_tool', e.target.value)} className="input">
+                    <option value="">Select current tool</option>
+                    {CURRENT_TOOLS.map(o => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">What is your biggest challenge right now?</label>
+                  <select value={form.pain_point} onChange={e => set('pain_point', e.target.value)} className="input">
+                    <option value="">Select main challenge</option>
+                    {PAIN_POINTS.map(o => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">How did you hear about Floatup?</label>
+                  <select value={form.how_did_you_hear} onChange={e => set('how_did_you_hear', e.target.value)} className="input">
+                    <option value="">Select an option</option>
+                    {HOW_DID_YOU_HEAR.map(o => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                </div>
               </div>
               <div className="flex gap-3 mt-6">
                 <button onClick={() => setStep(2)} className="btn btn-outline flex-1">Back</button>
                 <button onClick={() => setStep(4)} className="btn btn-brand flex-1 flex items-center justify-center gap-2">
-                  Continue <ChevronRight className="h-4 w-4"/>
+                  Almost done <ChevronRight className="h-4 w-4"/>
                 </button>
               </div>
             </>
