@@ -9,7 +9,8 @@ import { AppLoader }     from '@/components/ui/AppLoader'
 import { SearchModal }    from '@/components/search/SearchModal'
 import { useAppStore }    from '@/store/appStore'
 import type { OrgSummary } from '@/store/appStore'
-import { WalkthroughOverlay }  from '@/components/walkthrough/WalkthroughOverlay'
+import { WalkthroughOverlay }      from '@/components/walkthrough/WalkthroughOverlay'
+import { InteractiveOnboarding }   from '@/components/walkthrough/InteractiveOnboarding'
 import { OnboardingChecklist } from '@/components/walkthrough/OnboardingChecklist'
 import { HelpButton }          from '@/components/walkthrough/HelpButton'
 
@@ -120,6 +121,7 @@ export function AppShell({ user, org, role, workspaceId, allOrgs, children }: Pr
       <Suspense fallback={null}>
         <RouteLoader/>
       </Suspense>
+      <InteractiveOnboarding userId={user.id} userName={user.name} userCreatedAt={user.created_at} tourCompletedAt={user.tour_completed_at ?? null}/>
       <WalkthroughOverlay userId={user.id} userCreatedAt={user.created_at} tourCompletedAt={user.tour_completed_at ?? null}/>
       <OnboardingChecklist userId={user.id} userCreatedAt={user.created_at}/>
       <HelpButton/>
