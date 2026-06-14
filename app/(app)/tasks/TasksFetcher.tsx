@@ -4,7 +4,7 @@ import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { MyTasksView } from './MyTasksView'
 import { shiftDays } from '@/lib/utils/recurringSchedule'
 
-const TASK_COLS = 'id, title, description, status, priority, due_date, assignee_id, approver_id, client_id, project_id, parent_task_id, approval_status, approval_required, estimated_hours, is_recurring, custom_fields, created_at, updated_at, is_billable, billable_amount, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), approver:users!tasks_approver_id_fkey(id, name), creator:users!tasks_created_by_fkey(id, name), projects(id, name, color)'
+const TASK_COLS = 'id, title, description, status, priority, due_date, assignee_id, approver_id, client_id, project_id, parent_task_id, approval_status, approval_required, estimated_hours, is_recurring, custom_fields, created_at, updated_at, is_billable, billable_amount, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), approver:users!tasks_approver_id_fkey(id, name), creator:users!tasks_created_by_fkey(id, name), projects(id, name, color), parent:tasks!tasks_parent_task_id_fkey(id, title, status, priority)'
 
 export async function TasksFetcher() {
   const user = await getSessionUser()
@@ -32,7 +32,7 @@ export async function TasksFetcher() {
     { data: caInstances },
     { data: pendingApprovalRaw },
   ] = await Promise.all([
-    scopedBase.limit(10000),
+    scopedBase.limit(2000),
 
     supabase.from('org_members')
       .select('user_id, users(id, name)').eq('org_id', mb.org_id).eq('is_active', true),
@@ -45,7 +45,7 @@ export async function TasksFetcher() {
           .neq('is_archived', true).is('parent_task_id', null)
           .or('is_recurring.is.null,is_recurring.eq.false')
           .or('custom_fields.is.null,custom_fields.not.cs.{"_ca_compliance":true}')
-          .order('due_date', { ascending: true, nullsFirst: false }).limit(10000)
+          .order('due_date', { ascending: true, nullsFirst: false }).limit(1000)
       : Promise.resolve({ data: [] }),
 
     isOwnerAdmin
@@ -67,7 +67,7 @@ export async function TasksFetcher() {
       .neq('is_archived', true)
       .is('parent_task_id', null)
       .neq('assignee_id', user.id)
-      .order('due_date', { ascending: true, nullsFirst: false }).limit(10000),
+      .order('due_date', { ascending: true, nullsFirst: false }).limit(500),
   ])
 
   const clientMap: Record<string, { id: string; name: string; color: string }> = {}
@@ -106,26 +106,24 @@ export async function TasksFetcher() {
   const assignedByMeList    = (assignedByMeRaw ?? []).filter(isVisible).map(enrich)
   const pendingApprovalList = (pendingApprovalRaw ?? []).map(enrich) as any[]
 
-  // Context tasks: parents of subtasks assigned to the current user
-  const subtaskParentIds = (tasks ?? [])
-    .filter((t: any) => t.parent_task_id != null)
-    .map((t: any) => t.parent_task_id as string)
-  const uniqueParentIds = [...new Set(subtaskParentIds)]
-    .filter(id => !taskList.some((t: any) => t.id === id))
-
-  if (uniqueParentIds.length > 0) {
-    const { data: parentRows } = await supabase.from('tasks')
-      .select(TASK_COLS)
-      .in('id', uniqueParentIds)
-      .eq('org_id', mb.org_id)
-      .neq('is_archived', true)
-    ;(parentRows ?? []).forEach((t: any) => {
+  // Context tasks: parents of subtasks, now inlined via the parent join in TASK_COLS.
+  // No extra DB round-trip needed — use the joined parent data directly.
+  const seenIds = new Set(taskList.map((t: any) => t.id))
+  ;(tasks ?? []).forEach((t: any) => {
+    const p = (t as any).parent
+    if (p && !seenIds.has(p.id)) {
+      seenIds.add(p.id)
       taskList.push(enrich({
-        ...t,
-        custom_fields: { ...(t.custom_fields ?? {}), _context_task: true },
+        ...p,
+        description: null, due_date: null, assignee_id: null, approver_id: null,
+        client_id: null, project_id: null, approval_status: null, approval_required: false,
+        estimated_hours: null, is_recurring: false, custom_fields: { _context_task: true },
+        created_at: '', updated_at: null, is_billable: false, billable_amount: null,
+        assignee: null, approver: null, creator: null, projects: null, parent: null,
+        org_id: mb.org_id, parent_task_id: null,
       }))
-    })
-  }
+    }
+  })
 
   // Deduplicate CA compliance tasks: collapse same-assignment tasks spawned twice
   // (race condition between cron + manual trigger). Use _assignment_id if present
