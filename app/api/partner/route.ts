@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient }             from '@/lib/supabase/server'
 import { createAdminClient }        from '@/lib/supabase/admin'
 import { getApiOrgMembership }      from '@/lib/supabase/apiActiveOrg'
+import { generateCode }             from '@/lib/utils/codeGen'
 
 const COMMISSION_RATES: Record<string, number> = {
   bronze: 10,
@@ -27,10 +28,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Only the org owner or admin can access the Partner Portal' }, { status: 403 })
   }
 
-  const admin    = createAdminClient()
-  const org      = (mb.organisations as any)
-  const orgId    = mb.org_id
-  const refCode  = org.referral_code as string
+  const admin = createAdminClient()
+  const org   = (mb.organisations as any)
+  const orgId = mb.org_id
+  let refCode = org.referral_code as string | null
+
+  // Auto-generate a referral code if the org doesn't have one yet
+  if (!refCode) {
+    refCode = generateCode(8)
+    await admin.from('organisations').update({ referral_code: refCode }).eq('id', orgId)
+  }
 
   // Fetch all redemptions where this org is the referrer
   const { data: redemptions } = await admin
