@@ -11,8 +11,8 @@ export default async function PartnerPage() {
   const mb = await getActiveOrgMembership(user.id)
   if (!mb) redirect('/onboarding')
 
-  // Only org owners access the partner portal
-  if (mb.role !== 'owner') redirect('/dashboard')
+  // Only org owners and admins access the partner portal
+  if (!['owner', 'admin'].includes(mb.role)) redirect('/dashboard')
 
   return <PartnerView />
 }
