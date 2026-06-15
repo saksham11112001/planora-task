@@ -113,7 +113,12 @@ export async function canDo(
   // Role-based fallback
   const perms = await fetchOrgPermissions(supabase, orgId)
   const row = perms[permission] ?? DEFAULT_PERMISSIONS[permission]
-  if (!row) return false
+  if (!row) {
+    if (!(permission in DEFAULT_PERMISSIONS)) {
+      console.warn(`[permissionGate] Unknown permission key: "${permission}" — defaulting to deny`)
+    }
+    return false
+  }
   return row[role] === true
 }
 

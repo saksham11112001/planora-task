@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
       created_by: user.id,
     })
     .select()
-    .single()
+    .maybeSingle()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 

@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
       created_by: user.id,
     })
     .select('id, name, color, notes, created_at, updated_at')
-    .single()
+    .maybeSingle()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ data }, { status: 201 })

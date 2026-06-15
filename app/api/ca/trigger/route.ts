@@ -152,7 +152,7 @@ export async function POST(request: NextRequest) {
           custom_fields:     { _ca_compliance: true, _triggered: true, _assignment_id: asgn.id },
         })
         .select('id')
-        .single()
+        .maybeSingle()
 
       if (taskErr || !newTask?.id) {
         const msg = `${master.name} (${monthKey}): ${taskErr?.message ?? 'insert failed'}`

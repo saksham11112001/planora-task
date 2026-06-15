@@ -17,7 +17,9 @@ export const recurringSpawn = inngest.createFunction(
 
   async ({ step }) => {
     const admin = createAdminClient()
-    const today = new Date().toISOString().split('T')[0]
+    // Use IST date (UTC+5:30) so spawning aligns with the business day at cron time (7 AM IST = 1:30 AM UTC)
+    const todayIST = new Date(Date.now() + 5.5 * 60 * 60 * 1000)
+    const today = todayIST.toISOString().split('T')[0]
 
     const templates = await step.run('fetch-due-recurring-templates', async () => {
       const { data } = await admin.from('tasks')
