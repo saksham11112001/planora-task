@@ -102,11 +102,18 @@ export function MsmeView({ userRole }: Props) {
 
   const fetchVendors = useCallback(async () => {
     setLoading(true)
-    const res  = await fetch('/api/msme/vendors')
-    const data = await res.json()
-    setVendors(data.vendors ?? [])
-    setTotal(data.total ?? 0)
-    setLoading(false)
+    try {
+      const res  = await fetch('/api/msme/vendors')
+      const data = await res.json()
+      if (res.ok) {
+        setVendors(data.vendors ?? [])
+        setTotal(data.total ?? 0)
+      }
+    } catch (e) {
+      console.error('[MsmeView] fetchVendors failed', e)
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
   useEffect(() => { fetchVendors() }, [fetchVendors])
