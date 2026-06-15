@@ -1845,6 +1845,7 @@ export function MyTasksView({
           if (createdTo)      colTasks = colTasks.filter(t => t.created_at && t.created_at.slice(0,10) <= createdTo)
           if (updatedFrom)    colTasks = colTasks.filter(t => (t as any).updated_at && (t as any).updated_at.slice(0,10) >= updatedFrom)
           if (updatedTo)      colTasks = colTasks.filter(t => (t as any).updated_at && (t as any).updated_at.slice(0,10) <= updatedTo)
+          if (filterCreator.length > 0) colTasks = colTasks.filter(t => filterCreator.includes((t as any).created_by ?? ''))
 
           // Determine whether to render groups (todo + pending) or flat (overdue + done)
           const useGroups = col.status === 'todo' || col.status === 'in_review'
