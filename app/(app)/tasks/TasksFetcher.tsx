@@ -4,7 +4,7 @@ import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { MyTasksView } from './MyTasksView'
 import { shiftDays } from '@/lib/utils/recurringSchedule'
 
-const TASK_COLS = 'id, title, description, status, priority, due_date, assignee_id, approver_id, client_id, project_id, parent_task_id, approval_status, approval_required, estimated_hours, is_recurring, custom_fields, created_at, updated_at, is_billable, billable_amount, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), approver:users!tasks_approver_id_fkey(id, name), creator:users!tasks_created_by_fkey(id, name), projects(id, name, color), parent:tasks!tasks_parent_task_id_fkey(id, title, status, priority)'
+const TASK_COLS = 'id, title, description, status, priority, due_date, assignee_id, approver_id, client_id, project_id, parent_task_id, approval_status, approval_required, estimated_hours, is_recurring, custom_fields, created_at, updated_at, is_billable, billable_amount, created_by, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), approver:users!tasks_approver_id_fkey(id, name), creator:users!tasks_created_by_fkey(id, name), projects(id, name, color), parent:tasks!tasks_parent_task_id_fkey(id, title, status, priority)'
 
 export async function TasksFetcher() {
   const user = await getSessionUser()
@@ -94,6 +94,7 @@ export async function TasksFetcher() {
     approval_required: t.approval_required ?? false, estimated_hours: t.estimated_hours ?? null,
     is_recurring: t.is_recurring ?? false, completed_at: null,
     is_archived: false, created_at: t.created_at ?? '', updated_at: t.updated_at ?? null,
+    created_by: t.created_by ?? null,
     approver_id: t.approver_id ?? null,
     approver: (t.approver as any) ?? null,
     assignee: (t.assignee as any) ?? null,
