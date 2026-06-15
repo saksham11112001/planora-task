@@ -270,6 +270,34 @@ export default function MsmeLandingPage() {
         </div>
       </section>
 
+      {/* ── Explore Planora ──────────────────────────────────────────────── */}
+      <section style={{
+        background: 'rgba(255,255,255,0.03)', borderTop: '1px solid rgba(255,255,255,0.07)',
+        borderBottom: '1px solid rgba(255,255,255,0.07)', padding: '48px 24px',
+      }}>
+        <div style={{ maxWidth: 780, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 32, flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 260 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: TEAL, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
+              Need more than MSME tracking?
+            </div>
+            <h3 style={{ fontSize: 22, fontWeight: 700, marginBottom: 10, lineHeight: 1.3 }}>
+              Explore Planora — complete CA practice management
+            </h3>
+            <p style={{ fontSize: 14, color: MUTED, lineHeight: 1.7, margin: 0 }}>
+              Task management, compliance tracker, client portal, invoicing, team collaboration — everything a CA firm needs in one place.
+            </p>
+          </div>
+          <a href="https://sng-adwisers.com" target="_blank" rel="noopener noreferrer" style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8,
+            background: 'rgba(255,255,255,0.06)', color: WHITE, border: '1px solid rgba(255,255,255,0.15)',
+            borderRadius: 10, padding: '13px 24px', fontSize: 15, fontWeight: 600, textDecoration: 'none',
+            whiteSpace: 'nowrap', flexShrink: 0,
+          }}>
+            Explore Planora →
+          </a>
+        </div>
+      </section>
+
       {/* ── Final CTA ────────────────────────────────────────────────────── */}
       <section style={{
         background: `linear-gradient(135deg, rgba(13,148,136,0.15) 0%, rgba(8,145,178,0.1) 100%)`,

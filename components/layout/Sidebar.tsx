@@ -8,7 +8,7 @@ import {
   RefreshCw, Users, BarChart2, Settings, Plus,
   ChevronDown, ChevronRight, Clock, Zap, X, Upload,
   Calendar, Shield, LogOut, FileCheck, ArrowRight, Eye, Receipt, Copy, Check, Activity, BookOpen, ShieldAlert,
-  ChevronsUpDown, FileQuestion, CalendarDays, Building2, Handshake,
+  ChevronsUpDown, FileQuestion, CalendarDays, Building2, Handshake, ExternalLink,
 } from 'lucide-react'
 import { cn }            from '@/lib/utils/cn'
 import { createClient }  from '@/lib/supabase/client'
@@ -442,7 +442,26 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
 
         {/* TOOLS */}
         <GL>Tools</GL>
-        {canManage && <SI href="/msme" active={isActive('/msme')} icon={<Building2 className="h-4 w-4"/>} label="MSME Tracker"/>}
+        {canManage && (
+          <a
+            href="https://msme.sng-adwisers.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 9,
+              padding: '7px 10px', borderRadius: 7, fontSize: 13,
+              textDecoration: 'none', transition: 'all 0.12s', margin: '1px 4px',
+              background: 'transparent', color: 'rgba(255,255,255,0.6)', fontWeight: 400,
+              borderLeft: '3px solid transparent',
+            }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)'; (e.currentTarget as HTMLElement).style.color = '#fff' }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.6)' }}
+          >
+            <Building2 className="h-4 w-4" />
+            <span style={{ flex: 1 }}>MSME Tracker</span>
+            <ExternalLink className="h-3 w-3" style={{ opacity: 0.5 }} />
+          </a>
+        )}
         {['owner','admin'].includes(role) && <SI href="/partner" active={isActive('/partner')} icon={<Handshake className="h-4 w-4"/>} label="Partner Portal"/>}
         {nav.import_data && <SI href="/import" active={isActive('/import')} icon={<Upload className="h-4 w-4"/>} label="Import data"/>}
         {canManage && (

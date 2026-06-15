@@ -81,10 +81,15 @@ export default function OnboardingPage() {
         user.user_metadata?.given_name ??
         ''
 
+      // Pre-fill referral code from sessionStorage (set by login page when ?ref= is in URL)
+      const storedRef = sessionStorage.getItem('planora_ref_code') ?? ''
+      if (storedRef) sessionStorage.removeItem('planora_ref_code')
+
       setForm(f => ({
         ...f,
-        name:  metaName,
-        email: user.email ?? '',
+        name:          metaName,
+        email:         user.email ?? '',
+        referral_code: storedRef || f.referral_code,
       }))
 
       const invitedOrgId = user.user_metadata?.invited_to_org

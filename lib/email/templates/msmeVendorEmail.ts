@@ -2,7 +2,8 @@ interface Props {
   vendorName:  string
   orgName:     string
   formUrl:     string
-  attemptNo:   1 | 2 | 3
+  attemptNo:   1 | 2 | 3 | 4 | 5
+  totalEmails?: number  // total emails in the sequence (default 5)
 }
 
 const ACCENT = '#0d9488'
@@ -10,14 +11,16 @@ const ACCENT = '#0d9488'
 export function msmeVendorEmailSubject(p: Props): string {
   if (p.attemptNo === 1)
     return `Action required: Share your MSME details with ${p.orgName}`
-  if (p.attemptNo === 2)
-    return `Reminder: MSME certificate details still pending — ${p.orgName}`
-  return `Final reminder: MSME compliance details required — ${p.orgName}`
+  const total = p.totalEmails ?? 5
+  if (p.attemptNo === total)
+    return `Final reminder: MSME compliance details required — ${p.orgName}`
+  return `Reminder ${p.attemptNo}: MSME certificate details still pending — ${p.orgName}`
 }
 
 export function msmeVendorEmailHtml(p: Props): string {
+  const total      = p.totalEmails ?? 5
   const isReminder = p.attemptNo > 1
-  const isFinal    = p.attemptNo === 3
+  const isFinal    = p.attemptNo === total
 
   const headline = isFinal
     ? 'Final reminder: MSME details required'
@@ -28,7 +31,7 @@ export function msmeVendorEmailHtml(p: Props): string {
   const urgencyBadge = isFinal
     ? `<div style="display:inline-block;background:#dc262620;color:#dc2626;padding:4px 12px;border-radius:20px;font-size:13px;font-weight:600;margin-bottom:16px">⚠️ Final reminder</div>`
     : isReminder
-    ? `<div style="display:inline-block;background:#ca8a0420;color:#ca8a04;padding:4px 12px;border-radius:20px;font-size:13px;font-weight:600;margin-bottom:16px">⏰ Reminder ${p.attemptNo} of 3</div>`
+    ? `<div style="display:inline-block;background:#ca8a0420;color:#ca8a04;padding:4px 12px;border-radius:20px;font-size:13px;font-weight:600;margin-bottom:16px">⏰ Reminder ${p.attemptNo} of ${total}</div>`
     : `<div style="display:inline-block;background:${ACCENT}20;color:${ACCENT};padding:4px 12px;border-radius:20px;font-size:13px;font-weight:600;margin-bottom:16px">📋 Action required</div>`
 
   const bodyText = isFinal

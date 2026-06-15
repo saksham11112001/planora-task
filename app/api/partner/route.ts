@@ -91,7 +91,7 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     referral_code: refCode,
-    referral_link: `${APP_URL}/signup?ref=${refCode}`,
+    referral_link: `${APP_URL}/login?ref=${refCode}`,
     tier,
     rate_percent: ratePercent,
     next_tier: tier === 'gold' ? null : tier === 'silver' ? { name: 'gold', at: 10, current: activeCount } : { name: 'silver', at: 5, current: activeCount },

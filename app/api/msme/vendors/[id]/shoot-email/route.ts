@@ -3,10 +3,10 @@ import { createClient }             from '@/lib/supabase/server'
 import { createAdminClient }        from '@/lib/supabase/admin'
 import { getApiOrgMembership }      from '@/lib/supabase/apiActiveOrg'
 import { sendMsmeVendorEmail }      from '@/lib/email/send'
+import { DEFAULT_EMAIL_SCHEDULE }   from '@/app/api/msme/settings/route'
 import crypto                       from 'crypto'
 
-const APP_URL    = process.env.NEXT_PUBLIC_APP_URL ?? 'https://floatup.app'
-const MAX_EMAILS = 3
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://floatup.app'
 
 export async function POST(
   req: NextRequest,
@@ -24,6 +24,18 @@ export async function POST(
   }
 
   const admin = createAdminClient()
+
+  // Fetch org's email schedule to determine max emails
+  const { data: scheduleRow } = await admin
+    .from('org_feature_settings')
+    .select('config')
+    .eq('org_id', mb.org_id)
+    .eq('feature_key', 'msme_email_schedule')
+    .maybeSingle()
+  const intervalDays: number[] = (scheduleRow?.config?.days as number[] | undefined) ?? DEFAULT_EMAIL_SCHEDULE
+  // total emails = 1 (immediate) + number of scheduled intervals
+  const maxEmails = intervalDays.length + 1
+
   const { data: vendor } = await admin
     .from('msme_vendors')
     .select('id, vendor_name, vendor_email, status, email_count, payment_status')
@@ -48,8 +60,8 @@ export async function POST(
     if (vendor.status === 'submitted' || vendor.status === 'not_msme') {
       return NextResponse.json({ error: 'Vendor has already submitted their details' }, { status: 422 })
     }
-    if (vendor.email_count >= MAX_EMAILS) {
-      return NextResponse.json({ error: 'Maximum 3 emails already sent to this vendor' }, { status: 422 })
+    if (vendor.email_count >= maxEmails) {
+      return NextResponse.json({ error: `Maximum ${maxEmails} emails already sent to this vendor` }, { status: 422 })
     }
   }
 
@@ -73,7 +85,7 @@ export async function POST(
   }
 
   const orgName = (mb.organisations as any)?.name ?? 'Your firm'
-  const attempt = (vendor.email_count + 1) as 1 | 2 | 3
+  const attempt = (vendor.email_count + 1) as 1 | 2 | 3 | 4 | 5
 
   await sendMsmeVendorEmail({
     to: vendor.vendor_email,
@@ -81,6 +93,7 @@ export async function POST(
     orgName,
     formUrl,
     attemptNo: attempt,
+    totalEmails: maxEmails,
   })
 
   await admin.from('msme_vendors').update({
