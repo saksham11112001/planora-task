@@ -227,7 +227,7 @@ export function MyTasksView({
     if (createdTo      && (!t.created_at || t.created_at.slice(0,10) > createdTo))          return false
     if (updatedFrom    && (!(t as any).updated_at || (t as any).updated_at.slice(0,10) < updatedFrom)) return false
     if (updatedTo      && (!(t as any).updated_at || (t as any).updated_at.slice(0,10) > updatedTo))   return false
-    if (filterCreator.length > 0  && !filterCreator.includes((t as any).creator?.id ?? '')) return false
+    if (filterCreator.length > 0  && !filterCreator.includes((t as any).created_by ?? '')) return false
     return true
   }), [tasks, filterClient, filterPriority, filterStatus, filterSearch, dueDateFrom, dueDateTo, createdFrom, createdTo, updatedFrom, updatedTo, filterCreator])
 
