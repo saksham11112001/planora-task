@@ -4,7 +4,8 @@ import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { MyTasksView } from './MyTasksView'
 import { shiftDays } from '@/lib/utils/recurringSchedule'
 
-const TASK_COLS = 'id, title, description, status, priority, due_date, assignee_id, approver_id, client_id, project_id, parent_task_id, approval_status, approval_required, estimated_hours, is_recurring, custom_fields, created_at, updated_at, is_billable, billable_amount, created_by, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), approver:users!tasks_approver_id_fkey(id, name), creator:users!tasks_created_by_fkey(id, name), projects(id, name, color), parent:tasks!tasks_parent_task_id_fkey(id, title, status, priority)'
+const TASK_COLS = 'id, title, description, status, priority, due_date, assignee_id, approver_id, client_id, project_id, parent_task_id, approval_status, approval_required, estimated_hours, is_recurring, custom_fields, created_at, updated_at, is_billable, billable_amount, created_by, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), approver:users!tasks_approver_id_fkey(id, name), creator:users!tasks_created_by_fkey(id, name), projects(id, name, color)'
+const PARENT_COLS = 'id, title, status, priority'
 
 export async function TasksFetcher() {
   const user = await getSessionUser()
@@ -109,12 +110,17 @@ export async function TasksFetcher() {
   const assignedByMeList    = (assignedByMeRaw ?? []).filter(isVisible).map(enrich)
   const pendingApprovalList = (pendingApprovalRaw ?? []).map(enrich) as any[]
 
-  // Context tasks: parents of subtasks, now inlined via the parent join in TASK_COLS.
-  // No extra DB round-trip needed — use the joined parent data directly.
+  // Context tasks: fetch parents of subtasks so the board can nest them correctly.
   const seenIds = new Set(taskList.map((t: any) => t.id))
-  ;(tasks ?? []).forEach((t: any) => {
-    const p = (t as any).parent
-    if (p && !seenIds.has(p.id)) {
+  const parentIds = [...new Set(
+    (tasks ?? []).map((t: any) => t.parent_task_id).filter((id: any) => id && !seenIds.has(id))
+  )] as string[]
+
+  if (parentIds.length > 0) {
+    const { data: parentRows } = await supabase.from('tasks')
+      .select(PARENT_COLS).in('id', parentIds).eq('org_id', mb.org_id)
+    ;(parentRows ?? []).forEach((p: any) => {
+      if (seenIds.has(p.id)) return
       seenIds.add(p.id)
       taskList.push(enrich({
         ...p,
@@ -125,8 +131,8 @@ export async function TasksFetcher() {
         assignee: null, approver: null, creator: null, projects: null, parent: null,
         org_id: mb.org_id, parent_task_id: null,
       }))
-    }
-  })
+    })
+  }
 
   // Deduplicate CA compliance tasks: collapse same-assignment tasks spawned twice
   // (race condition between cron + manual trigger). Use _assignment_id if present
