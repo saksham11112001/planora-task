@@ -30,13 +30,26 @@ export async function POST(request: NextRequest) {
   }
 
   const response = NextResponse.json({ success: true })
-  response.cookies.set(ACTIVE_ORG_COOKIE, org_id, {
+  const cookieOpts = {
     path:     '/',
     maxAge:   60 * 60 * 24 * 365,
-    sameSite: 'lax',
+    sameSite: 'lax' as const,
     secure:   process.env.NODE_ENV === 'production',
     httpOnly: false,
+  }
+  // Set the domain-scoped cookie so it works across subdomains in production
+  response.cookies.set(ACTIVE_ORG_COOKIE, org_id, {
+    ...cookieOpts,
     ...(process.env.NODE_ENV === 'production' ? { domain: '.sng-adwisers.com' } : {}),
   })
+  // Clear the old host-only cookie (no domain) that was set before the domain migration.
+  // If both exist the browser sends the host-only one first (more specific), shadowing
+  // the domain-scoped one and causing the wrong org to load on API calls.
+  if (process.env.NODE_ENV === 'production') {
+    response.cookies.set(ACTIVE_ORG_COOKIE, '', {
+      path: '/', maxAge: 0, sameSite: 'lax', secure: true, httpOnly: false,
+      // No domain — this targets and expires the host-only cookie specifically
+    })
+  }
   return response
 }
