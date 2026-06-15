@@ -85,12 +85,12 @@ export function MsmeView({ userRole }: Props) {
 
   const canManage  = ['owner', 'admin', 'manager'].includes(userRole)
   const canAdmin   = ['owner', 'admin'].includes(userRole)
-  const maxEmails  = intervalDays.length + 1
 
   // ── Email schedule config ──────────────────────────────────────────────────
   // intervalDays[i] = days to wait after email i before sending email i+1
   // e.g. [7,14,21,30] means 5 total emails: immediate + after 7, 14, 21, 30 days
   const [intervalDays,    setIntervalDays]    = useState<number[]>([7, 14, 21, 30])
+  const maxEmails  = intervalDays.length + 1
   const [showSettings,    setShowSettings]    = useState(false)
   const [draftIntervals,  setDraftIntervals]  = useState<number[]>([7, 14, 21, 30])
   const [savingSchedule,  setSavingSchedule]  = useState(false)

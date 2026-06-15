@@ -87,11 +87,13 @@ export async function GET(req: NextRequest) {
     .order('created_at', { ascending: false })
     .limit(10)
 
-  const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://floatup.app'
+  const APP_URL  = process.env.NEXT_PUBLIC_APP_URL  ?? 'https://sng-adwisers.com'
+  const MSME_URL = process.env.NEXT_PUBLIC_MSME_URL ?? 'https://msme.sng-adwisers.com'
 
   return NextResponse.json({
-    referral_code: refCode,
-    referral_link: `${APP_URL}/login?ref=${refCode}`,
+    referral_code:  refCode,
+    referral_link:  `${APP_URL}/login?ref=${refCode}`,
+    msme_link:      `${MSME_URL}?ref=${refCode}`,
     tier,
     rate_percent: ratePercent,
     next_tier: tier === 'gold' ? null : tier === 'silver' ? { name: 'gold', at: 10, current: activeCount } : { name: 'silver', at: 5, current: activeCount },
