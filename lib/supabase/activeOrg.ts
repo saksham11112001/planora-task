@@ -23,6 +23,12 @@ export async function getActiveOrgId(): Promise<string | null> {
   return jar.get(ACTIVE_ORG_COOKIE)?.value ?? null
 }
 
+/** Read ALL active org cookie values (handles duplicate cookies from domain migration). */
+async function getAllActiveOrgIds(): Promise<string[]> {
+  const jar = await cookies()
+  return jar.getAll(ACTIVE_ORG_COOKIE).map(c => c.value).filter(Boolean)
+}
+
 /**
  * All active org memberships for a user — used to build the org switcher list.
  * Cached per request (React cache).
@@ -91,12 +97,15 @@ export const getActiveOrgMembership = cache(async (userId: string) => {
   // Use admin client to bypass RLS — same reason as getUserOrgs.
   const SELECT = 'org_id, role, can_view_all_tasks, can_view_monitor, organisations(id, name, slug, plan_tier, logo_color, status, trial_ends_at, trial_started_at, trial_extension_days, referral_code, join_code, subscription_id)'
 
-  if (activeOrgId) {
+  // Try every cookie value — duplicate cookies with the same name can exist after
+  // the domain migration (host-only cookie shadows domain-scoped one in Cookie header).
+  const allOrgIds = await getAllActiveOrgIds()
+  for (const orgId of allOrgIds) {
     const { data } = await admin
       .from('org_members')
       .select(SELECT)
       .eq('user_id', userId)
-      .eq('org_id', activeOrgId)
+      .eq('org_id', orgId)
       .eq('is_active', true)
       .maybeSingle()
     if (data) return data
