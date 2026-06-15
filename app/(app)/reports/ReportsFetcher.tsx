@@ -174,7 +174,7 @@ export async function ReportsFetcher() {
     const overdueT = assigned.filter(t => t.due_date && t.due_date < today && t.status !== 'completed')
     const inReview = assigned.filter(t => t.status === 'in_review')
     const withDue  = done.filter(t => t.due_date)
-    const onTime   = withDue.filter(t => t.completed_at && t.due_date && t.completed_at.split('T')[0] <= t.due_date)
+    const onTime   = withDue.filter(t => t.completed_at && t.due_date && new Date(t.completed_at).setHours(0,0,0,0) <= new Date(t.due_date).getTime())
     const onTimeRate = withDue.length > 0 ? Math.round((onTime.length / withDue.length) * 100) : null
     const completionTimes = done
       .filter(t => t.created_at && t.completed_at)
@@ -217,6 +217,7 @@ export async function ReportsFetcher() {
       client_id: t.client_id,
       client_name: clientObj?.name ?? null,
       client_color: clientObj?.color ?? '#94a3b8',
+      project_id: t.project_id ?? null,
       hours_logged: Math.round(memberHours * 10) / 10,
       is_billable: t.is_billable,
     }

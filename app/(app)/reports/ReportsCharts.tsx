@@ -62,6 +62,7 @@ interface Props {
     id: string; title: string; status: string; priority: string
     due_date: string | null; assignee_name: string | null
     client_id: string | null; client_name: string | null; client_color: string
+    project_id: string | null
     hours_logged: number; is_billable: boolean
   }[]
   trajectoryData?:  { week: string; added: number; completed: number }[]
@@ -1016,8 +1017,14 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
         const groups = Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b))
 
         const totalTasks    = wipData.length
-        const totalHours    = Math.round(wipData.reduce((s, t) => s + t.hours_logged, 0) * 10) / 10
-        const unbilledHours = Math.round(wipData.filter(t => !t.is_billable).reduce((s, t) => s + t.hours_logged, 0) * 10) / 10
+        // Deduplicate by project so tasks sharing a project don't inflate the sum
+        const seenProj = new Set<string>()
+        const totalHours = Math.round(wipData.reduce((s, t) => {
+          if (!t.project_id || seenProj.has(t.project_id)) return s
+          seenProj.add(t.project_id)
+          return s + t.hours_logged
+        }, 0) * 10) / 10
+        const unbilledTasks = wipData.filter(t => !t.is_billable).length
 
         const thStyle = {
           padding: '9px 12px', textAlign: 'left' as const, fontWeight: 600,
@@ -1042,7 +1049,12 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
               <>
                 {groups.map(([clientName, tasks]) => {
                   const clientColor = tasks[0].client_color ?? '#94a3b8'
-                  const clientHours = Math.round(tasks.reduce((s, t) => s + t.hours_logged, 0) * 10) / 10
+                  const seenProjForClient = new Set<string>()
+                  const clientHours = Math.round(tasks.reduce((s, t) => {
+                    if (!t.project_id || seenProjForClient.has(t.project_id)) return s
+                    seenProjForClient.add(t.project_id)
+                    return s + t.hours_logged
+                  }, 0) * 10) / 10
                   const hasUnbilled = tasks.some(t => !t.is_billable)
                   return (
                     <div key={clientName} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
@@ -1075,7 +1087,7 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
                               <th style={thStyle}>Priority</th>
                               <th style={thStyle}>Assignee</th>
                               <th style={thStyle}>Due Date</th>
-                              <th style={{ ...thStyle, textAlign: 'right' }}>Hours</th>
+                              <th style={{ ...thStyle, textAlign: 'right' }}>Project Hours</th>
                               <th style={thStyle}>Billing</th>
                             </tr>
                           </thead>
@@ -1153,12 +1165,12 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
                       <p style={{ fontSize: 32, fontWeight: 900, color: '#0891b2', lineHeight: 1 }}>{totalTasks}</p>
                     </div>
                     <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 10, padding: '16px 18px', textAlign: 'center' }}>
-                      <p style={{ fontSize: 11, fontWeight: 600, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Total Hours</p>
+                      <p style={{ fontSize: 11, fontWeight: 600, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Project Hours Logged</p>
                       <p style={{ fontSize: 32, fontWeight: 900, color: '#7c3aed', lineHeight: 1 }}>{totalHours}h</p>
                     </div>
                     <div style={{ background: '#fff7ed', border: '1px solid #fdba74', borderRadius: 10, padding: '16px 18px', textAlign: 'center' }}>
-                      <p style={{ fontSize: 11, fontWeight: 600, color: '#ea580c', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Unbilled Hours</p>
-                      <p style={{ fontSize: 32, fontWeight: 900, color: '#ea580c', lineHeight: 1 }}>{unbilledHours}h</p>
+                      <p style={{ fontSize: 11, fontWeight: 600, color: '#ea580c', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Unbilled Tasks</p>
+                      <p style={{ fontSize: 32, fontWeight: 900, color: '#ea580c', lineHeight: 1 }}>{unbilledTasks}</p>
                     </div>
                   </div>
                 </div>
