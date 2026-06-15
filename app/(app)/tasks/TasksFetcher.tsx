@@ -96,6 +96,7 @@ export async function TasksFetcher() {
     approval_required: t.approval_required ?? false, estimated_hours: t.estimated_hours ?? null,
     is_recurring: t.is_recurring ?? false, completed_at: null,
     is_archived: false, created_at: t.created_at ?? '', updated_at: t.updated_at ?? null,
+    created_by: t.created_by ?? null,
     approver_id: t.approver_id ?? null,
     approver: (t.approver as any) ?? null,
     assignee: (t.assignee as any) ?? null,

@@ -67,7 +67,6 @@ export function MsmeView({ userRole }: Props) {
   const [payingId,      setPayingId]      = useState<string | null>(null)
   const [checkedIds,    setCheckedIds]    = useState<Set<string>>(new Set())
   const [bulkShooting,  setBulkShooting]  = useState(false)
-  const [maxEmails,     setMaxEmails]     = useState(5)
   const toastRef = useRef(0)
 
   // Add vendor form
@@ -84,8 +83,17 @@ export function MsmeView({ userRole }: Props) {
   const [importing,     setImporting]     = useState(false)
   const [importResult,  setImportResult]  = useState<{ inserted: number; skipped: Array<{row:number;name:string;reason:string}>; paid_slots: number } | null>(null)
 
-  const canManage = ['owner', 'admin', 'manager'].includes(userRole)
-  const canAdmin  = ['owner', 'admin'].includes(userRole)
+  const canManage  = ['owner', 'admin', 'manager'].includes(userRole)
+  const canAdmin   = ['owner', 'admin'].includes(userRole)
+  const maxEmails  = intervalDays.length + 1
+
+  // ── Email schedule config ──────────────────────────────────────────────────
+  // intervalDays[i] = days to wait after email i before sending email i+1
+  // e.g. [7,14,21,30] means 5 total emails: immediate + after 7, 14, 21, 30 days
+  const [intervalDays,    setIntervalDays]    = useState<number[]>([7, 14, 21, 30])
+  const [showSettings,    setShowSettings]    = useState(false)
+  const [draftIntervals,  setDraftIntervals]  = useState<number[]>([7, 14, 21, 30])
+  const [savingSchedule,  setSavingSchedule]  = useState(false)
 
   function showToast(message: string, type: Toast['type'] = 'success') {
     const id = ++toastRef.current
@@ -95,20 +103,50 @@ export function MsmeView({ userRole }: Props) {
 
   const fetchVendors = useCallback(async () => {
     setLoading(true)
-    const res  = await fetch('/api/msme/vendors')
-    const data = await res.json()
-    setVendors(data.vendors ?? [])
-    setTotal(data.total ?? 0)
-    setLoading(false)
+    try {
+      const res  = await fetch('/api/msme/vendors')
+      const data = await res.json()
+      if (res.ok) {
+        setVendors(data.vendors ?? [])
+        setTotal(data.total ?? 0)
+      }
+    } catch (e) {
+      console.error('[MsmeView] fetchVendors failed', e)
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
   useEffect(() => { fetchVendors() }, [fetchVendors])
 
+  // Fetch email schedule for this org
   useEffect(() => {
-    fetch('/api/msme/settings').then(r => r.ok ? r.json() : null).then(d => {
-      if (d?.days && Array.isArray(d.days)) setMaxEmails(d.days.length + 1)
-    }).catch(() => {})
+    fetch('/api/msme/settings')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d?.schedule && Array.isArray(d.schedule)) {
+          setIntervalDays(d.schedule)
+          setDraftIntervals(d.schedule)
+        }
+      })
+      .catch(() => {})
   }, [])
+
+  // ── Save email schedule ───────────────────────────────────────────────────
+  async function handleSaveSchedule() {
+    setSavingSchedule(true)
+    const res  = await fetch('/api/msme/settings', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ schedule: draftIntervals }),
+    })
+    setSavingSchedule(false)
+    if (!res.ok) { const d = await res.json(); showToast(d.error ?? 'Failed to save', 'error'); return }
+    setIntervalDays(draftIntervals)
+    setShowSettings(false)
+    showToast('Email schedule saved')
+  }
+
 
   // ── Add single vendor ──────────────────────────────────────────────────────
   async function handleAdd(e: React.FormEvent) {
@@ -137,7 +175,7 @@ export function MsmeView({ userRole }: Props) {
     setShootingId(null)
     if (res.status === 402) { showToast('Pay ₹99 to unlock email sending for this vendor', 'info'); return }
     if (!res.ok) { showToast(data.error ?? 'Failed to send email', 'error'); return }
-    showToast(`Email sent to ${vendorName} (attempt ${data.attempt}/${maxEmails})`)
+    showToast(`Email sent to ${vendorName} (attempt ${data.attempt}/${intervalDays.length + 1})`)
     fetchVendors()
   }
 
@@ -400,6 +438,11 @@ export function MsmeView({ userRole }: Props) {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {canAdmin && (
+            <button onClick={() => { setShowSettings(true); setDraftIntervals([...intervalDays]) }} style={ghostBtn}>
+              ⚙ Email schedule
+            </button>
+          )}
           {canManage && (
             <button onClick={() => { setShowImport(true); setImportRows([]); setImportPreview([]); setImportResult(null); setImportError(null) }} style={ghostBtn}>
               ↑ Import Excel
@@ -770,6 +813,82 @@ export function MsmeView({ userRole }: Props) {
               <button type="button" onClick={() => { setShowAdd(false); setAddError(null) }} style={{ ...ghostBtn, flex: 1 }}>Cancel</button>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {/* ── Email schedule settings modal ── */}
+      {showSettings && (
+        <Modal title="Automated email schedule" onClose={() => setShowSettings(false)}>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20, lineHeight: 1.6 }}>
+            Configure when automated reminder emails are sent after the first email.
+            You can set up to 5 emails total (email 1 is always sent immediately when you click "Shoot email").
+          </p>
+
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 10 }}>
+              Email sequence ({draftIntervals.length + 1} emails total)
+            </div>
+
+            {/* Email 1 row — always fixed */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, marginBottom: 8 }}>
+              <div style={{ width: 24, height: 24, borderRadius: '50%', background: ACCENT, color: '#fff', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>1</div>
+              <div style={{ flex: 1, fontSize: 13, color: 'var(--text)' }}>First email — sent immediately when you click "Shoot email"</div>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Day 0</span>
+            </div>
+
+            {/* Configurable follow-up rows */}
+            {draftIntervals.map((days, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, marginBottom: 8 }}>
+                <div style={{ width: 24, height: 24, borderRadius: '50%', background: ACCENT, color: '#fff', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{i + 2}</div>
+                <div style={{ flex: 1, fontSize: 13, color: 'var(--text)' }}>
+                  Reminder email {i + 2}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>After</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={365}
+                    value={days}
+                    onChange={e => {
+                      const val = Math.max(1, Math.min(365, parseInt(e.target.value) || 1))
+                      setDraftIntervals(prev => prev.map((d, idx) => idx === i ? val : d))
+                    }}
+                    style={{ width: 60, padding: '4px 8px', border: '1px solid var(--border)', borderRadius: 6, fontSize: 13, background: 'var(--bg)', color: 'var(--text)', textAlign: 'center' }}
+                  />
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>days</span>
+                  {draftIntervals.length > 1 && (
+                    <button
+                      onClick={() => setDraftIntervals(prev => prev.filter((_, idx) => idx !== i))}
+                      style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 16, padding: '0 4px', lineHeight: 1 }}
+                      title="Remove this email"
+                    >×</button>
+                  )}
+                </div>
+              </div>
+            ))}
+
+            {/* Add email button */}
+            {draftIntervals.length < 4 && (
+              <button
+                onClick={() => setDraftIntervals(prev => [...prev, 7])}
+                style={{ width: '100%', padding: '8px', border: '1px dashed var(--border)', borderRadius: 8, background: 'none', color: 'var(--text-muted)', fontSize: 13, cursor: 'pointer', marginTop: 4 }}
+              >
+                + Add another reminder email
+              </button>
+            )}
+          </div>
+
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 20, padding: '10px 14px', background: 'rgba(13,148,136,0.06)', borderRadius: 8 }}>
+            💡 Tip: "After X days" means X days after the previous email in the sequence.
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button onClick={() => setShowSettings(false)} style={ghostBtn}>Cancel</button>
+            <button onClick={handleSaveSchedule} disabled={savingSchedule} style={{ ...primaryBtn, opacity: savingSchedule ? 0.7 : 1 }}>
+              {savingSchedule ? 'Saving…' : 'Save schedule'}
+            </button>
+          </div>
         </Modal>
       )}
 
