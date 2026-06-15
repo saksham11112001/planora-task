@@ -17,25 +17,22 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       getUserOrgs(user.id),
     ])
 
-    // Repair: reactivate owner memberships incorrectly deactivated by a past system bug.
-    // The team API explicitly blocks removing owners, so any is_active=false owner row
-    // was set by the old cross-org deactivation code — not a legitimate admin action.
-    // Only check when allOrgs.length < 2 (users with 2+ orgs are already fine).
-    // This is self-healing: once fixed, the query returns [] and is skipped.
+    // Repair: reactivate memberships incorrectly deactivated by a past provision/join-invite bug
+    // that set is_active=false on all other orgs when a user accepted an invite.
+    // Only runs when user has fewer than 2 active orgs (self-healing: skipped once fixed).
     if (allOrgs.length < 2) {
       const { createAdminClient: _adminForRepair } = await import('@/lib/supabase/admin')
       const adminRepair = _adminForRepair()
-      const { data: inactiveOwnerRows } = await adminRepair
+      const { data: inactiveRows } = await adminRepair
         .from('org_members')
         .select('id')
         .eq('user_id', user.id)
-        .eq('role', 'owner')
         .eq('is_active', false)
 
-      if (inactiveOwnerRows && inactiveOwnerRows.length > 0) {
+      if (inactiveRows && inactiveRows.length > 0) {
         await adminRepair.from('org_members')
           .update({ is_active: true })
-          .in('id', inactiveOwnerRows.map((m: any) => m.id))
+          .in('id', inactiveRows.map((m: any) => m.id))
         redirect('/dashboard')
       }
     }
