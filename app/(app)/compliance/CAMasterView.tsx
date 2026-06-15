@@ -444,11 +444,11 @@ function TemplateSelectCell({
     const W = 300
     // Horizontal: flip left if overflows right edge
     const left = rect.right + W > window.innerWidth - 8 ? rect.right - W : rect.left
-    // Vertical: measure available space below and above, pick whichever is larger
+    // Vertical: pick larger of space below/above; cap at 480, floor at 280
     const spaceBelow = window.innerHeight - rect.bottom - 8
     const spaceAbove = rect.top - 8
-    const flipUp = spaceBelow < 200 && spaceAbove > spaceBelow
-    const maxH   = Math.min(440, Math.max(spaceBelow, spaceAbove, 160))
+    const flipUp = spaceBelow < 280 && spaceAbove > spaceBelow
+    const maxH   = Math.min(480, Math.max(flipUp ? spaceAbove : spaceBelow, 280))
     const top    = flipUp ? rect.top - maxH : rect.bottom + 4
     setDropPos({ top, left, width: W, maxH })
     setOpen(true)
@@ -498,9 +498,10 @@ function TemplateSelectCell({
           {/* Panel — stopPropagation prevents backdrop's onMouseDown from firing */}
           <div
             onMouseDown={e => e.stopPropagation()}
+            onWheel={e => e.stopPropagation()}
             style={{
               position: 'fixed', top: dropPos.top, left: dropPos.left, width: dropPos.width,
-              maxHeight: dropPos.maxH, overflowY: 'auto',
+              maxHeight: dropPos.maxH, overflowY: 'scroll',
               zIndex: 8001, background: 'var(--surface)', border: '1px solid var(--border)',
               borderRadius: 12, boxShadow: '0 16px 40px rgba(0,0,0,0.22)', padding: 8,
             }}
@@ -596,16 +597,29 @@ function TemplateSelectCell({
               </div>
             )}
 
-            {/* Footer: done button + manage link */}
+            {/* Footer: done button + clear + manage link */}
             <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-              <button
-                onClick={close}
-                style={{
-                  fontSize: 11, fontWeight: 600, padding: '4px 14px', borderRadius: 6,
-                  background: 'rgba(13,148,136,0.10)', color: '#0d9488',
-                  border: '1px solid rgba(13,148,136,0.3)', cursor: 'pointer', fontFamily: 'inherit',
-                }}
-              >Done</button>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button
+                  onClick={close}
+                  style={{
+                    fontSize: 11, fontWeight: 600, padding: '4px 14px', borderRadius: 6,
+                    background: 'rgba(13,148,136,0.10)', color: '#0d9488',
+                    border: '1px solid rgba(13,148,136,0.3)', cursor: 'pointer', fontFamily: 'inherit',
+                  }}
+                >Done</button>
+                {selectedIds.length > 0 && (
+                  <button
+                    onClick={() => { onSelect([]); close() }}
+                    title="Remove all templates — no attachments required for this task"
+                    style={{
+                      fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6,
+                      background: 'transparent', color: 'var(--text-muted)',
+                      border: '1px solid var(--border)', cursor: 'pointer', fontFamily: 'inherit',
+                    }}
+                  >✕ Clear</button>
+                )}
+              </div>
               {onManage && templates.length > 0 && (
                 <button
                   onClick={() => { close(); onManage!() }}
