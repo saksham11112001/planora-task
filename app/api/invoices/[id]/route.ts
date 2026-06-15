@@ -18,7 +18,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const admin = createAdminClient()
   const { data, error } = await admin.from('invoices')
     .select('*, client:clients(id, name, color), items:invoice_items(*, task:tasks(id, title))')
-    .eq('id', id).eq('org_id', mb.org_id).single()
+    .eq('id', id).eq('org_id', mb.org_id).maybeSingle()
 
   if (error || !data) {
     console.error('[invoices/GET id]', error?.message)

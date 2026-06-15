@@ -52,12 +52,29 @@ export async function POST(req: NextRequest) {
     const admin = createAdminClient()
 
     // Auto-generate invoice number: INV-{year}-{4-digit sequence}
-    const { count } = await admin.from('invoices')
-      .select('id', { count: 'exact', head: true }).eq('org_id', mb.org_id)
-    const seq = String((count ?? 0) + 1).padStart(4, '0')
-    const invoice_number = `INV-${new Date().getFullYear()}-${seq}`
+    // Use MAX on the sequence suffix to be safe against deletes and concurrent inserts
+    const year = new Date().getFullYear()
+    const prefix = `INV-${year}-`
+    const { data: maxRow } = await admin.from('invoices')
+      .select('invoice_number')
+      .eq('org_id', mb.org_id)
+      .like('invoice_number', `${prefix}%`)
+      .order('invoice_number', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    const lastSeq = maxRow?.invoice_number
+      ? parseInt(maxRow.invoice_number.slice(prefix.length), 10)
+      : 0
+    const seq = String((isNaN(lastSeq) ? 0 : lastSeq) + 1).padStart(4, '0')
+    const invoice_number = `${prefix}${seq}`
 
-    // Calculate totals from items
+    // Calculate totals from items — validate each item to prevent NaN totals
+    for (const it of items as any[]) {
+      const qty   = Number(it.quantity  ?? it.qty   ?? 1)
+      const price = Number(it.unit_price ?? it.price ?? 0)
+      if (isNaN(qty) || qty <= 0)   return NextResponse.json({ error: 'Item quantity must be a positive number' }, { status: 400 })
+      if (isNaN(price) || price < 0) return NextResponse.json({ error: 'Item unit_price must be a non-negative number' }, { status: 400 })
+    }
     const subtotal = (items as any[]).reduce((sum: number, it: any) => {
       const qty   = Number(it.quantity  ?? it.qty   ?? 1)
       const price = Number(it.unit_price ?? it.price ?? 0)
@@ -83,7 +100,7 @@ export async function POST(req: NextRequest) {
       gst_amount,
       total,
       created_by:      user.id,
-    }).select('*').single()
+    }).select('*').maybeSingle()
 
     if (error) {
       console.error('[invoices/POST] insert error:', JSON.stringify({ message: error.message, details: error.details, hint: error.hint, code: error.code }))

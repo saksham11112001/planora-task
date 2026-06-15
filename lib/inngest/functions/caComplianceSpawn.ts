@@ -157,11 +157,16 @@ export const caComplianceSpawn = inngest.createFunction(
       }
     }
 
+    const capHit = spawned >= MAX_STEPS_PER_RUN
+    if (capHit) {
+      console.warn(`[caComplianceSpawn] Step cap (${MAX_STEPS_PER_RUN}) reached — some assignments deferred to next cron run`)
+    }
     return {
-      date_checked:       today,
+      date_checked:        today,
       assignments_checked: assignments.length,
       tasks_spawned:       spawned,
       already_existed:     alreadyExisted,
+      cap_hit:             capHit,
     }
   }
 )

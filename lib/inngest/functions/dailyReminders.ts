@@ -40,7 +40,7 @@ export const dailyReminders = inngest.createFunction(
           project:projects(name),
           org:organisations!inner(name)
         `)
-        .in('status', ['todo'])
+        .in('status', ['todo', 'in_progress'])
         .gte('due_date', in1day)
         .lte('due_date', in3day)
         .not('assignee_id', 'is', null)
@@ -123,8 +123,9 @@ export const dailyReminders = inngest.createFunction(
           org:organisations!inner(name),
           org_id
         `)
-        .in('status', ['todo'])
-        .eq('due_date', yesterday)
+        .in('status', ['todo', 'in_progress'])
+        .lte('due_date', yesterday)
+        .gte('due_date', new Date(now.getTime() - 3 * 86400000).toISOString().split('T')[0])
         .not('assignee_id', 'is', null)
         .eq('is_archived', false)
         .limit(300)
@@ -225,7 +226,7 @@ export const dailyReminders = inngest.createFunction(
           project:projects(name),
           org:organisations!inner(name)
         `)
-        .in('status', ['todo'])
+        .in('status', ['todo', 'in_progress'])
         .lt('due_date', today)
         .not('assignee_id', 'is', null)
         .eq('is_archived', false)
@@ -295,7 +296,8 @@ export const dailyReminders = inngest.createFunction(
         if ((approverPrefs?.via_email ?? true) === false) continue
 
         const approverOrgId = (tasks[0] as any)?.org_id as string | undefined
-        const approverOrgMode = approverOrgId ? await getOrgNotifMode(approverOrgId) : 'immediate'
+        if (!approverOrgId) return  // no org context, skip digest
+        const approverOrgMode = await getOrgNotifMode(approverOrgId)
 
         if (approverOrgMode === 'digest' && approverOrgId) {
           // Queue each pending-approval task as a separate digest item so they're

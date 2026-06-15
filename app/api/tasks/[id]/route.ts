@@ -21,7 +21,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const admin = createAdminClient()
   const { data, error } = await admin.from('tasks')
     .select('*, assignee:users!tasks_assignee_id_fkey(id,name), approver:users!tasks_approver_id_fkey(id,name), creator:users!tasks_created_by_fkey(id,name), projects(id,name,color), clients(id,name,color)')
-    .eq('id', id).eq('org_id', mb.org_id).single()
+    .eq('id', id).eq('org_id', mb.org_id).maybeSingle()
   if (error || !data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   return NextResponse.json({ data })
 }
@@ -39,7 +39,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { data: task } = await admin
     .from('tasks')
     .select('id, assignee_id, approver_id, org_id, approval_required, approval_status, status, parent_task_id, is_recurring, custom_fields')
-    .eq('id', id).eq('org_id', mb.org_id).single()
+    .eq('id', id).eq('org_id', mb.org_id).maybeSingle()
   if (!task) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const isManager     = ['owner','admin','manager'].includes(mb.role)
@@ -263,6 +263,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         await admin.from('tasks')
           .update({ status: 'completed', completed_at: new Date().toISOString() })
           .eq('id', data.parent_task_id)
+          .neq('status', 'completed')   // idempotent: skip if already completed
       }
     }
   }
@@ -273,11 +274,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       newAssigneeId !== task.assignee_id) {
     try {
       const { data: assignee } = await admin.from('users')
-        .select('email, phone_number').eq('id', newAssigneeId).single()
+        .select('email, phone_number').eq('id', newAssigneeId).maybeSingle()
       const { data: assigner } = await admin.from('users')
-        .select('name').eq('id', user.id).single()
+        .select('name').eq('id', user.id).maybeSingle()
       const { data: org } = await admin.from('organisations')
-        .select('name').eq('id', mb.org_id).single()
+        .select('name').eq('id', mb.org_id).maybeSingle()
       if (assignee?.email) {
         await inngest.send({
           id: `task-reassigned-${id}-${newAssigneeId}-${Date.now()}`,

@@ -80,6 +80,8 @@ export async function POST(request: NextRequest) {
           parent_task_id, is_recurring = false, frequency, next_occurrence_date,
           custom_fields, is_billable = false, billable_amount } = body
   if (!title?.trim()) return NextResponse.json({ error: 'Title required' }, { status: 400 })
+  if (approval_required && !approver_id)
+    return NextResponse.json({ error: 'approver_id is required when approval_required is true' }, { status: 400 })
   if (title.trim().length > 500) return NextResponse.json({ error: 'Title too long (max 500 chars)' }, { status: 400 })
   if (priority && !VALID_PRIORITIES.includes(priority)) return NextResponse.json({ error: `Invalid priority "${priority}". Must be one of: low, medium, high, urgent` }, { status: 400 })
   if (status && !VALID_TASK_STATUSES.includes(status)) return NextResponse.json({ error: `Invalid status "${status}". Must be one of: todo, in_progress, in_review, completed, cancelled` }, { status: 400 })
@@ -88,7 +90,7 @@ export async function POST(request: NextRequest) {
   // If attaching to a parent task, verify it belongs to the same org
   if (parent_task_id) {
     const { data: parentTask } = await admin
-      .from('tasks').select('id, org_id').eq('id', parent_task_id).eq('org_id', mb.org_id).single()
+      .from('tasks').select('id, org_id').eq('id', parent_task_id).eq('org_id', mb.org_id).maybeSingle()
     if (!parentTask) return NextResponse.json({ error: 'Parent task not found' }, { status: 404 })
   }
 
@@ -103,7 +105,7 @@ export async function POST(request: NextRequest) {
     parent_task_id: parent_task_id || null,
     is_billable: !!is_billable,
     billable_amount: (is_billable && billable_amount != null) ? Number(billable_amount) : null,
-  }).select('*').single()
+  }).select('*').maybeSingle()
 
   if (error) return NextResponse.json(dbError(error, 'tasks'), { status: 500 })
 
@@ -124,9 +126,9 @@ export async function POST(request: NextRequest) {
   if (assignee_id && assignee_id !== user.id) {
     try {
       const { data: assignee } = await admin.from('users')
-        .select('email, name, phone_number, whatsapp_opted_in').eq('id', assignee_id).single()
+        .select('email, name, phone_number, whatsapp_opted_in').eq('id', assignee_id).maybeSingle()
       const { data: project } = project_id
-        ? await admin.from('projects').select('name').eq('id', project_id).single()
+        ? await admin.from('projects').select('name').eq('id', project_id).maybeSingle()
         : { data: null }
       if (assignee?.email) {
         await inngest.send({
@@ -147,6 +149,8 @@ export async function POST(request: NextRequest) {
   }
   // Create compliance subtasks if provided
   const subtasks = body.subtasks as { title: string; required: boolean; due_date?: string }[] | undefined
+  if (Array.isArray(subtasks) && subtasks.length > 100)
+    return NextResponse.json({ error: 'Maximum 100 subtasks per task' }, { status: 400 })
   if (subtasks && subtasks.length > 0 && task?.id) {
     const subtaskInserts = subtasks.map(s => ({
       org_id:         mb.org_id,
