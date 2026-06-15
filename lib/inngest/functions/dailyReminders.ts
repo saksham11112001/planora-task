@@ -49,15 +49,26 @@ export const dailyReminders = inngest.createFunction(
       return tasks ?? []
     })
 
+    // Batch-fetch notification preferences for all unique assignees — avoids N+1 per task
+    const dueSoonPrefsMap = await step.run('fetch-due-soon-prefs', async () => {
+      const userIds = [...new Set(dueSoonTasks.map((t: any) => (t.assignee as any)?.id).filter(Boolean))]
+      if (!userIds.length) return {} as Record<string, { via_email: boolean; via_whatsapp: boolean }>
+      const { data } = await admin.from('notification_preferences')
+        .select('user_id, via_email, via_whatsapp')
+        .in('user_id', userIds)
+        .eq('event_type', 'task_due_soon')
+      const map: Record<string, { via_email: boolean; via_whatsapp: boolean }> = {}
+      for (const p of data ?? []) map[p.user_id] = { via_email: p.via_email, via_whatsapp: p.via_whatsapp }
+      return map
+    })
+
     let dueSoonCount = 0
     for (const task of dueSoonTasks) {
       await step.run(`remind-due-soon-${task.id}`, async () => {
         const assignee = task.assignee as any
         if (!assignee?.email) return
 
-        const { data: prefs } = await admin.from('notification_preferences')
-          .select('via_email, via_whatsapp')
-          .eq('user_id', assignee.id).eq('event_type', 'task_due_soon').maybeSingle()
+        const prefs = dueSoonPrefsMap[assignee.id] ?? null
 
         const sendEmail = prefs?.via_email    ?? true
         const sendWA    = prefs?.via_whatsapp ?? false
@@ -132,6 +143,21 @@ export const dailyReminders = inngest.createFunction(
       return tasks ?? []
     })
 
+    // Batch-fetch overdue prefs for all unique users in escalation tasks
+    const escalationPrefsMap = await step.run('fetch-escalation-prefs', async () => {
+      const userIds = [...new Set(escalationTasks.flatMap((t: any) => [
+        (t.assignee as any)?.id, (t.creator as any)?.id, (t.approver as any)?.id,
+      ].filter(Boolean)))]
+      if (!userIds.length) return {} as Record<string, { via_email: boolean }>
+      const { data } = await admin.from('notification_preferences')
+        .select('user_id, via_email')
+        .in('user_id', userIds)
+        .eq('event_type', 'task_overdue')
+      const map: Record<string, { via_email: boolean }> = {}
+      for (const p of data ?? []) map[p.user_id] = { via_email: p.via_email }
+      return map
+    })
+
     let escalationCount = 0
     for (const task of escalationTasks) {
       await step.run(`escalate-${task.id}`, async () => {
@@ -153,9 +179,7 @@ export const dailyReminders = inngest.createFunction(
         addStakeholder(approver)
 
         for (const recipient of stakeholders) {
-          const { data: recipientPrefs } = await admin.from('notification_preferences')
-            .select('via_email')
-            .eq('user_id', recipient.id).eq('event_type', 'task_overdue').maybeSingle()
+          const recipientPrefs = escalationPrefsMap[recipient.id] ?? null
           if ((recipientPrefs?.via_email ?? true) === false) continue
 
           const orgMode = await getOrgNotifMode((task as any).org_id)
@@ -186,9 +210,7 @@ export const dailyReminders = inngest.createFunction(
         }
 
         // Also notify the assignee directly that their task has been escalated
-        const { data: assigneeEscPrefs } = await admin.from('notification_preferences')
-          .select('via_email')
-          .eq('user_id', assignee.id).eq('event_type', 'task_overdue').maybeSingle()
+        const assigneeEscPrefs = escalationPrefsMap[assignee?.id] ?? null
         if ((assigneeEscPrefs?.via_email ?? true) && assignee?.email) {
           const assigneeOrgMode = await getOrgNotifMode((task as any).org_id)
           if (assigneeOrgMode === 'digest') {
@@ -234,15 +256,26 @@ export const dailyReminders = inngest.createFunction(
       return tasks ?? []
     })
 
+    // Batch-fetch WhatsApp prefs for all unique overdue assignees
+    const overduePrefsMap = await step.run('fetch-overdue-prefs', async () => {
+      const userIds = [...new Set(overdueTasks.map((t: any) => (t.assignee as any)?.id).filter(Boolean))]
+      if (!userIds.length) return {} as Record<string, { via_whatsapp: boolean }>
+      const { data } = await admin.from('notification_preferences')
+        .select('user_id, via_whatsapp')
+        .in('user_id', userIds)
+        .eq('event_type', 'task_overdue')
+      const map: Record<string, { via_whatsapp: boolean }> = {}
+      for (const p of data ?? []) map[p.user_id] = { via_whatsapp: p.via_whatsapp }
+      return map
+    })
+
     let overdueCount = 0
     for (const task of overdueTasks) {
       await step.run(`overdue-wa-${task.id}`, async () => {
         const assignee = task.assignee as any
         if (!assignee) return
 
-        const { data: prefs } = await admin.from('notification_preferences')
-          .select('via_whatsapp')
-          .eq('user_id', assignee.id).eq('event_type', 'task_overdue').maybeSingle()
+        const prefs = overduePrefsMap[assignee.id] ?? null
 
         if ((prefs?.via_whatsapp ?? false) && assignee.whatsapp_opted_in && assignee.phone_number) {
           await waTaskOverdue({
@@ -287,13 +320,21 @@ export const dailyReminders = inngest.createFunction(
         byApprover.get(key)!.tasks.push(t)
       }
 
+      // Batch-fetch approver prefs in one query
+      const approverIds = [...byApprover.keys()]
+      const approverPrefsMap: Record<string, boolean> = {}
+      if (approverIds.length > 0) {
+        const { data: approverPrefsRows } = await admin.from('notification_preferences')
+          .select('user_id, via_email')
+          .in('user_id', approverIds)
+          .eq('event_type', 'task_approved')
+        for (const p of approverPrefsRows ?? []) approverPrefsMap[p.user_id] = p.via_email
+      }
+
       let sent = 0
       for (const { approver, tasks } of byApprover.values()) {
-        // Respect approver's email preference
-        const { data: approverPrefs } = await admin.from('notification_preferences')
-          .select('via_email')
-          .eq('user_id', approver.id).eq('event_type', 'task_approved').maybeSingle()
-        if ((approverPrefs?.via_email ?? true) === false) continue
+        const approverEmailPref = approverPrefsMap[approver.id] ?? true
+        if (approverEmailPref === false) continue
 
         const approverOrgId = (tasks[0] as any)?.org_id as string | undefined
         if (!approverOrgId) return  // no org context, skip digest
