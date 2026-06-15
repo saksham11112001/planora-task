@@ -36,6 +36,7 @@ export async function POST(request: NextRequest) {
     sameSite: 'lax',
     secure:   process.env.NODE_ENV === 'production',
     httpOnly: false,
+    ...(process.env.NODE_ENV === 'production' ? { domain: '.sng-adwisers.com' } : {}),
   })
   return response
 }
