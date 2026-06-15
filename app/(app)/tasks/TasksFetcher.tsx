@@ -4,7 +4,7 @@ import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { MyTasksView } from './MyTasksView'
 import { shiftDays } from '@/lib/utils/recurringSchedule'
 
-const TASK_COLS = 'id, title, description, status, priority, due_date, assignee_id, approver_id, client_id, project_id, parent_task_id, approval_status, approval_required, estimated_hours, is_recurring, custom_fields, created_at, updated_at, is_billable, billable_amount, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), approver:users!tasks_approver_id_fkey(id, name), creator:users!tasks_created_by_fkey(id, name), projects(id, name, color), parent:tasks!tasks_parent_task_id_fkey(id, title, status, priority)'
+const TASK_COLS = 'id, title, description, status, priority, due_date, assignee_id, approver_id, client_id, project_id, parent_task_id, approval_status, approval_required, estimated_hours, is_recurring, custom_fields, created_at, updated_at, is_billable, billable_amount, created_by, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), approver:users!tasks_approver_id_fkey(id, name), creator:users!tasks_created_by_fkey(id, name), projects(id, name, color), parent:tasks!tasks_parent_task_id_fkey(id, title, status, priority)'
 
 export async function TasksFetcher() {
   const user = await getSessionUser()
@@ -24,7 +24,7 @@ export async function TasksFetcher() {
   const scopedBase = base.eq('assignee_id', user.id).or('is_recurring.is.null,is_recurring.eq.false')
 
   const [
-    { data: tasks },
+    { data: tasks, error: tasksError },
     { data: members },
     { data: clientsData },
     { data: assignedByMeRaw },
@@ -69,6 +69,8 @@ export async function TasksFetcher() {
       .neq('assignee_id', user.id)
       .order('due_date', { ascending: true, nullsFirst: false }).limit(500),
   ])
+
+  if (tasksError) console.error('[TasksFetcher] tasks query failed:', tasksError.message)
 
   const clientMap: Record<string, { id: string; name: string; color: string }> = {}
   clientsData?.forEach(c => { clientMap[c.id] = { id: c.id, name: c.name, color: c.color } })
