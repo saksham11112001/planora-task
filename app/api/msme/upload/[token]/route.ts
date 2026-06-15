@@ -50,10 +50,10 @@ export async function POST(
     // Fallback: Supabase Storage
     const supabaseAdmin = admin
     const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
-      .from('msme-certs')
+      .from('attachments')
       .upload(key, buffer, { contentType: file.type, upsert: true })
     if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 500 })
-    const { data: urlData } = supabaseAdmin.storage.from('msme-certs').getPublicUrl(uploadData.path)
+    const { data: urlData } = supabaseAdmin.storage.from('attachments').getPublicUrl(uploadData.path)
     certUrl = urlData.publicUrl
   }
 

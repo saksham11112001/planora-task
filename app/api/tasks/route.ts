@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
 
   const sp  = request.nextUrl.searchParams
   let q = admin.from('tasks')
-    .select('id, title, status, priority, due_date, assignee_id, approver_id, approval_status, approval_required, approved_by, approved_at, completed_at, project_id, client_id, is_recurring, frequency, next_occurrence_date, parent_task_id, parent_recurring_id, custom_fields, created_at, updated_at, is_billable, billable_amount')
+    .select('id, title, status, priority, due_date, assignee_id, approver_id, approval_status, approval_required, approved_by, approved_at, completed_at, project_id, client_id, is_recurring, frequency, next_occurrence_date, parent_task_id, parent_recurring_id, custom_fields, created_at, updated_at, is_billable, billable_amount, created_by')
     .eq('org_id', mb.org_id).neq('is_archived', true)
 
   // Non-manager/admin/owner users only see tasks they are involved in

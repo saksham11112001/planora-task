@@ -312,28 +312,28 @@ function buildComplianceData(
       dateKey:    ds,
       addedC:     caT.filter(t => t.created_at?.startsWith(ds)).length,
       completedC: caT.filter(t => t.completed_at?.startsWith(ds)).length,
-      noDueDateC: caT.filter(t => !t.due_date && t.created_at <= ds+'T23:59:59' && t.status !== 'completed').length,
-      overdueC:   caT.filter(t => t.due_date && t.due_date < ds && t.status !== 'completed').length,
+      noDueDateC: caT.filter(t => !t.due_date && t.created_at <= ds+'T23:59:59' && !['completed','cancelled'].includes(t.status)).length,
+      overdueC:   caT.filter(t => t.due_date && t.due_date < ds && !['completed','cancelled'].includes(t.status)).length,
       addedNC:    ncT.filter(t => t.created_at?.startsWith(ds)).length,
       completedNC:ncT.filter(t => t.completed_at?.startsWith(ds)).length,
-      noDueDateNC:ncT.filter(t => !t.due_date && t.created_at <= ds+'T23:59:59' && t.status !== 'completed').length,
-      overdueNC:  ncT.filter(t => t.due_date && t.due_date < ds && t.status !== 'completed').length,
+      noDueDateNC:ncT.filter(t => !t.due_date && t.created_at <= ds+'T23:59:59' && !['completed','cancelled'].includes(t.status)).length,
+      overdueNC:  ncT.filter(t => t.due_date && t.due_date < ds && !['completed','cancelled'].includes(t.status)).length,
     }
   })
 
   const todayD = new Date()
   const summary: ComplianceSummary = {
     date:             todayD.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
-    overdueC:         caT.filter(t => t.due_date && t.due_date < today && t.status !== 'completed').length,
-    overdueNC:        ncT.filter(t => t.due_date && t.due_date < today && t.status !== 'completed').length,
-    noDueDateC:       caT.filter(t => !t.due_date && t.status !== 'completed').length,
-    noDueDateNC:      ncT.filter(t => !t.due_date && t.status !== 'completed').length,
+    overdueC:         caT.filter(t => t.due_date && t.due_date < today && !['completed','cancelled'].includes(t.status)).length,
+    overdueNC:        ncT.filter(t => t.due_date && t.due_date < today && !['completed','cancelled'].includes(t.status)).length,
+    noDueDateC:       caT.filter(t => !t.due_date && !['completed','cancelled'].includes(t.status)).length,
+    noDueDateNC:      ncT.filter(t => !t.due_date && !['completed','cancelled'].includes(t.status)).length,
     addedTodayC:      caT.filter(t => t.created_at?.startsWith(today)).length,
     addedTodayNC:     ncT.filter(t => t.created_at?.startsWith(today)).length,
     completedTodayC:  caT.filter(t => t.completed_at?.startsWith(today)).length,
     completedTodayNC: ncT.filter(t => t.completed_at?.startsWith(today)).length,
-    pendingC:         caT.filter(t => t.status !== 'completed').length,
-    pendingNC:        ncT.filter(t => t.status !== 'completed').length,
+    pendingC:         caT.filter(t => !['completed','cancelled'].includes(t.status)).length,
+    pendingNC:        ncT.filter(t => !['completed','cancelled'].includes(t.status)).length,
   }
   return { daily, summary }
 }
@@ -979,13 +979,15 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 200 }}>
                 <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 12, padding: '20px 24px', textAlign: 'center' }}>
                   <p style={{ fontSize: 11, fontWeight: 600, color: '#dc2626', textTransform: 'uppercase',
-                    letterSpacing: '0.05em', marginBottom: 6 }}>Compliance Pending</p>
+                    letterSpacing: '0.05em', marginBottom: 6 }}>Compliance Active</p>
                   <p style={{ fontSize: 40, fontWeight: 900, color: '#dc2626', lineHeight: 1 }}>{complianceSummary.pendingC}</p>
+                  <p style={{ fontSize: 11, color: '#dc2626', opacity: 0.7, marginTop: 4 }}>{complianceSummary.overdueC} overdue</p>
                 </div>
                 <div style={{ background: '#fff7ed', border: '1px solid #fdba74', borderRadius: 12, padding: '20px 24px', textAlign: 'center' }}>
                   <p style={{ fontSize: 11, fontWeight: 600, color: '#ea580c', textTransform: 'uppercase',
-                    letterSpacing: '0.05em', marginBottom: 6 }}>Non-Compliance Pending</p>
+                    letterSpacing: '0.05em', marginBottom: 6 }}>Non-Compliance Active</p>
                   <p style={{ fontSize: 40, fontWeight: 900, color: '#ea580c', lineHeight: 1 }}>{complianceSummary.pendingNC}</p>
+                  <p style={{ fontSize: 11, color: '#ea580c', opacity: 0.7, marginTop: 4 }}>{complianceSummary.overdueNC} overdue</p>
                 </div>
               </div>
             </div>
