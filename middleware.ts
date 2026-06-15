@@ -105,6 +105,10 @@ export async function middleware(request: NextRequest) {
   const defaultRoute = isMsmeDomain ? '/msme' : '/dashboard'
 
   if (error || !user) {
+    // MSME subdomain: unauthenticated root → show product landing page (rewrite, keep URL as /)
+    if (isMsmeDomain && pathname === '/') {
+      return NextResponse.rewrite(new URL('/msme-landing', request.url))
+    }
     if (pathname === '/') return NextResponse.next({ request })
     const loginUrl = new URL('/login', request.url)
     // On MSME subdomain, always land on /msme after login
