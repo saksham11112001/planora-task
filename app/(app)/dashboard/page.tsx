@@ -27,11 +27,11 @@ export default async function DashboardPage() {
 
   const results = await Promise.allSettled([
     supabase.from('tasks').select('*', { count: 'exact', head: true })
-      .eq('org_id', orgId).neq('is_archived', true)
+      .eq('org_id', orgId).eq('assignee_id', user.id).neq('is_archived', true)
       .in('status', ['todo','in_review'])
       .not('due_date', 'is', null).lt('due_date', today),
     supabase.from('tasks').select('*', { count: 'exact', head: true })
-      .eq('org_id', orgId).neq('is_archived', true)
+      .eq('org_id', orgId).eq('assignee_id', user.id).neq('is_archived', true)
       .in('status', ['todo','in_review'])
       .eq('due_date', today),
     supabase.from('tasks').select('*', { count: 'exact', head: true })
@@ -62,7 +62,7 @@ export default async function DashboardPage() {
   const recentClients      = results[7].status === 'fulfilled' ? (results[7].value as any).data ?? [] : []
 
   const completionRate = totalThisMonth
-    ? Math.round(((completedThisMonth ?? 0) / totalThisMonth) * 100)
+    ? Math.min(100, Math.round(((completedThisMonth ?? 0) / totalThisMonth) * 100))
     : 0
 
   return (

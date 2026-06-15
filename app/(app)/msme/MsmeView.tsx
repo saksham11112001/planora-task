@@ -67,6 +67,7 @@ export function MsmeView({ userRole }: Props) {
   const [payingId,      setPayingId]      = useState<string | null>(null)
   const [checkedIds,    setCheckedIds]    = useState<Set<string>>(new Set())
   const [bulkShooting,  setBulkShooting]  = useState(false)
+  const [maxEmails,     setMaxEmails]     = useState(5)
   const toastRef = useRef(0)
 
   // Add vendor form
@@ -103,6 +104,12 @@ export function MsmeView({ userRole }: Props) {
 
   useEffect(() => { fetchVendors() }, [fetchVendors])
 
+  useEffect(() => {
+    fetch('/api/msme/settings').then(r => r.ok ? r.json() : null).then(d => {
+      if (d?.days && Array.isArray(d.days)) setMaxEmails(d.days.length + 1)
+    }).catch(() => {})
+  }, [])
+
   // ── Add single vendor ──────────────────────────────────────────────────────
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault()
@@ -130,7 +137,7 @@ export function MsmeView({ userRole }: Props) {
     setShootingId(null)
     if (res.status === 402) { showToast('Pay ₹99 to unlock email sending for this vendor', 'info'); return }
     if (!res.ok) { showToast(data.error ?? 'Failed to send email', 'error'); return }
-    showToast(`Email sent to ${vendorName} (attempt ${data.attempt}/3)`)
+    showToast(`Email sent to ${vendorName} (attempt ${data.attempt}/${maxEmails})`)
     fetchVendors()
   }
 
@@ -358,7 +365,7 @@ export function MsmeView({ userRole }: Props) {
     : searched.filter(v => v.status === filterStatus)
 
   const completedCount  = vendors.filter(v => v.status === 'submitted' || v.status === 'not_msme').length
-  const exhaustedCount  = vendors.filter(v => v.email_count >= 3 && v.status === 'emailed').length
+  const exhaustedCount  = vendors.filter(v => v.email_count >= maxEmails && v.status === 'emailed').length
   const unpaidCount     = vendors.filter(v => v.payment_status === 'unpaid').length
   const completionPct   = total > 0 ? Math.round((completedCount / total) * 100) : 0
   const counts = {
@@ -431,7 +438,7 @@ export function MsmeView({ userRole }: Props) {
           <SummaryCard label="NOT CONTACTED" value={String(counts.pending)} sub="awaiting first email" accent={counts.pending > 0 ? '#64748b' : ACCENT} />
           <SummaryCard label="AWAITING REPLY" value={String(counts.emailed)} sub="email sent, no response" accent={counts.emailed > 0 ? '#ea580c' : ACCENT} />
           {unpaidCount > 0 && <SummaryCard label="PAYMENT PENDING" value={String(unpaidCount)} sub={`₹${unpaidCount * PRICE_INR} total due`} accent="#ea580c" warn />}
-          {exhaustedCount > 0 && <SummaryCard label="MANUAL FOLLOW-UP" value={String(exhaustedCount)} sub="3 emails sent — call them" accent="#dc2626" warn />}
+          {exhaustedCount > 0 && <SummaryCard label="MANUAL FOLLOW-UP" value={String(exhaustedCount)} sub={`${maxEmails} emails sent — call them`} accent="#dc2626" warn />}
         </div>
       )}
 
@@ -493,9 +500,9 @@ export function MsmeView({ userRole }: Props) {
                       <input
                         type="checkbox"
                         style={{ accentColor: ACCENT, cursor: 'pointer' }}
-                        checked={checkedIds.size > 0 && filtered.filter(v => v.payment_status !== 'unpaid' && v.status !== 'submitted' && v.status !== 'not_msme' && v.email_count < 3).every(v => checkedIds.has(v.id))}
+                        checked={checkedIds.size > 0 && filtered.filter(v => v.payment_status !== 'unpaid' && v.status !== 'submitted' && v.status !== 'not_msme' && v.email_count < maxEmails).every(v => checkedIds.has(v.id))}
                         onChange={e => {
-                          const eligible = filtered.filter(v => v.payment_status !== 'unpaid' && v.status !== 'submitted' && v.status !== 'not_msme' && v.email_count < 3)
+                          const eligible = filtered.filter(v => v.payment_status !== 'unpaid' && v.status !== 'submitted' && v.status !== 'not_msme' && v.email_count < maxEmails)
                           if (e.target.checked) setCheckedIds(new Set(eligible.map(v => v.id)))
                           else setCheckedIds(new Set())
                         }}
@@ -510,9 +517,9 @@ export function MsmeView({ userRole }: Props) {
                   {filtered.map((v, i) => {
                     const sc        = STATUS_COLOR[v.status]
                     const sel       = selectedId === v.id
-                    const exhausted = v.email_count >= 3 && v.status === 'emailed'
+                    const exhausted = v.email_count >= maxEmails && v.status === 'emailed'
                     const locked    = v.payment_status === 'unpaid'
-                    const isEligible = !locked && v.status !== 'submitted' && v.status !== 'not_msme' && v.email_count < 3
+                    const isEligible = !locked && v.status !== 'submitted' && v.status !== 'not_msme' && v.email_count < maxEmails
                     return (
                       <tr
                         key={v.id}
@@ -567,7 +574,7 @@ export function MsmeView({ userRole }: Props) {
                           {v.msme_category ? CAT_LABEL[v.msme_category] : v.is_not_msme ? 'Not MSME' : '—'}
                         </td>
                         <td style={{ padding: '12px 14px', textAlign: 'center', color: locked ? '#94a3b8' : exhausted ? '#dc2626' : 'var(--text-muted)', fontWeight: exhausted ? 700 : 400 }}>
-                          {locked ? '—' : `${v.email_count}/3`}
+                          {locked ? '—' : `${v.email_count}/${maxEmails}`}
                         </td>
                         <td style={{ padding: '12px 14px' }}>
                           {locked && canManage && (
@@ -579,7 +586,7 @@ export function MsmeView({ userRole }: Props) {
                               {payingId === v.id ? 'Processing…' : `Pay ₹${PRICE_INR}`}
                             </button>
                           )}
-                          {!locked && canManage && v.status !== 'submitted' && v.status !== 'not_msme' && v.email_count < 3 && (
+                          {!locked && canManage && v.status !== 'submitted' && v.status !== 'not_msme' && v.email_count < maxEmails && (
                             <button
                               onClick={e => { e.stopPropagation(); handleShootEmail(v.id, v.vendor_name) }}
                               disabled={shootingId === v.id}
@@ -670,9 +677,9 @@ export function MsmeView({ userRole }: Props) {
                   <div style={{ marginTop: 3 }}>
                     {(() => {
                       const sc = STATUS_COLOR[selected.status]
-                      const ex = selected.email_count >= 3 && selected.status === 'emailed'
+                      const ex = selected.email_count >= maxEmails && selected.status === 'emailed'
                       return <span style={{ background: ex ? '#fef2f2' : sc.bg, color: ex ? '#dc2626' : sc.text, padding: '3px 10px', borderRadius: 12, fontSize: 11, fontWeight: 700 }}>
-                        {ex ? '⚠ 3 emails sent — contact directly' : STATUS_LABEL[selected.status]}
+                        {ex ? `⚠ ${maxEmails} emails sent — contact directly` : STATUS_LABEL[selected.status]}
                       </span>
                     })()}
                   </div>
@@ -708,7 +715,7 @@ export function MsmeView({ userRole }: Props) {
                 <div style={{ marginBottom: 12 }}>
                   <p style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, margin: '0 0 3px' }}>EMAIL HISTORY</p>
                   <p style={{ fontSize: 12, color: 'var(--text)', margin: 0 }}>
-                    {selected.email_count}/3 sent · Last: {selected.last_emailed_at ? new Date(selected.last_emailed_at).toLocaleDateString('en-IN') : '—'}
+                    {selected.email_count}/{maxEmails} sent · Last: {selected.last_emailed_at ? new Date(selected.last_emailed_at).toLocaleDateString('en-IN') : '—'}
                   </p>
                 </div>
               )}
@@ -716,9 +723,9 @@ export function MsmeView({ userRole }: Props) {
               {/* Actions */}
               {canManage && selected.payment_status !== 'unpaid' && selected.status !== 'submitted' && selected.status !== 'not_msme' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {selected.email_count < 3 && (
+                  {selected.email_count < maxEmails && (
                     <button onClick={() => handleShootEmail(selected.id, selected.vendor_name)} disabled={shootingId === selected.id} style={{ ...primaryBtn, width: '100%' }}>
-                      {shootingId === selected.id ? 'Sending…' : selected.email_count === 0 ? '✉ Shoot email' : `✉ Re-shoot (${selected.email_count}/3)`}
+                      {shootingId === selected.id ? 'Sending…' : selected.email_count === 0 ? '✉ Shoot email' : `✉ Re-shoot (${selected.email_count}/${maxEmails})`}
                     </button>
                   )}
                   <button onClick={() => handleCopyLink(selected.id)} disabled={copyingId === selected.id} style={{ ...ghostBtn, width: '100%' }}>
