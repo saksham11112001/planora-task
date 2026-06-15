@@ -38,6 +38,7 @@ interface Payout {
 interface PartnerData {
   referral_code: string
   referral_link: string
+  msme_link:     string
   tier:          'bronze' | 'silver' | 'gold'
   rate_percent:  number
   next_tier:     { name: string; at: number; current: number } | null
@@ -89,7 +90,8 @@ export function PartnerView() {
 
   const [data,    setData]    = useState<PartnerData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [copied,  setCopied]  = useState(false)
+  const [copied,      setCopied]      = useState(false)
+  const [copiedMsme,  setCopiedMsme]  = useState(false)
 
   // Payout form
   const [showPayout,   setShowPayout]   = useState(false)
@@ -115,8 +117,16 @@ export function PartnerView() {
     if (!data) return
     navigator.clipboard.writeText(data.referral_link)
     setCopied(true)
-    toast.success('Referral link copied!')
+    toast.success('Planora referral link copied!')
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  function copyMsmeLink() {
+    if (!data) return
+    navigator.clipboard.writeText(data.msme_link)
+    setCopiedMsme(true)
+    toast.success('MSME Tracker referral link copied!')
+    setTimeout(() => setCopiedMsme(false), 2000)
   }
 
   async function requestPayout() {
@@ -173,7 +183,7 @@ export function PartnerView() {
             </span>
           </div>
           <p style={{ fontSize: 13, color: 'var(--muted)', margin: 0 }}>
-            Earn {data.rate_percent}% commission for every client who pays after joining via your referral link.
+            Earn {data.rate_percent}% commission for every client who upgrades to a paid plan via your referral link — on Planora or MSME Tracker.
           </p>
         </div>
         <button onClick={fetchData} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer' }}>
@@ -202,36 +212,66 @@ export function PartnerView() {
 
       {/* ── Referral link card ─────────────────────────────────────────────── */}
       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 20, marginBottom: 24 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
           <ExternalLink size={16} style={{ color: 'var(--brand)' }} />
-          <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--fg)' }}>Your Referral Link</span>
+          <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--fg)' }}>Your Referral Links</span>
+          <span style={{ fontSize: 11, color: 'var(--muted)', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 20, padding: '2px 8px' }}>
+            Code: {data.referral_code}
+          </span>
         </div>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <div style={{ flex: 1, minWidth: 240, display: 'flex', alignItems: 'center', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', fontSize: 13, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {data.referral_link}
+
+        {/* Planora link */}
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+            Planora — Practice Management
           </div>
-          <button onClick={copyLink} style={{
-            display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px',
-            background: copied ? '#16a34a' : 'var(--brand)', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0,
-          }}>
-            {copied ? <Check size={14} /> : <Copy size={14} />}
-            {copied ? 'Copied!' : 'Copy Link'}
-          </button>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: 240, display: 'flex', alignItems: 'center', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', fontSize: 13, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {data.referral_link}
+            </div>
+            <button onClick={copyLink} style={{
+              display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px',
+              background: copied ? '#16a34a' : 'var(--brand)', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0,
+            }}>
+              {copied ? <Check size={14} /> : <Copy size={14} />}
+              {copied ? 'Copied!' : 'Copy'}
+            </button>
+          </div>
         </div>
-        <div style={{ marginTop: 12, fontSize: 12, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
+
+        {/* MSME Tracker link */}
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+            MSME Tracker — Vendor Email Automation
+          </div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: 240, display: 'flex', alignItems: 'center', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', fontSize: 13, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {data.msme_link}
+            </div>
+            <button onClick={copyMsmeLink} style={{
+              display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px',
+              background: copiedMsme ? '#16a34a' : '#0891b2', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0,
+            }}>
+              {copiedMsme ? <Check size={14} /> : <Copy size={14} />}
+              {copiedMsme ? 'Copied!' : 'Copy'}
+            </button>
+          </div>
+        </div>
+
+        <div style={{ marginTop: 14, fontSize: 12, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
           <QrCode size={13} />
-          <span>Share this link with CAs and business owners. When they sign up and pay, you earn {data.rate_percent}%.</span>
+          <span>Share either link — both use the same referral code. When the referred client upgrades to a paid plan, you earn {data.rate_percent}% commission.</span>
         </div>
       </div>
 
       {/* ── Stats grid ─────────────────────────────────────────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 28 }}>
         {[
-          { icon: <Users size={18} />,       label: 'Total Referred',    value: stats.total_referred,                  color: '#2563eb' },
-          { icon: <BadgeCheck size={18} />,  label: 'Paying Clients',    value: stats.paying_referred,                 color: '#16a34a' },
-          { icon: <TrendingUp size={18} />,  label: 'This Month',        value: rupees(stats.this_month_paise),        color: '#8b5cf6' },
-          { icon: <IndianRupee size={18} />, label: 'Total Earned',      value: rupees(stats.total_earned_paise),      color: '#0891b2' },
-          { icon: <Clock size={18} />,       label: 'Pending Balance',   value: rupees(stats.pending_paise),           color: '#f59e0b' },
+          { icon: <Users size={18} />,       label: 'Total Referrals',        value: stats.total_referred,             color: '#2563eb' },
+          { icon: <BadgeCheck size={18} />,  label: 'On a Paid Plan',         value: stats.paying_referred,            color: '#16a34a' },
+          { icon: <TrendingUp size={18} />,  label: 'Commissions This Month',  value: rupees(stats.this_month_paise),   color: '#8b5cf6' },
+          { icon: <IndianRupee size={18} />, label: 'Total Paid Out',          value: rupees(stats.total_earned_paise), color: '#0891b2' },
+          { icon: <Clock size={18} />,       label: 'Awaiting Payout',         value: rupees(stats.pending_paise),      color: '#f59e0b' },
         ].map(card => (
           <div key={card.label} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '16px 18px' }}>
             <div style={{ color: card.color, marginBottom: 8 }}>{card.icon}</div>
@@ -385,10 +425,10 @@ export function PartnerView() {
         <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--fg)', marginBottom: 14 }}>How the Partner Program Works</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {[
-            ['Share your link', `Send your referral link (code: ${data.referral_code}) to CA firms and business owners.`],
-            ['They sign up & pay', 'When they upgrade to a paid Planora plan, you earn a commission on their payment.'],
-            [`Earn ${data.rate_percent}% commission`, `Your current tier is ${tier.toUpperCase()}. Refer more clients to unlock Silver (15%) and Gold (20%).`],
-            ['Monthly payouts', 'Commissions are approved monthly. Request a bank transfer once you hit ₹500 balance.'],
+            ['Share your referral links', `Use your Planora link for CA firms or your MSME Tracker link for business owners. Both links use the same referral code (${data.referral_code}).`],
+            ['They sign up & upgrade', 'When the person you referred upgrades to any paid plan on Planora or MSME Tracker, a commission is created for you.'],
+            [`Earn ${data.rate_percent}% commission`, `Your current tier is ${tier.toUpperCase()}. Reach 5 active referrals for Silver (15%) and 10 for Gold (20%).`],
+            ['Monthly payouts', 'Commissions are reviewed and approved monthly. Request a bank transfer once your approved balance reaches ₹500.'],
           ].map(([title, desc], i) => (
             <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
               <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'var(--brand)', color: '#fff', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>

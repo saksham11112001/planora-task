@@ -4,9 +4,13 @@ import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { redirect }                from 'next/navigation'
 import { MsmeView }                from '@/app/(app)/msme/MsmeView'
 
-export default async function MsmePage() {
+export default async function MsmePage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
+  const params = await searchParams
   const user = await getSessionUser()
-  if (!user) redirect('/login?redirect=/msme')
+  if (!user) {
+    const ref = params.ref ? `&ref=${encodeURIComponent(params.ref)}` : ''
+    redirect(`/login?redirect=/msme${ref}`)
+  }
 
   const mb = await getActiveOrgMembership(user.id)
   if (!mb) redirect('/onboarding')
