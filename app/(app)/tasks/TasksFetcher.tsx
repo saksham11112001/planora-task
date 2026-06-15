@@ -24,7 +24,7 @@ export async function TasksFetcher() {
   const scopedBase = base.eq('assignee_id', user.id).or('is_recurring.is.null,is_recurring.eq.false')
 
   const [
-    { data: tasks },
+    { data: tasks, error: tasksError },
     { data: members },
     { data: clientsData },
     { data: assignedByMeRaw },
@@ -69,6 +69,8 @@ export async function TasksFetcher() {
       .neq('assignee_id', user.id)
       .order('due_date', { ascending: true, nullsFirst: false }).limit(500),
   ])
+
+  if (tasksError) console.error('[TasksFetcher] tasks query failed:', tasksError.message)
 
   const clientMap: Record<string, { id: string; name: string; color: string }> = {}
   clientsData?.forEach(c => { clientMap[c.id] = { id: c.id, name: c.name, color: c.color } })
