@@ -47,6 +47,9 @@ export default function LoginPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
+    // Persist referral code from ?ref= so onboarding can pick it up after auth
+    const ref = params.get('ref')
+    if (ref) sessionStorage.setItem('planora_ref_code', ref)
     if (params.get('error') === 'auth_failed') {
       setError("Sign-in failed. Please try again — if the problem persists, try a different method.")
       setMode('email_password')
