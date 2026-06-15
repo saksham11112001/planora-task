@@ -1607,6 +1607,55 @@ export default async function LandingPage() {
         </div>
       </section>
 
+      {/* ━━━ MSME TRACKER CALLOUT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <section style={{ padding: '72px 6%', background: '#f0fdf9', borderTop: '1px solid #ccfbf1' }}>
+        <div style={{ maxWidth: 1120, margin: '0 auto' }}>
+          <div style={{
+            display: 'grid', gridTemplateColumns: '1fr auto', gap: 48, alignItems: 'center',
+            background: 'linear-gradient(135deg, #0f172a 0%, #134e4a 60%, #0d9488 100%)',
+            borderRadius: 24, padding: '48px 52px',
+            boxShadow: '0 20px 60px rgba(13,148,136,0.22)',
+          }}>
+            <div>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '5px 14px 5px 8px',
+                background: 'rgba(45,212,191,0.15)', border: '1px solid rgba(45,212,191,0.3)',
+                borderRadius: 99, marginBottom: 20 }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#2dd4bf', display: 'inline-block' }}/>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#2dd4bf', letterSpacing: '0.04em' }}>FREE TOOL FOR MSME VENDORS</span>
+              </div>
+              <h2 style={{ fontSize: 'clamp(22px, 3vw, 36px)', fontWeight: 900, color: '#fff',
+                letterSpacing: '-1px', marginBottom: 14, lineHeight: 1.15 }}>
+                MSME Tracker — Never miss a<br/>
+                <span style={{ color: '#2dd4bf' }}>43B(h) filing deadline</span> again
+              </h2>
+              <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.55)', lineHeight: 1.75, maxWidth: 480, marginBottom: 28 }}>
+                Track outstanding vendor payments, get automated reminders at 45-day milestones,
+                and generate vendor reports — completely free for the first 5 vendors.
+              </p>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                {['45-day auto alerts','MSME vendor portal','43B(h) compliance','₹99 per extra vendor'].map(f => (
+                  <span key={f} style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.5)',
+                    background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)',
+                    padding: '5px 12px', borderRadius: 99 }}>{f}</span>
+                ))}
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 200 }}>
+              <a href="https://msme.sng-adwisers.com" target="_blank" rel="noopener noreferrer"
+                style={{ display: 'block', textAlign: 'center', padding: '15px 28px',
+                  background: '#0d9488', color: '#fff', borderRadius: 12, fontSize: 15,
+                  fontWeight: 800, textDecoration: 'none', letterSpacing: '-0.2px',
+                  boxShadow: '0 6px 24px rgba(13,148,136,0.5)' }}>
+                Open MSME Tracker →
+              </a>
+              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)', textAlign: 'center', margin: 0 }}>
+                msme.sng-adwisers.com
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ━━━ FOOTER ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <footer className="lp-footer" style={{ background: '#07090f', padding: '56px 6% 30px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
         <div style={{ maxWidth: 1120, margin: '0 auto' }}>

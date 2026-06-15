@@ -88,8 +88,9 @@ export async function middleware(request: NextRequest) {
         setAll(toSet: { name: string; value: string; options?: Record<string, unknown> }[]) {
           toSet.forEach(({ name, value }) => request.cookies.set(name, value))
           response = NextResponse.next({ request })
+          const sharedDomain = process.env.NODE_ENV === 'production' ? { domain: '.sng-adwisers.com' } : {}
           toSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options as any)
+            response.cookies.set(name, value, { ...(options as any), ...sharedDomain })
           )
         },
       },

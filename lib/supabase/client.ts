@@ -14,6 +14,10 @@ export function createClient() {
         detectSessionInUrl: true,
         persistSession: true,
       },
+      // Share auth cookies across subdomains (msme.sng-adwisers.com etc.)
+      cookieOptions: {
+        domain: process.env.NODE_ENV === 'production' ? '.sng-adwisers.com' : undefined,
+      },
     }
   )
 }
