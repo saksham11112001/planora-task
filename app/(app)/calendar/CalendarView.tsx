@@ -241,7 +241,13 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
       }
     } else {
       if (!byDate[t.due_date]) byDate[t.due_date] = []
-      byDate[t.due_date].push(t)
+      // Dedup: skip if same task ID already placed, or if a spawned instance
+      // with the same parent+date already exists (handles DB duplicates from retries)
+      const alreadyPlaced = byDate[t.due_date].some(x =>
+        x.id === t.id ||
+        (t.parent_recurring_id && x.parent_recurring_id === t.parent_recurring_id && x.due_date === t.due_date)
+      )
+      if (!alreadyPlaced) byDate[t.due_date].push(t)
     }
   })
 
