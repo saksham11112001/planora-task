@@ -45,6 +45,8 @@ export async function PATCH(
   if (body.vendor_email) allowed.vendor_email = body.vendor_email.trim().toLowerCase()
   if (body.vendor_name)  allowed.vendor_name  = body.vendor_name.trim()
   if (body.gstin !== undefined) allowed.gstin = body.gstin?.trim() || null
+  if (body.pan !== undefined) allowed.pan = body.pan?.trim().toUpperCase() || null
+  if (body.udyam_registered_on !== undefined) allowed.udyam_registered_on = body.udyam_registered_on || null
 
   const { error } = await admin
     .from('msme_vendors')

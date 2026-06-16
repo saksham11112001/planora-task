@@ -11,9 +11,11 @@ interface Vendor {
   vendor_name: string
   vendor_email: string
   gstin: string | null
+  pan: string | null
   status: 'pending' | 'emailed' | 'submitted' | 'not_msme'
   payment_status: 'free' | 'unpaid' | 'paid'
   udyam_number: string | null
+  udyam_registered_on: string | null
   msme_category: 'micro' | 'small' | 'medium' | null
   nature_of_business: 'manufacturer' | 'service_provider' | 'trader' | null
   outstanding_amount: number | null
@@ -363,24 +365,32 @@ export function MsmeView({ userRole }: Props) {
 
   // ── Export all vendors ─────────────────────────────────────────────────────
   function handleExport() {
-    const header = ['Vendor Name', 'Email', 'GSTIN', 'Slot Type', 'Payment Status', 'Tracker Status', 'Udyam Number', 'Category', 'Nature of Business', 'Outstanding Amount (₹)', 'Emails Sent', 'Last Email Date', 'Submitted On', 'Declaration By', 'Date Added']
-    const rows = vendors.map(v => [
-      v.vendor_name,
-      v.vendor_email,
-      v.gstin ?? '',
-      v.is_paid ? 'Paid slot' : 'Free',
-      v.payment_status === 'free' ? 'Free' : v.payment_status === 'paid' ? 'Paid ✓' : 'Payment pending',
-      v.is_not_msme ? 'Non-MSME Declaration' : STATUS_LABEL[v.status].replace(' ✓', ''),
-      v.udyam_number ?? '',
-      v.msme_category ? CAT_LABEL[v.msme_category] : '',
-      v.nature_of_business ? NAT_LABEL[v.nature_of_business] : '',
-      v.outstanding_amount !== null && v.outstanding_amount !== undefined ? v.outstanding_amount : '',
-      v.email_count,
-      v.last_emailed_at ? new Date(v.last_emailed_at).toLocaleDateString('en-IN') : '',
-      v.submitted_at ? new Date(v.submitted_at).toLocaleDateString('en-IN') : '',
-      v.declarant_name ?? '',
-      new Date(v.created_at).toLocaleDateString('en-IN'),
-    ])
+    const header = ['Vendor Name', 'Email', 'GSTIN', 'PAN', 'Tracker Status', 'Udyam Number', 'Udyam Registered On', 'Category', 'Nature of Business', 'Outstanding Amount (₹)', '43B(h) Applicable', 'Slot Type', 'Payment Status', 'Emails Sent', 'Last Email Date', 'Submitted On', 'Declaration By', 'Date Added']
+    const rows = vendors.map(v => {
+      // 43B(h) applies where the vendor is a verified MSME (micro/small/medium) with an outstanding balance.
+      // Non-MSME declarations and unverified/pending vendors are not applicable.
+      const is43bh = v.msme_category !== null && (v.outstanding_amount ?? 0) > 0 ? 'Yes' : v.is_not_msme ? 'No (Non-MSME)' : 'Unverified'
+      return [
+        v.vendor_name,
+        v.vendor_email,
+        v.gstin ?? '',
+        v.pan ?? '',
+        v.is_not_msme ? 'Non-MSME Declaration' : STATUS_LABEL[v.status].replace(' ✓', ''),
+        v.udyam_number ?? '',
+        v.udyam_registered_on ? new Date(v.udyam_registered_on).toLocaleDateString('en-IN') : '',
+        v.msme_category ? CAT_LABEL[v.msme_category] : '',
+        v.nature_of_business ? NAT_LABEL[v.nature_of_business] : '',
+        v.outstanding_amount !== null && v.outstanding_amount !== undefined ? v.outstanding_amount : '',
+        is43bh,
+        v.is_paid ? 'Paid slot' : 'Free',
+        v.payment_status === 'free' ? 'Free' : v.payment_status === 'paid' ? 'Paid ✓' : 'Payment pending',
+        v.email_count,
+        v.last_emailed_at ? new Date(v.last_emailed_at).toLocaleDateString('en-IN') : '',
+        v.submitted_at ? new Date(v.submitted_at).toLocaleDateString('en-IN') : '',
+        v.declarant_name ?? '',
+        new Date(v.created_at).toLocaleDateString('en-IN'),
+      ]
+    })
 
     const ws = XLSX.utils.aoa_to_sheet([header, ...rows])
     ws['!cols'] = header.map(() => ({ wch: 22 }))
@@ -702,6 +712,7 @@ export function MsmeView({ userRole }: Props) {
               </div>
 
               {selected.gstin && <DetailRow label="GSTIN" value={selected.gstin} />}
+              {selected.pan   && <DetailRow label="PAN"   value={selected.pan} />}
 
               {/* Slot type */}
               <div style={{ marginBottom: 12 }}>
@@ -732,8 +743,9 @@ export function MsmeView({ userRole }: Props) {
               {/* Submission details */}
               {selected.status === 'submitted' && (
                 <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: 12, marginBottom: 12 }}>
-                  {selected.udyam_number      && <DetailRow label="Udyam No."   value={selected.udyam_number} />}
-                  {selected.msme_category     && <DetailRow label="Category"    value={CAT_LABEL[selected.msme_category]} />}
+                  {selected.udyam_number       && <DetailRow label="Udyam No."        value={selected.udyam_number} />}
+                  {selected.udyam_registered_on && <DetailRow label="Registered On"    value={new Date(selected.udyam_registered_on).toLocaleDateString('en-IN')} />}
+                  {selected.msme_category      && <DetailRow label="Category"          value={CAT_LABEL[selected.msme_category]} />}
                   {selected.nature_of_business&& <DetailRow label="Nature"      value={NAT_LABEL[selected.nature_of_business]} />}
                   {selected.outstanding_amount !== null && selected.outstanding_amount !== undefined && (
                     <DetailRow label="Outstanding" value={`₹${Number(selected.outstanding_amount).toLocaleString('en-IN')}`} />
