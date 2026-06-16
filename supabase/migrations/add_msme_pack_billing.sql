@@ -13,9 +13,10 @@ CREATE TABLE IF NOT EXISTS msme_pack_payments (
   gateway          text NOT NULL DEFAULT 'manual',  -- 'cashfree' | 'razorpay' | 'manual'
   gateway_order_id text,
   gateway_payment_id text,
-  status           text NOT NULL DEFAULT 'created' CHECK (status IN ('created', 'paid', 'failed')),
+  status           text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'paid', 'failed')),
   created_at       timestamptz NOT NULL DEFAULT now(),
-  paid_at          timestamptz
+  paid_at          timestamptz,
+  UNIQUE (gateway_order_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_msme_pack_payments_org ON msme_pack_payments(org_id);

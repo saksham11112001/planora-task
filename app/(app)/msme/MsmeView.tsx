@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import * as XLSX from 'xlsx'
+import { MSME_PACKS } from '@/lib/msme/packs'
 
 const ACCENT = '#0d9488'
 
@@ -56,6 +57,9 @@ export function MsmeView({ userRole }: Props) {
   const [showImport,    setShowImport]    = useState(false)
   const [selectedId,    setSelectedId]    = useState<string | null>(null)
   const [vendorLimit,   setVendorLimit]   = useState<number>(5)
+  const [packTier,      setPackTier]      = useState<string>('free')
+  const [showUpgrade,   setShowUpgrade]   = useState(false)
+  const [upgradeBusy,   setUpgradeBusy]   = useState<string | null>(null)
   const [shootingId,    setShootingId]    = useState<string | null>(null)
   const [deletingId,    setDeletingId]    = useState<string | null>(null)
   const [filterStatus,  setFilterStatus]  = useState<string>('all')
@@ -120,7 +124,27 @@ export function MsmeView({ userRole }: Props) {
 
   useEffect(() => { fetchVendors() }, [fetchVendors])
 
-  // Fetch email schedule for this org
+  // If user returns from Cashfree payment page, refresh settings to pick up new pack
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('pack_upgraded') === '1') {
+      fetch('/api/msme/settings')
+        .then(r => r.ok ? r.json() : null)
+        .then(d => {
+          if (d?.pack?.tier) setPackTier(d.pack.tier)
+          if (d?.pack?.vendor_limit) setVendorLimit(d.pack.vendor_limit)
+        })
+        .catch(() => {})
+      // Clean up the URL param without a full reload
+      const url = new URL(window.location.href)
+      url.searchParams.delete('pack_upgraded')
+      window.history.replaceState({}, '', url.toString())
+      showToast('Payment received — your pack is now active!', 'success')
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch email schedule + pack tier for this org
   useEffect(() => {
     fetch('/api/msme/settings')
       .then(r => r.ok ? r.json() : null)
@@ -129,6 +153,7 @@ export function MsmeView({ userRole }: Props) {
           setIntervalDays(d.schedule)
           setDraftIntervals(d.schedule)
         }
+        if (d?.pack?.tier) setPackTier(d.pack.tier)
       })
       .catch(() => {})
   }, [])
@@ -148,6 +173,35 @@ export function MsmeView({ userRole }: Props) {
     showToast('Email schedule saved')
   }
 
+
+  // ── Upgrade pack ──────────────────────────────────────────────────────────
+  async function handleUpgrade(tier: string) {
+    setUpgradeBusy(tier)
+    const res  = await fetch('/api/msme/pay', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ pack_tier: tier }),
+    })
+    const data = await res.json()
+    setUpgradeBusy(null)
+
+    if (!res.ok) {
+      showToast(data.error ?? 'Failed to initiate payment', 'error')
+      return
+    }
+
+    if (data.gateway === 'cashfree' && data.payment_link) {
+      setShowUpgrade(false)
+      window.open(data.payment_link, '_blank', 'noopener,noreferrer')
+      showToast('Complete your payment in the new tab — your pack activates automatically.', 'info')
+      return
+    }
+
+    // Payment not configured yet
+    if (res.status === 503) {
+      showToast('Payment gateway not yet live. Contact support to upgrade.', 'info')
+    }
+  }
 
   // ── Add single vendor ──────────────────────────────────────────────────────
   async function handleAdd(e: React.FormEvent) {
@@ -386,6 +440,11 @@ export function MsmeView({ userRole }: Props) {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {canAdmin && (
+            <button onClick={() => setShowUpgrade(true)} style={{ ...ghostBtn, borderColor: ACCENT, color: ACCENT }}>
+              📦 {packTier === 'free' ? 'Upgrade Pack' : 'Manage Pack'}
+            </button>
+          )}
           {canAdmin && (
             <button onClick={() => { setShowSettings(true); setDraftIntervals([...intervalDays]) }} style={ghostBtn}>
               ⚙ Email schedule
@@ -710,6 +769,62 @@ export function MsmeView({ userRole }: Props) {
               <button type="button" onClick={() => { setShowAdd(false); setAddError(null) }} style={{ ...ghostBtn, flex: 1 }}>Cancel</button>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {/* ── Upgrade Pack modal ── */}
+      {showUpgrade && (
+        <Modal title="MSME Vendor Packs" onClose={() => setShowUpgrade(false)} wide>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20, lineHeight: 1.6 }}>
+            Choose a pack that fits your vendor base. All vendors within your pack limit get full access — automated emails, form links, and Section 43B(h) compliance tracking.
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {MSME_PACKS.filter(p => p.tier !== 'free').map(pack => {
+              const isCurrent = pack.tier === packTier
+              const isDowngrade = pack.vendor_limit < vendorLimit
+              return (
+                <div key={pack.tier} style={{
+                  border: `2px solid ${isCurrent ? ACCENT : 'var(--border)'}`,
+                  borderRadius: 10,
+                  padding: '14px 18px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                  background: isCurrent ? `${ACCENT}08` : 'var(--surface)',
+                }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontWeight: 700, fontSize: 15, color: 'var(--text)' }}>{pack.label}</span>
+                      {isCurrent && <span style={{ fontSize: 11, fontWeight: 700, color: ACCENT, background: `${ACCENT}15`, padding: '2px 8px', borderRadius: 10 }}>Current</span>}
+                    </div>
+                    <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>
+                      Up to <strong>{pack.vendor_limit} vendors</strong> · {pack.per_vendor}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)' }}>{pack.price_label}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>one-time</div>
+                    {!isCurrent && !isDowngrade && (
+                      <button
+                        onClick={() => handleUpgrade(pack.tier)}
+                        disabled={upgradeBusy === pack.tier}
+                        style={{ ...primaryBtn, marginTop: 8, padding: '6px 16px', fontSize: 12 }}
+                      >
+                        {upgradeBusy === pack.tier ? 'Redirecting…' : 'Pay via UPI →'}
+                      </button>
+                    )}
+                    {isDowngrade && !isCurrent && (
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginTop: 8 }}>Contact support to downgrade</span>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 16, lineHeight: 1.5 }}>
+            After payment, your pack activates instantly. Payment via UPI, net banking, or cards — powered by Cashfree.
+          </p>
         </Modal>
       )}
 

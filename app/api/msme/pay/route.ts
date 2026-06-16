@@ -40,8 +40,27 @@ export async function POST(req: NextRequest) {
 
   // ── Cashfree ──────────────────────────────────────────────────────────────
   if (CF_APP_ID && CF_SECRET_KEY) {
-    const linkId = `msme_${orgId.slice(0, 8)}_${pack_tier}_${Date.now()}`
-    const cfRes  = await fetch('https://api.cashfree.com/pg/links', {
+    // link_id: "msme_" + orgId-no-hyphens-first32 + "_" + pack_tier  → max ~50 chars
+    const linkId     = `msme_${orgId.replace(/-/g, '').slice(0, 32)}_${pack_tier}`
+    const admin      = createAdminClient()
+    const appUrl     = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.sng-adwisers.com'
+    const returnUrl  = `${appUrl}/msme?pack_upgraded=1`
+
+    // Record a pending payment so the webhook can look up org_id by link_id
+    await admin.from('msme_pack_payments').upsert(
+      {
+        org_id:           orgId,
+        pack_tier,
+        vendor_limit:     vendorLimit,
+        amount_paise:     pricePaise,
+        gateway:          'cashfree',
+        gateway_order_id: linkId,
+        status:           'pending',
+      },
+      { onConflict: 'gateway_order_id' }
+    )
+
+    const cfRes = await fetch('https://api.cashfree.com/pg/links', {
       method: 'POST',
       headers: {
         'Content-Type':    'application/json',
@@ -59,14 +78,19 @@ export async function POST(req: NextRequest) {
           customer_email: userEmail,
           customer_phone: '9999999999',
         },
-        link_notify: { send_sms: false, send_email: false },
-        link_meta:   { upi_intent: true },
+        link_notify:      { send_sms: false, send_email: false },
+        link_meta:        { upi_intent: true },
+        link_return_url:  returnUrl,
       }),
     })
-    const data = await cfRes.json()
-    if (!cfRes.ok) return NextResponse.json({ error: data.message ?? 'Cashfree link creation failed' }, { status: 500 })
+    const cfData = await cfRes.json()
+    if (!cfRes.ok) {
+      // Clean up pending row on failure
+      await admin.from('msme_pack_payments').delete().eq('gateway_order_id', linkId).eq('status', 'pending')
+      return NextResponse.json({ error: cfData.message ?? 'Cashfree link creation failed' }, { status: 500 })
+    }
 
-    return NextResponse.json({ gateway: 'cashfree', payment_link: data.link_url, amount: pricePaise, pack_tier })
+    return NextResponse.json({ gateway: 'cashfree', payment_link: cfData.link_url, link_id: linkId, amount: pricePaise, pack_tier })
   }
 
   // ── Razorpay ──────────────────────────────────────────────────────────────
