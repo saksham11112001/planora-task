@@ -80,7 +80,8 @@ export default function LoginPage() {
       const { error: e } = await supabase.auth.signInWithOAuth({
         provider: 'azure',
         options: {
-          redirectTo: `${window.location.origin}/auth/confirm?next=${encodeURIComponent(getPostLoginPath())}`,
+          // PKCE verifier stored in a cookie by SSR client — must exchange server-side at /auth/callback
+          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(getPostLoginPath())}`,
           scopes: 'email profile openid',
         },
       })
@@ -100,9 +101,8 @@ export default function LoginPage() {
       const { error: e } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          // Point directly at the client-side confirm page so the URL hash
-          // (#access_token=…) is preserved — server redirects strip the hash.
-          redirectTo: `${window.location.origin}/auth/confirm?next=${encodeURIComponent(getPostLoginPath())}`,
+          // PKCE verifier stored in a cookie by SSR client — must exchange server-side at /auth/callback
+          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(getPostLoginPath())}`,
           queryParams: { access_type: 'offline', prompt: 'consent' },
         },
       })
