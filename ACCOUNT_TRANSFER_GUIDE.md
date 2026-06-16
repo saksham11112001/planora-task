@@ -126,15 +126,17 @@ sng-adwisers.com is deployed on Vercel.
 
 1. In Vercel → your project → **Settings** → **Environment Variables**.
 2. Re-enter any secret that you need to rotate (you don't need to change them, but now's a good time to audit):
-   - `SUPABASE_URL`
-   - `SUPABASE_ANON_KEY`
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `SUPABASE_SERVICE_ROLE_KEY`
-   - `NEXTAUTH_SECRET` (if used)
    - `RESEND_API_KEY`
    - `INNGEST_SIGNING_KEY`
    - `INNGEST_EVENT_KEY`
-   - `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`
+   - `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ACCOUNT_ID`, `R2_BUCKET_NAME`
    - `ANTHROPIC_API_KEY`
+   - `CASHFREE_APP_ID`, `CASHFREE_SECRET_KEY` (MSME payments)
+   - `NEXT_PUBLIC_APP_URL` (set to `https://sng-adwisers.com`)
+   - `GSTIN_API_KEY` (Surepass, optional — for GSTIN auto-fill)
    - All n8n / social API keys
 
 ---
@@ -214,7 +216,31 @@ R2 holds uploaded attachments, compliance documents, and images.
 
 ---
 
-## Step 8 — Razorpay (Payments)
+## Step 8 — Cashfree (MSME Payments)
+
+Cashfree handles UPI payments for MSME Vendor Tracker packs.
+
+### 8a. Transfer Cashfree account
+
+1. Log into [merchant.cashfree.com](https://merchant.cashfree.com).
+2. **Settings** → **Account** → update the registered email.
+3. Or create a new Cashfree merchant account with the new email and re-KYC.
+
+### 8b. Get new API credentials
+
+1. Cashfree Dashboard → **Developers** → **API Keys**.
+2. Copy `App ID` and `Secret Key` (Production).
+3. Update `CASHFREE_APP_ID` and `CASHFREE_SECRET_KEY` in Vercel.
+
+### 8c. Verify webhook
+
+1. Cashfree → **Developers** → **Webhooks**.
+2. Confirm webhook URL: `https://sng-adwisers.com/api/msme/webhook`
+3. Re-add if missing.
+
+---
+
+## Step 9 — Razorpay (Payments — legacy)
 
 Razorpay accounts are KYC-linked to the business entity. This is the most involved step.
 

@@ -9,18 +9,22 @@ import { resend, FROM } from '@/lib/email/resend'
 // used for all other transactional emails in the app).
 export async function POST(req: NextRequest) {
   try {
-    const { email } = await req.json()
+    const { email, next } = await req.json()
     if (!email?.trim()) {
       return NextResponse.json({ error: 'Email required' }, { status: 400 })
     }
 
     const admin   = createAdminClient()
-    const siteUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://floatup.app'
+    const siteUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://sng-adwisers.com'
+
+    // Magic links use PKCE — code lands at /auth/callback (server-side exchange),
+    // NOT /auth/confirm (which only handles implicit OAuth hash tokens).
+    const redirectTo = `${siteUrl}/auth/callback?next=${encodeURIComponent(next ?? '/dashboard')}`
 
     const { data, error } = await admin.auth.admin.generateLink({
       type: 'magiclink',
       email: email.trim(),
-      options: { redirectTo: `${siteUrl}/auth/confirm` },
+      options: { redirectTo },
     })
 
     if (error || !data?.properties?.action_link) {
