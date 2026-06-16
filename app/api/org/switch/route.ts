@@ -30,26 +30,28 @@ export async function POST(request: NextRequest) {
   }
 
   const response = NextResponse.json({ success: true })
-  const cookieOpts = {
+  const isProd = process.env.NODE_ENV === 'production'
+
+  // Set the active-org cookie.
+  // In production: domain-scoped so it works across all subdomains of sng-adwisers.com.
+  response.cookies.set(ACTIVE_ORG_COOKIE, org_id, {
     path:     '/',
     maxAge:   60 * 60 * 24 * 365,
-    sameSite: 'lax' as const,
-    secure:   process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    secure:   isProd,
     httpOnly: false,
-  }
-  // Set the domain-scoped cookie so it works across subdomains in production
-  response.cookies.set(ACTIVE_ORG_COOKIE, org_id, {
-    ...cookieOpts,
-    ...(process.env.NODE_ENV === 'production' ? { domain: '.sng-adwisers.com' } : {}),
+    ...(isProd ? { domain: '.sng-adwisers.com' } : {}),
   })
-  // Clear the old host-only cookie (no domain) that was set before the domain migration.
-  // If both exist the browser sends the host-only one first (more specific), shadowing
-  // the domain-scoped one and causing the wrong org to load on API calls.
-  if (process.env.NODE_ENV === 'production') {
-    response.cookies.set(ACTIVE_ORG_COOKIE, '', {
-      path: '/', maxAge: 0, sameSite: 'lax', secure: true, httpOnly: false,
-      // No domain — this targets and expires the host-only cookie specifically
-    })
+
+  // In production, also expire any stale host-only cookie left from before the domain migration.
+  // response.cookies.set() is keyed by name so calling it twice would overwrite the first set
+  // above — use headers.append instead to emit a separate Set-Cookie header for the expiry.
+  if (isProd) {
+    response.headers.append(
+      'Set-Cookie',
+      `${ACTIVE_ORG_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax; Secure`,
+    )
   }
+
   return response
 }

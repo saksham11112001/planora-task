@@ -350,7 +350,8 @@ export function MsmeVendorForm({ token }: { token: string }) {
                         display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer',
                         padding: '10px 14px', borderRadius: 8,
                         border: `2px solid ${msmeCategory === c.value ? ACCENT : '#e2e8f0'}`,
-                        background: msmeCategory === c.value ? `${ACCENT}08` : '#fff',
+                        background: msmeCategory === c.value ? `${ACCENT}08` : '#ffffff',
+                        colorScheme: 'light',
                       }}
                     >
                       <input
@@ -379,7 +380,8 @@ export function MsmeVendorForm({ token }: { token: string }) {
                         display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer',
                         padding: '10px 14px', borderRadius: 8,
                         border: `2px solid ${natureOfBusiness === n.value ? ACCENT : '#e2e8f0'}`,
-                        background: natureOfBusiness === n.value ? `${ACCENT}08` : '#fff',
+                        background: natureOfBusiness === n.value ? `${ACCENT}08` : '#ffffff',
+                        colorScheme: 'light',
                       }}
                     >
                       <input
@@ -515,8 +517,9 @@ const pageStyle: React.CSSProperties = {
   color: '#0f172a',
 }
 const cardStyle: React.CSSProperties = {
+  colorScheme: 'light',
   background: '#ffffff', borderRadius: 12, border: '1px solid #e2e8f0',
-  padding: 32, width: '100%', maxWidth: 560,
+  padding: 32, width: '100%', maxWidth: 560, color: '#0f172a',
 }
 const h1: React.CSSProperties = { margin: '0 0 6px', color: '#0f172a', fontSize: 20, fontWeight: 700 }
 const sub: React.CSSProperties = { color: '#475569', fontSize: 14, margin: 0, lineHeight: 1.6 }
