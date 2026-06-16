@@ -39,7 +39,7 @@ export default function MsmeLandingPage() {
           <Link href="/login?redirect=/msme" style={{
             color: MUTED, fontSize: 14, textDecoration: 'none', fontWeight: 500,
           }}>Login</Link>
-          <Link href="/login?redirect=/msme" style={{
+          <Link href="/login?redirect=/msme&mode=signup" style={{
             background: TEAL, color: '#fff', borderRadius: 8, padding: '8px 20px',
             fontSize: 14, fontWeight: 600, textDecoration: 'none',
           }}>Get Started Free →</Link>
@@ -72,7 +72,7 @@ export default function MsmeLandingPage() {
         </p>
 
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 16 }}>
-          <Link href="/login?redirect=/msme" style={{
+          <Link href="/login?redirect=/msme&mode=signup" style={{
             background: TEAL, color: '#fff', borderRadius: 10, padding: '14px 32px',
             fontSize: 16, fontWeight: 700, textDecoration: 'none', display: 'inline-block',
           }}>Start free — no card needed</Link>
@@ -227,7 +227,7 @@ export default function MsmeLandingPage() {
               </div>
             ))}
           </div>
-          <Link href="/login?redirect=/msme" style={{
+          <Link href="/login?redirect=/msme&mode=signup" style={{
             display: 'block', background: TEAL, color: '#fff', borderRadius: 10,
             padding: '13px 0', fontSize: 15, fontWeight: 700, textDecoration: 'none',
           }}>
@@ -299,7 +299,7 @@ export default function MsmeLandingPage() {
         <p style={{ color: MUTED, fontSize: 15, marginBottom: 32, maxWidth: 420, margin: '0 auto 32px' }}>
           No credit card needed. You can start right away.
         </p>
-        <Link href="/login?redirect=/msme" style={{
+        <Link href="/login?redirect=/msme&mode=signup" style={{
           display: 'inline-block', background: TEAL, color: '#fff', borderRadius: 10,
           padding: '14px 36px', fontSize: 16, fontWeight: 700, textDecoration: 'none',
         }}>

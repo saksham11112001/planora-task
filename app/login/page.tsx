@@ -55,6 +55,9 @@ export default function LoginPage() {
     if (redir && redir.startsWith('/') && !redir.startsWith('//')) {
       sessionStorage.setItem('planora_post_onboard', redir)
     }
+    if (params.get('mode') === 'signup') {
+      setMode('email_signup')
+    }
     if (params.get('error') === 'auth_failed') {
       setError("Sign-in failed. Please try again — if the problem persists, try a different method.")
       setMode('email_password')

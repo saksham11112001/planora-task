@@ -48,9 +48,9 @@ const NAT_LABEL: Record<string, string>  = { manufacturer: 'Manufacturer', servi
 interface Toast { id: number; message: string; type: 'success' | 'error' | 'info' }
 interface ImportRow { vendor_name: string; vendor_email: string; gstin?: string }
 
-interface Props { userRole: string }
+interface Props { userRole: string; orgName?: string }
 
-export function MsmeView({ userRole }: Props) {
+export function MsmeView({ userRole, orgName }: Props) {
   const [vendors,       setVendors]       = useState<Vendor[]>([])
   const [total,         setTotal]         = useState(0)
   const [totalEver,     setTotalEver]     = useState(0)
@@ -437,9 +437,11 @@ export function MsmeView({ userRole }: Props) {
       {/* ── Header ── */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>MSME Vendor Tracker</h1>
+          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>
+            MSME Vendor Tracker{orgName ? <span style={{ fontSize: 15, fontWeight: 500, color: 'var(--text-muted)', marginLeft: 10 }}>· {orgName}</span> : null}
+          </h1>
           <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-muted)' }}>
-            Automated vendor registry for Section 43B(h) compliance · {totalEver}/{vendorLimit} slots used
+            Section 43B(h) compliance · {totalEver}/{vendorLimit} slots used
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -817,7 +819,15 @@ export function MsmeView({ userRole }: Props) {
                     )}
                     <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)' }}>{pack.price_label}</div>
                     <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>one-time</div>
-                    {!isCurrent && !isDowngrade && (
+                    {!isCurrent && !isDowngrade && pack.tier === 'pack_500' && (
+                      <a
+                        href="mailto:info@sng-adwisers.com?subject=MSME%20Enterprise%20Pack%20(500%20vendors)"
+                        style={{ ...primaryBtn, marginTop: 8, padding: '6px 16px', fontSize: 12, textDecoration: 'none', display: 'inline-block' }}
+                      >
+                        Contact us →
+                      </a>
+                    )}
+                    {!isCurrent && !isDowngrade && pack.tier !== 'pack_500' && (
                       <button
                         onClick={() => handleUpgrade(pack.tier)}
                         disabled={upgradeBusy === pack.tier}

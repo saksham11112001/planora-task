@@ -9,7 +9,7 @@ export default async function MsmePage({ searchParams }: { searchParams: Promise
   const user = await getSessionUser()
   if (!user) {
     const ref = params.ref ? `&ref=${encodeURIComponent(params.ref)}` : ''
-    redirect(`/login?redirect=/msme${ref}`)
+    redirect(`/login?redirect=/msme&mode=signup${ref}`)
   }
 
   const mb = await getActiveOrgMembership(user.id)
@@ -19,5 +19,8 @@ export default async function MsmePage({ searchParams }: { searchParams: Promise
     redirect('/dashboard')
   }
 
-  return <MsmeView userRole={mb.role} />
+  const org = (mb as any).organisations as any
+  const orgName: string = org?.name ?? ''
+
+  return <MsmeView userRole={mb.role} orgName={orgName} />
 }
