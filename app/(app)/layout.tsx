@@ -72,7 +72,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         redirect('/dashboard')
       }
 
-      // 2. Truly no org membership anywhere — send to onboarding to create one
+      // 2. Check if this user is a standalone partner — send to partner portal
+      const { data: standalonePartner } = await admin
+        .from('standalone_partners')
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      if (standalonePartner) redirect('/partners/dashboard')
+
+      // 3. Truly no org membership anywhere — send to onboarding to create one
       //    (do NOT redirect to /login here — the user IS authenticated)
       redirect('/onboarding')
     }

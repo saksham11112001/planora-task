@@ -50,6 +50,11 @@ export default function LoginPage() {
     // Persist referral code from ?ref= so onboarding can pick it up after auth
     const ref = params.get('ref')
     if (ref) sessionStorage.setItem('planora_ref_code', ref)
+    // Persist post-login redirect so onboarding can send the user to the right page
+    const redir = params.get('redirect')
+    if (redir && redir.startsWith('/') && !redir.startsWith('//')) {
+      sessionStorage.setItem('planora_post_onboard', redir)
+    }
     if (params.get('error') === 'auth_failed') {
       setError("Sign-in failed. Please try again — if the problem persists, try a different method.")
       setMode('email_password')

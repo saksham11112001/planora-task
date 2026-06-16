@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import * as XLSX from 'xlsx'
 import { MSME_PACKS } from '@/lib/msme/packs'
+import { createClient } from '@/lib/supabase/client'
 
 const ACCENT = '#0d9488'
 
@@ -441,12 +442,18 @@ export function MsmeView({ userRole }: Props) {
             Automated vendor registry for Section 43B(h) compliance · {totalEver}/{vendorLimit} slots used
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           {canAdmin && (
             <button onClick={() => setShowUpgrade(true)} style={{ ...ghostBtn, borderColor: ACCENT, color: ACCENT }}>
               📦 {packTier === 'free' ? 'Upgrade Pack' : 'Manage Pack'}
             </button>
           )}
+          <button
+            onClick={async () => { await createClient().auth.signOut(); window.location.href = '/' }}
+            style={{ ...ghostBtn, fontSize: 12, padding: '6px 12px' }}
+          >
+            Logout
+          </button>
           {canAdmin && (
             <button onClick={() => { setShowSettings(true); setDraftIntervals([...intervalDays]) }} style={ghostBtn}>
               ⚙ Email schedule
@@ -801,10 +808,13 @@ export function MsmeView({ userRole }: Props) {
                       {isCurrent && <span style={{ fontSize: 11, fontWeight: 700, color: ACCENT, background: `${ACCENT}15`, padding: '2px 8px', borderRadius: 10 }}>Current</span>}
                     </div>
                     <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>
-                      Up to <strong>{pack.vendor_limit} vendors</strong> · {pack.per_vendor}
+                      Up to <strong>{pack.vendor_limit} vendors</strong>
                     </div>
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    {pack.original_price_label && (
+                      <div style={{ fontSize: 13, color: 'var(--text-muted)', textDecoration: 'line-through' }}>{pack.original_price_label}</div>
+                    )}
                     <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)' }}>{pack.price_label}</div>
                     <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>one-time</div>
                     {!isCurrent && !isDowngrade && (
