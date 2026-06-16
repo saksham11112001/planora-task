@@ -68,7 +68,7 @@ export default function MsmeLandingPage() {
           background: 'rgba(13,148,136,0.12)', border: '1px solid rgba(13,148,136,0.3)',
           borderRadius: 20, padding: '6px 16px', fontSize: 13, color: TEAL, fontWeight: 600,
         }}>
-          ⚡ Section 43B(h) Compliance — fully automated
+        Income Tax and ROC Compliance
         </div>
 
         <h1 style={{
@@ -121,8 +121,8 @@ One upload. Zero worries.
         }}>
           {[
             { num: '100%', label: 'Automated — vendor emails, forms, and deadline tracking' },
-            { num: '2 min', label: 'To add a vendor' },
-            { num: '3×',   label: 'Audit Logs' },
+            { num: '2 mins', label: 'To add a vendor or import file' },
+            { num: '3×',   label: 'Easier to mantain Audit Logs' },
           ].map(s => (
             <div key={s.num}>
               <div style={{ fontSize: 28, fontWeight: 800, color: TEAL, marginBottom: 4 }}>{s.num}</div>
@@ -138,13 +138,13 @@ One upload. Zero worries.
           The problem every business faces
         </h2>
         <p style={{ color: MUTED, textAlign: 'center', fontSize: 15, marginBottom: 40, maxWidth: 540, margin: '0 auto 40px' }}>
-          MSME Trackingh= is simple in theory. In practice, tracking it manually is a nightmare.
+          MSME Tracking is simple in theory. In practice, tracking it manually is a nightmare.
         </p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
           {[
-            { icon: '📲', title: 'Chasing vendors Manually', body: "You need Udyam certificates from 50 vendors. You're sending messages manually, following up, waiting. Half don't reply." },
-            { icon: '📋', title: 'No central record', body: "You cant share with auditors which vendors are MSME registered." },
-            { icon: '🔔', title: 'Missing deadlines silently', body: "Payment deadlines pass without any alert. You find out during filing that a deduction is disallowed — and you've already paid the tax." },
+            {  title: 'Chasing vendors Manually', body: "You need Udyam certificates from 50 vendors. You're sending messages manually, following up, waiting. Half don't reply." },
+            {  title: 'No central record', body: "You cant share with auditors which vendors are MSME registered." },
+            {  title: 'Missing deadlines silently', body: "Payment deadlines pass without any alert. You find out during filing that a deduction is disallowed — and you've already paid the tax." },
           ].map(c => (
             <div key={c.title} style={{
               background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)',
