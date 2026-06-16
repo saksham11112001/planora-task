@@ -61,21 +61,26 @@ export default function MsmeLandingPage() {
           fontSize: 'clamp(32px, 5vw, 54px)', fontWeight: 800, lineHeight: 1.15,
           marginBottom: 20, letterSpacing: '-0.02em',
         }}>
-          Looking for something automated<br/>
-          for <span style={{ color: TEAL }}>MSME compliance?</span><br/>
+          Worried about<br/>
+          <span style={{ color: TEAL }}>MSME compliance?</span><br/>
           <span style={{ fontSize: '0.75em', fontWeight: 600, color: MUTED }}>We've got you covered.</span>
         </h1>
 
         <p style={{ fontSize: 17, color: MUTED, lineHeight: 1.7, maxWidth: 580, margin: '0 auto 36px' }}>
-          Stop chasing vendors on WhatsApp. Stop missing deadlines on spreadsheets.
-          Planora automates Udyam declarations, tracks payment deadlines, and keeps your Section 43B(h) compliance in order — on autopilot.
+         Stop chasing vendors manually.
+
+Planora automates vendor follow-ups for MSME status and compliance documents — so you never have to ask twice.
+
+Every communication is logged in an audit-ready trail, ready to hand to your auditor.
+
+One upload. Zero worries.
         </p>
 
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 16 }}>
           <Link href="/login?redirect=/msme&mode=signup" style={{
             background: TEAL, color: '#fff', borderRadius: 10, padding: '14px 32px',
             fontSize: 16, fontWeight: 700, textDecoration: 'none', display: 'inline-block',
-          }}>Start free — no card needed</Link>
+          }}>Start free</Link>
           <a href="#how-it-works" style={{
             background: 'rgba(255,255,255,0.06)', color: WHITE, borderRadius: 10,
             padding: '14px 28px', fontSize: 16, fontWeight: 600, textDecoration: 'none',
@@ -83,9 +88,7 @@ export default function MsmeLandingPage() {
           }}>See how it works ↓</a>
         </div>
 
-        <p style={{ fontSize: 13, color: MUTED }}>
-          You can start free · No subscription · Pay only to scale
-        </p>
+        
       </section>
 
       {/* ── Stats bar ────────────────────────────────────────────────────── */}
@@ -100,8 +103,8 @@ export default function MsmeLandingPage() {
         }}>
           {[
             { num: '100%', label: 'Automated — vendor emails, forms, and deadline tracking' },
-            { num: '2 min', label: 'To add a vendor and send them a declaration form' },
-            { num: '3×',   label: 'Automated reminders sent to each vendor' },
+            { num: '2 min', label: 'To add a vendor' },
+            { num: '3×',   label: 'Audit Logs' },
           ].map(s => (
             <div key={s.num}>
               <div style={{ fontSize: 28, fontWeight: 800, color: TEAL, marginBottom: 4 }}>{s.num}</div>
@@ -117,12 +120,12 @@ export default function MsmeLandingPage() {
           The problem every business faces
         </h2>
         <p style={{ color: MUTED, textAlign: 'center', fontSize: 15, marginBottom: 40, maxWidth: 540, margin: '0 auto 40px' }}>
-          Section 43B(h) is simple in theory. In practice, tracking it manually is a nightmare.
+          MSME Trackingh= is simple in theory. In practice, tracking it manually is a nightmare.
         </p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
           {[
-            { icon: '📲', title: 'Chasing vendors on WhatsApp', body: "You need Udyam certificates from 50 vendors. You're sending messages manually, following up, waiting. Half don't reply." },
-            { icon: '📋', title: 'No central record', body: "You don't know which vendors are MSME-registered, which have submitted their certificate, and which are still pending." },
+            { icon: '📲', title: 'Chasing vendors Manually', body: "You need Udyam certificates from 50 vendors. You're sending messages manually, following up, waiting. Half don't reply." },
+            { icon: '📋', title: 'No central record', body: "You cant share with auditors which vendors are MSME registered." },
             { icon: '🔔', title: 'Missing deadlines silently', body: "Payment deadlines pass without any alert. You find out during filing that a deduction is disallowed — and you've already paid the tax." },
           ].map(c => (
             <div key={c.title} style={{
@@ -151,10 +154,11 @@ export default function MsmeLandingPage() {
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 20 }}>
             {[
-              { step: '1', title: 'Add your MSME vendors', body: 'Add vendors one by one or bulk-import from Excel. Just need the vendor name and email.' },
-              { step: '2', title: 'We send them a declaration form', body: 'Each vendor gets an email with a simple form to confirm their Udyam number and MSME category — no chasing on WhatsApp.' },
-              { step: '3', title: 'Track payment deadlines', body: 'Log invoice dates. The tracker calculates the Section 43B(h) deadline and alerts you before it expires.' },
-              { step: '4', title: 'Export for filing', body: 'Download a clean Excel report with all vendor details, payment statuses, and Udyam numbers.' },
+              { step: '1', title: 'Add your MSME vendors', body: 'Add vendors one by one or bulk-import from Excel. Just need the vendor name,email and other basic information.' },
+              { step: '2', title: 'Automatic followups', body: 'Each vendor gets an email with a simple form to confirm their Udyam number and MSME category — no chasing manually.' },
+              { step: '3', title: 'Export for filing', body: 'Download a clean Excel report with all vendor details, payment statuses, and Udyam numbers.' },
+              { step: '4', title: 'Downloadable audit log', body: 'Downloadable audit log to be shared to auditor' },
+              
             ].map(s => (
               <div key={s.step} style={{ background: CARD, borderRadius: 12, padding: '22px' }}>
                 <div style={{
@@ -170,103 +174,7 @@ export default function MsmeLandingPage() {
         </div>
       </section>
 
-      {/* ── Features ─────────────────────────────────────────────────────── */}
-      <section style={{ maxWidth: 860, margin: '0 auto', padding: '64px 24px' }}>
-        <h2 style={{ fontSize: 28, fontWeight: 700, textAlign: 'center', marginBottom: 48 }}>
-          Everything included
-        </h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
-          {[
-            { icon: '⏱️', title: 'Deadline tracker',             body: 'Automatic calculation from invoice date. Visual status — green, amber, red.' },
-            { icon: '✉️', title: 'Automated vendor emails',       body: 'Up to 3 reminder emails sent automatically asking for Udyam declarations. No manual follow-up.' },
-            { icon: '🔗', title: 'One-click declaration form',    body: 'Each vendor gets a unique link. They fill in their MSME details — you receive it automatically.' },
-            { icon: '📊', title: 'Dashboard summary',             body: 'See total vendors, payment statuses, outstanding amounts, and compliance health at a glance.' },
-            { icon: '📥', title: 'Excel bulk import',             body: 'Import your full vendor list from Excel or CSV in one go.' },
-            { icon: '📤', title: 'Excel export for filing',       body: 'One-click export with all Udyam numbers, categories, amounts, and statuses.' },
-            { icon: '🔒', title: 'Secure & private',              body: "Your vendor data is stored securely. Each firm's data is completely isolated." },
-            { icon: '📱', title: 'Mobile-friendly vendor form',   body: 'Vendors can fill the declaration form on their phone in under 2 minutes.' },
-          ].map(f => (
-            <div key={f.title} style={{
-              background: CARD, borderRadius: 12, padding: '20px 22px',
-              border: '1px solid rgba(255,255,255,0.06)',
-            }}>
-              <div style={{ fontSize: 24, marginBottom: 10 }}>{f.icon}</div>
-              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6 }}>{f.title}</div>
-              <div style={{ fontSize: 13, color: MUTED, lineHeight: 1.55 }}>{f.body}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-
-      {/* ── Pricing ──────────────────────────────────────────────────────── */}
-      <section style={{ maxWidth: 640, margin: '0 auto', padding: '64px 24px', textAlign: 'center' }}>
-        <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 8 }}>Simple, transparent pricing</h2>
-        <p style={{ color: MUTED, fontSize: 15, marginBottom: 40 }}>
-          Start free. Pay only when you need more vendors.
-        </p>
-        <div style={{
-          background: CARD, border: '1px solid rgba(13,148,136,0.4)', borderRadius: 16, padding: '36px',
-          marginBottom: 20,
-        }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: TEAL, marginBottom: 16, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-            Free tier
-          </div>
-          <div style={{ fontSize: 42, fontWeight: 800, marginBottom: 4 }}>Free</div>
-          <div style={{ fontSize: 15, color: MUTED, marginBottom: 28 }}>You can start right away — no payment needed</div>
-          <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 20, marginBottom: 24 }}>
-            {[
-              '✓ Full access to all features',
-              '✓ Automated vendor emails',
-              '✓ Declaration form links',
-              '✓ Deadline tracker',
-              '✓ Excel export',
-            ].map(item => (
-              <div key={item} style={{ fontSize: 14, color: MUTED, marginBottom: 8, textAlign: 'left' }}>
-                <span style={{ color: TEAL }}>{item.slice(0,1)}</span>{item.slice(1)}
-              </div>
-            ))}
-          </div>
-          <Link href="/login?redirect=/msme&mode=signup" style={{
-            display: 'block', background: TEAL, color: '#fff', borderRadius: 10,
-            padding: '13px 0', fontSize: 15, fontWeight: 700, textDecoration: 'none',
-          }}>
-            Get started free →
-          </Link>
-        </div>
-        <p style={{ fontSize: 13, color: MUTED }}>
-          Need more vendors? Affordable packs are available inside the app after sign-up.
-        </p>
-      </section>
-
-      {/* ── Who is this for ──────────────────────────────────────────────── */}
-      <section style={{
-        background: 'rgba(255,255,255,0.02)', borderTop: '1px solid rgba(255,255,255,0.07)',
-        borderBottom: '1px solid rgba(255,255,255,0.07)', padding: '64px 24px',
-      }}>
-        <div style={{ maxWidth: 860, margin: '0 auto' }}>
-          <h2 style={{ fontSize: 28, fontWeight: 700, textAlign: 'center', marginBottom: 40 }}>
-            Who uses MSME Tracker?
-          </h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
-            {[
-              { icon: '🏢', who: 'Business owners & CFOs',     desc: 'Companies with vendor lists who need to track Section 43B(h) payment deadlines and collect declarations.' },
-              { icon: '📦', who: 'Purchase & finance teams',    desc: 'Teams managing vendor payments who need a single source of truth for MSME status and deadlines.' },
-              { icon: '📑', who: 'Accountants & tax advisors',  desc: 'Professionals who need a clean Udyam declaration trail and payment record before the filing deadline.' },
-            ].map(w => (
-              <div key={w.who} style={{
-                background: CARD, borderRadius: 12, padding: '22px',
-                border: '1px solid rgba(255,255,255,0.06)', textAlign: 'center',
-              }}>
-                <div style={{ fontSize: 32, marginBottom: 12 }}>{w.icon}</div>
-                <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 8 }}>{w.who}</div>
-                <div style={{ fontSize: 13, color: MUTED, lineHeight: 1.6 }}>{w.desc}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
+      
       {/* ── Explore Planora ──────────────────────────────────────────────── */}
       <section style={{
         borderTop: '1px solid rgba(255,255,255,0.07)',
@@ -275,7 +183,7 @@ export default function MsmeLandingPage() {
         <div style={{ maxWidth: 780, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 32, flexWrap: 'wrap' }}>
           <div style={{ flex: 1, minWidth: 260 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: TEAL, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
-              Need a full practice management tool?
+              Are you a CA, Need a full practice management tool?
             </div>
             <h3 style={{ fontSize: 22, fontWeight: 700, marginBottom: 10, lineHeight: 1.3 }}>
               Explore Planora — task management, compliance, invoicing & more
