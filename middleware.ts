@@ -107,6 +107,15 @@ export async function middleware(request: NextRequest) {
   const isMsmeDomain = host.startsWith('msme.')
   const defaultRoute = isMsmeDomain ? '/msme' : '/dashboard'
 
+  // Auth code landed on root (Supabase Site URL misconfigured) — forward to the callback handler
+  if (pathname === '/' && url.searchParams.has('code')) {
+    const callbackUrl = new URL('/auth/callback', request.url)
+    callbackUrl.searchParams.set('code', url.searchParams.get('code')!)
+    const next = url.searchParams.get('next')
+    if (next) callbackUrl.searchParams.set('next', next)
+    return NextResponse.redirect(callbackUrl)
+  }
+
   if (error || !user) {
     // MSME subdomain: unauthenticated root → show product landing page (rewrite, keep URL as /)
     if (isMsmeDomain && pathname === '/') {
