@@ -35,10 +35,12 @@ export async function GET(request: NextRequest) {
     {
       cookies: {
         getAll: () => cookieStore.getAll(),
-        setAll: (cs: { name: string; value: string; options?: Record<string, unknown> }[]) =>
+        setAll: (cs: { name: string; value: string; options?: Record<string, unknown> }[]) => {
+          const sharedDomain = process.env.NODE_ENV === 'production' ? { domain: '.sng-adwisers.com' } : {}
           cs.forEach(({ name, value, options }) => {
-            try { cookieStore.set(name, value, options as any) } catch {}
-          }),
+            try { cookieStore.set(name, value, { ...(options as any), ...sharedDomain }) } catch {}
+          })
+        },
       },
     }
   )
