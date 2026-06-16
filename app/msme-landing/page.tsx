@@ -205,7 +205,7 @@ One upload. Zero worries.
           Start tracking today
         </h2>
         <p style={{ color: MUTED, fontSize: 15, marginBottom: 32, maxWidth: 420, margin: '0 auto 32px' }}>
-          No credit card needed. You can start right away.
+          You can start right away.
         </p>
         <Link href="/login?redirect=/msme&mode=signup" style={{
           display: 'inline-block', background: TEAL, color: '#fff', borderRadius: 10,
