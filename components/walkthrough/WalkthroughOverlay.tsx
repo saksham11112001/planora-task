@@ -1426,7 +1426,7 @@ export function WalkthroughOverlay({ userId, userCreatedAt, tourCompletedAt, sta
           backdropFilter:'blur(3px)', zIndex:99990, display:'flex',
           alignItems:'center', justifyContent:'center', padding:'16px',
         }}
-        onClick={standalone ? undefined : dismiss}>
+        onClick={undefined}>
 
         {/* ── Main card ── */}
         <div

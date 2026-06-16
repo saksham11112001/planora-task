@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
+import { TryPlanoraSidebar } from './TryPlanoraSidebar'
 
 export const metadata: Metadata = {
   title: 'MSME Tracker — Automate Section 43B(h) Compliance | Planora',
@@ -197,50 +198,6 @@ export default function MsmeLandingPage() {
         </div>
       </section>
 
-      {/* ── Comparison vs Zoho / spreadsheets ────────────────────────────── */}
-      <section style={{
-        background: 'rgba(255,255,255,0.02)', borderTop: '1px solid rgba(255,255,255,0.07)',
-        borderBottom: '1px solid rgba(255,255,255,0.07)', padding: '64px 24px',
-      }}>
-        <div style={{ maxWidth: 800, margin: '0 auto' }}>
-          <h2 style={{ fontSize: 28, fontWeight: 700, textAlign: 'center', marginBottom: 8 }}>
-            Why not just use Zoho or a spreadsheet?
-          </h2>
-          <p style={{ color: MUTED, textAlign: 'center', fontSize: 15, marginBottom: 48 }}>
-            General-purpose tools aren't built for MSME compliance. Here's the difference.
-          </p>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
-              <thead>
-                <tr>
-                  <th style={{ textAlign: 'left', padding: '12px 16px', color: MUTED, fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.08)', width: '34%' }}></th>
-                  <th style={{ textAlign: 'center', padding: '12px 16px', color: WHITE, fontWeight: 700, borderBottom: '1px solid rgba(255,255,255,0.08)', width: '33%' }}>
-                    <span style={{ color: TEAL }}>Planora MSME Tracker</span>
-                  </th>
-                  <th style={{ textAlign: 'center', padding: '12px 16px', color: MUTED, fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.08)', width: '33%' }}>Zoho / Spreadsheet</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  ['Automated vendor declaration emails', '✅ Built-in, automatic', '❌ Manual or custom setup'],
-                  ['Vendor self-service form link', '✅ One click per vendor', '❌ Not available'],
-                  ['Section 43B(h) deadline tracking', '✅ Auto-calculated', '⚠️ You set it manually'],
-                  ['Deadline alerts before expiry', '✅ Automatic reminders', '❌ Manual reminders only'],
-                  ['MSME-specific Excel export', '✅ One click', '⚠️ Build your own template'],
-                  ['Setup time', '✅ Under 5 minutes', '⚠️ Hours of configuration'],
-                  ['Built for Indian compliance', '✅ Yes', '❌ Generic global tool'],
-                ].map(([feature, us, them]) => (
-                  <tr key={feature} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                    <td style={{ padding: '13px 16px', color: MUTED, fontSize: 13 }}>{feature}</td>
-                    <td style={{ padding: '13px 16px', textAlign: 'center', color: '#4ade80', fontWeight: 600, fontSize: 13 }}>{us}</td>
-                    <td style={{ padding: '13px 16px', textAlign: 'center', color: MUTED, fontSize: 13 }}>{them}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
 
       {/* ── Pricing ──────────────────────────────────────────────────────── */}
       <section style={{ maxWidth: 640, margin: '0 auto', padding: '64px 24px', textAlign: 'center' }}>
@@ -327,14 +284,7 @@ export default function MsmeLandingPage() {
               The same platform that powers MSME Tracker also manages tasks, recurring compliance deadlines, client portals, team collaboration, and invoicing — all in one place.
             </p>
           </div>
-          <Link href="/login" style={{
-            display: 'inline-flex', alignItems: 'center', gap: 8,
-            background: 'rgba(255,255,255,0.06)', color: WHITE, border: '1px solid rgba(255,255,255,0.15)',
-            borderRadius: 10, padding: '13px 24px', fontSize: 15, fontWeight: 600, textDecoration: 'none',
-            whiteSpace: 'nowrap', flexShrink: 0,
-          }}>
-            Explore Planora →
-          </Link>
+          <TryPlanoraSidebar />
         </div>
       </section>
 

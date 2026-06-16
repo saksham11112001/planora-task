@@ -21,12 +21,12 @@ const HOW_DID_YOU_HEAR = ['Google Search','LinkedIn','Friend / Colleague','Whats
 const ROLE_OPTIONS = ['CA / Chartered Accountant','CPA / Tax Professional','Owner / Founder','Firm Manager','Team Member / Employee','Other']
 const CURRENT_TOOLS = ['Excel / Google Sheets','Tally','Zoho','QuickBooks','Paper / Manual','Nothing yet','Other']
 const PAIN_POINTS = [
-  'Missing statutory deadlines (GST, ITR, TDS)',
-  'Tracking which client work is pending',
+  'Missing deadlines and follow-ups',
+  'Tracking what work is pending',
   'Managing my team\'s workload',
   'Client communication and follow-ups',
-  'MSME / Udyam compliance tracking',
-  'Billing and invoicing clients',
+  'Staying on top of recurring tasks',
+  'Billing and invoicing',
   'All of the above',
 ]
 
@@ -199,7 +199,9 @@ export default function OnboardingPage() {
           body: JSON.stringify({ org_id: data.org_id }),
         })
       }
-      router.push('/dashboard'); router.refresh()
+      const postOnboard = sessionStorage.getItem('planora_post_onboard') ?? ''
+      if (postOnboard) sessionStorage.removeItem('planora_post_onboard')
+      router.push(postOnboard || '/dashboard'); router.refresh()
     } catch { setError('Network error — please try again') } finally { setSaving(false) }
   }
 
@@ -457,8 +459,8 @@ export default function OnboardingPage() {
                   <Building2 className="h-5 w-5 text-teal-600"/>
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-gray-900">About your firm</h2>
-                  <p className="text-sm text-gray-500">Help us personalise Floatup for your practice</p>
+                  <h2 className="text-lg font-bold text-gray-900">About your organisation</h2>
+                  <p className="text-sm text-gray-500">Help us personalise Floatup for your team</p>
                 </div>
               </div>
               {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>}
@@ -470,9 +472,9 @@ export default function OnboardingPage() {
                     onKeyDown={e => e.key === 'Enter' && form.org_name.trim() && (setError(''), setStep(2))}/>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Type of practice</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Type of organisation</label>
                   <select value={form.practice_type} onChange={e => set('practice_type', e.target.value)} className="input">
-                    <option value="">Select practice type</option>
+                    <option value="">Select type</option>
                     {PRACTICE_TYPES.map(p => <option key={p} value={p}>{p}</option>)}
                   </select>
                 </div>
@@ -484,7 +486,7 @@ export default function OnboardingPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Years in practice</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Years in business</label>
                   <select value={form.years_in_practice} onChange={e => set('years_in_practice', e.target.value)} className="input">
                     <option value="">Select experience</option>
                     {YEARS_OPTIONS.map(y => <option key={y} value={y}>{y}</option>)}

@@ -242,6 +242,18 @@ export function PartnerView() {
         </button>
       </div>
 
+      {/* ── Hero CTA ───────────────────────────────────────────────────────── */}
+      <div style={{ background: 'linear-gradient(135deg, rgba(13,148,136,0.1), rgba(8,145,178,0.07))', border: '1px solid rgba(13,148,136,0.25)', borderRadius: 12, padding: '20px 24px', marginBottom: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
+        <div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--fg)', marginBottom: 4 }}>
+            Let's get your clients MSME complied 🚀
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.6 }}>
+            Share your referral link below — every client you bring in earns you <strong style={{ color: 'var(--brand)' }}>{data.rate_percent}% commission</strong> on their paid plan.
+          </div>
+        </div>
+      </div>
+
       {/* ── Tier progress ──────────────────────────────────────────────────── */}
       {data.next_tier && (
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 18px', marginBottom: 24, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
@@ -417,6 +429,74 @@ export function PartnerView() {
         )}
       </div>
 
+      {/* ── Invite by Email (MSME Tracker) ────────────────────────────────── */}
+      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 20, marginBottom: 28 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+          <Mail size={16} style={{ color: '#0d9488' }} />
+          <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--fg)' }}>Invite to MSME Tracker</span>
+        </div>
+        <p style={{ fontSize: 12, color: 'var(--muted)', margin: '0 0 16px', lineHeight: 1.6 }}>
+          Enter one email per line — we'll send each person a personalised invite to try MSME Tracker with your referral code embedded.
+        </p>
+
+        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <textarea
+            value={inviteEmails}
+            onChange={e => setInviteEmails(e.target.value)}
+            placeholder={'ca@example.com\naccounts@firm.in\nrajesh@vendor.com'}
+            rows={4}
+            style={{
+              flex: 1, minWidth: 240, padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 8,
+              fontSize: 13, color: 'var(--fg)', background: 'var(--bg)', resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5,
+            }}
+          />
+          <button
+            onClick={sendInvites}
+            disabled={inviteBusy || !inviteEmails.trim()}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6, padding: '10px 18px',
+              background: inviteBusy ? 'var(--border)' : '#0d9488', color: inviteBusy ? 'var(--muted)' : '#fff',
+              border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600,
+              cursor: inviteBusy || !inviteEmails.trim() ? 'not-allowed' : 'pointer', flexShrink: 0,
+            }}
+          >
+            <Send size={14} />
+            {inviteBusy ? 'Sending…' : 'Send Invites'}
+          </button>
+        </div>
+
+        <p style={{ fontSize: 11, color: 'var(--muted)', margin: '8px 0 0' }}>
+          One email per line · Max 20 per batch · Your referral code is embedded automatically.
+        </p>
+
+        {/* Invite history */}
+        {invites.length > 0 && (
+          <div style={{ marginTop: 20, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>
+              Invite History ({invites.length})
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 0, border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+              {invites.map((inv, i) => (
+                <div key={inv.id} style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 14px',
+                  background: 'var(--bg)', borderTop: i > 0 ? '1px solid var(--border)' : 'none', fontSize: 13,
+                }}>
+                  <div style={{ fontWeight: 500, color: 'var(--fg)' }}>{inv.email}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
+                    <span style={{ fontSize: 11, color: 'var(--muted)' }}>
+                      {inv.invite_count > 1 ? `${inv.invite_count}× sent` : 'Sent'} · {fmtDate(inv.last_sent_at)}
+                    </span>
+                    <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: '#f0fdfa', color: '#0d9488' }}>
+                      Invited
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* ── Referred clients table ─────────────────────────────────────────── */}
       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', marginBottom: 28 }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -456,8 +536,8 @@ export function PartnerView() {
                         </span>
                       </td>
                       <td style={{ padding: '12px 16px' }}>
-                        <span style={{ color: STATUS_COLORS[r.status] ?? '#64748b', fontSize: 12, fontWeight: 600, textTransform: 'capitalize' }}>
-                          ● {r.status}
+                        <span style={{ color: r.is_paying ? (STATUS_COLORS[r.status] ?? '#64748b') : '#2563eb', fontSize: 12, fontWeight: 600 }}>
+                          ● {r.is_paying ? (r.status === 'trialing' ? 'Trial' : r.status === 'past_due' ? 'Past due' : r.status === 'cancelled' ? 'Cancelled' : 'Active') : 'Signed up'}
                         </span>
                       </td>
                       <td style={{ padding: '12px 16px', color: earned > 0 ? '#16a34a' : 'var(--muted)', fontWeight: earned > 0 ? 600 : 400 }}>
@@ -468,77 +548,6 @@ export function PartnerView() {
                 })}
               </tbody>
             </table>
-          </div>
-        )}
-      </div>
-
-      {/* ── Invite by Email (MSME Tracker) ────────────────────────────────── */}
-      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 20, marginBottom: 28 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-          <Mail size={16} style={{ color: '#0d9488' }} />
-          <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--fg)' }}>Invite to MSME Tracker</span>
-        </div>
-        <p style={{ fontSize: 12, color: 'var(--muted)', margin: '0 0 16px', lineHeight: 1.6 }}>
-          Enter email addresses below — we'll send each person a personalised invite to try MSME Tracker with your referral code embedded. Separate multiple emails with commas or new lines.
-        </p>
-
-        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-          <textarea
-            value={inviteEmails}
-            onChange={e => setInviteEmails(e.target.value)}
-            placeholder={'ca@example.com\naccounts@firm.in, rajesh@vendor.com'}
-            rows={3}
-            style={{
-              flex: 1, minWidth: 240, padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 8,
-              fontSize: 13, color: 'var(--fg)', background: 'var(--bg)', resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5,
-            }}
-          />
-          <button
-            onClick={sendInvites}
-            disabled={inviteBusy || !inviteEmails.trim()}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6, padding: '10px 18px',
-              background: inviteBusy ? 'var(--border)' : '#0d9488', color: inviteBusy ? 'var(--muted)' : '#fff',
-              border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600,
-              cursor: inviteBusy || !inviteEmails.trim() ? 'not-allowed' : 'pointer', flexShrink: 0,
-            }}
-          >
-            <Send size={14} />
-            {inviteBusy ? 'Sending…' : 'Send Invites'}
-          </button>
-        </div>
-
-        <p style={{ fontSize: 11, color: 'var(--muted)', margin: '8px 0 0' }}>
-          Max 20 emails per batch. Each invite includes your referral code so sign-ups are tracked automatically.
-        </p>
-
-        {/* Invite history */}
-        {invites.length > 0 && (
-          <div style={{ marginTop: 20, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>
-              Invite History ({invites.length})
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 0, border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
-              {invites.map((inv, i) => (
-                <div key={inv.id} style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 14px',
-                  background: 'var(--bg)', borderTop: i > 0 ? '1px solid var(--border)' : 'none', fontSize: 13,
-                }}>
-                  <div style={{ fontWeight: 500, color: 'var(--fg)' }}>{inv.email}</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
-                    <span style={{ fontSize: 11, color: 'var(--muted)' }}>
-                      {inv.invite_count > 1 ? `${inv.invite_count}× sent` : 'Sent'} · {fmtDate(inv.last_sent_at)}
-                    </span>
-                    <span style={{
-                      fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20,
-                      background: '#f0fdfa', color: '#0d9488',
-                    }}>
-                      Invited
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
         )}
       </div>
