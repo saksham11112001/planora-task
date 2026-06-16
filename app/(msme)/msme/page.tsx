@@ -15,10 +15,6 @@ export default async function MsmePage({ searchParams }: { searchParams: Promise
   const mb = await getActiveOrgMembership(user.id)
   if (!mb) redirect('/onboarding')
 
-  if (!['owner', 'admin', 'manager'].includes(mb.role)) {
-    redirect('/dashboard')
-  }
-
   const org = (mb as any).organisations as any
   const orgName: string = org?.name ?? ''
 
