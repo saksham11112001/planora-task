@@ -79,6 +79,21 @@ export async function POST(
   const orgName = (mb.organisations as any)?.name ?? 'Your firm'
   const attempt = (vendor.email_count + 1) as 1 | 2 | 3 | 4 | 5
 
+  // Fetch org owner's email for CC
+  let ownerEmail: string | undefined
+  try {
+    const { data: ownerMember } = await admin
+      .from('org_members')
+      .select('user_id')
+      .eq('org_id', mb.org_id)
+      .eq('role', 'owner')
+      .maybeSingle()
+    if (ownerMember?.user_id) {
+      const { data: { user: ownerUser } } = await admin.auth.admin.getUserById(ownerMember.user_id)
+      ownerEmail = ownerUser?.email ?? undefined
+    }
+  } catch {}
+
   await sendMsmeVendorEmail({
     to: vendor.vendor_email,
     vendorName: vendor.vendor_name,
@@ -86,6 +101,7 @@ export async function POST(
     formUrl,
     attemptNo: attempt,
     totalEmails: maxEmails,
+    cc: ownerEmail,
   })
 
   await admin.from('msme_vendors').update({

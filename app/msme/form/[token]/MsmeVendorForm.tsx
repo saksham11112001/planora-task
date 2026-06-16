@@ -363,7 +363,6 @@ export function MsmeVendorForm({ token }: { token: string }) {
                       />
                       <div>
                         <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#1e293b' }}>{c.label}</p>
-                        <p style={{ margin: '2px 0 0', fontSize: 11, color: '#475569' }}>{c.hint}</p>
                       </div>
                     </label>
                   ))}
@@ -393,7 +392,6 @@ export function MsmeVendorForm({ token }: { token: string }) {
                       />
                       <div>
                         <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#1e293b' }}>{n.label}</p>
-                        <p style={{ margin: '2px 0 0', fontSize: 11, color: '#475569' }}>{n.hint}</p>
                       </div>
                     </label>
                   ))}
