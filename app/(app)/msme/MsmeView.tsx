@@ -2,9 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import * as XLSX from 'xlsx'
 
-const ACCENT      = '#0d9488'
-const FREE_LIMIT  = 5
-const PRICE_INR   = 99
+const ACCENT = '#0d9488'
 
 interface Vendor {
   id: string
@@ -57,6 +55,7 @@ export function MsmeView({ userRole }: Props) {
   const [showAdd,       setShowAdd]       = useState(false)
   const [showImport,    setShowImport]    = useState(false)
   const [selectedId,    setSelectedId]    = useState<string | null>(null)
+  const [vendorLimit,   setVendorLimit]   = useState<number>(5)
   const [shootingId,    setShootingId]    = useState<string | null>(null)
   const [deletingId,    setDeletingId]    = useState<string | null>(null)
   const [filterStatus,  setFilterStatus]  = useState<string>('all')
@@ -66,7 +65,6 @@ export function MsmeView({ userRole }: Props) {
   const [editingEmail,  setEditingEmail]  = useState<string | null>(null)
   const [editEmailVal,  setEditEmailVal]  = useState('')
   const [savingEmail,   setSavingEmail]   = useState(false)
-  const [payingId,      setPayingId]      = useState<string | null>(null)
   const [checkedIds,    setCheckedIds]    = useState<Set<string>>(new Set())
   const [bulkShooting,  setBulkShooting]  = useState(false)
   const toastRef = useRef(0)
@@ -111,6 +109,7 @@ export function MsmeView({ userRole }: Props) {
       if (res.ok) {
         setVendors(data.vendors ?? [])
         setTotal(data.total ?? 0)
+        if (data.vendorLimit) setVendorLimit(data.vendorLimit)
       }
     } catch (e) {
       console.error('[MsmeView] fetchVendors failed', e)
@@ -165,7 +164,7 @@ export function MsmeView({ userRole }: Props) {
     if (!res.ok) { setAddError(data.error ?? 'Failed to add vendor'); return }
     setShowAdd(false)
     setVendorName(''); setVendorEmail(''); setGstin('')
-    showToast(data.isPaid ? `${vendorName} added — complete payment to unlock email sending` : `${vendorName} added successfully`, data.isPaid ? 'info' : 'success')
+    showToast(`${vendorName} added successfully`)
     fetchVendors()
   }
 
@@ -175,7 +174,6 @@ export function MsmeView({ userRole }: Props) {
     const res  = await fetch(`/api/msme/vendors/${vendorId}/shoot-email`, { method: 'POST' })
     const data = await res.json()
     setShootingId(null)
-    if (res.status === 402) { showToast('Pay ₹99 to unlock email sending for this vendor', 'info'); return }
     if (!res.ok) { showToast(data.error ?? 'Failed to send email', 'error'); return }
     showToast(`Email sent to ${vendorName} (attempt ${data.attempt}/${intervalDays.length + 1})`)
     fetchVendors()
@@ -186,10 +184,9 @@ export function MsmeView({ userRole }: Props) {
     const ids = Array.from(checkedIds)
     if (ids.length === 0) return
     setBulkShooting(true)
-    let sent = 0, failed = 0, locked = 0
+    let sent = 0, failed = 0
     for (const id of ids) {
       const res  = await fetch(`/api/msme/vendors/${id}/shoot-email`, { method: 'POST' })
-      if (res.status === 402) { locked++; continue }
       if (!res.ok) { failed++; continue }
       sent++
     }
@@ -197,60 +194,9 @@ export function MsmeView({ userRole }: Props) {
     setCheckedIds(new Set())
     const parts: string[] = []
     if (sent)   parts.push(`${sent} email${sent > 1 ? 's' : ''} sent`)
-    if (locked) parts.push(`${locked} locked (payment required)`)
     if (failed) parts.push(`${failed} failed`)
-    showToast(parts.join(' · '), failed > 0 || locked > 0 ? 'info' : 'success')
+    showToast(parts.join(' · '), failed > 0 ? 'info' : 'success')
     fetchVendors()
-  }
-
-  // ── Pay for vendor slot ────────────────────────────────────────────────────
-  async function handlePay(vendorId: string) {
-    setPayingId(vendorId)
-    const res  = await fetch('/api/msme/pay', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ vendor_id: vendorId }),
-    })
-    const data = await res.json()
-    setPayingId(null)
-
-    if (res.status === 503 && data.code === 'RAZORPAY_NOT_CONFIGURED') {
-      showToast('Payment gateway coming soon. Contact us to pay manually.', 'info')
-      return
-    }
-    if (!res.ok) { showToast(data.error ?? 'Payment initiation failed', 'error'); return }
-
-    // Open Razorpay checkout
-    const options = {
-      key:         data.key_id,
-      amount:      data.amount,
-      currency:    data.currency,
-      name:        data.org_name,
-      description: `MSME Tracker — ${data.vendor_name}`,
-      order_id:    data.order_id,
-      handler: async (response: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) => {
-        const verifyRes = await fetch('/api/msme/pay', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            vendor_id: vendorId,
-            razorpay_order_id:   response.razorpay_order_id,
-            razorpay_payment_id: response.razorpay_payment_id,
-            razorpay_signature:  response.razorpay_signature,
-          }),
-        })
-        if (verifyRes.ok) {
-          showToast('Payment successful — vendor slot unlocked!')
-          fetchVendors()
-        } else {
-          showToast('Payment verification failed. Please contact support.', 'error')
-        }
-      },
-      theme: { color: ACCENT },
-    }
-    // @ts-ignore — Razorpay SDK loaded via script tag when keys are configured
-    const rzp = new window.Razorpay(options)
-    rzp.open()
   }
 
   // ── Delete ─────────────────────────────────────────────────────────────────
@@ -271,7 +217,6 @@ export function MsmeView({ userRole }: Props) {
     const res  = await fetch(`/api/msme/vendors/${vendorId}/shoot-email`, { method: 'POST', headers: { 'x-copy-only': '1' } })
     const data = await res.json()
     setCopyingId(null)
-    if (res.status === 402) { showToast('Pay ₹99 to unlock this vendor slot first', 'info'); return }
     if (!res.ok) { showToast(data.error ?? 'Could not generate link', 'error'); return }
     await navigator.clipboard.writeText(data.formUrl)
     showToast('Form link copied — paste in WhatsApp or SMS')
@@ -365,10 +310,8 @@ export function MsmeView({ userRole }: Props) {
 
   // ── Export all vendors ─────────────────────────────────────────────────────
   function handleExport() {
-    const header = ['Vendor Name', 'Email', 'GSTIN', 'PAN', 'Tracker Status', 'Udyam Number', 'Udyam Registered On', 'Category', 'Nature of Business', 'Outstanding Amount (₹)', '43B(h) Applicable', 'Slot Type', 'Payment Status', 'Emails Sent', 'Last Email Date', 'Submitted On', 'Declaration By', 'Date Added']
+    const header = ['Vendor Name', 'Email', 'GSTIN', 'PAN', 'Tracker Status', 'Udyam Number', 'Udyam Registered On', 'Category', 'Nature of Business', 'Outstanding Amount (₹)', '43B(h) Applicable', 'Emails Sent', 'Last Email Date', 'Submitted On', 'Declaration By', 'Date Added']
     const rows = vendors.map(v => {
-      // 43B(h) applies where the vendor is a verified MSME (micro/small/medium) with an outstanding balance.
-      // Non-MSME declarations and unverified/pending vendors are not applicable.
       const is43bh = v.msme_category !== null && (v.outstanding_amount ?? 0) > 0 ? 'Yes' : v.is_not_msme ? 'No (Non-MSME)' : 'Unverified'
       return [
         v.vendor_name,
@@ -382,8 +325,6 @@ export function MsmeView({ userRole }: Props) {
         v.nature_of_business ? NAT_LABEL[v.nature_of_business] : '',
         v.outstanding_amount !== null && v.outstanding_amount !== undefined ? v.outstanding_amount : '',
         is43bh,
-        v.is_paid ? 'Paid slot' : 'Free',
-        v.payment_status === 'free' ? 'Free' : v.payment_status === 'paid' ? 'Paid ✓' : 'Payment pending',
         v.email_count,
         v.last_emailed_at ? new Date(v.last_emailed_at).toLocaleDateString('en-IN') : '',
         v.submitted_at ? new Date(v.submitted_at).toLocaleDateString('en-IN') : '',
@@ -408,13 +349,10 @@ export function MsmeView({ userRole }: Props) {
     v.vendor_email.toLowerCase().includes(search.toLowerCase()) ||
     (v.gstin ?? '').toLowerCase().includes(search.toLowerCase())
   )
-  const filtered = filterStatus === 'all' ? searched : filterStatus === 'unpaid'
-    ? searched.filter(v => v.payment_status === 'unpaid')
-    : searched.filter(v => v.status === filterStatus)
+  const filtered = filterStatus === 'all' ? searched : searched.filter(v => v.status === filterStatus)
 
   const completedCount  = vendors.filter(v => v.status === 'submitted' || v.status === 'not_msme').length
   const exhaustedCount  = vendors.filter(v => v.email_count >= maxEmails && v.status === 'emailed').length
-  const unpaidCount     = vendors.filter(v => v.payment_status === 'unpaid').length
   const completionPct   = total > 0 ? Math.round((completedCount / total) * 100) : 0
   const counts = {
     pending:  vendors.filter(v => v.status === 'pending').length,
@@ -444,7 +382,7 @@ export function MsmeView({ userRole }: Props) {
         <div>
           <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>MSME Vendor Tracker</h1>
           <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-muted)' }}>
-            Collect and track MSME registrations · First 5 free, ₹{PRICE_INR}/vendor after
+            Automated vendor registry for Section 43B(h) compliance · {total}/{vendorLimit} vendors used
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -467,20 +405,17 @@ export function MsmeView({ userRole }: Props) {
         </div>
       </div>
 
-      {/* ── Payment needed banner ── */}
-      {unpaidCount > 0 && (
+      {/* ── Vendor limit banner ── */}
+      {total >= vendorLimit && (
         <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 10, padding: '14px 18px', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
           <div>
             <p style={{ margin: 0, fontWeight: 700, color: '#92400e', fontSize: 14 }}>
-              💳 {unpaidCount} vendor{unpaidCount > 1 ? 's' : ''} locked — payment required
+              📦 Vendor limit reached ({total}/{vendorLimit})
             </p>
             <p style={{ margin: '2px 0 0', fontSize: 12, color: '#b45309' }}>
-              Email sending and form links are blocked for unpaid vendor slots. ₹{PRICE_INR} per vendor per year.
+              Upgrade your pack to add more vendors. Contact us to upgrade.
             </p>
           </div>
-          <button onClick={() => setFilterStatus('unpaid')} style={{ ...primaryBtn, background: '#ea580c', fontSize: 12, padding: '7px 14px' }}>
-            View unpaid vendors →
-          </button>
         </div>
       )}
 
@@ -490,17 +425,15 @@ export function MsmeView({ userRole }: Props) {
           <SummaryCard label="COMPLETION" value={`${completedCount}/${total}`} sub={`${completionPct}% responded`} accent={ACCENT} progress={completionPct} />
           <SummaryCard label="NOT CONTACTED" value={String(counts.pending)} sub="awaiting first email" accent={counts.pending > 0 ? '#64748b' : ACCENT} />
           <SummaryCard label="AWAITING REPLY" value={String(counts.emailed)} sub="email sent, no response" accent={counts.emailed > 0 ? '#ea580c' : ACCENT} />
-          {unpaidCount > 0 && <SummaryCard label="PAYMENT PENDING" value={String(unpaidCount)} sub={`₹${unpaidCount * PRICE_INR} total due`} accent="#ea580c" warn />}
           {exhaustedCount > 0 && <SummaryCard label="MANUAL FOLLOW-UP" value={String(exhaustedCount)} sub={`${maxEmails} emails sent — call them`} accent="#dc2626" warn />}
         </div>
       )}
 
       {/* ── Filters + search ── */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-        {(['all', 'pending', 'emailed', 'submitted', 'not_msme', 'unpaid'] as const).map(s => {
-          const count  = s === 'all' ? total : s === 'unpaid' ? unpaidCount : counts[s as keyof typeof counts] ?? 0
+        {(['all', 'pending', 'emailed', 'submitted', 'not_msme'] as const).map(s => {
+          const count  = s === 'all' ? total : counts[s as keyof typeof counts] ?? 0
           const active = filterStatus === s
-          if (s === 'unpaid' && unpaidCount === 0) return null
           return (
             <button key={s} onClick={() => setFilterStatus(s)} style={{
               padding: '6px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer',
@@ -508,7 +441,7 @@ export function MsmeView({ userRole }: Props) {
               background: active ? `${ACCENT}15` : 'var(--surface)',
               color: active ? ACCENT : 'var(--text-muted)',
             }}>
-              {s === 'all' ? 'All' : s === 'unpaid' ? '💳 Unpaid' : STATUS_LABEL[s as Vendor['status']].replace(' ✓', '')} · {count}
+              {s === 'all' ? 'All' : STATUS_LABEL[s as Vendor['status']].replace(' ✓', '')} · {count}
             </button>
           )
         })}
@@ -553,9 +486,9 @@ export function MsmeView({ userRole }: Props) {
                       <input
                         type="checkbox"
                         style={{ accentColor: ACCENT, cursor: 'pointer' }}
-                        checked={checkedIds.size > 0 && filtered.filter(v => v.payment_status !== 'unpaid' && v.status !== 'submitted' && v.status !== 'not_msme' && v.email_count < maxEmails).every(v => checkedIds.has(v.id))}
+                        checked={checkedIds.size > 0 && filtered.filter(v => v.status !== 'submitted' && v.status !== 'not_msme' && v.email_count < maxEmails).every(v => checkedIds.has(v.id))}
                         onChange={e => {
-                          const eligible = filtered.filter(v => v.payment_status !== 'unpaid' && v.status !== 'submitted' && v.status !== 'not_msme' && v.email_count < maxEmails)
+                          const eligible = filtered.filter(v => v.status !== 'submitted' && v.status !== 'not_msme' && v.email_count < maxEmails)
                           if (e.target.checked) setCheckedIds(new Set(eligible.map(v => v.id)))
                           else setCheckedIds(new Set())
                         }}
@@ -571,15 +504,14 @@ export function MsmeView({ userRole }: Props) {
                     const sc        = STATUS_COLOR[v.status]
                     const sel       = selectedId === v.id
                     const exhausted = v.email_count >= maxEmails && v.status === 'emailed'
-                    const locked    = v.payment_status === 'unpaid'
-                    const isEligible = !locked && v.status !== 'submitted' && v.status !== 'not_msme' && v.email_count < maxEmails
+                    const isEligible = v.status !== 'submitted' && v.status !== 'not_msme' && v.email_count < maxEmails
                     return (
                       <tr
                         key={v.id}
                         onClick={() => setSelectedId(sel ? null : v.id)}
                         style={{
                           borderBottom: i < filtered.length - 1 ? '1px solid var(--border)' : undefined,
-                          background: locked ? '#fffbeb' : checkedIds.has(v.id) ? `${ACCENT}08` : sel ? `${ACCENT}05` : 'var(--surface)',
+                          background: checkedIds.has(v.id) ? `${ACCENT}08` : sel ? `${ACCENT}05` : 'var(--surface)',
                           cursor: 'pointer',
                         }}
                       >
@@ -600,7 +532,6 @@ export function MsmeView({ userRole }: Props) {
                         </td>
                         <td style={{ padding: '12px 14px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            {locked && <span title="Payment required" style={{ fontSize: 13 }}>🔒</span>}
                             <div>
                               <div style={{ fontWeight: 600, color: 'var(--text)' }}>{v.vendor_name}</div>
                               <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>{v.vendor_email}</div>
@@ -609,11 +540,7 @@ export function MsmeView({ userRole }: Props) {
                           </div>
                         </td>
                         <td style={{ padding: '12px 14px' }}>
-                          {locked ? (
-                            <span style={{ background: '#fff7ed', color: '#ea580c', padding: '3px 10px', borderRadius: 12, fontSize: 11, fontWeight: 700 }}>
-                              💳 Pay ₹{PRICE_INR}
-                            </span>
-                          ) : exhausted ? (
+                          {exhausted ? (
                             <span style={{ background: '#fef2f2', color: '#dc2626', padding: '3px 10px', borderRadius: 12, fontSize: 11, fontWeight: 700 }}>
                               ⚠ Needs call
                             </span>
@@ -626,20 +553,11 @@ export function MsmeView({ userRole }: Props) {
                         <td style={{ padding: '12px 14px', color: 'var(--text-muted)' }}>
                           {v.msme_category ? CAT_LABEL[v.msme_category] : v.is_not_msme ? 'Not MSME' : '—'}
                         </td>
-                        <td style={{ padding: '12px 14px', textAlign: 'center', color: locked ? '#94a3b8' : exhausted ? '#dc2626' : 'var(--text-muted)', fontWeight: exhausted ? 700 : 400 }}>
-                          {locked ? '—' : `${v.email_count}/${maxEmails}`}
+                        <td style={{ padding: '12px 14px', textAlign: 'center', color: exhausted ? '#dc2626' : 'var(--text-muted)', fontWeight: exhausted ? 700 : 400 }}>
+                          {`${v.email_count}/${maxEmails}`}
                         </td>
                         <td style={{ padding: '12px 14px' }}>
-                          {locked && canManage && (
-                            <button
-                              onClick={e => { e.stopPropagation(); handlePay(v.id) }}
-                              disabled={payingId === v.id}
-                              style={{ ...primaryBtn, padding: '5px 12px', fontSize: 11, background: '#ea580c' }}
-                            >
-                              {payingId === v.id ? 'Processing…' : `Pay ₹${PRICE_INR}`}
-                            </button>
-                          )}
-                          {!locked && canManage && v.status !== 'submitted' && v.status !== 'not_msme' && v.email_count < maxEmails && (
+                          {canManage && v.status !== 'submitted' && v.status !== 'not_msme' && v.email_count < maxEmails && (
                             <button
                               onClick={e => { e.stopPropagation(); handleShootEmail(v.id, v.vendor_name) }}
                               disabled={shootingId === v.id}
@@ -665,29 +583,12 @@ export function MsmeView({ userRole }: Props) {
         {/* ── Detail panel ── */}
         {selected && (
           <div style={{ width: 300, flexShrink: 0, border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', background: 'var(--surface)' }}>
-            <div style={{ background: selected.payment_status === 'unpaid' ? '#92400e' : '#0f172a', padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ background: '#0f172a', padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ color: '#fff', fontSize: 14, fontWeight: 700 }}>
-                {selected.payment_status === 'unpaid' && '🔒 '}{selected.vendor_name}
+                {selected.vendor_name}
               </span>
               <button onClick={() => setSelectedId(null)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>×</button>
             </div>
-
-            {/* Payment required block */}
-            {selected.payment_status === 'unpaid' && (
-              <div style={{ background: '#fff7ed', padding: '14px 16px', borderBottom: '1px solid #fed7aa' }}>
-                <p style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 700, color: '#92400e' }}>Payment required to unlock</p>
-                <p style={{ margin: '0 0 12px', fontSize: 12, color: '#b45309', lineHeight: 1.5 }}>
-                  This is a paid vendor slot. Pay ₹{PRICE_INR} once to unlock email sending, form link sharing, and tracking for this vendor.
-                </p>
-                <button
-                  onClick={() => handlePay(selected.id)}
-                  disabled={payingId === selected.id}
-                  style={{ ...primaryBtn, width: '100%', background: '#ea580c' }}
-                >
-                  {payingId === selected.id ? 'Opening payment…' : `Pay ₹${PRICE_INR} to unlock`}
-                </button>
-              </div>
-            )}
 
             <div style={{ padding: 16 }}>
               {/* Email with edit */}
@@ -714,18 +615,8 @@ export function MsmeView({ userRole }: Props) {
               {selected.gstin && <DetailRow label="GSTIN" value={selected.gstin} />}
               {selected.pan   && <DetailRow label="PAN"   value={selected.pan} />}
 
-              {/* Slot type */}
-              <div style={{ marginBottom: 12 }}>
-                <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>SLOT TYPE</span>
-                <div style={{ marginTop: 3 }}>
-                  {selected.payment_status === 'free'   && <span style={{ fontSize: 12, color: '#16a34a', fontWeight: 600 }}>✓ Free slot</span>}
-                  {selected.payment_status === 'unpaid' && <span style={{ fontSize: 12, color: '#ea580c', fontWeight: 700 }}>🔒 Payment required (₹{PRICE_INR})</span>}
-                  {selected.payment_status === 'paid'   && <span style={{ fontSize: 12, color: '#16a34a', fontWeight: 700 }}>✓ Paid · Unlocked</span>}
-                </div>
-              </div>
-
               {/* Status */}
-              {selected.payment_status !== 'unpaid' && (
+              {(
                 <div style={{ marginBottom: 12 }}>
                   <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>STATUS</span>
                   <div style={{ marginTop: 3 }}>
@@ -766,7 +657,7 @@ export function MsmeView({ userRole }: Props) {
                 </div>
               )}
 
-              {selected.email_count > 0 && selected.payment_status !== 'unpaid' && (
+              {selected.email_count > 0 && (
                 <div style={{ marginBottom: 12 }}>
                   <p style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, margin: '0 0 3px' }}>EMAIL HISTORY</p>
                   <p style={{ fontSize: 12, color: 'var(--text)', margin: 0 }}>
@@ -776,7 +667,7 @@ export function MsmeView({ userRole }: Props) {
               )}
 
               {/* Actions */}
-              {canManage && selected.payment_status !== 'unpaid' && selected.status !== 'submitted' && selected.status !== 'not_msme' && (
+              {canManage && selected.status !== 'submitted' && selected.status !== 'not_msme' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {selected.email_count < maxEmails && (
                     <button onClick={() => handleShootEmail(selected.id, selected.vendor_name)} disabled={shootingId === selected.id} style={{ ...primaryBtn, width: '100%' }}>
@@ -814,12 +705,6 @@ export function MsmeView({ userRole }: Props) {
               <input style={mi} type="text" value={gstin} onChange={e => setGstin(e.target.value)} placeholder="27AABCU9603R1ZX" />
             </Field>
             {addError && <ErrorBox>{addError}</ErrorBox>}
-            {total >= FREE_LIMIT && (
-              <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 12, color: '#92400e' }}>
-                <strong>Paid slot — ₹{PRICE_INR}/year</strong><br/>
-                This vendor will be added in locked state. Pay ₹{PRICE_INR} after adding to unlock email sending.
-              </div>
-            )}
             <div style={{ display: 'flex', gap: 10 }}>
               <button type="submit" disabled={adding} style={{ ...primaryBtn, flex: 1 }}>{adding ? 'Adding…' : 'Add vendor'}</button>
               <button type="button" onClick={() => { setShowAdd(false); setAddError(null) }} style={{ ...ghostBtn, flex: 1 }}>Cancel</button>
@@ -949,10 +834,9 @@ export function MsmeView({ userRole }: Props) {
                       </tbody>
                     </table>
                   </div>
-                  {total + importRows.length > FREE_LIMIT && (
+                  {total + importRows.length > vendorLimit && (
                     <div style={{ marginTop: 12, background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#92400e' }}>
-                      <strong>Heads up:</strong> {Math.max(0, total + importRows.length - FREE_LIMIT)} of these {importRows.length} vendors will need payment (₹{PRICE_INR} each) to unlock email sending.
-                      Free slots remaining: {Math.max(0, FREE_LIMIT - total)}.
+                      <strong>Heads up:</strong> This import will exceed your vendor limit ({vendorLimit}). Only the first {Math.max(0, vendorLimit - total)} vendors will be added. Upgrade your pack to add more.
                     </div>
                   )}
                   <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
@@ -971,11 +855,6 @@ export function MsmeView({ userRole }: Props) {
               <p style={{ textAlign: 'center', fontWeight: 700, fontSize: 16, color: 'var(--text)', margin: '0 0 8px' }}>
                 {importResult.inserted} vendor{importResult.inserted !== 1 ? 's' : ''} imported
               </p>
-              {importResult.paid_slots > 0 && (
-                <p style={{ textAlign: 'center', fontSize: 13, color: '#ea580c', margin: '0 0 16px' }}>
-                  {importResult.paid_slots} paid slot{importResult.paid_slots > 1 ? 's' : ''} — pay ₹{importResult.paid_slots * PRICE_INR} to unlock email sending
-                </p>
-              )}
               {importResult.skipped.length > 0 && (
                 <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: 14, marginBottom: 16 }}>
                   <p style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 700, color: '#dc2626' }}>{importResult.skipped.length} row{importResult.skipped.length !== 1 ? 's' : ''} skipped:</p>

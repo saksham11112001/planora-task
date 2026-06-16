@@ -38,20 +38,12 @@ export async function POST(
 
   const { data: vendor } = await admin
     .from('msme_vendors')
-    .select('id, vendor_name, vendor_email, status, email_count, payment_status')
+    .select('id, vendor_name, vendor_email, status, email_count')
     .eq('id', id)
     .eq('org_id', mb.org_id)
     .maybeSingle()
 
   if (!vendor) return NextResponse.json({ error: 'Vendor not found' }, { status: 404 })
-
-  // Hard payment gate — unpaid slots cannot shoot emails or get copy links
-  if ((vendor as any).payment_status === 'unpaid') {
-    return NextResponse.json({
-      error: 'Payment required. Complete ₹99 payment for this vendor slot to unlock email sending and tracking.',
-      code:  'PAYMENT_REQUIRED',
-    }, { status: 402 })
-  }
 
   // x-copy-only: generate link without sending email (for "share via WhatsApp" use case)
   const copyOnly = req.headers.get('x-copy-only') === '1'

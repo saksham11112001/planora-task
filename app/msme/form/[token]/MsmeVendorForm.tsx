@@ -171,7 +171,7 @@ export function MsmeVendorForm({ token }: { token: string }) {
         <div style={{ fontSize: 44, textAlign: 'center', marginBottom: 16 }}>🔗</div>
         <h1 style={{ ...h1, textAlign: 'center' }}>Link Expired or Invalid</h1>
         <p style={{ ...sub, textAlign: 'center', marginBottom: 0 }}>{error}</p>
-        <p style={{ color: '#94a3b8', fontSize: 12, textAlign: 'center', marginTop: 28 }}>Powered by Floatup</p>
+        <p style={{ color: '#94a3b8', fontSize: 12, textAlign: 'center', marginTop: 28 }}>Powered by Planora</p>
       </div>
     </div>
   )
@@ -221,7 +221,7 @@ export function MsmeVendorForm({ token }: { token: string }) {
           If you need to make any corrections, contact {info.org_name} directly.
         </p>
 
-        <p style={{ color: '#64748b', fontSize: 11, textAlign: 'center', margin: 0 }}>Powered by Floatup</p>
+        <p style={{ color: '#64748b', fontSize: 11, textAlign: 'center', margin: 0 }}>Powered by Planora</p>
       </div>
     </div>
   )
@@ -235,10 +235,11 @@ export function MsmeVendorForm({ token }: { token: string }) {
           <span style={{ color: '#fff', fontSize: 15, fontWeight: 700 }}>⚡ {info?.org_name}</span>
         </div>
 
-        <h1 style={{ ...h1, marginBottom: 4 }}>MSME Registration Details</h1>
+        <h1 style={{ ...h1, marginBottom: 4 }}>Share Your MSME Details</h1>
         <p style={{ ...sub, marginBottom: 20 }}>
-          Hi {info?.vendor_name} — {info?.org_name} needs your MSME registration details for statutory
-          compliance under the MSMED Act, 2006. Takes under 2 minutes.
+          Hi {info?.vendor_name} — {info?.org_name} is building a verified vendor registry to help businesses
+          stay compliant under Section 43B(h). Your details will be securely recorded on their behalf.
+          Takes under 2 minutes.
         </p>
 
         {/* Progress indicator */}
@@ -284,7 +285,7 @@ export function MsmeVendorForm({ token }: { token: string }) {
             <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 8, padding: 16, marginBottom: 20 }}>
               <p style={{ fontSize: 13, color: '#0369a1', marginBottom: 14, lineHeight: 1.6 }}>
                 By submitting, you confirm your business is not registered as an MSME and has no Udyam number.
-                {info?.org_name} will keep this on record for compliance purposes.
+                {info?.org_name} will keep this on file so your relationship is accurately classified for their compliance records.
               </p>
               <div>
                 <label style={labelStyle}>Your full name (as authorised signatory) <span style={{ color: '#dc2626' }}>*</span></label>
@@ -490,7 +491,7 @@ export function MsmeVendorForm({ token }: { token: string }) {
 
         <p style={{ color: '#64748b', fontSize: 11, textAlign: 'center', marginTop: 20, lineHeight: 1.6 }}>
           Your information is shared only with {info?.org_name} for MSME compliance purposes.<br/>
-          Powered by Floatup
+          Powered by Planora
         </p>
       </div>
     </div>
