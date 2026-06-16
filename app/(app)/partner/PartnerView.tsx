@@ -5,6 +5,7 @@ import {
   Copy, Check, Users, TrendingUp, IndianRupee, Clock,
   Award, ChevronRight, Download, Building2, RefreshCw,
   BadgeCheck, Wallet, AlertCircle, QrCode, ExternalLink,
+  Mail, Send, X,
 } from 'lucide-react'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -35,6 +36,14 @@ interface Payout {
   processed_at: string | null
 }
 
+interface PartnerInvite {
+  id:           string
+  email:        string
+  invite_count: number
+  last_sent_at: string
+  created_at:   string
+}
+
 interface PartnerData {
   referral_code: string
   referral_link: string
@@ -50,9 +59,10 @@ interface PartnerData {
     pending_paise:       number
     this_month_paise:    number
   }
-  referred:     ReferredOrg[]
-  commissions:  Commission[]
-  payouts:      Payout[]
+  referred:      ReferredOrg[]
+  commissions:   Commission[]
+  payouts:       Payout[]
+  invites_sent:  number
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -100,12 +110,25 @@ export function PartnerView() {
   const [accountName,  setAccountName]  = useState('')
   const [payoutBusy,   setPayoutBusy]   = useState(false)
 
+  // Invite form
+  const [invites,      setInvites]      = useState<PartnerInvite[]>([])
+  const [inviteEmails, setInviteEmails] = useState('')
+  const [inviteBusy,   setInviteBusy]  = useState(false)
+  const [invitesDone,  setInvitesDone]  = useState<{ sent: number; failed: number } | null>(null)
+
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/partner')
-      if (!res.ok) { toast.error('Failed to load partner data'); return }
-      setData(await res.json())
+      const [partnerRes, invitesRes] = await Promise.all([
+        fetch('/api/partner'),
+        fetch('/api/partner/invite'),
+      ])
+      if (!partnerRes.ok) { toast.error('Failed to load partner data'); return }
+      setData(await partnerRes.json())
+      if (invitesRes.ok) {
+        const inv = await invitesRes.json()
+        setInvites(inv.invites ?? [])
+      }
     } finally {
       setLoading(false)
     }
@@ -127,6 +150,34 @@ export function PartnerView() {
     setCopiedMsme(true)
     toast.success('MSME Tracker referral link copied!')
     setTimeout(() => setCopiedMsme(false), 2000)
+  }
+
+  async function sendInvites() {
+    const emails = inviteEmails.split(/[\s,;]+/).map(e => e.trim()).filter(Boolean)
+    if (emails.length === 0) { toast.error('Enter at least one email address'); return }
+    if (emails.length > 20)  { toast.error('Maximum 20 emails at a time'); return }
+    setInviteBusy(true)
+    setInvitesDone(null)
+    try {
+      const res  = await fetch('/api/partner/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emails }),
+      })
+      const json = await res.json()
+      if (!res.ok && json.sent === undefined) { toast.error(json.error ?? 'Failed to send invites'); return }
+      setInvitesDone({ sent: json.sent, failed: json.failed })
+      if (json.sent > 0) {
+        setInviteEmails('')
+        toast.success(`${json.sent} invite${json.sent > 1 ? 's' : ''} sent!`)
+        // Refresh invite list
+        const inv = await fetch('/api/partner/invite')
+        if (inv.ok) setInvites((await inv.json()).invites ?? [])
+      }
+      if (json.failed > 0) toast.error(`${json.failed} email${json.failed > 1 ? 's' : ''} failed to send`)
+    } finally {
+      setInviteBusy(false)
+    }
   }
 
   async function requestPayout() {
@@ -267,8 +318,9 @@ export function PartnerView() {
       {/* ── Stats grid ─────────────────────────────────────────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 28 }}>
         {[
-          { icon: <Users size={18} />,       label: 'Total Referrals',        value: stats.total_referred,             color: '#2563eb' },
-          { icon: <BadgeCheck size={18} />,  label: 'On a Paid Plan',         value: stats.paying_referred,            color: '#16a34a' },
+          { icon: <Users size={18} />,       label: 'Total Referrals',         value: stats.total_referred,             color: '#2563eb' },
+          { icon: <Mail size={18} />,        label: 'Direct Invites Sent',     value: data.invites_sent,                color: '#0d9488' },
+          { icon: <BadgeCheck size={18} />,  label: 'On a Paid Plan',          value: stats.paying_referred,            color: '#16a34a' },
           { icon: <TrendingUp size={18} />,  label: 'Commissions This Month',  value: rupees(stats.this_month_paise),   color: '#8b5cf6' },
           { icon: <IndianRupee size={18} />, label: 'Total Paid Out',          value: rupees(stats.total_earned_paise), color: '#0891b2' },
           { icon: <Clock size={18} />,       label: 'Awaiting Payout',         value: rupees(stats.pending_paise),      color: '#f59e0b' },
@@ -416,6 +468,77 @@ export function PartnerView() {
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+      </div>
+
+      {/* ── Invite by Email (MSME Tracker) ────────────────────────────────── */}
+      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 20, marginBottom: 28 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+          <Mail size={16} style={{ color: '#0d9488' }} />
+          <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--fg)' }}>Invite to MSME Tracker</span>
+        </div>
+        <p style={{ fontSize: 12, color: 'var(--muted)', margin: '0 0 16px', lineHeight: 1.6 }}>
+          Enter email addresses below — we'll send each person a personalised invite to try MSME Tracker with your referral code embedded. Separate multiple emails with commas or new lines.
+        </p>
+
+        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <textarea
+            value={inviteEmails}
+            onChange={e => setInviteEmails(e.target.value)}
+            placeholder={'ca@example.com\naccounts@firm.in, rajesh@vendor.com'}
+            rows={3}
+            style={{
+              flex: 1, minWidth: 240, padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 8,
+              fontSize: 13, color: 'var(--fg)', background: 'var(--bg)', resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5,
+            }}
+          />
+          <button
+            onClick={sendInvites}
+            disabled={inviteBusy || !inviteEmails.trim()}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6, padding: '10px 18px',
+              background: inviteBusy ? 'var(--border)' : '#0d9488', color: inviteBusy ? 'var(--muted)' : '#fff',
+              border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600,
+              cursor: inviteBusy || !inviteEmails.trim() ? 'not-allowed' : 'pointer', flexShrink: 0,
+            }}
+          >
+            <Send size={14} />
+            {inviteBusy ? 'Sending…' : 'Send Invites'}
+          </button>
+        </div>
+
+        <p style={{ fontSize: 11, color: 'var(--muted)', margin: '8px 0 0' }}>
+          Max 20 emails per batch. Each invite includes your referral code so sign-ups are tracked automatically.
+        </p>
+
+        {/* Invite history */}
+        {invites.length > 0 && (
+          <div style={{ marginTop: 20, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>
+              Invite History ({invites.length})
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 0, border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+              {invites.map((inv, i) => (
+                <div key={inv.id} style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 14px',
+                  background: 'var(--bg)', borderTop: i > 0 ? '1px solid var(--border)' : 'none', fontSize: 13,
+                }}>
+                  <div style={{ fontWeight: 500, color: 'var(--fg)' }}>{inv.email}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
+                    <span style={{ fontSize: 11, color: 'var(--muted)' }}>
+                      {inv.invite_count > 1 ? `${inv.invite_count}× sent` : 'Sent'} · {fmtDate(inv.last_sent_at)}
+                    </span>
+                    <span style={{
+                      fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20,
+                      background: '#f0fdfa', color: '#0d9488',
+                    }}>
+                      Invited
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
