@@ -66,6 +66,8 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/professionals') ||
     pathname.startsWith('/onboarding') ||
     pathname.startsWith('/portal/') ||
+    pathname.startsWith('/partners/') ||   // standalone partner portal — its own auth
+    pathname.startsWith('/msme-landing') || // public MSME product page
     pathname.startsWith('/_next/') ||
     pathname.includes('.')
   ) {
