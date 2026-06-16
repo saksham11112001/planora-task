@@ -32,7 +32,7 @@ interface Vendor {
 
 const STATUS_LABEL: Record<Vendor['status'], string> = {
   pending:   'Not contacted',
-  emailed:   'Email sent',
+  emailed:   'Awaited reply',
   submitted: 'Submitted ✓',
   not_msme:  'Non-MSME ✓',
 }
@@ -419,6 +419,9 @@ export function MsmeView({ userRole, orgName }: Props) {
   }
 
   return (
+    <div style={{ padding: '0', minHeight: '100vh', background: 'linear-gradient(180deg, rgba(13,148,136,0.04) 0%, transparent 200px)' }}>
+    {/* Teal accent strip */}
+    <div style={{ height: 3, background: `linear-gradient(90deg, ${ACCENT}, #14b8a6, ${ACCENT})` }} />
     <div style={{ padding: '24px', maxWidth: 1120, margin: '0 auto' }}>
 
       {/* ── Toasts ── */}
@@ -438,10 +441,10 @@ export function MsmeView({ userRole, orgName }: Props) {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>
-            MSME Vendor Tracker{orgName ? <span style={{ fontSize: 15, fontWeight: 500, color: 'var(--text-muted)', marginLeft: 10 }}>· {orgName}</span> : null}
+            MSME Vendor Tracker
           </h1>
           <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-muted)' }}>
-            Section 43B(h) compliance · {totalEver}/{vendorLimit} slots used
+            {totalEver}/{vendorLimit} vendor slots used
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -463,7 +466,7 @@ export function MsmeView({ userRole, orgName }: Props) {
           )}
           {canManage && (
             <button onClick={() => { setShowImport(true); setImportRows([]); setImportPreview([]); setImportResult(null); setImportError(null) }} style={ghostBtn}>
-              ↑ Import Excel
+              ↑ Import Vendors
             </button>
           )}
           {vendors.length > 0 && (
@@ -492,10 +495,10 @@ export function MsmeView({ userRole, orgName }: Props) {
       {/* ── Summary cards ── */}
       {total > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginBottom: 20 }}>
-          <SummaryCard label="COMPLETION" value={`${completedCount}/${total}`} sub={`${completionPct}% responded`} accent={ACCENT} progress={completionPct} />
-          <SummaryCard label="NOT CONTACTED" value={String(counts.pending)} sub="awaiting first email" accent={counts.pending > 0 ? '#64748b' : ACCENT} />
-          <SummaryCard label="AWAITING REPLY" value={String(counts.emailed)} sub="email sent, no response" accent={counts.emailed > 0 ? '#ea580c' : ACCENT} />
-          {exhaustedCount > 0 && <SummaryCard label="MANUAL FOLLOW-UP" value={String(exhaustedCount)} sub={`${maxEmails} emails sent — call them`} accent="#dc2626" warn />}
+          <SummaryCard label="COMPLETION" value={`${completedCount}/${total}`} sub={`${completionPct}% responded`} accent={ACCENT} progress={completionPct} icon="✅" onClick={() => setFilterStatus(filterStatus === 'submitted' ? 'all' : 'submitted')} active={filterStatus === 'submitted'} />
+          <SummaryCard label="NOT CONTACTED" value={String(counts.pending)} sub="awaiting first email" accent={counts.pending > 0 ? '#64748b' : ACCENT} icon="📭" onClick={() => setFilterStatus(filterStatus === 'pending' ? 'all' : 'pending')} active={filterStatus === 'pending'} />
+          <SummaryCard label="AWAITED REPLY" value={String(counts.emailed)} sub="email sent, no response" accent={counts.emailed > 0 ? '#ea580c' : ACCENT} icon="⏳" onClick={() => setFilterStatus(filterStatus === 'emailed' ? 'all' : 'emailed')} active={filterStatus === 'emailed'} />
+          {exhaustedCount > 0 && <SummaryCard label="MANUAL FOLLOW-UP" value={String(exhaustedCount)} sub={`${maxEmails} emails sent — call them`} accent="#dc2626" icon="📞" warn onClick={() => {}} active={false} />}
         </div>
       )}
 
@@ -1006,24 +1009,40 @@ export function MsmeView({ userRole, orgName }: Props) {
         </Modal>
       )}
     </div>
+    </div>
   )
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function SummaryCard({ label, value, sub, accent, progress, warn }: {
-  label: string; value: string; sub: string; accent: string; progress?: number; warn?: boolean
+function SummaryCard({ label, value, sub, accent, progress, warn, icon, onClick, active }: {
+  label: string; value: string; sub: string; accent: string; progress?: number; warn?: boolean;
+  icon?: string; onClick?: () => void; active?: boolean
 }) {
   return (
-    <div style={{ background: warn ? '#fef2f2' : 'var(--surface)', border: `1px solid ${warn ? '#fecaca' : 'var(--border)'}`, borderRadius: 10, padding: '14px 16px' }}>
-      <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 600, color: warn ? '#dc2626' : 'var(--text-muted)' }}>{label}</p>
-      <span style={{ fontSize: 24, fontWeight: 800, color: accent }}>{value}</span>
+    <div
+      onClick={onClick}
+      style={{
+        background: warn ? '#fef2f2' : active ? `${accent}12` : 'var(--surface)',
+        border: `1.5px solid ${warn ? '#fecaca' : active ? accent : 'var(--border)'}`,
+        borderRadius: 12, padding: '16px 16px 14px',
+        cursor: onClick ? 'pointer' : 'default',
+        transition: 'all 0.15s',
+        boxShadow: active ? `0 0 0 3px ${accent}20` : undefined,
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+        <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: warn ? '#dc2626' : active ? accent : 'var(--text-muted)', letterSpacing: '0.04em' }}>{label}</p>
+        {icon && <span style={{ fontSize: 16, lineHeight: 1 }}>{icon}</span>}
+      </div>
+      <span style={{ fontSize: 26, fontWeight: 800, color: active ? accent : warn ? '#dc2626' : accent }}>{value}</span>
       {progress !== undefined && (
-        <div style={{ height: 3, background: 'var(--border)', borderRadius: 2, margin: '6px 0 4px' }}>
-          <div style={{ height: 3, background: accent, borderRadius: 2, width: `${progress}%` }} />
+        <div style={{ height: 4, background: 'var(--border)', borderRadius: 2, margin: '8px 0 4px' }}>
+          <div style={{ height: 4, background: accent, borderRadius: 2, width: `${progress}%`, transition: 'width 0.4s' }} />
         </div>
       )}
-      <p style={{ margin: progress !== undefined ? 0 : '3px 0 0', fontSize: 11, color: warn ? '#dc2626' : 'var(--text-muted)' }}>{sub}</p>
+      <p style={{ margin: progress !== undefined ? '2px 0 0' : '4px 0 0', fontSize: 11, color: warn ? '#dc2626' : active ? accent : 'var(--text-muted)' }}>{sub}</p>
+      {onClick && <p style={{ margin: '6px 0 0', fontSize: 10, color: active ? accent : 'var(--text-muted)', fontWeight: 600 }}>{active ? 'Click to clear filter' : 'Click to filter'}</p>}
     </div>
   )
 }
