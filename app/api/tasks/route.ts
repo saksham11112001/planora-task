@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
   }
   const parsedLimit  = parseInt(sp.get('limit')  ?? '0', 10)
   const parsedOffset = parseInt(sp.get('offset') ?? '0', 10)
-  const _limit  = (!isNaN(parsedLimit) && parsedLimit > 0) ? parsedLimit : 10000
+  const _limit  = (!isNaN(parsedLimit) && parsedLimit > 0) ? Math.min(parsedLimit, 5000) : 5000
   const _offset = Math.max(isNaN(parsedOffset) ? 0 : parsedOffset, 0)
   q = q.order('due_date', { ascending: true, nullsFirst: false }).range(_offset, _offset + _limit - 1)
 

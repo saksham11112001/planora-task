@@ -87,6 +87,12 @@ export async function GET(req: NextRequest) {
     .order('created_at', { ascending: false })
     .limit(10)
 
+  // Direct invite count (MSME)
+  const { count: inviteCount } = await admin
+    .from('partner_invites')
+    .select('id', { count: 'exact', head: true })
+    .eq('referrer_org_id', orgId)
+
   const APP_URL  = process.env.NEXT_PUBLIC_APP_URL  ?? 'https://sng-adwisers.com'
   const MSME_URL = process.env.NEXT_PUBLIC_MSME_URL ?? 'https://msme.sng-adwisers.com'
 
@@ -108,5 +114,6 @@ export async function GET(req: NextRequest) {
     referred,
     commissions: (commissions ?? []).slice(0, 20),
     payouts: payouts ?? [],
+    invites_sent: inviteCount ?? 0,
   })
 }
