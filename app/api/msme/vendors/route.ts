@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient }             from '@/lib/supabase/server'
 import { createAdminClient }        from '@/lib/supabase/admin'
 import { getApiOrgMembership }      from '@/lib/supabase/apiActiveOrg'
-
-const FREE_VENDOR_LIMIT = 5
+import { FREE_VENDOR_LIMIT }        from '@/lib/msme/packs'
 
 export async function GET(req: NextRequest) {
   const supabase = await createClient()
@@ -22,8 +21,16 @@ export async function GET(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
+  const { data: packRow } = await admin
+    .from('org_feature_settings')
+    .select('config')
+    .eq('org_id', mb.org_id)
+    .eq('feature_key', 'msme_pack')
+    .maybeSingle()
+  const vendorLimit: number = (packRow?.config?.vendor_limit as number | undefined) ?? FREE_VENDOR_LIMIT
+
   const total = vendors?.length ?? 0
-  return NextResponse.json({ vendors: vendors ?? [], total, freeLimit: FREE_VENDOR_LIMIT })
+  return NextResponse.json({ vendors: vendors ?? [], total, vendorLimit })
 }
 
 export async function POST(req: NextRequest) {
@@ -50,15 +57,29 @@ export async function POST(req: NextRequest) {
 
   const admin = createAdminClient()
 
-  // Check current vendor count to determine slot type
+  // Fetch pack-based vendor limit
+  const { data: packRow } = await admin
+    .from('org_feature_settings')
+    .select('config')
+    .eq('org_id', mb.org_id)
+    .eq('feature_key', 'msme_pack')
+    .maybeSingle()
+  const vendorLimit: number = (packRow?.config?.vendor_limit as number | undefined) ?? FREE_VENDOR_LIMIT
+
+  // Check current vendor count against pack limit
   const { count } = await admin
     .from('msme_vendors')
     .select('id', { count: 'exact', head: true })
     .eq('org_id', mb.org_id)
 
-  const currentCount  = count ?? 0
-  const isPaid        = currentCount >= FREE_VENDOR_LIMIT
-  const paymentStatus = isPaid ? 'unpaid' : 'free'
+  const currentCount = count ?? 0
+
+  if (currentCount >= vendorLimit) {
+    return NextResponse.json({
+      error: 'Vendor limit reached. Upgrade your pack to add more vendors.',
+      code: 'LIMIT_REACHED',
+    }, { status: 402 })
+  }
 
   const { data: vendor, error } = await admin
     .from('msme_vendors')
@@ -67,8 +88,8 @@ export async function POST(req: NextRequest) {
       vendor_name: vendor_name.trim(),
       vendor_email: vendor_email.trim().toLowerCase(),
       gstin: gstin?.trim() || null,
-      is_paid: isPaid,
-      payment_status: paymentStatus,
+      is_paid: true,
+      payment_status: 'free',
       created_by: user.id,
     })
     .select()
@@ -76,5 +97,5 @@ export async function POST(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  return NextResponse.json({ vendor, isPaid, paymentStatus }, { status: 201 })
+  return NextResponse.json({ vendor }, { status: 201 })
 }

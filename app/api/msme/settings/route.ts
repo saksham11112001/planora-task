@@ -27,7 +27,16 @@ export async function GET(req: NextRequest) {
 
   const schedule = (data?.config?.days as number[] | undefined) ?? DEFAULT_EMAIL_SCHEDULE
 
-  return NextResponse.json({ schedule })
+  const { data: packRow } = await admin
+    .from('org_feature_settings')
+    .select('config')
+    .eq('org_id', mb.org_id)
+    .eq('feature_key', 'msme_pack')
+    .maybeSingle()
+
+  const pack = (packRow?.config as { tier: string; vendor_limit: number } | null) ?? { tier: 'free', vendor_limit: 5 }
+
+  return NextResponse.json({ schedule, pack })
 }
 
 export async function PATCH(req: NextRequest) {
