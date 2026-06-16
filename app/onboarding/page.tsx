@@ -201,7 +201,9 @@ export default function OnboardingPage() {
       }
       const postOnboard = sessionStorage.getItem('planora_post_onboard') ?? ''
       if (postOnboard) sessionStorage.removeItem('planora_post_onboard')
-      router.push(postOnboard || '/dashboard'); router.refresh()
+      const urlNext = new URLSearchParams(window.location.search).get('next') ?? ''
+      const dest = postOnboard || urlNext || '/dashboard'
+      router.push(dest); router.refresh()
     } catch { setError('Network error — please try again') } finally { setSaving(false) }
   }
 
