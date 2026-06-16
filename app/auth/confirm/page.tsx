@@ -18,6 +18,17 @@ function AuthConfirmInner() {
 
   useEffect(() => {
     async function handleAuth() {
+      // If a PKCE ?code= landed here by mistake (e.g. OAuth redirectTo misconfiguration),
+      // forward it to the server-side callback route which knows how to exchange it.
+      const queryCode = new URLSearchParams(window.location.search).get('code')
+      if (queryCode) {
+        const fwd = new URL('/auth/callback', window.location.origin)
+        fwd.searchParams.set('code', queryCode)
+        if (next !== '/dashboard') fwd.searchParams.set('next', next)
+        window.location.replace(fwd.toString())
+        return
+      }
+
       const hash       = window.location.hash.slice(1)
       const hashParams = new URLSearchParams(hash)
 

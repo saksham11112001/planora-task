@@ -78,8 +78,8 @@ export async function POST(request: NextRequest) {
   }
 
   // New user — send Supabase invite email.
-  // FIX: redirectTo points to /auth/confirm (handles implicit flow token in hash)
-  // and includes the org/role so the callback can provision membership.
+  // Invite email: redirectTo /auth/confirm which shows a "set password" screen for new users.
+  // If PKCE returns ?code= instead of a hash token, /auth/confirm now forwards to /auth/callback.
   const { error: inviteErr } = await admin.auth.admin.inviteUserByEmail(email.trim(), {
     data: { invited_to_org: mb.org_id, invited_role: role },
     redirectTo: `${APP_URL}/auth/confirm`,

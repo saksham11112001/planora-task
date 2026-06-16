@@ -419,7 +419,7 @@ export function MsmeView({ userRole, orgName }: Props) {
   }
 
   return (
-    <div style={{ padding: '0', minHeight: '100vh', background: 'linear-gradient(180deg, rgba(13,148,136,0.04) 0%, transparent 200px)' }}>
+    <div style={{ padding: '0', minHeight: '100vh', background: 'linear-gradient(180deg, rgba(13,148,136,0.04) 0%, transparent 200px)', colorScheme: 'light' }}>
     {/* Teal accent strip */}
     <div style={{ height: 3, background: `linear-gradient(90deg, ${ACCENT}, #14b8a6, ${ACCENT})` }} />
     <div style={{ padding: '24px', maxWidth: 1120, margin: '0 auto' }}>
@@ -440,10 +440,10 @@ export function MsmeView({ userRole, orgName }: Props) {
       {/* ── Header ── */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>
+          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#0f172a' }}>
             MSME Vendor Tracker
           </h1>
-          <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-muted)' }}>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>
             {totalEver}/{vendorLimit} vendor slots used
           </p>
         </div>
@@ -486,11 +486,11 @@ export function MsmeView({ userRole, orgName }: Props) {
             { step: '2', icon: '✉️', title: 'Shoot emails', desc: 'One click sends a branded MSME verification email' },
             { step: '3', icon: '📋', title: 'Track responses', desc: 'Vendors fill the form — you see status in real time' },
           ].map(s => (
-            <div key={s.step} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 18px', display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+            <div key={s.step} style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '16px 18px', display: 'flex', gap: 14, alignItems: 'flex-start' }}>
               <div style={{ width: 32, height: 32, borderRadius: 8, background: `${ACCENT}15`, border: `1.5px solid ${ACCENT}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>{s.icon}</div>
               <div>
-                <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{s.title}</p>
-                <p style={{ margin: '3px 0 0', fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>{s.desc}</p>
+                <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{s.title}</p>
+                <p style={{ margin: '3px 0 0', fontSize: 12, color: '#64748b', lineHeight: 1.5 }}>{s.desc}</p>
               </div>
             </div>
           ))}
@@ -529,16 +529,16 @@ export function MsmeView({ userRole, orgName }: Props) {
           return (
             <button key={s} onClick={() => setFilterStatus(s)} style={{
               padding: '6px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-              border: `1.5px solid ${active ? ACCENT : 'var(--border)'}`,
-              background: active ? `${ACCENT}15` : 'var(--surface)',
-              color: active ? ACCENT : 'var(--text-muted)',
+              border: `1.5px solid ${active ? ACCENT : '#e2e8f0'}`,
+              background: active ? `${ACCENT}15` : '#ffffff',
+              color: active ? ACCENT : '#64748b',
             }}>
               {s === 'all' ? 'All' : STATUS_LABEL[s as Vendor['status']].replace(' ✓', '')} · {count}
             </button>
           )
         })}
         <input
-          style={{ marginLeft: 'auto', padding: '7px 12px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13, color: 'var(--text)', background: 'var(--surface)', width: 220, outline: 'none' }}
+          style={{ marginLeft: 'auto', padding: '7px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, color: '#0f172a', background: '#ffffff', width: 220, outline: 'none', colorScheme: 'light' }}
           placeholder="Search name / email / GSTIN…"
           value={search}
           onChange={e => setSearch(e.target.value)}
@@ -550,7 +550,7 @@ export function MsmeView({ userRole, orgName }: Props) {
         {/* Table */}
         <div style={{ flex: 1, minWidth: 0 }}>
           {loading ? (
-            <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 40 }}>Loading…</div>
+            <div style={{ color: '#64748b', textAlign: 'center', padding: 40 }}>Loading…</div>
           ) : filtered.length === 0 ? (
             <EmptyState search={search} onAdd={canManage ? () => setShowAdd(true) : undefined} onImport={canManage ? () => setShowImport(true) : undefined} />
           ) : (
@@ -558,7 +558,7 @@ export function MsmeView({ userRole, orgName }: Props) {
             {/* Bulk action bar */}
             {checkedIds.size > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', background: `${ACCENT}12`, border: `1.5px solid ${ACCENT}40`, borderRadius: 10, marginBottom: 10 }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{checkedIds.size} vendor{checkedIds.size > 1 ? 's' : ''} selected</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>{checkedIds.size} vendor{checkedIds.size > 1 ? 's' : ''} selected</span>
                 <button
                   onClick={handleBulkShoot}
                   disabled={bulkShooting}
@@ -570,10 +570,10 @@ export function MsmeView({ userRole, orgName }: Props) {
               </div>
             )}
 
-            <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
+            <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'hidden' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
-                  <tr style={{ background: 'var(--surface-secondary)', borderBottom: '1px solid var(--border)' }}>
+                  <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
                     <th style={{ padding: '10px 14px', width: 36 }}>
                       <input
                         type="checkbox"
@@ -587,7 +587,7 @@ export function MsmeView({ userRole, orgName }: Props) {
                       />
                     </th>
                     {['Vendor', 'Status', 'Category', 'Emails', 'Action'].map(h => (
-                      <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{h}</th>
+                      <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: '#64748b', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -602,8 +602,8 @@ export function MsmeView({ userRole, orgName }: Props) {
                         key={v.id}
                         onClick={() => setSelectedId(sel ? null : v.id)}
                         style={{
-                          borderBottom: i < filtered.length - 1 ? '1px solid var(--border)' : undefined,
-                          background: checkedIds.has(v.id) ? `${ACCENT}08` : sel ? `${ACCENT}05` : 'var(--surface)',
+                          borderBottom: i < filtered.length - 1 ? '1px solid #e2e8f0' : undefined,
+                          background: checkedIds.has(v.id) ? `${ACCENT}08` : sel ? `${ACCENT}05` : '#ffffff',
                           cursor: 'pointer',
                         }}
                       >
@@ -625,9 +625,9 @@ export function MsmeView({ userRole, orgName }: Props) {
                         <td style={{ padding: '12px 14px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                             <div>
-                              <div style={{ fontWeight: 600, color: 'var(--text)' }}>{v.vendor_name}</div>
-                              <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>{v.vendor_email}</div>
-                              {v.gstin && <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>GSTIN: {v.gstin}</div>}
+                              <div style={{ fontWeight: 600, color: '#0f172a' }}>{v.vendor_name}</div>
+                              <div style={{ color: '#64748b', fontSize: 11 }}>{v.vendor_email}</div>
+                              {v.gstin && <div style={{ color: '#64748b', fontSize: 11 }}>GSTIN: {v.gstin}</div>}
                             </div>
                           </div>
                         </td>
@@ -642,10 +642,10 @@ export function MsmeView({ userRole, orgName }: Props) {
                             </span>
                           )}
                         </td>
-                        <td style={{ padding: '12px 14px', color: 'var(--text-muted)' }}>
+                        <td style={{ padding: '12px 14px', color: '#64748b' }}>
                           {v.msme_category ? CAT_LABEL[v.msme_category] : v.is_not_msme ? 'Not MSME' : '—'}
                         </td>
-                        <td style={{ padding: '12px 14px', textAlign: 'center', color: exhausted ? '#dc2626' : 'var(--text-muted)', fontWeight: exhausted ? 700 : 400 }}>
+                        <td style={{ padding: '12px 14px', textAlign: 'center', color: exhausted ? '#dc2626' : '#64748b', fontWeight: exhausted ? 700 : 400 }}>
                           {`${v.email_count}/${maxEmails}`}
                         </td>
                         <td style={{ padding: '12px 14px' }}>
@@ -674,7 +674,7 @@ export function MsmeView({ userRole, orgName }: Props) {
 
         {/* ── Detail panel ── */}
         {selected && (
-          <div style={{ width: 300, flexShrink: 0, border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', background: 'var(--surface)' }}>
+          <div style={{ width: 300, flexShrink: 0, border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'hidden', background: '#ffffff' }}>
             <div style={{ background: '#0f172a', padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ color: '#fff', fontSize: 14, fontWeight: 700 }}>
                 {selected.vendor_name}
@@ -685,17 +685,17 @@ export function MsmeView({ userRole, orgName }: Props) {
             <div style={{ padding: 16 }}>
               {/* Email with edit */}
               <div style={{ marginBottom: 12 }}>
-                <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>EMAIL</span>
+                <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>EMAIL</span>
                 {editingEmail === selected.id ? (
                   <div style={{ marginTop: 4, display: 'flex', gap: 6 }}>
-                    <input style={{ flex: 1, padding: '6px 10px', border: '1px solid var(--border)', borderRadius: 6, fontSize: 13, color: 'var(--text)', background: 'var(--surface)', outline: 'none' }}
+                    <input style={{ flex: 1, padding: '6px 10px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, color: '#0f172a', background: '#ffffff', outline: 'none' }}
                       value={editEmailVal} onChange={e => setEditEmailVal(e.target.value)} type="email" autoFocus />
                     <button onClick={() => handleSaveEmail(selected.id)} disabled={savingEmail} style={{ ...primaryBtn, padding: '6px 10px', fontSize: 11 }}>Save</button>
                     <button onClick={() => setEditingEmail(null)} style={{ ...ghostBtn, padding: '6px 8px', fontSize: 11 }}>✕</button>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                    <span style={{ fontSize: 13, color: 'var(--text)', wordBreak: 'break-all' }}>{selected.vendor_email}</span>
+                    <span style={{ fontSize: 13, color: '#0f172a', wordBreak: 'break-all' }}>{selected.vendor_email}</span>
                     {selected.email_count === 0 && canManage && (
                       <button onClick={() => { setEditingEmail(selected.id); setEditEmailVal(selected.vendor_email) }}
                         style={{ background: 'none', border: 'none', color: ACCENT, cursor: 'pointer', fontSize: 11, flexShrink: 0 }}>✎</button>
@@ -710,7 +710,7 @@ export function MsmeView({ userRole, orgName }: Props) {
               {/* Status */}
               {(
                 <div style={{ marginBottom: 12 }}>
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>STATUS</span>
+                  <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>STATUS</span>
                   <div style={{ marginTop: 3 }}>
                     {(() => {
                       const sc = STATUS_COLOR[selected.status]
@@ -751,8 +751,8 @@ export function MsmeView({ userRole, orgName }: Props) {
 
               {selected.email_count > 0 && (
                 <div style={{ marginBottom: 12 }}>
-                  <p style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, margin: '0 0 3px' }}>EMAIL HISTORY</p>
-                  <p style={{ fontSize: 12, color: 'var(--text)', margin: 0 }}>
+                  <p style={{ fontSize: 11, color: '#64748b', fontWeight: 600, margin: '0 0 3px' }}>EMAIL HISTORY</p>
+                  <p style={{ fontSize: 12, color: '#0f172a', margin: 0 }}>
                     {selected.email_count}/{maxEmails} sent · Last: {selected.last_emailed_at ? new Date(selected.last_emailed_at).toLocaleDateString('en-IN') : '—'}
                   </p>
                 </div>
@@ -808,7 +808,7 @@ export function MsmeView({ userRole, orgName }: Props) {
       {/* ── Upgrade Pack modal ── */}
       {showUpgrade && (
         <Modal title="MSME Vendor Packs" onClose={() => setShowUpgrade(false)} wide>
-          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20, lineHeight: 1.6 }}>
+          <p style={{ fontSize: 13, color: '#64748b', marginBottom: 20, lineHeight: 1.6 }}>
             Choose a pack that fits your vendor base. All vendors within your pack limit get full access — automated emails, form links, and Section 43B(h) compliance tracking.
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -817,30 +817,30 @@ export function MsmeView({ userRole, orgName }: Props) {
               const isDowngrade = pack.vendor_limit < totalEver
               return (
                 <div key={pack.tier} style={{
-                  border: `2px solid ${isCurrent ? ACCENT : 'var(--border)'}`,
+                  border: `2px solid ${isCurrent ? ACCENT : '#e2e8f0'}`,
                   borderRadius: 10,
                   padding: '14px 18px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   gap: 12,
-                  background: isCurrent ? `${ACCENT}08` : 'var(--surface)',
+                  background: isCurrent ? `${ACCENT}08` : '#ffffff',
                 }}>
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontWeight: 700, fontSize: 15, color: 'var(--text)' }}>{pack.label}</span>
+                      <span style={{ fontWeight: 700, fontSize: 15, color: '#0f172a' }}>{pack.label}</span>
                       {isCurrent && <span style={{ fontSize: 11, fontWeight: 700, color: ACCENT, background: `${ACCENT}15`, padding: '2px 8px', borderRadius: 10 }}>Current</span>}
                     </div>
-                    <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>
+                    <div style={{ fontSize: 13, color: '#64748b', marginTop: 2 }}>
                       Up to <strong>{pack.vendor_limit} vendors</strong>
                     </div>
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
                     {pack.original_price_label && (
-                      <div style={{ fontSize: 13, color: 'var(--text-muted)', textDecoration: 'line-through' }}>{pack.original_price_label}</div>
+                      <div style={{ fontSize: 13, color: '#64748b', textDecoration: 'line-through' }}>{pack.original_price_label}</div>
                     )}
-                    <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)' }}>{pack.price_label}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>one-time</div>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: '#0f172a' }}>{pack.price_label}</div>
+                    <div style={{ fontSize: 11, color: '#64748b' }}>one-time</div>
                     {!isCurrent && !isDowngrade && pack.tier === 'pack_500' && (
                       <a
                         href="mailto:info@sng-adwisers.com?subject=MSME%20Enterprise%20Pack%20(500%20vendors)"
@@ -859,14 +859,14 @@ export function MsmeView({ userRole, orgName }: Props) {
                       </button>
                     )}
                     {isDowngrade && !isCurrent && (
-                      <span style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginTop: 8 }}>Contact support to downgrade</span>
+                      <span style={{ fontSize: 11, color: '#64748b', display: 'block', marginTop: 8 }}>Contact support to downgrade</span>
                     )}
                   </div>
                 </div>
               )
             })}
           </div>
-          <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 16, lineHeight: 1.5 }}>
+          <p style={{ fontSize: 11, color: '#64748b', marginTop: 16, lineHeight: 1.5 }}>
             After payment, your pack activates instantly. Payment via UPI, net banking, or cards — powered by Cashfree.
           </p>
         </Modal>
@@ -875,32 +875,32 @@ export function MsmeView({ userRole, orgName }: Props) {
       {/* ── Email schedule settings modal ── */}
       {showSettings && (
         <Modal title="Automated email schedule" onClose={() => setShowSettings(false)}>
-          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20, lineHeight: 1.6 }}>
+          <p style={{ fontSize: 13, color: '#64748b', marginBottom: 20, lineHeight: 1.6 }}>
             Configure when automated reminder emails are sent after the first email.
             You can set up to 5 emails total (email 1 is always sent immediately when you click "Shoot email").
           </p>
 
           <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 10 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', marginBottom: 10 }}>
               Email sequence ({draftIntervals.length + 1} emails total)
             </div>
 
             {/* Email 1 row — always fixed */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, marginBottom: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 8, marginBottom: 8 }}>
               <div style={{ width: 24, height: 24, borderRadius: '50%', background: ACCENT, color: '#fff', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>1</div>
-              <div style={{ flex: 1, fontSize: 13, color: 'var(--text)' }}>First email — sent immediately when you click "Shoot email"</div>
-              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Day 0</span>
+              <div style={{ flex: 1, fontSize: 13, color: '#0f172a' }}>First email — sent immediately when you click "Shoot email"</div>
+              <span style={{ fontSize: 12, color: '#64748b' }}>Day 0</span>
             </div>
 
             {/* Configurable follow-up rows */}
             {draftIntervals.map((days, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, marginBottom: 8 }}>
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 8, marginBottom: 8 }}>
                 <div style={{ width: 24, height: 24, borderRadius: '50%', background: ACCENT, color: '#fff', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{i + 2}</div>
-                <div style={{ flex: 1, fontSize: 13, color: 'var(--text)' }}>
+                <div style={{ flex: 1, fontSize: 13, color: '#0f172a' }}>
                   Reminder email {i + 2}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>After</span>
+                  <span style={{ fontSize: 12, color: '#64748b' }}>After</span>
                   <input
                     type="number"
                     min={1}
@@ -910,9 +910,9 @@ export function MsmeView({ userRole, orgName }: Props) {
                       const val = Math.max(1, Math.min(365, parseInt(e.target.value) || 1))
                       setDraftIntervals(prev => prev.map((d, idx) => idx === i ? val : d))
                     }}
-                    style={{ width: 60, padding: '4px 8px', border: '1px solid var(--border)', borderRadius: 6, fontSize: 13, background: 'var(--bg)', color: 'var(--text)', textAlign: 'center' }}
+                    style={{ width: 60, padding: '4px 8px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, background: '#f8fafc', color: '#0f172a', textAlign: 'center' }}
                   />
-                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>days</span>
+                  <span style={{ fontSize: 12, color: '#64748b' }}>days</span>
                   {draftIntervals.length > 1 && (
                     <button
                       onClick={() => setDraftIntervals(prev => prev.filter((_, idx) => idx !== i))}
@@ -928,14 +928,14 @@ export function MsmeView({ userRole, orgName }: Props) {
             {draftIntervals.length < 4 && (
               <button
                 onClick={() => setDraftIntervals(prev => [...prev, 7])}
-                style={{ width: '100%', padding: '8px', border: '1px dashed var(--border)', borderRadius: 8, background: 'none', color: 'var(--text-muted)', fontSize: 13, cursor: 'pointer', marginTop: 4 }}
+                style={{ width: '100%', padding: '8px', border: '1px dashed #e2e8f0', borderRadius: 8, background: 'none', color: '#64748b', fontSize: 13, cursor: 'pointer', marginTop: 4 }}
               >
                 + Add another reminder email
               </button>
             )}
           </div>
 
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 20, padding: '10px 14px', background: 'rgba(13,148,136,0.06)', borderRadius: 8 }}>
+          <div style={{ fontSize: 12, color: '#64748b', marginBottom: 20, padding: '10px 14px', background: 'rgba(13,148,136,0.06)', borderRadius: 8 }}>
             💡 Tip: "After X days" means X days after the previous email in the sequence.
           </div>
 
@@ -953,7 +953,7 @@ export function MsmeView({ userRole, orgName }: Props) {
         <Modal title="Import vendors from Excel / CSV" onClose={() => setShowImport(false)} wide>
           {!importResult ? (
             <>
-              <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16, lineHeight: 1.6 }}>
+              <p style={{ fontSize: 13, color: '#64748b', marginBottom: 16, lineHeight: 1.6 }}>
                 Upload an Excel (.xlsx) or CSV file with columns: <strong>Vendor Name</strong> and <strong>Vendor Email</strong>.
                 GSTIN column is optional. Duplicate emails are skipped automatically.
               </p>
@@ -972,22 +972,22 @@ export function MsmeView({ userRole, orgName }: Props) {
 
               {importPreview.length > 0 && (
                 <div style={{ marginBottom: 20 }}>
-                  <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', margin: '0 0 10px' }}>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', margin: '0 0 10px' }}>
                     Preview — {importRows.length} rows found{importRows.length > 5 ? ` (showing first 5)` : ''}
                   </p>
-                  <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+                  <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                       <thead>
-                        <tr style={{ background: 'var(--surface-secondary)' }}>
-                          {['Vendor Name', 'Email', 'GSTIN'].map(h => <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--text-muted)' }}>{h}</th>)}
+                        <tr style={{ background: '#f8fafc' }}>
+                          {['Vendor Name', 'Email', 'GSTIN'].map(h => <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: '#64748b' }}>{h}</th>)}
                         </tr>
                       </thead>
                       <tbody>
                         {importPreview.map((r, i) => (
-                          <tr key={i} style={{ borderTop: '1px solid var(--border)' }}>
-                            <td style={{ padding: '8px 12px', color: r.vendor_name ? 'var(--text)' : '#dc2626' }}>{r.vendor_name || '(missing)'}</td>
-                            <td style={{ padding: '8px 12px', color: r.vendor_email ? 'var(--text)' : '#dc2626' }}>{r.vendor_email || '(missing)'}</td>
-                            <td style={{ padding: '8px 12px', color: 'var(--text-muted)' }}>{r.gstin || '—'}</td>
+                          <tr key={i} style={{ borderTop: '1px solid #e2e8f0' }}>
+                            <td style={{ padding: '8px 12px', color: r.vendor_name ? '#0f172a' : '#dc2626' }}>{r.vendor_name || '(missing)'}</td>
+                            <td style={{ padding: '8px 12px', color: r.vendor_email ? '#0f172a' : '#dc2626' }}>{r.vendor_email || '(missing)'}</td>
+                            <td style={{ padding: '8px 12px', color: '#64748b' }}>{r.gstin || '—'}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -1011,7 +1011,7 @@ export function MsmeView({ userRole, orgName }: Props) {
             /* Import result */
             <div>
               <div style={{ textAlign: 'center', fontSize: 40, marginBottom: 12 }}>{importResult.inserted > 0 ? '✅' : '⚠️'}</div>
-              <p style={{ textAlign: 'center', fontWeight: 700, fontSize: 16, color: 'var(--text)', margin: '0 0 8px' }}>
+              <p style={{ textAlign: 'center', fontWeight: 700, fontSize: 16, color: '#0f172a', margin: '0 0 8px' }}>
                 {importResult.inserted} vendor{importResult.inserted !== 1 ? 's' : ''} imported
               </p>
               {importResult.skipped.length > 0 && (
@@ -1042,8 +1042,8 @@ function SummaryCard({ label, value, sub, accent, progress, warn, icon, onClick,
     <div
       onClick={onClick}
       style={{
-        background: warn ? '#fef2f2' : active ? `${accent}12` : 'var(--surface)',
-        border: `1.5px solid ${warn ? '#fecaca' : active ? accent : 'var(--border)'}`,
+        background: warn ? '#fef2f2' : active ? `${accent}12` : '#ffffff',
+        border: `1.5px solid ${warn ? '#fecaca' : active ? accent : '#e2e8f0'}`,
         borderRadius: 12, padding: '16px 16px 14px',
         cursor: onClick ? 'pointer' : 'default',
         transition: 'all 0.15s',
@@ -1051,17 +1051,17 @@ function SummaryCard({ label, value, sub, accent, progress, warn, icon, onClick,
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-        <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: warn ? '#dc2626' : active ? accent : 'var(--text-muted)', letterSpacing: '0.04em' }}>{label}</p>
+        <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: warn ? '#dc2626' : active ? accent : '#64748b', letterSpacing: '0.04em' }}>{label}</p>
         {icon && <span style={{ fontSize: 16, lineHeight: 1 }}>{icon}</span>}
       </div>
       <span style={{ fontSize: 26, fontWeight: 800, color: active ? accent : warn ? '#dc2626' : accent }}>{value}</span>
       {progress !== undefined && (
-        <div style={{ height: 4, background: 'var(--border)', borderRadius: 2, margin: '8px 0 4px' }}>
+        <div style={{ height: 4, background: '#e2e8f0', borderRadius: 2, margin: '8px 0 4px' }}>
           <div style={{ height: 4, background: accent, borderRadius: 2, width: `${progress}%`, transition: 'width 0.4s' }} />
         </div>
       )}
-      <p style={{ margin: progress !== undefined ? '2px 0 0' : '4px 0 0', fontSize: 11, color: warn ? '#dc2626' : active ? accent : 'var(--text-muted)' }}>{sub}</p>
-      {onClick && <p style={{ margin: '6px 0 0', fontSize: 10, color: active ? accent : 'var(--text-muted)', fontWeight: 600 }}>{active ? 'Click to clear filter' : 'Click to filter'}</p>}
+      <p style={{ margin: progress !== undefined ? '2px 0 0' : '4px 0 0', fontSize: 11, color: warn ? '#dc2626' : active ? accent : '#64748b' }}>{sub}</p>
+      {onClick && <p style={{ margin: '6px 0 0', fontSize: 10, color: active ? accent : '#64748b', fontWeight: 600 }}>{active ? 'Click to clear filter' : 'Click to filter'}</p>}
     </div>
   )
 }
@@ -1069,18 +1069,18 @@ function SummaryCard({ label, value, sub, accent, progress, warn, icon, onClick,
 function EmptyState({ search, onAdd, onImport }: { search: string; onAdd?: () => void; onImport?: () => void }) {
   if (search) {
     return (
-      <div style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--text-muted)', border: '1.5px dashed var(--border)', borderRadius: 10 }}>
+      <div style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b', border: '1.5px dashed #e2e8f0', borderRadius: 10 }}>
         <div style={{ fontSize: 32, marginBottom: 10 }}>🔍</div>
-        <p style={{ margin: 0, fontWeight: 600, color: 'var(--text)' }}>No vendors match your search</p>
-        <p style={{ margin: '6px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>Try a different name, email, or GSTIN</p>
+        <p style={{ margin: 0, fontWeight: 600, color: '#0f172a' }}>No vendors match your search</p>
+        <p style={{ margin: '6px 0 0', fontSize: 12, color: '#64748b' }}>Try a different name, email, or GSTIN</p>
       </div>
     )
   }
   return (
     <div style={{ textAlign: 'center', padding: '56px 20px', background: `linear-gradient(135deg, ${ACCENT}05, transparent)`, border: `1.5px dashed ${ACCENT}40`, borderRadius: 12 }}>
       <div style={{ fontSize: 44, marginBottom: 14 }}>🏭</div>
-      <p style={{ margin: '0 0 4px', fontSize: 17, fontWeight: 700, color: 'var(--text)' }}>No vendors yet</p>
-      <p style={{ margin: '0 0 20px', fontSize: 13, color: 'var(--text-muted)' }}>Add your first MSME vendor to start tracking</p>
+      <p style={{ margin: '0 0 4px', fontSize: 17, fontWeight: 700, color: '#0f172a' }}>No vendors yet</p>
+      <p style={{ margin: '0 0 20px', fontSize: 13, color: '#64748b' }}>Add your first MSME vendor to start tracking</p>
       <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
         {onAdd    && <button onClick={onAdd}    style={primaryBtn}>+ Add vendor</button>}
         {onImport && <button onClick={onImport} style={ghostBtn}>↑ Import from Excel</button>}
@@ -1092,10 +1092,10 @@ function EmptyState({ search, onAdd, onImport }: { search: string; onAdd?: () =>
 function Modal({ title, children, onClose, wide }: { title: string; children: React.ReactNode; onClose: () => void; wide?: boolean }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-      <div style={{ background: 'var(--surface)', borderRadius: 12, padding: 28, width: '100%', maxWidth: wide ? 560 : 420, maxHeight: '90vh', overflowY: 'auto' }}>
+      <div style={{ background: '#ffffff', borderRadius: 12, padding: 28, width: '100%', maxWidth: wide ? 560 : 420, maxHeight: '90vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--text)' }}>{title}</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 20 }}>×</button>
+          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#0f172a' }}>{title}</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 20 }}>×</button>
         </div>
         {children}
       </div>
@@ -1106,9 +1106,9 @@ function Modal({ title, children, onClose, wide }: { title: string; children: Re
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
     <div style={{ marginBottom: 16 }}>
-      <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 6 }}>{label}</label>
+      <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#0f172a', marginBottom: 6 }}>{label}</label>
       {children}
-      {hint && <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--text-muted)' }}>{hint}</p>}
+      {hint && <p style={{ margin: '4px 0 0', fontSize: 11, color: '#64748b' }}>{hint}</p>}
     </div>
   )
 }
@@ -1116,8 +1116,8 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 8, gap: 8 }}>
-      <span style={{ color: 'var(--text-muted)', flexShrink: 0 }}>{label}</span>
-      <span style={{ color: 'var(--text)', fontWeight: 500, textAlign: 'right', wordBreak: 'break-all' }}>{value}</span>
+      <span style={{ color: '#64748b', flexShrink: 0 }}>{label}</span>
+      <span style={{ color: '#0f172a', fontWeight: 500, textAlign: 'right', wordBreak: 'break-all' }}>{value}</span>
     </div>
   )
 }
@@ -1136,10 +1136,10 @@ const primaryBtn: React.CSSProperties = {
   padding: '9px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer',
 }
 const ghostBtn: React.CSSProperties = {
-  background: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border)',
+  background: 'transparent', color: '#64748b', border: '1px solid #e2e8f0',
   borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
 }
 const mi: React.CSSProperties = {
-  width: '100%', padding: '9px 12px', border: '1px solid var(--border)', borderRadius: 8,
-  fontSize: 14, color: 'var(--text)', background: 'var(--surface)', boxSizing: 'border-box',
+  width: '100%', padding: '9px 12px', border: '1px solid #e2e8f0', borderRadius: 8,
+  fontSize: 14, color: '#0f172a', background: '#ffffff', boxSizing: 'border-box', colorScheme: 'light',
 }
