@@ -462,7 +462,7 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
             <ExternalLink className="h-3 w-3" style={{ opacity: 0.5 }} />
           </a>
         )}
-        {['owner','admin'].includes(role) && <SI href="/partner" active={isActive('/partner')} icon={<Handshake className="h-4 w-4"/>} label="Partner Portal"/>}
+        {['owner','admin'].includes(role) && <SI href="/partners/dashboard" active={isActive('/partners/dashboard')} icon={<Handshake className="h-4 w-4"/>} label="Partner Portal"/>}
         {nav.import_data && <SI href="/import" active={isActive('/import')} icon={<Upload className="h-4 w-4"/>} label="Import data"/>}
         {canManage && (
           <SI href="/settings/permissions" active={isActive('/settings/permissions')} icon={<Shield className="h-4 w-4"/>} label="Permissions"/>

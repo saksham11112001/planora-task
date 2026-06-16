@@ -255,10 +255,11 @@ export async function sendOnboardingNudgeEmail(p: {
 // ── MSME vendor form invitation ───────────────────────────────────────────
 export async function sendMsmeVendorEmail(p: {
   to: string; vendorName: string; orgName: string
-  formUrl: string; attemptNo: 1 | 2 | 3 | 4 | 5; totalEmails?: number
+  formUrl: string; attemptNo: 1 | 2 | 3 | 4 | 5; totalEmails?: number; cc?: string
 }) {
   return resend.emails.send({
     from: FROM, to: p.to,
+    ...(p.cc ? { cc: [p.cc] } : {}),
     subject: msmeVendorEmailSubject(p),
     html:    msmeVendorEmailHtml(p),
   })

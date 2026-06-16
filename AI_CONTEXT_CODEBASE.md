@@ -1,5 +1,5 @@
 # Planora Task — Codebase Transfer Document
-> Use this at the start of a new chat to give the AI full context. Last updated: 2026-05-01 (Session 13)
+> Use this at the start of a new chat to give the AI full context. Last updated: 2026-06-16 (Session 16)
 
 ---
 
@@ -1751,6 +1751,60 @@ interface MsmePack { ...; original_price_label: string | null }
   </div>
 )}
 <div style={{ fontSize: 18, fontWeight: 800 }}>{pack.price_label}</div>
+```
+
+---
+
+---
+
+## SESSION 16 CHANGES (2026-06-16)
+
+### Auth & Redirect Fixes
+- **`app/(msme)/msme/page.tsx`** — Removed `member`/`viewer` role gate that redirected to `/dashboard`; changed `redirect('/onboarding')` to `redirect('/onboarding?next=/msme')`
+- **`app/onboarding/page.tsx`** — Post-onboarding redirect now reads `?next=` URL param as fallback when `planora_post_onboard` sessionStorage is empty (cross-subdomain sessionStorage isolation fix for MSME signup flow)
+- **`app/auth/callback/route.ts`** — Session cookies now set with `domain: '.sng-adwisers.com'` in production (was only `sng-adwisers.com`), so `msme.sng-adwisers.com` sidebar link works immediately after login
+
+### MSME Portal UI
+- **`app/(msme)/layout.tsx`** — "by SNG Advisors" → "by Planora"; org name now fetched server-side and displayed in navbar
+- **`app/(app)/msme/MsmeView.tsx`**:
+  - STATUS_LABEL `emailed`: "Email sent" → "Awaited reply"
+  - Removed "Section 43B(h) compliance ·" from subtitle
+  - Org name removed from `<h1>` (moved to navbar)
+  - "↑ Import Excel" → "↑ Import Vendors"
+  - Summary cards (Completion, Not Contacted, Awaited Reply) are **clickable** to filter the vendor table; active state highlighted with coloured border + glow; icons added
+  - Added 3px teal gradient accent strip at top + subtle gradient page background
+- **`app/msme-landing/page.tsx`** — Animated floating gradient orbs in hero background (CSS keyframe animations, no dependencies)
+
+### Partner Portal Unification
+- **`app/(partner-portal)/partners/dashboard/PartnerDashboard.tsx`** — Full redesign to match internal partner view:
+  - Layout: Welcome + stats → **single email invite** (type toggle: MSME/Partner) → referred/invited table with status → referral links at bottom
+  - Invite list updates instantly after sending (no page reload)
+  - Status column: "Invite sent" (yellow) / "✓ Signed up" (green)
+  - Independent of Planora AppShell/Zustand — works standalone
+- **`components/layout/Sidebar.tsx`** — Partner Portal link changed from `/partner` to `/partners/dashboard`
+- **`app/(app)/partner/page.tsx`** — Now simply `redirect('/partners/dashboard')` (unified entry point)
+- **Result**: One portal for both Planora users (sidebar) and standalone partners (direct URL). Planora users without a partner record are redirected to `/partners/join` with email pre-filled from session.
+
+### New DB Tables Required (run in Supabase if not yet done)
+```sql
+-- Already in add_standalone_partners.sql:
+CREATE TABLE IF NOT EXISTS standalone_partners (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid REFERENCES auth.users(id),
+  name text NOT NULL, email text UNIQUE NOT NULL, phone text,
+  referral_code text UNIQUE NOT NULL, status text DEFAULT 'active',
+  referred_by text, created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS partner_portal_invites (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  partner_id uuid REFERENCES standalone_partners(id) ON DELETE CASCADE,
+  email text NOT NULL, invite_type text NOT NULL CHECK (invite_type IN ('msme','partner')),
+  invite_count int DEFAULT 1, last_sent_at timestamptz DEFAULT now(),
+  signed_up boolean DEFAULT false, signed_up_at timestamptz,
+  UNIQUE(partner_id, email, invite_type)
+);
+-- MSME vendor soft-delete:
+ALTER TABLE msme_vendors ADD COLUMN IF NOT EXISTS is_deleted boolean NOT NULL DEFAULT false;
 ```
 
 ---

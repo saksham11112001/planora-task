@@ -478,6 +478,25 @@ export function MsmeView({ userRole, orgName }: Props) {
         </div>
       </div>
 
+      {/* ── Getting started banner (shown when no vendors yet) ── */}
+      {!loading && totalEver === 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 24 }}>
+          {[
+            { step: '1', icon: '➕', title: 'Add your vendors', desc: 'Add vendors manually or bulk-import from Excel' },
+            { step: '2', icon: '✉️', title: 'Shoot emails', desc: 'One click sends a branded MSME verification email' },
+            { step: '3', icon: '📋', title: 'Track responses', desc: 'Vendors fill the form — you see status in real time' },
+          ].map(s => (
+            <div key={s.step} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 18px', display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: `${ACCENT}15`, border: `1.5px solid ${ACCENT}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>{s.icon}</div>
+              <div>
+                <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{s.title}</p>
+                <p style={{ margin: '3px 0 0', fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>{s.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* ── Vendor limit banner ── */}
       {totalEver >= vendorLimit && (
         <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 10, padding: '14px 18px', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
@@ -1048,16 +1067,24 @@ function SummaryCard({ label, value, sub, accent, progress, warn, icon, onClick,
 }
 
 function EmptyState({ search, onAdd, onImport }: { search: string; onAdd?: () => void; onImport?: () => void }) {
+  if (search) {
+    return (
+      <div style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--text-muted)', border: '1.5px dashed var(--border)', borderRadius: 10 }}>
+        <div style={{ fontSize: 32, marginBottom: 10 }}>🔍</div>
+        <p style={{ margin: 0, fontWeight: 600, color: 'var(--text)' }}>No vendors match your search</p>
+        <p style={{ margin: '6px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>Try a different name, email, or GSTIN</p>
+      </div>
+    )
+  }
   return (
-    <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)', border: '1.5px dashed var(--border)', borderRadius: 10 }}>
-      <div style={{ fontSize: 36, marginBottom: 12 }}>🏭</div>
-      <p style={{ margin: 0, fontWeight: 600, color: 'var(--text)' }}>{search ? 'No vendors match your search' : 'No vendors yet'}</p>
-      {!search && (
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 16, flexWrap: 'wrap' }}>
-          {onAdd    && <button onClick={onAdd}    style={primaryBtn}>+ Add vendor</button>}
-          {onImport && <button onClick={onImport} style={ghostBtn}>↑ Import from Excel</button>}
-        </div>
-      )}
+    <div style={{ textAlign: 'center', padding: '56px 20px', background: `linear-gradient(135deg, ${ACCENT}05, transparent)`, border: `1.5px dashed ${ACCENT}40`, borderRadius: 12 }}>
+      <div style={{ fontSize: 44, marginBottom: 14 }}>🏭</div>
+      <p style={{ margin: '0 0 4px', fontSize: 17, fontWeight: 700, color: 'var(--text)' }}>No vendors yet</p>
+      <p style={{ margin: '0 0 20px', fontSize: 13, color: 'var(--text-muted)' }}>Add your first MSME vendor to start tracking</p>
+      <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+        {onAdd    && <button onClick={onAdd}    style={primaryBtn}>+ Add vendor</button>}
+        {onImport && <button onClick={onImport} style={ghostBtn}>↑ Import from Excel</button>}
+      </div>
     </div>
   )
 }
