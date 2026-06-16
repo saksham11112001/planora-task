@@ -123,7 +123,7 @@ export default function LoginPage() {
     const res  = await fetch('/api/auth/magic-link', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email.trim() }),
+      body: JSON.stringify({ email: email.trim(), next: getPostLoginPath() }),
     })
     const json = await res.json().catch(() => ({}))
     setLoading(false)

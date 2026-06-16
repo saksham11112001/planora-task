@@ -1649,6 +1649,112 @@ function openDropdown(e: React.MouseEvent<HTMLElement>) {
 
 ---
 
+---
+
+### SESSION 14–15 — MSME TRACKER, PARTNER PORTAL, AUTH FIXES
+
+> Last updated: 2026-06-16
+
+#### New route groups
+| Group | Prefix | Description |
+|-------|--------|-------------|
+| `(msme)` | `/msme` | Standalone MSME vendor tracker — its own layout, no sidebar |
+| `(partner-portal)` | `/partners` | Standalone partner portal — no Planora auth, no sidebar |
+
+#### New DB tables (run migrations before use)
+```sql
+-- Standalone partner portal
+CREATE TABLE standalone_partners (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  name text NOT NULL, email text NOT NULL UNIQUE,
+  phone text, referral_code text NOT NULL UNIQUE,
+  status text NOT NULL DEFAULT 'active', referred_by text,
+  created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now()
+);
+CREATE TABLE partner_portal_invites (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  partner_id uuid NOT NULL REFERENCES standalone_partners(id) ON DELETE CASCADE,
+  email text NOT NULL, invite_type text NOT NULL CHECK (invite_type IN ('msme','partner')),
+  invite_count int NOT NULL DEFAULT 1, last_sent_at timestamptz DEFAULT now(),
+  signed_up boolean DEFAULT false, signed_up_at timestamptz, created_at timestamptz DEFAULT now(),
+  UNIQUE (partner_id, email, invite_type)
+);
+-- MSME vendor soft-delete (prevents free-tier gaming)
+ALTER TABLE msme_vendors ADD COLUMN IF NOT EXISTS is_deleted boolean NOT NULL DEFAULT false;
+```
+
+#### Key files added / changed
+
+**MSME Tracker**
+- `app/(msme)/msme/page.tsx` — server page; passes `orgName` to `MsmeView`
+- `app/(app)/msme/MsmeView.tsx` — client component; now accepts `orgName?: string`, shows it in header alongside title; pack_500 (Enterprise) shows "Contact us →" mailto link instead of pay button; upgrade modal shows strikethrough original price (`original_price_label`)
+- `lib/msme/packs.ts` — `MsmePack` interface has `original_price_label: string | null`; e.g. pack_20 shows ~~₹5,000~~ ₹3,000
+- `app/msme-landing/page.tsx` — rewritten: automation focus, Planora branding, no CA framing; "Get Started Free" links go to `/login?redirect=/msme&mode=signup`; "Login" nav link stays as `/login?redirect=/msme`
+
+**Partner Portal (standalone)**
+- `app/(partner-portal)/layout.tsx` — minimal layout, `colorScheme: 'light'`, no AppShell
+- `app/(partner-portal)/partners/page.tsx` — checks session → redirects to login/join/dashboard
+- `app/(partner-portal)/partners/login/page.tsx` — magic-link login (`shouldCreateUser: false`)
+- `app/(partner-portal)/partners/join/page.tsx` — signup form; reads `?ref=` for referral code; POSTs to `/api/partner-portal/profile` then sends magic link
+- `app/(partner-portal)/partners/dashboard/page.tsx` — server; fetches partner by user_id OR by email (auto-links on first login); splits invites into msme/partner lists
+- `app/(partner-portal)/partners/dashboard/PartnerDashboard.tsx` — client; two `InviteCard` components (MSME referral + partner referral); stats row; logout button
+  - Card 1: "Refer a CA / Business Friend" (MSME Tracker referral)
+  - Card 2: "Grow Your Network" (partner referral)
+  - Conversational short text throughout; no "Planora referral" language
+- `app/api/partner-portal/profile/route.ts` — GET/POST/PATCH; POST creates partner record + referral code; PATCH links user_id by email
+- `app/api/partner-portal/invite/route.ts` — POST; sends MSME or partner invite emails via Resend; upserts `partner_portal_invites`
+
+**Auth / Middleware fixes**
+- `middleware.ts`:
+  - Added `/partners/` and `/msme-landing` to the "always let through" whitelist — they have their own auth
+  - Added `/?code=` detection: if Supabase sends auth code to root URL (Site URL misconfigured), middleware forwards to `/auth/callback?code=...` automatically
+- `app/(app)/layout.tsx` — in the "no org membership" path, now checks `standalone_partners` by `user_id`; if found, redirects to `/partners/dashboard` (partners never see Planora app)
+- `app/login/page.tsx` — reads `?mode=signup` URL param in `useEffect` and sets initial mode to `email_signup`
+
+**Supabase URL config note**: Site URL must be `https://sng-adwisers.com` (without trailing slash) in Supabase Auth → URL Configuration. Redirect URLs must include `https://sng-adwisers.com/auth/callback`.
+
+#### Patterns
+
+**Standalone partner redirect (layout.tsx)**
+```typescript
+// Inside if (!membership) block, after pending invite check:
+const { data: standalonePartner } = await admin
+  .from('standalone_partners').select('id').eq('user_id', user.id).maybeSingle()
+if (standalonePartner) redirect('/partners/dashboard')
+redirect('/onboarding')
+```
+
+**Middleware: auth code on root URL**
+```typescript
+if (pathname === '/' && request.nextUrl.searchParams.has('code')) {
+  const callbackUrl = new URL('/auth/callback', request.url)
+  callbackUrl.searchParams.set('code', request.nextUrl.searchParams.get('code')!)
+  return NextResponse.redirect(callbackUrl)
+}
+```
+
+**Middleware public path whitelist (always let through)**
+```typescript
+pathname.startsWith('/partners/') ||   // partner portal has own auth
+pathname.startsWith('/msme-landing') || // public MSME product page
+```
+
+**MSME packs strikethrough**
+```typescript
+// lib/msme/packs.ts
+interface MsmePack { ...; original_price_label: string | null }
+// In upgrade modal:
+{pack.original_price_label && (
+  <div style={{ fontSize: 13, color: 'var(--text-muted)', textDecoration: 'line-through' }}>
+    {pack.original_price_label}
+  </div>
+)}
+<div style={{ fontSize: 18, fontWeight: 800 }}>{pack.price_label}</div>
+```
+
+---
+
 ## HOW TO START A NEW CHAT
 
 Paste this at the top of the new chat:
