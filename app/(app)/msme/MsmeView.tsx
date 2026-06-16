@@ -812,6 +812,9 @@ export function MsmeView({ userRole }: Props) {
                     </div>
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    {pack.original_price_label && (
+                      <div style={{ fontSize: 13, color: 'var(--text-muted)', textDecoration: 'line-through' }}>{pack.original_price_label}</div>
+                    )}
                     <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)' }}>{pack.price_label}</div>
                     <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>one-time</div>
                     {!isCurrent && !isDowngrade && (

@@ -138,19 +138,19 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
 
         {/* Welcome */}
         <div style={{ marginBottom: 28 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', margin: '0 0 4px' }}>Your referral dashboard</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', margin: '0 0 4px' }}>Hey {partner.name.split(' ')[0]}! 👋</h1>
           <p style={{ fontSize: 14, color: '#64748b', margin: 0 }}>
-            Referral code: <strong style={{ fontFamily: 'monospace', color: ACCENT }}>{partner.referral_code}</strong>
+            Your code: <strong style={{ fontFamily: 'monospace', color: ACCENT }}>{partner.referral_code}</strong> · Share it, earn on every paid signup.
           </p>
         </div>
 
         {/* Stats row */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 32 }}>
           {[
-            { label: 'MSME invites sent',       value: msmeInvites.length,    color: ACCENT },
-            { label: 'MSME sign-ups',            value: msmeSignedUp,          color: '#2563eb' },
-            { label: 'Partner invites sent',     value: partnerInvites.length, color: '#7c3aed' },
-            { label: 'Partners joined',          value: partnerSignedUp,       color: '#16a34a' },
+            { label: 'MSME invites out',    value: msmeInvites.length,    color: ACCENT },
+            { label: 'Signed up',           value: msmeSignedUp,          color: '#2563eb' },
+            { label: 'Partner invites out', value: partnerInvites.length, color: '#7c3aed' },
+            { label: 'Partners joined',     value: partnerSignedUp,       color: '#16a34a' },
           ].map(s => (
             <div key={s.label} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '16px 18px' }}>
               <div style={{ fontSize: 26, fontWeight: 800, color: s.color, lineHeight: 1 }}>{s.value}</div>
@@ -165,8 +165,8 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
           {/* ── Card 1: MSME Tracker ── */}
           <InviteCard
             icon="📦"
-            title="Refer to MSME Tracker"
-            description="Share your unique link or send an email invite. When they sign up for a paid MSME pack, you earn a commission."
+            title="Refer a CA / Business Friend"
+            description="Know a CA or business that needs MSME compliance sorted? Send them your link — you earn when they upgrade."
             accentColor={ACCENT}
             referralUrl={msmeReferralUrl}
             copied={copiedMsme}
@@ -181,8 +181,8 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
           {/* ── Card 2: Partner Program ── */}
           <InviteCard
             icon="🤝"
-            title="Invite New Partners"
-            description="Know someone who could refer clients? Invite them to join the partner program. When they join and refer, you both earn."
+            title="Grow Your Network"
+            description="Know someone who can refer clients too? Bring them in as a partner — when they earn, you do too."
             accentColor="#7c3aed"
             referralUrl={partnerReferralUrl}
             copied={copiedPartner}
@@ -196,7 +196,7 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
         </div>
 
         <p style={{ textAlign: 'center', fontSize: 12, color: '#94a3b8', marginTop: 32 }}>
-          Partner since {fmtDate(partner.created_at)} · Questions? Email us at info@sng-adwisers.com
+          With you since {fmtDate(partner.created_at)} · Ping us at info@sng-adwisers.com
         </p>
       </div>
 
@@ -237,7 +237,7 @@ function InviteCard({ icon, title, description, accentColor, referralUrl, copied
       <div style={{ padding: 20 }}>
         {/* Referral link */}
         <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Your referral link</div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Your link</div>
           <div style={{ display: 'flex', gap: 8 }}>
             <div style={{
               flex: 1, padding: '8px 12px', background: '#f8fafc', border: '1px solid #e2e8f0',
@@ -261,7 +261,7 @@ function InviteCard({ icon, title, description, accentColor, referralUrl, copied
 
         {/* Email invite */}
         <div>
-          <div style={{ fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Or send email invites</div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Or email them directly</div>
           <textarea
             value={emails}
             onChange={e => onEmailsChange(e.target.value)}
