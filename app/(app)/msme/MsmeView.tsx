@@ -52,6 +52,7 @@ interface Props { userRole: string }
 export function MsmeView({ userRole }: Props) {
   const [vendors,       setVendors]       = useState<Vendor[]>([])
   const [total,         setTotal]         = useState(0)
+  const [totalEver,     setTotalEver]     = useState(0)
   const [loading,       setLoading]       = useState(true)
   const [showAdd,       setShowAdd]       = useState(false)
   const [showImport,    setShowImport]    = useState(false)
@@ -113,6 +114,7 @@ export function MsmeView({ userRole }: Props) {
       if (res.ok) {
         setVendors(data.vendors ?? [])
         setTotal(data.total ?? 0)
+        setTotalEver(data.totalEver ?? data.total ?? 0)
         if (data.vendorLimit) setVendorLimit(data.vendorLimit)
       }
     } catch (e) {
@@ -436,7 +438,7 @@ export function MsmeView({ userRole }: Props) {
         <div>
           <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>MSME Vendor Tracker</h1>
           <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-muted)' }}>
-            Automated vendor registry for Section 43B(h) compliance · {total}/{vendorLimit} vendors used
+            Automated vendor registry for Section 43B(h) compliance · {totalEver}/{vendorLimit} slots used
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -465,11 +467,11 @@ export function MsmeView({ userRole }: Props) {
       </div>
 
       {/* ── Vendor limit banner ── */}
-      {total >= vendorLimit && (
+      {totalEver >= vendorLimit && (
         <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 10, padding: '14px 18px', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
           <div>
             <p style={{ margin: 0, fontWeight: 700, color: '#92400e', fontSize: 14 }}>
-              📦 Vendor limit reached ({total}/{vendorLimit})
+              📦 Vendor limit reached ({totalEver}/{vendorLimit})
             </p>
             <p style={{ margin: '2px 0 0', fontSize: 12, color: '#b45309' }}>
               Upgrade your pack to add more vendors. Contact us to upgrade.
@@ -781,7 +783,7 @@ export function MsmeView({ userRole }: Props) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {MSME_PACKS.filter(p => p.tier !== 'free').map(pack => {
               const isCurrent = pack.tier === packTier
-              const isDowngrade = pack.vendor_limit < vendorLimit
+              const isDowngrade = pack.vendor_limit < totalEver
               return (
                 <div key={pack.tier} style={{
                   border: `2px solid ${isCurrent ? ACCENT : 'var(--border)'}`,
@@ -949,9 +951,9 @@ export function MsmeView({ userRole }: Props) {
                       </tbody>
                     </table>
                   </div>
-                  {total + importRows.length > vendorLimit && (
+                  {totalEver + importRows.length > vendorLimit && (
                     <div style={{ marginTop: 12, background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#92400e' }}>
-                      <strong>Heads up:</strong> This import will exceed your vendor limit ({vendorLimit}). Only the first {Math.max(0, vendorLimit - total)} vendors will be added. Upgrade your pack to add more.
+                      <strong>Heads up:</strong> This import will exceed your vendor limit ({vendorLimit}). Only the first {Math.max(0, vendorLimit - totalEver)} vendors will be added. Upgrade your pack to add more.
                     </div>
                   )}
                   <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>

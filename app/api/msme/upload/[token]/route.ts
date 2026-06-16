@@ -47,13 +47,15 @@ export async function POST(
     await uploadToR2(key, buffer, file.type)
     certUrl = `r2:${key}`
   } else {
-    // Fallback: Supabase Storage
-    const supabaseAdmin = admin
-    const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+    // Fallback: Supabase Storage — create bucket if it doesn't exist yet
+    await admin.storage.createBucket('attachments', { public: true }).catch(() => {
+      // Ignore "already exists" error — any other error will surface on upload
+    })
+    const { data: uploadData, error: uploadError } = await admin.storage
       .from('attachments')
       .upload(key, buffer, { contentType: file.type, upsert: true })
     if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 500 })
-    const { data: urlData } = supabaseAdmin.storage.from('attachments').getPublicUrl(uploadData.path)
+    const { data: urlData } = admin.storage.from('attachments').getPublicUrl(uploadData.path)
     certUrl = urlData.publicUrl
   }
 

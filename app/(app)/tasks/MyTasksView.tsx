@@ -1230,6 +1230,14 @@ export function MyTasksView({
                             <circle cx="5" cy="5" r="1.2" fill="#94a3b8"/>
                           </svg>
                         </div>
+                      ) : isRecurring ? (
+                        /* Recurring template — not directly completable; instances are completed individually */
+                        <div style={{ width:16, height:16, borderRadius:'50%', flexShrink:0,
+                          border:'1.5px solid var(--brand)', background:'rgba(13,148,136,0.08)',
+                          display:'flex', alignItems:'center', justifyContent:'center' }}
+                          title="Recurring template — complete individual occurrences, not the template">
+                          <RefreshCw style={{ width:8, height:8, color:'var(--brand)' }}/>
+                        </div>
                       ) : <CircleBtn task={task}/>}
                       {/* Expand button — toggle subtasks inline (hidden for subtasks) */}
                       {task.parent_task_id ? (
@@ -1902,7 +1910,15 @@ export function MyTasksView({
                         <circle cx="5" cy="5" r="1.2" fill="#94a3b8"/>
                       </svg>
                     </div>
-                  ) : isPending
+                  ) : _isRec
+                    ? /* Recurring template — not directly completable */
+                      <div style={{ width:14, height:14, borderRadius:'50%', flexShrink:0, marginTop:1,
+                        background:'rgba(13,148,136,0.08)', border:'1.5px solid var(--brand)',
+                        display:'flex', alignItems:'center', justifyContent:'center' }}
+                        title="Recurring template — complete individual occurrences">
+                        <RefreshCw style={{ width:7, height:7, color:'var(--brand)' }}/>
+                      </div>
+                    : isPending
                     ? <div style={{ width:14, height:14, borderRadius:'50%', flexShrink:0, marginTop:1,
                         background:'rgba(124,58,237,0.1)', border:'1.5px solid #7c3aed',
                         display:'flex', alignItems:'center', justifyContent:'center' }}>

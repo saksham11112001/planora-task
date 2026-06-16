@@ -28,10 +28,12 @@ export async function ReportsFetcher() {
     { data: clients },
   ] = await Promise.all([
     supabase.from('tasks')
-      .select('id, title, status, priority, due_date, assignee_id, created_at, completed_at, project_id, client_id, is_billable, billable_amount, custom_fields')
+      .select('id, title, status, priority, due_date, assignee_id, created_at, completed_at, project_id, client_id, is_billable, billable_amount, custom_fields, is_recurring, parent_recurring_id')
       .eq('org_id', orgId).neq('is_archived', true).is('parent_task_id', null)
-      .or(`status.neq.completed,completed_at.gte.${from90}`)
-      .gte('created_at', from90).limit(3000),
+      // Fetch: tasks created in last 90 days (for chart metrics)
+      // OR any active task regardless of age (so overdue tasks created >90 days ago still appear in WIP)
+      .or(`created_at.gte.${from90},and(status.neq.completed,status.neq.cancelled)`)
+      .limit(5000),
     supabase.from('tasks')
       .select('*', { count: 'exact', head: true })
       .eq('org_id', orgId).neq('is_archived', true).is('parent_task_id', null)
@@ -50,7 +52,9 @@ export async function ReportsFetcher() {
   // Derived subsets — no extra DB round-trips
   const allTasks        = allTasksRaw ?? []
   const complianceTasksRaw = allTasks  // same data, compliance tab filters by custom_fields client-side
-  const wipTasksRaw     = allTasks.filter(t => ['todo','in_progress','in_review'].includes(t.status) && !t.custom_fields?.is_recurring)
+  // Exclude recurring templates (is_recurring=true without a parent) — they have no fixed due date
+  // and represent the template, not a scheduled occurrence. Spawned instances are included.
+  const wipTasksRaw     = allTasks.filter(t => ['todo','in_progress','in_review'].includes(t.status) && !((t as any).is_recurring === true && !(t as any).parent_recurring_id))
 
   const tasks   = allTasks
   const logs    = timeLogs ?? []

@@ -366,11 +366,19 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
     if (uClientId.length  > 0 && !uClientId.includes(t.client_id ?? ''))        return false
     if (uPriority.length  > 0 && !uPriority.includes(t.priority))               return false
     if (uStatus.length    > 0 && !uStatus.includes(t.status))                   return false
-    if (uAssigneeId.length > 0 && !uAssigneeId.includes(t.assignee_id ?? ''))   return false
+    if (uAssigneeId.length > 0) {
+      const matchById = uAssigneeId.includes(t.assignee_id ?? '')
+      // Fallback: CA compliance tasks embed assignee name in title as "(Name)" — match by that too
+      const matchByTitle = !matchById && uAssigneeId.some(id => {
+        const name = complianceMemberList.find(m => m.id === id)?.name
+        return name && t.title?.includes(`(${name})`)
+      })
+      if (!matchById && !matchByTitle) return false
+    }
     if (uDueDateFrom && t.due_date && t.due_date < uDueDateFrom)                 return false
     if (uDueDateTo   && t.due_date && t.due_date > uDueDateTo)                   return false
     return true
-  }), [complianceRawTasks, uSearch, uClientId, uPriority, uStatus, uAssigneeId, uDueDateFrom, uDueDateTo])
+  }), [complianceRawTasks, uSearch, uClientId, uPriority, uStatus, uAssigneeId, uDueDateFrom, uDueDateTo, complianceMemberList])
 
   // Compute compliance chart data from filtered tasks + date window
   const compDays = Math.max(1, Math.round(
@@ -1097,7 +1105,7 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
                               const stColor = STATUS_COLOR[t.status] ?? '#94a3b8'
                               const isOverdue = t.due_date && t.due_date < new Date().toISOString().split('T')[0]
                               return (
-                                <tr key={t.id} style={{ transition: 'background 0.1s' }}>
+                                <tr key={t.id} style={{ transition: 'background 0.1s', background: t.assignee_name ? undefined : '#fef2f2' }}>
                                   <td style={{ ...tdStyle, maxWidth: 280 }}>
                                     <span style={{ display: 'block', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', fontWeight: 500 }}>
                                       {t.title}

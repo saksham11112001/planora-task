@@ -74,9 +74,10 @@ export async function DELETE(
   }
 
   const admin = createAdminClient()
+  // Soft-delete: slot remains permanently consumed to prevent gaming the free tier
   const { error } = await admin
     .from('msme_vendors')
-    .delete()
+    .update({ is_deleted: true })
     .eq('id', id)
     .eq('org_id', mb.org_id)
 

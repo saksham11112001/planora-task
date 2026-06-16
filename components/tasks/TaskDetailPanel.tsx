@@ -812,7 +812,10 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
   // completion applies only to its spawned instances. Suppress the completion toggle and
   // any "done" styling on the template so its internal status can't be acted on or shown
   // as struck-through.
-  const isRecurringTemplate = (task as any)?.is_recurring === true && !task?.parent_task_id
+  // A recurring template has is_recurring=true and no parent_recurring_id.
+  // Spawned instances always have parent_recurring_id set, so they're completable even
+  // if is_recurring were somehow true on them.
+  const isRecurringTemplate = (task as any)?.is_recurring === true && !(task as any)?.parent_recurring_id
   const isCompleted = status === 'completed' && !isRecurringTemplate
   const isInReview  = status === 'in_review'
   const isPending   = task?.approval_status === 'pending' || isInReview
