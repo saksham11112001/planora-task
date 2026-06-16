@@ -47,7 +47,21 @@ export default function MsmeLandingPage() {
       </nav>
 
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
-      <section style={{ maxWidth: 780, margin: '0 auto', padding: '80px 24px 60px', textAlign: 'center' }}>
+      <section style={{ position: 'relative', overflow: 'hidden' }}>
+        {/* Animated background orbs */}
+        <style>{`
+          @keyframes msme-orb-1 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(40px,-30px) scale(1.1); } }
+          @keyframes msme-orb-2 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-30px,40px) scale(0.9); } }
+          @keyframes msme-orb-3 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(20px,30px) scale(1.05); } }
+          @keyframes msme-float { 0%,100% { opacity:0.12; } 50% { opacity:0.22; } }
+        `}</style>
+        <div aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', top: '-80px', left: '10%', width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(circle, rgba(13,148,136,0.18) 0%, transparent 70%)', animation: 'msme-orb-1 8s ease-in-out infinite, msme-float 8s ease-in-out infinite' }} />
+          <div style={{ position: 'absolute', top: '20px', right: '8%', width: 300, height: 300, borderRadius: '50%', background: 'radial-gradient(circle, rgba(20,184,166,0.14) 0%, transparent 70%)', animation: 'msme-orb-2 11s ease-in-out infinite, msme-float 11s ease-in-out infinite 2s' }} />
+          <div style={{ position: 'absolute', bottom: '-40px', left: '40%', width: 250, height: 250, borderRadius: '50%', background: 'radial-gradient(circle, rgba(13,148,136,0.10) 0%, transparent 70%)', animation: 'msme-orb-3 14s ease-in-out infinite, msme-float 14s ease-in-out infinite 1s' }} />
+          <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 80% 60% at 50% 0%, rgba(13,148,136,0.07) 0%, transparent 70%)' }} />
+        </div>
+        <div style={{ maxWidth: 780, margin: '0 auto', padding: '80px 24px 60px', textAlign: 'center', position: 'relative' }}>
 
         <div style={{
           display: 'inline-flex', alignItems: 'center', gap: 8, marginBottom: 24,
@@ -86,6 +100,7 @@ export default function MsmeLandingPage() {
         <p style={{ fontSize: 13, color: MUTED }}>
           You can start free · No subscription · Pay only to scale
         </p>
+        </div>
       </section>
 
       {/* ── Stats bar ────────────────────────────────────────────────────── */}
