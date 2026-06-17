@@ -103,7 +103,7 @@ export function BillingView({ orgName, currentPlan, status, subscriptionId, tria
       script.onload = () => {
         const options = {
           key: key_id, subscription_id,
-          name: 'Floatup', description: `${plan.charAt(0).toUpperCase() + plan.slice(1)} Plan — ${annual ? 'Annual' : 'Monthly'}`,
+          name: 'upFloat', description: `${plan.charAt(0).toUpperCase() + plan.slice(1)} Plan — ${annual ? 'Annual' : 'Monthly'}`,
           image: '/favicon.svg', prefill: { name: orgName },
           theme: { color: '#0d9488' },
           handler: () => { toast.success('Payment successful! Plan upgraded.'); setTimeout(() => window.location.reload(), 1500) },
@@ -131,7 +131,7 @@ export function BillingView({ orgName, currentPlan, status, subscriptionId, tria
       script.onload = () => {
         const options = {
           key: key_id, order_id,
-          name: 'Floatup', description: 'Professional Setup & Onboarding',
+          name: 'upFloat', description: 'Professional Setup & Onboarding',
           image: '/favicon.svg', prefill: { name: orgName },
           theme: { color: '#f97316' },
           handler: async (response: any) => {
@@ -518,7 +518,7 @@ export function BillingView({ orgName, currentPlan, status, subscriptionId, tria
             <p style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.65, margin: '0 0 10px' }}>
               {shSubmitted
                 ? "We've received your inquiry. Our enterprise team will reach out within 1–2 business days to discuss your infrastructure requirements and pricing."
-                : 'For banks, legal firms, healthcare providers, and regulated industries that need all data to stay exclusively on their own servers. Full Floatup platform, zero cloud dependency.'}
+                : 'For banks, legal firms, healthcare providers, and regulated industries that need all data to stay exclusively on their own servers. Full upFloat platform, zero cloud dependency.'}
             </p>
             {!shSubmitted && (
               <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 12 }}>

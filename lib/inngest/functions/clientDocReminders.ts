@@ -7,7 +7,7 @@ import { fmtDate }                                from '@/lib/utils/format'
 import { getOrgNotifMode, queueNotification }     from '@/lib/email/queue'
 import type { BatchTaskEntry }                    from '@/lib/email/templates/clientDocReminder'
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://taska.in'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://upfloat.io'
 
 /**
  * Fires daily at 7:00 AM IST (1:30 AM UTC).
@@ -187,7 +187,7 @@ export const clientDocReminders = inngest.createFunction(
       if (![7, 2, 0, -1].includes(daysLeft)) continue
 
       const client  = clients[clientId]
-      const orgName = orgs[inst.org_id] ?? 'Floatup'
+      const orgName = orgs[inst.org_id] ?? 'upFloat'
       if (!client) continue
 
       // Determine missing docs

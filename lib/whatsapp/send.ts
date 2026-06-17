@@ -24,7 +24,7 @@ import { sendWhatsApp } from './client'
  *   "⚠️ {{VAR1}}, your task *{{VAR2}}* is overdue (was due {{VAR3}}). Open: {{VAR4}}"
  */
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://taska.in'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://upfloat.io'
 function taskUrl(taskId: string, projectId?: string | null) {
   return projectId ? `${APP_URL}/projects/${projectId}` : `${APP_URL}/inbox`
 }

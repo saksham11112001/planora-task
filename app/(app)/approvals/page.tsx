@@ -9,7 +9,7 @@ import { effectivePlan, canUseFeature } from '@/lib/utils/planGate'
 import type { Metadata }       from 'next'
 
 export const dynamic   = 'force-dynamic'
-export const metadata: Metadata = { title: 'Approvals | Floatup' }
+export const metadata: Metadata = { title: 'Approvals | upFloat' }
 
 export default async function ApprovalsPage() {
   const user = await getSessionUser()

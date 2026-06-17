@@ -4,7 +4,7 @@ import { markQueueSent }        from '@/lib/email/queue'
 import { digestEmailHtml }      from '@/lib/email/templates/digestEmail'
 import { resend, FROM }         from '@/lib/email/resend'
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://taska.in'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://upfloat.io'
 
 async function runDigest(slot: 'morning' | 'evening') {
   const admin = createAdminClient()
@@ -74,7 +74,7 @@ async function runDigest(slot: 'morning' | 'evening') {
         await resend.emails.send({
           from:    FROM,
           to:      userEmail,
-          subject: `📬 Floatup digest (${slotLabel} IST) — ${items.length} update${items.length === 1 ? '' : 's'}`,
+          subject: `📬 upFloat digest (${slotLabel} IST) — ${items.length} update${items.length === 1 ? '' : 's'}`,
           html,
         })
         allSentIds.push(...items.map(i => i.id))

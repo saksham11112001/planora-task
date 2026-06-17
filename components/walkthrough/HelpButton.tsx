@@ -15,12 +15,12 @@ const FAQ: FAQItem[] = [
   {
     category: 'CA Compliance',
     q: 'How do compliance tasks get generated?',
-    a: 'Go to CA Compliance → select the filing types (GSTR, TDS, ITR, etc.) → pick the clients → click Generate. Floatup creates one task per client per filing, due on the correct statutory date. You only do this once per financial year.',
+    a: 'Go to CA Compliance → select the filing types (GSTR, TDS, ITR, etc.) → pick the clients → click Generate. upFloat creates one task per client per filing, due on the correct statutory date. You only do this once per financial year.',
   },
   {
     category: 'CA Compliance',
     q: 'What does the "Spawn tasks now" button do?',
-    a: '"Spawn tasks now" manually triggers task generation for the current period without waiting for the nightly cron. Use it when you have just added new clients mid-month and want their compliance tasks to appear immediately on the Kanban board. It is safe to click multiple times — Floatup skips tasks that already exist.',
+    a: '"Spawn tasks now" manually triggers task generation for the current period without waiting for the nightly cron. Use it when you have just added new clients mid-month and want their compliance tasks to appear immediately on the Kanban board. It is safe to click multiple times — upFloat skips tasks that already exist.',
   },
   {
     category: 'CA Compliance',
@@ -30,7 +30,7 @@ const FAQ: FAQItem[] = [
   {
     category: 'CA Compliance',
     q: 'What is "Days before" in the compliance calendar?',
-    a: '"Days before" sets how many days before the statutory due date Floatup creates the task on the board. For example, if GSTR-1 is due on the 11th and Days before = 7, the task appears on the 4th. This gives your team a head start. You can change the default per filing type in CA Compliance → Manage Templates.',
+    a: '"Days before" sets how many days before the statutory due date upFloat creates the task on the board. For example, if GSTR-1 is due on the 11th and Days before = 7, the task appears on the 4th. This gives your team a head start. You can change the default per filing type in CA Compliance → Manage Templates.',
   },
   {
     category: 'CA Compliance',
@@ -45,17 +45,17 @@ const FAQ: FAQItem[] = [
   {
     category: 'CA Compliance',
     q: 'How do I import compliance tasks via CSV?',
-    a: 'CA Compliance → click "Import CSV" at the top → download the template → fill in client names, filing types, due dates, and assignees → upload. This is useful if you are migrating from a spreadsheet. Floatup validates every row before importing and shows errors inline.',
+    a: 'CA Compliance → click "Import CSV" at the top → download the template → fill in client names, filing types, due dates, and assignees → upload. This is useful if you are migrating from a spreadsheet. upFloat validates every row before importing and shows errors inline.',
   },
   {
     category: 'CA Compliance',
     q: 'I imported successfully but my compliance tasks are not showing up on the board — why?',
-    a: 'Import only brings in your client and task data — it does not automatically create task instances on the Kanban board. You need to spawn them manually. Go to CA Compliance → click "Spawn tasks now". Floatup will generate a task for every client and filing type whose trigger date has already passed. Tasks appear on the board within a few seconds. If they still do not appear, check two things: (1) the client\'s status is Active (not Paused or Inactive), and (2) the filing types you expect are enabled in CA Compliance → Manage Templates. The nightly cron also runs at 7 AM IST every day and will spawn any remaining tasks automatically.',
+    a: 'Import only brings in your client and task data — it does not automatically create task instances on the Kanban board. You need to spawn them manually. Go to CA Compliance → click "Spawn tasks now". upFloat will generate a task for every client and filing type whose trigger date has already passed. Tasks appear on the board within a few seconds. If they still do not appear, check two things: (1) the client\'s status is Active (not Paused or Inactive), and (2) the filing types you expect are enabled in CA Compliance → Manage Templates. The nightly cron also runs at 7 AM IST every day and will spawn any remaining tasks automatically.',
   },
   {
     category: 'CA Compliance',
     q: 'What is the DSC Tracker?',
-    a: 'DSC Tracker (CA Compliance → DSC Tracker tab) lets you record each client\'s Digital Signature Certificate expiry date. Floatup shows a colour-coded status: green (valid), amber (expiring within 30 days), red (expired). You can filter by status and export the list. No reminders are sent automatically — it is a reference dashboard only.',
+    a: 'DSC Tracker (CA Compliance → DSC Tracker tab) lets you record each client\'s Digital Signature Certificate expiry date. upFloat shows a colour-coded status: green (valid), amber (expiring within 30 days), red (expired). You can filter by status and export the list. No reminders are sent automatically — it is a reference dashboard only.',
   },
 
   // ── Tasks & Kanban ─────────────────────────────────────────────────────────
@@ -114,12 +114,12 @@ const FAQ: FAQItem[] = [
   {
     category: 'Recurring Tasks',
     q: 'How do recurring tasks auto-spawn?',
-    a: 'When you create a Recurring Task (Sidebar → Repeat Tasks → + New), you set the frequency and due date. Every night at midnight, Floatup checks which recurring tasks are due to spawn and creates a fresh task instance for each. The template (master) never moves — only spawned instances have statuses.',
+    a: 'When you create a Recurring Task (Sidebar → Repeat Tasks → + New), you set the frequency and due date. Every night at midnight, upFloat checks which recurring tasks are due to spawn and creates a fresh task instance for each. The template (master) never moves — only spawned instances have statuses.',
   },
   {
     category: 'Recurring Tasks',
     q: 'What frequencies are supported for recurring tasks?',
-    a: 'Floatup supports: Daily, Every N days, Weekly on specific days (e.g. every Monday), Bi-weekly, Monthly on a specific date (e.g. 15th of every month), Monthly on the last day, Quarterly, and Annual (31 Jul, 30 Sep, 31 Dec, 31 Mar or any month). You can also set custom day combinations like every Monday + Wednesday + Friday.',
+    a: 'upFloat supports: Daily, Every N days, Weekly on specific days (e.g. every Monday), Bi-weekly, Monthly on a specific date (e.g. 15th of every month), Monthly on the last day, Quarterly, and Annual (31 Jul, 30 Sep, 31 Dec, 31 Mar or any month). You can also set custom day combinations like every Monday + Wednesday + Friday.',
   },
   {
     category: 'Recurring Tasks',
@@ -131,7 +131,7 @@ const FAQ: FAQItem[] = [
   {
     category: 'Clients',
     q: 'How do I add clients in bulk?',
-    a: 'Clients → click Import → download the Excel template → fill in client names, GSTINs, emails, phone numbers → upload. Floatup validates each row and shows errors inline before importing. Alternatively, clients with a GSTIN auto-fill their business name when you type the GSTIN.',
+    a: 'Clients → click Import → download the Excel template → fill in client names, GSTINs, emails, phone numbers → upload. upFloat validates each row and shows errors inline before importing. Alternatively, clients with a GSTIN auto-fill their business name when you type the GSTIN.',
   },
   {
     category: 'Clients',
@@ -141,7 +141,7 @@ const FAQ: FAQItem[] = [
   {
     category: 'Clients',
     q: 'What is the client portal?',
-    a: 'The client portal lets your clients view their own task status, download filed documents, and track due dates — without needing a Floatup login. Clients → select a client → Portal tab → copy the magic link and share it with your client. The link is unique per client and never expires unless you regenerate it.',
+    a: 'The client portal lets your clients view their own task status, download filed documents, and track due dates — without needing a upFloat login. Clients → select a client → Portal tab → copy the magic link and share it with your client. The link is unique per client and never expires unless you regenerate it.',
   },
 
   // ── Monitor & Reports ──────────────────────────────────────────────────────
@@ -185,7 +185,7 @@ const FAQ: FAQItem[] = [
   {
     category: 'Team & Settings',
     q: 'How do I manage notification preferences?',
-    a: 'Settings → Notifications. You can choose between Immediate (each event sends a separate email) and Digest (Floatup batches all notifications into a morning and evening summary email). Digest is the default and recommended for busy teams. You can also toggle specific notification types on or off.',
+    a: 'Settings → Notifications. You can choose between Immediate (each event sends a separate email) and Digest (upFloat batches all notifications into a morning and evening summary email). Digest is the default and recommended for busy teams. You can also toggle specific notification types on or off.',
   },
   {
     category: 'Team & Settings',

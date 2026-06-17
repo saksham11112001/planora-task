@@ -235,7 +235,7 @@ export default function LoginPage() {
           <Link href="/" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
             <div style={{ width: 40, height: 40, borderRadius: 11, background: 'rgba(255,255,255,0.15)',
               display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: 18 }}>P</div>
-            <span style={{ color: '#fff', fontWeight: 700, fontSize: 22, letterSpacing: '-0.5px' }}>Floatup</span>
+            <span style={{ color: '#fff', fontWeight: 700, fontSize: 22, letterSpacing: '-0.5px' }}>upFloat</span>
           </Link>
           <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14, marginTop: 4 }}>Project management for modern teams</p>
         </div>
@@ -281,7 +281,7 @@ export default function LoginPage() {
           {/* ── Choose method ── */}
           {mode === 'choose' && (
             <>
-              <h1 style={h1}>Welcome to Floatup</h1>
+              <h1 style={h1}>Welcome to upFloat</h1>
               <p style={subStyle}>Sign in or create your free workspace</p>
 
               {error && <ErrorBox msg={error} />}
@@ -343,7 +343,7 @@ export default function LoginPage() {
           {/* ── Email + password sign-in (default / first screen) ── */}
           {mode === 'email_password' && (
             <>
-              <h1 style={h1}>Welcome to Floatup</h1>
+              <h1 style={h1}>Welcome to upFloat</h1>
               <p style={subStyle}>Sign in to your workspace</p>
 
               {error && <ErrorBox msg={error} />}
@@ -442,7 +442,7 @@ export default function LoginPage() {
             <>
               <BackBtn onClick={() => resetForm('email_password')} />
               <h1 style={h1}>Create account</h1>
-              <p style={subStyle}>Set up your Floatup account</p>
+              <p style={subStyle}>Set up your upFloat account</p>
 
               {error && <ErrorBox msg={error} />}
 
@@ -476,7 +476,7 @@ export default function LoginPage() {
         </div>
 
         <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: 12, marginTop: 24 }}>
-          © 2025 SNG Advisors · Floatup
+          © 2025 SNG Advisors · upFloat
         </p>
       </div>
 

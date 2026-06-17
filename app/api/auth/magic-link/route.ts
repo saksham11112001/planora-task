@@ -37,20 +37,20 @@ export async function POST(req: NextRequest) {
     await resend.emails.send({
       from: FROM,
       to:   email.trim(),
-      subject: 'Your Floatup sign-in link',
+      subject: 'Your upFloat sign-in link',
       html: `
         <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;background:#fff">
           <div style="margin-bottom:24px">
-            <span style="font-size:22px;font-weight:800;color:#0f172a;letter-spacing:-0.5px">Floatup</span>
+            <span style="font-size:22px;font-weight:800;color:#0f172a;letter-spacing:-0.5px">upFloat</span>
           </div>
-          <h2 style="font-size:20px;font-weight:700;color:#0f172a;margin:0 0 8px">Sign in to Floatup</h2>
+          <h2 style="font-size:20px;font-weight:700;color:#0f172a;margin:0 0 8px">Sign in to upFloat</h2>
           <p style="font-size:14px;color:#64748b;margin:0 0 24px;line-height:1.6">
             Click the button below to sign in. This link is valid for 1 hour and can only be used once.
           </p>
           <a href="${data.properties.action_link}"
             style="display:inline-block;padding:13px 28px;background:#0d9488;color:#fff;
               text-decoration:none;border-radius:10px;font-weight:600;font-size:15px">
-            Sign in to Floatup →
+            Sign in to upFloat →
           </a>
           <p style="font-size:12px;color:#94a3b8;margin:24px 0 0;line-height:1.5">
             If you didn't request this link you can safely ignore this email.

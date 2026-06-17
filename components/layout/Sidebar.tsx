@@ -183,7 +183,7 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
               display: 'flex', alignItems: 'center', gap: 4, minWidth: 0, textAlign: 'left' }}>
             <span style={{ color: '#fff', fontWeight: 600, fontSize: 13, overflow: 'hidden',
               whiteSpace: 'nowrap', textOverflow: 'ellipsis', flex: 1 }}>
-              {session?.org.name ?? 'Floatup'}
+              {session?.org.name ?? 'upFloat'}
             </span>
             <ChevronsUpDown style={{ width: 13, height: 13, color: 'rgba(255,255,255,0.35)', flexShrink: 0 }}/>
           </button>

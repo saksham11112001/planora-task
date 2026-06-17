@@ -2,12 +2,12 @@ import { Inngest, EventSchemas } from 'inngest'
 
 export const inngest = new Inngest({
   id:          'floatup',
-  name:        'Floatup',
+  name:        'upFloat',
   eventKey:    process.env.INNGEST_EVENT_KEY,
   signingKey:  process.env.INNGEST_SIGNING_KEY,
 })
 
-export type FloatupEvents = {
+export type upFloatEvents = {
   'task/assigned': {
     data: {
       task_id: string; task_title: string

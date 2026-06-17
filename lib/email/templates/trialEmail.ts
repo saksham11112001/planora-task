@@ -32,7 +32,7 @@ export function trialExpiringSoonHtml(p: TrialExpiringSoonProps): string {
             <td style="background:#0d9488;border-radius:8px;width:32px;height:32px;text-align:center;vertical-align:middle">
               <span style="color:#fff;font-size:16px;font-weight:700">F</span>
             </td>
-            <td style="padding-left:10px;color:#ffffff;font-size:18px;font-weight:700">Floatup</td>
+            <td style="padding-left:10px;color:#ffffff;font-size:18px;font-weight:700">upFloat</td>
           </tr></table>
         </td></tr>
 
@@ -78,7 +78,7 @@ export function trialExpiringSoonHtml(p: TrialExpiringSoonProps): string {
 
         <!-- Footer -->
         <tr><td style="padding:16px 32px;border-top:1px solid #f1f5f9;background:#f8fafc">
-          <p style="color:#94a3b8;font-size:12px;margin:0">Floatup · ${p.orgName}</p>
+          <p style="color:#94a3b8;font-size:12px;margin:0">upFloat · ${p.orgName}</p>
         </td></tr>
 
       </table>
@@ -89,7 +89,7 @@ export function trialExpiringSoonHtml(p: TrialExpiringSoonProps): string {
 }
 
 export function trialExpiringSoonSubject(p: Pick<TrialExpiringSoonProps, 'daysLeft'>): string {
-  return `⏳ Your Floatup trial ends in ${p.daysLeft} day${p.daysLeft !== 1 ? 's' : ''} — upgrade to keep access`
+  return `⏳ Your upFloat trial ends in ${p.daysLeft} day${p.daysLeft !== 1 ? 's' : ''} — upgrade to keep access`
 }
 
 export function trialExpiredHtml(p: TrialExpiredProps): string {
@@ -107,7 +107,7 @@ export function trialExpiredHtml(p: TrialExpiredProps): string {
             <td style="background:#0d9488;border-radius:8px;width:32px;height:32px;text-align:center;vertical-align:middle">
               <span style="color:#fff;font-size:16px;font-weight:700">F</span>
             </td>
-            <td style="padding-left:10px;color:#ffffff;font-size:18px;font-weight:700">Floatup</td>
+            <td style="padding-left:10px;color:#ffffff;font-size:18px;font-weight:700">upFloat</td>
           </tr></table>
         </td></tr>
 
@@ -139,7 +139,7 @@ export function trialExpiredHtml(p: TrialExpiredProps): string {
 
         <!-- Footer -->
         <tr><td style="padding:16px 32px;border-top:1px solid #f1f5f9;background:#f8fafc">
-          <p style="color:#94a3b8;font-size:12px;margin:0">Floatup · ${p.orgName}</p>
+          <p style="color:#94a3b8;font-size:12px;margin:0">upFloat · ${p.orgName}</p>
         </td></tr>
 
       </table>
@@ -150,5 +150,5 @@ export function trialExpiredHtml(p: TrialExpiredProps): string {
 }
 
 export function trialExpiredSubject(): string {
-  return `Your Floatup trial has ended — upgrade to continue`
+  return `Your upFloat trial has ended — upgrade to continue`
 }

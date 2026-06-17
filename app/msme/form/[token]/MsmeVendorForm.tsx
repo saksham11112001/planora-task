@@ -171,7 +171,7 @@ export function MsmeVendorForm({ token }: { token: string }) {
         <div style={{ fontSize: 44, textAlign: 'center', marginBottom: 16 }}>🔗</div>
         <h1 style={{ ...h1, textAlign: 'center' }}>Link Expired or Invalid</h1>
         <p style={{ ...sub, textAlign: 'center', marginBottom: 0 }}>{error}</p>
-        <p style={{ color: '#94a3b8', fontSize: 12, textAlign: 'center', marginTop: 28 }}>Powered by Planora</p>
+        <p style={{ color: '#94a3b8', fontSize: 12, textAlign: 'center', marginTop: 28 }}>Powered by upFloat</p>
       </div>
     </div>
   )
@@ -221,7 +221,7 @@ export function MsmeVendorForm({ token }: { token: string }) {
           If you need to make any corrections, contact {info.org_name} directly.
         </p>
 
-        <p style={{ color: '#64748b', fontSize: 11, textAlign: 'center', margin: 0 }}>Powered by Planora</p>
+        <p style={{ color: '#64748b', fontSize: 11, textAlign: 'center', margin: 0 }}>Powered by upFloat</p>
       </div>
     </div>
   )
@@ -489,7 +489,7 @@ export function MsmeVendorForm({ token }: { token: string }) {
 
         <p style={{ color: '#64748b', fontSize: 11, textAlign: 'center', marginTop: 20, lineHeight: 1.6 }}>
           Your information is shared only with {info?.org_name} for MSME compliance purposes.<br/>
-          Powered by Planora
+          Powered by upFloat
         </p>
       </div>
     </div>

@@ -958,9 +958,9 @@ const STEPS: Step[] = [
   {
     id: 'welcome',
     icon: '🏢', color: '#0d9488', accent: 'rgba(13,148,136,0.1)',
-    title: 'Welcome to Floatup — Built for CA Firms',
+    title: 'Welcome to upFloat — Built for CA Firms',
     subtitle: 'The only practice management tool designed for Indian CA & CPA firms',
-    body: "If your team is still tracking filings in Excel, sending deadline reminders on WhatsApp, or wondering who is working on what — Floatup fixes all of that. This 5-minute tour covers every feature so you know exactly where to click on day one. Use the arrows to go at your own pace, or jump to any slide from the dots below.",
+    body: "If your team is still tracking filings in Excel, sending deadline reminders on WhatsApp, or wondering who is working on what — upFloat fixes all of that. This 5-minute tour covers every feature so you know exactly where to click on day one. Use the arrows to go at your own pace, or jump to any slide from the dots below.",
     bullets: [
       { emoji: '📋', text: '69+ statutory tasks — GSTR-1, GSTR-3B, TDS Q1–Q4, ITR, ROC, PF, ESI, PT — auto-generated with correct Indian due dates, no configuration needed' },
       { emoji: '👥', text: 'Unlimited clients: GSTIN auto-fills name and state, DSC expiry tracker with colour-coded alerts, import from Excel in minutes' },
@@ -975,7 +975,7 @@ const STEPS: Step[] = [
     icon: '👤', color: '#0891b2', accent: 'rgba(8,145,178,0.1)',
     title: 'Add Your Clients — One by One or in Bulk',
     subtitle: 'Sidebar → Clients → + Add Client  or  Import',
-    body: "Every client becomes a complete workspace in Floatup — their compliance filings, ad-hoc tasks, documents, and team notes all in one place. Add them manually (GSTIN auto-fills everything) or import your entire client list from an Excel or CSV file in under 5 minutes.",
+    body: "Every client becomes a complete workspace in upFloat — their compliance filings, ad-hoc tasks, documents, and team notes all in one place. Add them manually (GSTIN auto-fills everything) or import your entire client list from an Excel or CSV file in under 5 minutes.",
     bullets: [
       { emoji: '🆔', text: 'Type the GSTIN → business name, state, and entity type fill in automatically from the GST portal' },
       { emoji: '🔒', text: 'DSC expiry date: stored per client, colour-coded red when within 30 days of expiry' },
@@ -992,11 +992,11 @@ const STEPS: Step[] = [
     icon: '📥', color: '#0891b2', accent: 'rgba(8,145,178,0.1)',
     title: 'Import All Your Clients in Minutes',
     subtitle: 'Clients → Import button → Upload Excel / CSV',
-    body: "Already have a client list in Excel? Don't add them one by one. Download the Floatup import template, paste your client data (GSTIN, name, group, DSC date), and upload. All clients are created instantly — with groups, GSTIN, and DSC dates intact.",
+    body: "Already have a client list in Excel? Don't add them one by one. Download the upFloat import template, paste your client data (GSTIN, name, group, DSC date), and upload. All clients are created instantly — with groups, GSTIN, and DSC dates intact.",
     bullets: [
-      { emoji: '⬇️', text: 'Download the ready-made Excel template — columns match exactly what Floatup needs' },
+      { emoji: '⬇️', text: 'Download the ready-made Excel template — columns match exactly what upFloat needs' },
       { emoji: '📋', text: 'Fill in: Client Name, GSTIN, Group, DSC Expiry Date — all other fields are optional' },
-      { emoji: '📤', text: 'Upload the file — Floatup validates each row and shows a preview before importing' },
+      { emoji: '📤', text: 'Upload the file — upFloat validates each row and shows a preview before importing' },
       { emoji: '✅', text: 'All clients created in one go: groups, DSC dates, and GSTIN all carried across' },
     ],
     path: '/clients',
@@ -1023,7 +1023,7 @@ const STEPS: Step[] = [
     icon: '⚖️', color: '#b45309', accent: 'rgba(180,83,9,0.1)',
     title: 'CA Compliance — 69+ Filings, Auto-Generated',
     subtitle: 'Sidebar → CA Compliance → Generate Tasks',
-    body: "This is the heart of Floatup. In exactly 3 clicks: (1) select the statutory task types your firm handles, (2) pick the clients it applies to, (3) click Generate. Floatup creates one task per client with the correct statutory due date. No manual entry, no missed filings.",
+    body: "This is the heart of upFloat. In exactly 3 clicks: (1) select the statutory task types your firm handles, (2) pick the clients it applies to, (3) click Generate. upFloat creates one task per client with the correct statutory due date. No manual entry, no missed filings.",
     bullets: [
       { emoji: '📋', text: 'Step 1 — Choose task types: GSTR-1, GSTR-3B, TDS Q1–Q4, ITR, ROC Annual Return, PF, ESI, PT…' },
       { emoji: '🧑‍💼', text: 'Step 2 — Select clients: individually, by group, or all clients at once' },
@@ -1056,7 +1056,7 @@ const STEPS: Step[] = [
     subtitle: 'Click any task → Attachments section',
     body: "Every task — compliance filing, ad-hoc work, or project — has a dedicated attachments section. Upload PDFs and Excel files directly, or paste a Google Drive / Dropbox link. No more emailing files back and forth or hunting for documents in chat threads.",
     bullets: [
-      { emoji: '📤', text: 'Upload files directly: PDFs, images, Excel, Word — stored securely in Floatup' },
+      { emoji: '📤', text: 'Upload files directly: PDFs, images, Excel, Word — stored securely in upFloat' },
       { emoji: '🔗', text: 'Paste a Google Drive or Dropbox link — it attaches in one click, no login required from the viewer' },
       { emoji: '📂', text: 'Compliance tasks have per-type slots: Acknowledgement, Computation, Challan, Form 26AS, etc.' },
       { emoji: '👁️', text: 'All attachments are visible to the assignee, approver, and managers — no extra sharing needed' },
@@ -1068,7 +1068,7 @@ const STEPS: Step[] = [
     icon: '📋', color: '#0d9488', accent: 'rgba(13,148,136,0.1)',
     title: 'Everything About a Task — In One Panel',
     subtitle: 'Click any task card to open the detail panel',
-    body: "Every task in Floatup has a rich side panel. Attachments, threaded comments, blocked-by links, due date, priority, assignee, and approver — all in one place. Your team stops using WhatsApp for task updates because everything they need is already here.",
+    body: "Every task in upFloat has a rich side panel. Attachments, threaded comments, blocked-by links, due date, priority, assignee, and approver — all in one place. Your team stops using WhatsApp for task updates because everything they need is already here.",
     bullets: [
       { emoji: '💬', text: 'Threaded comments on every task — tag a teammate with @name to notify them instantly' },
       { emoji: '🔗', text: '"Blocked by" field: mark that this task is waiting on another — shown as a warning badge' },
@@ -1097,7 +1097,7 @@ const STEPS: Step[] = [
     icon: '✅', color: '#7c3aed', accent: 'rgba(124,58,237,0.1)',
     title: 'Built-In Approval Workflow',
     subtitle: 'My Tasks → Needs Approval tab',
-    body: "Floatup has a two-step approval process baked in. The assignee completes the work and clicks 'Submit for Review'. The task goes into Pending Review. The approver gets an email notification and can approve (closes the task) or return it with a comment (sends it back for revision).",
+    body: "upFloat has a two-step approval process baked in. The assignee completes the work and clicks 'Submit for Review'. The task goes into Pending Review. The approver gets an email notification and can approve (closes the task) or return it with a comment (sends it back for revision).",
     bullets: [
       { emoji: '📤', text: 'Assignee clicks Submit → task status changes to Pending Review automatically' },
       { emoji: '🔔', text: 'Approver gets an email + in-app notification the moment it is submitted' },
@@ -1129,7 +1129,7 @@ const STEPS: Step[] = [
     icon: '🔁', color: '#0d9488', accent: 'rgba(13,148,136,0.1)',
     title: 'Recurring Tasks — Set Once, Run Forever',
     subtitle: 'Sidebar → Repeat Tasks → + New Recurring Task',
-    body: "Monthly GST filings, weekly client calls, quarterly reviews — set these up once as recurring templates and never think about them again. Floatup spawns a new independent task automatically before each due date, with the assignee already set.",
+    body: "Monthly GST filings, weekly client calls, quarterly reviews — set these up once as recurring templates and never think about them again. upFloat spawns a new independent task automatically before each due date, with the assignee already set.",
     bullets: [
       { emoji: '🔁', text: 'Frequencies: daily · every N days · weekly on specific days · bi-weekly · monthly · quarterly · annual' },
       { emoji: '📅', text: 'Each task spawns N days before the due date so work starts on time — not on the deadline day' },
@@ -1211,9 +1211,9 @@ const STEPS: Step[] = [
     icon: '🏢', color: '#0d9488', accent: 'rgba(13,148,136,0.1)',
     title: 'Run Multiple Firms from One Login',
     subtitle: 'Click the org name at the top of the sidebar to switch',
-    body: "If you run multiple practices, partnerships, or entities — each gets its own completely isolated organisation in Floatup. One login covers all of them. Switch between organisations instantly from the org switcher at the top of the sidebar — no re-login, no confusion.",
+    body: "If you run multiple practices, partnerships, or entities — each gets its own completely isolated organisation in upFloat. One login covers all of them. Switch between organisations instantly from the org switcher at the top of the sidebar — no re-login, no confusion.",
     bullets: [
-      { emoji: '🏢', text: 'One Floatup account — unlimited organisations, switch in one click with zero re-login' },
+      { emoji: '🏢', text: 'One upFloat account — unlimited organisations, switch in one click with zero re-login' },
       { emoji: '🔒', text: 'Fully isolated: clients, tasks, team, and settings never mix between organisations' },
       { emoji: '👥', text: 'Different roles per org — you can be Owner of one firm and a Manager in another' },
       { emoji: '➕', text: 'Create a new organisation any time from the switcher → "New organisation" button' },
@@ -1225,9 +1225,9 @@ const STEPS: Step[] = [
     icon: '🏭', color: '#0891b2', accent: 'rgba(8,145,178,0.1)',
     title: 'MSME Vendor Compliance Tracker',
     subtitle: 'Sidebar → MSME Tracker (Manager, Admin & Owner only)',
-    body: "Under the MSME Act, your clients are legally required to collect Udyam Registration Numbers from their MSME vendors and report outstanding amounts. Floatup automates this entirely: send magic-link emails to vendors, they fill the form online, you get notified when done.",
+    body: "Under the MSME Act, your clients are legally required to collect Udyam Registration Numbers from their MSME vendors and report outstanding amounts. upFloat automates this entirely: send magic-link emails to vendors, they fill the form online, you get notified when done.",
     bullets: [
-      { emoji: '📧', text: 'Add vendor name + email → Floatup sends a branded magic-link email on your behalf (up to 3 reminders)' },
+      { emoji: '📧', text: 'Add vendor name + email → upFloat sends a branded magic-link email on your behalf (up to 3 reminders)' },
       { emoji: '📋', text: 'Vendor opens the link (no login needed) and fills: Udyam number, MSME category, nature of business, outstanding amount as on 31 March' },
       { emoji: '📎', text: 'Vendor uploads their Udyam certificate (PDF/JPG) — you can download it anytime from the dashboard' },
       { emoji: '🆓', text: 'First 5 vendors are free. After that, ₹99/vendor/year — a tiny fraction of the compliance fine risk' },
@@ -1241,9 +1241,9 @@ const STEPS: Step[] = [
   {
     id: 'partner-portal',
     icon: '🤝', color: '#16a34a', accent: 'rgba(22,163,74,0.1)',
-    title: 'Partner Portal — Earn by Referring Floatup',
+    title: 'Partner Portal — Earn by Referring upFloat',
     subtitle: 'Sidebar → Partner Portal (Org Owner only)',
-    body: "Every CA firm owner has a personal referral link. When you refer another CA or business owner to Floatup and they sign up and pay — you earn a commission on their subscription, every year, for as long as they stay. No cap, no expiry.",
+    body: "Every CA firm owner has a personal referral link. When you refer another CA or business owner to upFloat and they sign up and pay — you earn a commission on their subscription, every year, for as long as they stay. No cap, no expiry.",
     bullets: [
       { emoji: '🔗', text: 'Your unique referral link is one click to copy — share on WhatsApp, email, or LinkedIn' },
       { emoji: '💰', text: 'Bronze (1–4 referrals): 10% · Silver (5–9): 15% · Gold (10+): 20% — commission grows with your network' },

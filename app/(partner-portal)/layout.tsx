@@ -1,4 +1,4 @@
-// Standalone partner portal layout — no Planora sidebar, no AppShell.
+// Standalone partner portal layout — no upFloat sidebar, no AppShell.
 // This layout is intentionally minimal so the portal feels like its own product.
 export default function PartnerPortalLayout({ children }: { children: React.ReactNode }) {
   return (

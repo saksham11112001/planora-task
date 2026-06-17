@@ -73,7 +73,7 @@ export function onboardingNudgeHtml(p: OnboardingNudgeProps): string {
             <td style="background:#0d9488;border-radius:8px;width:32px;height:32px;text-align:center;vertical-align:middle">
               <span style="color:#fff;font-size:16px;font-weight:700">F</span>
             </td>
-            <td style="padding-left:10px;color:#ffffff;font-size:18px;font-weight:700">Floatup</td>
+            <td style="padding-left:10px;color:#ffffff;font-size:18px;font-weight:700">upFloat</td>
           </tr></table>
         </td></tr>
 
@@ -134,7 +134,7 @@ export function onboardingNudgeHtml(p: OnboardingNudgeProps): string {
 
         <tr><td style="padding:16px 32px 28px;border-top:1px solid #f1f5f9">
           <p style="margin:0;font-size:11px;color:#94a3b8;line-height:1.6">
-            You're receiving this because you recently signed up for Floatup.
+            You're receiving this because you recently signed up for upFloat.
             <a href="${p.appUrl}/settings/notifications" style="color:#0d9488">Unsubscribe</a>
           </p>
         </td></tr>

@@ -1,10 +1,10 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
-import { TryPlanoraSidebar } from './TryPlanoraSidebar'
+import { TryupFloatSidebar } from './TryupFloatSidebar'
 
 export const metadata: Metadata = {
-  title: 'MSME Tracker — Automate Section 43B(h) Compliance | Planora',
-  description: 'Struggling to track MSME vendor payments and collect Udyam declarations? Planora automates the entire process — reminders, forms, deadlines, and export. Start free.',
+  title: 'MSME Tracker — Automate Section 43B(h) Compliance | upFloat',
+  description: 'Struggling to track MSME vendor payments and collect Udyam declarations? upFloat automates the entire process — reminders, forms, deadlines, and export. Start free.',
 }
 
 const TEAL  = '#0d9488'
@@ -26,7 +26,7 @@ export default function MsmeLandingPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 32, height: 32, borderRadius: 8, background: TEAL, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 14, color: '#fff' }}>M</div>
           <span style={{ fontWeight: 700, fontSize: 16, color: DARK }}>MSME Tracker</span>
-          <span style={{ fontSize: 11, fontWeight: 600, color: TEAL, background: 'rgba(13,148,136,0.1)', border: '1px solid rgba(13,148,136,0.25)', borderRadius: 20, padding: '2px 8px' }}>by Planora</span>
+          <span style={{ fontSize: 11, fontWeight: 600, color: TEAL, background: 'rgba(13,148,136,0.1)', border: '1px solid rgba(13,148,136,0.25)', borderRadius: 20, padding: '2px 8px' }}>by upFloat</span>
         </div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           <Link href="/login?redirect=/msme" style={{ color: MUTED, fontSize: 14, textDecoration: 'none', fontWeight: 500 }}>Login</Link>
@@ -55,7 +55,7 @@ export default function MsmeLandingPage() {
             <span style={{ fontSize: '0.72em', fontWeight: 600, color: MUTED }}>We have got you covered.</span>
           </h1>
           <p style={{ fontSize: 16, color: MUTED, lineHeight: 1.75, maxWidth: 560, margin: '0 auto 36px' }}>
-            Stop chasing vendors manually. Planora automates vendor follow-ups for MSME status and compliance documents — so you never have to ask twice. Every communication is logged in an audit-ready trail.
+            Stop chasing vendors manually. upFloat automates vendor follow-ups for MSME status and compliance documents — so you never have to ask twice. Every communication is logged in an audit-ready trail.
           </p>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 16 }}>
             <Link href="/login?redirect=/msme&mode=signup" style={{ background: TEAL, color: '#fff', borderRadius: 10, padding: '14px 32px', fontSize: 16, fontWeight: 700, textDecoration: 'none', display: 'inline-block' }}>Start free</Link>
@@ -125,7 +125,7 @@ export default function MsmeLandingPage() {
         </div>
       </section>
 
-      {/* Explore Planora */}
+      {/* Explore upFloat */}
       <section style={{ borderBottom: `1px solid ${BORDER}`, padding: '48px 24px' }}>
         <div style={{ maxWidth: 780, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 32, flexWrap: 'wrap' }}>
           <div style={{ flex: 1, minWidth: 260 }}>
@@ -133,13 +133,13 @@ export default function MsmeLandingPage() {
               Are you a CA? Need a full practice management tool?
             </div>
             <h3 style={{ fontSize: 22, fontWeight: 700, marginBottom: 10, lineHeight: 1.3, color: DARK }}>
-              Explore Planora — task management, compliance, invoicing and more
+              Explore upFloat — task management, compliance, invoicing and more
             </h3>
             <p style={{ fontSize: 14, color: MUTED, lineHeight: 1.7, margin: 0 }}>
               The same platform that powers MSME Tracker also manages tasks, recurring compliance deadlines, client portals, team collaboration, and invoicing — all in one place.
             </p>
           </div>
-          <TryPlanoraSidebar />
+          <TryupFloatSidebar />
         </div>
       </section>
 
@@ -157,7 +157,7 @@ export default function MsmeLandingPage() {
 
       {/* Footer */}
       <footer style={{ borderTop: `1px solid ${BORDER}`, padding: '24px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-        <div style={{ fontSize: 13, color: MUTED }}>2025 Planora · MSME Tracker</div>
+        <div style={{ fontSize: 13, color: MUTED }}>2025 upFloat · MSME Tracker</div>
         <div style={{ display: 'flex', gap: 20, fontSize: 13 }}>
           <Link href="/privacy" style={{ color: MUTED, textDecoration: 'none' }}>Privacy</Link>
           <Link href="/terms"   style={{ color: MUTED, textDecoration: 'none' }}>Terms</Link>

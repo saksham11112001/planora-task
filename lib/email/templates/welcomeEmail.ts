@@ -27,7 +27,7 @@ export function welcomeEmailHtml(p: WelcomeProps): string {
             <td style="background:#0d9488;border-radius:9px;width:36px;height:36px;text-align:center;vertical-align:middle">
               <span style="color:#fff;font-size:18px;font-weight:700">F</span>
             </td>
-            <td style="padding-left:12px;color:#ffffff;font-size:20px;font-weight:700;letter-spacing:-0.3px">Floatup</td>
+            <td style="padding-left:12px;color:#ffffff;font-size:20px;font-weight:700;letter-spacing:-0.3px">upFloat</td>
           </tr></table>
         </td></tr>
 
@@ -37,7 +37,7 @@ export function welcomeEmailHtml(p: WelcomeProps): string {
             You're all set, ${p.userName.split(' ')[0]}! 🎉
           </h1>
           <p style="margin:0;color:#64748b;font-size:15px;line-height:1.6">
-            <strong>${p.orgName}</strong> is live on Floatup with a full <strong>${trial}-day Pro trial</strong>.<br>
+            <strong>${p.orgName}</strong> is live on upFloat with a full <strong>${trial}-day Pro trial</strong>.<br>
             Here's what's waiting for you:
           </p>
         </td></tr>
@@ -119,7 +119,7 @@ export function welcomeEmailHtml(p: WelcomeProps): string {
         <!-- Footer -->
         <tr><td style="padding:16px 36px;border-top:1px solid #f1f5f9;background:#f8fafc">
           <p style="color:#94a3b8;font-size:12px;margin:0">
-            Floatup · You're receiving this because you just created an account.<br>
+            upFloat · You're receiving this because you just created an account.<br>
             Questions? Reply to this email.
           </p>
         </td></tr>
@@ -132,7 +132,7 @@ export function welcomeEmailHtml(p: WelcomeProps): string {
 }
 
 export function welcomeEmailSubject(p: Pick<WelcomeProps, 'userName'>): string {
-  return `Welcome to Floatup, ${p.userName.split(' ')[0]}! Your workspace is ready 🚀`
+  return `Welcome to upFloat, ${p.userName.split(' ')[0]}! Your workspace is ready 🚀`
 }
 
 export function day2EmailHtml(p: Day2Props): string {
@@ -150,7 +150,7 @@ export function day2EmailHtml(p: Day2Props): string {
             <td style="background:#0d9488;border-radius:8px;width:32px;height:32px;text-align:center;vertical-align:middle">
               <span style="color:#fff;font-size:16px;font-weight:700">F</span>
             </td>
-            <td style="padding-left:10px;color:#ffffff;font-size:18px;font-weight:700">Floatup</td>
+            <td style="padding-left:10px;color:#ffffff;font-size:18px;font-weight:700">upFloat</td>
           </tr></table>
         </td></tr>
 
@@ -161,7 +161,7 @@ export function day2EmailHtml(p: Day2Props): string {
             Never set up the same task twice 🔄
           </h1>
           <p style="margin:0 0 20px;color:#475569;font-size:14px;line-height:1.7">
-            The thing most teams love about Floatup is <strong>Recurring Tasks</strong>.<br>
+            The thing most teams love about upFloat is <strong>Recurring Tasks</strong>.<br>
             Create a task once — and it re-appears automatically on a schedule you define.
           </p>
 
@@ -183,7 +183,7 @@ export function day2EmailHtml(p: Day2Props): string {
 
         <!-- Footer -->
         <tr><td style="padding:16px 32px;border-top:1px solid #f1f5f9;background:#f8fafc">
-          <p style="color:#94a3b8;font-size:12px;margin:0">Floatup · ${p.orgName} · Reply to unsubscribe from tips</p>
+          <p style="color:#94a3b8;font-size:12px;margin:0">upFloat · ${p.orgName} · Reply to unsubscribe from tips</p>
         </td></tr>
 
       </table>
@@ -194,5 +194,5 @@ export function day2EmailHtml(p: Day2Props): string {
 }
 
 export function day2EmailSubject(): string {
-  return `One tip to get more out of Floatup 🔄`
+  return `One tip to get more out of upFloat 🔄`
 }

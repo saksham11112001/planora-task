@@ -191,7 +191,7 @@ export function DashboardClient({
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#0d9488', animation: 'pulse 2s infinite' }}/>
             <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '0.05em' }}>
-              🚀 YOUR SETUP GUIDE — Complete these 4 steps to get the most out of Floatup
+              🚀 YOUR SETUP GUIDE — Complete these 4 steps to get the most out of upFloat
             </p>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>

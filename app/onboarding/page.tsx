@@ -267,7 +267,7 @@ export default function OnboardingPage() {
               <div className="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center">
                 <Zap className="h-6 w-6 text-white"/>
               </div>
-              <span className="text-2xl font-bold text-white">Floatup</span>
+              <span className="text-2xl font-bold text-white">upFloat</span>
             </div>
             <p className="text-teal-200 text-sm">Welcome! How would you like to get started?</p>
           </div>
@@ -311,7 +311,7 @@ export default function OnboardingPage() {
               <div className="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center">
                 <Zap className="h-6 w-6 text-white"/>
               </div>
-              <span className="text-2xl font-bold text-white">Floatup</span>
+              <span className="text-2xl font-bold text-white">upFloat</span>
             </div>
           </div>
           <div className="bg-white rounded-2xl p-8 shadow-2xl">
@@ -370,7 +370,7 @@ export default function OnboardingPage() {
             <div className="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center">
               <Zap className="h-6 w-6 text-white"/>
             </div>
-            <span className="text-2xl font-bold text-white">Floatup</span>
+            <span className="text-2xl font-bold text-white">upFloat</span>
           </div>
           <p className="text-teal-200 text-sm">
             {inviteData ? 'Complete your profile to get started' : 'Set up your workspace in a few quick steps'}
@@ -462,7 +462,7 @@ export default function OnboardingPage() {
                 </div>
                 <div>
                   <h2 className="text-lg font-bold text-gray-900">About your organisation</h2>
-                  <p className="text-sm text-gray-500">Help us personalise Floatup for your team</p>
+                  <p className="text-sm text-gray-500">Help us personalise upFloat for your team</p>
                 </div>
               </div>
               {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>}
@@ -581,7 +581,7 @@ export default function OnboardingPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">How did you hear about Floatup?</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">How did you hear about upFloat?</label>
                   <select value={form.how_did_you_hear} onChange={e => set('how_did_you_hear', e.target.value)} className="input">
                     <option value="">Select an option</option>
                     {HOW_DID_YOU_HEAR.map(o => <option key={o} value={o}>{o}</option>)}
@@ -618,7 +618,7 @@ export default function OnboardingPage() {
               <div className="flex gap-3 mt-2">
                 <button onClick={() => setStep(3)} className="btn btn-outline flex-1">Back</button>
                 <button onClick={handleSubmit} disabled={saving} className="btn btn-brand flex-1">
-                  {saving ? 'Setting up…' : 'Launch Floatup 🚀'}
+                  {saving ? 'Setting up…' : 'Launch upFloat 🚀'}
                 </button>
               </div>
             </>

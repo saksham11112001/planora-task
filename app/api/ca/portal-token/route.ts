@@ -4,7 +4,7 @@ import { createAdminClient }         from '@/lib/supabase/admin'
 import crypto                        from 'crypto'
 import { getApiOrgMembership }       from '@/lib/supabase/apiActiveOrg'
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://taska.in'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://upfloat.io'
 
 // POST /api/ca/portal-token
 // Body: { client_id: string }

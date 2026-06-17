@@ -371,7 +371,7 @@ export default async function LandingPage() {
               </svg>
             </div>
           </div>
-          <span style={{ fontWeight: 900, fontSize: 17, letterSpacing: '-0.6px', color: '#0f172a' }}>Floatup</span>
+          <span style={{ fontWeight: 900, fontSize: 17, letterSpacing: '-0.6px', color: '#0f172a' }}>upFloat</span>
         </Link>
 
         <div className="nav-mid" style={{ flex: 1, display: 'flex', justifyContent: 'center', gap: 28 }}>
@@ -852,13 +852,13 @@ export default async function LandingPage() {
           <div style={{ textAlign: 'center', marginBottom: 60 }}>
             <div className="chip chip-teal">
               <span className="chip-dot" style={{ background: '#0d9488' }}/>
-              Why practices choose Floatup
+              Why practices choose upFloat
             </div>
             <h2 style={{ fontSize: 'clamp(28px, 4vw, 46px)', fontWeight: 900, letterSpacing: '-2px', lineHeight: 1.06, margin: '0 0 16px', color: '#0f172a' }}>
               Everything generic tools miss<br/>for professional practices
             </h2>
             <p style={{ fontSize: 16, color: '#64748b', maxWidth: 480, margin: '0 auto', lineHeight: 1.75 }}>
-              Most task tools were designed for tech teams. Floatup was built for how accounting and advisory businesses actually operate.
+              Most task tools were designed for tech teams. upFloat was built for how accounting and advisory businesses actually operate.
             </p>
           </div>
 
@@ -938,7 +938,7 @@ export default async function LandingPage() {
               <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.5)', marginBottom: 14 }}>Automation</div>
               <h3 style={{ fontSize: 28, fontWeight: 900, letterSpacing: '-0.8px', marginBottom: 14, lineHeight: 1.15 }}>Recurring tasks,<br/>zero effort</h3>
               <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.7)', lineHeight: 1.75, marginBottom: 26, maxWidth: 320 }}>
-                Set any task to repeat daily, weekly, monthly, or quarterly. Floatup creates it, assigns it, and starts the clock automatically.
+                Set any task to repeat daily, weekly, monthly, or quarterly. upFloat creates it, assigns it, and starts the clock automatically.
               </p>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 {['Daily','Weekly','Monthly','Quarterly','Annual'].map(f => (
@@ -1006,8 +1006,8 @@ export default async function LandingPage() {
             <div className="step-connector" style={{ position: 'absolute', top: 44, left: '18%', right: '18%', height: 1, background: 'linear-gradient(90deg, transparent, #e2e8f0 15%, #e2e8f0 85%, transparent)', zIndex: 0 }}/>
             {[
               { n: '01', title: 'Invite your team', body: 'Add members, assign roles — owner, manager, member, viewer. Done in under 2 minutes.' },
-              { n: '02', title: 'Create & assign tasks', body: 'Add tasks manually, use templates, or let Floatup auto-generate compliance tasks for your practice from pre-built country templates.' },
-              { n: '03', title: 'Stay accountable automatically', body: 'Floatup sends smart reminders, tracks completion, escalates blockers — without anyone manually chasing anyone.' },
+              { n: '02', title: 'Create & assign tasks', body: 'Add tasks manually, use templates, or let upFloat auto-generate compliance tasks for your practice from pre-built country templates.' },
+              { n: '03', title: 'Stay accountable automatically', body: 'upFloat sends smart reminders, tracks completion, escalates blockers — without anyone manually chasing anyone.' },
             ].map((step, i) => (
               <div key={i} style={{ textAlign: 'center', padding: '0 30px', position: 'relative', zIndex: 1 }}>
                 <div style={{
@@ -1052,7 +1052,7 @@ export default async function LandingPage() {
               Built for every professional team type
             </h2>
             <p style={{ fontSize: 15, color: '#64748b', maxWidth: 380, margin: '0 auto', lineHeight: 1.75 }}>
-              Floatup adapts to your workflow — not the other way around.
+              upFloat adapts to your workflow — not the other way around.
             </p>
           </div>
 
@@ -1111,7 +1111,7 @@ export default async function LandingPage() {
               Side by side
             </div>
             <h2 style={{ fontSize: 'clamp(26px, 3.5vw, 42px)', fontWeight: 900, letterSpacing: '-1.5px', margin: '0 0 14px', color: '#0f172a' }}>
-              Why professional teams switch to Floatup
+              Why professional teams switch to upFloat
             </h2>
             <p style={{ fontSize: 15, color: '#64748b', maxWidth: 460, margin: '0 auto', lineHeight: 1.75 }}>
               Compliance-aware, flat-priced, with features professional practices actually need.
@@ -1126,7 +1126,7 @@ export default async function LandingPage() {
                   <th style={{ padding: '20px 16px', textAlign: 'center', background: '#0a0f1e', borderBottom: '2px solid #0d9488', minWidth: 110 }}>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
                       <div style={{ width: 28, height: 28, borderRadius: 9, background: 'linear-gradient(135deg,#0d9488,#0891b2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 900, color: '#fff', boxShadow: '0 2px 8px rgba(13,148,136,0.4)' }}>F</div>
-                      <span style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>Floatup</span>
+                      <span style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>upFloat</span>
                       <span style={{ fontSize: 10, color: '#2dd4bf', fontWeight: 700 }}>$29/mo</span>
                     </div>
                   </th>
@@ -1351,7 +1351,7 @@ export default async function LandingPage() {
           <h2 style={{ fontSize: 'clamp(24px, 3.5vw, 38px)', fontWeight: 900, letterSpacing: '-1.2px', margin: '0 0 12px', color: '#0f172a' }}>
             Teams who made the switch
           </h2>
-          <p style={{ fontSize: 15, color: '#64748b', lineHeight: 1.7 }}>What early users say after one month on Floatup.</p>
+          <p style={{ fontSize: 15, color: '#64748b', lineHeight: 1.7 }}>What early users say after one month on upFloat.</p>
         </div>
 
         {/* Marquee */}
@@ -1360,11 +1360,11 @@ export default async function LandingPage() {
             {/* Duplicate the cards twice for seamless loop */}
             {[...Array(2)].map((_, pass) =>
               [
-                { init:'JM', color:'#f97316', name:'James M.', role:'Managing Partner', co:'CPA firm, Chicago', quote:'We replaced three separate tools with Floatup. The compliance templates for US federal and state returns saved us hours of setup. The approval flow is exactly what our practice needed.', metric:'3 tools → 1 platform' },
+                { init:'JM', color:'#f97316', name:'James M.', role:'Managing Partner', co:'CPA firm, Chicago', quote:'We replaced three separate tools with upFloat. The compliance templates for US federal and state returns saved us hours of setup. The approval flow is exactly what our practice needed.', metric:'3 tools → 1 platform' },
                 { init:'SR', color:'#0d9488', name:'Sophie R.', role:'Director', co:'Accounting firm, London', quote:'Task completion jumped from 65% to 93% in six weeks. The VAT MTD templates were ready out of the box. Our managers finally have visibility without chasing everyone manually.', metric:'65% → 93% completion' },
                 { init:'LK', color:'#7c3aed', name:'Liam K.', role:'Head of Ops', co:'Agency, Toronto', quote:'Setup took 20 minutes. Flat USD pricing was a no-brainer versus Monday.com at $12 per person. Client management, approvals, and time tracking finally in one place.', metric:'ROI in week 1' },
                 { init:'AM', color:'#0891b2', name:'Ananya M.', role:'Partner', co:'CA firm, Mumbai', quote:'The Indian compliance templates saved us days of setup. GST, TDS, ITR all pre-built. Our team went from spreadsheets to a fully organised system in under a week.', metric:'Week 1 payback' },
-                { init:'PW', color:'#16a34a', name:'Paul W.', role:'COO', co:'Operations, Sydney', quote:'We run 60+ recurring checklists across 5 departments. Floatup handles every spawn, every reminder, every escalation — without a single Slack chase message from me anymore.', metric:'60 checklists automated' },
+                { init:'PW', color:'#16a34a', name:'Paul W.', role:'COO', co:'Operations, Sydney', quote:'We run 60+ recurring checklists across 5 departments. upFloat handles every spawn, every reminder, every escalation — without a single Slack chase message from me anymore.', metric:'60 checklists automated' },
               ].map((t, i) => (
                 <div key={`${pass}-${i}`} className="marquee-card" style={{
                   background: '#f8fafc', border: '1px solid #f1f5f9', borderRadius: 18,
@@ -1410,7 +1410,7 @@ export default async function LandingPage() {
               }}>We protect that trust.</span>
             </h2>
             <p style={{ fontSize: 16, color: 'rgba(255,255,255,0.42)', maxWidth: 520, margin: '0 auto', lineHeight: 1.8 }}>
-              Floatup is built for accounting and advisory firms that handle sensitive client data across multiple jurisdictions. Security is not a checkbox — it is the foundation.
+              upFloat is built for accounting and advisory firms that handle sensitive client data across multiple jurisdictions. Security is not a checkbox — it is the foundation.
             </p>
           </div>
 
@@ -1421,7 +1421,7 @@ export default async function LandingPage() {
                 {[
                   { icon: '🔒', title: 'Complete org isolation', body: 'Every organisation is a completely separate data silo. There is no data commingling — your client records, tasks, and documents are inaccessible to any other account on the platform.' },
                   { icon: '🔐', title: 'AES-256 + TLS 1.3 encryption', body: 'All data is encrypted at rest with AES-256 and in transit with TLS 1.3. Encryption is enforced at every layer — database, storage, and API.' },
-                  { icon: '🕵️', title: 'Zero data mining, ever', body: 'We do not analyse, profile, sell, or share your client data with any third party. Your data is used exclusively to run your Floatup account — nothing else.' },
+                  { icon: '🕵️', title: 'Zero data mining, ever', body: 'We do not analyse, profile, sell, or share your client data with any third party. Your data is used exclusively to run your upFloat account — nothing else.' },
                 ].map(item => (
                   <div key={item.title} style={{ display: 'flex', gap: 14 }}>
                     <span style={{ fontSize: 20, flexShrink: 0, marginTop: 2 }}>{item.icon}</span>
@@ -1460,7 +1460,7 @@ export default async function LandingPage() {
               <div style={{ flex: '0 0 auto' }}>
                 <div style={{ fontSize: 11, fontWeight: 800, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 10 }}>International standards</div>
                 <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.38)', lineHeight: 1.75, maxWidth: 260 }}>
-                  Floatup is designed to operate in compliance with privacy regulations across every jurisdiction we serve.
+                  upFloat is designed to operate in compliance with privacy regulations across every jurisdiction we serve.
                 </div>
               </div>
               <div className="compliance-grid" style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, minWidth: 300 }}>
@@ -1515,11 +1515,11 @@ export default async function LandingPage() {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
             {[
-              { q: 'Does my team need to install anything?', a: 'Nothing. Floatup is fully web-based — any browser, any device. Smart reminders work via email and in-app notifications with no installation required.' },
+              { q: 'Does my team need to install anything?', a: 'Nothing. upFloat is fully web-based — any browser, any device. Smart reminders work via email and in-app notifications with no installation required.' },
               { q: 'How are compliance templates organised by country?', a: 'In the Compliance module, you load task templates for your service countries — US, UK, Canada, Australia, or Europe. Each country has pre-built tasks (e.g. Form 941 for US, VAT MTD returns for UK, BAS for Australia) that you can load, customise, and assign to clients in bulk.' },
-              { q: 'How is Floatup different from Asana or Monday.com?', a: "Those tools are designed for general teams. Floatup is built specifically for accounting and advisory practices: flat USD team pricing (not $12–$14 per person), built-in compliance templates per country, client management, document upload enforcement, and approval workflows with full audit trails." },
-              { q: 'Where is our data stored, and who can access it?', a: 'Your data is hosted on AWS enterprise infrastructure. Each organisation is a fully isolated silo — no other Floatup account can access your data under any circumstances. Our team can only access infrastructure-level metrics (no task or client content) and only for incident resolution, with a logged access request. For EU practices, EU-region hosting is available on Pro and Enterprise plans.' },
-              { q: 'Is Floatup GDPR compliant? What about CCPA and PIPEDA?', a: 'Floatup is designed to align with GDPR (EU/EEA), UK GDPR, CCPA (California), and PIPEDA (Canada). We offer a Data Processing Agreement (DPA) for business customers. You can request deletion of all your data at any time, and we will action it within 30 days including all backup copies.' },
+              { q: 'How is upFloat different from Asana or Monday.com?', a: "Those tools are designed for general teams. upFloat is built specifically for accounting and advisory practices: flat USD team pricing (not $12–$14 per person), built-in compliance templates per country, client management, document upload enforcement, and approval workflows with full audit trails." },
+              { q: 'Where is our data stored, and who can access it?', a: 'Your data is hosted on AWS enterprise infrastructure. Each organisation is a fully isolated silo — no other upFloat account can access your data under any circumstances. Our team can only access infrastructure-level metrics (no task or client content) and only for incident resolution, with a logged access request. For EU practices, EU-region hosting is available on Pro and Enterprise plans.' },
+              { q: 'Is upFloat GDPR compliant? What about CCPA and PIPEDA?', a: 'upFloat is designed to align with GDPR (EU/EEA), UK GDPR, CCPA (California), and PIPEDA (Canada). We offer a Data Processing Agreement (DPA) for business customers. You can request deletion of all your data at any time, and we will action it within 30 days including all backup copies.' },
               { q: 'Can I try before paying?', a: 'Yes. The Free plan is free forever for up to 5 people. All paid plans include a 14-day free trial — no credit card required to start.' },
               { q: 'What happens if I cancel?', a: "Cancel any time from your billing settings. You keep access until the end of your billing period. You can export all your data at any time. No lock-in." },
               { q: 'Do you support multiple countries for the same practice?', a: 'Yes. If your practice serves clients in multiple jurisdictions, you can load compliance templates from several countries simultaneously — tasks are prefixed by country code so they stay clearly organised.' },
@@ -1561,7 +1561,7 @@ export default async function LandingPage() {
             background: 'rgba(13,148,136,0.12)', border: '1px solid rgba(13,148,136,0.25)',
           }}>
             <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#2dd4bf', animation: 'pulse-dot 2s ease-in-out infinite' }}/>
-            <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.55)' }}>500+ teams running on Floatup right now</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.55)' }}>500+ teams running on upFloat right now</span>
           </div>
 
           <h2 style={{
@@ -1578,7 +1578,7 @@ export default async function LandingPage() {
             }}>Start closing tasks.</span>
           </h2>
           <p style={{ fontSize: 17, color: 'rgba(255,255,255,0.44)', marginBottom: 40, lineHeight: 1.78 }}>
-            Join hundreds of professional teams running their work on Floatup.<br/>Free to start — no credit card needed.
+            Join hundreds of professional teams running their work on upFloat.<br/>Free to start — no credit card needed.
           </p>
           <div className="cta-buttons" style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
             <Link href="/login" className="btn-cta btn-cta-orange"
@@ -1667,7 +1667,7 @@ export default async function LandingPage() {
                     <path d="M3 8l3 3 7-7" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                 </div>
-                <span style={{ fontWeight: 900, fontSize: 15, color: '#fff', letterSpacing: '-0.4px' }}>Floatup</span>
+                <span style={{ fontWeight: 900, fontSize: 15, color: '#fff', letterSpacing: '-0.4px' }}>upFloat</span>
               </div>
               <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.32)', lineHeight: 1.75, maxWidth: 240, margin: '0 0 20px' }}>
                 Task management built for professional teams. Compliance-ready, flat-priced, globally available.
@@ -1705,7 +1705,7 @@ export default async function LandingPage() {
           </div>
 
           <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.16)' }}>© 2026 Floatup Technology. All rights reserved.</div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.16)' }}>© 2026 upFloat Technology. All rights reserved.</div>
             <div style={{ display: 'flex', gap: 24 }}>
               {[['Privacy','/privacy'],['Terms','/terms'],['Security','#security'],['DPA','mailto:hello@floatup.app?subject=DPA+Request']].map(([l,h]) => (
                 <a key={l} href={h} className="footer-link" style={{ fontSize: 12, color: 'rgba(255,255,255,0.2)', textDecoration: 'none' }}>{l}</a>

@@ -29,7 +29,7 @@ function msmeInviteHtml(partnerName: string, msmeUrl: string): string {
           </a>
         </td></tr>
         <tr><td style="padding:16px 32px;border-top:1px solid #f1f5f9;font-size:11px;color:#94a3b8;">
-          Powered by Planora · MSME Tracker
+          Powered by upFloat · MSME Tracker
         </td></tr>
       </table>
     </td></tr>
@@ -52,14 +52,14 @@ function partnerInviteHtml(partnerName: string, joinUrl: string): string {
             <strong>${partnerName}</strong> invited you to join the <strong>Partner Program</strong> — refer businesses to MSME Tracker and earn a commission on every paid plan.
           </p>
           <p style="margin:0 0 24px;font-size:14px;color:#475569;line-height:1.6;">
-            No Planora account needed. Just sign up as a partner, get your referral link, and start sharing.
+            No upFloat account needed. Just sign up as a partner, get your referral link, and start sharing.
           </p>
           <a href="${joinUrl}" style="display:inline-block;background:#7c3aed;color:#fff;padding:12px 28px;border-radius:8px;font-size:14px;font-weight:700;text-decoration:none;">
             Join as a Partner →
           </a>
         </td></tr>
         <tr><td style="padding:16px 32px;border-top:1px solid #f1f5f9;font-size:11px;color:#94a3b8;">
-          Powered by Planora Partner Program
+          Powered by upFloat Partner Program
         </td></tr>
       </table>
     </td></tr>

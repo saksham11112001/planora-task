@@ -51,7 +51,7 @@ export function upgradePushHtml(p: UpgradePushProps): string {
             <td style="background:#0d9488;border-radius:8px;width:32px;height:32px;text-align:center;vertical-align:middle">
               <span style="color:#fff;font-size:16px;font-weight:700">F</span>
             </td>
-            <td style="padding-left:10px;color:#ffffff;font-size:18px;font-weight:700">Floatup</td>
+            <td style="padding-left:10px;color:#ffffff;font-size:18px;font-weight:700">upFloat</td>
           </tr></table>
         </td></tr>
 

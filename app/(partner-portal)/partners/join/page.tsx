@@ -79,7 +79,7 @@ export default function PartnerJoinPage() {
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <div style={{ width: 48, height: 48, borderRadius: 14, background: ACCENT, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', fontSize: 22 }}>🤝</div>
           <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', margin: '0 0 4px' }}>Join the Partner Program</h1>
-          <p style={{ fontSize: 14, color: '#64748b', margin: 0 }}>Refer clients, earn commissions. No Planora account needed.</p>
+          <p style={{ fontSize: 14, color: '#64748b', margin: 0 }}>Refer clients, earn commissions. No upFloat account needed.</p>
         </div>
 
         <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', padding: 32, boxShadow: '0 1px 8px rgba(0,0,0,0.06)' }}>

@@ -67,7 +67,7 @@ export function clientDocReminderHtml(p: Props): string {
       </a>
     </td></tr>
     <tr><td style="padding:16px 32px;border-top:1px solid #f1f5f9">
-      <p style="color:#94a3b8;font-size:12px;margin:0">${p.orgName} · Powered by Floatup</p>
+      <p style="color:#94a3b8;font-size:12px;margin:0">${p.orgName} · Powered by upFloat</p>
     </td></tr>
   </table>
   </td></tr></table>
@@ -170,7 +170,7 @@ export function clientDocReminderBatchHtml(p: BatchProps): string {
       </a>
     </td></tr>
     <tr><td style="padding:16px 32px;border-top:1px solid #f1f5f9">
-      <p style="color:#94a3b8;font-size:12px;margin:0">${p.orgName} · Powered by Floatup</p>
+      <p style="color:#94a3b8;font-size:12px;margin:0">${p.orgName} · Powered by upFloat</p>
     </td></tr>
   </table>
   </td></tr></table>

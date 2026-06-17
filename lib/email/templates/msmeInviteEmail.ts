@@ -54,7 +54,7 @@ export function msmeInviteEmailHtml(p: Props): string {
 
         <tr><td style="background:#f8fafc;padding:16px 36px;border-top:1px solid #e2e8f0;">
           <p style="margin:0;font-size:11px;color:#94a3b8;text-align:center;">
-            Sent via Planora · Built for Indian CA firms &amp; businesses
+            Sent via upFloat · Built for Indian CA firms &amp; businesses
           </p>
         </td></tr>
 

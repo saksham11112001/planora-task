@@ -322,7 +322,7 @@ function WelcomeModal({ userName, onStart, onSkip }: { userName: string; onStart
           Welcome{userName ? `, ${userName.split(' ')[0]}` : ''}!
         </h2>
         <p style={{ fontSize:14, opacity:0.7, lineHeight:1.65, marginBottom:10 }}>
-          Let's take a <strong style={{ color:'#0d9488' }}>2-minute interactive tour</strong> of Planora.
+          Let's take a <strong style={{ color:'#0d9488' }}>2-minute interactive tour</strong> of upFloat.
         </p>
         <p style={{ fontSize:13, opacity:0.55, lineHeight:1.55, marginBottom:30 }}>
           You'll explore real features by clicking through the app — no boring slides.
@@ -363,7 +363,7 @@ function DoneModal({ onClose }: { onClose: () => void }) {
         boxShadow:'0 32px 80px rgba(0,0,0,0.65)', border:'1px solid rgba(255,255,255,0.08)',
       }}>
         <div style={{ fontSize:56, marginBottom:14 }}>🎉</div>
-        <h2 style={{ fontWeight:800, fontSize:23, marginBottom:10 }}>You know Planora!</h2>
+        <h2 style={{ fontWeight:800, fontSize:23, marginBottom:10 }}>You know upFloat!</h2>
         <p style={{ fontSize:14, opacity:0.7, lineHeight:1.65, marginBottom:30 }}>
           Start by adding your first client — compliance deadlines will appear automatically within seconds.
         </p>

@@ -212,7 +212,7 @@ export default async function ProfessionalsPage() {
               <path d="M3 8l3 3 7-7" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </div>
-          <span style={{ fontWeight: 800, fontSize: 17, letterSpacing: '-0.5px', color: '#0f172a' }}>Floatup</span>
+          <span style={{ fontWeight: 800, fontSize: 17, letterSpacing: '-0.5px', color: '#0f172a' }}>upFloat</span>
         </Link>
 
         <div className="nav-mid" style={{ flex: 1, display: 'flex', justifyContent: 'center', gap: 28 }}>
@@ -223,7 +223,7 @@ export default async function ProfessionalsPage() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-          <Link href="/" className="nav-signin" style={{ color: '#64748b', fontSize: 13, textDecoration: 'none', fontWeight: 500 }}>← Back to Floatup</Link>
+          <Link href="/" className="nav-signin" style={{ color: '#64748b', fontSize: 13, textDecoration: 'none', fontWeight: 500 }}>← Back to upFloat</Link>
           <Link href="/login" className="nav-link nav-signin" style={{ color: '#64748b', fontSize: 14, textDecoration: 'none', fontWeight: 500 }}>Sign in</Link>
           <Link href="/login" className="btn-primary nav-cta"
             style={{
@@ -242,7 +242,7 @@ export default async function ProfessionalsPage() {
               {[['Compliance','#compliance'],['Pricing','#pricing'],['Countries','#countries'],['How it works','#how']].map(([l,h]) => (
                 <a key={l} href={h}>{l}</a>
               ))}
-              <a href="/">← Back to Floatup</a>
+              <a href="/">← Back to upFloat</a>
               <a href="/login">Sign in</a>
               <a href="/login" className="mnav-cta">Start free →</a>
             </div>
@@ -367,7 +367,7 @@ export default async function ProfessionalsPage() {
                 icon: '👥',
                 color: '#f97316', bg: '#fff7ed', border: '#fed7aa',
                 title: 'Assign to clients in bulk',
-                body: 'Select which master tasks apply to each client during onboarding. Floatup auto-generates individual recurring compliance tasks with the exact attachment checklist you defined — ready for the whole financial year.',
+                body: 'Select which master tasks apply to each client during onboarding. upFloat auto-generates individual recurring compliance tasks with the exact attachment checklist you defined — ready for the whole financial year.',
               },
               {
                 step: '04',
@@ -539,7 +539,7 @@ export default async function ProfessionalsPage() {
               {
                 n: '01', color: '#7c3aed', bg: '#faf5ff', border: '#ddd6fe',
                 title: 'Load your country templates',
-                body: 'Go to Compliance → Master Tasks → Load Defaults. Select the countries you serve (US, UK, Canada, Australia, EU, India). Floatup loads all relevant task templates instantly — deadlines, frequencies, and document requirements pre-filled.',
+                body: 'Go to Compliance → Master Tasks → Load Defaults. Select the countries you serve (US, UK, Canada, Australia, EU, India). upFloat loads all relevant task templates instantly — deadlines, frequencies, and document requirements pre-filled.',
                 tag: '< 60 seconds',
               },
               {
@@ -551,7 +551,7 @@ export default async function ProfessionalsPage() {
               {
                 n: '03', color: '#f97316', bg: '#fff7ed', border: '#fed7aa',
                 title: 'Onboard clients in bulk',
-                body: 'In Client Setup (Step 2), select a client and check off which master tasks apply to them. Assign a staff member and approver. Floatup auto-generates their full compliance schedule — task by task, month by month — for the entire financial year.',
+                body: 'In Client Setup (Step 2), select a client and check off which master tasks apply to them. Assign a staff member and approver. upFloat auto-generates their full compliance schedule — task by task, month by month — for the entire financial year.',
                 tag: '2 min per client',
               },
               {
@@ -695,7 +695,7 @@ export default async function ProfessionalsPage() {
                 padding: '15px 24px', borderRadius: 11, fontSize: 15, fontWeight: 500,
                 textDecoration: 'none', border: '1px solid rgba(255,255,255,0.12)', display: 'inline-block',
               }}>
-              ← Back to Floatup
+              ← Back to upFloat
             </Link>
           </div>
           <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.22)', marginTop: 20 }}>

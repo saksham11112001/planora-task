@@ -5,7 +5,7 @@ import { ImportView }    from './ImportView'
 
 export const dynamic = 'force-dynamic'
 
-export const metadata = { title: 'Bulk Import — Floatup' }
+export const metadata = { title: 'Bulk Import — upFloat' }
 
 export default async function ImportPage() {
   // Use cached fetchers — layout already called these, so no extra DB round trips

@@ -128,7 +128,7 @@ export async function sendMemberInvitedEmail(p: {
 }) {
   return resend.emails.send({
     from: FROM, to: p.to,
-    subject: `👋 ${p.memberName} joined ${p.orgName} on Floatup`,
+    subject: `👋 ${p.memberName} joined ${p.orgName} on upFloat`,
     html: memberInvitedHtml({ ...p, appUrl: APP_URL }),
   })
 }

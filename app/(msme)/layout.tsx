@@ -30,7 +30,7 @@ export default async function MsmeLayout({ children }: { children: React.ReactNo
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 28, height: 28, borderRadius: 7, background: TEAL, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13, color: '#fff', flexShrink: 0 }}>M</div>
           <span style={{ fontWeight: 700, fontSize: 14, color: DARK }}>MSME Tracker</span>
-          <span style={{ fontSize: 10, fontWeight: 600, color: TEAL, background: 'rgba(13,148,136,0.1)', border: '1px solid rgba(13,148,136,0.25)', borderRadius: 20, padding: '2px 7px' }}>by Planora</span>
+          <span style={{ fontSize: 10, fontWeight: 600, color: TEAL, background: 'rgba(13,148,136,0.1)', border: '1px solid rgba(13,148,136,0.25)', borderRadius: 20, padding: '2px 7px' }}>by upFloat</span>
           {orgName && (
             <>
               <span style={{ color: BORDER, fontSize: 13 }}>·</span>
@@ -49,7 +49,7 @@ export default async function MsmeLayout({ children }: { children: React.ReactNo
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
           </svg>
-          Try Planora
+          Try upFloat
         </a>
       </nav>
 

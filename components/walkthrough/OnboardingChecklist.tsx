@@ -19,7 +19,7 @@ const STEPS: ChecklistStep[] = [
     id:    'tour',
     emoji: '🎬',
     label: 'Watch the product tour',
-    detail: 'A full walkthrough of every Floatup feature — clients, compliance, tasks, approvals, reports, and more. Takes about 3 minutes and answers most questions before you even ask them.',
+    detail: 'A full walkthrough of every upFloat feature — clients, compliance, tasks, approvals, reports, and more. Takes about 3 minutes and answers most questions before you even ask them.',
     substeps: [
       'Click the arrow to open the tour in full-screen',
       'Use arrow keys or the Next button to move between slides',
@@ -57,7 +57,7 @@ const STEPS: ChecklistStep[] = [
     id:        'compliance',
     emoji:     '⚖️',
     label:     'Generate compliance tasks',
-    detail:    'In 3 clicks, Floatup creates one task per client with the correct statutory due date for every filing type you select. No manual entry, no missed deadlines — 69+ task types come pre-loaded.',
+    detail:    'In 3 clicks, upFloat creates one task per client with the correct statutory due date for every filing type you select. No manual entry, no missed deadlines — 69+ task types come pre-loaded.',
     substeps: [
       'Sidebar → CA Compliance → click Generate Tasks',
       'Step 1: tick the filing types — GSTR-1, GSTR-3B, TDS Q1-Q4, ITR, ROC, PF, ESI, PT…',
@@ -140,7 +140,7 @@ const STEPS: ChecklistStep[] = [
     id:        'recurring',
     emoji:     '🔁',
     label:     'Set up a recurring task',
-    detail:    'For work that repeats on a schedule — monthly billing, weekly calls, quarterly reports — create it once as a template. Floatup spawns a fresh independent copy automatically before each due date. The assignee is inherited from the template.',
+    detail:    'For work that repeats on a schedule — monthly billing, weekly calls, quarterly reports — create it once as a template. upFloat spawns a fresh independent copy automatically before each due date. The assignee is inherited from the template.',
     substeps: [
       'Sidebar → Repeat Tasks → + New Recurring Task',
       'Choose frequency: daily / weekly on specific days / monthly / quarterly / annual',
@@ -401,7 +401,7 @@ export function OnboardingChecklist({ userId, userCreatedAt }: Props) {
 
         {allDone && (
           <p style={{ fontSize: 12, color: '#16a34a', margin: '8px 0 0', lineHeight: 1.4 }}>
-            You&apos;ve set up everything. Your firm is ready to run on Floatup.
+            You&apos;ve set up everything. Your firm is ready to run on upFloat.
           </p>
         )}
       </div>

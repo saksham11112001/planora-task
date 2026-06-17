@@ -117,7 +117,7 @@ export async function GET(request: NextRequest) {
     const exceljs = await import('exceljs')
     const ExcelJS  = (exceljs as any).default ?? exceljs
     const wb       = new ExcelJS.Workbook()
-    wb.creator     = 'Floatup'
+    wb.creator     = 'upFloat'
     wb.created     = new Date()
 
     // ── Palette ────────────────────────────────────────────────────────────
@@ -208,7 +208,7 @@ wsRM.views = [
 ]
 
     const instructions: [string, any][] = [
-      ['Floatup Bulk Import Template',
+      ['upFloat Bulk Import Template',
         { bold: true, size: 15, color: { argb: C.teal }, name: 'Arial' }],
       ['', {}],
       ['📋 How to use this template',
@@ -386,7 +386,7 @@ wsRM.views = [
     return new NextResponse(Buffer.from(buf as ArrayBuffer), {
       headers: {
         'Content-Type'        : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Disposition' : 'attachment; filename="taska_import_template.xlsx"',
+        'Content-Disposition' : 'attachment; filename="upfloat_import_template.xlsx"',
         'Cache-Control'       : 'no-store',
       },
     })

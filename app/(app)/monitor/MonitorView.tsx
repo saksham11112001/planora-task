@@ -189,7 +189,7 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
   async function exportToExcel() {
     const ExcelJS = (await import('exceljs')).default
     const wb = new ExcelJS.Workbook()
-    wb.creator  = 'Floatup'
+    wb.creator  = 'upFloat'
     wb.created  = new Date()
 
     // ── Summary sheet ──
@@ -199,7 +199,7 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
       { header: 'Value', key: 'value', width: 34 },
     ]
     ;[
-      ['Exported by',   'Floatup Monitor'],
+      ['Exported by',   'upFloat Monitor'],
       ['Export date',   new Date().toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })],
       ['Total tasks',   visible.length],
       ['Filters active', [

@@ -140,7 +140,7 @@ export function PartnerView() {
     if (!data) return
     navigator.clipboard.writeText(data.referral_link)
     setCopied(true)
-    toast.success('Planora referral link copied!')
+    toast.success('upFloat referral link copied!')
     setTimeout(() => setCopied(false), 2000)
   }
 
@@ -234,7 +234,7 @@ export function PartnerView() {
             </span>
           </div>
           <p style={{ fontSize: 13, color: 'var(--muted)', margin: 0 }}>
-            Earn {data.rate_percent}% commission for every client who upgrades to a paid plan via your referral link — on Planora or MSME Tracker.
+            Earn {data.rate_percent}% commission for every client who upgrades to a paid plan via your referral link — on upFloat or MSME Tracker.
           </p>
         </div>
         <button onClick={fetchData} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer' }}>
@@ -283,10 +283,10 @@ export function PartnerView() {
           </span>
         </div>
 
-        {/* Planora link */}
+        {/* upFloat link */}
         <div style={{ marginBottom: 12 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
-            Planora — Practice Management
+            upFloat — Practice Management
           </div>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: 240, display: 'flex', alignItems: 'center', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', fontSize: 13, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -557,8 +557,8 @@ export function PartnerView() {
         <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--fg)', marginBottom: 14 }}>How the Partner Program Works</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {[
-            ['Share your referral links', `Use your Planora link for CA firms or your MSME Tracker link for business owners. Both links use the same referral code (${data.referral_code}).`],
-            ['They sign up & upgrade', 'When the person you referred upgrades to any paid plan on Planora or MSME Tracker, a commission is created for you.'],
+            ['Share your referral links', `Use your upFloat link for CA firms or your MSME Tracker link for business owners. Both links use the same referral code (${data.referral_code}).`],
+            ['They sign up & upgrade', 'When the person you referred upgrades to any paid plan on upFloat or MSME Tracker, a commission is created for you.'],
             [`Earn ${data.rate_percent}% commission`, `Your current tier is ${tier.toUpperCase()}. Reach 5 active referrals for Silver (15%) and 10 for Gold (20%).`],
             ['Monthly payouts', 'Commissions are reviewed and approved monthly. Request a bank transfer once your approved balance reaches ₹500.'],
           ].map(([title, desc], i) => (

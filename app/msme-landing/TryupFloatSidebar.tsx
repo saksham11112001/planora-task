@@ -15,10 +15,10 @@ const FEATURES = [
   { icon: '👥', title: 'Client Portal', desc: 'Each client gets their own portal to view tasks, upload documents, and track status.' },
   { icon: '🧾', title: 'Invoicing', desc: 'Create and send GST-ready invoices to clients directly from the platform.' },
   { icon: '📊', title: 'Reports & Monitor', desc: 'Full-org view of pending, overdue, and completed work across your team.' },
-  { icon: '📦', title: 'MSME Tracker', desc: 'This tool is built inside Planora — unlock full vendor tracking, deadline alerts, and Udyam management.' },
+  { icon: '📦', title: 'MSME Tracker', desc: 'This tool is built inside upFloat — unlock full vendor tracking, deadline alerts, and Udyam management.' },
 ]
 
-export function TryPlanoraSidebar() {
+export function TryupFloatSidebar() {
   const [open, setOpen] = useState(false)
 
   return (
@@ -33,7 +33,7 @@ export function TryPlanoraSidebar() {
           textDecoration: 'none',
         }}
       >
-        Explore Planora →
+        Explore upFloat →
       </button>
 
       {/* Backdrop */}
@@ -63,7 +63,7 @@ export function TryPlanoraSidebar() {
           position: 'sticky', top: 0, background: DARK, zIndex: 1,
         }}>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 16, color: WHITE }}>Planora</div>
+            <div style={{ fontWeight: 700, fontSize: 16, color: WHITE }}>upFloat</div>
             <div style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>Complete practice management</div>
           </div>
           <button
@@ -81,7 +81,7 @@ export function TryPlanoraSidebar() {
         {/* Feature list */}
         <div style={{ padding: '20px 24px 0' }}>
           <p style={{ fontSize: 13, color: MUTED, marginBottom: 20, lineHeight: 1.6 }}>
-            MSME Tracker is one tool inside Planora. Here's everything else you get:
+            MSME Tracker is one tool inside upFloat. Here's everything else you get:
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {FEATURES.map(f => (
@@ -106,7 +106,7 @@ export function TryPlanoraSidebar() {
               textDecoration: 'none', textAlign: 'center',
             }}
           >
-            Try Planora free →
+            Try upFloat free →
           </a>
           <p style={{ textAlign: 'center', fontSize: 12, color: MUTED, marginTop: 10 }}>
             14-day free trial · No credit card needed
