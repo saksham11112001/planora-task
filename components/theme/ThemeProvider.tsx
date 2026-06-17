@@ -10,7 +10,7 @@ function getSystemTheme(): 'light' | 'dark' {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
 }
 
-const PUBLIC_PATHS = ['/', '/login', '/privacy', '/terms']
+const PUBLIC_PATHS = ['/', '/login', '/privacy', '/terms', '/msme', '/partners', '/portal', '/msme-landing']
 
 function isPublicPage(): boolean {
   if (typeof window === 'undefined') return false

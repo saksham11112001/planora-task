@@ -34,7 +34,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                                  window.location.pathname.startsWith('/terms') ||
                                  window.location.pathname.startsWith('/portal/') ||
                                  window.location.pathname.startsWith('/partners') ||
-                                 window.location.pathname.startsWith('/msme');
+                                 window.location.pathname.startsWith('/msme') ||
+                                 window.location.pathname.startsWith('/msme-landing');
             if (!isPublicPage) {
               const t = localStorage.getItem('upfloat-theme') || 'system';
               const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
