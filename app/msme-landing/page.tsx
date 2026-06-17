@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
 import { TryupFloatSidebar } from './TryupFloatSidebar'
+import MsmeDemoAnimation from './MsmeDemoAnimation'
 
 export const metadata: Metadata = {
   title: 'MSME Tracker — Automate Section 43B(h) Compliance | upFloat',
@@ -105,8 +106,7 @@ export default function MsmeLandingPage() {
               </div>
               <div style={{ flex: 1, background: '#e2e8f0', borderRadius: 6, padding: '4px 12px', fontSize: 11, color: '#94a3b8', textAlign: 'center' }}>msme.upfloat.co/msme</div>
             </div>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/msme-demo.gif" alt="MSME Vendor Tracker demo" style={{ width: '100%', display: 'block' }} />
+            <MsmeDemoAnimation />
           </div>
         </div>
       </section>
