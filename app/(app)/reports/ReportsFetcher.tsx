@@ -181,7 +181,7 @@ export async function ReportsFetcher() {
     const role     = m.role ?? 'member'
     const assigned = tasksByAssignee[uid] ?? []
     const done     = assigned.filter(t => t.status === 'completed')
-    const overdueT = assigned.filter(t => t.due_date && t.due_date < today && t.status !== 'completed')
+    const overdueT = assigned.filter(t => t.due_date && t.due_date < today && !['completed','cancelled'].includes(t.status))
     const inReview = assigned.filter(t => t.status === 'in_review')
     const withDue  = done.filter(t => t.due_date)
     const onTime   = withDue.filter(t => t.completed_at && t.due_date && new Date(t.completed_at).setHours(0,0,0,0) <= new Date(t.due_date).getTime())
