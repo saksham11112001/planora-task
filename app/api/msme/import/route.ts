@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
 
   const admin = createAdminClient()
 
-  // Resolve pack-based vendor limit (same logic as single-add POST)
+  // Resolve pack-based vendor limit (used in response only — not enforced as a hard stop)
   const { data: packRow } = await admin
     .from('org_feature_settings')
     .select('config')
@@ -45,22 +45,13 @@ export async function POST(req: NextRequest) {
     .maybeSingle()
   const vendorLimit: number = (packRow?.config?.vendor_limit as number | undefined) ?? FREE_VENDOR_LIMIT
 
-  // Count ALL slots ever used (including soft-deleted) — mirrors the single-add anti-gaming logic
+  // Count ALL slots ever used (including soft-deleted) for isPaid logic
   const { count: totalEver } = await admin
     .from('msme_vendors')
     .select('id', { count: 'exact', head: true })
     .eq('org_id', mb.org_id)
 
-  const slotsUsed = totalEver ?? 0
-
-  if (slotsUsed >= vendorLimit) {
-    return NextResponse.json({
-      error: 'Vendor limit reached. Upgrade your pack to import more vendors.',
-      code: 'LIMIT_REACHED',
-    }, { status: 402 })
-  }
-
-  // Get existing emails to avoid duplicates (all rows, including soft-deleted)
+  // Get existing emails (all rows incl. soft-deleted) to avoid duplicates
   const { data: existingVendors } = await admin
     .from('msme_vendors')
     .select('vendor_email')
@@ -68,8 +59,9 @@ export async function POST(req: NextRequest) {
 
   const existingEmails = new Set((existingVendors ?? []).map(v => v.vendor_email.toLowerCase()))
 
-  let slotIndex = slotsUsed
+  let slotIndex = totalEver ?? 0
   const inserted: string[] = []
+  const lockedCount: number[] = [] // indices of inserted vendors that are locked (beyond vendorLimit)
   const skipped:  Array<{ row: number; name: string; reason: string }> = []
 
   for (let i = 0; i < rows.length; i++) {
@@ -82,12 +74,7 @@ export async function POST(req: NextRequest) {
     if (!email || !EMAIL_RE.test(email)) { skipped.push({ row: i + 1, name, reason: 'Invalid or missing email' }); continue }
     if (existingEmails.has(email)) { skipped.push({ row: i + 1, name, reason: 'Email already exists' }); continue }
 
-    // Stop inserting once the pack limit is reached; add remaining rows to skipped
-    if (slotIndex >= vendorLimit) {
-      skipped.push({ row: i + 1, name, reason: 'Vendor limit reached — upgrade pack to add more' })
-      continue
-    }
-
+    // Vendors beyond the free limit are marked unpaid (locked in UI until pack is purchased)
     const isPaid        = slotIndex >= FREE_VENDOR_LIMIT
     const paymentStatus = isPaid ? 'unpaid' : 'free'
 
@@ -106,14 +93,19 @@ export async function POST(req: NextRequest) {
     } else {
       inserted.push(name)
       existingEmails.add(email)
+      if (slotIndex >= vendorLimit) lockedCount.push(inserted.length - 1)
       slotIndex++
     }
   }
 
+  const lockedInserted = lockedCount.length
+
   return NextResponse.json({
     ok: true,
     inserted: inserted.length,
+    locked: lockedInserted,
     skipped,
+    vendor_limit: vendorLimit,
     paid_slots: Math.max(0, slotIndex - FREE_VENDOR_LIMIT),
   })
 }
