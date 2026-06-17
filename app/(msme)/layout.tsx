@@ -1,5 +1,7 @@
 import { getSessionUser }         from '@/lib/supabase/cached'
 import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
+import MsmeFeedbackButton         from './MsmeFeedbackButton'
+import MsmeLogoutButton           from './MsmeLogoutButton'
 
 const TEAL  = '#0d9488'
 const DARK  = '#0f172a'
@@ -7,10 +9,12 @@ const MUTED = '#64748b'
 const BORDER = '#e2e8f0'
 
 export default async function MsmeLayout({ children }: { children: React.ReactNode }) {
-  let orgName = ''
+  let orgName   = ''
+  let isLoggedIn = false
   try {
     const user = await getSessionUser()
     if (user) {
+      isLoggedIn = true
       const mb = await getActiveOrgMembership(user.id)
       orgName = (mb as any)?.organisations?.name ?? ''
     }
@@ -18,6 +22,7 @@ export default async function MsmeLayout({ children }: { children: React.ReactNo
 
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc', display: 'flex', flexDirection: 'column', colorScheme: 'light' }}>
+      <style>{`:root { color-scheme: light !important; } * { color-scheme: light !important; }`}</style>
 
       {/* Top nav — light */}
       <nav style={{
@@ -40,17 +45,21 @@ export default async function MsmeLayout({ children }: { children: React.ReactNo
         </div>
 
         {/* Right */}
-        <a
-          href="https://upfloat.co"
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f1f5f9', color: MUTED, border: `1px solid ${BORDER}`, borderRadius: 8, padding: '6px 14px', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}
-        >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-          </svg>
-          Try upFloat
-        </a>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <MsmeFeedbackButton />
+          {isLoggedIn && <MsmeLogoutButton />}
+          <a
+            href="https://upfloat.co"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f1f5f9', color: MUTED, border: `1px solid ${BORDER}`, borderRadius: 8, padding: '6px 14px', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+            </svg>
+            Try upFloat
+          </a>
+        </div>
       </nav>
 
       <main style={{ flex: 1, overflowY: 'auto' }}>

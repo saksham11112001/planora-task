@@ -16,7 +16,9 @@ function safeRedirect(next: string | null, fallback = '/dashboard'): string {
 export async function GET(request: NextRequest) {
   const url  = new URL(request.url)
   const code = url.searchParams.get('code')
-  const next = safeRedirect(url.searchParams.get('next'))
+  const host = request.headers.get('host') ?? ''
+  const isMsmeDomain = host.startsWith('msme.')
+  const next = safeRedirect(url.searchParams.get('next'), isMsmeDomain ? '/msme' : '/dashboard')
 
   // IMPLICIT FLOW: token is in the URL hash (#access_token=...).
   // Hashes are never sent to the server, so if there's no ?code,
