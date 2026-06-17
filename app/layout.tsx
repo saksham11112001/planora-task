@@ -5,8 +5,36 @@ import { NavigationProgress }  from '@/components/ui/NavigationProgress'
 import { KeyboardShortcuts }    from '@/components/ui/KeyboardShortcuts'
 
 export const metadata: Metadata = {
-  title:       { default: 'upFloat', template: '%s | upFloat' },
-  description: 'Project management for modern teams',
+  title:       { default: 'upFloat — Task & Practice Management for CA Firms', template: '%s | upFloat' },
+  description: 'upFloat is the all-in-one task manager and practice management software built for Indian CA firms, CPAs, and MSMEs. Track compliance, manage teams, automate recurring tasks, and collaborate with clients — all in one place.',
+  keywords: [
+    'task manager for CA firms', 'CA practice management software', 'MSME tracker', 'compliance task management',
+    'project management India', 'CA office management', 'chartered accountant software', 'CPA practice management',
+    'upFloat', 'task management software India', 'compliance management', 'recurring task automation',
+    'client portal for CA', 'team task tracker', 'GST compliance tracker', 'TDS compliance software',
+    'income tax task management', 'practice management software India', 'accounting firm software',
+  ],
+  authors: [{ name: 'upFloat', url: 'https://upfloat.co' }],
+  creator: 'upFloat',
+  publisher: 'upFloat',
+  metadataBase: new URL('https://upfloat.co'),
+  alternates: { canonical: 'https://upfloat.co' },
+  robots: { index: true, follow: true, googleBot: { index: true, follow: true } },
+  openGraph: {
+    type:        'website',
+    url:         'https://upfloat.co',
+    siteName:    'upFloat',
+    title:       'upFloat — Task & Practice Management for CA Firms',
+    description: 'All-in-one task manager and practice management software for Indian CA firms, CPAs, and MSMEs. Track compliance, manage teams, automate recurring tasks.',
+    images: [{ url: '/og-image.svg', width: 1200, height: 630, alt: 'upFloat — Practice Management for CA Firms' }],
+  },
+  twitter: {
+    card:        'summary_large_image',
+    title:       'upFloat — Task & Practice Management for CA Firms',
+    description: 'All-in-one task manager and practice management software for Indian CA firms, CPAs, and MSMEs.',
+    images:      ['/og-image.svg'],
+    creator:     '@upfloatco',
+  },
   icons: {
     icon:  [{ url: '/favicon.svg', type: 'image/svg+xml' }],
     apple: [{ url: '/favicon.svg' }],
