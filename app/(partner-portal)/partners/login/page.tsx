@@ -1,12 +1,12 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 
 const ACCENT = '#0d9488'
 
-export default function PartnerLoginPage() {
+function PartnerLoginInner() {
   const router = useRouter()
   const params = useSearchParams()
   const [email,    setEmail]    = useState('')
@@ -97,6 +97,14 @@ export default function PartnerLoginPage() {
         </p>
       </div>
     </div>
+  )
+}
+
+export default function PartnerLoginPage() {
+  return (
+    <Suspense>
+      <PartnerLoginInner />
+    </Suspense>
   )
 }
 
