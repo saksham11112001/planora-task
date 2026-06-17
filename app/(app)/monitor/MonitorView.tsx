@@ -289,7 +289,7 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
     const blob   = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
     const url    = URL.createObjectURL(blob)
     const a      = document.createElement('a')
-    a.href = url; a.download = `floatup_monitor_${today}.xlsx`; a.click()
+    a.href = url; a.download = `upfloat_monitor_${today}.xlsx`; a.click()
     URL.revokeObjectURL(url)
   }
 
