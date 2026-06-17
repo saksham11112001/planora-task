@@ -111,7 +111,7 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
     .sort((a, b) => new Date(b.last_sent_at).getTime() - new Date(a.last_sent_at).getTime())
 
   const [allInvites, setAllInvites] = useState<Invite[]>(combined)
-  const [email,      setEmail]      = useState('')
+  const [emails,     setEmails]     = useState<string[]>([''])
   const [invType,    setInvType]    = useState<'msme' | 'partner'>('msme')
   const [busy,       setBusy]       = useState(false)
   const [toast,      setToast]      = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
@@ -149,23 +149,24 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
   }
 
   const sendInvite = useCallback(async () => {
-    const trimmed = email.trim()
-    if (!trimmed) { showToast('Enter an email address', 'error'); return }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) { showToast('Enter a valid email', 'error'); return }
+    const valid = emails.map(e => e.trim()).filter(e => e.length > 0)
+    if (valid.length === 0) { showToast('Enter at least one email address', 'error'); return }
+    const badEmail = valid.find(e => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))
+    if (badEmail) { showToast(`Invalid email: ${badEmail}`, 'error'); return }
 
     setBusy(true)
     try {
       const res  = await fetch('/api/partner-portal/invite', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ emails: [trimmed], invite_type: invType }),
+        body:    JSON.stringify({ emails: valid, invite_type: invType }),
       })
       const json = await res.json()
       if (!res.ok) { showToast(json.error ?? 'Failed to send invite', 'error'); return }
 
       if (json.sent > 0) {
-        showToast(`Invite sent to ${trimmed}!`)
-        setEmail('')
+        showToast(json.sent === 1 ? `Invite sent to ${valid[0]}!` : `${json.sent} invites sent!`)
+        setEmails([''])
         if (Array.isArray(json.invites)) {
           setAllInvites(prev => {
             const kept    = prev.filter(i => i.invite_type !== invType)
@@ -178,7 +179,7 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
       }
     } catch { showToast('Network error', 'error') }
     finally  { setBusy(false) }
-  }, [email, invType])
+  }, [emails, invType])
 
   async function loadBalance() {
     if (balLoaded) return
@@ -354,28 +355,58 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
             ))}
           </div>
 
-          <div style={{ display: 'flex', gap: 10 }}>
-            <input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') sendInvite() }}
-              placeholder={invType === 'msme' ? 'business@example.com' : 'friend@example.com'}
-              style={{ ...inputStyle, flex: 1, width: 'auto' }}
-            />
-            <button
-              onClick={sendInvite}
-              disabled={busy || !email.trim()}
-              style={{
-                padding: '10px 24px', borderRadius: 8, fontSize: 14, fontWeight: 600,
-                background: busy || !email.trim() ? '#e2e8f0' : (invType === 'msme' ? TEAL : PURPLE),
-                color: busy || !email.trim() ? '#94a3b8' : WHITE,
-                border: 'none', cursor: busy || !email.trim() ? 'not-allowed' : 'pointer', flexShrink: 0,
-                colorScheme: 'light',
-              }}
-            >
-              {busy ? 'Sending…' : 'Send Invite'}
-            </button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {emails.map((em, idx) => (
+              <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input
+                  type="email"
+                  value={em}
+                  onChange={e => {
+                    const next = [...emails]; next[idx] = e.target.value; setEmails(next)
+                  }}
+                  onKeyDown={e => { if (e.key === 'Enter') sendInvite() }}
+                  placeholder={invType === 'msme' ? 'business@example.com' : 'friend@example.com'}
+                  style={{ ...inputStyle, flex: 1, width: 'auto' }}
+                />
+                {emails.length > 1 && (
+                  <button
+                    onClick={() => setEmails(emails.filter((_, i) => i !== idx))}
+                    title="Remove"
+                    style={{ width: 34, height: 34, borderRadius: 8, border: `1px solid ${BORDER}`, background: WHITE, color: '#94a3b8', fontSize: 18, lineHeight: 1, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', colorScheme: 'light' }}
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            ))}
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <button
+                onClick={() => setEmails([...emails, ''])}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                  border: `1.5px dashed ${BORDER}`, background: WHITE,
+                  color: MUTED, cursor: 'pointer', colorScheme: 'light',
+                }}
+              >
+                <span style={{ fontSize: 18, lineHeight: 1, marginTop: -1 }}>+</span> Add another email
+              </button>
+              <div style={{ flex: 1 }} />
+              <button
+                onClick={sendInvite}
+                disabled={busy || !emails.some(e => e.trim())}
+                style={{
+                  padding: '10px 24px', borderRadius: 8, fontSize: 14, fontWeight: 600,
+                  background: busy || !emails.some(e => e.trim()) ? '#e2e8f0' : (invType === 'msme' ? TEAL : PURPLE),
+                  color: busy || !emails.some(e => e.trim()) ? '#94a3b8' : WHITE,
+                  border: 'none', cursor: busy || !emails.some(e => e.trim()) ? 'not-allowed' : 'pointer', flexShrink: 0,
+                  colorScheme: 'light',
+                }}
+              >
+                {busy ? 'Sending…' : emails.filter(e => e.trim()).length > 1 ? `Send ${emails.filter(e => e.trim()).length} Invites` : 'Send Invite'}
+              </button>
+            </div>
           </div>
           <p style={{ fontSize: 11, color: '#94a3b8', margin: '8px 0 0' }}>
             {invType === 'msme'
