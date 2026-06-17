@@ -1193,7 +1193,7 @@ export function MyTasksView({
                   const isCompliance = (task as any).custom_fields?._ca_compliance === true
                   const isRecurring  = task.is_recurring === true
                   const isProject    = !!task.project_id && !isRecurring && !isCompliance
-                  const isSpawnedUnassigned = canManage && !!(task as any).parent_recurring_id && !(task as any).assignee_id
+                  const isSpawnedUnassigned = canManage && !(task as any).assignee_id
                   const typeAccent   = isSpawnedUnassigned ? '#f59e0b' : isCompliance ? '#d97706' : isRecurring ? '#0d9488' : isProject ? '#7c3aed' : '#0891b2'
                   const typeBg = checked.has(task.id) ? 'var(--brand-light)'
                     : isSpawnedUnassigned ? 'rgba(245,158,11,0.10)'
