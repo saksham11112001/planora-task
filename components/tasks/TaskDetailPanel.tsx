@@ -1059,6 +1059,18 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                   </span>
                 </div>
               )}
+              {isRecurringTemplate && (
+                <div style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 10,
+                  padding: '8px 12px', borderRadius: 8,
+                  background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.18)',
+                }}>
+                  <span style={{ fontSize: 14, flexShrink: 0, marginTop: 1 }}>🔁</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                    This is a <strong style={{ color: '#4f46e5' }}>recurring task template</strong>. It cannot be completed directly — each occurrence is completed individually when it is generated on its due date.
+                  </span>
+                </div>
+              )}
               {/* Title — editable large text */}
               <textarea
                 ref={titleRef}
