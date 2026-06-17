@@ -500,10 +500,10 @@ export function MsmeView({ userRole, orgName }: Props) {
       {/* ── Header ── */}
       <div data-tour="msme-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#0f172a' }}>
+          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: ACCENT, letterSpacing: '-0.3px' }}>
             MSME Vendor Tracker
           </h1>
-          <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: '#475569', fontWeight: 500 }}>
             {totalEver}/{vendorLimit} vendor slots used
           </p>
         </div>
@@ -633,7 +633,7 @@ export function MsmeView({ userRole, orgName }: Props) {
             <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'hidden' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
-                  <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                  <tr style={{ background: `${ACCENT}08`, borderBottom: `1.5px solid ${ACCENT}25` }}>
                     <th style={{ padding: '10px 14px', width: 36 }}>
                       <input
                         type="checkbox"
@@ -647,7 +647,7 @@ export function MsmeView({ userRole, orgName }: Props) {
                       />
                     </th>
                     {['Vendor', 'Status', 'Category', 'Emails', 'Action'].map(h => (
-                      <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: '#64748b', whiteSpace: 'nowrap' }}>{h}</th>
+                      <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: ACCENT, whiteSpace: 'nowrap', fontSize: 12, letterSpacing: '0.03em' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -767,12 +767,12 @@ export function MsmeView({ userRole, orgName }: Props) {
 
         {/* ── Detail panel ── */}
         {selected && (
-          <div style={{ width: 300, flexShrink: 0, border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'hidden', background: '#ffffff' }}>
-            <div style={{ background: '#0f172a', padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ width: 300, flexShrink: 0, border: `1.5px solid ${ACCENT}40`, borderRadius: 10, overflow: 'hidden', background: '#ffffff', boxShadow: `0 0 0 3px ${ACCENT}10` }}>
+            <div style={{ background: `linear-gradient(135deg, ${ACCENT}, #14b8a6)`, padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ color: '#fff', fontSize: 14, fontWeight: 700 }}>
                 {selected.vendor_name}
               </span>
-              <button onClick={() => setSelectedId(null)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>×</button>
+              <button onClick={() => setSelectedId(null)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.8)', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>×</button>
             </div>
 
             <div style={{ padding: 16 }}>
@@ -1139,12 +1139,13 @@ function SummaryCard({ label, value, sub, accent, progress, warn, icon, onClick,
     <div
       onClick={onClick}
       style={{
-        background: warn ? '#fef2f2' : active ? `${accent}12` : '#ffffff',
+        background: warn ? '#fef2f2' : active ? `${accent}10` : '#ffffff',
         border: `1.5px solid ${warn ? '#fecaca' : active ? accent : '#e2e8f0'}`,
+        borderTop: `3px solid ${warn ? '#ef4444' : accent}`,
         borderRadius: 12, padding: '16px 16px 14px',
         cursor: onClick ? 'pointer' : 'default',
         transition: 'all 0.15s',
-        boxShadow: active ? `0 0 0 3px ${accent}20` : undefined,
+        boxShadow: active ? `0 2px 12px ${accent}25` : '0 1px 3px rgba(0,0,0,0.04)',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>

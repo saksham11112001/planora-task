@@ -2,6 +2,7 @@ import { getSessionUser }         from '@/lib/supabase/cached'
 import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import MsmeFeedbackButton         from './MsmeFeedbackButton'
 import MsmeLogoutButton           from './MsmeLogoutButton'
+import { ForceLightMode }         from '@/components/portal/ForceLightMode'
 
 const TEAL  = '#0d9488'
 const DARK  = '#0f172a'
@@ -24,6 +25,7 @@ export default async function MsmeLayout({ children }: { children: React.ReactNo
     <div style={{ minHeight: '100vh', background: '#f8fafc', display: 'flex', flexDirection: 'column', colorScheme: 'light' }}>
       <style>{`:root { color-scheme: light !important; } * { color-scheme: light !important; }`}</style>
       <script dangerouslySetInnerHTML={{ __html: `document.documentElement.classList.remove('dark');` }} />
+      <ForceLightMode />
 
       {/* Top nav — light */}
       <nav style={{
