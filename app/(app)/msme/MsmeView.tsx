@@ -1,5 +1,7 @@
 'use client'
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import MsmeWalkthrough from './MsmeWalkthrough'
+import MsmeTour        from './MsmeTour'
 import * as XLSX from 'xlsx'
 import { MSME_PACKS } from '@/lib/msme/packs'
 import { createClient } from '@/lib/supabase/client'
@@ -67,6 +69,7 @@ export function MsmeView({ userRole, orgName }: Props) {
   const [filterStatus,  setFilterStatus]  = useState<string>('all')
   const [search,        setSearch]        = useState('')
   const [toasts,        setToasts]        = useState<Toast[]>([])
+  const [showTour,      setShowTour]      = useState(false)
   const [copyingId,     setCopyingId]     = useState<string | null>(null)
   const [editingEmail,  setEditingEmail]  = useState<string | null>(null)
   const [editEmailVal,  setEditEmailVal]  = useState('')
@@ -91,6 +94,12 @@ export function MsmeView({ userRole, orgName }: Props) {
 
   const canManage  = ['owner', 'admin', 'manager'].includes(userRole)
   const canAdmin   = ['owner', 'admin'].includes(userRole)
+
+  // Vendors sorted oldest-first; the first `vendorLimit` are unlocked, the rest are locked.
+  const unlockedIds = useMemo(() => {
+    const sorted = [...vendors].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+    return new Set(sorted.slice(0, vendorLimit).map(v => v.id))
+  }, [vendors, vendorLimit])
 
   // ── Email schedule config ──────────────────────────────────────────────────
   // intervalDays[i] = days to wait after email i before sending email i+1
@@ -438,7 +447,7 @@ export function MsmeView({ userRole, orgName }: Props) {
       </div>
 
       {/* ── Header ── */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+      <div data-tour="msme-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#0f172a' }}>
             MSME Vendor Tracker
@@ -449,7 +458,7 @@ export function MsmeView({ userRole, orgName }: Props) {
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           {canAdmin && (
-            <button onClick={() => setShowUpgrade(true)} style={{ ...ghostBtn, borderColor: ACCENT, color: ACCENT }}>
+            <button data-tour="msme-upgrade-btn" onClick={() => setShowUpgrade(true)} style={{ ...ghostBtn, borderColor: ACCENT, color: ACCENT }}>
               📦 {packTier === 'free' ? 'Upgrade Pack' : 'Manage Pack'}
             </button>
           )}
@@ -460,12 +469,12 @@ export function MsmeView({ userRole, orgName }: Props) {
             Logout
           </button>
           {canAdmin && (
-            <button onClick={() => { setShowSettings(true); setDraftIntervals([...intervalDays]) }} style={ghostBtn}>
+            <button data-tour="msme-schedule-btn" onClick={() => { setShowSettings(true); setDraftIntervals([...intervalDays]) }} style={ghostBtn}>
               ⚙ Email schedule
             </button>
           )}
           {canManage && (
-            <button onClick={() => { setShowImport(true); setImportRows([]); setImportPreview([]); setImportResult(null); setImportError(null) }} style={ghostBtn}>
+            <button data-tour="msme-import-btn" onClick={() => { setShowImport(true); setImportRows([]); setImportPreview([]); setImportResult(null); setImportError(null) }} style={ghostBtn}>
               ↑ Import Vendors
             </button>
           )}
@@ -473,14 +482,14 @@ export function MsmeView({ userRole, orgName }: Props) {
             <button onClick={handleExport} style={ghostBtn}>↓ Export Excel</button>
           )}
           {canManage && (
-            <button onClick={() => setShowAdd(true)} style={primaryBtn}>+ Add vendor</button>
+            <button data-tour="msme-add-btn" onClick={() => setShowAdd(true)} style={primaryBtn}>+ Add vendor</button>
           )}
         </div>
       </div>
 
       {/* ── Getting started banner (shown when no vendors yet) ── */}
       {!loading && totalEver === 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 24 }}>
+        <div data-tour="msme-getting-started" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 24 }}>
           {[
             { step: '1', icon: '➕', title: 'Add your vendors', desc: 'Add vendors manually or bulk-import from Excel' },
             { step: '2', icon: '✉️', title: 'Shoot emails', desc: 'One click sends a branded MSME verification email' },
@@ -522,7 +531,7 @@ export function MsmeView({ userRole, orgName }: Props) {
       )}
 
       {/* ── Filters + search ── */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+      <div data-tour="msme-filters" style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
         {(['all', 'pending', 'emailed', 'submitted', 'not_msme'] as const).map(s => {
           const count  = s === 'all' ? total : counts[s as keyof typeof counts] ?? 0
           const active = filterStatus === s
@@ -593,10 +602,43 @@ export function MsmeView({ userRole, orgName }: Props) {
                 </thead>
                 <tbody>
                   {filtered.map((v, i) => {
+                    const locked    = !unlockedIds.has(v.id)
                     const sc        = STATUS_COLOR[v.status]
                     const sel       = selectedId === v.id
                     const exhausted = v.email_count >= maxEmails && v.status === 'emailed'
                     const isEligible = v.status !== 'submitted' && v.status !== 'not_msme' && v.email_count < maxEmails
+
+                    // Locked row — blurred content with upgrade CTA overlay
+                    if (locked) {
+                      return (
+                        <tr key={v.id} style={{ borderBottom: i < filtered.length - 1 ? '1px solid #e2e8f0' : undefined, background: '#f8fafc' }}>
+                          <td colSpan={6} style={{ padding: 0, position: 'relative' }}>
+                            {/* Blurred vendor info */}
+                            <div style={{ display: 'flex', alignItems: 'center', padding: '12px 14px', gap: 14, filter: 'blur(3px)', userSelect: 'none', pointerEvents: 'none', opacity: 0.5 }}>
+                              <div style={{ width: 20, height: 20, borderRadius: 4, background: '#e2e8f0' }} />
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 13 }}>{v.vendor_name}</div>
+                                <div style={{ color: '#64748b', fontSize: 11 }}>{v.vendor_email}</div>
+                              </div>
+                              <span style={{ background: '#f1f5f9', color: '#64748b', padding: '3px 10px', borderRadius: 12, fontSize: 11, fontWeight: 700 }}>
+                                {STATUS_LABEL[v.status]}
+                              </span>
+                            </div>
+                            {/* Lock overlay */}
+                            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                              <span style={{ fontSize: 13, color: '#64748b', fontWeight: 600 }}>🔒 Locked</span>
+                              <button
+                                onClick={e => { e.stopPropagation(); setShowUpgrade(true) }}
+                                style={{ background: ACCENT, color: '#fff', border: 'none', borderRadius: 6, padding: '5px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+                              >
+                                Upgrade to unlock
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    }
+
                     return (
                       <tr
                         key={v.id}
@@ -948,6 +990,10 @@ export function MsmeView({ userRole, orgName }: Props) {
         </Modal>
       )}
 
+      {/* ── Walkthrough + spotlight tour ── */}
+      <MsmeWalkthrough onUpgrade={() => setShowUpgrade(true)} onStartTour={() => setShowTour(true)} />
+      {showTour && <MsmeTour onDone={() => setShowTour(false)} />}
+
       {/* ── Import modal ── */}
       {showImport && (
         <Modal title="Import vendors from Excel / CSV" onClose={() => setShowImport(false)} wide>
@@ -995,7 +1041,7 @@ export function MsmeView({ userRole, orgName }: Props) {
                   </div>
                   {totalEver + importRows.length > vendorLimit && (
                     <div style={{ marginTop: 12, background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#92400e' }}>
-                      <strong>Heads up:</strong> This import will exceed your vendor limit ({vendorLimit}). Only the first {Math.max(0, vendorLimit - totalEver)} vendors will be added. Upgrade your pack to add more.
+                      <strong>Heads up:</strong> {Math.max(0, vendorLimit - totalEver)} vendors will be active. The remaining {Math.max(0, totalEver + importRows.length - vendorLimit)} will be imported but blurred and locked — upgrade your pack to unlock them.
                     </div>
                   )}
                   <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>

@@ -1278,7 +1278,7 @@ const STEPS: Step[] = [
 // Constants & helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-const STORAGE_PREFIX = 'planora_wt_v3_'
+const STORAGE_PREFIX = 'upfloat_wt_v3_'
 const MAX_AGE_MS     = 14 * 24 * 60 * 60 * 1000   // show to accounts < 14 days old
 
 const CONFETTI_COLORS = ['#0d9488','#7c3aed','#0891b2','#d97706','#16a34a','#ec4899','#f43f5e']

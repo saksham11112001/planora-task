@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name:             'upFloat — Project Management',
     short_name:       'upFloat',
-    description:      'Project management for modern teams',
+    description:      'Practice management for CA & accounting firms',
     start_url:        '/dashboard',
     display:          'standalone',
     background_color: '#0f172a',

@@ -4,7 +4,7 @@ import { cookies }            from 'next/headers'
 import { NextResponse }       from 'next/server'
 import type { NextRequest }   from 'next/server'
 
-const VALID_ROLES = new Set(['member', 'manager', 'admin', 'owner'])
+const VALID_ROLES = new Set(['member', 'manager', 'admin', 'owner', 'viewer'])
 
 function safeRedirect(next: string | null, fallback = '/dashboard'): string {
   if (!next) return fallback

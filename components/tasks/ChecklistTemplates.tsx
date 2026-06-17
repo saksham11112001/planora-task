@@ -19,7 +19,7 @@ export default function ChecklistTemplates({ orgId, subtasks, onApply }: Checkli
   const [saveName, setSaveName] = useState('')
   const [showSaveInput, setShowSaveInput] = useState(false)
 
-  const storageKey = `planora_checklist_tpl_${orgId}`
+  const storageKey = `upfloat_checklist_tpl_${orgId}`
 
   useEffect(() => {
     try {

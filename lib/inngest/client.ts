@@ -1,7 +1,7 @@
 import { Inngest, EventSchemas } from 'inngest'
 
 export const inngest = new Inngest({
-  id:          'floatup',
+  id:          'upfloat',
   name:        'upFloat',
   eventKey:    process.env.INNGEST_EVENT_KEY,
   signingKey:  process.env.INNGEST_SIGNING_KEY,

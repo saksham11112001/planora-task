@@ -337,7 +337,7 @@ export const dailyReminders = inngest.createFunction(
         if (approverEmailPref === false) continue
 
         const approverOrgId = (tasks[0] as any)?.org_id as string | undefined
-        if (!approverOrgId) return  // no org context, skip digest
+        if (!approverOrgId) continue  // no org context, skip digest
         const approverOrgMode = await getOrgNotifMode(approverOrgId)
 
         if (approverOrgMode === 'digest' && approverOrgId) {

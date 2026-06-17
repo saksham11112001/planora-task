@@ -19,8 +19,8 @@ interface ClientOnboardingChecklistProps {
 }
 
 export default function ClientOnboardingChecklist({ clientId, clientName, canManage }: ClientOnboardingChecklistProps) {
-  const storageKey  = `planora_client_ob_${clientId}`
-  const dismissKey  = `planora_client_ob_${clientId}_done`
+  const storageKey  = `upfloat_client_ob_${clientId}`
+  const dismissKey  = `upfloat_client_ob_${clientId}_done`
 
   const [dismissed, setDismissed]   = useState(true) // start hidden until hydration
   const [completed, setCompleted]   = useState<string[]>([])

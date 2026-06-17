@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
 
   const orgId      = mb.org_id
   const orgName    = (mb.organisations as any)?.name ?? 'Organisation'
-  const userEmail  = user.email ?? 'noreply@planora.app'
+  const userEmail  = user.email ?? 'noreply@upfloat.co'
   const { price_paise: pricePaise, label: packLabel, vendor_limit: vendorLimit } = pack
 
   // ── Cashfree ──────────────────────────────────────────────────────────────
@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
     payment_instructions: {
       message:  'Payment gateway is not yet configured. Please contact support to purchase a pack.',
       pack:     pack,
-      bank_transfer: 'Contact support@planora.app for manual payment details.',
+      bank_transfer: 'Contact support@upfloat.co for manual payment details.',
     },
   }, { status: 503 })
 }

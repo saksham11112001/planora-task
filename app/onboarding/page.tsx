@@ -82,8 +82,8 @@ export default function OnboardingPage() {
         ''
 
       // Pre-fill referral code from sessionStorage (set by login page when ?ref= is in URL)
-      const storedRef = sessionStorage.getItem('planora_ref_code') ?? ''
-      if (storedRef) sessionStorage.removeItem('planora_ref_code')
+      const storedRef = sessionStorage.getItem('upfloat_ref_code') ?? ''
+      if (storedRef) sessionStorage.removeItem('upfloat_ref_code')
 
       setForm(f => ({
         ...f,
@@ -199,8 +199,8 @@ export default function OnboardingPage() {
           body: JSON.stringify({ org_id: data.org_id }),
         })
       }
-      const postOnboard = sessionStorage.getItem('planora_post_onboard') ?? ''
-      if (postOnboard) sessionStorage.removeItem('planora_post_onboard')
+      const postOnboard = sessionStorage.getItem('upfloat_post_onboard') ?? ''
+      if (postOnboard) sessionStorage.removeItem('upfloat_post_onboard')
       const urlNext = new URLSearchParams(window.location.search).get('next') ?? ''
       const dest = postOnboard || urlNext || '/dashboard'
       router.push(dest); router.refresh()
