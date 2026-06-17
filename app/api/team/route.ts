@@ -8,7 +8,7 @@ import { dbError } from '@/lib/api-error'
 import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
 import { isGhostAdmin }      from '@/lib/supabase/ghostAdmin'
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://floatup.app'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://upfloat.co'
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient()

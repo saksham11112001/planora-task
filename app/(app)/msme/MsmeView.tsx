@@ -843,7 +843,7 @@ export function MsmeView({ userRole, orgName }: Props) {
                     <div style={{ fontSize: 11, color: '#64748b' }}>one-time</div>
                     {!isCurrent && !isDowngrade && pack.tier === 'pack_500' && (
                       <a
-                        href="mailto:info@sng-adwisers.com?subject=MSME%20Enterprise%20Pack%20(500%20vendors)"
+                        href="mailto:info@upfloat.co?subject=MSME%20Enterprise%20Pack%20(500%20vendors)"
                         style={{ ...primaryBtn, marginTop: 8, padding: '6px 16px', fontSize: 12, textDecoration: 'none', display: 'inline-block' }}
                       >
                         Contact us →

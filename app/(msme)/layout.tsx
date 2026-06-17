@@ -41,7 +41,7 @@ export default async function MsmeLayout({ children }: { children: React.ReactNo
 
         {/* Right */}
         <a
-          href="https://sng-adwisers.com"
+          href="https://upfloat.co"
           target="_blank"
           rel="noopener noreferrer"
           style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f1f5f9', color: MUTED, border: `1px solid ${BORDER}`, borderRadius: 8, padding: '6px 14px', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}

@@ -43,7 +43,7 @@ export default function TermsPage() {
           },
           {
             n:'3', title:'Account Registration',
-            body:'You must provide accurate information when creating an account. You are responsible for maintaining the confidentiality of your credentials and for all activity that occurs under your account. You must notify us immediately of any unauthorised access at <strong>support@sngadvisers.com</strong>.',
+            body:'You must provide accurate information when creating an account. You are responsible for maintaining the confidentiality of your credentials and for all activity that occurs under your account. You must notify us immediately of any unauthorised access at <strong>support@upfloat.co</strong>.',
           },
           {
             n:'4', title:'Acceptable Use',
@@ -66,7 +66,7 @@ Violation of this section may result in immediate account suspension without ref
           },
           {
             n:'7', title:'Service Availability & SLA',
-            body:`We target 99.5% monthly uptime. Planned maintenance is announced at least 48 hours in advance. The Service is provided on an "as-is" basis, and we do not guarantee uninterrupted access.<br/><br/>Supabase (our database provider) has their own uptime commitments which affect our availability. Our status page at <strong>status.sngadvisers.com</strong> reflects current service health.`,
+            body:`We target 99.5% monthly uptime. Planned maintenance is announced at least 48 hours in advance. The Service is provided on an "as-is" basis, and we do not guarantee uninterrupted access.<br/><br/>Supabase (our database provider) has their own uptime commitments which affect our availability. Our status page at <strong>status.upfloat.co</strong> reflects current service health.`,
           },
           {
             n:'8', title:'Intellectual Property',
@@ -90,7 +90,7 @@ Violation of this section may result in immediate account suspension without ref
           },
           {
             n:'13', title:'Contact',
-            body:'Legal enquiries: <strong>legal@sngadvisers.com</strong>. Support: <strong>support@sngadvisers.com</strong>. Response time: within 2 business days.',
+            body:'Legal enquiries: <strong>legal@upfloat.co</strong>. Support: <strong>support@upfloat.co</strong>. Response time: within 2 business days.',
           },
         ] as {n:string;title:string;body:string}[]).map(s => (
           <section key={s.n} style={{ marginBottom:36 }}>
@@ -105,7 +105,7 @@ Violation of this section may result in immediate account suspension without ref
 
         <div style={{ background:'#f0fdfa', border:'1px solid #99f6e4', borderRadius:12, padding:'24px 28px', marginTop:8, display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:12 }}>
           <p style={{ margin:0, fontSize:14, color:'#0f766e', lineHeight:1.7 }}>
-            <strong>Questions about these terms?</strong> Email <strong>legal@sngadvisers.com</strong>
+            <strong>Questions about these terms?</strong> Email <strong>legal@upfloat.co</strong>
           </p>
           <Link href="/privacy" style={{ fontSize:13, color:'#0d9488', fontWeight:600, textDecoration:'none' }}>
             Read our Privacy Policy →

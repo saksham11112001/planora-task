@@ -3,7 +3,7 @@ import { createAdminClient }    from '@/lib/supabase/admin'
 import { sendMsmeVendorEmail }  from '@/lib/email/send'
 import { DEFAULT_EMAIL_SCHEDULE } from '@/app/api/msme/settings/route'
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://floatup.app'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://upfloat.co'
 
 // Daily cron — 10 AM IST — sends automated follow-up emails to vendors
 // who still haven't submitted, based on each org's configured schedule.

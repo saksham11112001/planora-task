@@ -161,7 +161,7 @@ export default function MsmeLandingPage() {
         <div style={{ display: 'flex', gap: 20, fontSize: 13 }}>
           <Link href="/privacy" style={{ color: MUTED, textDecoration: 'none' }}>Privacy</Link>
           <Link href="/terms"   style={{ color: MUTED, textDecoration: 'none' }}>Terms</Link>
-          <a href="mailto:info@upfloat.io" style={{ color: MUTED, textDecoration: 'none' }}>Contact</a>
+          <a href="mailto:info@upfloat.co" style={{ color: MUTED, textDecoration: 'none' }}>Contact</a>
         </div>
       </footer>
 

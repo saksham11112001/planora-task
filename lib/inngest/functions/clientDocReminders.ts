@@ -7,7 +7,7 @@ import { fmtDate }                                from '@/lib/utils/format'
 import { getOrgNotifMode, queueNotification }     from '@/lib/email/queue'
 import type { BatchTaskEntry }                    from '@/lib/email/templates/clientDocReminder'
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://upfloat.io'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://upfloat.co'
 
 /**
  * Fires daily at 7:00 AM IST (1:30 AM UTC).

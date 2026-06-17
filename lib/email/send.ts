@@ -16,7 +16,7 @@ import { onboardingNudgeHtml, onboardingNudgeSubject } from './templates/onboard
 import { upgradePushHtml, upgradePushSubject } from './templates/upgradePushEmail'
 import { msmeVendorEmailHtml, msmeVendorEmailSubject } from './templates/msmeVendorEmail'
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://floatup.app'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://upfloat.co'
 
 function taskUrl(taskId: string, projectId?: string | null) {
   return projectId ? `${APP_URL}/projects/${projectId}` : `${APP_URL}/inbox`

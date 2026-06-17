@@ -725,7 +725,7 @@ export default async function LandingPage() {
                     display: 'flex', alignItems: 'center', padding: '0 10px', gap: 6,
                   }}>
                     <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'rgba(255,255,255,0.15)' }}/>
-                    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>app.floatup.app/tasks</span>
+                    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>upfloat.co/tasks</span>
                   </div>
                 </div>
                 {/* App bar */}
@@ -1332,7 +1332,7 @@ export default async function LandingPage() {
             <div className="addon-right" style={{ textAlign: 'right', flexShrink: 0 }}>
               <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.32)', marginBottom: 4 }}>Custom pricing</div>
               <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)', marginBottom: 14 }}>based on team size &amp; infra</div>
-              <a href="mailto:hello@floatup.app?subject=Enterprise%20Inquiry" className="btn-cta btn-cta-teal" style={{
+              <a href="mailto:hello@upfloat.co?subject=Enterprise%20Inquiry" className="btn-cta btn-cta-teal" style={{
                 display: 'inline-block', padding: '10px 22px', borderRadius: 10,
                 background: 'linear-gradient(135deg, #0d9488, #0891b2)', color: '#fff',
                 fontSize: 13, fontWeight: 800, textDecoration: 'none',
@@ -1498,7 +1498,7 @@ export default async function LandingPage() {
               <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.38)', lineHeight: 1.78, margin: '0 0 16px' }}>
                 For banks, regulated advisories, and data-sensitive enterprises that require all data to remain on their own infrastructure — with zero third-party cloud dependency.
               </p>
-              <a href="mailto:hello@floatup.app?subject=Private+Cloud+Inquiry" style={{ fontSize: 13, fontWeight: 800, color: '#c4b5fd', textDecoration: 'none' }}>
+              <a href="mailto:hello@upfloat.co?subject=Private+Cloud+Inquiry" style={{ fontSize: 13, fontWeight: 800, color: '#c4b5fd', textDecoration: 'none' }}>
                 Enquire about private deployment →
               </a>
             </div>
@@ -1641,7 +1641,7 @@ export default async function LandingPage() {
               </div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 200 }}>
-              <a href="https://msme.sng-adwisers.com" target="_blank" rel="noopener noreferrer"
+              <a href="https://msme.upfloat.co" target="_blank" rel="noopener noreferrer"
                 style={{ display: 'block', textAlign: 'center', padding: '15px 28px',
                   background: '#0d9488', color: '#fff', borderRadius: 12, fontSize: 15,
                   fontWeight: 800, textDecoration: 'none', letterSpacing: '-0.2px',
@@ -1649,7 +1649,7 @@ export default async function LandingPage() {
                 Open MSME Tracker →
               </a>
               <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)', textAlign: 'center', margin: 0 }}>
-                msme.sng-adwisers.com
+                msme.upfloat.co
               </p>
             </div>
           </div>
@@ -1695,7 +1695,7 @@ export default async function LandingPage() {
               {[
                 { l: 'Privacy policy',          h: '/privacy' },
                 { l: 'Terms of service',         h: '/terms' },
-                { l: 'Data processing (DPA)',    h: 'mailto:hello@floatup.app?subject=DPA+Request' },
+                { l: 'Data processing (DPA)',    h: 'mailto:hello@upfloat.co?subject=DPA+Request' },
                 { l: 'Security',                 h: '#security' },
                 { l: 'Cookie policy',            h: '/privacy#cookies' },
               ].map(({ l, h }) => (
@@ -1707,7 +1707,7 @@ export default async function LandingPage() {
           <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
             <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.16)' }}>© 2026 upFloat Technology. All rights reserved.</div>
             <div style={{ display: 'flex', gap: 24 }}>
-              {[['Privacy','/privacy'],['Terms','/terms'],['Security','#security'],['DPA','mailto:hello@floatup.app?subject=DPA+Request']].map(([l,h]) => (
+              {[['Privacy','/privacy'],['Terms','/terms'],['Security','#security'],['DPA','mailto:hello@upfloat.co?subject=DPA+Request']].map(([l,h]) => (
                 <a key={l} href={h} className="footer-link" style={{ fontSize: 12, color: 'rgba(255,255,255,0.2)', textDecoration: 'none' }}>{l}</a>
               ))}
             </div>

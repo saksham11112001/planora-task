@@ -6,7 +6,7 @@ import { sendMsmeVendorEmail }      from '@/lib/email/send'
 import { DEFAULT_EMAIL_SCHEDULE }   from '@/app/api/msme/settings/route'
 import crypto                       from 'crypto'
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://floatup.app'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://upfloat.co'
 
 export async function POST(
   req: NextRequest,

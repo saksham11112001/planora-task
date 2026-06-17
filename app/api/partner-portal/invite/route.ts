@@ -5,7 +5,7 @@ import { createClient }             from '@/lib/supabase/server'
 import { createAdminClient }        from '@/lib/supabase/admin'
 import { resend, FROM }             from '@/lib/email/resend'
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://sng-adwisers.com'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://upfloat.co'
 
 function msmeInviteHtml(partnerName: string, msmeUrl: string): string {
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"></head>

@@ -90,7 +90,7 @@ export async function middleware(request: NextRequest) {
         setAll(toSet: { name: string; value: string; options?: Record<string, unknown> }[]) {
           toSet.forEach(({ name, value }) => request.cookies.set(name, value))
           response = NextResponse.next({ request })
-          const sharedDomain = process.env.NODE_ENV === 'production' ? { domain: '.sng-adwisers.com' } : {}
+          const sharedDomain = process.env.NODE_ENV === 'production' ? { domain: '.upfloat.co' } : {}
           toSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, { ...(options as any), ...sharedDomain })
           )
@@ -102,7 +102,7 @@ export async function middleware(request: NextRequest) {
   // getUser() validates the JWT AND triggers a token refresh if needed
   const { data: { user }, error } = await supabase.auth.getUser()
 
-  // Detect MSME subdomain (msme.sng-adwisers.com or msme.localhost for dev)
+  // Detect MSME subdomain (msme.upfloat.co or msme.localhost for dev)
   const host         = request.headers.get('host') ?? ''
   const isMsmeDomain = host.startsWith('msme.')
   const defaultRoute = isMsmeDomain ? '/msme' : '/dashboard'

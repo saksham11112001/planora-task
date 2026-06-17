@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     }
 
     const admin   = createAdminClient()
-    const siteUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://sng-adwisers.com'
+    const siteUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://upfloat.co'
 
     // Magic links use PKCE — code lands at /auth/callback (server-side exchange),
     // NOT /auth/confirm (which only handles implicit OAuth hash tokens).

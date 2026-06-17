@@ -95,7 +95,7 @@ export async function POST(req: Request) {
             <p style="margin:0;font-size:14px;color:#1e293b;white-space:pre-wrap">${message.trim() || '(no message — attachments only)'}</p>
           </div>
           ${attachmentUrls.length > 0 ? `<p style="font-size:13px;color:#64748b">${attachmentUrls.length} attachment(s): ${attachmentUrls.map((u,i)=>`<a href="${u}">File ${i+1}</a>`).join(' · ')}</p>` : ''}
-          <a href="https://sng-adwisers.com/complaints" style="display:inline-block;margin-top:8px;padding:12px 24px;background:#0d9488;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:14px">View in Complaints Dashboard →</a>
+          <a href="https://upfloat.co/complaints" style="display:inline-block;margin-top:8px;padding:12px 24px;background:#0d9488;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:14px">View in Complaints Dashboard →</a>
         </div>
       `,
     }).catch(e => console.warn('[report-issue] admin email failed:', e))

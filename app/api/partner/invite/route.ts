@@ -5,7 +5,7 @@ import { getApiOrgMembership }      from '@/lib/supabase/apiActiveOrg'
 import { resend, FROM }             from '@/lib/email/resend'
 import { msmeInviteEmailHtml, msmeInviteEmailSubject } from '@/lib/email/templates/msmeInviteEmail'
 
-const MSME_URL = process.env.NEXT_PUBLIC_MSME_URL ?? 'https://msme.sng-adwisers.com'
+const MSME_URL = process.env.NEXT_PUBLIC_MSME_URL ?? 'https://msme.upfloat.co'
 
 export async function GET(req: NextRequest) {
   const supabase = await createClient()

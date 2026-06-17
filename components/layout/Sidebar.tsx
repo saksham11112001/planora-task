@@ -444,7 +444,7 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
         <GL>Tools</GL>
         {canManage && (
           <a
-            href="https://msme.sng-adwisers.com"
+            href="https://msme.upfloat.co"
             target="_blank"
             rel="noopener noreferrer"
             style={{

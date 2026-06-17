@@ -14,9 +14,9 @@ export function createClient() {
         detectSessionInUrl: true,
         persistSession: true,
       },
-      // Share auth cookies across subdomains (msme.sng-adwisers.com etc.)
+      // Share auth cookies across subdomains (msme.upfloat.co etc.)
       cookieOptions: {
-        domain: process.env.NODE_ENV === 'production' ? '.sng-adwisers.com' : undefined,
+        domain: process.env.NODE_ENV === 'production' ? '.upfloat.co' : undefined,
       },
     }
   )

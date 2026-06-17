@@ -4,7 +4,7 @@ import { markQueueSent }        from '@/lib/email/queue'
 import { digestEmailHtml }      from '@/lib/email/templates/digestEmail'
 import { resend, FROM }         from '@/lib/email/resend'
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://upfloat.io'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://upfloat.co'
 
 async function runDigest(slot: 'morning' | 'evening') {
   const admin = createAdminClient()

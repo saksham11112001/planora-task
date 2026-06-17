@@ -900,7 +900,7 @@ function IllustrationPartner() {
       <text x="255" y="35" textAnchor="middle" fontSize="8.5" fontWeight="700" fill="#b45309">🥇 GOLD TIER</text>
       {/* Referral link */}
       <rect x="28" y="58" width="182" height="22" rx="6" fill="white" stroke="#e2e8f0" strokeWidth="1"/>
-      <text x="38" y="73" fontSize="8" fill="#94a3b8">floatup.app/signup?ref=SNGCA08</text>
+      <text x="38" y="73" fontSize="8" fill="#94a3b8">upfloat.co/signup?ref=SNGCA08</text>
       <rect x="216" y="58" width="76" height="22" rx="6" fill="#0d9488"/>
       <text x="254" y="73" textAnchor="middle" fontSize="8.5" fontWeight="700" fill="white">Copy Link</text>
       {/* Stat boxes */}

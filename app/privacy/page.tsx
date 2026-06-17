@@ -35,7 +35,7 @@ export default function PrivacyPage() {
         {([
           {
             n:'1', title:'Who We Are',
-            body:'upFloat is a project and task management platform operated by SNG Advisers. Our data controller contact is: <strong>legal@sngadvisers.com</strong>.',
+            body:'upFloat is a project and task management platform operated by SNG Advisers. Our data controller contact is: <strong>legal@upfloat.co</strong>.',
           },
           {
             n:'2', title:'What Data We Collect',
@@ -59,7 +59,7 @@ export default function PrivacyPage() {
           },
           {
             n:'7', title:'Your Rights',
-            body:`You have the right to access, export, correct, or delete your data at any time. Export is available in-app at Reports → Tasks CSV or Time CSV. To exercise any other right, email <strong>privacy@sngadvisers.com</strong>. We respond within 30 days.`,
+            body:`You have the right to access, export, correct, or delete your data at any time. Export is available in-app at Reports → Tasks CSV or Time CSV. To exercise any other right, email <strong>privacy@upfloat.co</strong>. We respond within 30 days.`,
           },
           {
             n:'8', title:'Cookies',
@@ -71,7 +71,7 @@ export default function PrivacyPage() {
           },
           {
             n:'10', title:'Contact',
-            body:'Privacy questions: <strong>privacy@sngadvisers.com</strong>. Response time: within 2 business days.',
+            body:'Privacy questions: <strong>privacy@upfloat.co</strong>. Response time: within 2 business days.',
           },
         ] as {n:string;title:string;body:string}[]).map(s => (
           <section key={s.n} style={{ marginBottom:36 }}>
@@ -86,7 +86,7 @@ export default function PrivacyPage() {
 
         <div style={{ background:'#f0fdfa', border:'1px solid #99f6e4', borderRadius:12, padding:'24px 28px', marginTop:8 }}>
           <p style={{ margin:0, fontSize:14, color:'#0f766e', lineHeight:1.7 }}>
-            <strong>Questions?</strong> Email us at <strong>privacy@sngadvisers.com</strong> — you will get a response from a real person.
+            <strong>Questions?</strong> Email us at <strong>privacy@upfloat.co</strong> — you will get a response from a real person.
           </p>
         </div>
       </main>

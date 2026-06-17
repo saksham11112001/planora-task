@@ -33,14 +33,14 @@ export async function POST(request: NextRequest) {
   const isProd = process.env.NODE_ENV === 'production'
 
   // Set the active-org cookie.
-  // In production: domain-scoped so it works across all subdomains of sng-adwisers.com.
+  // In production: domain-scoped so it works across all subdomains of upfloat.co.
   response.cookies.set(ACTIVE_ORG_COOKIE, org_id, {
     path:     '/',
     maxAge:   60 * 60 * 24 * 365,
     sameSite: 'lax',
     secure:   isProd,
     httpOnly: false,
-    ...(isProd ? { domain: '.sng-adwisers.com' } : {}),
+    ...(isProd ? { domain: '.upfloat.co' } : {}),
   })
 
   // In production, also expire any stale host-only cookie left from before the domain migration.

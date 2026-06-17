@@ -367,7 +367,7 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
               ['Invite clients or partners', 'Send an email invite above or share your referral link on WhatsApp.'],
               ['They sign up via your link', 'Anyone who uses your link or code gets tagged to your account automatically.'],
               ['They upgrade — you earn', `₹${MSME_COMMISSION}/MSME sign-up · ₹${PARTNER_COMMISSION}/Partner sign-up. Tiers unlock at 1, 5, and 10 sign-ups.`],
-              ['Monthly payouts on request', 'Commissions are reviewed monthly. Email info@sng-adwisers.com to request a payout.'],
+              ['Monthly payouts on request', 'Commissions are reviewed monthly. Email info@upfloat.co to request a payout.'],
             ].map(([title, desc], i) => (
               <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                 <div style={{ width: 24, height: 24, borderRadius: '50%', background: TEAL, color: WHITE, fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>{i + 1}</div>
@@ -382,7 +382,7 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
 
         <p style={{ textAlign: 'center', fontSize: 12, color: '#94a3b8', marginTop: 28 }}>
           Questions? Email{' '}
-          <a href="mailto:info@sng-adwisers.com" style={{ color: TEAL, textDecoration: 'none' }}>info@sng-adwisers.com</a>
+          <a href="mailto:info@upfloat.co" style={{ color: TEAL, textDecoration: 'none' }}>info@upfloat.co</a>
         </p>
       </div>
 

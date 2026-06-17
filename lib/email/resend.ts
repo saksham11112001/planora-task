@@ -1,7 +1,7 @@
 import { Resend } from 'resend'
 
 const _resend = new Resend(process.env.RESEND_API_KEY!)
-export const FROM = process.env.FROM_EMAIL ?? 'upFloat <noreply@floatup.app>'
+export const FROM = process.env.FROM_EMAIL ?? 'upFloat <noreply@upfloat.co>'
 
 // Proxy that short-circuits all sends when DISABLE_EMAILS=true
 export const resend = {

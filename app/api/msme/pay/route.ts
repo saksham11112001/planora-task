@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     // link_id: "msme_" + orgId-no-hyphens-first32 + "_" + pack_tier  → max ~50 chars
     const linkId     = `msme_${orgId.replace(/-/g, '').slice(0, 32)}_${pack_tier}`
     const admin      = createAdminClient()
-    const appUrl     = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.sng-adwisers.com'
+    const appUrl     = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.upfloat.co'
     const returnUrl  = `${appUrl}/msme?pack_upgraded=1`
 
     // Record a pending payment so the webhook can look up org_id by link_id

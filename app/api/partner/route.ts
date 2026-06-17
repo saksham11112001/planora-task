@@ -93,8 +93,8 @@ export async function GET(req: NextRequest) {
     .select('id', { count: 'exact', head: true })
     .eq('referrer_org_id', orgId)
 
-  const APP_URL  = process.env.NEXT_PUBLIC_APP_URL  ?? 'https://sng-adwisers.com'
-  const MSME_URL = process.env.NEXT_PUBLIC_MSME_URL ?? 'https://msme.sng-adwisers.com'
+  const APP_URL  = process.env.NEXT_PUBLIC_APP_URL  ?? 'https://upfloat.co'
+  const MSME_URL = process.env.NEXT_PUBLIC_MSME_URL ?? 'https://msme.upfloat.co'
 
   return NextResponse.json({
     referral_code:  refCode,

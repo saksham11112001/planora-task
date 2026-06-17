@@ -10,7 +10,7 @@ import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
 export const maxDuration = 60 // seconds — Vercel Hobby plan cap
 export const dynamic = 'force-dynamic'
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://floatup.app'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://upfloat.co'
 
 const COMPLIANCE_MAP = new Map(
   COMPLIANCE_TASKS.map(t => [t.title.toLowerCase().trim(), t])
