@@ -318,7 +318,7 @@ export function HelpButton() {
   if (!mounted) return null
 
   return (
-    <div ref={drawerRef} style={{ position: 'fixed', bottom: 20, left: 20, zIndex: 998, fontFamily: 'inherit' }}>
+    <div ref={drawerRef} style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 998, fontFamily: 'inherit' }}>
       {/* Floating trigger button */}
       <button
         onClick={() => setOpen(o => !o)}
@@ -343,7 +343,7 @@ export function HelpButton() {
       {open && (
         <div
           style={{
-            position: 'absolute', bottom: 54, left: 0,
+            position: 'absolute', bottom: 54, right: 0,
             width: 380, maxHeight: '80vh',
             background: 'var(--surface)',
             border: '1.5px solid var(--border)',
