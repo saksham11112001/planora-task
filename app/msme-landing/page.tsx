@@ -18,7 +18,7 @@ export default function MsmeLandingPage() {
     <div style={{ background: '#ffffff', color: DARK, minHeight: '100vh', fontFamily: "'Inter', system-ui, sans-serif", colorScheme: 'light' }}>
 
       {/* Nav */}
-      <nav style={{
+      <nav className="msme-nav" style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '16px 40px', borderBottom: `1px solid ${BORDER}`,
         position: 'sticky', top: 0, background: '#ffffff', zIndex: 50,
@@ -29,8 +29,8 @@ export default function MsmeLandingPage() {
           <span style={{ fontSize: 11, fontWeight: 600, color: TEAL, background: 'rgba(13,148,136,0.1)', border: '1px solid rgba(13,148,136,0.25)', borderRadius: 20, padding: '2px 8px' }}>by upFloat</span>
         </div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          <Link href="/login?redirect=/msme" style={{ color: MUTED, fontSize: 14, textDecoration: 'none', fontWeight: 500 }}>Login</Link>
-          <Link href="/login?redirect=/msme&mode=signup" style={{ background: TEAL, color: '#fff', borderRadius: 8, padding: '8px 20px', fontSize: 14, fontWeight: 600, textDecoration: 'none' }}>Get Started Free</Link>
+          <Link href="/login?redirect=/msme" className="msme-nav-login" style={{ color: MUTED, fontSize: 14, textDecoration: 'none', fontWeight: 500 }}>Login</Link>
+          <Link href="/login?redirect=/msme&mode=signup" className="msme-nav-cta" style={{ background: TEAL, color: '#fff', borderRadius: 8, padding: '8px 20px', fontSize: 14, fontWeight: 600, textDecoration: 'none' }}>Get Started Free</Link>
         </div>
       </nav>
 
@@ -53,6 +53,19 @@ export default function MsmeLandingPage() {
           .msme-stat-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(13,148,136,0.12) !important; transition: transform 0.2s, box-shadow 0.2s; }
           .msme-step-card:hover { border-color: rgba(13,148,136,0.4) !important; box-shadow: 0 4px 16px rgba(13,148,136,0.10) !important; transition: all 0.2s; }
           .msme-problem-card:hover { transform: translateY(-2px); transition: transform 0.2s; }
+          @media (max-width: 640px) {
+            .msme-nav { padding: 12px 20px !important; }
+            .msme-nav-cta { padding: 6px 14px !important; font-size: 13px !important; }
+            .msme-stats-grid { grid-template-columns: 1fr 1fr !important; }
+            .msme-footer { padding: 20px 20px !important; flex-direction: column !important; text-align: center !important; align-items: center !important; gap: 16px !important; }
+            .msme-explore { flex-direction: column !important; }
+          }
+          @media (max-width: 480px) {
+            .msme-nav { padding: 10px 16px !important; }
+            .msme-nav-login { display: none !important; }
+            .msme-stats-grid { grid-template-columns: 1fr !important; }
+            .msme-footer { padding: 16px 16px !important; }
+          }
         `}</style>
         <div aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
           {/* Animated gradient orbs */}
@@ -144,7 +157,7 @@ export default function MsmeLandingPage() {
 
       {/* Stats bar */}
       <section style={{ borderTop: `1px solid ${BORDER}`, borderBottom: `1px solid ${BORDER}`, padding: '32px 24px', background: BG }}>
-        <div style={{ maxWidth: 860, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 24, textAlign: 'center' }}>
+        <div className="msme-stats-grid" style={{ maxWidth: 860, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 24, textAlign: 'center' }}>
           {[
             { num: '100%', label: 'Automated — vendor emails, forms, and deadline tracking' },
             { num: '2 min', label: 'To onboard a vendor and send the first email' },
@@ -204,7 +217,7 @@ export default function MsmeLandingPage() {
 
       {/* Explore upFloat */}
       <section style={{ borderBottom: `1px solid ${BORDER}`, padding: '48px 24px' }}>
-        <div style={{ maxWidth: 780, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 32, flexWrap: 'wrap' }}>
+        <div className="msme-explore" style={{ maxWidth: 780, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 32, flexWrap: 'wrap' }}>
           <div style={{ flex: 1, minWidth: 260 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: TEAL, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
               Are you a CA? Need a full practice management tool?
@@ -233,7 +246,7 @@ export default function MsmeLandingPage() {
       </section>
 
       {/* Footer */}
-      <footer style={{ borderTop: `1px solid ${BORDER}`, padding: '24px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+      <footer className="msme-footer" style={{ borderTop: `1px solid ${BORDER}`, padding: '24px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <div style={{ fontSize: 13, color: MUTED }}>© 2026 upFloat · MSME Tracker</div>
         <div style={{ display: 'flex', gap: 20, fontSize: 13 }}>
           <Link href="/privacy" style={{ color: MUTED, textDecoration: 'none' }}>Privacy</Link>

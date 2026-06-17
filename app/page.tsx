@@ -288,16 +288,18 @@ export default async function LandingPage() {
 
         /* ── Responsive ──────────────────────────────────────────────────── */
         @media (max-width: 960px) {
-          .hero-cols    { flex-direction: column !important; gap: 44px !important }
-          .hero-visual  { align-self: auto !important; justify-content: center !important; width: 100% }
+          .hero-cols        { flex-direction: column !important; gap: 44px !important }
+          .hero-visual      { align-self: auto !important; justify-content: center !important; width: 100% }
           .hero-visual > div { margin: 0 auto }
-          .hero-left    { padding-bottom: 0 !important }
-          .grid-3       { grid-template-columns: 1fr !important }
-          .grid-4       { grid-template-columns: 1fr 1fr !important }
-          .grid-2       { grid-template-columns: 1fr !important }
-          .pricing-grid { grid-template-columns: 1fr !important; max-width: 460px; margin: 0 auto }
-          .footer-grid  { grid-template-columns: 1fr 1fr !important; gap: 36px !important }
-          .lp-sec       { padding-top: 76px !important; padding-bottom: 76px !important }
+          .hero-left        { padding-bottom: 0 !important }
+          .grid-3           { grid-template-columns: 1fr !important }
+          .grid-4           { grid-template-columns: 1fr 1fr !important }
+          .grid-2           { grid-template-columns: 1fr !important }
+          .pricing-grid     { grid-template-columns: 1fr !important; max-width: 460px; margin: 0 auto }
+          .footer-grid      { grid-template-columns: 1fr 1fr !important; gap: 36px !important }
+          .lp-sec           { padding-top: 76px !important; padding-bottom: 76px !important }
+          .msme-callout-grid { grid-template-columns: 1fr !important; gap: 28px !important }
+          .compliance-sec-flex { gap: 24px !important }
         }
         @media (max-width: 760px) {
           .nav-mid     { display: none !important }
@@ -327,6 +329,8 @@ export default async function LandingPage() {
           .addon-right { text-align: left !important }
           .addon-right > div:first-child { justify-content: flex-start !important }
           .compliance-grid { grid-template-columns: 1fr 1fr !important; min-width: 0 !important }
+          .compliance-sec-flex { flex-direction: column !important; gap: 16px !important }
+          .msme-callout-inner { padding: 32px 24px !important; border-radius: 18px !important }
           .marquee-card { width: 272px !important; padding: 24px 20px !important }
         }
         @media (max-width: 480px) {
@@ -341,6 +345,8 @@ export default async function LandingPage() {
           .hero-h1     { letter-spacing: -1.2px !important }
           .lp-nav      { padding: 0 14px !important }
           .nav-cta     { padding: 8px 14px !important; font-size: 13px !important }
+          .msme-callout-inner { padding: 24px 18px !important; gap: 22px !important }
+          .msme-callout-inner a { width: 100% !important; box-sizing: border-box !important }
         }
       `}</style>
 
@@ -1456,14 +1462,14 @@ export default async function LandingPage() {
 
           {/* Compliance standards */}
           <div className="sec-card" style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.18)', borderRadius: 22, padding: '34px 38px', marginBottom: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 44, flexWrap: 'wrap' }}>
+            <div className="compliance-sec-flex" style={{ display: 'flex', alignItems: 'flex-start', gap: 44, flexWrap: 'wrap' }}>
               <div style={{ flex: '0 0 auto' }}>
                 <div style={{ fontSize: 11, fontWeight: 800, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 10 }}>International standards</div>
                 <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.38)', lineHeight: 1.75, maxWidth: 260 }}>
                   upFloat is designed to operate in compliance with privacy regulations across every jurisdiction we serve.
                 </div>
               </div>
-              <div className="compliance-grid" style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, minWidth: 300 }}>
+              <div className="compliance-grid" style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, minWidth: 0 }}>
                 {[
                   { label: 'GDPR',        sub: 'EU / EEA',       color: '#60a5fa' },
                   { label: 'CCPA',        sub: 'California, USA', color: '#f97316' },
@@ -1610,7 +1616,7 @@ export default async function LandingPage() {
       {/* ━━━ MSME TRACKER CALLOUT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <section style={{ padding: '72px 6%', background: '#f0fdf9', borderTop: '1px solid #ccfbf1' }}>
         <div style={{ maxWidth: 1120, margin: '0 auto' }}>
-          <div style={{
+          <div className="msme-callout-grid msme-callout-inner" style={{
             display: 'grid', gridTemplateColumns: '1fr auto', gap: 48, alignItems: 'center',
             background: 'linear-gradient(135deg, #0f172a 0%, #134e4a 60%, #0d9488 100%)',
             borderRadius: 24, padding: '48px 52px',
