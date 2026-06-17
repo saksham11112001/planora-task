@@ -1059,6 +1059,9 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                   </span>
                 </div>
               )}
+              {isRecurringTemplate && (
+                <RecurringTemplateBanner task={task} canEdit={canEdit} onDone={onClose} />
+              )}
               {/* Title — editable large text */}
               <textarea
                 ref={titleRef}
@@ -2414,6 +2417,73 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
         </div>
       )}
     </>
+  )
+}
+
+function RecurringTemplateBanner({ task, canEdit, onDone }: { task: any; canEdit: boolean; onDone?: () => void }) {
+  const [busy, setBusy]       = useState(false)
+  const [done, setDone]       = useState(false)
+  const [err,  setErr]        = useState<string | null>(null)
+  const slotDate  = task?._slot_date as string | undefined
+  const todayStr  = new Date().toISOString().split('T')[0]
+  const isPastSlot = !!slotDate && slotDate <= todayStr
+
+  async function completeOccurrence() {
+    if (!slotDate) return
+    setBusy(true); setErr(null)
+    try {
+      const res  = await fetch(`/api/tasks/${task.id}/complete-occurrence`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ date: slotDate }),
+      })
+      const json = await res.json()
+      if (!res.ok) { setErr(json.error ?? 'Failed'); return }
+      setDone(true)
+      setTimeout(() => onDone?.(), 1000)
+    } catch { setErr('Network error') }
+    finally   { setBusy(false) }
+  }
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 10,
+      padding: '10px 12px', borderRadius: 8,
+      background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.18)',
+    }}>
+      <span style={{ fontSize: 14, flexShrink: 0, marginTop: 1 }}>🔁</span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {done ? (
+          <span style={{ fontSize: 11, color: '#16a34a', fontWeight: 700 }}>✓ Occurrence marked done!</span>
+        ) : (
+          <>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+              This is a <strong style={{ color: '#4f46e5' }}>recurring task template</strong>.
+              {isPastSlot
+                ? ' This occurrence was not yet spawned. You can mark it done below.'
+                : ' Each occurrence is completed individually when it is generated on its due date.'}
+            </span>
+            {canEdit && isPastSlot && (
+              <div style={{ marginTop: 7 }}>
+                <button
+                  onClick={completeOccurrence}
+                  disabled={busy}
+                  style={{
+                    padding: '5px 14px', borderRadius: 7, fontSize: 12, fontWeight: 700,
+                    background: busy ? '#e2e8f0' : '#4f46e5',
+                    color: busy ? '#94a3b8' : '#fff',
+                    border: 'none', cursor: busy ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {busy ? 'Marking done…' : `Complete occurrence (${slotDate})`}
+                </button>
+                {err && <span style={{ fontSize: 11, color: '#dc2626', marginLeft: 8 }}>{err}</span>}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
   )
 }
 

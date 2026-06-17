@@ -17,6 +17,7 @@ interface CalTask {
   projects: { id: string; name: string; color: string } | null
   assignee: { id: string; name: string } | null
   client?: { id: string; name: string; color: string } | null
+  _slot_date?: string   // calendar cursor date stamped on virtual template expansions
 }
 interface Props {
   tasks: CalTask[]
@@ -142,6 +143,9 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
   }, [viewMode, year, month])
 
   function openTask(t: CalTask) {
+    // Preserve _slot_date (the calendar cursor date stamped on virtual template expansions)
+    // through the background fetch so TaskDetailPanel can offer "complete this occurrence".
+    const slotDate = t._slot_date ?? null
     // Open panel immediately with data we already have — no loading overlay
     setPanelTask({
       ...t,
@@ -156,10 +160,13 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
       completed_at:     null,
       project:          t.projects ?? null,
     } as unknown as Task)
-    // Background-fetch full task (description, approver, etc.) and update silently
+    // Background-fetch full task (description, approver, etc.) and update silently.
+    // Re-attach slotDate so the panel retains "complete this occurrence" context.
     fetch(`/api/tasks/${t.id}`)
       .then(r => r.json())
-      .then(d => { if (d?.data) setPanelTask(d.data as Task) })
+      .then(d => {
+        if (d?.data) setPanelTask({ ...(d.data as Task), ...(slotDate ? { _slot_date: slotDate } : {}) } as Task)
+      })
       .catch(() => {})
   }
 
@@ -221,7 +228,7 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
           if (!spawnedCoverage.has(`${t.id}__${cursor}`)) {
             if (!byDate[cursor]) byDate[cursor] = []
             if (!byDate[cursor].find(x => x.id === t.id)) {
-              byDate[cursor].push(t)
+              byDate[cursor].push({ ...t, _slot_date: cursor })
               placed = true
             }
           } else {
@@ -236,7 +243,7 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
       if (!placed && t.due_date >= winStart && t.due_date <= winEnd) {
         if (!spawnedCoverage.has(`${t.id}__${t.due_date}`)) {
           if (!byDate[t.due_date]) byDate[t.due_date] = []
-          if (!byDate[t.due_date].find(x => x.id === t.id)) byDate[t.due_date].push(t)
+          if (!byDate[t.due_date].find(x => x.id === t.id)) byDate[t.due_date].push({ ...t, _slot_date: t.due_date })
         }
       }
     } else {
