@@ -56,7 +56,13 @@ export async function ReportsFetcher() {
   // and represent the template, not a scheduled occurrence. Spawned instances are included.
   const wipTasksRaw     = allTasks.filter(t => ['todo','in_progress','in_review'].includes(t.status) && !((t as any).is_recurring === true && !(t as any).parent_recurring_id))
 
-  const tasks   = allTasks
+  // Exclude recurring templates (is_recurring=true, no parent) and spawned instances
+  // (parent_recurring_id set) from KPI metrics — they distort team performance numbers.
+  const nonRecurringTasks = allTasks.filter(t =>
+    !((t as any).is_recurring === true && !(t as any).parent_recurring_id) &&
+    !(t as any).parent_recurring_id
+  )
+  const tasks   = nonRecurringTasks
   const logs    = timeLogs ?? []
 
   // Single-pass aggregation over tasks — avoids repeated .filter() scans
