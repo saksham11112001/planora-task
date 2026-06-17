@@ -112,23 +112,28 @@ export async function POST(req: NextRequest) {
       const { error: emailErr } = await resend.emails.send({ from: FROM, to: normalEmail, subject, html })
       if (emailErr) { failed++; continue }
 
-      // Upsert invite record
-      await admin.from('partner_portal_invites').upsert({
-        partner_id:   partner.id,
-        email:        normalEmail,
-        invite_type,
-        invite_count: 1,
-        last_sent_at: new Date().toISOString(),
-      }, {
-        onConflict: 'partner_id,email,invite_type',
-        ignoreDuplicates: false,
-      })
-      // Increment count on conflict (simple approach: update separately)
-      await admin.from('partner_portal_invites')
-        .update({ last_sent_at: new Date().toISOString() })
+      // Correctly track invite count: select first, then insert or increment
+      const { data: existingInvite } = await admin
+        .from('partner_portal_invites')
+        .select('id, invite_count')
         .eq('partner_id', partner.id)
         .eq('email', normalEmail)
         .eq('invite_type', invite_type)
+        .maybeSingle()
+
+      if (existingInvite) {
+        await admin.from('partner_portal_invites')
+          .update({ invite_count: existingInvite.invite_count + 1, last_sent_at: new Date().toISOString() })
+          .eq('id', existingInvite.id)
+      } else {
+        await admin.from('partner_portal_invites').insert({
+          partner_id:   partner.id,
+          email:        normalEmail,
+          invite_type,
+          invite_count: 1,
+          last_sent_at: new Date().toISOString(),
+        })
+      }
 
       sent++
     } catch { failed++ }
