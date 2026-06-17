@@ -22,11 +22,9 @@ export async function TasksFetcher() {
     .eq('org_id', mb.org_id).neq('is_archived', true)
     .order('due_date', { ascending: true, nullsFirst: false })
 
-  // Admins and owners see ALL non-recurring org tasks so they can oversee the full team.
-  // Other roles see only tasks assigned to themselves.
-  const scopedBase = isOwnerAdmin
-    ? base.or('is_recurring.is.null,is_recurring.eq.false')
-    : base.eq('assignee_id', user.id).or('is_recurring.is.null,is_recurring.eq.false')
+  // My Tasks always scopes to the logged-in user regardless of role —
+  // admins/owners use the Team or Reports views for org-wide oversight.
+  const scopedBase = base.eq('assignee_id', user.id).or('is_recurring.is.null,is_recurring.eq.false')
 
   const [
     { data: tasks, error: tasksError },
