@@ -2,23 +2,24 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 const ACCENT = '#0d9488'
 
 export default function PartnerJoinPage() {
+  const router = useRouter()
   const [name,        setName]        = useState('')
   const [email,       setEmail]       = useState('')
   const [phone,       setPhone]       = useState('')
+  const [password,    setPassword]    = useState('')
+  const [confirmPwd,  setConfirmPwd]  = useState('')
   const [refCode,     setRefCode]     = useState('')
   const [loading,     setLoading]     = useState(false)
-  const [sent,        setSent]        = useState(false)
   const [error,       setError]       = useState('')
 
   useEffect(() => {
-    // Pre-fill ref code from URL if present
     const ref = new URLSearchParams(window.location.search).get('ref')
     if (ref) setRefCode(ref)
-    // Pre-fill email from existing Supabase session (if any)
     createClient().auth.getUser().then(({ data }) => {
       if (data.user?.email) setEmail(data.user.email)
     })
@@ -26,56 +27,50 @@ export default function PartnerJoinPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!name.trim()) { setError('Name is required'); return }
-    if (!email.trim()) { setError('Email is required'); return }
+    if (!name.trim())    { setError('Name is required'); return }
+    if (!email.trim())   { setError('Email is required'); return }
+    if (!password)       { setError('Password is required'); return }
+    if (password.length < 8) { setError('Password must be at least 8 characters'); return }
+    if (password !== confirmPwd) { setError('Passwords do not match'); return }
     setLoading(true); setError('')
     try {
-      // Register partner profile first, then send magic link
+      // Create Supabase account with email + password
+      const supabase = createClient()
+      const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
+        email:    email.trim().toLowerCase(),
+        password,
+        options: { emailRedirectTo: `${window.location.origin}/auth/callback?next=/partners/dashboard` },
+      })
+      if (signUpErr) { setError(signUpErr.message); return }
+
+      // Register partner profile
       const res = await fetch('/api/partner-portal/profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), email: email.trim().toLowerCase(), phone: phone.trim() || null, referred_by: refCode.trim() || null }),
+        body: JSON.stringify({
+          name:        name.trim(),
+          email:       email.trim().toLowerCase(),
+          phone:       phone.trim() || null,
+          referred_by: refCode.trim() || null,
+        }),
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error ?? 'Registration failed'); return }
 
-      // Send magic link
-      const origin = window.location.origin
-      const { error: authErr } = await createClient().auth.signInWithOtp({
-        email: email.trim().toLowerCase(),
-        options: {
-          emailRedirectTo: `${origin}/auth/callback?next=/partners/dashboard`,
-          shouldCreateUser: true,
-        },
-      })
-      if (authErr) { setError(authErr.message); return }
-      setSent(true)
+      // If session is already active (email confirm disabled), go straight to dashboard
+      if (signUpData.session) {
+        router.push('/partners/dashboard')
+      } else {
+        router.push('/partners/login?registered=1')
+      }
     } catch { setError('Something went wrong — please try again') }
     finally { setLoading(false) }
-  }
-
-  if (sent) {
-    return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 16px', background: '#f8fafc', colorScheme: 'light' }}>
-        <div style={{ width: '100%', maxWidth: 420, background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', padding: 32, textAlign: 'center', boxShadow: '0 1px 8px rgba(0,0,0,0.06)' }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>🎉</div>
-          <h2 style={{ fontSize: 20, fontWeight: 800, color: '#0f172a', marginBottom: 8 }}>You're in!</h2>
-          <p style={{ fontSize: 14, color: '#475569', lineHeight: 1.6, margin: '0 0 8px' }}>
-            Welcome to the Partner Program, <strong>{name}</strong>.
-          </p>
-          <p style={{ fontSize: 14, color: '#64748b', lineHeight: 1.6, margin: 0 }}>
-            We've sent a sign-in link to <strong>{email}</strong>.<br/>Click it to open your dashboard.
-          </p>
-        </div>
-      </div>
-    )
   }
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 16px', background: '#f8fafc', colorScheme: 'light' }}>
       <div style={{ width: '100%', maxWidth: 440 }}>
 
-        {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <div style={{ width: 48, height: 48, borderRadius: 14, background: ACCENT, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', fontSize: 22 }}>🤝</div>
           <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', margin: '0 0 4px' }}>Join the Partner Program</h1>
@@ -97,6 +92,14 @@ export default function PartnerJoinPage() {
                 <label style={lblStyle}>Phone <span style={{ fontWeight: 400, color: '#94a3b8' }}>optional</span></label>
                 <input style={inputStyle} type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+91 98765 43210" />
               </div>
+              <div>
+                <label style={lblStyle}>Create password *</label>
+                <input style={inputStyle} type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="At least 8 characters" autoComplete="new-password" />
+              </div>
+              <div>
+                <label style={lblStyle}>Confirm password *</label>
+                <input style={inputStyle} type="password" value={confirmPwd} onChange={e => setConfirmPwd(e.target.value)} placeholder="Re-enter your password" autoComplete="new-password" />
+              </div>
               {refCode && (
                 <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#166534' }}>
                   ✅ Referred by a partner — your account will be linked automatically.
@@ -116,7 +119,7 @@ export default function PartnerJoinPage() {
                 cursor: loading ? 'not-allowed' : 'pointer',
               }}
             >
-              {loading ? 'Setting up…' : 'Join & get my referral link →'}
+              {loading ? 'Creating account…' : 'Create account & join →'}
             </button>
           </form>
         </div>

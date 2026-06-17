@@ -72,6 +72,19 @@ export async function POST(request: NextRequest) {
     const orgReferralCode = generateCode(8)
     const orgJoinCode     = generateCode(8)
 
+    // Guard: prevent creating a duplicate org with the same name for this user
+    const { data: existingOrgs } = await admin
+      .from('org_members')
+      .select('organisations(name)')
+      .eq('user_id', user.id)
+      .eq('role', 'owner')
+    const duplicate = (existingOrgs ?? []).some(
+      (m: any) => (m.organisations?.name ?? '').trim().toLowerCase() === org_name.trim().toLowerCase()
+    )
+    if (duplicate) {
+      return NextResponse.json({ error: 'You already have an organisation with this name. Please choose a different name.' }, { status: 409 })
+    }
+
     // Only the user's very first org gets a 14-day Pro trial.
     // Subsequent orgs start on free to prevent trial gaming.
     const { count: ownedOrgCount } = await admin
