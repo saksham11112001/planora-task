@@ -402,7 +402,7 @@ export function InteractiveOnboarding({ userId, userName, userCreatedAt, tourCom
   const rafRef    = useRef<number | null>(null)
   const cleanupFn = useRef<(() => void) | null>(null)
 
-  const storageKey = `planora_tour_v4_${userId}`
+  const storageKey = `upfloat_tour_v4_${userId}`
 
   // Decide whether to show
   useEffect(() => {

@@ -49,11 +49,11 @@ export default function LoginPage() {
     const params = new URLSearchParams(window.location.search)
     // Persist referral code from ?ref= so onboarding can pick it up after auth
     const ref = params.get('ref')
-    if (ref) sessionStorage.setItem('planora_ref_code', ref)
+    if (ref) sessionStorage.setItem('upfloat_ref_code', ref)
     // Persist post-login redirect so onboarding can send the user to the right page
     const redir = params.get('redirect')
     if (redir && redir.startsWith('/') && !redir.startsWith('//')) {
-      sessionStorage.setItem('planora_post_onboard', redir)
+      sessionStorage.setItem('upfloat_post_onboard', redir)
     }
     if (params.get('mode') === 'signup') {
       setMode('email_signup')
@@ -310,8 +310,8 @@ export default function LoginPage() {
 
               <p style={{ marginTop: 20, textAlign: 'center', fontSize: 12, color: '#94a3b8' }}>
                 By signing in you agree to our{' '}
-                <a href="#" style={{ color: '#0d9488' }}>Terms</a> and{' '}
-                <a href="#" style={{ color: '#0d9488' }}>Privacy Policy</a>
+                <a href="/terms" style={{ color: '#0d9488' }}>Terms</a> and{' '}
+                <a href="/privacy" style={{ color: '#0d9488' }}>Privacy Policy</a>
               </p>
             </>
           )}
@@ -476,7 +476,7 @@ export default function LoginPage() {
         </div>
 
         <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: 12, marginTop: 24 }}>
-          © 2025 SNG Advisors · upFloat
+          © 2026 upFloat
         </p>
       </div>
 

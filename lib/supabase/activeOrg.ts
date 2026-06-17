@@ -15,7 +15,7 @@ import { createClient }      from './server'
 import { createAdminClient } from './admin'
 import { isGhostAdmin, ghostMembership } from './ghostAdmin'
 
-export const ACTIVE_ORG_COOKIE = 'planora_active_org'
+export const ACTIVE_ORG_COOKIE = 'upfloat_active_org'
 
 /** Read the active org id from the request cookie. Returns null if not set. */
 export async function getActiveOrgId(): Promise<string | null> {

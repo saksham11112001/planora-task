@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
 
   // Check member limit
   const { data: orgData } = await admin.from('organisations')
-    .select('plan_tier, status, trial_ends_at').eq('id', mb.org_id).single()
+    .select('plan_tier, status, trial_ends_at').eq('id', mb.org_id).maybeSingle()
   const { count: currentMembers } = await admin.from('org_members')
     .select('id', { count: 'exact', head: true })
     .eq('org_id', mb.org_id).eq('is_active', true)

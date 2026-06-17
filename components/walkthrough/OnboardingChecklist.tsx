@@ -207,7 +207,7 @@ const STEPS: ChecklistStep[] = [
   },
 ]
 
-const PREFIX   = 'planora_ob_v1_'
+const PREFIX   = 'upfloat_ob_v1_'
 const MAX_DAYS = 30
 
 function key(userId: string, stepId: string) {
