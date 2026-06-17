@@ -5,5 +5,11 @@ export const viewport = {
 }
 
 export default function MsmeFormLayout({ children }: { children: React.ReactNode }) {
-  return <>{children}</>
+  return (
+    <>
+      <style>{`:root { color-scheme: light !important; } * { color-scheme: light !important; }`}</style>
+      <script dangerouslySetInnerHTML={{ __html: `document.documentElement.classList.remove('dark');` }} />
+      {children}
+    </>
+  )
 }

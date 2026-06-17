@@ -23,6 +23,7 @@ export default async function MsmeLayout({ children }: { children: React.ReactNo
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc', display: 'flex', flexDirection: 'column', colorScheme: 'light' }}>
       <style>{`:root { color-scheme: light !important; } * { color-scheme: light !important; }`}</style>
+      <script dangerouslySetInnerHTML={{ __html: `document.documentElement.classList.remove('dark');` }} />
 
       {/* Top nav — light */}
       <nav style={{
