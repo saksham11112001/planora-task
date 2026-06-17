@@ -301,7 +301,7 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
         </div>
 
         {/* Tier progress */}
-        <div style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 12, padding: '16px 20px', marginBottom: 20 }}>
+        <div style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 12, padding: '16px 20px', marginBottom: 20, borderLeft: `4px solid #b45309` }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <span style={{ fontSize: 13, fontWeight: 700, color: DARK }}>Partner Tier Progress</span>
             <span style={{ fontSize: 12, color: MUTED }}>{totalSignedUp} sign-up{totalSignedUp !== 1 ? 's' : ''} total</span>
@@ -330,7 +330,7 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
         </div>
 
         {/* Invite section */}
-        <div style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 20, marginBottom: 20 }}>
+        <div style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 20, marginBottom: 20, borderLeft: `4px solid ${PURPLE}` }}>
           <div style={{ fontWeight: 700, fontSize: 15, color: DARK, marginBottom: 4 }}>Send an invite</div>
           <p style={{ fontSize: 13, color: MUTED, margin: '0 0 16px', lineHeight: 1.6 }}>
             Choose what to invite them to, then enter their email.
@@ -386,7 +386,7 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
 
         {/* Referred Users table */}
         <div style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 12, overflow: 'hidden', marginBottom: 20 }}>
-          <div style={{ padding: '14px 20px', borderBottom: `1px solid ${BORDER}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ padding: '14px 20px', borderBottom: `1px solid ${BORDER}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: `${TEAL}06`, borderLeft: `4px solid ${TEAL}` }}>
             <div>
               <span style={{ fontWeight: 700, fontSize: 14, color: DARK }}>Referred Users</span>
               <span style={{ fontSize: 12, color: MUTED, marginLeft: 8 }}>— full transparency on each referral</span>
@@ -405,7 +405,7 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
                 <thead>
                   <tr style={{ background: BG }}>
                     {['Email', 'Invited to', 'Times sent', 'Sign-up', 'Pack purchased', 'Commission', 'Last sent'].map(h => (
-                      <th key={h} style={{ padding: '9px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap', borderBottom: `1px solid ${BORDER}` }}>{h}</th>
+                      <th key={h} style={{ padding: '9px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: TEAL, textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap', borderBottom: `1.5px solid rgba(13,148,136,0.25)`, background: 'rgba(13,148,136,0.05)' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -571,7 +571,7 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
                     <thead>
                       <tr style={{ background: BG }}>
                         {['Date', 'Amount', 'Account', 'IFSC', 'Status', 'Note'].map(h => (
-                          <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap', borderBottom: `1px solid ${BORDER}` }}>{h}</th>
+                          <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: TEAL, textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap', borderBottom: `1.5px solid rgba(13,148,136,0.25)`, background: 'rgba(13,148,136,0.05)' }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
@@ -600,7 +600,7 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
         </div>
 
         {/* Referral links */}
-        <div style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 20, marginBottom: 20 }}>
+        <div style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 20, marginBottom: 20, borderLeft: `4px solid #2563eb` }}>
           <div style={{ fontWeight: 700, fontSize: 14, color: DARK, marginBottom: 4 }}>Your Referral Links</div>
           <p style={{ fontSize: 13, color: MUTED, margin: '0 0 18px', lineHeight: 1.6 }}>
             Share these links directly — code <strong style={{ fontFamily: 'monospace', color: TEAL }}>{partner.referral_code}</strong> is embedded in both.

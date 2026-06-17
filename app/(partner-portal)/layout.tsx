@@ -1,5 +1,7 @@
 // Standalone partner portal layout — no upFloat sidebar, no AppShell.
 // This layout is intentionally minimal so the portal feels like its own product.
+import { ForceLightMode } from '@/components/portal/ForceLightMode'
+
 export default function PartnerPortalLayout({ children }: { children: React.ReactNode }) {
   return (
     <div style={{
@@ -16,6 +18,7 @@ export default function PartnerPortalLayout({ children }: { children: React.Reac
       */}
       <style>{`:root { color-scheme: light !important; } * { color-scheme: light !important; }`}</style>
       <script dangerouslySetInnerHTML={{ __html: `document.documentElement.classList.remove('dark');` }} />
+      <ForceLightMode />
       {children}
     </div>
   )
