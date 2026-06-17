@@ -1,6 +1,7 @@
 import { getSessionUser }         from '@/lib/supabase/cached'
 import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import MsmeFeedbackButton         from './MsmeFeedbackButton'
+import MsmeLogoutButton           from './MsmeLogoutButton'
 
 const TEAL  = '#0d9488'
 const DARK  = '#0f172a'
@@ -8,10 +9,12 @@ const MUTED = '#64748b'
 const BORDER = '#e2e8f0'
 
 export default async function MsmeLayout({ children }: { children: React.ReactNode }) {
-  let orgName = ''
+  let orgName   = ''
+  let isLoggedIn = false
   try {
     const user = await getSessionUser()
     if (user) {
+      isLoggedIn = true
       const mb = await getActiveOrgMembership(user.id)
       orgName = (mb as any)?.organisations?.name ?? ''
     }
@@ -19,6 +22,8 @@ export default async function MsmeLayout({ children }: { children: React.ReactNo
 
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc', display: 'flex', flexDirection: 'column', colorScheme: 'light' }}>
+      <style>{`:root { color-scheme: light !important; } * { color-scheme: light !important; }`}</style>
+      <script dangerouslySetInnerHTML={{ __html: `document.documentElement.classList.remove('dark');` }} />
 
       {/* Top nav — light */}
       <nav style={{
@@ -43,6 +48,7 @@ export default async function MsmeLayout({ children }: { children: React.ReactNo
         {/* Right */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <MsmeFeedbackButton />
+          {isLoggedIn && <MsmeLogoutButton />}
           <a
             href="https://upfloat.co"
             target="_blank"

@@ -2,7 +2,7 @@
 **GitHub:** saksham11112001/planora-task  
 **Live URL:** sng-adwisers.com  
 **Stack:** Next.js 15.5 · Supabase (xjaybcthnneppfdgmtaq) · Tailwind v4 · Inngest · Resend · Vercel  
-**Last Updated:** 2026-06-13 (Sessions 18–19)
+**Last Updated:** 2026-06-17 (Session 20)
 
 ---
 
@@ -31,6 +31,13 @@
 20. **NEW (Sessions 14–17):** Digest email mode is the default for ALL orgs (when no `org_feature_settings.notification_frequency` record exists, `getOrgNotifMode` returns `'digest'`). Every notification handler MUST check `getOrgNotifMode` or `getOrgNotifModeForUser` before calling a direct send function.
 21. **NEW (Sessions 18–19):** MSME Vendor Compliance Tracker — separate module at `/msme`. Vendors added via form; owner/admin/manager only. Razorpay payment gate for vendor reports (₹99/vendor). Bulk email via Resend (`POST /api/msme/shoot`). Magic-link share for client-facing vendor list. Tables: `msme_vendors`, `msme_payments`. SQL: `supabase/migrations/create_msme_tracker.sql` + `add_msme_payment_status.sql`.
 22. **NEW (Sessions 18–19):** Partner Portal — `/partner` (owner only). CAs earn commissions (Bronze 10% 1–4 referrals / Silver 15% 5–9 / Gold 20% 10+) when orgs join via their referral link. Tables: `partner_commissions`, `partner_payouts`. API: `GET /api/partner` (tier + stats + referred list), `POST /api/partner/payout` (min ₹500, no double-payout guard). Sidebar shows Handshake icon for owners only.
+25. **NEW (Session 20):** Standalone Partner Portal withdrawal feature — partners can request payouts (min ₹500) via bank transfer from `/partners/dashboard`. New `standalone_partner_withdrawals` table. API: `GET /api/partner-portal/withdraw` (balance), `POST /api/partner-portal/withdraw` (submit request with IFSC validation, no-duplicate-pending guard). Dashboard shows full withdrawal history with status badges (requested/processing/paid/rejected).
+26. **NEW (Session 20):** Partner portal referral transparency — signed-up MSME referrals now show pack tier purchased, amount paid (₹), and date. Commission per row shown. Data fetched via `users` → `org_members` → `msme_pack_payments` join in server component.
+27. **NEW (Session 20):** Standalone partner portal dark mode fix — `app/(partner-portal)/layout.tsx` now forces light mode via `color-scheme: light !important` CSS and `document.documentElement.classList.remove('dark')` script. Same fix applied to `app/(msme)/layout.tsx` and `app/msme/form/[token]/layout.tsx`.
+28. **NEW (Session 20):** MSME login redirect — `app/auth/callback/route.ts` detects if `host` header starts with `msme.` and uses `/msme` as default redirect (instead of `/dashboard`).
+29. **NEW (Session 20):** MSME export email audit trail — `MsmeView.tsx` export now generates a second Excel sheet "Email Audit Trail" from `/api/msme/email-logs` (new route). Columns: Vendor Name, Vendor Email, Email Attempt #, Date Sent, Time Sent, Opened On, Status When Sent, Current Status, Response Received On.
+30. **NEW (Session 20):** Partner portal `invite_count` bug fixed — was always resetting to 1 on every send. Now uses select-first-then-insert-or-update pattern in `/api/partner-portal/invite`.
+31. **NEW (Session 20):** MSME logout button moved to top navbar in `app/(msme)/layout.tsx` (`MsmeLogoutButton.tsx` client component, signs out and redirects to `/login?redirect=/msme`).
 23. **NEW (Sessions 18–19):** Reports revamp — `ReportsFetcher.tsx` now computes trajectory (12-week AreaChart), status breakdown (PieChart donut), action items (overdue by assignee / pending approvals / unassigned urgent), and top/bottom 3 performers — all from the existing 90-day tasks query (zero extra DB hits). `ReportsCharts.tsx` has 4 tabs: Overview, Team Performance, Action Items (executive summarized view for owners/admins), Time.
 24. **NEW (Sessions 18–19):** Walkthrough enhanced — now 20 slides. Added `msme-tracker` and `partner-portal` slides with SVG illustrations. Updated `welcome`, `reports`, `done` slides with richer detail. Storage key: `planora_wt_v3_${userId}`. Shows to accounts < 14 days old. `standalone` prop renders as full page.
 
@@ -49,7 +56,8 @@ referral_redemptions,                     ← Session 13 (add_org_codes_trial.sq
 notification_queue,                       ← digest email system
 ca_master_tasks, ca_client_assignments, ca_task_instances,
 msme_vendors, msme_payments,              ← Sessions 18–19 (create_msme_tracker.sql + add_msme_payment_status.sql)
-partner_commissions, partner_payouts      ← Sessions 18–19 (add_partner_portal.sql)
+partner_commissions, partner_payouts,     ← Sessions 18–19 (add_partner_portal.sql)
+standalone_partner_withdrawals            ← Session 20 (add_standalone_partner_withdrawals.sql)
 ```
 
 ### ❌ DELETE (legacy merged tables)
@@ -64,6 +72,27 @@ workspaces
 -- Projects member visibility (run this if not done)
 ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS member_ids uuid[] DEFAULT NULL;
 CREATE INDEX IF NOT EXISTS idx_projects_member_ids ON public.projects USING GIN (member_ids);
+```
+
+### Schema additions — Session 20
+```sql
+-- Standalone partner withdrawal requests (supabase/migrations/add_standalone_partner_withdrawals.sql)
+CREATE TABLE IF NOT EXISTS standalone_partner_withdrawals (
+  id              uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  partner_id      uuid        NOT NULL REFERENCES standalone_partners(id) ON DELETE CASCADE,
+  amount_paise    integer     NOT NULL,
+  account_name    text        NOT NULL,
+  bank_account    text        NOT NULL,
+  bank_ifsc       text        NOT NULL,
+  upi_id          text,
+  status          text        NOT NULL DEFAULT 'requested'
+                              CHECK (status IN ('requested', 'processing', 'paid', 'rejected')),
+  admin_note      text,
+  created_at      timestamptz NOT NULL DEFAULT now(),
+  processed_at    timestamptz
+);
+CREATE INDEX IF NOT EXISTS idx_standalone_partner_withdrawals_partner
+  ON standalone_partner_withdrawals(partner_id);
 ```
 
 ### Schema additions — Sessions 18–19
@@ -303,15 +332,20 @@ app/(app)/import/ImportView.tsx
 
 **MSME Vendor Compliance Tracker**
 ```
+app/(msme)/layout.tsx          – Forces light mode; shows MsmeLogoutButton in navbar when logged in
+app/(msme)/MsmeLogoutButton.tsx – Client: signs out via Supabase, redirects to /login?redirect=/msme
 app/(app)/msme/page.tsx        – owner/admin/manager only; redirects others to /dashboard
 app/(app)/msme/MsmeView.tsx    – Client: vendor table (add/edit/remove), Udyam form, bulk email button,
-                                  magic-link share, payment gate (Razorpay ₹99/vendor)
+                                  magic-link share, payment gate (Razorpay ₹99/vendor).
+                                  Excel export generates 2 sheets: "MSME Vendors" + "Email Audit Trail"
 app/api/msme/route.ts          – GET/POST/PATCH/DELETE vendors (org-scoped)
 app/api/msme/shoot/route.ts    – POST: bulk email to all vendors via Resend
 app/api/msme/pay/route.ts      – POST: Razorpay order creation for vendor report unlock
+app/api/msme/email-logs/route.ts – GET: returns all msme_email_log rows for the org (for audit export)
+app/auth/callback/route.ts     – Detects msme. subdomain host → defaults redirect to /msme not /dashboard
 ```
 
-**Partner Portal**
+**Partner Portal (org-based, legacy)**
 ```
 app/(app)/partner/page.tsx        – owner only; redirects non-owners to /dashboard
 app/(app)/partner/PartnerView.tsx – Client: tier badge + progress bar, referral link copy,
@@ -319,6 +353,25 @@ app/(app)/partner/PartnerView.tsx – Client: tier badge + progress bar, referra
                                     payout history, referred clients table, "How It Works" section
 app/api/partner/route.ts          – GET: tier, rate, stats, referred[], commissions[], payouts[]
 app/api/partner/payout/route.ts   – POST: create payout request (guard: min ₹500, no double-payout)
+```
+
+**Standalone Partner Portal (active, at /partners/**)**
+```
+app/(partner-portal)/layout.tsx                 – Forces light mode (color-scheme + removes html.dark)
+app/(partner-portal)/partners/dashboard/page.tsx – Server: fetches partner, invites, withdrawals,
+                                                    enriches signed-up MSME invites with pack purchase
+                                                    data via users → org_members → msme_pack_payments
+app/(partner-portal)/partners/dashboard/PartnerDashboard.tsx – Client: invite form, referral links,
+                                                    Referred Users table (shows pack tier + commission
+                                                    per row), Withdraw Earnings section (balance cards,
+                                                    withdrawal form, withdrawal history table)
+app/api/partner-portal/invite/route.ts          – POST: send invite email, track invite_count
+app/api/partner-portal/withdraw/route.ts        – GET: balance (earned/available/hasPending) + history
+                                                   POST: submit withdrawal (IFSC validation, min ₹500,
+                                                   no-duplicate-pending guard)
+Tables: standalone_partners, partner_portal_invites, standalone_partner_withdrawals
+Commission: MSME sign-up ₹500 · Partner sign-up ₹1000
+Balance = earned − (requested + processing + paid withdrawals)
 ```
 
 ### API Routes

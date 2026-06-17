@@ -10,9 +10,8 @@ const BORDER = '#e2e8f0'
 const BG     = '#f8fafc'
 const WHITE  = '#ffffff'
 
-// Commission rates (display only — actual payouts confirmed by admin)
-const MSME_COMMISSION   = 500   // ₹ per MSME sign-up
-const PARTNER_COMMISSION = 1000 // ₹ per partner sign-up
+const MSME_COMMISSION   = 500
+const PARTNER_COMMISSION = 1000
 
 interface Partner {
   id: string
@@ -32,10 +31,31 @@ interface Invite {
   signed_up: boolean
 }
 
+interface Withdrawal {
+  id: string
+  amount_paise: number
+  status: 'requested' | 'processing' | 'paid' | 'rejected'
+  account_name: string
+  bank_account: string
+  bank_ifsc: string
+  upi_id: string | null
+  admin_note: string | null
+  created_at: string
+  processed_at: string | null
+}
+
+interface PackInfo {
+  packTier: string
+  amountPaise: number
+  paidAt: string
+}
+
 interface Props {
   partner: Partner
   msmeInvites: Invite[]
   partnerInvites: Invite[]
+  withdrawals: Withdrawal[]
+  packByEmail: Record<string, PackInfo>
 }
 
 function fmtDate(iso: string) {
@@ -53,13 +73,36 @@ function getTier(signedUp: number): { label: string; color: string; bg: string; 
   return { label: 'Starter', color: MUTED, bg: BG, next: '1 sign-up to Bronze' }
 }
 
-const inputStyle: React.CSSProperties = {
-  flex: 1, padding: '10px 14px', border: `1px solid ${BORDER}`,
-  borderRadius: 8, fontSize: 14, color: DARK, background: BG,
-  outline: 'none', colorScheme: 'light',
+function packTierLabel(tier: string): string {
+  const map: Record<string, string> = {
+    pack_5: 'Pack 5', pack_10: 'Pack 10', pack_20: 'Pack 20',
+    pack_50: 'Pack 50', pack_100: 'Pack 100',
+  }
+  return map[tier] ?? tier
 }
 
-export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvites: initPartner }: Props) {
+function withdrawalStatusBadge(status: Withdrawal['status']) {
+  const styles: Record<string, { bg: string; color: string; label: string }> = {
+    requested:  { bg: '#fef9c3', color: '#a16207', label: 'Requested' },
+    processing: { bg: '#dbeafe', color: '#1d4ed8', label: 'Processing' },
+    paid:       { bg: '#dcfce7', color: '#166534', label: 'Paid' },
+    rejected:   { bg: '#fee2e2', color: '#dc2626', label: 'Rejected' },
+  }
+  const s = styles[status] ?? styles.requested
+  return (
+    <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 20, background: s.bg, color: s.color }}>
+      {s.label}
+    </span>
+  )
+}
+
+const inputStyle: React.CSSProperties = {
+  width: '100%', padding: '10px 14px', border: `1px solid ${BORDER}`,
+  borderRadius: 8, fontSize: 14, color: DARK, background: WHITE,
+  outline: 'none', colorScheme: 'light', boxSizing: 'border-box',
+}
+
+export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvites: initPartner, withdrawals: initWithdrawals, packByEmail }: Props) {
   const APP_URL = typeof window !== 'undefined' ? window.location.origin : ''
   const msmeReferralUrl    = `${APP_URL}/msme-landing?ref=${partner.referral_code}`
   const partnerReferralUrl = `${APP_URL}/partners/join?ref=${partner.referral_code}`
@@ -74,6 +117,19 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
   const [toast,      setToast]      = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
   const [copiedMsme,    setCopiedMsme]    = useState(false)
   const [copiedPartner, setCopiedPartner] = useState(false)
+
+  // Withdrawal state
+  const [withdrawals, setWithdrawals] = useState<Withdrawal[]>(initWithdrawals)
+  const [earnedPaise, setEarnedPaise] = useState<number | null>(null)
+  const [availPaise,  setAvailPaise]  = useState<number | null>(null)
+  const [hasPending,  setHasPending]  = useState(initWithdrawals.some(w => w.status === 'requested' || w.status === 'processing'))
+  const [wdAmount,    setWdAmount]    = useState('')
+  const [wdName,      setWdName]      = useState('')
+  const [wdAccount,   setWdAccount]   = useState('')
+  const [wdIfsc,      setWdIfsc]      = useState('')
+  const [wdUpi,       setWdUpi]       = useState('')
+  const [wdBusy,      setWdBusy]      = useState(false)
+  const [balLoaded,   setBalLoaded]   = useState(false)
 
   function showToast(msg: string, type: 'success' | 'error' = 'success') {
     setToast({ msg, type })
@@ -124,6 +180,53 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
     finally  { setBusy(false) }
   }, [email, invType])
 
+  async function loadBalance() {
+    if (balLoaded) return
+    const res = await fetch('/api/partner-portal/withdraw')
+    if (!res.ok) return
+    const json = await res.json()
+    setEarnedPaise(json.earned_paise)
+    setAvailPaise(json.available_paise)
+    setHasPending(json.has_pending)
+    setWithdrawals(json.withdrawals ?? [])
+    setBalLoaded(true)
+  }
+
+  async function submitWithdrawal() {
+    const amtNum = parseFloat(wdAmount)
+    if (isNaN(amtNum) || amtNum <= 0) { showToast('Enter a valid amount', 'error'); return }
+    const amtPaise = Math.round(amtNum * 100)
+    if (amtPaise < 50000) { showToast('Minimum withdrawal amount is ₹500', 'error'); return }
+    if (!wdName.trim())    { showToast('Account holder name is required', 'error'); return }
+    if (!wdAccount.trim()) { showToast('Bank account number is required', 'error'); return }
+    if (!wdIfsc.trim())    { showToast('IFSC code is required', 'error'); return }
+
+    setWdBusy(true)
+    try {
+      const res = await fetch('/api/partner-portal/withdraw', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          amount_paise:  amtPaise,
+          account_name:  wdName.trim(),
+          bank_account:  wdAccount.trim(),
+          bank_ifsc:     wdIfsc.trim().toUpperCase(),
+          upi_id:        wdUpi.trim() || null,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) { showToast(json.error ?? 'Failed to submit request', 'error'); return }
+
+      showToast('Withdrawal request submitted!')
+      setWdAmount(''); setWdName(''); setWdAccount(''); setWdIfsc(''); setWdUpi('')
+      if (json.withdrawals) setWithdrawals(json.withdrawals)
+      if (json.available_paise !== undefined) setAvailPaise(json.available_paise)
+      if (json.earned_paise   !== undefined) setEarnedPaise(json.earned_paise)
+      setHasPending(true)
+    } catch { showToast('Network error', 'error') }
+    finally  { setWdBusy(false) }
+  }
+
   async function handleLogout() {
     await createClient().auth.signOut()
     window.location.href = '/partners/login'
@@ -134,6 +237,11 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
   const totalSignedUp   = msmeSignedUp + partnerSignedUp
   const totalSent       = allInvites.length
   const commissionEst   = msmeSignedUp * MSME_COMMISSION + partnerSignedUp * PARTNER_COMMISSION
+
+  // Use API balance if loaded, else compute from withdrawals props
+  const displayEarned = earnedPaise !== null ? earnedPaise / 100 : commissionEst
+  const paidDeducted  = initWithdrawals.filter(w => w.status !== 'rejected').reduce((s, w) => s + w.amount_paise, 0)
+  const displayAvail  = availPaise !== null ? availPaise / 100 : Math.max(0, commissionEst - paidDeducted / 100)
 
   const tier = getTier(totalSignedUp)
 
@@ -161,7 +269,7 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
       </nav>
 
       {/* Body */}
-      <div style={{ maxWidth: 800, margin: '0 auto', padding: '32px 16px 64px' }}>
+      <div style={{ maxWidth: 860, margin: '0 auto', padding: '32px 16px 64px' }}>
 
         {/* Welcome + tier badge */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24, gap: 16, flexWrap: 'wrap' }}>
@@ -217,7 +325,7 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
             })}
           </div>
           <div style={{ marginTop: 10, padding: '10px 14px', background: BG, borderRadius: 8, fontSize: 12, color: MUTED, lineHeight: 1.6 }}>
-            Commission rates: <strong style={{ color: DARK }}>₹{MSME_COMMISSION.toLocaleString('en-IN')}/MSME sign-up</strong> · <strong style={{ color: DARK }}>₹{PARTNER_COMMISSION.toLocaleString('en-IN')}/Partner sign-up</strong> · Paid monthly on request.
+            Commission rates: <strong style={{ color: DARK }}>₹{MSME_COMMISSION.toLocaleString('en-IN')}/MSME sign-up</strong> · <strong style={{ color: DARK }}>₹{PARTNER_COMMISSION.toLocaleString('en-IN')}/Partner sign-up</strong> · Paid on request (min ₹500).
           </div>
         </div>
 
@@ -253,7 +361,7 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
               onChange={e => setEmail(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') sendInvite() }}
               placeholder={invType === 'msme' ? 'business@example.com' : 'friend@example.com'}
-              style={inputStyle}
+              style={{ ...inputStyle, flex: 1, width: 'auto' }}
             />
             <button
               onClick={sendInvite}
@@ -276,16 +384,18 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
           </p>
         </div>
 
-        {/* Activity table */}
+        {/* Referred Users table */}
         <div style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 12, overflow: 'hidden', marginBottom: 20 }}>
           <div style={{ padding: '14px 20px', borderBottom: `1px solid ${BORDER}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontWeight: 700, fontSize: 14, color: DARK }}>Referral Activity</span>
+            <div>
+              <span style={{ fontWeight: 700, fontSize: 14, color: DARK }}>Referred Users</span>
+              <span style={{ fontSize: 12, color: MUTED, marginLeft: 8 }}>— full transparency on each referral</span>
+            </div>
             <span style={{ fontSize: 12, color: MUTED }}>{allInvites.length} total</span>
           </div>
 
           {allInvites.length === 0 ? (
             <div style={{ padding: '40px 20px', textAlign: 'center', color: MUTED }}>
-              <div style={{ width: 48, height: 48, borderRadius: 12, background: BG, border: `1px solid ${BORDER}`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', fontSize: 22 }}>—</div>
               <div style={{ fontWeight: 600, color: DARK, marginBottom: 4 }}>No invites sent yet</div>
               <div style={{ fontSize: 13 }}>Enter an email above and send your first invite!</div>
             </div>
@@ -294,37 +404,199 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: BG }}>
-                    {['Email', 'Invited to', 'Times sent', 'Status', 'Last sent'].map(h => (
-                      <th key={h} style={{ padding: '9px 16px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap', borderBottom: `1px solid ${BORDER}` }}>{h}</th>
+                    {['Email', 'Invited to', 'Times sent', 'Sign-up', 'Pack purchased', 'Commission', 'Last sent'].map(h => (
+                      <th key={h} style={{ padding: '9px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap', borderBottom: `1px solid ${BORDER}` }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {allInvites.map((inv, i) => (
-                    <tr key={inv.id} style={{ borderTop: i > 0 ? `1px solid ${BORDER}` : 'none', background: WHITE }}>
-                      <td style={{ padding: '11px 16px', fontWeight: 500, color: DARK, maxWidth: 220 }}>
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{inv.email}</span>
-                      </td>
-                      <td style={{ padding: '11px 16px' }}>
-                        <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 20, background: inv.invite_type === 'msme' ? 'rgba(13,148,136,0.1)' : 'rgba(124,58,237,0.1)', color: inv.invite_type === 'msme' ? TEAL : PURPLE }}>
-                          {inv.invite_type === 'msme' ? 'MSME Tracker' : 'Partner Program'}
-                        </span>
-                      </td>
-                      <td style={{ padding: '11px 16px', color: MUTED, textAlign: 'center' }}>{inv.invite_count}x</td>
-                      <td style={{ padding: '11px 16px' }}>
-                        {inv.signed_up ? (
-                          <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 20, background: '#dcfce7', color: '#166534' }}>Signed up</span>
-                        ) : (
-                          <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 20, background: '#fef9c3', color: '#a16207' }}>Invited</span>
-                        )}
-                      </td>
-                      <td style={{ padding: '11px 16px', color: MUTED, fontSize: 12 }}>{fmtShort(inv.last_sent_at)}</td>
-                    </tr>
-                  ))}
+                  {allInvites.map((inv, i) => {
+                    const emailKey = inv.email.toLowerCase()
+                    const pack = inv.invite_type === 'msme' && inv.signed_up ? packByEmail[emailKey] : undefined
+                    return (
+                      <tr key={inv.id} style={{ borderTop: i > 0 ? `1px solid ${BORDER}` : 'none', background: WHITE }}>
+                        <td style={{ padding: '10px 14px', fontWeight: 500, color: DARK, maxWidth: 180 }}>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{inv.email}</span>
+                        </td>
+                        <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                          <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 20, background: inv.invite_type === 'msme' ? 'rgba(13,148,136,0.1)' : 'rgba(124,58,237,0.1)', color: inv.invite_type === 'msme' ? TEAL : PURPLE }}>
+                            {inv.invite_type === 'msme' ? 'MSME Tracker' : 'Partner Program'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '10px 14px', color: MUTED, textAlign: 'center' }}>{inv.invite_count}x</td>
+                        <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                          {inv.signed_up ? (
+                            <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 20, background: '#dcfce7', color: '#166534' }}>✓ Signed up</span>
+                          ) : (
+                            <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 20, background: '#fef9c3', color: '#a16207' }}>Invited</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                          {inv.invite_type === 'msme' && inv.signed_up ? (
+                            pack ? (
+                              <div>
+                                <span style={{ fontSize: 12, fontWeight: 700, color: TEAL }}>{packTierLabel(pack.packTier)}</span>
+                                <span style={{ fontSize: 11, color: MUTED, marginLeft: 6 }}>₹{(pack.amountPaise / 100).toLocaleString('en-IN')}</span>
+                                <div style={{ fontSize: 10, color: '#94a3b8' }}>{fmtDate(pack.paidAt)}</div>
+                              </div>
+                            ) : (
+                              <span style={{ fontSize: 12, color: '#94a3b8' }}>Free plan</span>
+                            )
+                          ) : inv.invite_type === 'partner' && inv.signed_up ? (
+                            <span style={{ fontSize: 12, color: '#94a3b8' }}>Partner joined</span>
+                          ) : (
+                            <span style={{ fontSize: 12, color: '#cbd5e1' }}>—</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                          {inv.signed_up ? (
+                            <span style={{ fontSize: 13, fontWeight: 700, color: TEAL }}>
+                              ₹{(inv.invite_type === 'msme' ? MSME_COMMISSION : PARTNER_COMMISSION).toLocaleString('en-IN')}
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: 12, color: '#cbd5e1' }}>—</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '10px 14px', color: MUTED, fontSize: 12, whiteSpace: 'nowrap' }}>{fmtShort(inv.last_sent_at)}</td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
           )}
+        </div>
+
+        {/* Withdraw Earnings */}
+        <div style={{ background: WHITE, border: `1.5px solid ${TEAL}40`, borderRadius: 12, overflow: 'hidden', marginBottom: 20 }}>
+          <div
+            style={{ padding: '14px 20px', borderBottom: `1px solid ${BORDER}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', background: `${TEAL}06` }}
+            onClick={loadBalance}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 20 }}>💰</span>
+              <span style={{ fontWeight: 700, fontSize: 14, color: DARK }}>Withdraw Earnings</span>
+            </div>
+            <span style={{ fontSize: 12, color: MUTED }}>{balLoaded ? '' : 'Click to load balance'}</span>
+          </div>
+
+          <div style={{ padding: 20 }}>
+            {/* Balance summary */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 20 }}>
+              <div style={{ background: BG, border: `1px solid ${BORDER}`, borderRadius: 10, padding: '14px 16px' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Total Earned</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: TEAL }}>₹{displayEarned.toLocaleString('en-IN')}</div>
+                <div style={{ fontSize: 11, color: MUTED }}>estimated commissions</div>
+              </div>
+              <div style={{ background: BG, border: `1px solid ${BORDER}`, borderRadius: 10, padding: '14px 16px' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Available</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: displayAvail >= 500 ? '#16a34a' : '#dc2626' }}>₹{displayAvail.toLocaleString('en-IN')}</div>
+                <div style={{ fontSize: 11, color: MUTED }}>after pending/paid withdrawals</div>
+              </div>
+              <div style={{ background: BG, border: `1px solid ${BORDER}`, borderRadius: 10, padding: '14px 16px' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Withdrawals</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: DARK }}>{withdrawals.length}</div>
+                <div style={{ fontSize: 11, color: hasPending ? '#a16207' : MUTED }}>{hasPending ? '1 in progress' : 'no pending'}</div>
+              </div>
+            </div>
+
+            {/* Withdrawal form */}
+            {hasPending ? (
+              <div style={{ padding: '14px 16px', background: '#fef9c3', border: '1px solid #fde68a', borderRadius: 10, fontSize: 13, color: '#92400e', marginBottom: 20 }}>
+                You have a withdrawal request in progress. You can submit a new one once it is processed.
+              </div>
+            ) : displayAvail < 500 ? (
+              <div style={{ padding: '14px 16px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, fontSize: 13, color: '#dc2626', marginBottom: 20 }}>
+                Minimum withdrawal amount is ₹500. Your available balance is ₹{displayAvail.toLocaleString('en-IN')}.
+              </div>
+            ) : (
+              <div style={{ background: BG, border: `1px solid ${BORDER}`, borderRadius: 10, padding: 18, marginBottom: 20 }}>
+                <div style={{ fontWeight: 700, fontSize: 13, color: DARK, marginBottom: 14 }}>Request a withdrawal</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: MUTED, marginBottom: 5 }}>Amount (₹) *</label>
+                    <input
+                      type="number"
+                      min="500"
+                      max={displayAvail}
+                      step="1"
+                      value={wdAmount}
+                      onChange={e => setWdAmount(e.target.value)}
+                      placeholder={`500 – ${displayAvail}`}
+                      style={inputStyle}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: MUTED, marginBottom: 5 }}>Account Holder Name *</label>
+                    <input type="text" value={wdName} onChange={e => setWdName(e.target.value)} placeholder="As per bank records" style={inputStyle} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: MUTED, marginBottom: 5 }}>Bank Account Number *</label>
+                    <input type="text" value={wdAccount} onChange={e => setWdAccount(e.target.value)} placeholder="e.g. 123456789012" style={inputStyle} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: MUTED, marginBottom: 5 }}>IFSC Code *</label>
+                    <input type="text" value={wdIfsc} onChange={e => setWdIfsc(e.target.value.toUpperCase())} placeholder="e.g. SBIN0001234" maxLength={11} style={inputStyle} />
+                  </div>
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: MUTED, marginBottom: 5 }}>UPI ID (optional)</label>
+                    <input type="text" value={wdUpi} onChange={e => setWdUpi(e.target.value)} placeholder="yourname@upi" style={inputStyle} />
+                  </div>
+                </div>
+                <button
+                  onClick={submitWithdrawal}
+                  disabled={wdBusy}
+                  style={{
+                    padding: '11px 28px', borderRadius: 8, fontSize: 14, fontWeight: 700,
+                    background: wdBusy ? '#e2e8f0' : TEAL,
+                    color: wdBusy ? '#94a3b8' : WHITE,
+                    border: 'none', cursor: wdBusy ? 'not-allowed' : 'pointer',
+                    colorScheme: 'light',
+                  }}
+                >
+                  {wdBusy ? 'Submitting…' : 'Submit Withdrawal Request'}
+                </button>
+                <p style={{ fontSize: 11, color: MUTED, margin: '8px 0 0' }}>
+                  Our team will process your request within 3–5 business days and transfer the amount to your bank account.
+                </p>
+              </div>
+            )}
+
+            {/* Withdrawal history */}
+            {withdrawals.length > 0 && (
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 13, color: DARK, marginBottom: 10 }}>Withdrawal History</div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                    <thead>
+                      <tr style={{ background: BG }}>
+                        {['Date', 'Amount', 'Account', 'IFSC', 'Status', 'Note'].map(h => (
+                          <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap', borderBottom: `1px solid ${BORDER}` }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {withdrawals.map((w, i) => (
+                        <tr key={w.id} style={{ borderTop: i > 0 ? `1px solid ${BORDER}` : 'none', background: WHITE }}>
+                          <td style={{ padding: '9px 12px', color: MUTED, fontSize: 12, whiteSpace: 'nowrap' }}>{fmtDate(w.created_at)}</td>
+                          <td style={{ padding: '9px 12px', fontWeight: 700, color: DARK, whiteSpace: 'nowrap' }}>₹{(w.amount_paise / 100).toLocaleString('en-IN')}</td>
+                          <td style={{ padding: '9px 12px', color: MUTED, fontSize: 12, maxWidth: 140 }}>
+                            <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.account_name}</div>
+                            <div style={{ fontSize: 11, color: '#94a3b8' }}>····{w.bank_account.slice(-4)}</div>
+                          </td>
+                          <td style={{ padding: '9px 12px', color: MUTED, fontSize: 12, fontFamily: 'monospace' }}>{w.bank_ifsc}</td>
+                          <td style={{ padding: '9px 12px', whiteSpace: 'nowrap' }}>{withdrawalStatusBadge(w.status)}</td>
+                          <td style={{ padding: '9px 12px', fontSize: 12, color: MUTED, maxWidth: 160 }}>
+                            {w.admin_note ?? (w.status === 'paid' && w.processed_at ? `Paid on ${fmtDate(w.processed_at)}` : '—')}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Referral links */}
@@ -367,7 +639,7 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
               ['Invite clients or partners', 'Send an email invite above or share your referral link on WhatsApp.'],
               ['They sign up via your link', 'Anyone who uses your link or code gets tagged to your account automatically.'],
               ['They upgrade — you earn', `₹${MSME_COMMISSION}/MSME sign-up · ₹${PARTNER_COMMISSION}/Partner sign-up. Tiers unlock at 1, 5, and 10 sign-ups.`],
-              ['Monthly payouts on request', 'Commissions are reviewed monthly. Email info@upfloat.co to request a payout.'],
+              ['Request payout anytime', 'Min ₹500. Submit your bank details in the Withdraw section above. Processed within 3–5 business days.'],
             ].map(([title, desc], i) => (
               <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                 <div style={{ width: 24, height: 24, borderRadius: '50%', background: TEAL, color: WHITE, fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>{i + 1}</div>

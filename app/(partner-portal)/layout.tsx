@@ -9,6 +9,13 @@ export default function PartnerPortalLayout({ children }: { children: React.Reac
       color: '#0f172a',
       colorScheme: 'light',
     }}>
+      {/*
+        Force light mode: remove html.dark class (applied by app's ThemeProvider
+        for dark mode users) so globals.css dark overrides don't affect this portal.
+        Also force color-scheme to block Chrome's Auto Dark Mode for Web Contents.
+      */}
+      <style>{`:root { color-scheme: light !important; } * { color-scheme: light !important; }`}</style>
+      <script dangerouslySetInnerHTML={{ __html: `document.documentElement.classList.remove('dark');` }} />
       {children}
     </div>
   )

@@ -1,5 +1,5 @@
 # Planora Task — Codebase Transfer Document
-> Use this at the start of a new chat to give the AI full context. Last updated: 2026-06-16 (Session 16)
+> Use this at the start of a new chat to give the AI full context. Last updated: 2026-06-17 (Session 20)
 
 ---
 
@@ -42,6 +42,10 @@
 | `invoice_items` | `id, invoice_id, org_id, task_id, description, quantity, unit_price, amount` |
 | `referral_redemptions` | `id, referrer_org_id, redeemer_org_id, extension_days, created_at` — UNIQUE(redeemer_org_id) |
 | `organisations` (extended) | added: `trial_started_at, trial_extension_days (int default 0), referral_code (text unique), join_code (text unique)` — **requires add_org_codes_trial.sql migration** |
+| `standalone_partners` | `id, user_id, name, email, referral_code, status, created_at` — standalone partner portal |
+| `partner_portal_invites` | `id, partner_id, email, invite_type (msme/partner), invite_count, last_sent_at, signed_up` |
+| `standalone_partner_withdrawals` | `id, partner_id, amount_paise, account_name, bank_account, bank_ifsc, upi_id, status (requested/processing/paid/rejected), admin_note, created_at, processed_at` — **requires add_standalone_partner_withdrawals.sql migration** |
+| `msme_pack_payments` | `id, org_id, pack_tier, vendor_limit, amount_paise, status (pending/paid/failed), paid_at` — **requires add_msme_pack_billing.sql migration** |
 
 **Important FK join syntax** (must be explicit in `.select()`):
 ```
@@ -989,6 +993,65 @@ lib/data/caDefaultTasks.ts            — Default CA task templates
   ```
 - **No UI or interface changes**: `MonitorView` props are identical. The completed count in the stats bar now reflects "completed in last 90 days" — appropriate for a real-time monitoring dashboard.
 - **File**: `app/(app)/monitor/page.tsx`
+
+---
+
+### SESSION 20 FEATURES & FIXES
+
+### 42. MSME login redirected to `/dashboard` instead of `/msme`
+- **Root cause**: `app/auth/callback/route.ts` used `safeRedirect(null, '/dashboard')` — no awareness of which subdomain triggered the login.
+- **Fix**: Read `request.headers.get('host')` at callback time. If host starts with `msme.`, default redirect is `/msme`.
+  ```typescript
+  const host = request.headers.get('host') ?? ''
+  const isMsmeDomain = host.startsWith('msme.')
+  const next = safeRedirect(url.searchParams.get('next'), isMsmeDomain ? '/msme' : '/dashboard')
+  ```
+- **File**: `app/auth/callback/route.ts`
+
+### 43. Partner portal and MSME portal showed broken dark mode (text invisible)
+- **Root cause**: `ThemeProvider` applies `html.dark` class based on OS/browser preference. The partner portal and MSME portal use hardcoded inline `#ffffff` hex colors that `globals.css` overrides in dark mode.
+- **Fix (two-pronged)**:
+  1. `app/layout.tsx` inline script — added `/partners` and `/msme` to `isPublicPage` check so `html.dark` is never added on initial page load for these routes.
+  2. Each portal layout — added `<style>` for `color-scheme: light !important` and `<script>` to call `document.documentElement.classList.remove('dark')` for client-side navigation cases.
+- **Files**: `app/layout.tsx`, `app/(partner-portal)/layout.tsx`, `app/(msme)/layout.tsx`, `app/msme/form/[token]/layout.tsx`
+
+### 44. Partner portal `invite_count` always reset to 1 on every invite send
+- **Root cause**: The old upsert pattern used `.upsert({ invite_count: 1, ... })` — it always wrote 1, ignoring the existing count.
+- **Fix**: Changed to select-first-then-insert-or-update pattern:
+  ```typescript
+  const { data: existing } = await admin.from('partner_portal_invites')
+    .select('id, invite_count').eq('partner_id', ...).eq('email', ...).eq('invite_type', ...).maybeSingle()
+  if (existing) {
+    await admin.from('partner_portal_invites')
+      .update({ invite_count: existing.invite_count + 1, last_sent_at: new Date().toISOString() })
+      .eq('id', existing.id)
+  } else {
+    await admin.from('partner_portal_invites').insert({ ..., invite_count: 1, ... })
+  }
+  ```
+- **File**: `app/api/partner-portal/invite/route.ts`
+
+### 45. Partner portal withdrawal feature (NEW)
+- **New migration**: `supabase/migrations/add_standalone_partner_withdrawals.sql` — creates `standalone_partner_withdrawals` table with status enum `(requested/processing/paid/rejected)`.
+- **New API**: `app/api/partner-portal/withdraw/route.ts`
+  - `GET`: returns `{ withdrawals, earned_paise, available_paise, has_pending }`. `computeBalance()` counts signed-up invite counts × commission rates (₹500/MSME, ₹1000/partner) minus all non-rejected withdrawals.
+  - `POST`: validates amount (≥ ₹500), IFSC regex `/^[A-Z]{4}0[A-Z0-9]{6}$/`, no-duplicate-pending guard, amount ≤ available balance, then inserts.
+- **Updated `page.tsx`**: Fetches withdrawal history and enriches signed-up MSME invites with pack purchase data via `users` → `org_members` → `msme_pack_payments` join. Passes `withdrawals` and `packByEmail` to `PartnerDashboard`.
+- **Updated `PartnerDashboard.tsx`**: 
+  - "Referred Users" table (replaces "Referral Activity") now shows: Pack Purchased (tier + amount + date), Commission per row.
+  - "Withdraw Earnings" section: balance cards (earned / available / withdrawals count), withdrawal form (amount, account name, bank account, IFSC, optional UPI), withdrawal history with status badges.
+  - Balance lazy-loads on first click of the section header via `/api/partner-portal/withdraw GET`.
+- **Files**: `supabase/migrations/add_standalone_partner_withdrawals.sql` (new), `app/api/partner-portal/withdraw/route.ts` (new), `app/(partner-portal)/partners/dashboard/page.tsx`, `app/(partner-portal)/partners/dashboard/PartnerDashboard.tsx`
+
+### 46. MSME Excel export — added full email audit trail sheet
+- **New API**: `app/api/msme/email-logs/route.ts` — GET returns all `msme_email_log` rows (`vendor_id, attempt_no, sent_at, opened_at`) for the org. Auth via `getApiOrgMembership`.
+- **Updated `MsmeView.tsx`**: `handleExport` now async. After building Sheet 1 "MSME Vendors", it fetches `/api/msme/email-logs` and builds Sheet 2 "Email Audit Trail" with columns: Vendor Name, Vendor Email, Email Attempt #, Date Sent, Time Sent, Opened On, Status When Sent, Current Status, Response Received On. Email log sheet failure is best-effort (doesn't block export).
+- **Files**: `app/api/msme/email-logs/route.ts` (new), `app/(app)/msme/MsmeView.tsx`
+
+### 47. MSME dashboard — logout button moved to top navbar
+- **New file**: `app/(msme)/MsmeLogoutButton.tsx` — `'use client'` component. Calls `createClient().auth.signOut()`, then redirects to `/login?redirect=/msme`.
+- **Updated**: `app/(msme)/layout.tsx` — imports `MsmeLogoutButton` and conditionally renders it in the navbar when `isLoggedIn` is true (determined by whether `getSessionUser()` returns a user).
+- **Files**: `app/(msme)/MsmeLogoutButton.tsx` (new), `app/(msme)/layout.tsx`
 
 ---
 

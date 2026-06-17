@@ -71,6 +71,7 @@ export function MsmeView({ userRole, orgName }: Props) {
   const [toasts,        setToasts]        = useState<Toast[]>([])
   const [showTour,      setShowTour]      = useState(false)
   const [copyingId,     setCopyingId]     = useState<string | null>(null)
+  const [exporting,     setExporting]     = useState(false)
   const [editingEmail,  setEditingEmail]  = useState<string | null>(null)
   const [editEmailVal,  setEditEmailVal]  = useState('')
   const [savingEmail,   setSavingEmail]   = useState(false)
@@ -374,37 +375,87 @@ export function MsmeView({ userRole, orgName }: Props) {
     XLSX.writeFile(wb, 'msme-vendor-import-template.xlsx')
   }
 
-  // ── Export all vendors ─────────────────────────────────────────────────────
-  function handleExport() {
-    const header = ['Vendor Name', 'Email', 'GSTIN', 'PAN', 'Tracker Status', 'Udyam Number', 'Udyam Registered On', 'Category', 'Nature of Business', 'Outstanding Amount (₹)', '43B(h) Applicable', 'Emails Sent', 'Last Email Date', 'Submitted On', 'Declaration By', 'Date Added']
-    const rows = vendors.map(v => {
-      const is43bh = v.msme_category !== null && (v.outstanding_amount ?? 0) > 0 ? 'Yes' : v.is_not_msme ? 'No (Non-MSME)' : 'Unverified'
-      return [
-        v.vendor_name,
-        v.vendor_email,
-        v.gstin ?? '',
-        v.pan ?? '',
-        v.is_not_msme ? 'Non-MSME Declaration' : STATUS_LABEL[v.status].replace(' ✓', ''),
-        v.udyam_number ?? '',
-        v.udyam_registered_on ? new Date(v.udyam_registered_on).toLocaleDateString('en-IN') : '',
-        v.msme_category ? CAT_LABEL[v.msme_category] : '',
-        v.nature_of_business ? NAT_LABEL[v.nature_of_business] : '',
-        v.outstanding_amount !== null && v.outstanding_amount !== undefined ? v.outstanding_amount : '',
-        is43bh,
-        v.email_count,
-        v.last_emailed_at ? new Date(v.last_emailed_at).toLocaleDateString('en-IN') : '',
-        v.submitted_at ? new Date(v.submitted_at).toLocaleDateString('en-IN') : '',
-        v.declarant_name ?? '',
-        new Date(v.created_at).toLocaleDateString('en-IN'),
-      ]
-    })
+  // ── Export all vendors + email audit trail ────────────────────────────────
+  async function handleExport() {
+    if (exporting) return
+    setExporting(true)
+    try {
+      // Sheet 1: Vendor summary
+      const header = ['Vendor Name', 'Email', 'GSTIN', 'PAN', 'Tracker Status', 'Udyam Number', 'Udyam Registered On', 'Category', 'Nature of Business', 'Outstanding Amount (₹)', '43B(h) Applicable', 'Emails Sent', 'Last Email Date', 'Submitted On', 'Declaration By', 'Date Added']
+      const rows = vendors.map(v => {
+        const is43bh = v.msme_category !== null && (v.outstanding_amount ?? 0) > 0 ? 'Yes' : v.is_not_msme ? 'No (Non-MSME)' : 'Unverified'
+        return [
+          v.vendor_name,
+          v.vendor_email,
+          v.gstin ?? '',
+          v.pan ?? '',
+          v.is_not_msme ? 'Non-MSME Declaration' : STATUS_LABEL[v.status].replace(' ✓', ''),
+          v.udyam_number ?? '',
+          v.udyam_registered_on ? new Date(v.udyam_registered_on).toLocaleDateString('en-IN') : '',
+          v.msme_category ? CAT_LABEL[v.msme_category] : '',
+          v.nature_of_business ? NAT_LABEL[v.nature_of_business] : '',
+          v.outstanding_amount !== null && v.outstanding_amount !== undefined ? v.outstanding_amount : '',
+          is43bh,
+          v.email_count,
+          v.last_emailed_at ? new Date(v.last_emailed_at).toLocaleDateString('en-IN') : '',
+          v.submitted_at ? new Date(v.submitted_at).toLocaleDateString('en-IN') : '',
+          v.declarant_name ?? '',
+          new Date(v.created_at).toLocaleDateString('en-IN'),
+        ]
+      })
+      const ws = XLSX.utils.aoa_to_sheet([header, ...rows])
+      ws['!cols'] = header.map(() => ({ wch: 22 }))
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'MSME Vendors')
 
-    const ws = XLSX.utils.aoa_to_sheet([header, ...rows])
-    ws['!cols'] = header.map(() => ({ wch: 22 }))
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'MSME Vendors')
-    XLSX.writeFile(wb, `msme-vendors-${new Date().toISOString().slice(0,10)}.xlsx`)
-    showToast(`Exported ${vendors.length} vendors to Excel`)
+      // Sheet 2: Full email audit trail
+      try {
+        const logsRes = await fetch('/api/msme/email-logs')
+        if (logsRes.ok) {
+          const { logs } = await logsRes.json()
+          if (Array.isArray(logs) && logs.length > 0) {
+            const vendorMap = new Map(vendors.map(v => [v.id, v]))
+            const auditHeader = [
+              'Vendor Name', 'Vendor Email',
+              'Email Attempt #', 'Date Sent', 'Time Sent', 'Opened On',
+              'Status When Sent', 'Current Status', 'Response Received On',
+            ]
+            const auditRows = logs.map((log: { vendor_id: string; attempt_no: number; sent_at: string; opened_at: string | null }) => {
+              const v = vendorMap.get(log.vendor_id)
+              const sentDate = new Date(log.sent_at)
+              // Status when sent: emails are sent while status is 'emailed' or 'pending'
+              // We don't store historical status per-email, so we infer:
+              // if current status is submitted/not_msme and this email was before response, status was 'emailed'
+              const responseDate = v?.submitted_at ?? v?.declared_at ?? null
+              const wasResponded = responseDate && new Date(log.sent_at) < new Date(responseDate)
+              const statusWhenSent = wasResponded ? 'Awaiting reply' : (v?.status === 'submitted' || v?.status === 'not_msme' ? 'Awaiting reply (now responded)' : 'Awaiting reply')
+              const currentStatus = v
+                ? (v.is_not_msme ? 'Non-MSME Declaration' : STATUS_LABEL[v.status].replace(' ✓', ''))
+                : '—'
+              return [
+                v?.vendor_name ?? '—',
+                v?.vendor_email ?? '—',
+                log.attempt_no,
+                sentDate.toLocaleDateString('en-IN'),
+                sentDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+                log.opened_at ? new Date(log.opened_at).toLocaleDateString('en-IN') : 'Not opened',
+                statusWhenSent,
+                currentStatus,
+                responseDate ? new Date(responseDate).toLocaleDateString('en-IN') : 'Pending',
+              ]
+            })
+            const wsAudit = XLSX.utils.aoa_to_sheet([auditHeader, ...auditRows])
+            wsAudit['!cols'] = auditHeader.map(() => ({ wch: 24 }))
+            XLSX.utils.book_append_sheet(wb, wsAudit, 'Email Audit Trail')
+          }
+        }
+      } catch { /* email log sheet is best-effort — don't block export */ }
+
+      XLSX.writeFile(wb, `msme-vendors-${new Date().toISOString().slice(0,10)}.xlsx`)
+      showToast(`Exported ${vendors.length} vendors to Excel`)
+    } finally {
+      setExporting(false)
+    }
   }
 
   // ── Derived values ─────────────────────────────────────────────────────────
@@ -479,7 +530,7 @@ export function MsmeView({ userRole, orgName }: Props) {
             </button>
           )}
           {vendors.length > 0 && (
-            <button onClick={handleExport} style={ghostBtn}>↓ Export Excel</button>
+            <button onClick={handleExport} disabled={exporting} style={{ ...ghostBtn, opacity: exporting ? 0.6 : 1, cursor: exporting ? 'default' : 'pointer' }}>{exporting ? 'Exporting…' : '↓ Export Excel'}</button>
           )}
           {canManage && (
             <button data-tour="msme-add-btn" onClick={() => setShowAdd(true)} style={primaryBtn}>+ Add vendor</button>
