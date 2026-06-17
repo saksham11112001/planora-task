@@ -62,50 +62,6 @@ export default function MsmeLandingPage() {
             <a href="#how-it-works" style={{ background: BG, color: DARK, borderRadius: 10, padding: '14px 28px', fontSize: 16, fontWeight: 600, textDecoration: 'none', border: `1px solid ${BORDER}` }}>See how it works</a>
           </div>
           <p style={{ fontSize: 13, color: MUTED }}>No subscription · Pay only to scale</p>
-        <div style={{ maxWidth: 780, margin: '0 auto', padding: '80px 24px 60px', textAlign: 'center', position: 'relative' }}>
-
-        <div style={{
-          display: 'inline-flex', alignItems: 'center', gap: 8, marginBottom: 24,
-          background: 'rgba(13,148,136,0.12)', border: '1px solid rgba(13,148,136,0.3)',
-          borderRadius: 20, padding: '6px 16px', fontSize: 13, color: TEAL, fontWeight: 600,
-        }}>
-        Income Tax and ROC Compliance
-        </div>
-
-        <h1 style={{
-          fontSize: 'clamp(32px, 5vw, 54px)', fontWeight: 800, lineHeight: 1.15,
-          marginBottom: 20, letterSpacing: '-0.02em',
-        }}>
-          Worried about<br/>
-          <span style={{ color: TEAL }}>MSME compliance?</span><br/>
-          <span style={{ fontSize: '0.75em', fontWeight: 600, color: MUTED }}>We've got you covered.</span>
-        </h1>
-
-        <p style={{ fontSize: 17, color: MUTED, lineHeight: 1.7, maxWidth: 580, margin: '0 auto 36px' }}>
-         Stop chasing vendors manually.
-
-Planora automates vendor follow-ups for MSME status and compliance documents — so you never have to ask twice.
-
-Every communication is logged in an audit-ready trail, ready to hand to your auditor.
-
-One upload. Zero worries.
-        </p>
-
-        <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 16 }}>
-          <Link href="/login?redirect=/msme&mode=signup" style={{
-            background: TEAL, color: '#fff', borderRadius: 10, padding: '14px 32px',
-            fontSize: 16, fontWeight: 700, textDecoration: 'none', display: 'inline-block',
-          }}>Start free</Link>
-          <a href="#how-it-works" style={{
-            background: 'rgba(255,255,255,0.06)', color: WHITE, borderRadius: 10,
-            padding: '14px 28px', fontSize: 16, fontWeight: 600, textDecoration: 'none',
-            border: '1px solid rgba(255,255,255,0.1)',
-          }}>See how it works ↓</a>
-        </div>
-
-        <p style={{ fontSize: 13, color: MUTED }}>
-          You can start free · No subscription · Pay only to scale
-        </p>
         </div>
       </section>
 
@@ -116,8 +72,6 @@ One upload. Zero worries.
             { num: '100%', label: 'Automated — vendor emails, forms, and deadline tracking' },
             { num: '2 min', label: 'To onboard a vendor and send the first email' },
             { num: 'Full', label: 'Audit log ready to share with your CA or auditor' },
-            { num: '2 mins', label: 'To add a vendor or import file' },
-            { num: '3×',   label: 'Easier to mantain Audit Logs' },
           ].map(s => (
             <div key={s.num}>
               <div style={{ fontSize: 28, fontWeight: 800, color: TEAL, marginBottom: 4 }}>{s.num}</div>
@@ -137,19 +91,11 @@ One upload. Zero worries.
         </p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
           {[
-            {title: 'Chasing vendors manually', body: "You need Udyam certificates from 50 vendors. You're sending messages manually, following up, waiting. Half don't reply." },
-            {title: 'No central record', body: "You can't tell your auditor which vendors are MSME-registered and which aren't — it's all in scattered emails and WhatsApp chats." },
+            { title: 'Chasing vendors manually', body: "You need Udyam certificates from 50 vendors. You're sending messages manually, following up, waiting. Half don't reply." },
+            { title: 'No central record', body: "You can't tell your auditor which vendors are MSME-registered and which aren't — it's all in scattered emails and WhatsApp chats." },
             { title: 'Missing deadlines silently', body: "Payment deadlines pass without any alert. You find out during filing that a deduction is disallowed — and you've already paid tax on it." },
-          MSME Tracking is simple in theory. In practice, tracking it manually is a nightmare.
-        </p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
-          {[
-            {  title: 'Chasing vendors Manually', body: "You need Udyam certificates from 50 vendors. You're sending messages manually, following up, waiting. Half don't reply." },
-            {  title: 'No central record', body: "You cant share with auditors which vendors are MSME registered." },
-            {  title: 'Missing deadlines silently', body: "Payment deadlines pass without any alert. You find out during filing that a deduction is disallowed — and you've already paid the tax." },
           ].map(c => (
             <div key={c.title} style={{ background: '#fff5f5', border: '1px solid #fecaca', borderRadius: 12, padding: '20px 22px' }}>
-              <div style={{ fontSize: 22, marginBottom: 10 }}>{c.icon}</div>
               <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 8, color: DARK }}>{c.title}</div>
               <div style={{ fontSize: 13, color: MUTED, lineHeight: 1.6 }}>{c.body}</div>
             </div>
@@ -215,7 +161,7 @@ One upload. Zero worries.
         <div style={{ display: 'flex', gap: 20, fontSize: 13 }}>
           <Link href="/privacy" style={{ color: MUTED, textDecoration: 'none' }}>Privacy</Link>
           <Link href="/terms"   style={{ color: MUTED, textDecoration: 'none' }}>Terms</Link>
-          <a href="mailto:info@sng-adwisers.com" style={{ color: MUTED, textDecoration: 'none' }}>Contact</a>
+          <a href="mailto:info@upfloat.io" style={{ color: MUTED, textDecoration: 'none' }}>Contact</a>
         </div>
       </footer>
 
