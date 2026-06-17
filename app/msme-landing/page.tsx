@@ -94,7 +94,7 @@ export default function MsmeLandingPage() {
           </div>
           <p style={{ fontSize: 13, color: MUTED, marginBottom: 56 }}>No subscription · Pay only to scale</p>
 
-          {/* Product mockup */}
+          {/* Product demo GIF */}
           <div className="msme-mockup" style={{ maxWidth: 720, margin: '0 auto', borderRadius: 16, overflow: 'hidden', boxShadow: '0 24px 60px rgba(0,0,0,0.12), 0 0 0 1px rgba(13,148,136,0.12)', background: '#fff', border: `1px solid ${BORDER}` }}>
             {/* Browser chrome */}
             <div style={{ background: '#f1f5f9', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8, borderBottom: `1px solid ${BORDER}` }}>
@@ -105,52 +105,8 @@ export default function MsmeLandingPage() {
               </div>
               <div style={{ flex: 1, background: '#e2e8f0', borderRadius: 6, padding: '4px 12px', fontSize: 11, color: '#94a3b8', textAlign: 'center' }}>msme.upfloat.co/msme</div>
             </div>
-            {/* Mock dashboard content */}
-            <div style={{ padding: 20, textAlign: 'left' }}>
-              {/* Header row */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                <div>
-                  <div style={{ fontWeight: 800, fontSize: 15, color: DARK, marginBottom: 2 }}>MSME Vendor Tracker</div>
-                  <div style={{ fontSize: 12, color: MUTED }}>Section 43B(h) compliance dashboard</div>
-                </div>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <div style={{ background: 'rgba(13,148,136,0.08)', border: '1px solid rgba(13,148,136,0.2)', borderRadius: 6, padding: '5px 10px', fontSize: 11, color: TEAL, fontWeight: 600 }}>+ Add Vendor</div>
-                  <div style={{ background: TEAL, borderRadius: 6, padding: '5px 10px', fontSize: 11, color: '#fff', fontWeight: 600 }}>Send Emails</div>
-                </div>
-              </div>
-              {/* Stats row */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 16 }}>
-                {[
-                  { label: 'Total Vendors', value: '24', color: TEAL },
-                  { label: 'MSME Verified', value: '14', color: '#10b981' },
-                  { label: 'Pending Reply', value: '7', color: '#f59e0b' },
-                  { label: 'Not MSME', value: '3', color: '#64748b' },
-                ].map(s => (
-                  <div key={s.label} style={{ background: '#f8fafc', borderRadius: 8, padding: '10px 12px', border: `1px solid ${BORDER}` }}>
-                    <div style={{ fontSize: 18, fontWeight: 800, color: s.color }}>{s.value}</div>
-                    <div style={{ fontSize: 10, color: MUTED, marginTop: 2 }}>{s.label}</div>
-                  </div>
-                ))}
-              </div>
-              {/* Table rows */}
-              <div style={{ border: `1px solid ${BORDER}`, borderRadius: 8, overflow: 'hidden' }}>
-                <div style={{ background: '#f8fafc', padding: '8px 14px', display: 'grid', gridTemplateColumns: '2fr 2fr 1fr 1fr', gap: 8, fontSize: 10, fontWeight: 700, color: MUTED, borderBottom: `1px solid ${BORDER}`, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                  <span>Vendor</span><span>Email</span><span>Status</span><span>Action</span>
-                </div>
-                {[
-                  { name: 'Mehta Textiles Pvt Ltd', email: 'accounts@mehtax.in', status: 'Verified', statusColor: '#10b981', statusBg: '#d1fae5' },
-                  { name: 'Ravi Auto Parts', email: 'ravi@autoparts.co', status: 'Pending', statusColor: '#d97706', statusBg: '#fef3c7' },
-                  { name: 'Gupta Traders', email: 'info@guptatraders.in', status: 'Email Sent', statusColor: '#6366f1', statusBg: '#e0e7ff' },
-                ].map((r, i) => (
-                  <div key={r.name} style={{ padding: '9px 14px', display: 'grid', gridTemplateColumns: '2fr 2fr 1fr 1fr', gap: 8, alignItems: 'center', fontSize: 11, borderBottom: i < 2 ? `1px solid ${BORDER}` : 'none', background: '#fff' }}>
-                    <span style={{ fontWeight: 600, color: DARK }}>{r.name}</span>
-                    <span style={{ color: MUTED }}>{r.email}</span>
-                    <span style={{ background: r.statusBg, color: r.statusColor, borderRadius: 4, padding: '2px 6px', fontSize: 10, fontWeight: 600, display: 'inline-block' }}>{r.status}</span>
-                    <span style={{ color: TEAL, fontWeight: 600, cursor: 'pointer', fontSize: 10 }}>Resend →</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/msme-demo.gif" alt="MSME Vendor Tracker demo" style={{ width: '100%', display: 'block' }} />
           </div>
         </div>
       </section>
