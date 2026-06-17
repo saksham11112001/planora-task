@@ -513,12 +513,6 @@ export function MsmeView({ userRole, orgName }: Props) {
               📦 {packTier === 'free' ? 'Upgrade Pack' : 'Manage Pack'}
             </button>
           )}
-          <button
-            onClick={async () => { await createClient().auth.signOut(); window.location.href = '/' }}
-            style={{ ...ghostBtn, fontSize: 12, padding: '6px 12px' }}
-          >
-            Logout
-          </button>
           {canAdmin && (
             <button data-tour="msme-schedule-btn" onClick={() => { setShowSettings(true); setDraftIntervals([...intervalDays]) }} style={ghostBtn}>
               ⚙ Email schedule
@@ -542,11 +536,14 @@ export function MsmeView({ userRole, orgName }: Props) {
       {!loading && totalEver === 0 && (
         <div data-tour="msme-getting-started" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 24 }}>
           {[
-            { step: '1', icon: '➕', title: 'Add your vendors', desc: 'Add vendors manually or bulk-import from Excel' },
-            { step: '2', icon: '✉️', title: 'Shoot emails', desc: 'One click sends a branded MSME verification email' },
-            { step: '3', icon: '📋', title: 'Track responses', desc: 'Vendors fill the form — you see status in real time' },
+            { step: '1', icon: '➕', title: 'Add your vendors', desc: 'Add vendors manually or bulk-import from Excel', onClick: () => setShowAdd(true) },
+            { step: '2', icon: '✉️', title: 'Shoot emails', desc: 'One click sends a branded MSME verification email', onClick: () => { setShowImport(true); setImportRows([]); setImportPreview([]); setImportResult(null); setImportError(null) } },
+            { step: '3', icon: '📋', title: 'Track responses', desc: 'Vendors fill the form — you see status in real time', onClick: () => setShowAdd(true) },
           ].map(s => (
-            <div key={s.step} style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '16px 18px', display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+            <div key={s.step} onClick={s.onClick} style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '16px 18px', display: 'flex', gap: 14, alignItems: 'flex-start', cursor: 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = ACCENT; (e.currentTarget as HTMLDivElement).style.boxShadow = `0 4px 12px ${ACCENT}18` }}
+              onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = '#e2e8f0'; (e.currentTarget as HTMLDivElement).style.boxShadow = 'none' }}
+            >
               <div style={{ width: 32, height: 32, borderRadius: 8, background: `${ACCENT}15`, border: `1.5px solid ${ACCENT}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>{s.icon}</div>
               <div>
                 <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{s.title}</p>
