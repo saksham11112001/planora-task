@@ -4,8 +4,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient }             from '@/lib/supabase/server'
 import { createAdminClient }        from '@/lib/supabase/admin'
 import { getApiOrgMembership }      from '@/lib/supabase/apiActiveOrg'
+import { FREE_VENDOR_LIMIT }        from '@/lib/msme/packs'
 
-const FREE_VENDOR_LIMIT = 5
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 interface ImportRow {
@@ -36,13 +36,31 @@ export async function POST(req: NextRequest) {
 
   const admin = createAdminClient()
 
-  // Get current count for payment_status logic
-  const { count: existingCount } = await admin
+  // Resolve pack-based vendor limit (same logic as single-add POST)
+  const { data: packRow } = await admin
+    .from('org_feature_settings')
+    .select('config')
+    .eq('org_id', mb.org_id)
+    .eq('feature_key', 'msme_pack')
+    .maybeSingle()
+  const vendorLimit: number = (packRow?.config?.vendor_limit as number | undefined) ?? FREE_VENDOR_LIMIT
+
+  // Count ALL slots ever used (including soft-deleted) — mirrors the single-add anti-gaming logic
+  const { count: totalEver } = await admin
     .from('msme_vendors')
     .select('id', { count: 'exact', head: true })
     .eq('org_id', mb.org_id)
 
-  // Get existing emails to avoid duplicates
+  const slotsUsed = totalEver ?? 0
+
+  if (slotsUsed >= vendorLimit) {
+    return NextResponse.json({
+      error: 'Vendor limit reached. Upgrade your pack to import more vendors.',
+      code: 'LIMIT_REACHED',
+    }, { status: 402 })
+  }
+
+  // Get existing emails to avoid duplicates (all rows, including soft-deleted)
   const { data: existingVendors } = await admin
     .from('msme_vendors')
     .select('vendor_email')
@@ -50,12 +68,12 @@ export async function POST(req: NextRequest) {
 
   const existingEmails = new Set((existingVendors ?? []).map(v => v.vendor_email.toLowerCase()))
 
-  let slotIndex = existingCount ?? 0
+  let slotIndex = slotsUsed
   const inserted: string[] = []
   const skipped:  Array<{ row: number; name: string; reason: string }> = []
 
   for (let i = 0; i < rows.length; i++) {
-    const row  = rows[i]
+    const row   = rows[i]
     const name  = row.vendor_name?.toString().trim()
     const email = row.vendor_email?.toString().trim().toLowerCase()
     const gstin = row.gstin?.toString().trim() || null
@@ -64,17 +82,23 @@ export async function POST(req: NextRequest) {
     if (!email || !EMAIL_RE.test(email)) { skipped.push({ row: i + 1, name, reason: 'Invalid or missing email' }); continue }
     if (existingEmails.has(email)) { skipped.push({ row: i + 1, name, reason: 'Email already exists' }); continue }
 
+    // Stop inserting once the pack limit is reached; add remaining rows to skipped
+    if (slotIndex >= vendorLimit) {
+      skipped.push({ row: i + 1, name, reason: 'Vendor limit reached — upgrade pack to add more' })
+      continue
+    }
+
     const isPaid        = slotIndex >= FREE_VENDOR_LIMIT
     const paymentStatus = isPaid ? 'unpaid' : 'free'
 
     const { error } = await admin.from('msme_vendors').insert({
-      org_id: mb.org_id,
-      vendor_name: name,
-      vendor_email: email,
+      org_id:         mb.org_id,
+      vendor_name:    name,
+      vendor_email:   email,
       gstin,
-      is_paid: isPaid,
+      is_paid:        isPaid,
       payment_status: paymentStatus,
-      created_by: user.id,
+      created_by:     user.id,
     })
 
     if (error) {

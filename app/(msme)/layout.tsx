@@ -1,5 +1,6 @@
 import { getSessionUser }         from '@/lib/supabase/cached'
 import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
+import MsmeFeedbackButton         from './MsmeFeedbackButton'
 
 const TEAL  = '#0d9488'
 const DARK  = '#0f172a'
@@ -40,17 +41,20 @@ export default async function MsmeLayout({ children }: { children: React.ReactNo
         </div>
 
         {/* Right */}
-        <a
-          href="https://upfloat.co"
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f1f5f9', color: MUTED, border: `1px solid ${BORDER}`, borderRadius: 8, padding: '6px 14px', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}
-        >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-          </svg>
-          Try upFloat
-        </a>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <MsmeFeedbackButton />
+          <a
+            href="https://upfloat.co"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f1f5f9', color: MUTED, border: `1px solid ${BORDER}`, borderRadius: 8, padding: '6px 14px', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+            </svg>
+            Try upFloat
+          </a>
+        </div>
       </nav>
 
       <main style={{ flex: 1, overflowY: 'auto' }}>

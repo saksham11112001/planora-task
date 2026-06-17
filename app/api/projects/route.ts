@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
 
   // Enforce project limit based on plan
   const { data: orgData } = await admin.from('organisations')
-    .select('plan_tier, status, trial_ends_at').eq('id', mb.org_id).single()
+    .select('plan_tier, status, trial_ends_at').eq('id', mb.org_id).maybeSingle()
   const { count: projectCount } = await admin.from('projects')
     .select('*', { count: 'exact', head: true }).eq('org_id', mb.org_id).neq('is_archived', true)
   const plan = effectivePlan(orgData ?? { plan_tier: 'free', status: 'active' })
