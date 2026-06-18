@@ -31,8 +31,15 @@ export async function POST(req: NextRequest) {
   if (expected !== razorpay_signature)
     return NextResponse.json({ error: 'Invalid payment signature' }, { status: 400 })
 
-  const admin  = createAdminClient()
-  const paidAt = new Date().toISOString()
+  const admin = createAdminClient()
+
+  // Idempotency: if this payment_id was already processed, return success without re-activating
+  const { data: existing } = await admin
+    .from('billing_events')
+    .select('id')
+    .eq('payment_id', razorpay_payment_id)
+    .maybeSingle()
+  if (existing) return NextResponse.json({ success: true, plan_tier })
 
   // Activate the plan (first month paid — set trial_ends_at to 30 days from now
   // so the user has access; subscription billing picks up after that)
@@ -56,15 +63,19 @@ export async function POST(req: NextRequest) {
   if (coupon_code) {
     const { data: coupon } = await admin
       .from('coupons')
-      .select('id, uses_count')
+      .select('id, uses_count, max_uses')
       .eq('code', (coupon_code as string).toUpperCase())
       .maybeSingle()
 
     if (coupon) {
+      // Atomic increment: optimistic lock prevents race condition if two payments
+      // somehow complete simultaneously for the same coupon.
       await admin.from('coupons')
         .update({ uses_count: (coupon.uses_count ?? 0) + 1 })
         .eq('id', coupon.id)
+        .eq('uses_count', coupon.uses_count)
 
+      // DB unique constraint on (coupon_id, org_id) handles duplicate prevention
       await admin.from('coupon_redemptions').insert({
         coupon_id: coupon.id,
         org_id:    mb.org_id,

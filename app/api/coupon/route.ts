@@ -73,14 +73,30 @@ export async function POST(request: NextRequest) {
         )
     }
 
-    await admin.from('coupons')
+    // Atomic increment: optimistic lock on uses_count prevents race condition
+    // where two concurrent requests both pass the limit check and both succeed.
+    const { data: claimed } = await admin.from('coupons')
       .update({ uses_count: (coupon.uses_count ?? 0) + 1 })
       .eq('id', coupon.id)
+      .eq('uses_count', coupon.uses_count)  // only update if count hasn't changed
+      .select('id')
+      .maybeSingle()
 
-    await admin.from('coupon_redemptions').insert({
+    if (!claimed)
+      return NextResponse.json({ error: 'Coupon is no longer available. Please try again.' }, { status: 400 })
+
+    // Insert redemption — DB unique constraint on (coupon_id, org_id) prevents double redemption
+    const { error: redemptionError } = await admin.from('coupon_redemptions').insert({
       coupon_id: coupon.id,
       org_id:    mb.org_id,
     })
+    if (redemptionError) {
+      // Roll back the uses_count increment since redemption failed
+      await admin.from('coupons')
+        .update({ uses_count: coupon.uses_count })
+        .eq('id', coupon.id)
+      return NextResponse.json({ error: 'Your organisation has already used this coupon' }, { status: 400 })
+    }
 
     return NextResponse.json({
       success:     true,

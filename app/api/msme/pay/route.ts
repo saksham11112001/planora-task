@@ -117,6 +117,15 @@ export async function PUT(req: NextRequest) {
   const paidAt  = new Date().toISOString()
   const admin   = createAdminClient()
 
+  // Idempotency: if this payment was already processed, return success without re-activating
+  const { data: alreadyPaid } = await admin
+    .from('msme_pack_payments')
+    .select('id')
+    .eq('gateway_payment_id', razorpay_payment_id)
+    .eq('status', 'paid')
+    .maybeSingle()
+  if (alreadyPaid) return NextResponse.json({ ok: true, pack_tier, vendor_limit: pack.vendor_limit })
+
   await admin.from('org_feature_settings').upsert(
     {
       org_id:      mb.org_id,

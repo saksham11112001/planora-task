@@ -6,21 +6,34 @@ import { dbError }           from '@/lib/api-error'
 import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
 import { DEFAULT_COUNTRY, isValidCountry, getCountry } from '@/lib/locale/countries'
 
+/** Detect country from Vercel/Cloudflare IP headers. Returns a supported country code. */
+function detectCountryFromIp(request: NextRequest): string {
+  // Vercel injects x-vercel-ip-country on all edge requests (ISO 3166-1 alpha-2)
+  // Cloudflare injects cf-ipcountry on proxied requests
+  const ipCountry =
+    request.headers.get('x-vercel-ip-country') ??
+    request.headers.get('cf-ipcountry') ??
+    ''
+  return isValidCountry(ipCountry) ? ipCountry.toUpperCase() : DEFAULT_COUNTRY
+}
+
 /** GET — current org country/locale. Any member may read. */
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ data: { country: DEFAULT_COUNTRY } })
+    if (!user) return NextResponse.json({ data: { country: detectCountryFromIp(request) } })
 
     const mb = await getApiOrgMembership(supabase, user.id, request, 'org_id')
-    if (!mb) return NextResponse.json({ data: { country: DEFAULT_COUNTRY } })
+    if (!mb) return NextResponse.json({ data: { country: detectCountryFromIp(request) } })
 
     const admin = createAdminClient()
     const { data } = await admin.from('org_settings')
       .select('locale').eq('org_id', mb.org_id).maybeSingle()
 
-    const country = (data as any)?.locale?.country
+    const storedCountry = (data as any)?.locale?.country
+    // Use stored preference; fall back to IP-detected country for new orgs
+    const country = storedCountry ?? detectCountryFromIp(request)
     const profile = getCountry(country)
     return NextResponse.json({ data: { country: profile.code } })
   } catch {
