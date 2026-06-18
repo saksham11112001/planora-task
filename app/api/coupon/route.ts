@@ -73,14 +73,30 @@ export async function POST(request: NextRequest) {
         )
     }
 
-    await admin.from('coupons')
+    // Atomic increment: optimistic lock on uses_count prevents race condition
+    // where two concurrent requests both pass the limit check and both succeed.
+    const { data: claimed } = await admin.from('coupons')
       .update({ uses_count: (coupon.uses_count ?? 0) + 1 })
       .eq('id', coupon.id)
+      .eq('uses_count', coupon.uses_count)  // only update if count hasn't changed
+      .select('id')
+      .maybeSingle()
 
-    await admin.from('coupon_redemptions').insert({
+    if (!claimed)
+      return NextResponse.json({ error: 'Coupon is no longer available. Please try again.' }, { status: 400 })
+
+    // Insert redemption — DB unique constraint on (coupon_id, org_id) prevents double redemption
+    const { error: redemptionError } = await admin.from('coupon_redemptions').insert({
       coupon_id: coupon.id,
       org_id:    mb.org_id,
     })
+    if (redemptionError) {
+      // Roll back the uses_count increment since redemption failed
+      await admin.from('coupons')
+        .update({ uses_count: coupon.uses_count })
+        .eq('id', coupon.id)
+      return NextResponse.json({ error: 'Your organisation has already used this coupon' }, { status: 400 })
+    }
 
     return NextResponse.json({
       success:     true,
@@ -92,26 +108,19 @@ export async function POST(request: NextRequest) {
     })
   }
 
-  // Handle percent / fixed_inr type — return discount info for Razorpay (future use)
+  // Handle percent / fixed_inr — validate only, do NOT record redemption here.
+  // Redemption is recorded after successful Razorpay payment in /api/settings/billing/verify.
   if (coupon.discount_type === 'percent' || coupon.discount_type === 'fixed_inr') {
-    // Record redemption intent (increment uses_count, record redemption)
-    await admin.from('coupons')
-      .update({ uses_count: (coupon.uses_count ?? 0) + 1 })
-      .eq('id', coupon.id)
-
-    await admin.from('coupon_redemptions').insert({
-      coupon_id: coupon.id,
-      org_id:    mb.org_id,
-    })
-
     return NextResponse.json({
       success:          true,
       type:             coupon.discount_type,
-      discount_percent: coupon.discount_percent,
+      code:             coupon.code,
+      discount_percent: coupon.discount_percent ?? null,
+      discount_inr:     coupon.discount_inr     ?? null,
       description:      coupon.description,
       message:          coupon.discount_type === 'percent'
-        ? `${coupon.discount_percent}% discount will be applied at checkout`
-        : `$${coupon.discount_inr} discount will be applied at checkout`,
+        ? `${coupon.discount_percent}% off — applied at checkout`
+        : `₹${coupon.discount_inr} off — applied at checkout`,
     })
   }
 

@@ -137,7 +137,7 @@ export function MsmeView({ userRole, orgName }: Props) {
 
   useEffect(() => { fetchVendors() }, [fetchVendors])
 
-  // If user returns from Cashfree payment page, refresh settings to pick up new pack
+  // If user returns to the page after payment (fallback), refresh pack settings
   useEffect(() => {
     if (typeof window === 'undefined') return
     const params = new URLSearchParams(window.location.search)
@@ -203,14 +203,61 @@ export function MsmeView({ userRole, orgName }: Props) {
       return
     }
 
-    if (data.gateway === 'cashfree' && data.payment_link) {
+    if (data.gateway === 'razorpay' && data.order_id) {
       setShowUpgrade(false)
-      window.open(data.payment_link, '_blank', 'noopener,noreferrer')
-      showToast('Complete your payment in the new tab — your pack activates automatically.', 'info')
+      // Load Razorpay checkout script dynamically
+      const loadRzp = () => new Promise<void>((resolve, reject) => {
+        if ((window as any).Razorpay) { resolve(); return }
+        const s = document.createElement('script')
+        s.src = 'https://checkout.razorpay.com/v1/checkout.js'
+        s.onload = () => resolve()
+        s.onerror = () => reject(new Error('Failed to load Razorpay'))
+        document.body.appendChild(s)
+      })
+      try {
+        await loadRzp()
+        const rzp = new (window as any).Razorpay({
+          key:         data.key_id,
+          order_id:    data.order_id,
+          amount:      data.amount,
+          currency:    'INR',
+          name:        'upFloat',
+          description: `MSME Tracker — ${data.pack_tier} pack`,
+          image:       '/favicon.svg',
+          prefill: { email: data.email, name: data.org_name },
+          theme: { color: '#0d9488' },
+          handler: async (response: any) => {
+            // Verify signature server-side
+            const verifyRes = await fetch('/api/msme/pay', {
+              method:  'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                pack_tier:             data.pack_tier,
+                razorpay_order_id:    response.razorpay_order_id,
+                razorpay_payment_id:  response.razorpay_payment_id,
+                razorpay_signature:   response.razorpay_signature,
+              }),
+            })
+            const verifyData = await verifyRes.json()
+            if (!verifyRes.ok) {
+              showToast(verifyData.error ?? 'Payment verification failed', 'error')
+              return
+            }
+            setPackTier(data.pack_tier)
+            setVendorLimit(verifyData.vendor_limit ?? vendorLimit)
+            showToast('Payment successful — your pack is now active! 🎉', 'success')
+          },
+          modal: {
+            ondismiss: () => showToast('Payment cancelled', 'info'),
+          },
+        })
+        rzp.open()
+      } catch {
+        showToast('Failed to open payment window. Please try again.', 'error')
+      }
       return
     }
 
-    // Payment not configured yet
     if (res.status === 503) {
       showToast('Payment gateway not yet live. Contact support to upgrade.', 'info')
     }
