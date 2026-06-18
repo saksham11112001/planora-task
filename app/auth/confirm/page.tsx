@@ -3,6 +3,18 @@ import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
+const MSME_URL = process.env.NEXT_PUBLIC_MSME_URL ?? 'https://msme.upfloat.co'
+
+// Cross-subdomain redirect helper: if next=/msme and we're on the main domain,
+// use a full-page navigation to the MSME subdomain.
+function navigateToNext(next: string, router: ReturnType<typeof import('next/navigation').useRouter>) {
+  if (next === '/msme' && typeof window !== 'undefined' && !window.location.hostname.startsWith('msme.')) {
+    window.location.replace(`${MSME_URL}/msme`)
+    return
+  }
+  router.replace(next)
+}
+
 type State = 'loading' | 'set_password' | 'otp_expired' | 'cancelled' | 'error'
 
 function AuthConfirmInner() {
@@ -50,7 +62,7 @@ function AuthConfirmInner() {
         const { data: { session } } = await supabase.auth.getSession()
         if (session?.user) {
           await provision(session.user)
-          router.replace(next)
+          navigateToNext(next, router)
         } else {
           setState('error')
         }
@@ -79,7 +91,7 @@ function AuthConfirmInner() {
         return
       }
 
-      router.replace(next)
+      navigateToNext(next, router)
     }
 
     async function provision(user: any) {
@@ -112,7 +124,7 @@ function AuthConfirmInner() {
     const { error } = await supabase.auth.updateUser({ password })
     setSaving(false)
     if (error) { setPwError(error.message); return }
-    router.replace(next)
+    navigateToNext(next, router)
   }
 
   // ── Set password screen (shown after invite link) ──────────────────────
@@ -157,7 +169,7 @@ function AuthConfirmInner() {
 
           {!isRecovery && (
             <button
-              onClick={() => router.replace(next)}
+              onClick={() => navigateToNext(next, router)}
               style={{ marginTop: 12, width: '100%', padding: '11px 16px', background: 'transparent',
                 color: '#94a3b8', border: '1.5px solid #e2e8f0', borderRadius: 10, fontSize: 13,
                 cursor: 'pointer', fontFamily: 'inherit' }}>
