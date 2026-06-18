@@ -958,8 +958,11 @@ export function MsmeView({ userRole, orgName }: Props) {
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {MSME_PACKS.filter(p => p.tier !== 'free').map(pack => {
-              const isCurrent = pack.tier === packTier
-              const isDowngrade = pack.vendor_limit < totalEver
+              const isCurrent   = pack.tier === packTier
+              // Downgrade = new pack has fewer slots than the current active pack limit
+              const isDowngrade = pack.vendor_limit < vendorLimit
+              // Warn (but don't block) when some vendors would remain locked after upgrade
+              const lockedAfter = Math.max(0, totalEver - pack.vendor_limit)
               return (
                 <div key={pack.tier} style={{
                   border: `2px solid ${isCurrent ? ACCENT : '#e2e8f0'}`,
@@ -971,7 +974,7 @@ export function MsmeView({ userRole, orgName }: Props) {
                   gap: 12,
                   background: isCurrent ? `${ACCENT}08` : '#ffffff',
                 }}>
-                  <div>
+                  <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span style={{ fontWeight: 700, fontSize: 15, color: '#0f172a' }}>{pack.label}</span>
                       {isCurrent && <span style={{ fontSize: 11, fontWeight: 700, color: ACCENT, background: `${ACCENT}15`, padding: '2px 8px', borderRadius: 10 }}>Current</span>}
@@ -979,6 +982,11 @@ export function MsmeView({ userRole, orgName }: Props) {
                     <div style={{ fontSize: 13, color: '#64748b', marginTop: 2 }}>
                       Up to <strong>{pack.vendor_limit} vendors</strong>
                     </div>
+                    {!isCurrent && !isDowngrade && lockedAfter > 0 && (
+                      <div style={{ fontSize: 11, color: '#b45309', marginTop: 4 }}>
+                        {lockedAfter} vendor{lockedAfter > 1 ? 's' : ''} will remain locked — upgrade to a larger pack to unlock all
+                      </div>
+                    )}
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
                     {pack.original_price_label && (
