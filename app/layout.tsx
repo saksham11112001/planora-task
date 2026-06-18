@@ -1,6 +1,9 @@
 import type { Metadata, Viewport } from 'next'
+import { Inter } from 'next/font/google'
 import './globals.css'
 import { ThemeProvider }       from '@/components/theme/ThemeProvider'
+
+const inter = Inter({ subsets: ['latin'], display: 'swap', variable: '--font-inter' })
 import { NavigationProgress }  from '@/components/ui/NavigationProgress'
 import { KeyboardShortcuts }    from '@/components/ui/KeyboardShortcuts'
 
@@ -51,7 +54,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     // suppressHydrationWarning still needed for ThemeProvider useEffect
-    <html lang="en" suppressHydrationWarning style={{ backgroundColor: '#ffffff' }}>
+    <html lang="en" suppressHydrationWarning style={{ backgroundColor: '#ffffff' }} className={inter.variable}>
       <head>
         {/* Apply saved theme before paint to avoid flash */}
         <script dangerouslySetInnerHTML={{ __html: `
