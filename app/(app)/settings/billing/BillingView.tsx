@@ -43,6 +43,9 @@ export function BillingView({ orgName, currentPlan, status, subscriptionId, tria
   const [couponCode, setCouponCode] = useState('')
   const [couponMsg,  setCouponMsg]  = useState<{ok:boolean;text:string}|null>(null)
   const [applyingCoupon, setApplyingCoupon] = useState(false)
+  const [appliedDiscount, setAppliedDiscount] = useState<{
+    code: string; type: 'percent' | 'fixed_inr'; percent?: number | null; inr?: number | null
+  } | null>(null)
 
   // Setup fee state
   const [setupPaid,       setSetupPaid]       = useState(setupFeePaid)
@@ -74,9 +77,9 @@ export function BillingView({ orgName, currentPlan, status, subscriptionId, tria
           setCouponMsg({ ok:true, text:`✓ ${(d.plan as string).charAt(0).toUpperCase()+(d.plan as string).slice(1)} plan activated for ${d.months} month${d.months>1?'s':''}! Refreshing…` })
           setCouponCode('')
           setTimeout(() => window.location.reload(), 2000)
-        } else {
-          // percent / fixed_inr — discount stored for checkout
-          setCouponMsg({ ok:true, text:`✓ ${d.message ?? 'Discount code applied!'}` })
+        } else if (d.type === 'percent' || d.type === 'fixed_inr') {
+          setAppliedDiscount({ code: d.code, type: d.type, percent: d.discount_percent, inr: d.discount_inr })
+          setCouponMsg({ ok:true, text:`✓ ${d.message ?? 'Discount applied at checkout!'}` })
           setCouponCode('')
         }
       } else {
@@ -91,29 +94,88 @@ export function BillingView({ orgName, currentPlan, status, subscriptionId, tria
     try {
       const res  = await fetch('/api/settings/billing', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan_tier: plan, billing_cycle: annual ? 'annual' : 'monthly' }),
+        body: JSON.stringify({
+          plan_tier:    plan,
+          billing_cycle: annual ? 'annual' : 'monthly',
+          coupon_code:  appliedDiscount?.code ?? null,
+        }),
       })
       const data = await res.json()
       if (!res.ok) { toast.error(data.error ?? 'Failed to initiate payment'); setLoading(null); return }
 
-      const { subscription_id, key_id } = data
-      const script = document.createElement('script')
-      script.src   = 'https://checkout.razorpay.com/v1/checkout.js'
-      document.body.appendChild(script)
-      script.onload = () => {
-        const options = {
-          key: key_id, subscription_id,
-          name: 'upFloat', description: `${plan.charAt(0).toUpperCase() + plan.slice(1)} Plan — ${annual ? 'Annual' : 'Monthly'}`,
-          image: '/favicon.svg', prefill: { name: orgName },
-          theme: { color: '#0d9488' },
+      // Load Razorpay checkout.js once
+      await new Promise<void>((resolve, reject) => {
+        if ((window as any).Razorpay) { resolve(); return }
+        const s = document.createElement('script')
+        s.src = 'https://checkout.razorpay.com/v1/checkout.js'
+        s.onload = () => resolve(); s.onerror = () => reject()
+        document.body.appendChild(s)
+      })
+
+      if (data.type === 'discounted_order') {
+        // ── Discounted first-month order checkout ──────────────────────────────
+        const rzp = new (window as any).Razorpay({
+          key:         data.key_id,
+          order_id:    data.order_id,
+          amount:      data.amount,
+          currency:    'INR',
+          name:        'upFloat',
+          description: `${plan.charAt(0).toUpperCase() + plan.slice(1)} Plan — First month (discounted)`,
+          image:       '/favicon.svg',
+          prefill:     { name: data.org_name, email: data.email },
+          theme:       { color: '#0d9488' },
+          notes:       { coupon: data.coupon_code },
+          handler: async (response: any) => {
+            const verifyRes = await fetch('/api/settings/billing/verify', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                razorpay_order_id:   response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature:  response.razorpay_signature,
+                plan_tier:           plan,
+                coupon_code:         data.coupon_code,
+              }),
+            })
+            if (verifyRes.ok) {
+              toast.success('Payment successful! Plan upgraded.')
+              setAppliedDiscount(null)
+              setTimeout(() => window.location.reload(), 1500)
+            } else {
+              const vd = await verifyRes.json()
+              toast.error(vd.error ?? 'Payment verification failed')
+            }
+          },
+          modal: { ondismiss: () => setLoading(null) },
+        })
+        rzp.open()
+        setLoading(null)
+      } else {
+        // ── Regular subscription checkout ──────────────────────────────────────
+        const rzp = new (window as any).Razorpay({
+          key:            data.key_id,
+          subscription_id: data.subscription_id,
+          name:           'upFloat',
+          description:    `${plan.charAt(0).toUpperCase() + plan.slice(1)} Plan — ${annual ? 'Annual' : 'Monthly'}`,
+          image:          '/favicon.svg',
+          prefill:        { name: orgName },
+          theme:          { color: '#0d9488' },
           handler: () => { toast.success('Payment successful! Plan upgraded.'); setTimeout(() => window.location.reload(), 1500) },
           modal: { ondismiss: () => setLoading(null) },
-        }
-        const rzp = new (window as any).Razorpay(options)
+        })
         rzp.open()
         setLoading(null)
       }
     } catch { toast.error('Network error'); setLoading(null) }
+  }
+
+  // Compute discounted display price for a plan (INR, not paise)
+  function discountedPrice(planKey: string, baseInr: number): number | null {
+    if (!appliedDiscount) return null
+    if (appliedDiscount.type === 'percent' && appliedDiscount.percent)
+      return Math.round(baseInr * (1 - appliedDiscount.percent / 100))
+    if (appliedDiscount.type === 'fixed_inr' && appliedDiscount.inr)
+      return Math.max(1, baseInr - appliedDiscount.inr)
+    return null
   }
 
   async function handleSetupFee() {
@@ -282,6 +344,7 @@ export function BillingView({ orgName, currentPlan, status, subscriptionId, tria
             const price     = annual && annualP > 0 ? annualP : monthlyP
             const sym       = countryProfile.currencySymbol
             const isLoading = loading === plan.key
+            const discounted = plan.key !== 'free' ? discountedPrice(plan.key, price) : null
 
             return (
               <div key={plan.key} style={{
@@ -315,19 +378,36 @@ export function BillingView({ orgName, currentPlan, status, subscriptionId, tria
                       <span style={{ fontSize: 28, fontWeight: 800, color: 'var(--text-primary)' }}>Free</span>
                     ) : (
                       <>
-                        <span style={{ fontSize: 28, fontWeight: 800, color: 'var(--text-primary)' }}>
-                          {sym}{price.toLocaleString(countryProfile.locale)}
-                        </span>
-                        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>/mo</span>
-                        {annual && (
-                          <div style={{ fontSize: 11, color: '#16a34a', fontWeight: 600, marginTop: 2 }}>
-                            Billed {sym}{(price * 12).toLocaleString(countryProfile.locale)}/yr · Save {sym}{((monthlyP - annualP) * 12).toLocaleString(countryProfile.locale)}
+                        {discounted != null ? (
+                          <div>
+                            <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-muted)', textDecoration: 'line-through', marginRight: 6 }}>
+                              {sym}{price.toLocaleString(countryProfile.locale)}
+                            </span>
+                            <span style={{ fontSize: 28, fontWeight: 800, color: '#16a34a' }}>
+                              {sym}{discounted.toLocaleString(countryProfile.locale)}
+                            </span>
+                            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>/mo</span>
+                            <div style={{ fontSize: 11, color: '#16a34a', fontWeight: 600, marginTop: 2 }}>
+                              First month discounted · regular price after
+                            </div>
                           </div>
-                        )}
-                        {!annual && (
-                          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                            or {sym}{annualP.toLocaleString(countryProfile.locale)}/mo billed annually
-                          </div>
+                        ) : (
+                          <>
+                            <span style={{ fontSize: 28, fontWeight: 800, color: 'var(--text-primary)' }}>
+                              {sym}{price.toLocaleString(countryProfile.locale)}
+                            </span>
+                            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>/mo</span>
+                            {annual && (
+                              <div style={{ fontSize: 11, color: '#16a34a', fontWeight: 600, marginTop: 2 }}>
+                                Billed {sym}{(price * 12).toLocaleString(countryProfile.locale)}/yr · Save {sym}{((monthlyP - annualP) * 12).toLocaleString(countryProfile.locale)}
+                              </div>
+                            )}
+                            {!annual && (
+                              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                                or {sym}{annualP.toLocaleString(countryProfile.locale)}/mo billed annually
+                              </div>
+                            )}
+                          </>
                         )}
                       </>
                     )}
@@ -357,6 +437,7 @@ export function BillingView({ orgName, currentPlan, status, subscriptionId, tria
                     {isLoading ? 'Opening checkout…' :
                      isCurrent ? 'Current plan' :
                      plan.key === 'free' ? 'Downgrade' :
+                     discounted != null ? `Upgrade to ${plan.name} — ${sym}${discounted.toLocaleString(countryProfile.locale)} first month` :
                      `Upgrade to ${plan.name}`}
                   </button>
                 </div>
