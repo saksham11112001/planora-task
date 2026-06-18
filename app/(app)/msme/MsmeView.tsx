@@ -199,7 +199,11 @@ export function MsmeView({ userRole, orgName }: Props) {
     setUpgradeBusy(null)
 
     if (!res.ok) {
-      showToast(data.error ?? 'Failed to initiate payment', 'error')
+      if (res.status === 503) {
+        showToast('Payment gateway not yet configured. Contact support to upgrade.', 'info')
+      } else {
+        showToast(data.error ?? data.message ?? 'Failed to initiate payment', 'error')
+      }
       return
     }
 
@@ -258,9 +262,6 @@ export function MsmeView({ userRole, orgName }: Props) {
       return
     }
 
-    if (res.status === 503) {
-      showToast('Payment gateway not yet live. Contact support to upgrade.', 'info')
-    }
   }
 
   // ── Add single vendor ──────────────────────────────────────────────────────
