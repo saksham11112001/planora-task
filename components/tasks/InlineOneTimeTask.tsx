@@ -325,9 +325,10 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated, 
               {coAssignees.length > 0 ? `+${coAssignees.length} co-assignee${coAssignees.length>1?'s':''}` : '+ Co-assignee'}
             </button>
             {coAssigneesOpen && (
-              <div style={{ position:'absolute', top:'calc(100% + 4px)', ...(coAlignRight ? {right:0} : {left:0}), zIndex:100,
+              <div style={{ position:'absolute', top:'calc(100% + 4px)', ...(coAlignRight ? {right:0} : {left:0}), zIndex:1000,
                 background:'var(--surface)', border:'1px solid var(--border)', borderRadius:10,
-                boxShadow:'0 8px 24px rgba(0,0,0,0.12)', padding:'6px 8px', minWidth:170 }}>
+                boxShadow:'0 8px 24px rgba(0,0,0,0.12)', padding:'6px 8px', minWidth:170,
+                maxHeight: 220, overflowY: 'auto' }}>
                 {members.filter(m => m.id !== assignee).map(m => (
                   <label key={m.id} style={{ display:'flex', alignItems:'center', gap:8, padding:'5px 6px',
                     borderRadius:6, cursor:'pointer', fontSize:12, color:'var(--text-primary)' }}

@@ -211,7 +211,7 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void } = {}) {
           <Plus style={{ width: 15, height: 15 }}/> Create <ChevronDown style={{ width: 12, height: 12, opacity: 0.8 }}/>
         </button>
         {createOpen && (
-          <div className="menu-in" style={{position:'absolute',right:0,top:'100%',marginTop:6,borderRadius:12,boxShadow:'0 10px 40px rgba(0,0,0,0.15)',padding:'6px 0',zIndex:50,minWidth:200,background:'var(--surface)',border:'1px solid var(--border)'}}>
+          <div className="menu-in" style={{position:'absolute',right:0,top:'100%',marginTop:6,borderRadius:12,boxShadow:'0 10px 40px rgba(0,0,0,0.15)',padding:'6px 0',zIndex:1000,minWidth:200,background:'var(--surface)',border:'1px solid var(--border)'}}>
             {CREATE_ITEMS.map(({ icon: Icon, label, href }) => (
               <Link key={href} href={href} onClick={() => setCreateOpen(false)}
                 style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 14px',
@@ -259,7 +259,7 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void } = {}) {
         </button>
 
         {bellOpen && (
-          <div className="absolute right-0 top-full mt-1.5 rounded-xl shadow-xl z-50 w-80" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+          <div className="absolute right-0 top-full mt-1.5 rounded-xl shadow-xl w-80" style={{ background: 'var(--surface)', border: '1px solid var(--border)', zIndex: 1000 }}>
             <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--border)' }}>
               <span style={{ fontSize:14, fontWeight:600, color:'var(--text-primary)' }}>Activity</span>
               <button onClick={() => setBellOpen(false)}
@@ -323,7 +323,7 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void } = {}) {
           {name[0]?.toUpperCase()}
         </button>
         {profileOpen && (
-          <div className="menu-in" style={{position:'absolute',right:0,top:'100%',marginTop:6,borderRadius:12,boxShadow:'0 10px 40px rgba(0,0,0,0.15)',padding:'6px 0',zIndex:50,minWidth:200,background:'var(--surface)',border:'1px solid var(--border)'}}>
+          <div className="menu-in" style={{position:'absolute',right:0,top:'100%',marginTop:6,borderRadius:12,boxShadow:'0 10px 40px rgba(0,0,0,0.15)',padding:'6px 0',zIndex:1000,minWidth:200,background:'var(--surface)',border:'1px solid var(--border)'}}>
             <div className="px-3 py-2 border-b" style={{ borderColor: 'var(--border)' }}>
               <p style={{fontSize:12,fontWeight:600,color:'var(--text-primary)',overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{name}</p>
               <p style={{fontSize:11,color:'var(--text-muted)',overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{session?.user.email}</p>

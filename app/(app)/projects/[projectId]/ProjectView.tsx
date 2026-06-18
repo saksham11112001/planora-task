@@ -501,12 +501,12 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
           }}>
           {taskAssigneeOpen[task.id] && canManage && (
             <>
-              <div style={{ position:'fixed', inset:0, zIndex:49 }}
+              <div style={{ position:'fixed', inset:0, zIndex:999 }}
                 onClick={e => { e.stopPropagation(); setTaskAssigneeOpen(p => ({...p, [task.id]:false})) }}/>
-              <div style={{ position:'absolute', ...(taskAssigneeAlign[task.id]==='right'?{right:0}:{left:0}), top:'calc(100% + 4px)', zIndex:50,
+              <div style={{ position:'absolute', ...(taskAssigneeAlign[task.id]==='right'?{right:0}:{left:0}), top:'calc(100% + 4px)', zIndex:1000,
                 background:'var(--surface)', border:'1px solid var(--border)',
                 borderRadius:8, boxShadow:'0 4px 16px rgba(0,0,0,0.12)',
-                minWidth:160, overflow:'hidden' }}>
+                minWidth:160, maxHeight:200, overflowY:'auto' }}>
                 <button onClick={e => { e.stopPropagation(); setTaskAssigneeOpen(p=>({...p,[task.id]:false})); patchTaskInline(task.id,'assignee_id',null) }}
                   style={{ width:'100%', textAlign:'left', padding:'7px 12px', fontSize:12, border:'none',
                     cursor:'pointer', color:'var(--text-muted)', fontFamily:'inherit',

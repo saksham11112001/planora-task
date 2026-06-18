@@ -620,9 +620,10 @@ export function RecurringView({
                   {bulkFreqSaving ? 'Saving…' : '⟳ Change Frequency'}
                 </button>
                 {freqPickerOpen && (
-                  <div style={{ position:'absolute', top:'calc(100% + 4px)', left:0, zIndex:200,
+                  <div style={{ position:'absolute', top:'calc(100% + 4px)', left:0, zIndex:1000,
                     background:'var(--surface)', border:'1px solid var(--border)', borderRadius:8,
-                    boxShadow:'0 4px 16px rgba(0,0,0,0.12)', padding:'6px 0', minWidth:180 }}>
+                    boxShadow:'0 4px 16px rgba(0,0,0,0.12)', padding:'6px 0', minWidth:180,
+                    maxHeight:240, overflowY:'auto' }}>
                     {[
                       { v:'daily',       l:'Every day' },
                       { v:'weekly_mon',  l:'Every Monday' },

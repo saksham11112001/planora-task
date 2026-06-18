@@ -101,7 +101,7 @@ export function MentionTextarea({ value, onChange, onKeyDown, members, placehold
           position: 'absolute', top: dropPos.top, left: dropPos.left,
           background: 'var(--surface)', border: '1px solid var(--border)',
           borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-          zIndex: 9999, minWidth: 180, overflow: 'hidden',
+          zIndex: 9999, minWidth: 180, maxHeight: 240, overflowY: 'auto',
         }}>
           <div style={{ padding: '4px 10px 2px', fontSize: 10, fontWeight: 700,
             textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>
