@@ -72,6 +72,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL(isMsmeDomain ? '/msme' : '/dashboard', request.url))
   }
 
+  // Cross-subdomain redirect: if next=/msme but we're on the main domain,
+  // send the user to msme.upfloat.co/msme where the MSME dashboard lives.
+  const MSME_ORIGIN = process.env.NEXT_PUBLIC_MSME_URL ?? 'https://msme.upfloat.co'
+  if (next === '/msme' && !isMsmeDomain) {
+    return NextResponse.redirect(`${MSME_ORIGIN}/msme`)
+  }
+
   return NextResponse.redirect(new URL(next, request.url))
 }
 

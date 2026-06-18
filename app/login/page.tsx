@@ -4,6 +4,10 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
+// Always route auth callbacks through the main domain so msme.upfloat.co
+// doesn't need its own entry in the Supabase redirect URL allow-list.
+const APP_ORIGIN = process.env.NEXT_PUBLIC_APP_URL ?? 'https://upfloat.co'
+
 type Mode = 'choose' | 'magic' | 'magic_sent' | 'email_password' | 'email_signup' | 'signup_confirm' | 'reset_password' | 'reset_sent'
 
 function MicrosoftIcon() {
@@ -84,7 +88,7 @@ export default function LoginPage() {
         provider: 'azure',
         options: {
           // PKCE verifier stored in a cookie by SSR client — must exchange server-side at /auth/callback
-          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(getPostLoginPath())}`,
+          redirectTo: `${APP_ORIGIN}/auth/callback?next=${encodeURIComponent(getPostLoginPath())}`,
           scopes: 'email profile openid',
         },
       })
@@ -105,7 +109,7 @@ export default function LoginPage() {
         provider: 'google',
         options: {
           // PKCE verifier stored in a cookie by SSR client — must exchange server-side at /auth/callback
-          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(getPostLoginPath())}`,
+          redirectTo: `${APP_ORIGIN}/auth/callback?next=${encodeURIComponent(getPostLoginPath())}`,
           queryParams: { access_type: 'offline', prompt: 'consent' },
         },
       })
@@ -170,7 +174,7 @@ export default function LoginPage() {
       email: email.trim(),
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(getPostLoginPath())}`,
+        emailRedirectTo: `${APP_ORIGIN}/auth/callback?next=${encodeURIComponent(getPostLoginPath())}`,
       },
     })
 
@@ -185,7 +189,7 @@ export default function LoginPage() {
     if (data.session?.user) {
       await provisionUser()
       setLoading(false)
-      router.replace('/onboarding')
+      router.replace('/onboarding?next=' + encodeURIComponent(getPostLoginPath()))
       return
     }
 
