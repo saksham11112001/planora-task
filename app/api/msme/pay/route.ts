@@ -54,7 +54,6 @@ export async function POST(req: NextRequest) {
     }),
   })
   const order = await orderRes.json()
-  console.error('[msme/pay] order create status:', orderRes.status, JSON.stringify(order))
   if (!orderRes.ok) {
     return NextResponse.json({ error: order.error?.description ?? 'Order creation failed' }, { status: 500 })
   }

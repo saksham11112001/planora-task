@@ -81,7 +81,6 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify({ name: org?.name ?? 'Customer', email: user.email }),
       })
       const cust = await custRes.json()
-      console.error('[billing] customer create status:', custRes.status, JSON.stringify(cust))
       if (!cust.id) throw new Error(cust.error?.description ?? 'Customer creation failed')
       customerId = cust.id
       await admin.from('organisations').update({ razorpay_customer_id: customerId }).eq('id', mb.org_id)
@@ -144,7 +143,6 @@ export async function POST(request: NextRequest) {
       }),
     })
     const orderSub = await orderRes.json()
-    console.error('[billing] order create status:', orderRes.status, JSON.stringify(orderSub))
     if (!orderSub.id) throw new Error(orderSub.error?.description ?? 'Order creation failed')
 
     return NextResponse.json({
