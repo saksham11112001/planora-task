@@ -15,10 +15,10 @@ const PRACTICE_TYPES = [
   'Other',
 ]
 const YEARS_OPTIONS = ['Less than 1 year','1–3 years','3–5 years','5–10 years','10–20 years','20+ years']
-const INDUSTRIES = ['CA / Accounting Firm','Technology','Finance','Healthcare','Education','E-commerce','Marketing','Consulting','Real Estate','Manufacturing','Legal','Non-profit','Other']
+const INDUSTRIES = ['Accounting & Finance','Technology','Healthcare','E-commerce','Marketing & Advertising','Consulting','Real Estate','Education','Manufacturing','Legal','Retail','Non-profit','Other']
 const TEAM_SIZES = ['Just me','2–5','6–15','16–50','51–200','200+']
 const HOW_DID_YOU_HEAR = ['Google Search','LinkedIn','Friend / Colleague','WhatsApp / Referral','Social Media (Instagram / Facebook)','YouTube / Podcast','CA Association / ICAI','Product Hunt','Other']
-const ROLE_OPTIONS = ['CA / Chartered Accountant','CPA / Tax Professional','Owner / Founder','Firm Manager','Team Member / Employee','Other']
+const ROLE_OPTIONS = ['Business Owner / Founder','CA / Chartered Accountant','CPA / Tax Professional','Manager / Team Lead','Freelancer / Consultant','Finance & Accounts','Operations','Team Member / Employee','Other']
 const CURRENT_TOOLS = ['Excel / Google Sheets','Tally','Zoho','QuickBooks','Paper / Manual','Nothing yet','Other']
 const PAIN_POINTS = [
   'Missing deadlines and follow-ups',
@@ -357,7 +357,7 @@ export default function OnboardingPage() {
   // Invited users only see step 0; fresh signup sees steps 0–4
   const totalSteps   = inviteData ? 1 : 5
   const progressStep = inviteData ? 1 : step + 1
-  const stepLabels   = ['You', 'Your Firm', 'Team', 'Your Situation', 'Done']
+  const stepLabels   = ['You', 'Your Business', 'Team', 'Your Situation', 'Done']
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4"
@@ -468,7 +468,7 @@ export default function OnboardingPage() {
               {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>}
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Firm / Organisation name *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Business / Organisation name *</label>
                   <input value={form.org_name} onChange={e => set('org_name', e.target.value)}
                     className="input" placeholder="e.g. Sharma & Associates" autoFocus
                     onKeyDown={e => e.key === 'Enter' && form.org_name.trim() && (setError(''), setStep(2))}/>
@@ -505,7 +505,7 @@ export default function OnboardingPage() {
               </div>
               <div className="flex gap-3 mt-6">
                 <button onClick={() => { setError(''); setStep(0) }} className="btn btn-outline flex-1">Back</button>
-                <button onClick={() => { if (!form.org_name.trim()) { setError('Firm name is required'); return } setError(''); setStep(2) }}
+                <button onClick={() => { if (!form.org_name.trim()) { setError('Business name is required'); return } setError(''); setStep(2) }}
                   className="btn btn-brand flex-1 flex items-center justify-center gap-2">
                   Continue <ChevronRight className="h-4 w-4"/>
                 </button>
@@ -564,20 +564,6 @@ export default function OnboardingPage() {
                   <select value={form.role_title} onChange={e => set('role_title', e.target.value)} className="input">
                     <option value="">Select your role</option>
                     {ROLE_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">What are you currently using to manage work?</label>
-                  <select value={form.current_tool} onChange={e => set('current_tool', e.target.value)} className="input">
-                    <option value="">Select current tool</option>
-                    {CURRENT_TOOLS.map(o => <option key={o} value={o}>{o}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">What is your biggest challenge right now?</label>
-                  <select value={form.pain_point} onChange={e => set('pain_point', e.target.value)} className="input">
-                    <option value="">Select main challenge</option>
-                    {PAIN_POINTS.map(o => <option key={o} value={o}>{o}</option>)}
                   </select>
                 </div>
                 <div>

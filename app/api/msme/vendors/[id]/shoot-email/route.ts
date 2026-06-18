@@ -76,7 +76,7 @@ export async function POST(
     return NextResponse.json({ ok: true, formUrl })
   }
 
-  const orgName = (mb.organisations as any)?.name ?? 'Your firm'
+  const orgName = (mb.organisations as any)?.name ?? 'Your business'
   const attempt = (vendor.email_count + 1) as 1 | 2 | 3 | 4 | 5
 
   // Fetch org owner's email for CC

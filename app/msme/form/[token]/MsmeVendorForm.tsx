@@ -69,7 +69,7 @@ export function MsmeVendorForm({ token }: { token: string }) {
         if (d.already_submitted) setSubmitted(true)
         setLoading(false)
       })
-      .catch(() => { setError('Failed to load the form. Please try again or ask your firm to resend the link.'); setLoading(false) })
+      .catch(() => { setError('Failed to load the form. Please try again or ask the sender to resend the link.'); setLoading(false) })
   }, [token])
 
   // Udyam format validation — live
@@ -415,7 +415,7 @@ export function MsmeVendorForm({ token }: { token: string }) {
                 />
                 <div style={{ marginTop: 6, padding: '8px 12px', background: '#fef9c3', border: '1px solid #fde047', borderRadius: 6 }}>
                   <p style={{ margin: 0, fontSize: 11, color: '#713f12', lineHeight: 1.6 }}>
-                    <strong>What this means:</strong> The amount <em>your firm is owed</em> (money {info?.org_name} owes you)
+                    <strong>What this means:</strong> The amount <em>you are owed</em> (money {info?.org_name} owes you)
                     that was unpaid as of 31st March of the last financial year. Enter <strong>0</strong> if fully paid up.
                     Leave blank if you don't have this figure.
                   </p>

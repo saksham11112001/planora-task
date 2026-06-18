@@ -71,7 +71,7 @@ export async function POST(
 
   if (!tokenRow) return NextResponse.json({ error: 'Invalid link' }, { status: 404 })
   if (new Date(tokenRow.expires_at) < new Date()) {
-    return NextResponse.json({ error: 'Link has expired. Please ask your firm to resend the email.' }, { status: 410 })
+    return NextResponse.json({ error: 'Link has expired. Please ask the sender to resend the email.' }, { status: 410 })
   }
 
   const body = await req.json()

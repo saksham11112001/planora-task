@@ -1,6 +1,8 @@
-import { createClient } from '@/lib/supabase/server'
-import { redirect }     from 'next/navigation'
-import Link             from 'next/link'
+import { createClient }            from '@/lib/supabase/server'
+import { redirect }                from 'next/navigation'
+import Link                        from 'next/link'
+import { headers }                 from 'next/headers'
+import { getCountry, isValidCountry } from '@/lib/locale/countries'
 
 export default async function LandingPage() {
   try {
@@ -8,6 +10,15 @@ export default async function LandingPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (user) redirect('/dashboard')
   } catch {}
+
+  // Detect country from IP for pricing display
+  const hdrs        = await headers()
+  const ipCountry   = hdrs.get('x-vercel-ip-country') ?? hdrs.get('cf-ipcountry') ?? ''
+  const country     = getCountry(isValidCountry(ipCountry) ? ipCountry : null)
+  const sym         = country.currencySymbol
+  const starterP    = country.pricing.starter.monthly
+  const proP        = country.pricing.pro.monthly
+  const currName    = country.currency  // e.g. "INR", "USD"
 
   return (
     <div style={{
@@ -584,7 +595,7 @@ export default async function LandingPage() {
                 animation: 'pulse-dot 2s ease-in-out infinite',
               }}/>
               <span style={{ color: 'rgba(255,255,255,0.65)', fontSize: 13, fontWeight: 600, letterSpacing: '0.01em' }}>
-                Professional teams · USD billing · Compliance included
+                Professional teams · {currName} billing · Compliance included
               </span>
             </div>
 
@@ -807,7 +818,7 @@ export default async function LandingPage() {
           <div className="stats-row" style={{ display: 'flex', gap: 0 }}>
             {[
               { v: '500+', l: 'professional teams', color: '#0d9488' },
-              { v: '$29',  l: 'flat team pricing from', color: '#f97316' },
+              { v: `${sym}${starterP.toLocaleString()}`,  l: 'flat team pricing from', color: '#f97316' },
               { v: '5',    l: 'countries supported', color: '#7c3aed' },
               { v: '99.9%',l: 'uptime SLA', color: '#0891b2' },
             ].map(({ v, l, color }, i) => (
@@ -880,8 +891,8 @@ export default async function LandingPage() {
               {
                 icon: '💰',
                 color: '#f97316', bg: '#fff7ed', border: '#fed7aa', glow: 'rgba(249,115,22,0.12)',
-                title: 'Flat USD pricing',
-                body: 'From $29/month for your whole team — not $30 per person like typical project tools. One predictable bill. No per-user upsell traps. Cancel anytime.',
+                title: `Flat ${currName} pricing`,
+                body: `From ${sym}${starterP.toLocaleString()}/month for your whole team — not per person like typical project tools. One predictable bill. No per-user upsell traps. Cancel anytime.`,
                 tag: 'No per-user fees',
               },
               {
@@ -1133,7 +1144,7 @@ export default async function LandingPage() {
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
                       <div style={{ width: 28, height: 28, borderRadius: 9, background: 'linear-gradient(135deg,#0d9488,#0891b2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 900, color: '#fff', boxShadow: '0 2px 8px rgba(13,148,136,0.4)' }}>F</div>
                       <span style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>upFloat</span>
-                      <span style={{ fontSize: 10, color: '#2dd4bf', fontWeight: 700 }}>$29/mo</span>
+                      <span style={{ fontSize: 10, color: '#2dd4bf', fontWeight: 700 }}>{sym}{starterP.toLocaleString()}/mo</span>
                     </div>
                   </th>
                   {[['Asana','$13.49/user'],['Monday','$12/user'],['ClickUp','$10/user']].map(([name, price]) => (
@@ -1197,7 +1208,7 @@ export default async function LandingPage() {
               Simple, flat pricing
             </div>
             <h2 style={{ fontSize: 'clamp(26px, 3.5vw, 42px)', fontWeight: 900, letterSpacing: '-1.5px', margin: '0 0 14px', color: '#0f172a' }}>
-              Simple pricing, billed in USD
+              Simple pricing, billed in {currName}
             </h2>
             <p style={{ fontSize: 15, color: '#64748b', maxWidth: 380, margin: '0 auto', lineHeight: 1.75 }}>
               Flat team pricing — not per user. Start free and upgrade when you grow.
@@ -1212,12 +1223,12 @@ export default async function LandingPage() {
                 features:['Up to 5 members','3 active projects','Unlimited tasks','Smart reminders (basic)','Task comments & activity'],
               },
               {
-                name:'Starter', price:'29', period:'/mo', color:'#0d9488', bg:'#fff', border:'#0d9488',
+                name:'Starter', price:starterP.toLocaleString(), period:'/mo', color:'#0d9488', bg:'#fff', border:'#0d9488',
                 badge:'Most popular', primary:true, cta:'Start free trial',
                 features:['Up to 15 members','15 projects','Recurring task automation','Approval workflows','Time tracking','Reports & CSV export'],
               },
               {
-                name:'Pro', price:'79', period:'/mo', color:'#7c3aed', bg:'#fff', border:'#ddd6fe',
+                name:'Pro', price:proP.toLocaleString(), period:'/mo', color:'#7c3aed', bg:'#fff', border:'#ddd6fe',
                 primary:false, cta:'Start free trial',
                 features:['Up to 50 members','Unlimited projects','Compliance module (all countries)','Custom fields & templates','API access','Priority support'],
               },
@@ -1235,7 +1246,7 @@ export default async function LandingPage() {
                 )}
                 <div style={{ fontSize: 11, fontWeight: 800, color: plan.primary ? plan.color : '#64748b', textTransform: 'uppercase', letterSpacing: '0.09em', marginBottom: 12 }}>{plan.name}</div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 2, marginBottom: 24 }}>
-                  {plan.price !== '0' && <span style={{ fontSize: 14, color: '#94a3b8', fontWeight: 600 }}>$</span>}
+                  {plan.price !== '0' && <span style={{ fontSize: 14, color: '#94a3b8', fontWeight: 600 }}>{sym}</span>}
                   <span style={{ fontSize: 40, fontWeight: 900, color: '#0f172a', letterSpacing: '-2px' }}>{plan.price === '0' ? 'Free' : plan.price}</span>
                   {plan.period && <span style={{ fontSize: 13, color: '#94a3b8' }}>{plan.period}</span>}
                 </div>
@@ -1259,7 +1270,7 @@ export default async function LandingPage() {
             ))}
           </div>
           <p style={{ textAlign: 'center', fontSize: 13, color: '#94a3b8', marginTop: 24 }}>
-            All plans include 14-day free trial · No credit card required · Cancel anytime · Billed in USD
+            All plans include 14-day free trial · No credit card required · Cancel anytime · Billed in {currName}
           </p>
 
           {/* Professional Setup */}
@@ -1608,7 +1619,7 @@ export default async function LandingPage() {
             </Link>
           </div>
           <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.2)', marginTop: 22, letterSpacing: '0.02em' }}>
-            14-day free trial&nbsp;&nbsp;·&nbsp;&nbsp;No credit card&nbsp;&nbsp;·&nbsp;&nbsp;Cancel anytime&nbsp;&nbsp;·&nbsp;&nbsp;Billed in USD
+            14-day free trial&nbsp;&nbsp;·&nbsp;&nbsp;No credit card&nbsp;&nbsp;·&nbsp;&nbsp;Cancel anytime&nbsp;&nbsp;·&nbsp;&nbsp;Billed in {currName}
           </p>
         </div>
       </section>

@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
 
   const msmeUrl    = refCode ? `${MSME_URL}?ref=${refCode}` : MSME_URL
   const senderName = senderUser?.name ?? 'A colleague'
-  const senderOrg  = org?.name ?? 'our firm'
+  const senderOrg  = org?.name ?? 'our team'
 
   let sent = 0; let failed = 0
   const results: Array<{ email: string; ok: boolean; error?: string }> = []

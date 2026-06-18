@@ -38,7 +38,7 @@ function ExpiredPage() {
           Link Expired or Invalid
         </h1>
         <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 24px', lineHeight: 1.6 }}>
-          This portal link is no longer active. Please contact your CA firm to get a fresh link.
+          This portal link is no longer active. Please contact your account manager to get a fresh link.
         </p>
         <div style={{ fontSize: '12px', color: '#94a3b8' }}>Powered by upFloat</div>
       </div>

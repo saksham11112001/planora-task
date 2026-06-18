@@ -1,6 +1,8 @@
-import { createClient } from '@/lib/supabase/server'
-import { redirect }     from 'next/navigation'
-import Link             from 'next/link'
+import { createClient }               from '@/lib/supabase/server'
+import { redirect }                   from 'next/navigation'
+import Link                           from 'next/link'
+import { headers }                    from 'next/headers'
+import { getCountry, isValidCountry } from '@/lib/locale/countries'
 
 export default async function ProfessionalsPage() {
   try {
@@ -8,6 +10,15 @@ export default async function ProfessionalsPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (user) redirect('/dashboard')
   } catch {}
+
+  const hdrs      = await headers()
+  const ipCountry = hdrs.get('x-vercel-ip-country') ?? hdrs.get('cf-ipcountry') ?? ''
+  const country   = getCountry(isValidCountry(ipCountry) ? ipCountry : null)
+  const sym       = country.currencySymbol
+  const starterP  = country.pricing.starter.monthly
+  const proP      = country.pricing.pro.monthly
+  const businessP = country.pricing.business.monthly
+  const currName  = country.currency
 
   const COUNTRIES = [
     {
@@ -595,7 +606,7 @@ export default async function ProfessionalsPage() {
               <div style={{ width: 22, height: 2, background: '#7c3aed', borderRadius: 2, flexShrink: 0 }} />
             </div>
             <h2 style={{ fontSize: 'clamp(26px, 3.5vw, 36px)', fontWeight: 800, letterSpacing: '-1.2px', margin: '0 0 10px' }}>
-              Flat team pricing, billed in USD
+              Flat team pricing, billed in {currName}
             </h2>
             <p style={{ fontSize: 15, color: '#64748b', margin: '0 auto', lineHeight: 1.7 }}>
               Not per user. Your whole practice, one predictable bill.
@@ -605,19 +616,19 @@ export default async function ProfessionalsPage() {
           <div className="pricing-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, alignItems: 'start' }}>
             {[
               {
-                name: 'Starter', price: '29', color: '#0d9488', border: '#0d9488', primary: false,
+                name: 'Starter', price: starterP.toLocaleString(), color: '#0d9488', border: '#0d9488', primary: false,
                 badge: '',
                 features: ['Up to 15 members', '15 projects', 'Recurring task automation', 'Approval workflows', 'Time tracking', 'Reports & CSV export'],
                 note: 'Compliance module not included',
               },
               {
-                name: 'Pro', price: '79', color: '#7c3aed', border: '#7c3aed', primary: true,
+                name: 'Pro', price: proP.toLocaleString(), color: '#7c3aed', border: '#7c3aed', primary: true,
                 badge: 'Recommended for practices',
                 features: ['Up to 50 members', 'Unlimited projects', '✦ Compliance module — all countries', '✦ Country task templates (US/UK/CA/AU/EU)', '✦ Client bulk task assignment', 'Custom fields & API access'],
                 note: 'Full compliance module included',
               },
               {
-                name: 'Business', price: '149', color: '#0891b2', border: '#7dd3fc', primary: false,
+                name: 'Business', price: businessP.toLocaleString(), color: '#0891b2', border: '#7dd3fc', primary: false,
                 badge: '',
                 features: ['Unlimited members', 'Unlimited projects', '✦ Compliance module — all countries', '✦ Multi-country task libraries', '✦ Advanced reports & analytics', 'White-label client portal'],
                 note: 'Full compliance + advanced features',
@@ -634,7 +645,7 @@ export default async function ProfessionalsPage() {
                 )}
                 <div style={{ fontSize: 12, fontWeight: 700, color: plan.primary ? plan.color : '#64748b', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>{plan.name}</div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 2, marginBottom: 6 }}>
-                  <span style={{ fontSize: 12, color: '#94a3b8' }}>$</span>
+                  <span style={{ fontSize: 12, color: '#94a3b8' }}>{sym}</span>
                   <span style={{ fontSize: 36, fontWeight: 900, color: '#0f172a', letterSpacing: '-1.5px' }}>{plan.price}</span>
                   <span style={{ fontSize: 12, color: '#94a3b8' }}>/mo</span>
                 </div>
@@ -661,7 +672,7 @@ export default async function ProfessionalsPage() {
             ))}
           </div>
           <p style={{ textAlign: 'center', fontSize: 13, color: '#94a3b8', marginTop: 20 }}>
-            14-day free trial · No credit card required · Cancel anytime · Billed in USD
+            14-day free trial · No credit card required · Cancel anytime · Billed in {currName}
           </p>
         </div>
       </section>
