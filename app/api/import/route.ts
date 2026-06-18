@@ -263,8 +263,9 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
     }
+    const userId = user.id
 
-    const mb = await getApiOrgMembership(supabase, user.id, request, 'org_id, role')
+    const mb = await getApiOrgMembership(supabase, userId, request, 'org_id, role')
 
     if (!mb || !['owner', 'admin', 'manager'].includes(mb.role)) {
       return NextResponse.json(
@@ -659,7 +660,7 @@ export async function POST(request: NextRequest) {
       // 4. Auto-create with just the name so downstream rows don't fail
       const { data: created, error: createErr } = await admin
         .from('clients')
-        .insert({ org_id: orgId, name: rawName.trim(), color: '#0d9488', status: 'active', created_by: user.id })
+        .insert({ org_id: orgId, name: rawName.trim(), color: '#0d9488', status: 'active', created_by: userId })
         .select('id')
         .maybeSingle()
       if (created?.id) {
@@ -870,7 +871,7 @@ export async function POST(request: NextRequest) {
           color:    extra.color    ?? '#0d9488',
           status:   extra.status   ?? 'active',
           notes:    extra.notes    ?? null,
-          created_by: user.id,
+          created_by: userId,
         })
       }
 

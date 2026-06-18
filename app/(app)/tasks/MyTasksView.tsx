@@ -9,7 +9,7 @@ import { InlineOneTimeTask }     from '@/components/tasks/InlineOneTimeTask'
 import { CompletionAttachModal }  from '@/components/tasks/CompletionAttachModal'
 import { fmtDate, isOverdue, todayStr } from '@/lib/utils/format'
 import { PRIORITY_CONFIG } from '@/types'
-import type { Task } from '@/types'
+import type { Task, TaskStatus } from '@/types'
 import { toast, useFilterStore } from '@/store/appStore'
 import { UniversalFilterBar } from '@/components/filters/UniversalFilterBar'
 
@@ -521,7 +521,7 @@ export function MyTasksView({
     setStatusMenuOpen(false)
     setChecked(new Set())
     const snapshot = new Map(tasks.filter(t => ids.includes(t.id)).map(t => [t.id, t.status]))
-    setTasks(prev => prev.map(t => ids.includes(t.id) ? { ...t, status: newStatus } : t))
+    setTasks(prev => prev.map(t => ids.includes(t.id) ? { ...t, status: newStatus as TaskStatus } : t))
     const results = await Promise.all(ids.map(id =>
       fetch(`/api/tasks/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: newStatus }) })
     ))
