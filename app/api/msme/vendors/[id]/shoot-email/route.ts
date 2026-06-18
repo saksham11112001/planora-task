@@ -38,12 +38,37 @@ export async function POST(
 
   const { data: vendor } = await admin
     .from('msme_vendors')
-    .select('id, vendor_name, vendor_email, status, email_count')
+    .select('id, vendor_name, vendor_email, status, email_count, created_at')
     .eq('id', id)
     .eq('org_id', mb.org_id)
     .maybeSingle()
 
   if (!vendor) return NextResponse.json({ error: 'Vendor not found' }, { status: 404 })
+
+  // ── Lock check: enforce vendor_limit server-side ──────────────────────────
+  // Fetch the org's active pack to get vendor_limit (free = 5)
+  const { data: packRow } = await admin
+    .from('org_feature_settings')
+    .select('config')
+    .eq('org_id', mb.org_id)
+    .eq('feature_key', 'msme_pack')
+    .maybeSingle()
+  const vendorLimit: number = (packRow?.config as any)?.vendor_limit ?? 5
+
+  // Count how many vendors in this org were created before (or at) this one
+  const { count: rankCount } = await admin
+    .from('msme_vendors')
+    .select('id', { count: 'exact', head: true })
+    .eq('org_id', mb.org_id)
+    .lte('created_at', vendor.created_at)
+  const rank = rankCount ?? 0
+
+  if (rank > vendorLimit) {
+    return NextResponse.json(
+      { error: 'This vendor is locked. Upgrade your pack to contact more vendors.' },
+      { status: 403 }
+    )
+  }
 
   // x-copy-only: generate link without sending email (for "share via WhatsApp" use case)
   const copyOnly = req.headers.get('x-copy-only') === '1'
