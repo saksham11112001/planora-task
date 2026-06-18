@@ -295,7 +295,8 @@ export function MsmeView({ userRole, orgName }: Props) {
 
   // ── Bulk shoot email ──────────────────────────────────────────────────────
   async function handleBulkShoot() {
-    const ids = Array.from(checkedIds)
+    // Only shoot to unlocked vendors — never send to locked ones
+    const ids = Array.from(checkedIds).filter(id => unlockedIds.has(id))
     if (ids.length === 0) return
     setBulkShooting(true)
     let sent = 0, failed = 0
@@ -513,7 +514,14 @@ export function MsmeView({ userRole, orgName }: Props) {
     v.vendor_email.toLowerCase().includes(search.toLowerCase()) ||
     (v.gstin ?? '').toLowerCase().includes(search.toLowerCase())
   )
-  const filtered = filterStatus === 'all' ? searched : searched.filter(v => v.status === filterStatus)
+  const filtered = (filterStatus === 'all' ? searched : searched.filter(v => v.status === filterStatus))
+    .slice()
+    .sort((a, b) => {
+      const aLocked = !unlockedIds.has(a.id)
+      const bLocked = !unlockedIds.has(b.id)
+      if (aLocked !== bLocked) return aLocked ? 1 : -1  // unlocked first, locked last
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    })
 
   const completedCount  = vendors.filter(v => v.status === 'submitted' || v.status === 'not_msme').length
   const exhaustedCount  = vendors.filter(v => v.email_count >= maxEmails && v.status === 'emailed').length
@@ -682,9 +690,9 @@ export function MsmeView({ userRole, orgName }: Props) {
                       <input
                         type="checkbox"
                         style={{ accentColor: ACCENT, cursor: 'pointer' }}
-                        checked={checkedIds.size > 0 && filtered.filter(v => v.status !== 'submitted' && v.status !== 'not_msme' && v.email_count < maxEmails).every(v => checkedIds.has(v.id))}
+                        checked={checkedIds.size > 0 && filtered.filter(v => unlockedIds.has(v.id) && v.status !== 'submitted' && v.status !== 'not_msme' && v.email_count < maxEmails).every(v => checkedIds.has(v.id))}
                         onChange={e => {
-                          const eligible = filtered.filter(v => v.status !== 'submitted' && v.status !== 'not_msme' && v.email_count < maxEmails)
+                          const eligible = filtered.filter(v => unlockedIds.has(v.id) && v.status !== 'submitted' && v.status !== 'not_msme' && v.email_count < maxEmails)
                           if (e.target.checked) setCheckedIds(new Set(eligible.map(v => v.id)))
                           else setCheckedIds(new Set())
                         }}
