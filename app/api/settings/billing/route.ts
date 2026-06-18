@@ -81,7 +81,6 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify({ name: org?.name ?? 'Customer', email: user.email }),
       })
       const cust = await custRes.json()
-      console.error('[billing] customer create status:', custRes.status, JSON.stringify(cust))
       if (!cust.id) throw new Error(cust.error?.description ?? 'Customer creation failed')
       customerId = cust.id
       await admin.from('organisations').update({ razorpay_customer_id: customerId }).eq('id', mb.org_id)
@@ -130,23 +129,31 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // ── Regular subscription ───────────────────────────────────────────────────
-    const subRes = await fetch('https://api.razorpay.com/v1/subscriptions', {
+    // ── One-time order (subscriptions require Razorpay account activation) ────
+    // When subscriptions are enabled on the account, this can be changed back
+    // to POST /v1/subscriptions with the plan_id.
+    const orderRes = await fetch('https://api.razorpay.com/v1/orders', {
       method: 'POST',
       headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        plan_id:         planId,
-        customer_id:     customerId,
-        quantity:        1,
-        total_count:     12,
-        customer_notify: 1,
+        amount:   PLAN_PAISE[plan_tier] ?? 99900,
+        currency: 'INR',
+        receipt:  `plan_${mb.org_id.slice(0, 8)}_${plan_tier}`,
+        notes: { org_id: mb.org_id, plan_tier, type: 'plan_upgrade' },
       }),
     })
-    const sub = await subRes.json()
-    console.error('[billing] subscription create status:', subRes.status, JSON.stringify(sub))
-    if (!sub.id) throw new Error(sub.error?.description ?? 'Subscription creation failed')
+    const orderSub = await orderRes.json()
+    if (!orderSub.id) throw new Error(orderSub.error?.description ?? 'Order creation failed')
 
-    return NextResponse.json({ type: 'subscription', subscription_id: sub.id, key_id: keyId })
+    return NextResponse.json({
+      type:     'discounted_order',
+      order_id: orderSub.id,
+      amount:   PLAN_PAISE[plan_tier] ?? 99900,
+      key_id:   keyId,
+      plan_tier,
+      org_name: org?.name ?? '',
+      email:    user.email ?? '',
+    })
   } catch (err: any) {
     return NextResponse.json(dbError(err, 'settings/billing'), { status: 500 })
   }
