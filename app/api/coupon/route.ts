@@ -92,26 +92,19 @@ export async function POST(request: NextRequest) {
     })
   }
 
-  // Handle percent / fixed_inr type — return discount info for Razorpay (future use)
+  // Handle percent / fixed_inr — validate only, do NOT record redemption here.
+  // Redemption is recorded after successful Razorpay payment in /api/settings/billing/verify.
   if (coupon.discount_type === 'percent' || coupon.discount_type === 'fixed_inr') {
-    // Record redemption intent (increment uses_count, record redemption)
-    await admin.from('coupons')
-      .update({ uses_count: (coupon.uses_count ?? 0) + 1 })
-      .eq('id', coupon.id)
-
-    await admin.from('coupon_redemptions').insert({
-      coupon_id: coupon.id,
-      org_id:    mb.org_id,
-    })
-
     return NextResponse.json({
       success:          true,
       type:             coupon.discount_type,
-      discount_percent: coupon.discount_percent,
+      code:             coupon.code,
+      discount_percent: coupon.discount_percent ?? null,
+      discount_inr:     coupon.discount_inr     ?? null,
       description:      coupon.description,
       message:          coupon.discount_type === 'percent'
-        ? `${coupon.discount_percent}% discount will be applied at checkout`
-        : `$${coupon.discount_inr} discount will be applied at checkout`,
+        ? `${coupon.discount_percent}% off — applied at checkout`
+        : `₹${coupon.discount_inr} off — applied at checkout`,
     })
   }
 

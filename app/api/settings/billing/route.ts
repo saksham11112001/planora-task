@@ -1,14 +1,21 @@
-import { createClient }  from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
-import { NextResponse }   from 'next/server'
-import type { NextRequest } from 'next/server'
-import { dbError } from '@/lib/api-error'
+import { createClient }      from '@/lib/supabase/server'
+import { createAdminClient }  from '@/lib/supabase/admin'
+import { NextResponse }       from 'next/server'
+import type { NextRequest }   from 'next/server'
+import { dbError }            from '@/lib/api-error'
 import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
 
 const PLAN_IDS: Record<string, string> = {
   starter:  process.env.RAZORPAY_STARTER_PLAN_ID  ?? '',
   pro:      process.env.RAZORPAY_PRO_PLAN_ID       ?? '',
   business: process.env.RAZORPAY_BUSINESS_PLAN_ID  ?? '',
+}
+
+// Full price in paise for each plan (monthly)
+const PLAN_PAISE: Record<string, number> = {
+  starter:  99900,
+  pro:      249900,
+  business: 499900,
 }
 
 export async function POST(request: NextRequest) {
@@ -18,17 +25,54 @@ export async function POST(request: NextRequest) {
   const mb = await getApiOrgMembership(supabase, user.id, request, 'org_id, role, organisations(name, razorpay_customer_id, plan_tier)')
   if (!mb || !['owner','admin'].includes(mb.role)) return NextResponse.json({ error: 'Admins only' }, { status: 403 })
 
-  const { plan_tier } = await request.json()
+  const { plan_tier, billing_cycle, coupon_code } = await request.json()
   const planId = PLAN_IDS[plan_tier]
   if (!planId) return NextResponse.json({ error: 'Invalid plan' }, { status: 400 })
 
-  const org  = mb.organisations as any
-  const keyId     = process.env.RAZORPAY_KEY_ID     ?? ''
-  const keySecret = process.env.RAZORPAY_KEY_SECRET  ?? ''
-  const auth  = Buffer.from(`${keyId}:${keySecret}`).toString('base64')
+  const org       = mb.organisations as any
+  const keyId     = process.env.RAZORPAY_KEY_ID    ?? ''
+  const keySecret = process.env.RAZORPAY_KEY_SECRET ?? ''
+  const auth      = Buffer.from(`${keyId}:${keySecret}`).toString('base64')
+
+  // ── Validate discount coupon if provided ────────────────────────────────────
+  let discountCoupon: {
+    id: string; code: string; discount_type: string
+    discount_percent?: number | null; discount_inr?: number | null
+    uses_count: number; max_uses?: number | null
+  } | null = null
+
+  if (coupon_code) {
+    const admin = createAdminClient()
+    const { data: c } = await admin
+      .from('coupons')
+      .select('id, code, discount_type, discount_percent, discount_inr, uses_count, max_uses, expires_at, is_active')
+      .eq('code', (coupon_code as string).trim().toUpperCase())
+      .eq('is_active', true)
+      .maybeSingle()
+
+    if (!c) return NextResponse.json({ error: 'Invalid or expired coupon code' }, { status: 400 })
+    if (c.expires_at && new Date(c.expires_at) < new Date())
+      return NextResponse.json({ error: 'Coupon has expired' }, { status: 400 })
+    if (c.max_uses != null && c.uses_count >= c.max_uses)
+      return NextResponse.json({ error: 'Coupon has reached its usage limit' }, { status: 400 })
+
+    // Confirm org hasn't already used it
+    const { data: existing } = await admin
+      .from('coupon_redemptions')
+      .select('id')
+      .eq('coupon_id', c.id)
+      .eq('org_id', mb.org_id)
+      .maybeSingle()
+    if (existing) return NextResponse.json({ error: 'Your organisation has already used this coupon' }, { status: 400 })
+
+    if (c.discount_type === 'percent' || c.discount_type === 'fixed_inr') {
+      discountCoupon = c
+    }
+  }
 
   try {
-    // Create or reuse customer
+    // ── Create or reuse Razorpay customer ──────────────────────────────────────
+    const admin = createAdminClient()
     let customerId = org?.razorpay_customer_id
     if (!customerId) {
       const custRes = await fetch('https://api.razorpay.com/v1/customers', {
@@ -39,20 +83,68 @@ export async function POST(request: NextRequest) {
       const cust = await custRes.json()
       if (!cust.id) throw new Error(cust.error?.description ?? 'Customer creation failed')
       customerId = cust.id
-      const admin = createAdminClient()
       await admin.from('organisations').update({ razorpay_customer_id: customerId }).eq('id', mb.org_id)
     }
 
-    // Create subscription
+    // ── Discounted first-month order ───────────────────────────────────────────
+    // When a percent/fixed_inr coupon is applied, charge the discounted amount
+    // as a one-time order. Regular subscription billing starts from month 2.
+    if (discountCoupon) {
+      const basePaise = PLAN_PAISE[plan_tier] ?? 99900
+      let discountedPaise = basePaise
+      if (discountCoupon.discount_type === 'percent' && discountCoupon.discount_percent) {
+        discountedPaise = Math.round(basePaise * (1 - discountCoupon.discount_percent / 100))
+      } else if (discountCoupon.discount_type === 'fixed_inr' && discountCoupon.discount_inr) {
+        discountedPaise = Math.max(100, basePaise - discountCoupon.discount_inr * 100)
+      }
+
+      const orderRes = await fetch('https://api.razorpay.com/v1/orders', {
+        method: 'POST',
+        headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount:   discountedPaise,
+          currency: 'INR',
+          receipt:  `disc_${mb.org_id.slice(0, 8)}_${plan_tier}`,
+          notes: {
+            org_id:      mb.org_id,
+            plan_tier,
+            coupon_code: discountCoupon.code,
+            type:        'discounted_first_month',
+          },
+        }),
+      })
+      const order = await orderRes.json()
+      if (!order.id) throw new Error(order.error?.description ?? 'Order creation failed')
+
+      return NextResponse.json({
+        type:             'discounted_order',
+        order_id:         order.id,
+        amount:           discountedPaise,
+        original_amount:  basePaise,
+        key_id:           keyId,
+        plan_tier,
+        coupon_code:      discountCoupon.code,
+        org_name:         org?.name ?? '',
+        email:            user.email ?? '',
+      })
+    }
+
+    // ── Regular subscription ───────────────────────────────────────────────────
     const subRes = await fetch('https://api.razorpay.com/v1/subscriptions', {
       method: 'POST',
       headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ plan_id: planId, customer_id: customerId, quantity: 1, total_count: 12, customer_notify: 1 }),
+      body: JSON.stringify({
+        plan_id:         planId,
+        customer_id:     customerId,
+        quantity:        1,
+        total_count:     12,
+        customer_notify: 1,
+      }),
     })
     const sub = await subRes.json()
     if (!sub.id) throw new Error(sub.error?.description ?? 'Subscription creation failed')
 
-    return NextResponse.json({ subscription_id: sub.id, key_id: keyId })
+    return NextResponse.json({ type: 'subscription', subscription_id: sub.id, key_id: keyId })
   } catch (err: any) {
     return NextResponse.json(dbError(err, 'settings/billing'), { status: 500 })
   }
