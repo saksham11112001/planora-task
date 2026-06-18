@@ -9,7 +9,7 @@ import { InlineOneTimeTask }     from '@/components/tasks/InlineOneTimeTask'
 import { CompletionAttachModal }  from '@/components/tasks/CompletionAttachModal'
 import { fmtDate, isOverdue, todayStr } from '@/lib/utils/format'
 import { PRIORITY_CONFIG } from '@/types'
-import type { Task } from '@/types'
+import type { Task, TaskStatus } from '@/types'
 import { toast, useFilterStore } from '@/store/appStore'
 import { UniversalFilterBar } from '@/components/filters/UniversalFilterBar'
 
@@ -521,7 +521,7 @@ export function MyTasksView({
     setStatusMenuOpen(false)
     setChecked(new Set())
     const snapshot = new Map(tasks.filter(t => ids.includes(t.id)).map(t => [t.id, t.status]))
-    setTasks(prev => prev.map(t => ids.includes(t.id) ? { ...t, status: newStatus } : t))
+    setTasks(prev => prev.map(t => ids.includes(t.id) ? { ...t, status: newStatus as TaskStatus } : t))
     const results = await Promise.all(ids.map(id =>
       fetch(`/api/tasks/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: newStatus }) })
     ))
@@ -1509,12 +1509,12 @@ export function MyTasksView({
                             <div style={{ position:'relative', flexShrink:0 }}>
                               {subAssigneeOpen?.subId===sub.id && (
                                 <>
-                                  <div style={{ position:'fixed', inset:0, zIndex:49 }}
+                                  <div style={{ position:'fixed', inset:0, zIndex:999 }}
                                     onClick={e => { e.stopPropagation(); setSubAssigneeOpen(null) }}/>
-                                  <div style={{ position:'absolute', right:0, top:'calc(100% + 4px)', zIndex:50,
+                                  <div style={{ position:'absolute', right:0, top:'calc(100% + 4px)', zIndex:1000,
                                     background:'var(--surface)', border:'1px solid var(--border)',
                                     borderRadius:8, boxShadow:'0 4px 16px rgba(0,0,0,0.12)',
-                                    minWidth:148, overflow:'hidden' }}>
+                                    minWidth:148, maxHeight:200, overflowY:'auto' }}>
                                     <button onClick={e => { e.stopPropagation(); patchSubtaskField(task.id, sub.id,'assignee_id',null) }}
                                       style={{ width:'100%', textAlign:'left', padding:'7px 12px', fontSize:12, border:'none',
                                         cursor:'pointer', color:'var(--text-muted)', fontFamily:'inherit',

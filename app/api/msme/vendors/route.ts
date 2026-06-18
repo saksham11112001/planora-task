@@ -14,30 +14,32 @@ export async function GET(req: NextRequest) {
 
   const admin = createAdminClient()
 
-  // Only return active (non-deleted) vendors for display
-  const { data: vendors, error } = await admin
-    .from('msme_vendors')
-    .select('id, vendor_name, vendor_email, gstin, pan, status, payment_status, udyam_number, udyam_registered_on, msme_category, nature_of_business, outstanding_amount, cert_url, is_not_msme, declarant_name, declared_at, submitted_at, email_count, last_emailed_at, is_paid, created_at')
-    .eq('org_id', mb.org_id)
-    .eq('is_deleted', false)
-    .order('created_at', { ascending: false })
+  const [
+    { data: vendors, error },
+    { data: packRow },
+    { count: totalEver },
+  ] = await Promise.all([
+    admin
+      .from('msme_vendors')
+      .select('id, vendor_name, vendor_email, gstin, pan, status, payment_status, udyam_number, udyam_registered_on, msme_category, nature_of_business, outstanding_amount, cert_url, is_not_msme, declarant_name, declared_at, submitted_at, email_count, last_emailed_at, is_paid, created_at')
+      .eq('org_id', mb.org_id)
+      .eq('is_deleted', false)
+      .order('created_at', { ascending: false }),
+    admin
+      .from('org_feature_settings')
+      .select('config')
+      .eq('org_id', mb.org_id)
+      .eq('feature_key', 'msme_pack')
+      .maybeSingle(),
+    admin
+      .from('msme_vendors')
+      .select('id', { count: 'exact', head: true })
+      .eq('org_id', mb.org_id),
+  ])
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  const { data: packRow } = await admin
-    .from('org_feature_settings')
-    .select('config')
-    .eq('org_id', mb.org_id)
-    .eq('feature_key', 'msme_pack')
-    .maybeSingle()
   const vendorLimit: number = (packRow?.config?.vendor_limit as number | undefined) ?? FREE_VENDOR_LIMIT
-
-  // totalEver counts ALL rows (including soft-deleted) — reflects permanent slot consumption
-  const { count: totalEver } = await admin
-    .from('msme_vendors')
-    .select('id', { count: 'exact', head: true })
-    .eq('org_id', mb.org_id)
-
   const total = vendors?.length ?? 0
   return NextResponse.json({ vendors: vendors ?? [], total, totalEver: totalEver ?? total, vendorLimit })
 }

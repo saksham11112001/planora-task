@@ -84,7 +84,7 @@ export const monthlyDocReminders = inngest.createFunction(
                 due_date: task.due_date,
               },
               scheduled_for: new Date().toISOString(),
-            }).catch(() => {}) // non-fatal if queue doesn't exist
+            }).then(undefined, () => {}) // non-fatal if queue doesn't exist
           }
           count++
         }
