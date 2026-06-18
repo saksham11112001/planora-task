@@ -32,7 +32,8 @@ function ResetPasswordInner() {
     const { error: err } = await supabase.auth.updateUser({ password })
     setSaving(false)
     if (err) { setError(err.message); return }
-    router.replace('/dashboard')
+    // Subdomain-aware redirect so MSME users land back in /msme
+    router.replace(window.location.hostname.startsWith('msme.') ? '/msme' : '/dashboard')
   }
 
   if (state === 'loading') {

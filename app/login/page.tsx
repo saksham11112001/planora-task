@@ -42,7 +42,10 @@ export default function LoginPage() {
   function getPostLoginPath(): string {
     if (typeof window === 'undefined') return '/dashboard'
     const redir = new URLSearchParams(window.location.search).get('redirect')
-    return (redir && redir.startsWith('/') && !redir.startsWith('//')) ? redir : '/dashboard'
+    if (redir && redir.startsWith('/') && !redir.startsWith('//')) return redir
+    // Subdomain-aware fallback: MSME users always land on /msme even if ?redirect= is absent
+    if (window.location.hostname.startsWith('msme.')) return '/msme'
+    return '/dashboard'
   }
 
   useEffect(() => {
