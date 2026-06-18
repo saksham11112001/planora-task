@@ -20,6 +20,7 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://upfloat.co'),
   alternates: { canonical: 'https://upfloat.co' },
   robots: { index: true, follow: true, googleBot: { index: true, follow: true } },
+  verification: { google: 'mR4kX-0PEdTunuzBPrlsScd33f-EqwRorc1nP8_pY3Y' },
   openGraph: {
     type:        'website',
     url:         'https://upfloat.co',
