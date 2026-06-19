@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify({
           amount:   discountedPaise,
           currency: 'INR',
-          receipt:  `disc_${mb.org_id.slice(0, 8)}_${plan_tier}`,
+          receipt:  `disc_${mb.org_id.slice(0, 8)}_${plan_tier}_${Date.now()}`,
           notes: {
             org_id:      mb.org_id,
             plan_tier,
@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         amount:   PLAN_PAISE[plan_tier] ?? 99900,
         currency: 'INR',
-        receipt:  `plan_${mb.org_id.slice(0, 8)}_${plan_tier}`,
+        receipt:  `plan_${mb.org_id.slice(0, 8)}_${plan_tier}_${Date.now()}`,
         notes: { org_id: mb.org_id, plan_tier, type: 'plan_upgrade' },
       }),
     })
