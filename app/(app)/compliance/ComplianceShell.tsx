@@ -191,11 +191,14 @@ function CAKanbanView({ userRole, currentUserId }: { userRole: string; currentUs
         )
         newClientTasks[client.id] = tasks
 
+        // Build full DB state for every task — both active and paused
         const defaultBoard: Record<string, 'active' | 'paused'> = {}
-        for (const t of tasks) { if (!t._assignmentActive) defaultBoard[t.id] = 'paused' }
+        for (const t of tasks) { defaultBoard[t.id] = t._assignmentActive ? 'active' : 'paused' }
         try {
           const stored = localStorage.getItem(`ca_board_${client.id}`)
-          newBoards[client.id] = stored ? { ...defaultBoard, ...JSON.parse(stored) } : defaultBoard
+          // DB state wins: spread localStorage first, then defaultBoard overrides it.
+          // This prevents stale localStorage entries from incorrectly showing paused tasks as active.
+          newBoards[client.id] = stored ? { ...JSON.parse(stored), ...defaultBoard } : defaultBoard
         } catch {
           newBoards[client.id] = defaultBoard
         }

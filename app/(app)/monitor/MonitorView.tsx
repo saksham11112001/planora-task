@@ -293,6 +293,31 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
     URL.revokeObjectURL(url)
   }
 
+  function exportToCSV() {
+    const fmtD = (iso: string | null | undefined) => iso ? iso.slice(0, 10) : ''
+    const capFirst = (s: string) => s ? s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, ' ') : ''
+    const escape   = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`
+    const header   = ['Title', 'Status', 'Priority', 'Type', 'Assignee', 'Client', 'Project', 'Due Date', 'Created', 'Updated']
+    const rows     = visible.map(t => [
+      t.title ?? '',
+      STATUS_CONFIG[t.status]?.label ?? capFirst(t.status),
+      capFirst(t.priority),
+      typeLabel(t),
+      t.assignee?.name ?? '',
+      t.client?.name   ?? '',
+      t.project?.name  ?? '',
+      fmtD(t.due_date),
+      fmtD(t.created_at),
+      fmtD(t.updated_at ?? t.created_at),
+    ])
+    const csv  = [header, ...rows].map(r => r.map(escape).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href = url; a.download = `upfloat_monitor_${today}.csv`; a.click()
+    URL.revokeObjectURL(url)
+  }
+
   // ── Filtering ──
   const visible = useMemo(() => {
     return tasks.filter(t => {
@@ -489,6 +514,12 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
             {showChart ? 'Hide chart' : 'Show chart'}
           </button>
           {/* Export */}
+          <button onClick={exportToCSV}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 20,
+              border: '1px solid var(--border)', background: 'var(--surface-subtle)',
+              color: 'var(--text-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+            <Download style={{ width: 13, height: 13 }}/> Export CSV
+          </button>
           <button onClick={exportToExcel}
             style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 20,
               border: '1px solid var(--brand)', background: 'rgba(13,148,136,0.1)',
