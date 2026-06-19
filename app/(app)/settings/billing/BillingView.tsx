@@ -152,16 +152,33 @@ export function BillingView({ orgName, currentPlan, status, subscriptionId, tria
         rzp.open()
         setLoading(null)
       } else {
-        // ── Regular subscription checkout ──────────────────────────────────────
+        // ── Monthly subscription checkout (autopay) ────────────────────────────
         const rzp = new (window as any).Razorpay({
-          key:            data.key_id,
+          key:             data.key_id,
           subscription_id: data.subscription_id,
-          name:           'upFloat',
-          description:    `${plan.charAt(0).toUpperCase() + plan.slice(1)} Plan — ${annual ? 'Annual' : 'Monthly'}`,
-          image:          '/favicon.svg',
-          prefill:        { name: orgName },
-          theme:          { color: '#0d9488' },
-          handler: () => { toast.success('Payment successful! Plan upgraded.'); setTimeout(() => window.location.reload(), 1500) },
+          name:            'upFloat',
+          description:     `${plan.charAt(0).toUpperCase() + plan.slice(1)} Plan — Monthly`,
+          image:           '/favicon.svg',
+          prefill:         { name: data.org_name, email: data.email },
+          theme:           { color: '#0d9488' },
+          handler: async (response: any) => {
+            const verifyRes = await fetch('/api/settings/billing/verify', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                razorpay_payment_id:      response.razorpay_payment_id,
+                razorpay_subscription_id: response.razorpay_subscription_id,
+                razorpay_signature:       response.razorpay_signature,
+                plan_tier:                plan,
+              }),
+            })
+            if (verifyRes.ok) {
+              toast.success('Payment successful! Plan upgraded.')
+              setTimeout(() => window.location.reload(), 1500)
+            } else {
+              const vd = await verifyRes.json()
+              toast.error(vd.error ?? 'Payment verification failed')
+            }
+          },
           modal: { ondismiss: () => setLoading(null) },
         })
         rzp.open()

@@ -152,37 +152,67 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // ── One-time order — amount depends on billing cycle ─────────────────────
-    const isAnnual    = billing_cycle === 'annual'
-    const amountPaise = isAnnual
-      ? (PLAN_PAISE_ANNUAL[plan_tier] ?? PLAN_PAISE[plan_tier] ?? 99900)
-      : (PLAN_PAISE[plan_tier] ?? 99900)
+    // ── Annual: one-time order for full year ──────────────────────────────────
+    if (billing_cycle === 'annual') {
+      const amountPaise = PLAN_PAISE_ANNUAL[plan_tier] ?? PLAN_PAISE[plan_tier] ?? 99900
 
-    const orderRes = await fetch('https://api.razorpay.com/v1/orders', {
+      const orderRes = await fetch('https://api.razorpay.com/v1/orders', {
+        method: 'POST',
+        headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount:   amountPaise,
+          currency: 'INR',
+          receipt:  `plan_${mb.org_id.slice(0, 8)}_${plan_tier}_annual_${Date.now()}`,
+          notes: { org_id: mb.org_id, plan_tier, billing_cycle: 'annual', type: 'plan_upgrade' },
+        }),
+      })
+      const order = await orderRes.json()
+      if (!order.id) {
+        console.error('[billing] Razorpay annual order creation failed:', JSON.stringify(order))
+        return NextResponse.json({ error: 'Payment session could not be created. Please try again.' }, { status: 502 })
+      }
+
+      return NextResponse.json({
+        type:          'discounted_order',
+        order_id:      order.id,
+        amount:        amountPaise,
+        billing_cycle: 'annual',
+        key_id:        keyId,
+        plan_tier,
+        org_name:      org?.name ?? '',
+        email:         user.email ?? '',
+      })
+    }
+
+    // ── Monthly: Razorpay Subscription (autopay, customer cannot disable) ─────
+
+    const subBody: Record<string, any> = {
+      plan_id:         planId,
+      quantity:        1,
+      total_count:     120,  // 10-year rolling window; effectively perpetual
+      customer_notify: 1,
+      notes:           { org_id: mb.org_id, plan_tier },
+    }
+    if (customerId) subBody.customer_id = customerId
+
+    const subRes = await fetch('https://api.razorpay.com/v1/subscriptions', {
       method: 'POST',
       headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        amount:   amountPaise,
-        currency: 'INR',
-        receipt:  `plan_${mb.org_id.slice(0, 8)}_${plan_tier}_${billing_cycle}_${Date.now()}`,
-        notes: { org_id: mb.org_id, plan_tier, billing_cycle, type: 'plan_upgrade' },
-      }),
+      body: JSON.stringify(subBody),
     })
-    const orderSub = await orderRes.json()
-    if (!orderSub.id) {
-      console.error('[billing] Razorpay order creation failed:', JSON.stringify(orderSub))
+    const sub = await subRes.json()
+    if (!sub.id) {
+      console.error('[billing] Razorpay subscription creation failed:', JSON.stringify(sub))
       return NextResponse.json({ error: 'Payment session could not be created. Please try again.' }, { status: 502 })
     }
 
     return NextResponse.json({
-      type:          'discounted_order',
-      order_id:      orderSub.id,
-      amount:        amountPaise,
-      billing_cycle,
-      key_id:        keyId,
+      type:            'subscription',
+      subscription_id: sub.id,
+      key_id:          keyId,
       plan_tier,
-      org_name:      org?.name ?? '',
-      email:         user.email ?? '',
+      org_name:        org?.name ?? '',
+      email:           user.email ?? '',
     })
   } catch (err: any) {
     return NextResponse.json(dbError(err, 'settings/billing'), { status: 500 })
