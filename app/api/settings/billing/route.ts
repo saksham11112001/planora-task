@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
       const custRes = await fetch('https://api.razorpay.com/v1/customers', {
         method: 'POST',
         headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: org?.name ?? 'Customer', email: user.email }),
+        body: JSON.stringify({ name: org?.name ?? 'Customer', email: user.email, fail_existing: 0 }),
       })
       const cust = await custRes.json()
       // Razorpay returns existing customer (200) or an error object — handle both
