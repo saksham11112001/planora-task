@@ -82,7 +82,16 @@ export async function POST(request: NextRequest) {
       })
       const cust = await custRes.json()
       // Razorpay returns existing customer (200) or an error object — handle both
-      if (!cust.id) return NextResponse.json({ error: 'Payment setup failed. Please try again or contact support.' }, { status: 502 })
+      if (!cust.id) {
+        console.error('[billing] Razorpay customer creation failed. HTTP status:', custRes.status, 'Response:', JSON.stringify(cust))
+        const rzpMsg = cust?.error?.description ?? cust?.error?.code ?? 'unknown'
+        const isAuth = custRes.status === 401 || rzpMsg.toLowerCase().includes('auth') || rzpMsg.toLowerCase().includes('key')
+        return NextResponse.json({
+          error: isAuth
+            ? 'Payment gateway authentication failed. Please check Razorpay API keys in environment variables.'
+            : 'Payment setup failed. Please try again or contact support.',
+        }, { status: 502 })
+      }
       customerId = cust.id
       await admin.from('organisations').update({ razorpay_customer_id: customerId }).eq('id', mb.org_id)
     }
@@ -115,7 +124,10 @@ export async function POST(request: NextRequest) {
         }),
       })
       const order = await orderRes.json()
-      if (!order.id) return NextResponse.json({ error: 'Payment session could not be created. Please try again.' }, { status: 502 })
+      if (!order.id) {
+        console.error('[billing] Razorpay discounted order creation failed:', JSON.stringify(order))
+        return NextResponse.json({ error: 'Payment session could not be created. Please try again.' }, { status: 502 })
+      }
 
       return NextResponse.json({
         type:             'discounted_order',
@@ -144,7 +156,10 @@ export async function POST(request: NextRequest) {
       }),
     })
     const orderSub = await orderRes.json()
-    if (!orderSub.id) return NextResponse.json({ error: 'Payment session could not be created. Please try again.' }, { status: 502 })
+    if (!orderSub.id) {
+      console.error('[billing] Razorpay order creation failed:', JSON.stringify(orderSub))
+      return NextResponse.json({ error: 'Payment session could not be created. Please try again.' }, { status: 502 })
+    }
 
     return NextResponse.json({
       type:     'discounted_order',
