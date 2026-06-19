@@ -31,12 +31,15 @@ export async function POST(_req: NextRequest) {
       body: JSON.stringify({
         amount:   SETUP_FEE_PAISE,
         currency: 'INR',
-        receipt:  `setup_${mb.org_id}`,
+        receipt:  `setup_${mb.org_id}_${Date.now()}`,
         notes:    { org_id: mb.org_id, type: 'setup_fee' },
       }),
     })
     const order = await orderRes.json()
-    if (!order.id) throw new Error(order.error?.description ?? 'Order creation failed')
+    if (!order.id) {
+      const desc = (order.error?.description ?? 'Order creation failed') as string
+      throw new Error(desc.toLowerCase().includes('receipt') ? 'Checkout session expired. Please try again.' : desc)
+    }
 
     return NextResponse.json({ order_id: order.id, key_id: keyId })
   } catch (err: any) {
