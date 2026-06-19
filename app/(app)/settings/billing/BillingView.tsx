@@ -135,6 +135,7 @@ export function BillingView({ orgName, currentPlan, status, subscriptionId, tria
                 razorpay_signature:  response.razorpay_signature,
                 plan_tier:           plan,
                 coupon_code:         data.coupon_code,
+                billing_cycle:       data.billing_cycle,
               }),
             })
             if (verifyRes.ok) {

@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
   if (!mb || !['owner', 'admin'].includes(mb.role))
     return NextResponse.json({ error: 'Admins only' }, { status: 403 })
 
-  const { razorpay_order_id, razorpay_payment_id, razorpay_signature, plan_tier, coupon_code } = await req.json()
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature, plan_tier, coupon_code, billing_cycle } = await req.json()
 
   if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !plan_tier)
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -41,9 +41,9 @@ export async function POST(req: NextRequest) {
     .maybeSingle()
   if (existing) return NextResponse.json({ success: true, plan_tier })
 
-  // Activate the plan (first month paid — set trial_ends_at to 30 days from now
-  // so the user has access; subscription billing picks up after that)
-  const trialEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+  // Access duration: 365 days for annual, 30 days for monthly
+  const daysAccess = billing_cycle === 'annual' ? 365 : 30
+  const trialEnd = new Date(Date.now() + daysAccess * 24 * 60 * 60 * 1000).toISOString()
   await admin.from('organisations').update({
     plan_tier,
     status:        'active',
