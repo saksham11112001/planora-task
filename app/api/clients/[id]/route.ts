@@ -47,7 +47,10 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const clientDeleteDenied = await assertCan(admin, mb.org_id, user.id, mb.role, 'clients.delete')
   if (clientDeleteDenied) return NextResponse.json({ error: clientDeleteDenied.error }, { status: clientDeleteDenied.status })
 
-  const { error } = await admin.from('clients').delete().eq('id', id).eq('org_id', mb.org_id)
+  // Soft-delete: mark is_archived + deleted_at so data is recoverable from trash
+  const { error } = await admin.from('clients')
+    .update({ is_archived: true, deleted_at: new Date().toISOString() })
+    .eq('id', id).eq('org_id', mb.org_id)
   if (error) return NextResponse.json(dbError(error, 'clients/[id]'), { status: 500 })
   return NextResponse.json({ success: true })
 }
