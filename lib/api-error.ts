@@ -21,7 +21,7 @@ export function friendlyError(err: AnyError, context = 'api'): string {
   const msg = raw.toLowerCase()
 
   // ── Supabase / PostgREST patterns ──────────────────────────────────────────
-  if (msg.includes('duplicate key') || msg.includes('already exists') || msg.includes('unique constraint'))
+  if (msg.includes('duplicate key') || msg.includes('unique constraint'))
     return 'This record already exists. Please check for duplicates and try again.'
 
   if (msg.includes('violates foreign key') || msg.includes('foreign key constraint'))

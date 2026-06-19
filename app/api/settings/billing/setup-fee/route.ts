@@ -36,10 +36,7 @@ export async function POST(_req: NextRequest) {
       }),
     })
     const order = await orderRes.json()
-    if (!order.id) {
-      const desc = (order.error?.description ?? 'Order creation failed') as string
-      throw new Error(desc.toLowerCase().includes('receipt') ? 'Checkout session expired. Please try again.' : desc)
-    }
+    if (!order.id) return NextResponse.json({ error: 'Payment session could not be created. Please try again.' }, { status: 502 })
 
     return NextResponse.json({ order_id: order.id, key_id: keyId })
   } catch (err: any) {
