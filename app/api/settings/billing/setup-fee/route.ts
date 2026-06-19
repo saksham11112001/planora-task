@@ -4,7 +4,7 @@ import type { NextRequest } from 'next/server'
 import { dbError }         from '@/lib/api-error'
 import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
 
-const SETUP_FEE_PAISE = 49900 // $499 in cents
+const SETUP_FEE_PAISE = 49900 // ₹499 in paise
 
 export async function POST(_req: NextRequest) {
   const supabase = await createClient()
