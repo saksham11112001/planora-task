@@ -114,7 +114,10 @@ export async function POST(request: NextRequest) {
         }),
       })
       const order = await orderRes.json()
-      if (!order.id) throw new Error(order.error?.description ?? 'Order creation failed')
+      if (!order.id) {
+        const desc = (order.error?.description ?? 'Order creation failed') as string
+        throw new Error(desc.toLowerCase().includes('receipt') ? 'Checkout session expired. Please try again.' : desc)
+      }
 
       return NextResponse.json({
         type:             'discounted_order',
@@ -143,7 +146,10 @@ export async function POST(request: NextRequest) {
       }),
     })
     const orderSub = await orderRes.json()
-    if (!orderSub.id) throw new Error(orderSub.error?.description ?? 'Order creation failed')
+    if (!orderSub.id) {
+      const desc = (orderSub.error?.description ?? 'Order creation failed') as string
+      throw new Error(desc.toLowerCase().includes('receipt') ? 'Checkout session expired. Please try again.' : desc)
+    }
 
     return NextResponse.json({
       type:     'discounted_order',
