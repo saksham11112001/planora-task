@@ -81,7 +81,8 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify({ name: org?.name ?? 'Customer', email: user.email }),
       })
       const cust = await custRes.json()
-      if (!cust.id) throw new Error(cust.error?.description ?? 'Customer creation failed')
+      // Razorpay returns existing customer (200) or an error object — handle both
+      if (!cust.id) return NextResponse.json({ error: 'Payment setup failed. Please try again or contact support.' }, { status: 502 })
       customerId = cust.id
       await admin.from('organisations').update({ razorpay_customer_id: customerId }).eq('id', mb.org_id)
     }
@@ -114,10 +115,7 @@ export async function POST(request: NextRequest) {
         }),
       })
       const order = await orderRes.json()
-      if (!order.id) {
-        const desc = (order.error?.description ?? 'Order creation failed') as string
-        throw new Error(desc.toLowerCase().includes('receipt') ? 'Checkout session expired. Please try again.' : desc)
-      }
+      if (!order.id) return NextResponse.json({ error: 'Payment session could not be created. Please try again.' }, { status: 502 })
 
       return NextResponse.json({
         type:             'discounted_order',
@@ -146,10 +144,7 @@ export async function POST(request: NextRequest) {
       }),
     })
     const orderSub = await orderRes.json()
-    if (!orderSub.id) {
-      const desc = (orderSub.error?.description ?? 'Order creation failed') as string
-      throw new Error(desc.toLowerCase().includes('receipt') ? 'Checkout session expired. Please try again.' : desc)
-    }
+    if (!orderSub.id) return NextResponse.json({ error: 'Payment session could not be created. Please try again.' }, { status: 502 })
 
     return NextResponse.json({
       type:     'discounted_order',
