@@ -81,19 +81,22 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify({ name: org?.name ?? 'Customer', email: user.email, fail_existing: 0 }),
       })
       const cust = await custRes.json()
-      // Razorpay returns existing customer (200) or an error object — handle both
-      if (!cust.id) {
-        console.error('[billing] Razorpay customer creation failed. HTTP status:', custRes.status, 'Response:', JSON.stringify(cust))
-        const rzpMsg = cust?.error?.description ?? cust?.error?.code ?? 'unknown'
-        const isAuth = custRes.status === 401 || rzpMsg.toLowerCase().includes('auth') || rzpMsg.toLowerCase().includes('key')
-        return NextResponse.json({
-          error: isAuth
-            ? 'Payment gateway authentication failed. Please check Razorpay API keys in environment variables.'
-            : 'Payment setup failed. Please try again or contact support.',
-        }, { status: 502 })
+      if (cust.id) {
+        customerId = cust.id
+        await admin.from('organisations').update({ razorpay_customer_id: customerId }).eq('id', mb.org_id)
+      } else {
+        const desc: string = cust?.error?.description ?? ''
+        // "Customer already exists" — proceed without storing; order creation doesn't need customer ID
+        if (!desc.toLowerCase().includes('already exists')) {
+          console.error('[billing] Razorpay customer creation failed. HTTP status:', custRes.status, 'Response:', JSON.stringify(cust))
+          const isAuth = custRes.status === 401 || desc.toLowerCase().includes('auth') || desc.toLowerCase().includes('key')
+          return NextResponse.json({
+            error: isAuth
+              ? 'Payment gateway authentication failed. Please check Razorpay API keys in environment variables.'
+              : 'Payment setup failed. Please try again or contact support.',
+          }, { status: 502 })
+        }
       }
-      customerId = cust.id
-      await admin.from('organisations').update({ razorpay_customer_id: customerId }).eq('id', mb.org_id)
     }
 
     // ── Discounted first-month order ───────────────────────────────────────────
