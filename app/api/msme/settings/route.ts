@@ -36,7 +36,16 @@ export async function GET(req: NextRequest) {
 
   const pack = (packRow?.config as { tier: string; vendor_limit: number } | null) ?? { tier: 'free', vendor_limit: 5 }
 
-  return NextResponse.json({ schedule, pack })
+  const { data: ccRow } = await admin
+    .from('org_feature_settings')
+    .select('config')
+    .eq('org_id', mb.org_id)
+    .eq('feature_key', 'msme_cc_email')
+    .maybeSingle()
+
+  const cc_email: string | null = (ccRow?.config as { email: string } | null)?.email ?? null
+
+  return NextResponse.json({ schedule, pack, cc_email })
 }
 
 export async function PATCH(req: NextRequest) {
@@ -51,24 +60,38 @@ export async function PATCH(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { schedule } = body as { schedule: number[] }
-
-  if (!Array.isArray(schedule) || schedule.length < 1 || schedule.length > 4) {
-    return NextResponse.json({ error: 'Schedule must be an array of 1–4 day intervals (for 2–5 emails)' }, { status: 400 })
-  }
-  if (schedule.some(d => !Number.isInteger(d) || d < 1 || d > 365)) {
-    return NextResponse.json({ error: 'Each interval must be a whole number of days between 1 and 365' }, { status: 400 })
-  }
+  const { schedule, cc_email } = body as { schedule?: number[]; cc_email?: string | null }
 
   const admin = createAdminClient()
-  const { error } = await admin
-    .from('org_feature_settings')
-    .upsert(
-      { org_id: mb.org_id, feature_key: 'msme_email_schedule', is_enabled: true, config: { days: schedule } },
-      { onConflict: 'org_id,feature_key' }
-    )
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (schedule !== undefined) {
+    if (!Array.isArray(schedule) || schedule.length < 1 || schedule.length > 4) {
+      return NextResponse.json({ error: 'Schedule must be an array of 1–4 day intervals (for 2–5 emails)' }, { status: 400 })
+    }
+    if (schedule.some(d => !Number.isInteger(d) || d < 1 || d > 365)) {
+      return NextResponse.json({ error: 'Each interval must be a whole number of days between 1 and 365' }, { status: 400 })
+    }
+    const { error } = await admin
+      .from('org_feature_settings')
+      .upsert(
+        { org_id: mb.org_id, feature_key: 'msme_email_schedule', is_enabled: true, config: { days: schedule } },
+        { onConflict: 'org_id,feature_key' }
+      )
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  }
 
-  return NextResponse.json({ ok: true, schedule })
+  if (cc_email !== undefined) {
+    if (cc_email !== null && cc_email !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cc_email)) {
+      return NextResponse.json({ error: 'Invalid CC email address' }, { status: 400 })
+    }
+    const { error } = await admin
+      .from('org_feature_settings')
+      .upsert(
+        { org_id: mb.org_id, feature_key: 'msme_cc_email', is_enabled: true, config: { email: cc_email ?? '' } },
+        { onConflict: 'org_id,feature_key' }
+      )
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  return NextResponse.json({ ok: true })
 }

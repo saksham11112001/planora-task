@@ -31,17 +31,19 @@ export async function GET(req: NextRequest) {
       .eq('org_id', mb.org_id)
       .eq('feature_key', 'msme_pack')
       .maybeSingle(),
+    // Count vendors that have ever been emailed (including soft-deleted ones) — these are permanent slots used.
     admin
       .from('msme_vendors')
       .select('id', { count: 'exact', head: true })
-      .eq('org_id', mb.org_id),
+      .eq('org_id', mb.org_id)
+      .gt('email_count', 0),
   ])
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   const vendorLimit: number = (packRow?.config?.vendor_limit as number | undefined) ?? FREE_VENDOR_LIMIT
   const total = vendors?.length ?? 0
-  return NextResponse.json({ vendors: vendors ?? [], total, totalEver: totalEver ?? total, vendorLimit })
+  return NextResponse.json({ vendors: vendors ?? [], total, totalEver: totalEver ?? 0, vendorLimit })
 }
 
 export async function POST(req: NextRequest) {
@@ -69,23 +71,7 @@ export async function POST(req: NextRequest) {
   const admin       = createAdminClient()
   const emailNorm   = vendor_email.trim().toLowerCase()
 
-  // Fetch pack-based vendor limit
-  const { data: packRow } = await admin
-    .from('org_feature_settings')
-    .select('config')
-    .eq('org_id', mb.org_id)
-    .eq('feature_key', 'msme_pack')
-    .maybeSingle()
-  const vendorLimit: number = (packRow?.config?.vendor_limit as number | undefined) ?? FREE_VENDOR_LIMIT
-
-  // Anti-gaming: count ALL slots ever used (including soft-deleted) for the limit check.
-  // Deleting a vendor does NOT free up a slot.
-  const { count: totalEver } = await admin
-    .from('msme_vendors')
-    .select('id', { count: 'exact', head: true })
-    .eq('org_id', mb.org_id)
-
-  // Check if a soft-deleted vendor with the same email exists — reactivate it (same slot).
+  // Check if a soft-deleted vendor with the same email exists — reactivate it (no new slot).
   const { data: deleted } = await admin
     .from('msme_vendors')
     .select('id')
@@ -111,14 +97,6 @@ export async function POST(req: NextRequest) {
       .maybeSingle()
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ vendor }, { status: 201 })
-  }
-
-  // New slot: check against limit
-  if ((totalEver ?? 0) >= vendorLimit) {
-    return NextResponse.json({
-      error: 'Vendor limit reached. Upgrade your pack to add more vendors.',
-      code: 'LIMIT_REACHED',
-    }, { status: 402 })
   }
 
   // Check active vendors don't already have this email

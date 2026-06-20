@@ -4,7 +4,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient }             from '@/lib/supabase/server'
 import { createAdminClient }        from '@/lib/supabase/admin'
 import { getApiOrgMembership }      from '@/lib/supabase/apiActiveOrg'
-import { FREE_VENDOR_LIMIT }        from '@/lib/msme/packs'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -36,21 +35,6 @@ export async function POST(req: NextRequest) {
 
   const admin = createAdminClient()
 
-  // Resolve pack-based vendor limit (used in response only — not enforced as a hard stop)
-  const { data: packRow } = await admin
-    .from('org_feature_settings')
-    .select('config')
-    .eq('org_id', mb.org_id)
-    .eq('feature_key', 'msme_pack')
-    .maybeSingle()
-  const vendorLimit: number = (packRow?.config?.vendor_limit as number | undefined) ?? FREE_VENDOR_LIMIT
-
-  // Count ALL slots ever used (including soft-deleted) for isPaid logic
-  const { count: totalEver } = await admin
-    .from('msme_vendors')
-    .select('id', { count: 'exact', head: true })
-    .eq('org_id', mb.org_id)
-
   // Get existing emails (all rows incl. soft-deleted) to avoid duplicates
   const { data: existingVendors } = await admin
     .from('msme_vendors')
@@ -59,9 +43,7 @@ export async function POST(req: NextRequest) {
 
   const existingEmails = new Set((existingVendors ?? []).map(v => v.vendor_email.toLowerCase()))
 
-  let slotIndex = totalEver ?? 0
   const inserted: string[] = []
-  const lockedCount: number[] = [] // indices of inserted vendors that are locked (beyond vendorLimit)
   const skipped:  Array<{ row: number; name: string; reason: string }> = []
 
   for (let i = 0; i < rows.length; i++) {
@@ -74,17 +56,13 @@ export async function POST(req: NextRequest) {
     if (!email || !EMAIL_RE.test(email)) { skipped.push({ row: i + 1, name, reason: 'Invalid or missing email' }); continue }
     if (existingEmails.has(email)) { skipped.push({ row: i + 1, name, reason: 'Email already exists' }); continue }
 
-    // Vendors beyond the free limit are marked unpaid (locked in UI until pack is purchased)
-    const isPaid        = slotIndex >= FREE_VENDOR_LIMIT
-    const paymentStatus = isPaid ? 'unpaid' : 'free'
-
     const { error } = await admin.from('msme_vendors').insert({
       org_id:         mb.org_id,
       vendor_name:    name,
       vendor_email:   email,
       gstin,
-      is_paid:        isPaid,
-      payment_status: paymentStatus,
+      is_paid:        true,
+      payment_status: 'free',
       created_by:     user.id,
     })
 
@@ -93,19 +71,13 @@ export async function POST(req: NextRequest) {
     } else {
       inserted.push(name)
       existingEmails.add(email)
-      if (slotIndex >= vendorLimit) lockedCount.push(inserted.length - 1)
-      slotIndex++
     }
   }
-
-  const lockedInserted = lockedCount.length
 
   return NextResponse.json({
     ok: true,
     inserted: inserted.length,
-    locked: lockedInserted,
     skipped,
-    vendor_limit: vendorLimit,
-    paid_slots: Math.max(0, slotIndex - FREE_VENDOR_LIMIT),
+    paid_slots: 0,
   })
 }
