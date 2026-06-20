@@ -40,16 +40,19 @@ export async function POST(req: NextRequest) {
 
   const orgId   = mb.org_id
   const orgName = (mb.organisations as any)?.name ?? 'Organisation'
-  const { price_paise: pricePaise, label: packLabel, vendor_limit: vendorLimit } = pack
+  const { price_paise: basePaise, label: packLabel, vendor_limit: vendorLimit } = pack
+
+  // Charge GST-inclusive amount on Razorpay; the UI shows the base (ex-GST) price.
+  const chargeablePaise = Math.round(basePaise * 1.18)
 
   const basicAuth = Buffer.from(`${RZP_KEY_ID}:${RZP_KEY_SECRET}`).toString('base64')
   const orderRes  = await fetch('https://api.razorpay.com/v1/orders', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Basic ${basicAuth}` },
     body: JSON.stringify({
-      amount:   pricePaise,
+      amount:   chargeablePaise,
       currency: 'INR',
-      receipt:  `msme_${orgId.slice(0, 8)}_${pack_tier}`,
+      receipt:  `msme_${orgId.slice(0, 8)}_${pack_tier}_${Date.now()}`,
       notes:    { org_id: orgId, pack_tier, org_name: orgName },
     }),
   })
@@ -58,14 +61,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: order.error?.description ?? 'Order creation failed' }, { status: 500 })
   }
 
-  // Record pending payment so webhook can also activate the pack as a fallback
+  // Record pending payment — store base (pre-GST) amount for internal records
   const admin = createAdminClient()
   await admin.from('msme_pack_payments').upsert(
     {
       org_id:           orgId,
       pack_tier,
       vendor_limit:     vendorLimit,
-      amount_paise:     pricePaise,
+      amount_paise:     basePaise,
       gateway:          'razorpay',
       gateway_order_id: order.id,
       status:           'pending',
@@ -76,7 +79,7 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     gateway:  'razorpay',
     order_id: order.id,
-    amount:   pricePaise,
+    amount:   chargeablePaise,
     key_id:   RZP_KEY_ID,
     pack_tier,
     org_name: orgName,

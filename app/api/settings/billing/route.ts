@@ -117,12 +117,14 @@ export async function POST(request: NextRequest) {
       } else if (discountCoupon.discount_type === 'fixed_inr' && discountCoupon.discount_inr) {
         discountedPaise = Math.max(100, basePaise - discountCoupon.discount_inr * 100)
       }
+      // Charge GST-inclusive amount on Razorpay; UI shows the base (ex-GST) price
+      const chargeablePaise = Math.round(discountedPaise * 1.18)
 
       const orderRes = await fetch('https://api.razorpay.com/v1/orders', {
         method: 'POST',
         headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          amount:   discountedPaise,
+          amount:   chargeablePaise,
           currency: 'INR',
           receipt:  `disc_${mb.org_id.slice(0, 8)}_${plan_tier}_${Date.now()}`,
           notes: {
@@ -142,7 +144,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         type:             'discounted_order',
         order_id:         order.id,
-        amount:           discountedPaise,
+        amount:           chargeablePaise,
         original_amount:  basePaise,
         key_id:           keyId,
         plan_tier,
@@ -154,7 +156,9 @@ export async function POST(request: NextRequest) {
 
     // ── Annual: one-time order for full year ──────────────────────────────────
     if (billing_cycle === 'annual') {
-      const amountPaise = PLAN_PAISE_ANNUAL[plan_tier] ?? PLAN_PAISE[plan_tier] ?? 99900
+      const basePaise   = PLAN_PAISE_ANNUAL[plan_tier] ?? PLAN_PAISE[plan_tier] ?? 99900
+      // Charge GST-inclusive amount on Razorpay; UI shows the base (ex-GST) price
+      const amountPaise = Math.round(basePaise * 1.18)
 
       const orderRes = await fetch('https://api.razorpay.com/v1/orders', {
         method: 'POST',
