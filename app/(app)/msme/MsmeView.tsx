@@ -77,6 +77,7 @@ export function MsmeView({ userRole, orgName }: Props) {
   const [savingEmail,   setSavingEmail]   = useState(false)
   const [checkedIds,    setCheckedIds]    = useState<Set<string>>(new Set())
   const [bulkShooting,  setBulkShooting]  = useState(false)
+  const [viewingCert,   setViewingCert]   = useState<string | null>(null)
   const toastRef = useRef(0)
 
   // Add vendor form
@@ -331,6 +332,21 @@ export function MsmeView({ userRole, orgName }: Props) {
     fetchVendors()
   }
 
+  // ── View vendor certificate ───────────────────────────────────────────────
+  async function handleViewCert(vendorId: string) {
+    setViewingCert(vendorId)
+    try {
+      const res  = await fetch(`/api/msme/vendors/${vendorId}/cert`)
+      const data = await res.json()
+      if (!res.ok || !data.url) { showToast(data.error ?? 'Could not load document', 'error'); return }
+      window.open(data.url, '_blank', 'noopener')
+    } catch {
+      showToast('Failed to open document', 'error')
+    } finally {
+      setViewingCert(null)
+    }
+  }
+
   // ── Delete ─────────────────────────────────────────────────────────────────
   async function handleDelete(vendorId: string) {
     if (!confirm('Remove this vendor? This cannot be undone.')) return
@@ -440,84 +456,80 @@ export function MsmeView({ userRole, orgName }: Props) {
     XLSX.writeFile(wb, 'msme-vendor-import-template.xlsx')
   }
 
-  // ── Export all vendors + email audit trail ────────────────────────────────
+  // ── Export audit log: vendor data + email history merged ─────────────────
   async function handleExport() {
     if (exporting) return
     setExporting(true)
     try {
-      // Sheet 1: Vendor summary
-      const header = ['Vendor Name', 'Email', 'GSTIN', 'PAN', 'Tracker Status', 'Udyam Number', 'Udyam Registered On', 'Category', 'Nature of Business', 'Outstanding Amount (₹)', '43B(h) Applicable', 'Emails Sent', 'Last Email Date', 'Submitted On', 'Declaration By', 'Date Added']
-      const rows = vendors.map(v => {
-        const is43bh = v.msme_category !== null && (v.outstanding_amount ?? 0) > 0 ? 'Yes' : v.is_not_msme ? 'No (Non-MSME)' : 'Unverified'
-        return [
-          v.vendor_name,
-          v.vendor_email,
-          v.gstin ?? '',
-          v.pan ?? '',
-          v.is_not_msme ? 'Non-MSME Declaration' : STATUS_LABEL[v.status].replace(' ✓', ''),
-          v.udyam_number ?? '',
-          v.udyam_registered_on ? new Date(v.udyam_registered_on).toLocaleDateString('en-IN') : '',
-          v.msme_category ? CAT_LABEL[v.msme_category] : '',
-          v.nature_of_business ? NAT_LABEL[v.nature_of_business] : '',
-          v.outstanding_amount !== null && v.outstanding_amount !== undefined ? v.outstanding_amount : '',
-          is43bh,
-          v.email_count,
-          v.last_emailed_at ? new Date(v.last_emailed_at).toLocaleDateString('en-IN') : '',
-          v.submitted_at ? new Date(v.submitted_at).toLocaleDateString('en-IN') : '',
-          v.declarant_name ?? '',
-          new Date(v.created_at).toLocaleDateString('en-IN'),
-        ]
-      })
-      const ws = XLSX.utils.aoa_to_sheet([header, ...rows])
-      ws['!cols'] = header.map(() => ({ wch: 22 }))
-      const wb = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(wb, ws, 'MSME Vendors')
-
-      // Sheet 2: Full email audit trail
+      // Fetch email logs first
+      let logs: Array<{ vendor_id: string; attempt_no: number; sent_at: string; opened_at: string | null }> = []
       try {
         const logsRes = await fetch('/api/msme/email-logs')
         if (logsRes.ok) {
-          const { logs } = await logsRes.json()
-          if (Array.isArray(logs) && logs.length > 0) {
-            const vendorMap = new Map(vendors.map(v => [v.id, v]))
-            const auditHeader = [
-              'Vendor Name', 'Vendor Email',
-              'Email Attempt #', 'Date Sent', 'Time Sent', 'Opened On',
-              'Status When Sent', 'Current Status', 'Response Received On',
-            ]
-            const auditRows = logs.map((log: { vendor_id: string; attempt_no: number; sent_at: string; opened_at: string | null }) => {
-              const v = vendorMap.get(log.vendor_id)
-              const sentDate = new Date(log.sent_at)
-              // Status when sent: emails are sent while status is 'emailed' or 'pending'
-              // We don't store historical status per-email, so we infer:
-              // if current status is submitted/not_msme and this email was before response, status was 'emailed'
-              const responseDate = v?.submitted_at ?? v?.declared_at ?? null
-              const wasResponded = responseDate && new Date(log.sent_at) < new Date(responseDate)
-              const statusWhenSent = wasResponded ? 'Awaiting reply' : (v?.status === 'submitted' || v?.status === 'not_msme' ? 'Awaiting reply (now responded)' : 'Awaiting reply')
-              const currentStatus = v
-                ? (v.is_not_msme ? 'Non-MSME Declaration' : STATUS_LABEL[v.status].replace(' ✓', ''))
-                : '—'
-              return [
-                v?.vendor_name ?? '—',
-                v?.vendor_email ?? '—',
-                log.attempt_no,
-                sentDate.toLocaleDateString('en-IN'),
-                sentDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-                log.opened_at ? new Date(log.opened_at).toLocaleDateString('en-IN') : 'Not opened',
-                statusWhenSent,
-                currentStatus,
-                responseDate ? new Date(responseDate).toLocaleDateString('en-IN') : 'Pending',
-              ]
-            })
-            const wsAudit = XLSX.utils.aoa_to_sheet([auditHeader, ...auditRows])
-            wsAudit['!cols'] = auditHeader.map(() => ({ wch: 24 }))
-            XLSX.utils.book_append_sheet(wb, wsAudit, 'Email Audit Trail')
+          const d = await logsRes.json()
+          if (Array.isArray(d.logs)) logs = d.logs
+        }
+      } catch { /* best-effort */ }
+
+      // Build a map: vendor_id → email log rows
+      const logsByVendor = new Map<string, typeof logs>()
+      for (const log of logs) {
+        if (!logsByVendor.has(log.vendor_id)) logsByVendor.set(log.vendor_id, [])
+        logsByVendor.get(log.vendor_id)!.push(log)
+      }
+
+      // Single merged sheet: one row per email sent (vendors with no emails get one row)
+      const header = [
+        'Vendor Name', 'Vendor Email', 'GSTIN', 'Current Status',
+        'Udyam Number', 'Category', 'Nature of Business', 'Outstanding Amount (₹)',
+        'Email # (of Total)', 'Email Sent On', 'Email Sent At', 'Email Opened On',
+        'Submitted On', 'Declaration By', 'Date Added',
+      ]
+
+      const mergedRows: (string | number)[][] = []
+      for (const v of vendors) {
+        const vendorLogs = logsByVendor.get(v.id) ?? []
+        const status = v.is_not_msme ? 'Non-MSME Declaration' : STATUS_LABEL[v.status].replace(' ✓', '')
+
+        if (vendorLogs.length === 0) {
+          // Vendor added but never emailed
+          mergedRows.push([
+            v.vendor_name, v.vendor_email, v.gstin ?? '', status,
+            v.udyam_number ?? '', v.msme_category ? CAT_LABEL[v.msme_category] : '',
+            v.nature_of_business ? NAT_LABEL[v.nature_of_business] : '',
+            v.outstanding_amount !== null && v.outstanding_amount !== undefined ? v.outstanding_amount : '',
+            '—', '—', '—', '—',
+            v.submitted_at ? new Date(v.submitted_at).toLocaleDateString('en-IN') : '',
+            v.declarant_name ?? '',
+            new Date(v.created_at).toLocaleDateString('en-IN'),
+          ])
+        } else {
+          for (const log of vendorLogs) {
+            const sentDate = new Date(log.sent_at)
+            mergedRows.push([
+              v.vendor_name, v.vendor_email, v.gstin ?? '', status,
+              v.udyam_number ?? '', v.msme_category ? CAT_LABEL[v.msme_category] : '',
+              v.nature_of_business ? NAT_LABEL[v.nature_of_business] : '',
+              v.outstanding_amount !== null && v.outstanding_amount !== undefined ? v.outstanding_amount : '',
+              `${log.attempt_no} / ${maxEmails}`,
+              sentDate.toLocaleDateString('en-IN'),
+              sentDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+              log.opened_at ? new Date(log.opened_at).toLocaleDateString('en-IN') : 'Not opened',
+              v.submitted_at ? new Date(v.submitted_at).toLocaleDateString('en-IN') : '',
+              v.declarant_name ?? '',
+              new Date(v.created_at).toLocaleDateString('en-IN'),
+            ])
           }
         }
-      } catch { /* email log sheet is best-effort — don't block export */ }
+      }
 
-      XLSX.writeFile(wb, `msme-vendors-${new Date().toISOString().slice(0,10)}.xlsx`)
-      showToast(`Exported ${vendors.length} vendors to Excel`)
+      const ws = XLSX.utils.aoa_to_sheet([header, ...mergedRows])
+      ws['!cols'] = header.map(() => ({ wch: 22 }))
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'MSME Audit Log')
+
+      XLSX.writeFile(wb, `msme-audit-log-${new Date().toISOString().slice(0,10)}.xlsx`)
+      showToast(`Exported audit log — ${vendors.length} vendors, ${logs.length} email records`)
     } finally {
       setExporting(false)
     }
@@ -587,7 +599,7 @@ export function MsmeView({ userRole, orgName }: Props) {
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           {canAdmin && (
             <button data-tour="msme-upgrade-btn" onClick={() => setShowUpgrade(true)} style={{ ...ghostBtn, borderColor: ACCENT, color: ACCENT }}>
-              📦 {packTier === 'free' ? 'Upgrade Pack' : canUpgrade ? `${packLabel} · Upgrade ↑` : `${packLabel} Plan`}
+              {packTier === 'free' ? '↑ Upgrade Pack' : canUpgrade ? 'Buy Credits →' : `${packLabel} Plan`}
             </button>
           )}
           {canAdmin && (
@@ -601,7 +613,7 @@ export function MsmeView({ userRole, orgName }: Props) {
             </button>
           )}
           {vendors.length > 0 && (
-            <button onClick={handleExport} disabled={exporting} style={{ ...ghostBtn, opacity: exporting ? 0.6 : 1, cursor: exporting ? 'default' : 'pointer' }}>{exporting ? 'Exporting…' : '↓ Export Excel'}</button>
+            <button onClick={handleExport} disabled={exporting} style={{ ...ghostBtn, opacity: exporting ? 0.6 : 1, cursor: exporting ? 'default' : 'pointer' }}>{exporting ? 'Exporting…' : '↓ Export Audit Log'}</button>
           )}
           {canManage && (
             <button data-tour="msme-add-btn" onClick={() => setShowAdd(true)} style={primaryBtn}>+ Add vendor</button>
@@ -844,7 +856,19 @@ export function MsmeView({ userRole, orgName }: Props) {
                         <td style={{ padding: '12px 14px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                             <div>
-                              <div style={{ fontWeight: 600, color: '#0f172a' }}>{v.vendor_name}</div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span style={{ fontWeight: 600, color: '#0f172a' }}>{v.vendor_name}</span>
+                                {v.cert_url && (
+                                  <button
+                                    onClick={e => { e.stopPropagation(); handleViewCert(v.id) }}
+                                    disabled={viewingCert === v.id}
+                                    title="View uploaded certificate"
+                                    style={{ background: `${ACCENT}15`, border: 'none', borderRadius: 4, padding: '1px 6px', color: ACCENT, fontSize: 10, fontWeight: 700, cursor: 'pointer', lineHeight: 1.6 }}
+                                  >
+                                    {viewingCert === v.id ? '…' : '📄'}
+                                  </button>
+                                )}
+                              </div>
                               <div style={{ color: '#64748b', fontSize: 11 }}>{v.vendor_email}</div>
                               {v.gstin && <div style={{ color: '#64748b', fontSize: 11 }}>GSTIN: {v.gstin}</div>}
                             </div>
@@ -953,10 +977,15 @@ export function MsmeView({ userRole, orgName }: Props) {
                     <DetailRow label="Outstanding" value={`₹${Number(selected.outstanding_amount).toLocaleString('en-IN')}`} />
                   )}
                   {selected.submitted_at && <DetailRow label="Submitted" value={new Date(selected.submitted_at).toLocaleDateString('en-IN')} />}
-                  {selected.cert_url && !selected.cert_url.startsWith('r2:') && (
-                    <a href={selected.cert_url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', marginTop: 8, color: ACCENT, fontSize: 12, fontWeight: 600 }}>📎 Download certificate →</a>
+                  {selected.cert_url && (
+                    <button
+                      onClick={() => handleViewCert(selected.id)}
+                      disabled={viewingCert === selected.id}
+                      style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, background: `${ACCENT}12`, border: `1px solid ${ACCENT}40`, borderRadius: 6, padding: '6px 12px', color: ACCENT, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+                    >
+                      {viewingCert === selected.id ? '⏳ Opening…' : '📄 View Certificate'}
+                    </button>
                   )}
-                  {selected.cert_url?.startsWith('r2:') && <p style={{ margin: '6px 0 0', fontSize: 11, color: '#16a34a', fontWeight: 600 }}>✓ Certificate in secure storage</p>}
                 </div>
               )}
 
@@ -1026,9 +1055,11 @@ export function MsmeView({ userRole, orgName }: Props) {
 
       {/* ── Upgrade Pack modal ── */}
       {showUpgrade && (
-        <Modal title="MSME Vendor Packs" onClose={() => setShowUpgrade(false)} wide>
+        <Modal title={packTier === 'free' ? 'MSME Vendor Packs' : 'Buy More Credits'} onClose={() => setShowUpgrade(false)} wide>
           <p style={{ fontSize: 13, color: '#64748b', marginBottom: 20, lineHeight: 1.6 }}>
-            Choose a pack that fits your vendor base. All vendors within your pack limit get full access — automated emails, form links, and Section 43B(h) compliance tracking.
+            {packTier === 'free'
+              ? 'Choose a pack that fits your vendor base. All vendors within your pack limit get full access — automated emails, form links, and compliance tracking.'
+              : `You're on the ${packLabel} plan (${vendorLimit} vendor slots). Purchase additional credits to email more vendors.`}
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {MSME_PACKS.filter(p => p.tier !== 'free').map(pack => {
@@ -1063,30 +1094,38 @@ export function MsmeView({ userRole, orgName }: Props) {
                     )}
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    {pack.original_price_label && (
-                      <div style={{ fontSize: 13, color: '#64748b', textDecoration: 'line-through' }}>{pack.original_price_label}</div>
-                    )}
-                    <div style={{ fontSize: 18, fontWeight: 800, color: '#0f172a' }}>{pack.price_label}</div>
-                    <div style={{ fontSize: 11, color: '#64748b' }}>one-time · + 18% GST</div>
-                    {!isCurrent && !isDowngrade && pack.tier === 'pack_500' && (
-                      <a
-                        href="mailto:info@upfloat.co?subject=MSME%20Enterprise%20Pack%20(500%20vendors)"
-                        style={{ ...primaryBtn, marginTop: 8, padding: '6px 16px', fontSize: 12, textDecoration: 'none', display: 'inline-block' }}
-                      >
-                        Contact us →
-                      </a>
-                    )}
-                    {!isCurrent && !isDowngrade && pack.tier !== 'pack_500' && (
-                      <button
-                        onClick={() => handleUpgrade(pack.tier)}
-                        disabled={upgradeBusy === pack.tier}
-                        style={{ ...primaryBtn, marginTop: 8, padding: '6px 16px', fontSize: 12 }}
-                      >
-                        {upgradeBusy === pack.tier ? 'Redirecting…' : 'Pay via UPI →'}
-                      </button>
-                    )}
-                    {isDowngrade && !isCurrent && (
-                      <span style={{ fontSize: 11, color: '#64748b', display: 'block', marginTop: 8 }}>Contact support to downgrade</span>
+                    {pack.tier === 'pack_500' ? (
+                      <>
+                        <div style={{ fontSize: 13, color: '#64748b', marginBottom: 4 }}>500+ vendors</div>
+                        {!isCurrent && (
+                          <a
+                            href="mailto:info@upfloat.co?subject=MSME%20Enterprise%20Pack%20(500%20vendors)"
+                            style={{ ...primaryBtn, marginTop: 4, padding: '6px 16px', fontSize: 12, textDecoration: 'none', display: 'inline-block' }}
+                          >
+                            Contact sales →
+                          </a>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        {pack.original_price_label && (
+                          <div style={{ fontSize: 13, color: '#64748b', textDecoration: 'line-through' }}>{pack.original_price_label}</div>
+                        )}
+                        <div style={{ fontSize: 18, fontWeight: 800, color: '#0f172a' }}>{pack.price_label}</div>
+                        <div style={{ fontSize: 11, color: '#64748b' }}>one-time · + 18% GST</div>
+                        {!isCurrent && !isDowngrade && (
+                          <button
+                            onClick={() => handleUpgrade(pack.tier)}
+                            disabled={upgradeBusy === pack.tier}
+                            style={{ ...primaryBtn, marginTop: 8, padding: '6px 16px', fontSize: 12 }}
+                          >
+                            {upgradeBusy === pack.tier ? 'Redirecting…' : packTier === 'free' ? 'Purchase →' : 'Buy Credits →'}
+                          </button>
+                        )}
+                        {isDowngrade && !isCurrent && (
+                          <span style={{ fontSize: 11, color: '#64748b', display: 'block', marginTop: 8 }}>Contact support to downgrade</span>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>

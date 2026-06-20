@@ -257,8 +257,10 @@ export async function sendMsmeVendorEmail(p: {
   to: string; vendorName: string; orgName: string
   formUrl: string; attemptNo: 1 | 2 | 3 | 4 | 5; totalEmails?: number; cc?: string
 }) {
+  const msmeDomain = (process.env.FROM_EMAIL ?? 'noreply@upfloat.co').replace(/.*<|>/g, '')
+  const msmeFrom   = `MSME Compliance <${msmeDomain}>`
   return resend.emails.send({
-    from: FROM, to: p.to,
+    from: msmeFrom, to: p.to,
     ...(p.cc ? { cc: [p.cc] } : {}),
     subject: msmeVendorEmailSubject(p),
     html:    msmeVendorEmailHtml(p),

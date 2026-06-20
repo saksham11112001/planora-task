@@ -64,7 +64,6 @@ export function TryupFloatSidebar() {
         }}>
           <div>
             <div style={{ fontWeight: 700, fontSize: 16, color: WHITE }}>upFloat</div>
-            <div style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>Complete practice management</div>
           </div>
           <button
             onClick={() => setOpen(false)}
