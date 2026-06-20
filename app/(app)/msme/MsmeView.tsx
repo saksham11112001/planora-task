@@ -77,6 +77,7 @@ export function MsmeView({ userRole, orgName }: Props) {
   const [savingEmail,   setSavingEmail]   = useState(false)
   const [checkedIds,    setCheckedIds]    = useState<Set<string>>(new Set())
   const [bulkShooting,  setBulkShooting]  = useState(false)
+  const [viewingCert,   setViewingCert]   = useState<string | null>(null)
   const toastRef = useRef(0)
 
   // Add vendor form
@@ -329,6 +330,21 @@ export function MsmeView({ userRole, orgName }: Props) {
     if (failed) parts.push(`${failed} failed`)
     showToast(parts.join(' · '), failed > 0 ? 'info' : 'success')
     fetchVendors()
+  }
+
+  // ── View vendor certificate ───────────────────────────────────────────────
+  async function handleViewCert(vendorId: string) {
+    setViewingCert(vendorId)
+    try {
+      const res  = await fetch(`/api/msme/vendors/${vendorId}/cert`)
+      const data = await res.json()
+      if (!res.ok || !data.url) { showToast(data.error ?? 'Could not load document', 'error'); return }
+      window.open(data.url, '_blank', 'noopener')
+    } catch {
+      showToast('Failed to open document', 'error')
+    } finally {
+      setViewingCert(null)
+    }
   }
 
   // ── Delete ─────────────────────────────────────────────────────────────────
@@ -840,7 +856,19 @@ export function MsmeView({ userRole, orgName }: Props) {
                         <td style={{ padding: '12px 14px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                             <div>
-                              <div style={{ fontWeight: 600, color: '#0f172a' }}>{v.vendor_name}</div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span style={{ fontWeight: 600, color: '#0f172a' }}>{v.vendor_name}</span>
+                                {v.cert_url && (
+                                  <button
+                                    onClick={e => { e.stopPropagation(); handleViewCert(v.id) }}
+                                    disabled={viewingCert === v.id}
+                                    title="View uploaded certificate"
+                                    style={{ background: `${ACCENT}15`, border: 'none', borderRadius: 4, padding: '1px 6px', color: ACCENT, fontSize: 10, fontWeight: 700, cursor: 'pointer', lineHeight: 1.6 }}
+                                  >
+                                    {viewingCert === v.id ? '…' : '📄'}
+                                  </button>
+                                )}
+                              </div>
                               <div style={{ color: '#64748b', fontSize: 11 }}>{v.vendor_email}</div>
                               {v.gstin && <div style={{ color: '#64748b', fontSize: 11 }}>GSTIN: {v.gstin}</div>}
                             </div>
@@ -949,10 +977,15 @@ export function MsmeView({ userRole, orgName }: Props) {
                     <DetailRow label="Outstanding" value={`₹${Number(selected.outstanding_amount).toLocaleString('en-IN')}`} />
                   )}
                   {selected.submitted_at && <DetailRow label="Submitted" value={new Date(selected.submitted_at).toLocaleDateString('en-IN')} />}
-                  {selected.cert_url && !selected.cert_url.startsWith('r2:') && (
-                    <a href={selected.cert_url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', marginTop: 8, color: ACCENT, fontSize: 12, fontWeight: 600 }}>📎 Download certificate →</a>
+                  {selected.cert_url && (
+                    <button
+                      onClick={() => handleViewCert(selected.id)}
+                      disabled={viewingCert === selected.id}
+                      style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, background: `${ACCENT}12`, border: `1px solid ${ACCENT}40`, borderRadius: 6, padding: '6px 12px', color: ACCENT, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+                    >
+                      {viewingCert === selected.id ? '⏳ Opening…' : '📄 View Certificate'}
+                    </button>
                   )}
-                  {selected.cert_url?.startsWith('r2:') && <p style={{ margin: '6px 0 0', fontSize: 11, color: '#16a34a', fontWeight: 600 }}>✓ Certificate in secure storage</p>}
                 </div>
               )}
 
