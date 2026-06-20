@@ -648,6 +648,55 @@ export function MsmeView({ userRole, orgName }: Props) {
         </div>
       )}
 
+      {/* ── Compliance progress banner ── */}
+      {!loading && total > 0 && (() => {
+        const emailedCount = vendors.filter(v => v.email_count > 0).length
+        const pct = Math.round((completedCount / total) * 100)
+        const emailPct = Math.round((emailedCount / total) * 100)
+
+        const catchyLine = completedCount === total
+          ? '🎉 All vendors have responded — you\'re fully compliant!'
+          : completedCount === 0 && emailedCount === 0
+          ? 'Start by shooting emails — one click sends a branded verification request.'
+          : completedCount === 0
+          ? `${emailedCount} vendor${emailedCount > 1 ? 's' : ''} contacted. Waiting for responses — automated reminders are on the job.`
+          : pct >= 75
+          ? `Almost there! Just ${total - completedCount} more vendor${total - completedCount > 1 ? 's' : ''} to respond.`
+          : pct >= 50
+          ? `You're over halfway — ${completedCount} done, ${total - completedCount} more to go. Keep it up!`
+          : pct >= 25
+          ? `Good progress! ${completedCount} responded. Email the remaining ${total - completedCount} to stay on track.`
+          : `${completedCount} responded so far. ${total - emailedCount > 0 ? `${total - emailedCount} vendor${total - emailedCount > 1 ? 's' : ''} still haven't been contacted.` : 'Hang tight — reminders are going out automatically.'}`
+
+        return (
+          <div style={{ background: '#ffffff', border: '1.5px solid #e2e8f0', borderRadius: 12, padding: '18px 22px', marginBottom: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>Compliance Progress</span>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                {emailedCount > 0 && completedCount < total && (
+                  <span style={{ fontSize: 12, color: '#64748b' }}>
+                    <span style={{ fontWeight: 700, color: '#ea580c' }}>{emailedCount}</span> contacted
+                  </span>
+                )}
+                <span style={{ fontSize: 13, fontWeight: 800, color: ACCENT }}>
+                  {completedCount} / {total} responded
+                </span>
+              </div>
+            </div>
+
+            {/* Two-layer progress bar: emailed (amber) behind, completed (teal) in front */}
+            <div style={{ height: 10, background: '#f1f5f9', borderRadius: 99, overflow: 'hidden', marginBottom: 10, position: 'relative' }}>
+              {/* emailed layer */}
+              <div style={{ position: 'absolute', inset: 0, width: `${emailPct}%`, background: '#fed7aa', borderRadius: 99, transition: 'width 0.5s' }} />
+              {/* completed layer */}
+              <div style={{ position: 'absolute', inset: 0, width: `${pct}%`, background: `linear-gradient(90deg, ${ACCENT}, #14b8a6)`, borderRadius: 99, transition: 'width 0.5s' }} />
+            </div>
+
+            <p style={{ margin: 0, fontSize: 12, color: '#64748b', lineHeight: 1.6 }}>{catchyLine}</p>
+          </div>
+        )
+      })()}
+
       {/* ── Summary cards ── */}
       {total > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginBottom: 20 }}>
