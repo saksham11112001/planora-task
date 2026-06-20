@@ -6,6 +6,7 @@ import { createClient }             from '@/lib/supabase/server'
 import { createAdminClient }        from '@/lib/supabase/admin'
 import { getApiOrgMembership }      from '@/lib/supabase/apiActiveOrg'
 import { MSME_PACKS, getPackByTier } from '@/lib/msme/packs'
+import { sendInvoiceEmail }         from '@/lib/email/send'
 import crypto                       from 'crypto'
 
 const RZP_KEY_ID     = process.env.RAZORPAY_KEY_ID
@@ -153,6 +154,30 @@ export async function PUT(req: NextRequest) {
     },
     { onConflict: 'gateway_order_id' }
   )
+
+  // Send tax invoice email (best-effort)
+  try {
+    const [{ data: gstRow }, { data: orgRow }] = await Promise.all([
+      admin.from('org_feature_settings').select('config')
+        .eq('org_id', mb.org_id).eq('feature_key', 'billing_gst').maybeSingle(),
+      admin.from('organisations').select('name').eq('id', mb.org_id).maybeSingle(),
+    ])
+    const gstDetails    = gstRow?.config as any ?? null
+    const orgName       = orgRow?.name ?? ''
+    const chargeablePaise = Math.round(pack.price_paise * 1.18)
+    const invoiceNum    = `INV-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${Math.random().toString(36).slice(2,8).toUpperCase()}`
+
+    await sendInvoiceEmail({
+      invoiceNumber:   invoiceNum,
+      invoiceDate:     new Date().toISOString().slice(0, 10),
+      customerEmail:   user.email!,
+      orgName,
+      gstDetails,
+      itemDescription: `MSME Tracker — ${pack.label} Pack (${pack.vendor_limit} vendors)`,
+      amountPaise:     chargeablePaise,
+      paymentId:       razorpay_payment_id,
+    })
+  } catch { /* never block payment success */ }
 
   return NextResponse.json({ ok: true, pack_tier, vendor_limit: pack.vendor_limit })
 }

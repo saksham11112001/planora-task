@@ -8,6 +8,7 @@ import { NextResponse }       from 'next/server'
 import type { NextRequest }   from 'next/server'
 import { createHmac }         from 'crypto'
 import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
+import { sendInvoiceEmail }   from '@/lib/email/send'
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -22,6 +23,7 @@ export async function POST(req: NextRequest) {
     razorpay_order_id, razorpay_payment_id, razorpay_signature,
     razorpay_subscription_id,
     plan_tier, coupon_code, billing_cycle,
+    amount_paise,
   } = await req.json()
 
   if (!razorpay_payment_id || !razorpay_signature || !plan_tier)
@@ -99,6 +101,31 @@ export async function POST(req: NextRequest) {
       }).select().maybeSingle() // ignore duplicate errors gracefully
     }
   }
+
+  // Send tax invoice email (best-effort — never block payment success)
+  try {
+    const [{ data: gstRow }, { data: orgRow }] = await Promise.all([
+      admin.from('org_feature_settings').select('config')
+        .eq('org_id', mb.org_id).eq('feature_key', 'billing_gst').maybeSingle(),
+      admin.from('organisations').select('name').eq('id', mb.org_id).maybeSingle(),
+    ])
+    const gstDetails = gstRow?.config as any ?? null
+    const orgName    = orgRow?.name ?? ''
+    const planLabel  = `upFloat ${(plan_tier as string).charAt(0).toUpperCase() + (plan_tier as string).slice(1)} Plan`
+    const cycle      = isSubscription ? 'Monthly (autopay)' : billing_cycle === 'annual' ? 'Annual' : 'Monthly'
+    const invoiceNum = `INV-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${Math.random().toString(36).slice(2,8).toUpperCase()}`
+
+    await sendInvoiceEmail({
+      invoiceNumber:   invoiceNum,
+      invoiceDate:     new Date().toISOString().slice(0, 10),
+      customerEmail:   user.email!,
+      orgName,
+      gstDetails,
+      itemDescription: `${planLabel} — ${cycle}`,
+      amountPaise:     amount_paise ?? 0,
+      paymentId:       razorpay_payment_id,
+    })
+  } catch { /* invoice failure must never block the payment success response */ }
 
   return NextResponse.json({ success: true, plan_tier })
 }
