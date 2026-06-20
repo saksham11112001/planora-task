@@ -591,7 +591,7 @@ function Hero() {
                 boxShadow: '0 10px 28px rgba(13,148,136,0.4)',
               }}
             >
-              Start Free — Up to 5 vendors
+              Start Tracking Free
               <ArrowRight size={18} />
             </Link>
             <a
@@ -979,180 +979,110 @@ function ComplianceExplainer() {
 }
 
 /* ============================================================
-   PRICING
+   UNLOCK TEASER (replaces pricing — builds sunk-cost psychology)
 ============================================================ */
-interface Plan {
-  name: string
-  price: string
-  was?: string
-  vendors: string
-  features: string[]
-  popular?: boolean
-}
-
-const PLANS: Plan[] = [
-  {
-    name: 'Free',
-    price: '₹0',
-    vendors: '5 vendors',
-    features: ['Basic vendor tracking', 'Email declarations', 'Status dashboard'],
-  },
-  {
-    name: 'Starter',
-    price: '₹3,000',
-    was: '₹5,000',
-    vendors: '20 vendors',
-    features: ['All Free features', 'Auto-reminders', 'CSV import', '43B(h) report export'],
-  },
-  {
-    name: 'Standard',
-    price: '₹5,500',
-    was: '₹9,000',
-    vendors: '50 vendors',
-    features: ['All Starter features', 'Priority support', 'GSTIN auto-fetch', 'Branded emails'],
-    popular: true,
-  },
-  {
-    name: 'Professional',
-    price: '₹16,000',
-    was: '₹24,000',
-    vendors: '200 vendors',
-    features: ['All Standard features', 'Dedicated support', 'Bulk operations', 'API access'],
-  },
-]
-
-function PricingCard({ plan, index }: { plan: Plan; index: number }) {
-  const [hover, setHover] = useState(false)
+function UnlockTeaser() {
+  const MOCK_VENDORS = [
+    { name: 'Rajesh Traders', status: 'Submitted', unlocked: true },
+    { name: 'Anita Enterprises', status: 'Pending', unlocked: true },
+    { name: 'Kumar & Sons', status: 'Sent', unlocked: true },
+    { name: 'Mehta Pvt Ltd', status: 'Submitted', unlocked: true },
+    { name: 'Singh Exports', status: 'Pending', unlocked: true },
+    { name: 'Patel Industries', status: '—', unlocked: false },
+    { name: 'Gupta Supplies', status: '—', unlocked: false },
+    { name: 'Sharma & Co.', status: '—', unlocked: false },
+  ]
   return (
-    <div
-      className="msme-reveal"
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      style={{
-        position: 'relative',
-        background: plan.popular ? `linear-gradient(170deg, #ffffff, ${C.bgLight})` : C.surface,
-        border: plan.popular ? `2px solid ${C.teal}` : `1px solid ${C.border}`,
-        borderRadius: 18,
-        padding: '30px 24px',
-        transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-        transform: hover ? 'translateY(-8px)' : 'translateY(0)',
-        boxShadow: hover
-          ? '0 24px 50px rgba(13,148,136,0.22)'
-          : plan.popular
-          ? '0 16px 40px rgba(13,148,136,0.16)'
-          : '0 8px 24px rgba(15,42,39,0.06)',
-        transitionDelay: `${index * 0.08}s`,
-      }}
-    >
-      {plan.popular && (
-        <div
-          style={{
-            position: 'absolute',
-            top: -13,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            background: `linear-gradient(135deg, ${C.teal}, ${C.emerald})`,
-            color: '#fff',
-            fontWeight: 800,
-            fontSize: 12,
-            padding: '5px 16px',
-            borderRadius: 999,
-            whiteSpace: 'nowrap',
-            boxShadow: '0 6px 16px rgba(13,148,136,0.4)',
-          }}
-        >
-          Most Popular
-        </div>
-      )}
-      <div style={{ fontWeight: 800, fontSize: 18, color: C.text, marginBottom: 6 }}>{plan.name}</div>
-      <div style={{ fontSize: 13, color: C.muted, fontWeight: 600, marginBottom: 16 }}>
-        {plan.vendors}
-      </div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 4 }}>
-        <span style={{ fontSize: 34, fontWeight: 900, color: C.text, letterSpacing: '-0.02em' }}>
-          {plan.price}
-        </span>
-        {plan.was && (
-          <span style={{ fontSize: 16, color: C.muted, textDecoration: 'line-through' }}>
-            {plan.was}
-          </span>
-        )}
-      </div>
-      <div
-        style={{
-          display: 'inline-block',
-          fontSize: 11,
-          fontWeight: 700,
-          color: C.teal,
-          background: 'rgba(13,148,136,0.1)',
-          padding: '4px 10px',
-          borderRadius: 999,
-          marginBottom: 22,
-        }}
-      >
-        Pay once, use forever
-      </div>
-      <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 24px' }}>
-        {plan.features.map((f) => (
-          <li
-            key={f}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 9,
-              fontSize: 14,
-              color: C.text,
-              padding: '7px 0',
-            }}
-          >
-            <CheckCircle2 size={16} color={C.emerald} style={{ flexShrink: 0 }} />
-            {f}
-          </li>
-        ))}
-      </ul>
-      <Link
-        href="/login?redirect=/msme&mode=signup"
-        style={{
-          display: 'block',
-          textAlign: 'center',
-          background: plan.popular ? `linear-gradient(135deg, ${C.teal}, ${C.emerald})` : 'transparent',
-          color: plan.popular ? '#fff' : C.teal,
-          border: plan.popular ? 'none' : `1.5px solid ${C.teal}`,
-          fontWeight: 800,
-          fontSize: 15,
-          padding: '13px',
-          borderRadius: 11,
-          textDecoration: 'none',
-          boxShadow: plan.popular ? '0 8px 22px rgba(13,148,136,0.35)' : 'none',
-        }}
-      >
-        {plan.price === '₹0' ? 'Start Free' : 'Buy Now'}
-      </Link>
-    </div>
-  )
-}
-
-function Pricing() {
-  return (
-    <section style={{ background: C.surface, padding: '88px 24px' }}>
-      <div style={{ maxWidth: 1180, margin: '0 auto' }}>
+    <section style={{ background: C.bgLight, padding: '88px 24px' }}>
+      <div style={{ maxWidth: 920, margin: '0 auto' }}>
         <SectionHeading
-          eyebrow="Pricing"
-          title="One-time payment. No subscriptions."
-          subtitle="Pick the pack that matches your vendor count. Upgrade anytime."
+          eyebrow="How it feels on day one"
+          title="You import. We track. You unlock."
+          subtitle="Import your entire vendor list for free. Then watch your compliance dashboard fill up — and decide when you're ready to unlock the rest."
         />
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(4, 1fr)',
-            gap: 22,
-            marginTop: 56,
-            alignItems: 'start',
-          }}
-          className="msme-pricing-grid"
-        >
-          {PLANS.map((p, i) => (
-            <PricingCard key={p.name} plan={p} index={i} />
+
+        <div className="msme-reveal" style={{ marginTop: 52, background: C.surface, borderRadius: 20, border: `1px solid ${C.border}`, boxShadow: '0 20px 50px rgba(15,42,39,0.10)', overflow: 'hidden' }}>
+          {/* mock header */}
+          <div style={{ padding: '16px 22px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ fontWeight: 800, fontSize: 15, color: C.text }}>Your Vendor Dashboard</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: C.teal, background: 'rgba(13,148,136,0.1)', padding: '4px 12px', borderRadius: 999 }}>
+              8 vendors imported
+            </div>
+          </div>
+
+          {/* progress bar */}
+          <div style={{ padding: '14px 22px', background: 'rgba(13,148,136,0.04)', borderBottom: `1px solid ${C.border}` }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 7 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Compliance progress</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: C.teal }}>5 / 8 tracked</span>
+            </div>
+            <div style={{ height: 8, borderRadius: 999, background: 'rgba(15,42,39,0.07)', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: '62%', borderRadius: 999, background: `linear-gradient(90deg, ${C.teal}, ${C.emerald})`, transition: 'width 1s ease' }} />
+            </div>
+            <p style={{ fontSize: 12, color: C.muted, margin: '8px 0 0' }}>
+              You've already done the hard part — your vendor list is in. Unlock the remaining 3 to reach full compliance.
+            </p>
+          </div>
+
+          {/* vendor rows */}
+          <div>
+            {MOCK_VENDORS.map((v, i) => (
+              <div key={v.name} style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '13px 22px', borderBottom: i < MOCK_VENDORS.length - 1 ? `1px solid ${C.border}` : 'none',
+                opacity: v.unlocked ? 1 : 0.5,
+                background: v.unlocked ? 'transparent' : 'repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(15,42,39,0.02) 4px, rgba(15,42,39,0.02) 8px)',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  {v.unlocked
+                    ? <CheckCircle2 size={15} color={C.emerald} />
+                    : <Lock size={15} color={C.muted} />}
+                  <span style={{ fontWeight: 600, fontSize: 14, color: v.unlocked ? C.text : C.muted }}>{v.name}</span>
+                </div>
+                <span style={{
+                  fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999,
+                  background: v.unlocked ? (v.status === 'Submitted' ? '#f0fdf4' : v.status === 'Sent' ? 'rgba(13,148,136,0.1)' : 'rgba(245,158,11,0.1)') : 'rgba(15,42,39,0.06)',
+                  color: v.unlocked ? (v.status === 'Submitted' ? '#16a34a' : v.status === 'Sent' ? C.teal : C.amber) : C.muted,
+                }}>
+                  {v.unlocked ? v.status : 'Locked'}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* unlock CTA */}
+          <div style={{ padding: '20px 22px', background: `linear-gradient(135deg, rgba(13,148,136,0.06), rgba(16,185,129,0.04))`, borderTop: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 14 }}>
+            <div>
+              <p style={{ fontWeight: 800, fontSize: 15, color: C.text, margin: '0 0 4px' }}>
+                You're 62% there. Unlock everything →
+              </p>
+              <p style={{ fontSize: 13, color: C.muted, margin: 0 }}>
+                All your data is already imported. One click to full compliance.
+              </p>
+            </div>
+            <Link
+              href="/login?redirect=/msme&mode=signup"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+                background: `linear-gradient(135deg, ${C.teal}, ${C.emerald})`,
+                color: '#fff', fontWeight: 800, fontSize: 14, padding: '11px 22px',
+                borderRadius: 10, textDecoration: 'none', boxShadow: '0 8px 22px rgba(13,148,136,0.35)',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Unlock all vendors <ArrowRight size={16} />
+            </Link>
+          </div>
+        </div>
+
+        {/* reassurance strip */}
+        <div className="msme-reveal" style={{ marginTop: 28, display: 'flex', justifyContent: 'center', gap: 32, flexWrap: 'wrap' }}>
+          {[
+            '✓ Import unlimited vendors for free',
+            '✓ No credit card to start',
+            '✓ Pay only when you\'re ready',
+          ].map(t => (
+            <span key={t} style={{ fontSize: 14, fontWeight: 600, color: C.muted }}>{t}</span>
           ))}
         </div>
       </div>
@@ -1303,7 +1233,7 @@ function CtaSection() {
           Start tracking MSME compliance today
         </h2>
         <p style={{ fontSize: 18, color: 'rgba(255,255,255,0.82)', margin: '0 0 32px' }}>
-          Free tier includes up to 5 vendors. No credit card required.
+          Import all your MSME vendors in minutes. No credit card required.
         </p>
         <Link
           href="/login?redirect=/msme&mode=signup"
@@ -1373,7 +1303,7 @@ function Footer() {
         <div style={{ display: 'flex', gap: 56, flexWrap: 'wrap' }}>
           <FooterCol
             heading="Product"
-            links={['Features', 'Pricing', 'How it works', 'Security']}
+            links={['Features', 'How it works', 'Security']}
           />
           <FooterCol heading="Company" links={['About upFloat', 'Contact', 'Privacy', 'Terms']} />
         </div>
@@ -1475,9 +1405,9 @@ function FloatingBadge() {
       </span>
       <div style={{ flex: 1 }}>
         <div style={{ fontWeight: 800, fontSize: 14, color: C.text }}>
-          🎉 First 5 vendors FREE
+          Start free · No credit card
         </div>
-        <div style={{ fontSize: 12.5, color: C.muted }}>No credit card needed</div>
+        <div style={{ fontSize: 12.5, color: C.muted }}>Import your vendors in minutes</div>
       </div>
       <button
         onClick={() => setDismissed(true)}
@@ -1588,13 +1518,7 @@ function GlobalStyles() {
         .msme-hero-grid { grid-template-columns: 1fr !important; }
         .msme-steps-grid { grid-template-columns: 1fr !important; }
         .msme-connector { display: none; }
-        .msme-pricing-grid { grid-template-columns: repeat(2, 1fr) !important; }
         .msme-testi-grid { grid-template-columns: 1fr !important; }
-        .msme-43b-card { }
-        section [class~="msme-43b-card"] { }
-      }
-      @media (max-width: 720px) {
-        .msme-pricing-grid { grid-template-columns: 1fr !important; }
       }
     `}</style>
   )
@@ -1620,7 +1544,7 @@ export function MsmeLandingClient() {
       <Hero />
       <HowItWorks />
       <ComplianceExplainer />
-      <Pricing />
+      <UnlockTeaser />
       <Testimonials />
       <CtaSection />
       <Footer />

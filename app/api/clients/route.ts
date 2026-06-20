@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
   const offset = Math.max(isNaN(parsedOffset) ? 0   : parsedOffset, 0)
   const { data, error } = await admin.from('clients')
     .select('id, name, color, status, email, company').eq('org_id', mb.org_id)
+    .neq('is_archived', true)
     .order('name').range(offset, offset + limit - 1)
   if (error) return NextResponse.json(dbError(error, 'clients'), { status: 500 })
   return NextResponse.json({ data }, {

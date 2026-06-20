@@ -935,6 +935,45 @@ function IllustrationPartner() {
   )
 }
 
+// ── Audit Log illustration ─────────────────────────────────────────────────
+function IllustrationAuditLog() {
+  const rows = [
+    { time: '09:14 AM', user: 'Anjali M.', action: 'Completed task', detail: 'GSTR-1 · ABC Corp', color: '#16a34a' },
+    { time: '09:22 AM', user: 'Rahul K.', action: 'Uploaded doc',   detail: 'ITR filing · XYZ Ltd', color: '#0891b2' },
+    { time: '10:01 AM', user: 'You',       action: 'Approved task',  detail: 'TDS Q3 · Mehta & Co', color: '#7c3aed' },
+    { time: '10:45 AM', user: 'Anjali M.', action: 'Added comment',  detail: 'GST audit · Singh Pvt', color: '#f59e0b' },
+    { time: '11:30 AM', user: 'Rahul K.', action: 'Status changed', detail: 'ROC filing · Kumar',   color: '#0d9488' },
+  ]
+  return (
+    <svg viewBox="0 0 320 260" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width:'100%', height:'100%' }}>
+      <rect x="20" y="16" width="280" height="228" rx="12" fill="#f8fafc" stroke="#e2e8f0" strokeWidth="1.5"/>
+      <rect x="20" y="16" width="280" height="34" rx="12" fill="#7c3aed" fillOpacity="0.1"/>
+      <text x="36" y="36" fontSize="11" fontWeight="700" fill="#7c3aed">Activity Log</text>
+      {/* Download button */}
+      <rect x="224" y="22" width="68" height="20" rx="5" fill="#7c3aed"/>
+      <text x="258" y="35" textAnchor="middle" fontSize="8" fontWeight="700" fill="white">↓ Download CSV</text>
+      {/* Column headers */}
+      <text x="34"  y="64" fontSize="7" fontWeight="700" fill="#94a3b8">TIME</text>
+      <text x="80"  y="64" fontSize="7" fontWeight="700" fill="#94a3b8">TEAM MEMBER</text>
+      <text x="154" y="64" fontSize="7" fontWeight="700" fill="#94a3b8">ACTION</text>
+      <text x="220" y="64" fontSize="7" fontWeight="700" fill="#94a3b8">DETAIL</text>
+      <line x1="28" y1="68" x2="292" y2="68" stroke="#e2e8f0" strokeWidth="1"/>
+      {/* Rows */}
+      {rows.map((r, i) => (
+        <g key={r.time}>
+          <rect x="28" y={73+i*33} width="264" height="26" rx="5" fill={i % 2 === 0 ? 'white' : '#f8fafc'} stroke="#f1f5f9" strokeWidth="1"/>
+          <text x="34"  y={73+i*33+16} fontSize="8"   fill="#64748b">{r.time}</text>
+          <text x="80"  y={73+i*33+16} fontSize="9"   fontWeight="600" fill="#1e293b">{r.user}</text>
+          <rect x="150" y={73+i*33+6} width="60" height="14" rx="4" fill={r.color} fillOpacity="0.12"/>
+          <text x="180" y={73+i*33+16} textAnchor="middle" fontSize="7.5" fontWeight="700" fill={r.color}>{r.action}</text>
+          <text x="220" y={73+i*33+16} fontSize="7.5" fill="#64748b">{r.detail}</text>
+        </g>
+      ))}
+      <text x="160" y="250" textAnchor="middle" fontSize="8" fill="#94a3b8">Every action logged · Export for compliance audits</text>
+    </svg>
+  )
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Step definitions
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1255,6 +1294,24 @@ const STEPS: Step[] = [
     actionLabel: 'Open Partner Portal',
     actionHref: '/partner',
     Illustration: IllustrationPartner,
+  },
+  {
+    id: 'audit-log',
+    icon: '📋', color: '#7c3aed', accent: 'rgba(124,58,237,0.1)',
+    title: 'Activity Log — Complete Audit Trail',
+    subtitle: 'Activity Log (sidebar) → Download CSV',
+    body: "Every action taken in your firm is recorded: who completed a task, who uploaded a document, who approved what and when. This is your compliance paper trail — essential for firm accountability, client disputes, and tax audits.",
+    bullets: [
+      { emoji: '🕐', text: 'Timestamped entries for every task completion, status change, comment, document upload, and approval' },
+      { emoji: '👤', text: 'Filtered by team member — instantly see what any specific person did this week or month' },
+      { emoji: '📂', text: 'Filter by client or project to get a full history of every action taken for a specific client' },
+      { emoji: '⬇️', text: 'Download as CSV with one click — hand the audit log to your quality reviewer or attach to your firm audit file' },
+      { emoji: '🔒', text: 'Logs are read-only and append-only — no one can delete or edit past entries, so the record is always clean' },
+    ],
+    path: '/activity',
+    actionLabel: 'Open Activity Log',
+    actionHref: '/activity',
+    Illustration: IllustrationAuditLog,
   },
   {
     id: 'done',

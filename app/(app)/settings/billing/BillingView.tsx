@@ -38,6 +38,7 @@ interface Props {
 
 export function BillingView({ orgName, currentPlan, status, subscriptionId, trialEndsAt, setupFeePaid = false }: Props) {
   const countryProfile = useCountry()
+  const sym = countryProfile.currencySymbol
   const [loading,  setLoading]  = useState<string | null>(null)
   const [annual,    setAnnual]    = useState(false)
   const [couponCode, setCouponCode] = useState('')
@@ -134,6 +135,7 @@ export function BillingView({ orgName, currentPlan, status, subscriptionId, tria
                 razorpay_signature:  response.razorpay_signature,
                 plan_tier:           plan,
                 coupon_code:         data.coupon_code,
+                billing_cycle:       data.billing_cycle,
               }),
             })
             if (verifyRes.ok) {
@@ -150,16 +152,33 @@ export function BillingView({ orgName, currentPlan, status, subscriptionId, tria
         rzp.open()
         setLoading(null)
       } else {
-        // ── Regular subscription checkout ──────────────────────────────────────
+        // ── Monthly subscription checkout (autopay) ────────────────────────────
         const rzp = new (window as any).Razorpay({
-          key:            data.key_id,
+          key:             data.key_id,
           subscription_id: data.subscription_id,
-          name:           'upFloat',
-          description:    `${plan.charAt(0).toUpperCase() + plan.slice(1)} Plan — ${annual ? 'Annual' : 'Monthly'}`,
-          image:          '/favicon.svg',
-          prefill:        { name: orgName },
-          theme:          { color: '#0d9488' },
-          handler: () => { toast.success('Payment successful! Plan upgraded.'); setTimeout(() => window.location.reload(), 1500) },
+          name:            'upFloat',
+          description:     `${plan.charAt(0).toUpperCase() + plan.slice(1)} Plan — Monthly`,
+          image:           '/favicon.svg',
+          prefill:         { name: data.org_name, email: data.email },
+          theme:           { color: '#0d9488' },
+          handler: async (response: any) => {
+            const verifyRes = await fetch('/api/settings/billing/verify', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                razorpay_payment_id:      response.razorpay_payment_id,
+                razorpay_subscription_id: response.razorpay_subscription_id,
+                razorpay_signature:       response.razorpay_signature,
+                plan_tier:                plan,
+              }),
+            })
+            if (verifyRes.ok) {
+              toast.success('Payment successful! Plan upgraded.')
+              setTimeout(() => window.location.reload(), 1500)
+            } else {
+              const vd = await verifyRes.json()
+              toast.error(vd.error ?? 'Payment verification failed')
+            }
+          },
           modal: { ondismiss: () => setLoading(null) },
         })
         rzp.open()
@@ -455,7 +474,10 @@ export function BillingView({ orgName, currentPlan, status, subscriptionId, tria
           }}>
             <span style={{ fontSize: 20 }}>💡</span>
             <p style={{ fontSize: 13, color: 'var(--brand-dark)' }}>
-              <strong>Save 20%</strong> by switching to annual billing. Starter saves ${(29-23)*12} · Pro saves ${(79-63)*12} · Business saves ${(149-119)*12} per year.
+              <strong>Save 20%</strong> by switching to annual billing.{' '}
+              Starter saves {sym}{((countryProfile.pricing.starter.monthly - countryProfile.pricing.starter.annual) * 12).toLocaleString(countryProfile.locale)} ·{' '}
+              Pro saves {sym}{((countryProfile.pricing.pro.monthly - countryProfile.pricing.pro.annual) * 12).toLocaleString(countryProfile.locale)} ·{' '}
+              Business saves {sym}{((countryProfile.pricing.business.monthly - countryProfile.pricing.business.annual) * 12).toLocaleString(countryProfile.locale)} per year.
             </p>
             <button onClick={() => setAnnual(true)} style={{
               flexShrink: 0, padding: '6px 14px', borderRadius: 8, border: 'none',
@@ -534,7 +556,7 @@ export function BillingView({ orgName, currentPlan, status, subscriptionId, tria
               <span style={{
                 fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 99,
                 background: '#fff7ed', color: '#f97316', border: '1px solid #fed7aa',
-              }}>One-time · $499</span>
+              }}>One-time · ₹499</span>
             )}
           </div>
           <p style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.65, margin: '0 0 10px' }}>
@@ -559,7 +581,7 @@ export function BillingView({ orgName, currentPlan, status, subscriptionId, tria
                 fontSize: 12, fontWeight: 700, cursor: setupLoading ? 'not-allowed' : 'pointer',
                 opacity: setupLoading ? 0.7 : 1, fontFamily: 'inherit',
               }}>
-              {setupLoading ? 'Opening checkout…' : 'Pay $499 →'}
+              {setupLoading ? 'Opening checkout…' : 'Pay ₹499 →'}
             </button>
           )}
         </div>
