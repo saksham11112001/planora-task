@@ -24,6 +24,7 @@ export default async function DashboardPage() {
   const name     = profile?.name?.split(' ')[0] ?? user.email?.split('@')[0]?.split('.')[0] ?? 'there'
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
   const from30   = new Date(Date.now() - 30 * 86400000).toISOString()
+  const from7    = new Date(Date.now() - 7  * 86400000).toISOString()
 
   const results = await Promise.allSettled([
     supabase.from('tasks').select('*', { count: 'exact', head: true })
@@ -50,6 +51,13 @@ export default async function DashboardPage() {
       .eq('org_id', orgId).eq('assignee_id', user.id).gte('created_at', from30),
     supabase.from('clients').select('id, name, color').eq('org_id', orgId).eq('status', 'active')
       .order('created_at', { ascending: false }).limit(5),
+    // Additional KPIs
+    supabase.from('clients').select('*', { count: 'exact', head: true })
+      .eq('org_id', orgId).eq('status', 'active'),
+    supabase.from('tasks').select('*', { count: 'exact', head: true })
+      .eq('org_id', orgId).eq('assignee_id', user.id).eq('status', 'completed').gte('completed_at', from7),
+    supabase.from('org_members').select('*', { count: 'exact', head: true })
+      .eq('org_id', orgId),
   ])
 
   const overdueCount       = results[0].status === 'fulfilled' ? (results[0].value as any).count ?? 0 : 0
@@ -60,6 +68,9 @@ export default async function DashboardPage() {
   const completedThisMonth = results[5].status === 'fulfilled' ? (results[5].value as any).count ?? 0 : 0
   const totalThisMonth     = results[6].status === 'fulfilled' ? (results[6].value as any).count ?? 0 : 0
   const recentClients      = results[7].status === 'fulfilled' ? (results[7].value as any).data ?? [] : []
+  const clientsCount       = results[8].status === 'fulfilled' ? (results[8].value as any).count ?? 0 : 0
+  const weeklyCompleted    = results[9].status === 'fulfilled' ? (results[9].value as any).count ?? 0 : 0
+  const teamCount          = results[10].status === 'fulfilled' ? (results[10].value as any).count ?? 1 : 1
 
   const completionRate = totalThisMonth
     ? Math.min(100, Math.round(((completedThisMonth ?? 0) / totalThisMonth) * 100))
@@ -78,6 +89,9 @@ export default async function DashboardPage() {
       activeProjects={(activeProjects ?? []) as any}
       recentClients={recentClients ?? []}
       isAdmin={['owner','admin'].includes(mb.role)}
+      clientsCount={clientsCount ?? 0}
+      weeklyCompleted={weeklyCompleted ?? 0}
+      teamCount={teamCount ?? 1}
     />
   )
 }
