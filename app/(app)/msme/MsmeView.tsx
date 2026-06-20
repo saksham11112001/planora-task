@@ -92,6 +92,7 @@ export function MsmeView({ userRole, orgName }: Props) {
   const [importPreview, setImportPreview] = useState<ImportRow[]>([])
   const [importError,   setImportError]   = useState<string | null>(null)
   const [importing,     setImporting]     = useState(false)
+  const [importProgress, setImportProgress] = useState<{ done: number; total: number } | null>(null)
   const [importResult,  setImportResult]  = useState<{ inserted: number; skipped: Array<{row:number;name:string;reason:string}>; paid_slots: number } | null>(null)
 
   const canManage  = ['owner', 'admin', 'manager'].includes(userRole)
@@ -470,17 +471,38 @@ export function MsmeView({ userRole, orgName }: Props) {
   }
 
   async function handleImportSubmit() {
+    const BATCH = 20
     setImporting(true)
     setImportError(null)
-    const res  = await fetch('/api/msme/import', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rows: importRows }),
-    })
-    const data = await res.json()
+    setImportProgress({ done: 0, total: importRows.length })
+
+    let totalInserted = 0
+    const allSkipped: Array<{row:number;name:string;reason:string}> = []
+    let totalPaidSlots = 0
+
+    for (let i = 0; i < importRows.length; i += BATCH) {
+      const batch = importRows.slice(i, i + BATCH)
+      const res = await fetch('/api/msme/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rows: batch }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setImporting(false)
+        setImportProgress(null)
+        setImportError(data.error ?? 'Import failed')
+        return
+      }
+      totalInserted += data.inserted ?? 0
+      if (Array.isArray(data.skipped)) allSkipped.push(...data.skipped)
+      totalPaidSlots = data.paid_slots ?? totalPaidSlots
+      setImportProgress({ done: Math.min(i + BATCH, importRows.length), total: importRows.length })
+    }
+
     setImporting(false)
-    if (!res.ok) { setImportError(data.error ?? 'Import failed'); return }
-    setImportResult(data)
+    setImportProgress(null)
+    setImportResult({ inserted: totalInserted, skipped: allSkipped, paid_slots: totalPaidSlots })
     fetchVendors()
   }
 
@@ -1368,11 +1390,22 @@ export function MsmeView({ userRole, orgName }: Props) {
                       <strong>Heads up:</strong> You&apos;ve used all {vendorLimit} email slots. These vendors will be imported but you&apos;ll need to upgrade your pack before sending them emails.
                     </div>
                   )}
+                  {importProgress && (
+                    <div style={{ marginTop: 16 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#64748b', marginBottom: 6 }}>
+                        <span>Importing vendors…</span>
+                        <span>{importProgress.done} / {importProgress.total}</span>
+                      </div>
+                      <div style={{ background: '#e2e8f0', borderRadius: 99, height: 8, overflow: 'hidden' }}>
+                        <div style={{ height: '100%', borderRadius: 99, background: 'var(--brand)', width: `${Math.round((importProgress.done / importProgress.total) * 100)}%`, transition: 'width 0.3s ease' }} />
+                      </div>
+                    </div>
+                  )}
                   <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
                     <button onClick={handleImportSubmit} disabled={importing} style={{ ...primaryBtn, flex: 1 }}>
-                      {importing ? 'Importing…' : `Import ${importRows.length} vendors`}
+                      {importing ? `Importing… (${importProgress ? Math.round((importProgress.done / importProgress.total) * 100) : 0}%)` : `Import ${importRows.length} vendors`}
                     </button>
-                    <button onClick={() => { setImportRows([]); setImportPreview([]) }} style={{ ...ghostBtn, flex: 1 }}>Clear</button>
+                    <button onClick={() => { setImportRows([]); setImportPreview([]) }} disabled={importing} style={{ ...ghostBtn, flex: 1 }}>Clear</button>
                   </div>
                 </div>
               )}
