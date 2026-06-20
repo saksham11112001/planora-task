@@ -92,6 +92,7 @@ export function MsmeView({ userRole, orgName }: Props) {
   const [importPreview, setImportPreview] = useState<ImportRow[]>([])
   const [importError,   setImportError]   = useState<string | null>(null)
   const [importing,     setImporting]     = useState(false)
+  const [importProgress, setImportProgress] = useState<{ done: number; total: number } | null>(null)
   const [importResult,  setImportResult]  = useState<{ inserted: number; skipped: Array<{row:number;name:string;reason:string}>; paid_slots: number } | null>(null)
 
   const canManage  = ['owner', 'admin', 'manager'].includes(userRole)
@@ -109,6 +110,13 @@ export function MsmeView({ userRole, orgName }: Props) {
     const canEmailMore = totalEver < vendorLimit
     return new Set(vendors.filter(v => v.email_count > 0 || canEmailMore).map(v => v.id))
   }, [vendors, vendorLimit, totalEver])
+
+  // ── GST details modal (shown before MSME pack payment) ───────────────────
+  const [showGstModal,   setShowGstModal]   = useState(false)
+  const [pendingPackTier,setPendingPackTier] = useState<string | null>(null)
+  const [gstFetched,     setGstFetched]     = useState(false)
+  const [savingGst,      setSavingGst]      = useState(false)
+  const [gstDraft, setGstDraft] = useState({ gstin: '', legal_name: '', address_line1: '', city: '', state_name: '', pincode: '' })
 
   // ── Email schedule config ──────────────────────────────────────────────────
   // intervalDays[i] = days to wait after email i before sending email i+1
@@ -204,8 +212,41 @@ export function MsmeView({ userRole, orgName }: Props) {
   }
 
 
-  // ── Upgrade pack ──────────────────────────────────────────────────────────
+  // ── Upgrade pack — Step 1: show GST modal ────────────────────────────────
   async function handleUpgrade(tier: string) {
+    if (!gstFetched) {
+      try {
+        const r = await fetch('/api/settings/billing/gst')
+        if (r.ok) {
+          const d = await r.json()
+          if (d.gst) setGstDraft(g => ({ ...g, ...Object.fromEntries(Object.entries(d.gst).map(([k,v]) => [k, v ?? ''])) }))
+        }
+      } catch { /* pre-fill is best-effort */ }
+      setGstFetched(true)
+    }
+    setPendingPackTier(tier)
+    setShowGstModal(true)
+  }
+
+  async function handleGstProceed() {
+    if (!gstDraft.legal_name.trim()) { showToast('Legal / company name is required', 'error'); return }
+    setSavingGst(true)
+    try {
+      const r = await fetch('/api/settings/billing/gst', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(gstDraft),
+      })
+      const d = await r.json()
+      if (!r.ok) { showToast(d.error ?? 'Failed to save billing details', 'error'); return }
+    } catch { showToast('Network error', 'error'); return }
+    finally { setSavingGst(false) }
+    setShowGstModal(false)
+    if (pendingPackTier) await _doUpgrade(pendingPackTier)
+    setPendingPackTier(null)
+  }
+
+  // ── Upgrade pack — Step 2: open Razorpay ──────────────────────────────────
+  async function _doUpgrade(tier: string) {
     setUpgradeBusy(tier)
     const res  = await fetch('/api/msme/pay', {
       method:  'POST',
@@ -430,17 +471,38 @@ export function MsmeView({ userRole, orgName }: Props) {
   }
 
   async function handleImportSubmit() {
+    const BATCH = 20
     setImporting(true)
     setImportError(null)
-    const res  = await fetch('/api/msme/import', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rows: importRows }),
-    })
-    const data = await res.json()
+    setImportProgress({ done: 0, total: importRows.length })
+
+    let totalInserted = 0
+    const allSkipped: Array<{row:number;name:string;reason:string}> = []
+    let totalPaidSlots = 0
+
+    for (let i = 0; i < importRows.length; i += BATCH) {
+      const batch = importRows.slice(i, i + BATCH)
+      const res = await fetch('/api/msme/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rows: batch }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setImporting(false)
+        setImportProgress(null)
+        setImportError(data.error ?? 'Import failed')
+        return
+      }
+      totalInserted += data.inserted ?? 0
+      if (Array.isArray(data.skipped)) allSkipped.push(...data.skipped)
+      totalPaidSlots = data.paid_slots ?? totalPaidSlots
+      setImportProgress({ done: Math.min(i + BATCH, importRows.length), total: importRows.length })
+    }
+
     setImporting(false)
-    if (!res.ok) { setImportError(data.error ?? 'Import failed'); return }
-    setImportResult(data)
+    setImportProgress(null)
+    setImportResult({ inserted: totalInserted, skipped: allSkipped, paid_slots: totalPaidSlots })
     fetchVendors()
   }
 
@@ -1234,6 +1296,46 @@ export function MsmeView({ userRole, orgName }: Props) {
         </Modal>
       )}
 
+      {/* ── GST / Billing details modal ── */}
+      {showGstModal && (
+        <Modal title="Billing details" onClose={() => { setShowGstModal(false); setPendingPackTier(null) }}>
+          <p style={{ fontSize: 12, color: '#64748b', marginTop: -12, marginBottom: 18, lineHeight: 1.6 }}>
+            Required to generate your GST tax invoice after payment.
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <Field label="Legal / company name *" hint="As registered with GST / ROC">
+              <input value={gstDraft.legal_name} onChange={e => setGstDraft(g => ({ ...g, legal_name: e.target.value }))} placeholder={orgName ?? ''} style={mi} />
+            </Field>
+            <Field label="GSTIN" hint="15-character GST Identification Number (optional but recommended for credit)">
+              <input value={gstDraft.gstin} onChange={e => setGstDraft(g => ({ ...g, gstin: e.target.value.toUpperCase() }))} placeholder="e.g. 27AABCU9603R1ZX" maxLength={15} style={mi} />
+            </Field>
+            <Field label="Address">
+              <input value={gstDraft.address_line1} onChange={e => setGstDraft(g => ({ ...g, address_line1: e.target.value }))} placeholder="Building / street / locality" style={mi} />
+            </Field>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <Field label="City">
+                <input value={gstDraft.city} onChange={e => setGstDraft(g => ({ ...g, city: e.target.value }))} placeholder="Mumbai" style={mi} />
+              </Field>
+              <Field label="State">
+                <input value={gstDraft.state_name} onChange={e => setGstDraft(g => ({ ...g, state_name: e.target.value }))} placeholder="Maharashtra" style={mi} />
+              </Field>
+            </div>
+            <Field label="PIN code">
+              <input value={gstDraft.pincode} onChange={e => setGstDraft(g => ({ ...g, pincode: e.target.value }))} placeholder="400001" maxLength={6} style={mi} />
+            </Field>
+          </div>
+          <p style={{ fontSize: 11, color: '#94a3b8', margin: '14px 0', lineHeight: 1.6 }}>
+            A tax invoice (including GST breakdown) will be emailed to your registered address after payment.
+          </p>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button onClick={() => { setShowGstModal(false); setPendingPackTier(null) }} style={{ ...ghostBtn, flex: 1 }}>Cancel</button>
+            <button onClick={handleGstProceed} disabled={savingGst} style={{ ...primaryBtn, flex: 2, opacity: savingGst ? 0.7 : 1 }}>
+              {savingGst ? 'Saving…' : 'Proceed to Payment →'}
+            </button>
+          </div>
+        </Modal>
+      )}
+
       {/* ── Walkthrough + spotlight tour ── */}
       <MsmeWalkthrough onUpgrade={() => setShowUpgrade(true)} onStartTour={() => setShowTour(true)} />
       {showTour && <MsmeTour onDone={() => setShowTour(false)} />}
@@ -1288,11 +1390,22 @@ export function MsmeView({ userRole, orgName }: Props) {
                       <strong>Heads up:</strong> You&apos;ve used all {vendorLimit} email slots. These vendors will be imported but you&apos;ll need to upgrade your pack before sending them emails.
                     </div>
                   )}
+                  {importProgress && (
+                    <div style={{ marginTop: 16 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#64748b', marginBottom: 6 }}>
+                        <span>Importing vendors…</span>
+                        <span>{importProgress.done} / {importProgress.total}</span>
+                      </div>
+                      <div style={{ background: '#e2e8f0', borderRadius: 99, height: 8, overflow: 'hidden' }}>
+                        <div style={{ height: '100%', borderRadius: 99, background: 'var(--brand)', width: `${Math.round((importProgress.done / importProgress.total) * 100)}%`, transition: 'width 0.3s ease' }} />
+                      </div>
+                    </div>
+                  )}
                   <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
                     <button onClick={handleImportSubmit} disabled={importing} style={{ ...primaryBtn, flex: 1 }}>
-                      {importing ? 'Importing…' : `Import ${importRows.length} vendors`}
+                      {importing ? `Importing… (${importProgress ? Math.round((importProgress.done / importProgress.total) * 100) : 0}%)` : `Import ${importRows.length} vendors`}
                     </button>
-                    <button onClick={() => { setImportRows([]); setImportPreview([]) }} style={{ ...ghostBtn, flex: 1 }}>Clear</button>
+                    <button onClick={() => { setImportRows([]); setImportPreview([]) }} disabled={importing} style={{ ...ghostBtn, flex: 1 }}>Clear</button>
                   </div>
                 </div>
               )}

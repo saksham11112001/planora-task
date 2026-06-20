@@ -48,6 +48,13 @@ export function BillingView({ orgName, currentPlan, status, subscriptionId, tria
     code: string; type: 'percent' | 'fixed_inr'; percent?: number | null; inr?: number | null
   } | null>(null)
 
+  // GST details modal state (shown before Razorpay opens)
+  const [showGstModal,    setShowGstModal]    = useState(false)
+  const [pendingPlan,     setPendingPlan]     = useState<string | null>(null)
+  const [gstFetched,      setGstFetched]      = useState(false)
+  const [savingGst,       setSavingGst]       = useState(false)
+  const [gst, setGst] = useState({ gstin: '', legal_name: '', address_line1: '', city: '', state_name: '', pincode: '' })
+
   // Setup fee state
   const [setupPaid,       setSetupPaid]       = useState(setupFeePaid)
   const [setupLoading,    setSetupLoading]    = useState(false)
@@ -89,8 +96,42 @@ export function BillingView({ orgName, currentPlan, status, subscriptionId, tria
     } finally { setApplyingCoupon(false) }
   }
 
+  // Step 1: show GST modal (pre-fetch saved details)
   async function handleUpgrade(plan: string) {
     if (plan === 'free' || plan === currentPlan) return
+    if (!gstFetched) {
+      try {
+        const r = await fetch('/api/settings/billing/gst')
+        if (r.ok) {
+          const d = await r.json()
+          if (d.gst) setGst(g => ({ ...g, ...Object.fromEntries(Object.entries(d.gst).map(([k,v]) => [k, v ?? ''])) }))
+        }
+      } catch { /* pre-fill is best-effort */ }
+      setGstFetched(true)
+    }
+    setPendingPlan(plan)
+    setShowGstModal(true)
+  }
+
+  // Step 2: save GST details then open Razorpay
+  async function handleGstProceed() {
+    if (!gst.legal_name.trim()) { toast.error('Legal / company name is required'); return }
+    setSavingGst(true)
+    try {
+      const r = await fetch('/api/settings/billing/gst', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(gst),
+      })
+      const d = await r.json()
+      if (!r.ok) { toast.error(d.error ?? 'Failed to save billing details'); return }
+    } catch { toast.error('Network error'); return }
+    finally { setSavingGst(false) }
+    setShowGstModal(false)
+    if (pendingPlan) await _doUpgrade(pendingPlan)
+    setPendingPlan(null)
+  }
+
+  async function _doUpgrade(plan: string) {
     setLoading(plan)
     try {
       const res  = await fetch('/api/settings/billing', {
@@ -136,6 +177,7 @@ export function BillingView({ orgName, currentPlan, status, subscriptionId, tria
                 plan_tier:           plan,
                 coupon_code:         data.coupon_code,
                 billing_cycle:       data.billing_cycle,
+                amount_paise:        data.amount,
               }),
             })
             if (verifyRes.ok) {
@@ -169,6 +211,7 @@ export function BillingView({ orgName, currentPlan, status, subscriptionId, tria
                 razorpay_subscription_id: response.razorpay_subscription_id,
                 razorpay_signature:       response.razorpay_signature,
                 plan_tier:                plan,
+                amount_paise:             data.amount,
               }),
             })
             if (verifyRes.ok) {
@@ -254,6 +297,7 @@ export function BillingView({ orgName, currentPlan, status, subscriptionId, tria
   }
 
   return (
+    <>
     <div className="page-container">
       <div style={{ maxWidth: 900, margin: '0 auto' }}>
 
@@ -716,5 +760,72 @@ export function BillingView({ orgName, currentPlan, status, subscriptionId, tria
         )}
       </div>
     </div>
+
+    {/* ── GST / Billing details modal (portal-style, outside main scroll) ── */}
+    {showGstModal && (
+      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+        <div style={{ background: 'var(--surface)', borderRadius: 12, padding: 28, width: '100%', maxWidth: 460, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 80px rgba(0,0,0,0.24)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <div>
+              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--text-primary)' }}>Billing details</h2>
+              <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>Required to generate your GST tax invoice</p>
+            </div>
+            <button onClick={() => { setShowGstModal(false); setPendingPlan(null) }} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 20 }}>×</button>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <GstField label="Legal / company name *" hint="As registered with GST / ROC">
+              <input value={gst.legal_name} onChange={e => setGst(g => ({ ...g, legal_name: e.target.value }))} placeholder={orgName} style={gstInput} />
+            </GstField>
+            <GstField label="GSTIN" hint="15-character GST Identification Number (optional but recommended)">
+              <input value={gst.gstin} onChange={e => setGst(g => ({ ...g, gstin: e.target.value.toUpperCase() }))} placeholder="e.g. 27AABCU9603R1ZX" maxLength={15} style={gstInput} />
+            </GstField>
+            <GstField label="Address line 1">
+              <input value={gst.address_line1} onChange={e => setGst(g => ({ ...g, address_line1: e.target.value }))} placeholder="Building / street / locality" style={gstInput} />
+            </GstField>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <GstField label="City">
+                <input value={gst.city} onChange={e => setGst(g => ({ ...g, city: e.target.value }))} placeholder="Mumbai" style={gstInput} />
+              </GstField>
+              <GstField label="State">
+                <input value={gst.state_name} onChange={e => setGst(g => ({ ...g, state_name: e.target.value }))} placeholder="Maharashtra" style={gstInput} />
+              </GstField>
+            </div>
+            <GstField label="PIN code">
+              <input value={gst.pincode} onChange={e => setGst(g => ({ ...g, pincode: e.target.value }))} placeholder="400001" maxLength={6} style={gstInput} />
+            </GstField>
+          </div>
+
+          <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '16px 0', lineHeight: 1.6 }}>
+            Your billing details will be saved for future invoices. A tax invoice will be emailed to you after payment.
+          </p>
+
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button onClick={() => { setShowGstModal(false); setPendingPlan(null) }} style={{ flex: 1, padding: '10px 0', borderRadius: 8, border: '1.5px solid var(--border)', background: 'transparent', color: 'var(--text-muted)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Cancel</button>
+            <button onClick={handleGstProceed} disabled={savingGst} style={{ flex: 2, padding: '10px 0', borderRadius: 8, border: 'none', background: '#0d9488', color: '#fff', fontWeight: 700, fontSize: 13, cursor: savingGst ? 'default' : 'pointer', opacity: savingGst ? 0.7 : 1 }}>
+              {savingGst ? 'Saving…' : 'Proceed to Payment →'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   )
+}
+
+function GstField({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 5 }}>{label}</label>
+      {children}
+      {hint && <p style={{ margin: '3px 0 0', fontSize: 11, color: 'var(--text-muted)' }}>{hint}</p>}
+    </div>
+  )
+}
+
+const gstInput: React.CSSProperties = {
+  width: '100%', padding: '8px 10px', borderRadius: 8,
+  border: '1.5px solid var(--border)', outline: 'none',
+  fontSize: 13, background: 'var(--surface)', color: 'var(--text-primary)',
+  fontFamily: 'inherit', boxSizing: 'border-box',
 }

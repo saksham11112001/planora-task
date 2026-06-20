@@ -3,6 +3,7 @@ import { welcomeEmailHtml, welcomeEmailSubject, day2EmailHtml, day2EmailSubject 
 import { trialExpiringSoonHtml, trialExpiringSoonSubject, trialExpiredHtml, trialExpiredSubject } from './templates/trialEmail'
 import { taskAssignedHtml, taskAssignedText }     from './templates/taskAssigned'
 import { taskDueSoonHtml, taskDueSoonText }       from './templates/taskDueSoon'
+import { paymentInvoiceHtml, paymentInvoiceSubject, type InvoiceProps } from './templates/paymentInvoice'
 import { approvalRequestedHtml, approvalResultHtml } from './templates/approvalEmail'
 import { approvalDigestHtml } from './templates/approvalDigest'
 import { taskCommentedHtml }  from './templates/taskCommented'
@@ -264,6 +265,16 @@ export async function sendMsmeVendorEmail(p: {
     ...(p.cc ? { cc: [p.cc] } : {}),
     subject: msmeVendorEmailSubject(p),
     html:    msmeVendorEmailHtml(p),
+  })
+}
+
+// ── Payment tax invoice ───────────────────────────────────────────────────
+export async function sendInvoiceEmail(p: InvoiceProps) {
+  return resend.emails.send({
+    from:    FROM,
+    to:      p.customerEmail,
+    subject: paymentInvoiceSubject(p),
+    html:    paymentInvoiceHtml(p),
   })
 }
 
