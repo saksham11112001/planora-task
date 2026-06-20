@@ -23,22 +23,26 @@ export function msmeVendorEmailHtml(p: Props): string {
   const isFinal    = p.attemptNo === total
 
   const headline = isFinal
-    ? 'Final reminder: MSME details required'
+    ? 'Final Request: MSME Registration Details Required'
     : isReminder
-    ? 'Gentle reminder: your MSME details are pending'
-    : 'We need your MSME registration details'
+    ? 'Follow-up: MSME Registration Details Pending'
+    : 'MSME Registration Details Required'
 
   const urgencyBadge = isFinal
-    ? `<div style="display:inline-block;background:#dc262620;color:#dc2626;padding:4px 12px;border-radius:20px;font-size:13px;font-weight:600;margin-bottom:16px">⚠️ Final reminder</div>`
+    ? `<div style="display:inline-block;background:#dc262620;color:#dc2626;padding:4px 12px;border-radius:4px;font-size:12px;font-weight:600;margin-bottom:16px;letter-spacing:0.05em">FINAL REQUEST</div>`
     : isReminder
-    ? `<div style="display:inline-block;background:#ca8a0420;color:#ca8a04;padding:4px 12px;border-radius:20px;font-size:13px;font-weight:600;margin-bottom:16px">⏰ Reminder ${p.attemptNo} of ${total}</div>`
-    : `<div style="display:inline-block;background:${ACCENT}20;color:${ACCENT};padding:4px 12px;border-radius:20px;font-size:13px;font-weight:600;margin-bottom:16px">📋 Action required</div>`
+    ? `<div style="display:inline-block;background:#92400e20;color:#92400e;padding:4px 12px;border-radius:4px;font-size:12px;font-weight:600;margin-bottom:16px;letter-spacing:0.05em">REMINDER ${p.attemptNo} OF ${total}</div>`
+    : `<div style="display:inline-block;background:${ACCENT}20;color:${ACCENT};padding:4px 12px;border-radius:4px;font-size:12px;font-weight:600;margin-bottom:16px;letter-spacing:0.05em">ACTION REQUIRED</div>`
+
+  const priorRef = isReminder
+    ? `<p style="color:#64748b;font-size:14px;margin:0 0 16px;line-height:1.6">Further to our previous communication${p.attemptNo === total ? ` (${total - 1} reminder${total - 2 > 0 ? 's' : ''} sent)` : ''}, your MSME registration details have not yet been received.</p>`
+    : ''
 
   const bodyText = isFinal
-    ? `This is our final attempt to collect your MSME registration details. Under the MSMED Act, ${p.orgName} is required to verify the MSME status of all vendors. If we do not receive your details, we may not be able to process payments within the standard timeline.`
+    ? `As this is our final request, we urge you to submit your details at the earliest. Under the Micro, Small and Medium Enterprises Development Act (MSMED Act), ${p.orgName} is required to verify the MSME status of all vendors. Delays in submission may affect payment processing timelines.`
     : isReminder
-    ? `We noticed you haven't filled in your MSME registration details yet. ${p.orgName} needs this information to comply with the MSMED Act and ensure your payments are processed on time.`
-    : `${p.orgName} is collecting MSME registration details from all vendors as part of their statutory compliance under the MSMED Act, 2006. This takes less than 2 minutes.`
+    ? `Your MSME registration details are still pending. ${p.orgName} requires this information to comply with the MSMED Act, 2006 and ensure your payments are processed without delays.`
+    : `${p.orgName} is collecting MSME registration details from all vendors as part of their statutory compliance obligations under the MSMED Act, 2006. This process takes less than 2 minutes.`
 
   return `<!DOCTYPE html><html>
 <body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
@@ -46,43 +50,43 @@ export function msmeVendorEmailHtml(p: Props): string {
   <table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden">
 
     <tr><td style="background:#0f172a;padding:20px 32px">
-      <span style="color:#fff;font-size:16px;font-weight:700">⚡ ${p.orgName}</span>
+      <span style="color:#fff;font-size:16px;font-weight:700">MSME Compliance — ${p.orgName}</span>
     </td></tr>
 
     <tr><td style="padding:32px">
       ${urgencyBadge}
       <h1 style="margin:0 0 8px;color:#0f172a;font-size:20px;font-weight:700">${headline}</h1>
-      <p style="color:#64748b;font-size:14px;margin:0 0 24px;line-height:1.6">
-        Hi ${p.vendorName}, ${bodyText}
-      </p>
+      <p style="color:#64748b;font-size:14px;margin:0 0 16px;line-height:1.6">Dear ${p.vendorName},</p>
+      ${priorRef}
+      <p style="color:#64748b;font-size:14px;margin:0 0 24px;line-height:1.6">${bodyText}</p>
 
       <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:20px;margin-bottom:24px">
-        <p style="color:#0f172a;font-size:14px;font-weight:600;margin:0 0 12px">What you'll need to provide:</p>
+        <p style="color:#0f172a;font-size:14px;font-weight:600;margin:0 0 12px">Documents and details required:</p>
         <ul style="margin:0;padding-left:20px;font-size:13px;color:#374151;line-height:1.8">
           <li>Udyam Registration Number (from your Udyam certificate)</li>
           <li>MSME Category — Micro, Small, or Medium</li>
           <li>Nature of business — Manufacturer, Service Provider, or Trader</li>
           <li>Last outstanding amount as on 31st March</li>
-          <li>Upload your Udyam Registration Certificate (PDF/JPG)</li>
+          <li>Udyam Registration Certificate (PDF/JPG)</li>
         </ul>
         <p style="color:#64748b;font-size:12px;margin:12px 0 0">
-          If you are <strong>not registered as an MSME</strong>, you can submit a declaration instead.
+          If your business is <strong>not registered as an MSME</strong>, you may submit a declaration to that effect instead.
         </p>
       </div>
 
       <a href="${p.formUrl}"
         style="display:inline-block;background:${ACCENT};color:#fff;text-decoration:none;padding:14px 28px;border-radius:8px;font-size:15px;font-weight:600">
-        Fill MSME Details →
+        Submit MSME Details
       </a>
 
       <p style="color:#94a3b8;font-size:12px;margin:24px 0 0;line-height:1.5">
-        This link is valid for 30 days. If you've already submitted your details, please ignore this email.<br/>
-        Your information is shared only with ${p.orgName} for compliance purposes.
+        This link is valid for 30 days. If you have already submitted your details, please disregard this email.<br/>
+        Your information will be shared only with ${p.orgName} for statutory compliance purposes.
       </p>
     </td></tr>
 
     <tr><td style="padding:16px 32px;border-top:1px solid #f1f5f9">
-      <p style="color:#94a3b8;font-size:12px;margin:0">${p.orgName} · Powered by upFloat</p>
+      <p style="color:#94a3b8;font-size:12px;margin:0">On behalf of ${p.orgName} &nbsp;|&nbsp; Powered by upFloat</p>
     </td></tr>
 
   </table>
