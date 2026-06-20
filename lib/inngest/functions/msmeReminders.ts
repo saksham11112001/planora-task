@@ -16,12 +16,13 @@ export const msmeReminders = inngest.createFunction(
     const admin = createAdminClient()
     const now   = new Date()
 
-    // Fetch all vendors still awaiting submission who have received at least 1 email
+    // Fetch all active (non-deleted) vendors still awaiting submission who have received at least 1 email
     const vendors = await step.run('fetch-pending-vendors', async () => {
       const { data } = await admin
         .from('msme_vendors')
         .select('id, vendor_name, vendor_email, org_id, email_count, last_emailed_at, organisations(name)')
         .eq('status', 'emailed')
+        .eq('is_deleted', false)
         .gte('email_count', 1)
         .lte('email_count', 4)  // max 5 emails (email_count 1–4 still have follow-ups pending)
         .not('last_emailed_at', 'is', null)
@@ -30,19 +31,31 @@ export const msmeReminders = inngest.createFunction(
 
     if (vendors.length === 0) return { vendors_checked: 0, emails_sent: 0 }
 
-    // Fetch schedule configs for all orgs that have vendors due
+    // Fetch schedule configs and CC email settings for all orgs that have vendors due
     const orgIds = [...new Set(vendors.map(v => v.org_id))]
-    const scheduleMap = await step.run('fetch-org-schedules', async () => {
-      const { data } = await admin
-        .from('org_feature_settings')
-        .select('org_id, config')
-        .eq('feature_key', 'msme_email_schedule')
-        .in('org_id', orgIds)
-      const map: Record<string, number[]> = {}
-      for (const row of data ?? []) {
-        if (Array.isArray(row.config?.days)) map[row.org_id] = row.config.days
+    const { scheduleMap, ccMap } = await step.run('fetch-org-settings', async () => {
+      const [{ data: schedRows }, { data: ccRows }] = await Promise.all([
+        admin
+          .from('org_feature_settings')
+          .select('org_id, config')
+          .eq('feature_key', 'msme_email_schedule')
+          .in('org_id', orgIds),
+        admin
+          .from('org_feature_settings')
+          .select('org_id, config')
+          .eq('feature_key', 'msme_cc_email')
+          .in('org_id', orgIds),
+      ])
+      const scheduleMap: Record<string, number[]> = {}
+      for (const row of schedRows ?? []) {
+        if (Array.isArray(row.config?.days)) scheduleMap[row.org_id] = row.config.days
       }
-      return map
+      const ccMap: Record<string, string | undefined> = {}
+      for (const row of ccRows ?? []) {
+        const email = (row.config as { email?: string } | null)?.email
+        if (email) ccMap[row.org_id] = email
+      }
+      return { scheduleMap, ccMap }
     })
 
     let emailsSent = 0
@@ -89,6 +102,7 @@ export const msmeReminders = inngest.createFunction(
             formUrl,
             attemptNo,
             totalEmails: maxEmails,
+            cc: ccMap[vendor.org_id],
           })
           await admin.from('msme_vendors').update({
             email_count: attemptNo,
