@@ -45,29 +45,32 @@ export async function POST(
 
   if (!vendor) return NextResponse.json({ error: 'Vendor not found' }, { status: 404 })
 
-  // ── Lock check: enforce vendor_limit server-side ──────────────────────────
-  // Fetch the org's active pack to get vendor_limit (free = 5)
-  const { data: packRow } = await admin
-    .from('org_feature_settings')
-    .select('config')
-    .eq('org_id', mb.org_id)
-    .eq('feature_key', 'msme_pack')
-    .maybeSingle()
-  const vendorLimit: number = (packRow?.config as any)?.vendor_limit ?? 5
+  // ── Lock check: enforce email-slot limit server-side ──────────────────────
+  // A slot is consumed when the first email is sent to a vendor (email_count 0→1).
+  // Slots are permanent even if the vendor is later deleted — this prevents gaming.
+  // If the vendor has already been emailed (email_count > 0), allow re-shoots regardless.
+  if (vendor.email_count === 0) {
+    const { data: packRow } = await admin
+      .from('org_feature_settings')
+      .select('config')
+      .eq('org_id', mb.org_id)
+      .eq('feature_key', 'msme_pack')
+      .maybeSingle()
+    const vendorLimit: number = (packRow?.config as any)?.vendor_limit ?? 5
 
-  // Count how many vendors in this org were created before (or at) this one
-  const { count: rankCount } = await admin
-    .from('msme_vendors')
-    .select('id', { count: 'exact', head: true })
-    .eq('org_id', mb.org_id)
-    .lte('created_at', vendor.created_at)
-  const rank = rankCount ?? 0
+    // Count vendors that have already consumed an email slot (incl. soft-deleted)
+    const { count: emailedEver } = await admin
+      .from('msme_vendors')
+      .select('id', { count: 'exact', head: true })
+      .eq('org_id', mb.org_id)
+      .gt('email_count', 0)
 
-  if (rank > vendorLimit) {
-    return NextResponse.json(
-      { error: 'This vendor is locked. Upgrade your pack to contact more vendors.' },
-      { status: 403 }
-    )
+    if ((emailedEver ?? 0) >= vendorLimit) {
+      return NextResponse.json(
+        { error: 'Email slot limit reached. Upgrade your pack to contact more vendors.' },
+        { status: 403 }
+      )
+    }
   }
 
   // x-copy-only: generate link without sending email (for "share via WhatsApp" use case)
@@ -104,18 +107,29 @@ export async function POST(
   const orgName = (mb.organisations as any)?.name ?? 'Your business'
   const attempt = (vendor.email_count + 1) as 1 | 2 | 3 | 4 | 5
 
-  // Fetch org owner's email for CC
+  // Fetch CC email — use custom setting if configured, else fall back to org owner's auth email
   let ownerEmail: string | undefined
   try {
-    const { data: ownerMember } = await admin
-      .from('org_members')
-      .select('user_id')
+    const { data: ccRow } = await admin
+      .from('org_feature_settings')
+      .select('config')
       .eq('org_id', mb.org_id)
-      .eq('role', 'owner')
+      .eq('feature_key', 'msme_cc_email')
       .maybeSingle()
-    if (ownerMember?.user_id) {
-      const { data: { user: ownerUser } } = await admin.auth.admin.getUserById(ownerMember.user_id)
-      ownerEmail = ownerUser?.email ?? undefined
+    const customCc: string | undefined = (ccRow?.config as { email?: string } | null)?.email || undefined
+    if (customCc) {
+      ownerEmail = customCc
+    } else {
+      const { data: ownerMember } = await admin
+        .from('org_members')
+        .select('user_id')
+        .eq('org_id', mb.org_id)
+        .eq('role', 'owner')
+        .maybeSingle()
+      if (ownerMember?.user_id) {
+        const { data: { user: ownerUser } } = await admin.auth.admin.getUserById(ownerMember.user_id)
+        ownerEmail = ownerUser?.email ?? undefined
+      }
     }
   } catch {}
 

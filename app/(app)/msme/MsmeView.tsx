@@ -96,11 +96,18 @@ export function MsmeView({ userRole, orgName }: Props) {
   const canManage  = ['owner', 'admin', 'manager'].includes(userRole)
   const canAdmin   = ['owner', 'admin'].includes(userRole)
 
-  // Vendors sorted oldest-first; the first `vendorLimit` are unlocked, the rest are locked.
+  // Derive current pack label and whether a higher pack is available
+  const currentPack   = MSME_PACKS.find(p => p.tier === packTier)
+  const packLabel     = currentPack?.label ?? 'Free'
+  const highestTier   = MSME_PACKS[MSME_PACKS.length - 1].tier
+  const canUpgrade    = packTier !== highestTier
+
+  // A vendor is "unlocked" if it has already been emailed (slot consumed) OR if there are
+  // still free email slots available. Locking is based on email slots, not import order.
   const unlockedIds = useMemo(() => {
-    const sorted = [...vendors].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-    return new Set(sorted.slice(0, vendorLimit).map(v => v.id))
-  }, [vendors, vendorLimit])
+    const canEmailMore = totalEver < vendorLimit
+    return new Set(vendors.filter(v => v.email_count > 0 || canEmailMore).map(v => v.id))
+  }, [vendors, vendorLimit, totalEver])
 
   // ── Email schedule config ──────────────────────────────────────────────────
   // intervalDays[i] = days to wait after email i before sending email i+1
@@ -110,6 +117,8 @@ export function MsmeView({ userRole, orgName }: Props) {
   const [showSettings,    setShowSettings]    = useState(false)
   const [draftIntervals,  setDraftIntervals]  = useState<number[]>([7, 14, 21, 30])
   const [savingSchedule,  setSavingSchedule]  = useState(false)
+  const [ccEmail,         setCcEmail]         = useState<string>('')
+  const [draftCcEmail,    setDraftCcEmail]    = useState<string>('')
 
   function showToast(message: string, type: Toast['type'] = 'success') {
     const id = ++toastRef.current
@@ -157,7 +166,7 @@ export function MsmeView({ userRole, orgName }: Props) {
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Fetch email schedule + pack tier for this org
+  // Fetch email schedule + pack tier + cc_email for this org
   useEffect(() => {
     fetch('/api/msme/settings')
       .then(r => r.ok ? r.json() : null)
@@ -167,23 +176,30 @@ export function MsmeView({ userRole, orgName }: Props) {
           setDraftIntervals(d.schedule)
         }
         if (d?.pack?.tier) setPackTier(d.pack.tier)
+        const cc = d?.cc_email ?? ''
+        setCcEmail(cc)
+        setDraftCcEmail(cc)
       })
       .catch(() => {})
   }, [])
 
-  // ── Save email schedule ───────────────────────────────────────────────────
+  // ── Save email schedule + cc_email ───────────────────────────────────────
   async function handleSaveSchedule() {
+    if (draftCcEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draftCcEmail)) {
+      showToast('Enter a valid CC email address', 'error'); return
+    }
     setSavingSchedule(true)
     const res  = await fetch('/api/msme/settings', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ schedule: draftIntervals }),
+      body: JSON.stringify({ schedule: draftIntervals, cc_email: draftCcEmail || null }),
     })
     setSavingSchedule(false)
     if (!res.ok) { const d = await res.json(); showToast(d.error ?? 'Failed to save', 'error'); return }
     setIntervalDays(draftIntervals)
+    setCcEmail(draftCcEmail)
     setShowSettings(false)
-    showToast('Email schedule saved')
+    showToast('Settings saved')
   }
 
 
@@ -556,21 +572,26 @@ export function MsmeView({ userRole, orgName }: Props) {
       {/* ── Header ── */}
       <div data-tour="msme-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: ACCENT, letterSpacing: '-0.3px' }}>
-            MSME Vendor Tracker
-          </h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: ACCENT, letterSpacing: '-0.3px' }}>
+              MSME Vendor Tracker
+            </h1>
+            <span style={{ fontSize: 11, fontWeight: 700, background: packTier === 'free' ? '#f1f5f9' : `${ACCENT}18`, color: packTier === 'free' ? '#64748b' : ACCENT, padding: '3px 10px', borderRadius: 20, border: `1px solid ${packTier === 'free' ? '#e2e8f0' : `${ACCENT}40`}` }}>
+              {packLabel} Plan
+            </span>
+          </div>
           <p style={{ margin: '4px 0 0', fontSize: 13, color: '#475569', fontWeight: 500 }}>
-            {totalEver}/{vendorLimit} vendor slots used
+            {totalEver}/{vendorLimit} email slots used
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           {canAdmin && (
             <button data-tour="msme-upgrade-btn" onClick={() => setShowUpgrade(true)} style={{ ...ghostBtn, borderColor: ACCENT, color: ACCENT }}>
-              📦 {packTier === 'free' ? 'Upgrade Pack' : 'Manage Pack'}
+              📦 {packTier === 'free' ? 'Upgrade Pack' : canUpgrade ? `${packLabel} · Upgrade ↑` : `${packLabel} Plan`}
             </button>
           )}
           {canAdmin && (
-            <button data-tour="msme-schedule-btn" onClick={() => { setShowSettings(true); setDraftIntervals([...intervalDays]) }} style={ghostBtn}>
+            <button data-tour="msme-schedule-btn" onClick={() => { setShowSettings(true); setDraftIntervals([...intervalDays]); setDraftCcEmail(ccEmail) }} style={ghostBtn}>
               ⚙ Email schedule
             </button>
           )}
@@ -615,12 +636,15 @@ export function MsmeView({ userRole, orgName }: Props) {
         <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 10, padding: '14px 18px', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
           <div>
             <p style={{ margin: 0, fontWeight: 700, color: '#92400e', fontSize: 14 }}>
-              📦 Vendor limit reached ({totalEver}/{vendorLimit})
+              📦 Email limit reached ({totalEver}/{vendorLimit})
             </p>
             <p style={{ margin: '2px 0 0', fontSize: 12, color: '#b45309' }}>
-              Upgrade your pack to add more vendors. Contact us to upgrade.
+              Upgrade your pack to email more vendors.
             </p>
           </div>
+          {canAdmin && canUpgrade && (
+            <button onClick={() => setShowUpgrade(true)} style={{ ...primaryBtn, padding: '7px 16px', fontSize: 12 }}>Upgrade Pack →</button>
+          )}
         </div>
       )}
 
@@ -994,7 +1018,7 @@ export function MsmeView({ userRole, orgName }: Props) {
                       <div style={{ fontSize: 13, color: '#64748b', textDecoration: 'line-through' }}>{pack.original_price_label}</div>
                     )}
                     <div style={{ fontSize: 18, fontWeight: 800, color: '#0f172a' }}>{pack.price_label}</div>
-                    <div style={{ fontSize: 11, color: '#64748b' }}>one-time</div>
+                    <div style={{ fontSize: 11, color: '#64748b' }}>one-time · + 18% GST</div>
                     {!isCurrent && !isDowngrade && pack.tier === 'pack_500' && (
                       <a
                         href="mailto:info@upfloat.co?subject=MSME%20Enterprise%20Pack%20(500%20vendors)"
@@ -1021,7 +1045,10 @@ export function MsmeView({ userRole, orgName }: Props) {
             })}
           </div>
           <p style={{ fontSize: 11, color: '#64748b', marginTop: 16, lineHeight: 1.5 }}>
-            After payment, your pack activates instantly. Payment via UPI, net banking, or cards — powered by Cashfree.
+            After payment, your pack activates instantly. Payment via UPI, net banking, or cards — powered by Razorpay.
+          </p>
+          <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 6, lineHeight: 1.5 }}>
+            * 18% GST will be added at checkout. Your GST invoice will be issued after payment.
           </p>
         </Modal>
       )}
@@ -1093,10 +1120,27 @@ export function MsmeView({ userRole, orgName }: Props) {
             💡 Tip: "After X days" means X days after the previous email in the sequence.
           </div>
 
+          {/* CC email */}
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#0f172a', marginBottom: 6 }}>
+              CC email address <span style={{ fontWeight: 400, color: '#64748b' }}>(optional)</span>
+            </label>
+            <input
+              type="email"
+              value={draftCcEmail}
+              onChange={e => setDraftCcEmail(e.target.value)}
+              placeholder="e.g. accounts@yourfirm.com"
+              style={mi}
+            />
+            <p style={{ margin: '4px 0 0', fontSize: 11, color: '#64748b' }}>
+              Every vendor email will be CC'd to this address. Leave blank to CC the org owner&apos;s email.
+            </p>
+          </div>
+
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <button onClick={() => setShowSettings(false)} style={ghostBtn}>Cancel</button>
+            <button onClick={() => { setShowSettings(false); setDraftCcEmail(ccEmail) }} style={ghostBtn}>Cancel</button>
             <button onClick={handleSaveSchedule} disabled={savingSchedule} style={{ ...primaryBtn, opacity: savingSchedule ? 0.7 : 1 }}>
-              {savingSchedule ? 'Saving…' : 'Save schedule'}
+              {savingSchedule ? 'Saving…' : 'Save settings'}
             </button>
           </div>
         </Modal>
@@ -1151,9 +1195,9 @@ export function MsmeView({ userRole, orgName }: Props) {
                       </tbody>
                     </table>
                   </div>
-                  {totalEver + importRows.length > vendorLimit && (
+                  {totalEver >= vendorLimit && (
                     <div style={{ marginTop: 12, background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#92400e' }}>
-                      <strong>Heads up:</strong> {Math.max(0, vendorLimit - totalEver)} vendors will be active. The remaining {Math.max(0, totalEver + importRows.length - vendorLimit)} will be imported but blurred and locked — upgrade your pack to unlock them.
+                      <strong>Heads up:</strong> You&apos;ve used all {vendorLimit} email slots. These vendors will be imported but you&apos;ll need to upgrade your pack before sending them emails.
                     </div>
                   )}
                   <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
