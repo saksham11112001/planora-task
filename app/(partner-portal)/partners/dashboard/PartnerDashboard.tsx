@@ -10,7 +10,7 @@ const BORDER = '#e2e8f0'
 const BG     = '#f8fafc'
 const WHITE  = '#ffffff'
 
-const MSME_COMMISSION    = 500  // ₹500 per MSME invite that makes a paid pack purchase
+const MSME_COMMISSION    = 200  // ₹200 per MSME invite that makes a paid pack purchase
 const PARTNER_COMMISSION = 0    // ₹0 — no commission for referring a partner
 
 interface Partner {
