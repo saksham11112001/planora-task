@@ -5,8 +5,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient }             from '@/lib/supabase/server'
 import { createAdminClient }        from '@/lib/supabase/admin'
 
-const MSME_COMMISSION_PAISE    = 50000   // ₹500 per MSME sign-up
-const PARTNER_COMMISSION_PAISE = 50000   // ₹500 per partner sign-up
+const MSME_COMMISSION_PAISE    = 50000   // ₹500 per MSME paid pack
+const PARTNER_COMMISSION_PAISE = 0       // ₹0 — no commission for referring a partner
 const MIN_WITHDRAWAL_PAISE     = 50000   // ₹500 minimum
 
 async function getPartnerOrError(admin: ReturnType<typeof createAdminClient>, userId: string) {
@@ -19,22 +19,47 @@ async function getPartnerOrError(admin: ReturnType<typeof createAdminClient>, us
 }
 
 async function computeBalance(admin: ReturnType<typeof createAdminClient>, partnerId: string) {
-  // Earned = signed-up MSME invites × ₹500 + signed-up partner invites × ₹500
-  const { count: msmeCount } = await admin
+  // Earned = MSME invites where referred org has made a paid pack purchase × ₹500
+  // Partner referrals earn ₹0 — no commission for referring a partner
+  const { data: msmeInvites } = await admin
     .from('partner_portal_invites')
-    .select('id', { count: 'exact', head: true })
+    .select('email')
     .eq('partner_id', partnerId)
     .eq('invite_type', 'msme')
     .eq('signed_up', true)
 
-  const { count: partnerCount } = await admin
-    .from('partner_portal_invites')
-    .select('id', { count: 'exact', head: true })
-    .eq('partner_id', partnerId)
-    .eq('invite_type', 'partner')
-    .eq('signed_up', true)
+  let paidMsmeCount = 0
+  if (msmeInvites && msmeInvites.length > 0) {
+    const emails = msmeInvites.map((i: { email: string }) => i.email.toLowerCase())
 
-  const earnedPaise = (msmeCount ?? 0) * MSME_COMMISSION_PAISE + (partnerCount ?? 0) * PARTNER_COMMISSION_PAISE
+    const { data: users } = await admin
+      .from('users')
+      .select('id, email')
+      .in('email', emails)
+
+    if (users && users.length > 0) {
+      const userIds = users.map((u: { id: string }) => u.id)
+
+      const { data: members } = await admin
+        .from('org_members')
+        .select('org_id')
+        .in('user_id', userIds)
+
+      if (members && members.length > 0) {
+        const orgIds = [...new Set(members.map((m: { org_id: string }) => m.org_id))]
+
+        const { count } = await admin
+          .from('msme_pack_payments')
+          .select('id', { count: 'exact', head: true })
+          .in('org_id', orgIds)
+          .eq('status', 'paid')
+
+        paidMsmeCount = count ?? 0
+      }
+    }
+  }
+
+  const earnedPaise = paidMsmeCount * MSME_COMMISSION_PAISE
 
   // Deduct paid + pending withdrawals
   const { data: withdrawals } = await admin
