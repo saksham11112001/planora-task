@@ -17,6 +17,7 @@ export async function GET(req: NextRequest) {
   const [
     { data: vendors, error },
     { data: packRow },
+    { data: addonRow },
     { count: totalEver },
   ] = await Promise.all([
     admin
@@ -31,6 +32,12 @@ export async function GET(req: NextRequest) {
       .eq('org_id', mb.org_id)
       .eq('feature_key', 'msme_pack')
       .maybeSingle(),
+    admin
+      .from('org_feature_settings')
+      .select('config')
+      .eq('org_id', mb.org_id)
+      .eq('feature_key', 'msme_addon_slots')
+      .maybeSingle(),
     // Count vendors that have ever been emailed (including soft-deleted ones) — these are permanent slots used.
     admin
       .from('msme_vendors')
@@ -41,7 +48,9 @@ export async function GET(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  const vendorLimit: number = (packRow?.config?.vendor_limit as number | undefined) ?? FREE_VENDOR_LIMIT
+  const packLimit: number   = (packRow?.config?.vendor_limit as number | undefined) ?? FREE_VENDOR_LIMIT
+  const addonSlots: number  = (addonRow?.config as any)?.extra_slots ?? 0
+  const vendorLimit: number = packLimit + addonSlots
   const total = vendors?.length ?? 0
   return NextResponse.json({ vendors: vendors ?? [], total, totalEver: totalEver ?? 0, vendorLimit })
 }

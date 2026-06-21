@@ -36,16 +36,15 @@ export async function GET(req: NextRequest) {
 
   const pack = (packRow?.config as { tier: string; vendor_limit: number } | null) ?? { tier: 'free', vendor_limit: 5 }
 
-  const { data: ccRow } = await admin
-    .from('org_feature_settings')
-    .select('config')
-    .eq('org_id', mb.org_id)
-    .eq('feature_key', 'msme_cc_email')
-    .maybeSingle()
+  const [{ data: ccRow }, { data: contactRow }] = await Promise.all([
+    admin.from('org_feature_settings').select('config').eq('org_id', mb.org_id).eq('feature_key', 'msme_cc_email').maybeSingle(),
+    admin.from('org_feature_settings').select('config').eq('org_id', mb.org_id).eq('feature_key', 'msme_contact_person').maybeSingle(),
+  ])
 
-  const cc_email: string | null = (ccRow?.config as { email: string } | null)?.email ?? null
+  const cc_email: string | null = (ccRow?.config as { email?: string } | null)?.email ?? null
+  const contact_person = (contactRow?.config as { name?: string; email?: string; phone?: string } | null) ?? null
 
-  return NextResponse.json({ schedule, pack, cc_email })
+  return NextResponse.json({ schedule, pack, cc_email, contact_person })
 }
 
 export async function PATCH(req: NextRequest) {
@@ -60,7 +59,11 @@ export async function PATCH(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { schedule, cc_email } = body as { schedule?: number[]; cc_email?: string | null }
+  const { schedule, cc_email, contact_person } = body as {
+    schedule?: number[]
+    cc_email?: string | null
+    contact_person?: { name: string; email: string; phone?: string } | null
+  }
 
   const admin = createAdminClient()
 
@@ -88,6 +91,21 @@ export async function PATCH(req: NextRequest) {
       .from('org_feature_settings')
       .upsert(
         { org_id: mb.org_id, feature_key: 'msme_cc_email', is_enabled: true, config: { email: cc_email ?? '' } },
+        { onConflict: 'org_id,feature_key' }
+      )
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  if (contact_person !== undefined) {
+    if (contact_person !== null) {
+      if (!contact_person.name?.trim()) return NextResponse.json({ error: 'Contact name is required' }, { status: 400 })
+      if (!contact_person.email?.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact_person.email))
+        return NextResponse.json({ error: 'Valid contact email is required' }, { status: 400 })
+    }
+    const { error } = await admin
+      .from('org_feature_settings')
+      .upsert(
+        { org_id: mb.org_id, feature_key: 'msme_contact_person', is_enabled: true, config: contact_person ?? {} },
         { onConflict: 'org_id,feature_key' }
       )
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })

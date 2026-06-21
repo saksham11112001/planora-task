@@ -1,9 +1,12 @@
 interface Props {
-  vendorName:  string
-  orgName:     string
-  formUrl:     string
-  attemptNo:   1 | 2 | 3 | 4 | 5
-  totalEmails?: number  // total emails in the sequence (default 5)
+  vendorName:    string
+  orgName:       string
+  formUrl:       string
+  attemptNo:     1 | 2 | 3 | 4 | 5
+  totalEmails?:  number
+  contactName?:  string
+  contactEmail?: string
+  contactPhone?: string
 }
 
 const ACCENT = '#0d9488'
@@ -18,6 +21,7 @@ export function msmeVendorEmailSubject(p: Props): string {
 }
 
 export function msmeVendorEmailHtml(p: Props): string {
+  const hasContact = p.contactName && p.contactEmail
   const total      = p.totalEmails ?? 5
   const isReminder = p.attemptNo > 1
   const isFinal    = p.attemptNo === total
@@ -106,6 +110,11 @@ export function msmeVendorEmailHtml(p: Props): string {
     <!-- Footer / Sign-off -->
     <tr><td style="padding:20px 36px;background:#f8fafc;border-top:1px solid #e2e8f0">
       <p style="color:#334155;font-size:13px;margin:0 0 4px;line-height:1.6">Regards,<br/><strong>On Behalf of ${p.orgName}</strong></p>
+      ${hasContact ? `<p style="color:#475569;font-size:12px;margin:10px 0 0;line-height:1.7">
+        For queries, please contact:<br/>
+        <strong>${p.contactName}</strong>${p.contactPhone ? ` &nbsp;|&nbsp; ${p.contactPhone}` : ''}<br/>
+        <a href="mailto:${p.contactEmail}" style="color:${ACCENT};text-decoration:none">${p.contactEmail}</a>
+      </p>` : ''}
       <p style="color:#94a3b8;font-size:11px;margin:8px 0 0">Powered by upFloat</p>
     </td></tr>
 

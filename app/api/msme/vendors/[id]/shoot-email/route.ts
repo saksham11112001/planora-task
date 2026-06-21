@@ -50,13 +50,11 @@ export async function POST(
   // Slots are permanent even if the vendor is later deleted — this prevents gaming.
   // If the vendor has already been emailed (email_count > 0), allow re-shoots regardless.
   if (vendor.email_count === 0) {
-    const { data: packRow } = await admin
-      .from('org_feature_settings')
-      .select('config')
-      .eq('org_id', mb.org_id)
-      .eq('feature_key', 'msme_pack')
-      .maybeSingle()
-    const vendorLimit: number = (packRow?.config as any)?.vendor_limit ?? 5
+    const [{ data: packRow }, { data: addonRow }] = await Promise.all([
+      admin.from('org_feature_settings').select('config').eq('org_id', mb.org_id).eq('feature_key', 'msme_pack').maybeSingle(),
+      admin.from('org_feature_settings').select('config').eq('org_id', mb.org_id).eq('feature_key', 'msme_addon_slots').maybeSingle(),
+    ])
+    const vendorLimit: number = ((packRow?.config as any)?.vendor_limit ?? 5) + ((addonRow?.config as any)?.extra_slots ?? 0)
 
     // Count vendors that have already consumed an email slot (incl. soft-deleted)
     const { count: emailedEver } = await admin
@@ -107,15 +105,15 @@ export async function POST(
   const orgName = (mb.organisations as any)?.name ?? 'Your business'
   const attempt = (vendor.email_count + 1) as 1 | 2 | 3 | 4 | 5
 
-  // Fetch CC email — use custom setting if configured, else fall back to org owner's auth email
+  // Fetch CC email + contact person setting
   let ownerEmail: string | undefined
+  let contactPerson: { name?: string; email?: string; phone?: string } | null = null
   try {
-    const { data: ccRow } = await admin
-      .from('org_feature_settings')
-      .select('config')
-      .eq('org_id', mb.org_id)
-      .eq('feature_key', 'msme_cc_email')
-      .maybeSingle()
+    const [{ data: ccRow }, { data: contactRow }] = await Promise.all([
+      admin.from('org_feature_settings').select('config').eq('org_id', mb.org_id).eq('feature_key', 'msme_cc_email').maybeSingle(),
+      admin.from('org_feature_settings').select('config').eq('org_id', mb.org_id).eq('feature_key', 'msme_contact_person').maybeSingle(),
+    ])
+    contactPerson = (contactRow?.config as { name?: string; email?: string; phone?: string } | null) ?? null
     const customCc: string | undefined = (ccRow?.config as { email?: string } | null)?.email || undefined
     if (customCc) {
       ownerEmail = customCc
@@ -134,13 +132,16 @@ export async function POST(
   } catch {}
 
   await sendMsmeVendorEmail({
-    to: vendor.vendor_email,
-    vendorName: vendor.vendor_name,
+    to:           vendor.vendor_email,
+    vendorName:   vendor.vendor_name,
     orgName,
     formUrl,
-    attemptNo: attempt,
-    totalEmails: maxEmails,
-    cc: ownerEmail,
+    attemptNo:    attempt,
+    totalEmails:  maxEmails,
+    cc:           ownerEmail,
+    contactName:  contactPerson?.name,
+    contactEmail: contactPerson?.email,
+    contactPhone: contactPerson?.phone,
   })
 
   await admin.from('msme_vendors').update({
