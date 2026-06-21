@@ -560,49 +560,39 @@ export function MsmeView({ userRole, orgName }: Props) {
         logsByVendor.get(log.vendor_id)!.push(log)
       }
 
-      // Single merged sheet: one row per email sent (vendors with no emails get one row)
+      // Single merged sheet: one row per vendor, emails collapsed into single cells
       const header = [
         'Vendor Name', 'Vendor Email', 'GSTIN', 'Current Status',
         'Udyam Number', 'Category', 'Nature of Business', 'Outstanding Amount (₹)',
-        'Email # (of Total)', 'Email Sent On', 'Email Sent At', 'Email Opened On',
+        'Emails Sent', 'Email Dates (all)', 'Opened On (all)',
         'Submitted On', 'Declaration By', 'Date Added',
       ]
 
       const mergedRows: (string | number)[][] = []
       for (const v of vendors) {
-        const vendorLogs = logsByVendor.get(v.id) ?? []
+        const vendorLogs = (logsByVendor.get(v.id) ?? []).sort((a, b) => a.attempt_no - b.attempt_no)
         const status = v.is_not_msme ? 'Non-MSME Declaration' : STATUS_LABEL[v.status].replace(' ✓', '')
 
-        if (vendorLogs.length === 0) {
-          // Vendor added but never emailed
-          mergedRows.push([
-            v.vendor_name, v.vendor_email, v.gstin ?? '', status,
-            v.udyam_number ?? '', v.msme_category ? CAT_LABEL[v.msme_category] : '',
-            v.nature_of_business ? NAT_LABEL[v.nature_of_business] : '',
-            v.outstanding_amount !== null && v.outstanding_amount !== undefined ? v.outstanding_amount : '',
-            '—', '—', '—', '—',
-            v.submitted_at ? new Date(v.submitted_at).toLocaleDateString('en-IN') : '',
-            v.declarant_name ?? '',
-            new Date(v.created_at).toLocaleDateString('en-IN'),
-          ])
-        } else {
-          for (const log of vendorLogs) {
-            const sentDate = new Date(log.sent_at)
-            mergedRows.push([
-              v.vendor_name, v.vendor_email, v.gstin ?? '', status,
-              v.udyam_number ?? '', v.msme_category ? CAT_LABEL[v.msme_category] : '',
-              v.nature_of_business ? NAT_LABEL[v.nature_of_business] : '',
-              v.outstanding_amount !== null && v.outstanding_amount !== undefined ? v.outstanding_amount : '',
-              `${log.attempt_no} / ${maxEmails}`,
-              sentDate.toLocaleDateString('en-IN'),
-              sentDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-              log.opened_at ? new Date(log.opened_at).toLocaleDateString('en-IN') : 'Not opened',
-              v.submitted_at ? new Date(v.submitted_at).toLocaleDateString('en-IN') : '',
-              v.declarant_name ?? '',
-              new Date(v.created_at).toLocaleDateString('en-IN'),
-            ])
-          }
-        }
+        const emailsSent   = vendorLogs.length
+        const emailDates   = vendorLogs.length
+          ? vendorLogs.map(l => new Date(l.sent_at).toLocaleDateString('en-IN')).join(' | ')
+          : '—'
+        const openedDates  = vendorLogs.length
+          ? vendorLogs.map(l => l.opened_at ? new Date(l.opened_at).toLocaleDateString('en-IN') : 'Not opened').join(' | ')
+          : '—'
+
+        mergedRows.push([
+          v.vendor_name, v.vendor_email, v.gstin ?? '', status,
+          v.udyam_number ?? '', v.msme_category ? CAT_LABEL[v.msme_category] : '',
+          v.nature_of_business ? NAT_LABEL[v.nature_of_business] : '',
+          v.outstanding_amount !== null && v.outstanding_amount !== undefined ? v.outstanding_amount : '',
+          emailsSent || '—',
+          emailDates,
+          openedDates,
+          v.submitted_at ? new Date(v.submitted_at).toLocaleDateString('en-IN') : '',
+          v.declarant_name ?? '',
+          new Date(v.created_at).toLocaleDateString('en-IN'),
+        ])
       }
 
       const ws = XLSX.utils.aoa_to_sheet([header, ...mergedRows])
