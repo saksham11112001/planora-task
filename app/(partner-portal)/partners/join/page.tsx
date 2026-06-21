@@ -41,7 +41,16 @@ export default function PartnerJoinPage() {
         password,
         options: { emailRedirectTo: `${window.location.origin}/auth/callback?next=/partners/dashboard` },
       })
-      if (signUpErr) { setError(signUpErr.message); return }
+      if (signUpErr) {
+        // If the user already has an account, send them to login instead of showing a raw error
+        if (signUpErr.message.toLowerCase().includes('already registered') ||
+            signUpErr.message.toLowerCase().includes('already been registered') ||
+            signUpErr.status === 422) {
+          router.push('/partners/login?already=1')
+          return
+        }
+        setError(signUpErr.message); return
+      }
 
       // Register partner profile
       const res = await fetch('/api/partner-portal/profile', {
