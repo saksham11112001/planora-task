@@ -558,7 +558,7 @@ function Hero({ loginUrl }: { loginUrl: string }) {
               margin: '0 0 20px',
             }}
           >
-            Never miss an{' '}
+            Waiting for your clients to set up{' '}
             <span
               style={{
                 background: `linear-gradient(135deg, ${C.teal}, ${C.emerald})`,
@@ -567,13 +567,12 @@ function Hero({ loginUrl }: { loginUrl: string }) {
                 color: 'transparent',
               }}
             >
-              MSME payment
+              MSME compliance
             </span>{' '}
-            deadline again
+            before audit?
           </h1>
           <p style={{ fontSize: 18, lineHeight: 1.6, color: C.muted, margin: '0 0 30px', maxWidth: 520 }}>
-            Automatically collect Udyam declarations from vendors and
-            generate Section 43B(h) compliance reports — all in one place.
+            Get your clients' MSME compliance ready with just a click of a button — collect Udyam declarations and generate Section 43B(h) reports instantly.
           </p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginBottom: 34 }}>
             <Link
@@ -592,7 +591,7 @@ function Hero({ loginUrl }: { loginUrl: string }) {
                 boxShadow: '0 10px 28px rgba(13,148,136,0.4)',
               }}
             >
-              Start Tracking Free
+              Get Started Free
               <ArrowRight size={18} />
             </Link>
             <a

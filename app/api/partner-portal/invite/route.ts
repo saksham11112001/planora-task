@@ -19,7 +19,7 @@ function msmeInviteHtml(partnerName: string, msmeUrl: string): string {
         </td></tr>
         <tr><td style="padding:28px 32px;">
           <p style="margin:0 0 16px;font-size:15px;color:#1e293b;line-height:1.6;">
-            <strong>${partnerName}</strong> invited you to try <strong>MSME Tracker</strong> — a tool that automates Udyam declarations, vendor payment deadline tracking, and Section 43B(h) compliance.
+            <strong>${partnerName}</strong> invited you to try <strong>MSME Tracker</strong> — a tool that automates Udyam declarations from vendors and generates Section 43B(h) compliance reports.
           </p>
           <p style="margin:0 0 24px;font-size:14px;color:#475569;line-height:1.6;">
             You can start completely free. No setup needed.

@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient }             from '@/lib/supabase/server'
 import { createAdminClient }        from '@/lib/supabase/admin'
 
-const MSME_COMMISSION_PAISE    = 50000   // ₹500 per MSME paid pack
+const MSME_COMMISSION_PAISE    = 20000   // ₹200 per MSME paid pack
 const PARTNER_COMMISSION_PAISE = 0       // ₹0 — no commission for referring a partner
 const MIN_WITHDRAWAL_PAISE     = 50000   // ₹500 minimum
 
@@ -19,7 +19,7 @@ async function getPartnerOrError(admin: ReturnType<typeof createAdminClient>, us
 }
 
 async function computeBalance(admin: ReturnType<typeof createAdminClient>, partnerId: string) {
-  // Earned = MSME invites where referred org has made a paid pack purchase × ₹500
+  // Earned = MSME invites where referred org has made a paid pack purchase × ₹200
   // Partner referrals earn ₹0 — no commission for referring a partner
   const { data: msmeInvites } = await admin
     .from('partner_portal_invites')
