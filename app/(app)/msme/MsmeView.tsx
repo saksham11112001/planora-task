@@ -1204,11 +1204,8 @@ export function MsmeView({ userRole, orgName }: Props) {
                       </>
                     ) : (
                       <>
-                        {pack.original_price_label && (
-                          <div style={{ fontSize: 13, color: '#64748b', textDecoration: 'line-through' }}>{pack.original_price_label}</div>
-                        )}
-                        <div style={{ fontSize: 18, fontWeight: 800, color: '#0f172a' }}>{pack.price_label}</div>
-                        <div style={{ fontSize: 11, color: '#64748b' }}>one-time · + 18% GST</div>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: '#0f172a' }}>{pack.quarterly_label}<span style={{ fontSize: 12, fontWeight: 500, color: '#64748b' }}>/qtr</span></div>
+                        <div style={{ fontSize: 11, color: '#64748b' }}>₹{(pack.price_paise / 100).toLocaleString('en-IN')} payable annually · + 18% GST</div>
                         {!isCurrent && !isDowngrade && (
                           <button
                             onClick={() => handleUpgrade(pack.tier)}
