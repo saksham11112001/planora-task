@@ -19,6 +19,9 @@ function PartnerLoginInner() {
     if (params.get('registered') === '1') {
       setInfo('Account created! Please check your email to confirm your address, then sign in.')
     }
+    if (params.get('already') === '1') {
+      setInfo('You already have a partner account. Please sign in below.')
+    }
   }, [params])
 
   async function handleSignIn(e: React.FormEvent) {

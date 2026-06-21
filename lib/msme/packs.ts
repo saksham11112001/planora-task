@@ -23,3 +23,16 @@ export const MSME_PACKS: MsmePack[] = [
 export function getPackByTier(tier: string): MsmePack {
   return MSME_PACKS.find(p => p.tier === tier) ?? MSME_PACKS[0]
 }
+
+export interface MsmeAddonPack {
+  slots:           number
+  price_paise:     number
+  price_label:     string
+  label:           string
+}
+
+export const MSME_ADDON_PACKS: MsmeAddonPack[] = [
+  { slots: 20,  price_paise: 300000,  price_label: '₹3,000', label: '+20 vendors' },
+  { slots: 50,  price_paise: 550000,  price_label: '₹5,500', label: '+50 vendors' },
+  { slots: 100, price_paise: 900000,  price_label: '₹9,000', label: '+100 vendors' },
+]

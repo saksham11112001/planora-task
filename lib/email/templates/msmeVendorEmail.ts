@@ -1,9 +1,12 @@
 interface Props {
-  vendorName:  string
-  orgName:     string
-  formUrl:     string
-  attemptNo:   1 | 2 | 3 | 4 | 5
-  totalEmails?: number  // total emails in the sequence (default 5)
+  vendorName:    string
+  orgName:       string
+  formUrl:       string
+  attemptNo:     1 | 2 | 3 | 4 | 5
+  totalEmails?:  number
+  contactName?:  string
+  contactEmail?: string
+  contactPhone?: string
 }
 
 const ACCENT = '#0d9488'
@@ -18,29 +21,30 @@ export function msmeVendorEmailSubject(p: Props): string {
 }
 
 export function msmeVendorEmailHtml(p: Props): string {
+  const hasContact = p.contactName && p.contactEmail
   const total      = p.totalEmails ?? 5
   const isReminder = p.attemptNo > 1
   const isFinal    = p.attemptNo === total
 
   const attentionLine = isFinal
     ? `<p style="font-weight:700;color:#0f172a;font-size:14px;margin:0 0 16px;line-height:1.6">
-        ⚠️ It has come to our attention that despite ${total - 1} previous reminder${total - 2 > 0 ? 's' : ''}, your MSME details have not yet been submitted. This is our final request.
+        ⚠️ We haven't heard back despite ${total - 1} earlier email${total - 2 > 0 ? 's' : ''}. This is our final request before we mark your status as unresponsive.
        </p>`
     : isReminder
     ? `<p style="font-weight:700;color:#0f172a;font-size:14px;margin:0 0 16px;line-height:1.6">
-        It has come to our attention that you have missed to respond to the previous email.
+        We noticed you haven't responded to our earlier email. Just a gentle nudge!
        </p>`
     : ''
 
   const bodyText = isFinal
-    ? `We have sent you ${total - 1} reminder${total - 2 > 0 ? 's' : ''} regarding your MSME registration status, but we have not yet received a response. Kindly submit your details at the earliest using the button below.`
+    ? `We've sent you ${total - 1} reminder${total - 2 > 0 ? 's' : ''} but haven't received your MSME details yet. Please take a moment to fill in the short form below — it takes less than 2 minutes.`
     : isReminder
-    ? `We are writing to follow up on our earlier request for your MSME registration details. Your response is still awaited. Kindly complete the short form below at your earliest convenience to ensure uninterrupted payment processing.`
-    : `${p.orgName} is in the process of updating its vendor records for MSME compliance, as mandated under the Micro, Small and Medium Enterprises Development Act (MSMED Act), 2006. We request you to confirm whether your business holds a valid Udyam Registration, or whether it is not registered as an MSME. The process takes less than two minutes.`
+    ? `We're following up on our earlier request for your MSME registration details. Please take a moment to fill in the short form below — it won't take more than 2 minutes.`
+    : `${p.orgName} is collecting MSME registration details from all vendors. This is a standard compliance step required under the MSMED Act, 2006. We just need to know whether your business is registered as an MSME or not — it takes less than 2 minutes.`
 
   const deadlineColour = isFinal ? '#dc2626' : '#b45309'
 
-  return `<!DOCTYPE html><html>
+  return `<!DOCTYPE html><html lang="en">
 <body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
   <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 16px"><tr><td align="center">
   <table width="580" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:10px;overflow:hidden;border:1px solid #e2e8f0">
@@ -48,7 +52,7 @@ export function msmeVendorEmailHtml(p: Props): string {
     <!-- Header -->
     <tr><td style="background:#0f172a;padding:28px 36px">
       <div style="color:#fff;font-size:22px;font-weight:800;letter-spacing:0.01em;line-height:1.2">${p.orgName}</div>
-      <div style="color:#94a3b8;font-size:12px;margin-top:4px;letter-spacing:0.04em;text-transform:uppercase">MSME Compliance Notice</div>
+      <div style="color:#94a3b8;font-size:12px;margin-top:4px;letter-spacing:0.04em;text-transform:uppercase">MSME Compliance</div>
     </td></tr>
 
     <!-- Body -->
@@ -58,54 +62,77 @@ export function msmeVendorEmailHtml(p: Props): string {
 
       ${attentionLine}
 
-      <p style="color:#334155;font-size:14px;margin:0 0 20px;line-height:1.7">${bodyText}</p>
+      <p style="color:#334155;font-size:14px;margin:0 0 24px;line-height:1.7">${bodyText}</p>
 
-      <p style="color:#334155;font-size:14px;margin:0 0 24px;line-height:1.7">
-        This is an <strong>MSME confirmation request</strong> issued in accordance with the requirements of the MSMED Act, 2006.
-      </p>
+      <!-- Data notice -->
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;margin-bottom:20px">
+        <tr><td style="padding:16px 20px">
+          <p style="color:#0f172a;font-size:13px;font-weight:700;margin:0 0 6px">A quick note on your data</p>
+          <p style="color:#374151;font-size:12.5px;line-height:1.7;margin:0">
+            The details you share will only be used for MSME compliance and will not be passed on to anyone else.
+            If you have any questions about how your data is handled, please reach out to our contact person listed at the bottom of this email.
+          </p>
+        </td></tr>
+      </table>
 
       <!-- Checklist -->
-      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:20px;margin-bottom:28px">
-        <p style="color:#0f172a;font-size:13px;font-weight:700;margin:0 0 10px;text-transform:uppercase;letter-spacing:0.05em">If MSME-registered, please keep the following ready:</p>
-        <ul style="margin:0;padding-left:20px;font-size:13px;color:#374151;line-height:2">
-          <li>Udyam Registration Number (format: UDYAM-XX-00-0000000)</li>
-          <li>MSME Category — Micro, Small, or Medium</li>
-          <li>Nature of Business — Manufacturer, Service Provider, or Trader</li>
-          <li>Outstanding receivable amount as on 31st March (if any)</li>
-          <li>Udyam Registration Certificate (PDF or JPG)</li>
-        </ul>
-        <p style="color:#64748b;font-size:12px;margin:10px 0 0;line-height:1.6">
-          If your business is <strong>not registered as an MSME</strong>, you may submit a simple declaration. No certificate is required.
-        </p>
-      </div>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:20px">
+        <tr><td style="padding:16px 20px">
+          <p style="color:#0f172a;font-size:13px;font-weight:700;margin:0 0 10px">If you are MSME-registered, please keep these handy:</p>
+          <table role="presentation" cellpadding="0" cellspacing="0">
+            <tr><td style="color:#374151;font-size:13px;line-height:1.9;vertical-align:top;padding-right:6px">•</td><td style="color:#374151;font-size:13px;line-height:1.9">Udyam Registration Number (format: UDYAM-XX-00-0000000)</td></tr>
+            <tr><td style="color:#374151;font-size:13px;line-height:1.9;vertical-align:top;padding-right:6px">•</td><td style="color:#374151;font-size:13px;line-height:1.9">MSME Category — Micro, Small, or Medium</td></tr>
+            <tr><td style="color:#374151;font-size:13px;line-height:1.9;vertical-align:top;padding-right:6px">•</td><td style="color:#374151;font-size:13px;line-height:1.9">Nature of Business — Manufacturer, Service Provider, or Trader</td></tr>
+            <tr><td style="color:#374151;font-size:13px;line-height:1.9;vertical-align:top;padding-right:6px">•</td><td style="color:#374151;font-size:13px;line-height:1.9">Outstanding receivable amount as on 31st March (if any)</td></tr>
+            <tr><td style="color:#374151;font-size:13px;line-height:1.9;vertical-align:top;padding-right:6px">•</td><td style="color:#374151;font-size:13px;line-height:1.9">Udyam Registration Certificate (PDF or JPG)</td></tr>
+          </table>
+          <p style="color:#64748b;font-size:12px;line-height:1.6;margin:10px 0 0">
+            <strong>Not an MSME?</strong> You can simply declare that — no certificate needed.
+          </p>
+        </td></tr>
+      </table>
+
+      <!-- Consent note -->
+      <p style="color:#64748b;font-size:12px;line-height:1.6;margin:0 0 24px">
+        ☐ &nbsp;The form will ask you to confirm: <em>"I agree to ${p.orgName} collecting this information for MSME compliance purposes."</em>
+      </p>
 
       <!-- CTA Button -->
-      <table cellpadding="0" cellspacing="0" style="margin-bottom:28px"><tr><td>
-        <a href="${p.formUrl}"
-          style="display:inline-block;background:${ACCENT};color:#fff;text-decoration:none;padding:14px 36px;border-radius:8px;font-size:15px;font-weight:700;letter-spacing:0.01em">
-          Submit MSME Details →
-        </a>
-      </td></tr></table>
+      <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:24px">
+        <tr><td align="center" style="background:${ACCENT};border-radius:8px">
+          <a href="${p.formUrl}"
+            style="display:block;padding:14px 0;font-size:15px;font-weight:700;color:#fff;text-decoration:none;letter-spacing:0.01em">
+            Submit MSME Details →
+          </a>
+        </td></tr>
+      </table>
 
-      <!-- Numbered Notes -->
-      <div style="border-top:1px solid #e2e8f0;padding-top:20px">
-        <p style="color:#0f172a;font-size:13px;font-weight:700;margin:0 0 12px">Notes:</p>
-        <ol style="margin:0;padding-left:20px;font-size:12px;color:#475569;line-height:2">
-          <li>This email has been sent as part of a statutory compliance exercise under the MSMED Act, 2006.</li>
-          <li>If you have already submitted your details, kindly disregard this communication.</li>
-          <li style="color:${deadlineColour};font-weight:600">
-            Failure to respond will result in your MSME status being presumed as <em>Not Registered</em> for the purpose of our vendor records. This may affect future payment timelines as per Section 15 of the MSMED Act.
-          </li>
-          <li>${p.orgName} shall not be held liable for any consequence arising from non-submission or incorrect submission of MSME details by the vendor.</li>
-          <li>Your information will be used solely for statutory compliance purposes and will not be shared with any third party.</li>
+      <p style="color:#94a3b8;font-size:12px;line-height:1.6;margin:0 0 24px">
+        This link is valid for 30 days. Already submitted? You can ignore this email.
+      </p>
+
+      <!-- Notes -->
+      <div style="border-top:1px solid #e2e8f0;padding-top:18px">
+        <p style="color:#0f172a;font-size:12px;font-weight:700;margin:0 0 10px">A few things to note:</p>
+        <ol style="margin:0;padding-left:18px;font-size:12px;color:#475569;line-height:2">
+          <li>This request is part of a compliance exercise under the MSMED Act, 2006 — not a promotional email.</li>
+          <li>If you've already filled in the form, no action is needed.</li>
+          <li style="color:${deadlineColour};font-weight:600">If we don't hear back, we'll have to record your status as <em>Not Registered</em>, which could affect payment timelines under the MSMED Act.</li>
+          <li>${p.orgName} is not responsible for any impact caused by non-submission or incorrect details provided by the vendor.</li>
         </ol>
       </div>
 
     </td></tr>
 
-    <!-- Footer / Sign-off -->
+    <!-- Footer -->
     <tr><td style="padding:20px 36px;background:#f8fafc;border-top:1px solid #e2e8f0">
-      <p style="color:#334155;font-size:13px;margin:0 0 4px;line-height:1.6">Regards,<br/><strong>On Behalf of ${p.orgName}</strong></p>
+      <p style="color:#334155;font-size:13px;margin:0 0 4px;line-height:1.6">Warm regards,<br/><strong>On Behalf of ${p.orgName}</strong></p>
+      ${hasContact ? `
+      <p style="color:#475569;font-size:12px;margin:12px 0 0;line-height:1.8">
+        <strong style="color:#0f172a">Questions? Contact us:</strong><br/>
+        ${p.contactName}${p.contactPhone ? ` &nbsp;·&nbsp; ${p.contactPhone}` : ''}<br/>
+        <a href="mailto:${p.contactEmail}" style="color:${ACCENT};text-decoration:none">${p.contactEmail}</a>
+      </p>` : ''}
       <p style="color:#94a3b8;font-size:11px;margin:8px 0 0">Powered by upFloat</p>
     </td></tr>
 

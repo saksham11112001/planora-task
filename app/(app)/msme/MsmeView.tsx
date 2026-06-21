@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import MsmeWalkthrough from './MsmeWalkthrough'
 import MsmeTour        from './MsmeTour'
 import * as XLSX from 'xlsx'
-import { MSME_PACKS } from '@/lib/msme/packs'
+import { MSME_PACKS, MSME_ADDON_PACKS } from '@/lib/msme/packs'
 import { createClient } from '@/lib/supabase/client'
 
 const ACCENT = '#0d9488'
@@ -130,6 +130,24 @@ export function MsmeView({ userRole, orgName }: Props) {
   const [ccEmail,         setCcEmail]         = useState<string>('')
   const [draftCcEmail,    setDraftCcEmail]    = useState<string>('')
 
+  // ── Addon purchase ─────────────────────────────────────────────────────────
+  const [addonBusy,       setAddonBusy]       = useState<number | null>(null)
+
+  // ── Coupon code ────────────────────────────────────────────────────────────
+  const [couponCode,      setCouponCode]      = useState('')
+  const [couponDiscount,  setCouponDiscount]  = useState(0)
+  const [couponError,     setCouponError]     = useState('')
+  const [couponBusy,      setCouponBusy]      = useState(false)
+
+  // ── Contact person (shown before first email shoot if not set) ─────────────
+  const [contactPerson,   setContactPerson]   = useState<{ name: string; email: string; phone: string } | null>(null)
+  const [showContactModal,setShowContactModal] = useState(false)
+  const [contactDraft,    setContactDraft]    = useState({ name: '', email: '', phone: '' })
+  const [savingContact,   setSavingContact]   = useState(false)
+  const [pendingShootId,  setPendingShootId]  = useState<string | null>(null)
+  const [pendingShootName,setPendingShootName] = useState<string | null>(null)
+  const [pendingBulkShoot,setPendingBulkShoot] = useState(false)
+
   function showToast(message: string, type: Toast['type'] = 'success') {
     const id = ++toastRef.current
     setToasts(t => [...t, { id, message, type }])
@@ -189,6 +207,7 @@ export function MsmeView({ userRole, orgName }: Props) {
         const cc = d?.cc_email ?? ''
         setCcEmail(cc)
         setDraftCcEmail(cc)
+        if (d?.contact_person?.name) setContactPerson(d.contact_person)
       })
       .catch(() => {})
   }, [])
@@ -212,6 +231,98 @@ export function MsmeView({ userRole, orgName }: Props) {
     showToast('Settings saved')
   }
 
+
+  // ── Coupon code apply ─────────────────────────────────────────────────────
+  async function handleApplyCoupon() {
+    if (!couponCode.trim()) { setCouponError('Enter a coupon code'); return }
+    setCouponBusy(true); setCouponError('')
+    const res = await fetch(`/api/msme/coupon?code=${encodeURIComponent(couponCode.trim())}`)
+    const data = await res.json()
+    setCouponBusy(false)
+    if (!res.ok) { setCouponError(data.error ?? 'Invalid coupon'); setCouponDiscount(0); return }
+    setCouponDiscount(data.discount_percent)
+  }
+
+  // ── Save contact person then proceed with shoot ────────────────────────────
+  async function handleSaveContact() {
+    if (!contactDraft.name.trim()) { showToast('Contact name is required', 'error'); return }
+    if (!contactDraft.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactDraft.email)) {
+      showToast('Valid contact email is required', 'error'); return
+    }
+    setSavingContact(true)
+    const res = await fetch('/api/msme/settings', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contact_person: { name: contactDraft.name.trim(), email: contactDraft.email.trim(), phone: contactDraft.phone.trim() || undefined } }),
+    })
+    setSavingContact(false)
+    if (!res.ok) { const d = await res.json(); showToast(d.error ?? 'Failed to save', 'error'); return }
+    const cp = { name: contactDraft.name.trim(), email: contactDraft.email.trim(), phone: contactDraft.phone.trim() }
+    setContactPerson(cp)
+    setShowContactModal(false)
+    // Now fire the pending shoot
+    if (pendingBulkShoot) {
+      setPendingBulkShoot(false)
+      _doBulkShoot()
+    } else if (pendingShootId) {
+      const id = pendingShootId; const name = pendingShootName ?? ''
+      setPendingShootId(null); setPendingShootName(null)
+      _doShootEmail(id, name)
+    }
+  }
+
+  // ── Addon purchase ─────────────────────────────────────────────────────────
+  async function handleAddon(slots: number, _pricePaise: number) {
+    setAddonBusy(slots)
+    const res = await fetch('/api/msme/pay', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ addon_slots: slots, ...(couponCode && couponDiscount > 0 ? { coupon_code: couponCode } : {}) }),
+    })
+    const data = await res.json()
+    setAddonBusy(null)
+    if (!res.ok) {
+      if (res.status === 503) { showToast('Payment gateway not configured. Contact support.', 'info'); return }
+      showToast(data.error ?? 'Failed to initiate payment', 'error'); return
+    }
+    if (data.gateway === 'razorpay' && data.order_id) {
+      setShowUpgrade(false)
+      const loadRzp = () => new Promise<void>((resolve, reject) => {
+        if ((window as any).Razorpay) { resolve(); return }
+        const s = document.createElement('script')
+        s.src = 'https://checkout.razorpay.com/v1/checkout.js'
+        s.onload = () => resolve(); s.onerror = () => reject()
+        document.body.appendChild(s)
+      })
+      try {
+        await loadRzp()
+        const rzp = new (window as any).Razorpay({
+          key:      data.key_id,
+          order_id: data.order_id,
+          amount:   data.amount,
+          currency: 'INR',
+          name:     'upFloat',
+          description: `MSME Tracker — +${slots} vendor slots`,
+          image:    '/favicon.svg',
+          prefill: { email: data.email, name: data.org_name },
+          theme: { color: '#0d9488' },
+          handler: async (response: any) => {
+            const verifyRes = await fetch('/api/msme/pay', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ addon_slots: slots, razorpay_order_id: response.razorpay_order_id, razorpay_payment_id: response.razorpay_payment_id, razorpay_signature: response.razorpay_signature }),
+            })
+            const verifyData = await verifyRes.json()
+            if (!verifyRes.ok) { showToast(verifyData.error ?? 'Verification failed', 'error'); return }
+            setVendorLimit(v => v + slots)
+            showToast(`+${slots} vendor slots added! 🎉`, 'success')
+          },
+          modal: { ondismiss: () => showToast('Payment cancelled', 'info') },
+        })
+        rzp.open()
+      } catch { showToast('Failed to open payment window', 'error') }
+    }
+  }
 
   // ── Upgrade pack — Step 1: show GST modal ────────────────────────────────
   async function handleUpgrade(tier: string) {
@@ -252,7 +363,7 @@ export function MsmeView({ userRole, orgName }: Props) {
     const res  = await fetch('/api/msme/pay', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ pack_tier: tier }),
+      body:    JSON.stringify({ pack_tier: tier, ...(couponCode && couponDiscount > 0 ? { coupon_code: couponCode } : {}) }),
     })
     const data = await res.json()
     setUpgradeBusy(null)
@@ -342,8 +453,8 @@ export function MsmeView({ userRole, orgName }: Props) {
     fetchVendors()
   }
 
-  // ── Shoot email ────────────────────────────────────────────────────────────
-  async function handleShootEmail(vendorId: string, vendorName: string) {
+  // ── Shoot email (inner — always fires) ───────────────────────────────────
+  async function _doShootEmail(vendorId: string, vendorName: string) {
     setShootingId(vendorId)
     const res  = await fetch(`/api/msme/vendors/${vendorId}/shoot-email`, { method: 'POST' })
     const data = await res.json()
@@ -353,9 +464,18 @@ export function MsmeView({ userRole, orgName }: Props) {
     fetchVendors()
   }
 
-  // ── Bulk shoot email ──────────────────────────────────────────────────────
-  async function handleBulkShoot() {
-    // Only shoot to unlocked vendors — never send to locked ones
+  // ── Shoot email (public — gates on contact person) ────────────────────────
+  async function handleShootEmail(vendorId: string, vendorName: string) {
+    if (!contactPerson) {
+      setPendingShootId(vendorId); setPendingShootName(vendorName)
+      setContactDraft({ name: '', email: '', phone: '' })
+      setShowContactModal(true); return
+    }
+    _doShootEmail(vendorId, vendorName)
+  }
+
+  // ── Bulk shoot email (inner) ──────────────────────────────────────────────
+  async function _doBulkShoot() {
     const ids = Array.from(checkedIds).filter(id => unlockedIds.has(id))
     if (ids.length === 0) return
     setBulkShooting(true)
@@ -372,6 +492,16 @@ export function MsmeView({ userRole, orgName }: Props) {
     if (failed) parts.push(`${failed} failed`)
     showToast(parts.join(' · '), failed > 0 ? 'info' : 'success')
     fetchVendors()
+  }
+
+  // ── Bulk shoot email (public — gates on contact person) ──────────────────
+  async function handleBulkShoot() {
+    if (!contactPerson) {
+      setPendingBulkShoot(true)
+      setContactDraft({ name: '', email: '', phone: '' })
+      setShowContactModal(true); return
+    }
+    _doBulkShoot()
   }
 
   // ── Bulk delete ──────────────────────────────────────────────────────────
@@ -1205,7 +1335,7 @@ export function MsmeView({ userRole, orgName }: Props) {
                     ) : (
                       <>
                         <div style={{ fontSize: 18, fontWeight: 800, color: '#0f172a' }}>{pack.quarterly_label}<span style={{ fontSize: 12, fontWeight: 500, color: '#64748b' }}>/qtr</span></div>
-                        <div style={{ fontSize: 11, color: '#64748b' }}>₹{(pack.price_paise / 100).toLocaleString('en-IN')} payable annually · + 18% GST</div>
+                        <div style={{ fontSize: 11, color: '#64748b' }}>payable annually · + 18% GST</div>
                         {!isCurrent && !isDowngrade && (
                           <button
                             onClick={() => handleUpgrade(pack.tier)}
@@ -1222,6 +1352,55 @@ export function MsmeView({ userRole, orgName }: Props) {
               )
             })}
           </div>
+          {/* ── Add-on slots section (only for paid plans) ── */}
+          {packTier !== 'free' && (
+            <div style={{ marginTop: 20, borderTop: '1px solid #e2e8f0', paddingTop: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#334155', marginBottom: 10 }}>
+                Or add more vendor slots to your current plan:
+              </div>
+              {MSME_ADDON_PACKS.map(addon => (
+                <div key={addon.slots} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: 8, marginBottom: 8 }}>
+                  <div>
+                    <span style={{ fontWeight: 600, fontSize: 14, color: '#0f172a' }}>{addon.label}</span>
+                    <span style={{ fontSize: 12, color: '#64748b' }}> extra slots</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span style={{ fontWeight: 700, fontSize: 15, color: '#0f172a' }}>
+                      {couponDiscount > 0
+                        ? <><s style={{ color: '#94a3b8', fontSize: 12 }}>{addon.price_label}</s> ₹{Math.round(addon.price_paise * (1 - couponDiscount / 100) / 100).toLocaleString('en-IN')}</>
+                        : addon.price_label
+                      }
+                    </span>
+                    <button
+                      onClick={() => handleAddon(addon.slots, addon.price_paise)}
+                      disabled={addonBusy === addon.slots}
+                      style={{ ...primaryBtn, padding: '6px 14px', fontSize: 12 }}
+                    >
+                      {addonBusy === addon.slots ? 'Redirecting…' : 'Add →'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ── Coupon code ── */}
+          <div style={{ marginTop: 16, borderTop: '1px solid #e2e8f0', paddingTop: 14 }}>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                value={couponCode}
+                onChange={e => { setCouponCode(e.target.value.toUpperCase()); setCouponDiscount(0); setCouponError('') }}
+                placeholder="Coupon code"
+                style={{ flex: 1, padding: '8px 12px', border: '1px solid #cbd5e1', borderRadius: 7, fontSize: 13 }}
+              />
+              <button onClick={handleApplyCoupon} disabled={couponBusy} style={{ ...primaryBtn, padding: '8px 16px', fontSize: 12 }}>
+                {couponBusy ? '…' : 'Apply'}
+              </button>
+            </div>
+            {couponDiscount > 0 && <p style={{ fontSize: 12, color: '#16a34a', margin: '6px 0 0' }}>✓ {couponDiscount}% discount applied to all packs!</p>}
+            {couponError && <p style={{ fontSize: 12, color: '#dc2626', margin: '6px 0 0' }}>{couponError}</p>}
+          </div>
+
           <p style={{ fontSize: 11, color: '#64748b', marginTop: 16, lineHeight: 1.5 }}>
             After payment, your pack activates instantly. Payment via UPI, net banking, or cards — powered by Razorpay.
           </p>
@@ -1473,6 +1652,55 @@ export function MsmeView({ userRole, orgName }: Props) {
               </div>
             ))}
           </div>
+        </Modal>
+      )}
+
+      {/* ── Contact person modal ── */}
+      {showContactModal && (
+        <Modal title="Add your contact person" onClose={() => { setShowContactModal(false); setPendingShootId(null); setPendingShootName(null); setPendingBulkShoot(false) }}>
+          <p style={{ fontSize: 13, color: '#64748b', marginBottom: 20, lineHeight: 1.6 }}>
+            Vendors will see this contact in the email footer so they know who to reach for queries or complaints.
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#334155', marginBottom: 4 }}>Contact name *</label>
+              <input
+                value={contactDraft.name}
+                onChange={e => setContactDraft(d => ({ ...d, name: e.target.value }))}
+                placeholder="e.g. Rahul Sharma"
+                style={{ width: '100%', padding: '9px 12px', border: '1px solid #cbd5e1', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#334155', marginBottom: 4 }}>Contact email *</label>
+              <input
+                type="email"
+                value={contactDraft.email}
+                onChange={e => setContactDraft(d => ({ ...d, email: e.target.value }))}
+                placeholder="rahul@yourfirm.com"
+                style={{ width: '100%', padding: '9px 12px', border: '1px solid #cbd5e1', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#334155', marginBottom: 4 }}>Phone <span style={{ fontWeight: 400, color: '#94a3b8' }}>optional</span></label>
+              <input
+                value={contactDraft.phone}
+                onChange={e => setContactDraft(d => ({ ...d, phone: e.target.value }))}
+                placeholder="+91 98765 43210"
+                style={{ width: '100%', padding: '9px 12px', border: '1px solid #cbd5e1', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }}
+              />
+            </div>
+          </div>
+          <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 12, lineHeight: 1.5 }}>
+            This is saved once and used for all future emails. You can update it anytime in Email Schedule settings.
+          </p>
+          <button
+            onClick={handleSaveContact}
+            disabled={savingContact}
+            style={{ ...primaryBtn, width: '100%', marginTop: 18 }}
+          >
+            {savingContact ? 'Saving…' : 'Save & send email →'}
+          </button>
         </Modal>
       )}
 

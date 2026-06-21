@@ -257,6 +257,7 @@ export async function sendOnboardingNudgeEmail(p: {
 export async function sendMsmeVendorEmail(p: {
   to: string; vendorName: string; orgName: string
   formUrl: string; attemptNo: 1 | 2 | 3 | 4 | 5; totalEmails?: number; cc?: string
+  contactName?: string; contactEmail?: string; contactPhone?: string
 }) {
   const msmeDomain = (process.env.FROM_EMAIL ?? 'noreply@upfloat.co').replace(/.*<|>/g, '')
   const msmeFrom   = `MSME Compliance <${msmeDomain}>`

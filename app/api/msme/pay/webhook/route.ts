@@ -56,14 +56,35 @@ export async function POST(req: NextRequest) {
   const pack_tier  = notes?.pack_tier
   const orgId      = notes?.org_id
 
-  if (!orderId || !pack_tier || !orgId) {
-    // Not an MSME pack order — skip silently
+  if (!orderId || !orgId) {
     return NextResponse.json({ ok: true, skipped: true })
   }
 
   const admin  = createAdminClient()
-  const pack   = getPackByTier(pack_tier)
   const paidAt = new Date().toISOString()
+  const orderType   = notes?.order_type
+  const addonSlots  = notes?.addon_slots ? parseInt(notes.addon_slots, 10) : NaN
+
+  // ── Add-on order webhook ───────────────────────────────────────────────────
+  if (orderType === 'addon' && !isNaN(addonSlots) && addonSlots > 0) {
+    const { data: existing } = await admin
+      .from('org_feature_settings').select('config')
+      .eq('org_id', orgId).eq('feature_key', 'msme_addon_slots').maybeSingle()
+    const currentExtra: number = (existing?.config as any)?.extra_slots ?? 0
+    await admin.from('org_feature_settings').upsert(
+      { org_id: orgId, feature_key: 'msme_addon_slots', is_enabled: true, config: { extra_slots: currentExtra + addonSlots } },
+      { onConflict: 'org_id,feature_key' }
+    )
+    console.log('[msme/webhook] Addon slots activated', { orgId, addonSlots, total: currentExtra + addonSlots })
+    return NextResponse.json({ ok: true })
+  }
+
+  // ── Pack upgrade webhook ───────────────────────────────────────────────────
+  if (!pack_tier) {
+    return NextResponse.json({ ok: true, skipped: true })
+  }
+
+  const pack = getPackByTier(pack_tier)
 
   // Activate the pack (idempotent — safe to run even if client already verified)
   await admin.from('org_feature_settings').upsert(

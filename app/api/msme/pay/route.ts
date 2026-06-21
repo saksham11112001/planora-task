@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient }             from '@/lib/supabase/server'
 import { createAdminClient }        from '@/lib/supabase/admin'
 import { getApiOrgMembership }      from '@/lib/supabase/apiActiveOrg'
-import { MSME_PACKS, getPackByTier } from '@/lib/msme/packs'
+import { MSME_PACKS, getPackByTier, MSME_ADDON_PACKS } from '@/lib/msme/packs'
 import { sendInvoiceEmail }         from '@/lib/email/send'
 import crypto                       from 'crypto'
 
@@ -24,13 +24,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Only owner/admin can initiate payments' }, { status: 403 })
   }
 
-  const { pack_tier } = await req.json()
-  if (!pack_tier) return NextResponse.json({ error: 'pack_tier required' }, { status: 400 })
-
-  const pack = getPackByTier(pack_tier)
-  if (pack.tier === 'free') {
-    return NextResponse.json({ error: 'Free tier does not require payment' }, { status: 400 })
-  }
+  const body = await req.json()
+  const { pack_tier, addon_slots, coupon_code } = body as { pack_tier?: string; addon_slots?: number; coupon_code?: string }
 
   if (!RZP_KEY_ID || !RZP_KEY_SECRET) {
     return NextResponse.json({
@@ -41,12 +36,66 @@ export async function POST(req: NextRequest) {
 
   const orgId   = mb.org_id
   const orgName = (mb.organisations as any)?.name ?? 'Organisation'
-  const { price_paise: basePaise, label: packLabel, vendor_limit: vendorLimit } = pack
-
-  // Charge GST-inclusive amount on Razorpay; the UI shows the base (ex-GST) price.
-  const chargeablePaise = Math.round(basePaise * 1.18)
-
   const basicAuth = Buffer.from(`${RZP_KEY_ID}:${RZP_KEY_SECRET}`).toString('base64')
+
+  // Resolve coupon discount (validates server-side regardless of client claim)
+  let discountPct = 0
+  if (coupon_code) {
+    const raw = process.env.MSME_COUPON_CODES ?? ''
+    const coupons = Object.fromEntries(
+      raw.split(',').flatMap(c => {
+        const [k, v] = c.split(':')
+        const pct = parseInt(v ?? '0', 10)
+        return k?.trim() && !isNaN(pct) ? [[k.trim().toUpperCase(), pct]] : []
+      })
+    )
+    discountPct = coupons[coupon_code.trim().toUpperCase()] ?? 0
+  }
+
+  // ── Add-on order ──────────────────────────────────────────────────────────
+  if (addon_slots !== undefined) {
+    const addonPack = MSME_ADDON_PACKS.find(a => a.slots === addon_slots)
+    if (!addonPack) return NextResponse.json({ error: 'Invalid addon_slots value' }, { status: 400 })
+
+    const basePaise      = addonPack.price_paise
+    const chargeablePaise = Math.round(basePaise * 1.18 * (1 - discountPct / 100))
+
+    const orderRes = await fetch('https://api.razorpay.com/v1/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Basic ${basicAuth}` },
+      body: JSON.stringify({
+        amount:   chargeablePaise,
+        currency: 'INR',
+        receipt:  `msme_addon_${orgId.slice(0, 8)}_${addon_slots}_${Date.now()}`,
+        notes:    { org_id: orgId, order_type: 'addon', addon_slots: String(addon_slots), org_name: orgName },
+      }),
+    })
+    const order = await orderRes.json()
+    if (!orderRes.ok) return NextResponse.json({ error: order.error?.description ?? 'Order creation failed' }, { status: 500 })
+
+    return NextResponse.json({
+      gateway:    'razorpay',
+      order_id:   order.id,
+      amount:     chargeablePaise,
+      key_id:     RZP_KEY_ID,
+      order_type: 'addon',
+      addon_slots,
+      org_name:   orgName,
+      email:      user.email ?? '',
+    })
+  }
+
+  // ── Pack upgrade order ────────────────────────────────────────────────────
+  if (!pack_tier) return NextResponse.json({ error: 'pack_tier required' }, { status: 400 })
+
+  const pack = getPackByTier(pack_tier)
+  if (pack.tier === 'free') {
+    return NextResponse.json({ error: 'Free tier does not require payment' }, { status: 400 })
+  }
+
+  const { price_paise: basePaise, label: packLabel, vendor_limit: vendorLimit } = pack
+  const chargeablePaise = Math.round(basePaise * 1.18 * (1 - discountPct / 100))
+
   const orderRes  = await fetch('https://api.razorpay.com/v1/orders', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Basic ${basicAuth}` },
@@ -62,7 +111,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: order.error?.description ?? 'Order creation failed' }, { status: 500 })
   }
 
-  // Record pending payment — store base (pre-GST) amount for internal records
   const admin = createAdminClient()
   await admin.from('msme_pack_payments').upsert(
     {
@@ -98,10 +146,13 @@ export async function PUT(req: NextRequest) {
   const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'Not a member' }, { status: 403 })
 
-  const { pack_tier, razorpay_order_id, razorpay_payment_id, razorpay_signature } = await req.json()
+  const { pack_tier, addon_slots, razorpay_order_id, razorpay_payment_id, razorpay_signature } = await req.json()
 
-  if (!pack_tier || !razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+  if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+  }
+  if (!pack_tier && addon_slots === undefined) {
+    return NextResponse.json({ error: 'pack_tier or addon_slots required' }, { status: 400 })
   }
   if (!RZP_KEY_SECRET) {
     return NextResponse.json({ error: 'Payment gateway not configured' }, { status: 503 })
@@ -117,9 +168,24 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: 'Payment verification failed — invalid signature' }, { status: 400 })
   }
 
-  const pack    = getPackByTier(pack_tier)
-  const paidAt  = new Date().toISOString()
-  const admin   = createAdminClient()
+  const paidAt = new Date().toISOString()
+  const admin  = createAdminClient()
+
+  // ── Add-on verification ───────────────────────────────────────────────────
+  if (addon_slots !== undefined) {
+    const { data: existing } = await admin
+      .from('org_feature_settings').select('config')
+      .eq('org_id', mb.org_id).eq('feature_key', 'msme_addon_slots').maybeSingle()
+    const currentExtra: number = (existing?.config as any)?.extra_slots ?? 0
+    await admin.from('org_feature_settings').upsert(
+      { org_id: mb.org_id, feature_key: 'msme_addon_slots', is_enabled: true, config: { extra_slots: currentExtra + addon_slots } },
+      { onConflict: 'org_id,feature_key' }
+    )
+    return NextResponse.json({ ok: true, addon_slots_added: addon_slots, extra_slots: currentExtra + addon_slots })
+  }
+
+  // ── Pack upgrade verification ─────────────────────────────────────────────
+  const pack = getPackByTier(pack_tier)
 
   // Idempotency: if this payment was already processed, return success without re-activating
   const { data: alreadyPaid } = await admin
