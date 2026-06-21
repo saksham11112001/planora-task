@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -1527,13 +1527,29 @@ function GlobalStyles() {
 /* ============================================================
    ROOT
 ============================================================ */
-export function MsmeLandingClient() {
+function MsmeLandingInner() {
   useMsmeScrollReveal()
   const searchParams = useSearchParams()
   const ref = searchParams.get('ref')
   const loginUrl = ref
     ? `/login?redirect=/msme&mode=signup&ref=${encodeURIComponent(ref)}`
     : '/login?redirect=/msme&mode=signup'
+  return (
+    <>
+      <Nav />
+      <Hero loginUrl={loginUrl} />
+      <HowItWorks />
+      <ComplianceExplainer />
+      <UnlockTeaser />
+      <Testimonials />
+      <CtaSection loginUrl={loginUrl} />
+      <Footer />
+      <FloatingBadge />
+    </>
+  )
+}
+
+export function MsmeLandingClient() {
   return (
     <div
       style={{
@@ -1545,15 +1561,9 @@ export function MsmeLandingClient() {
       }}
     >
       <GlobalStyles />
-      <Nav />
-      <Hero loginUrl={loginUrl} />
-      <HowItWorks />
-      <ComplianceExplainer />
-      <UnlockTeaser />
-      <Testimonials />
-      <CtaSection loginUrl={loginUrl} />
-      <Footer />
-      <FloatingBadge />
+      <Suspense fallback={null}>
+        <MsmeLandingInner />
+      </Suspense>
     </div>
   )
 }
