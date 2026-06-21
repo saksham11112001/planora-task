@@ -6,7 +6,7 @@ import { createClient }             from '@/lib/supabase/server'
 import { createAdminClient }        from '@/lib/supabase/admin'
 
 const MSME_COMMISSION_PAISE    = 50000   // ₹500 per MSME sign-up
-const PARTNER_COMMISSION_PAISE = 100000  // ₹1000 per partner sign-up
+const PARTNER_COMMISSION_PAISE = 50000   // ₹500 per partner sign-up
 const MIN_WITHDRAWAL_PAISE     = 50000   // ₹500 minimum
 
 async function getPartnerOrError(admin: ReturnType<typeof createAdminClient>, userId: string) {
@@ -19,7 +19,7 @@ async function getPartnerOrError(admin: ReturnType<typeof createAdminClient>, us
 }
 
 async function computeBalance(admin: ReturnType<typeof createAdminClient>, partnerId: string) {
-  // Earned = signed-up MSME invites × ₹500 + signed-up partner invites × ₹1000
+  // Earned = signed-up MSME invites × ₹500 + signed-up partner invites × ₹500
   const { count: msmeCount } = await admin
     .from('partner_portal_invites')
     .select('id', { count: 'exact', head: true })

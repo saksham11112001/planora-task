@@ -11,7 +11,7 @@ const BG     = '#f8fafc'
 const WHITE  = '#ffffff'
 
 const MSME_COMMISSION   = 500
-const PARTNER_COMMISSION = 1000
+const PARTNER_COMMISSION = 500
 
 interface Partner {
   id: string
