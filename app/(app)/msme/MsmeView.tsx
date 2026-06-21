@@ -373,6 +373,25 @@ export function MsmeView({ userRole, orgName }: Props) {
     fetchVendors()
   }
 
+  // ── Bulk delete ──────────────────────────────────────────────────────────
+  async function handleBulkDelete() {
+    if (!confirm(`Remove ${checkedIds.size} vendor${checkedIds.size > 1 ? 's' : ''}? Vendors who have already been emailed will still count toward your slot usage.`)) return
+    const ids = Array.from(checkedIds)
+    let deleted = 0, failed = 0
+    for (const id of ids) {
+      const res = await fetch(`/api/msme/vendors/${id}`, { method: 'DELETE' })
+      if (!res.ok) { failed++; continue }
+      deleted++
+    }
+    setCheckedIds(new Set())
+    const parts: string[] = []
+    if (deleted) parts.push(`${deleted} vendor${deleted > 1 ? 's' : ''} removed`)
+    if (failed)  parts.push(`${failed} failed`)
+    showToast(parts.join(' · '), failed > 0 ? 'info' : 'success')
+    if (selectedId && checkedIds.has(selectedId)) setSelectedId(null)
+    fetchVendors()
+  }
+
   // ── View vendor certificate ───────────────────────────────────────────────
   async function handleViewCert(vendorId: string) {
     setViewingCert(vendorId)
@@ -817,15 +836,24 @@ export function MsmeView({ userRole, orgName }: Props) {
             <div>
             {/* Bulk action bar */}
             {checkedIds.size > 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', background: `${ACCENT}12`, border: `1.5px solid ${ACCENT}40`, borderRadius: 10, marginBottom: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', background: `${ACCENT}12`, border: `1.5px solid ${ACCENT}40`, borderRadius: 10, marginBottom: 10, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>{checkedIds.size} vendor{checkedIds.size > 1 ? 's' : ''} selected</span>
                 <button
                   onClick={handleBulkShoot}
                   disabled={bulkShooting}
                   style={{ ...primaryBtn, padding: '7px 16px', fontSize: 13 }}
                 >
-                  {bulkShooting ? 'Sending…' : `✉ Shoot email to ${checkedIds.size} selected`}
+                  {bulkShooting ? 'Sending…' : `✉ Email ${checkedIds.size} selected`}
                 </button>
+                {canAdmin && (
+                  <button
+                    onClick={handleBulkDelete}
+                    disabled={bulkShooting}
+                    style={{ ...ghostBtn, padding: '7px 14px', fontSize: 13, color: '#dc2626', borderColor: '#fecaca' }}
+                  >
+                    🗑 Delete selected
+                  </button>
+                )}
                 <button onClick={() => setCheckedIds(new Set())} style={{ ...ghostBtn, padding: '7px 12px', fontSize: 12 }}>Clear</button>
               </div>
             )}
@@ -838,10 +866,10 @@ export function MsmeView({ userRole, orgName }: Props) {
                       <input
                         type="checkbox"
                         style={{ accentColor: ACCENT, cursor: 'pointer' }}
-                        checked={checkedIds.size > 0 && filtered.filter(v => unlockedIds.has(v.id) && v.status !== 'submitted' && v.status !== 'not_msme' && v.email_count < maxEmails).every(v => checkedIds.has(v.id))}
+                        checked={checkedIds.size > 0 && filtered.filter(v => unlockedIds.has(v.id)).every(v => checkedIds.has(v.id))}
                         onChange={e => {
-                          const eligible = filtered.filter(v => unlockedIds.has(v.id) && v.status !== 'submitted' && v.status !== 'not_msme' && v.email_count < maxEmails)
-                          if (e.target.checked) setCheckedIds(new Set(eligible.map(v => v.id)))
+                          const unlocked = filtered.filter(v => unlockedIds.has(v.id))
+                          if (e.target.checked) setCheckedIds(new Set(unlocked.map(v => v.id)))
                           else setCheckedIds(new Set())
                         }}
                       />
@@ -901,19 +929,17 @@ export function MsmeView({ userRole, orgName }: Props) {
                         }}
                       >
                         <td style={{ padding: '12px 14px', width: 36 }} onClick={e => e.stopPropagation()}>
-                          {isEligible && (
-                            <input
-                              type="checkbox"
-                              style={{ accentColor: ACCENT, cursor: 'pointer' }}
-                              checked={checkedIds.has(v.id)}
-                              onChange={e => {
-                                const next = new Set(checkedIds)
-                                if (e.target.checked) next.add(v.id)
-                                else next.delete(v.id)
-                                setCheckedIds(next)
-                              }}
-                            />
-                          )}
+                          <input
+                            type="checkbox"
+                            style={{ accentColor: ACCENT, cursor: 'pointer' }}
+                            checked={checkedIds.has(v.id)}
+                            onChange={e => {
+                              const next = new Set(checkedIds)
+                              if (e.target.checked) next.add(v.id)
+                              else next.delete(v.id)
+                              setCheckedIds(next)
+                            }}
+                          />
                         </td>
                         <td style={{ padding: '12px 14px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -954,18 +980,32 @@ export function MsmeView({ userRole, orgName }: Props) {
                           {`${v.email_count}/${maxEmails}`}
                         </td>
                         <td style={{ padding: '12px 14px' }}>
-                          {canManage && v.status !== 'submitted' && v.status !== 'not_msme' && v.email_count < maxEmails && (
-                            <button
-                              onClick={e => { e.stopPropagation(); handleShootEmail(v.id, v.vendor_name) }}
-                              disabled={shootingId === v.id}
-                              style={{ ...primaryBtn, padding: '5px 12px', fontSize: 11 }}
-                            >
-                              {shootingId === v.id ? 'Sending…' : v.email_count === 0 ? '✉ Shoot' : '✉ Re-shoot'}
-                            </button>
-                          )}
-                          {(v.status === 'submitted' || v.status === 'not_msme') && (
-                            <span style={{ fontSize: 11, color: '#16a34a', fontWeight: 700 }}>✓ Done</span>
-                          )}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            {canManage && v.status !== 'submitted' && v.status !== 'not_msme' && v.email_count < maxEmails && (
+                              <button
+                                onClick={e => { e.stopPropagation(); handleShootEmail(v.id, v.vendor_name) }}
+                                disabled={shootingId === v.id}
+                                style={{ ...primaryBtn, padding: '5px 12px', fontSize: 11 }}
+                              >
+                                {shootingId === v.id ? 'Sending…' : v.email_count === 0 ? '✉ Shoot' : '✉ Re-shoot'}
+                              </button>
+                            )}
+                            {(v.status === 'submitted' || v.status === 'not_msme') && (
+                              <span style={{ fontSize: 11, color: '#16a34a', fontWeight: 700 }}>✓ Done</span>
+                            )}
+                            {canAdmin && (
+                              <button
+                                onClick={e => { e.stopPropagation(); handleDelete(v.id) }}
+                                disabled={deletingId === v.id}
+                                title="Remove vendor"
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#cbd5e1', fontSize: 14, padding: '2px 4px', lineHeight: 1, borderRadius: 4 }}
+                                onMouseEnter={e => (e.currentTarget.style.color = '#dc2626')}
+                                onMouseLeave={e => (e.currentTarget.style.color = '#cbd5e1')}
+                              >
+                                {deletingId === v.id ? '…' : '🗑'}
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     )
@@ -1551,7 +1591,7 @@ const MSME_FAQ = [
   },
   {
     q: 'What is an email slot and how does it get consumed?',
-    a: 'Each pack gives you a fixed number of vendor email slots (e.g. Pack 20 = 20 slots). A slot is permanently consumed the first time an email is sent to a vendor. If you soft-delete a vendor, the slot stays consumed. Re-adding the same email address later reuses the same slot at no extra cost.',
+    a: 'Each pack gives you a fixed number of email slots (e.g. Pack 20 = 20 slots). Importing vendors does NOT consume any slots — slots are only consumed when you send the first email to a vendor. If you delete a vendor after emailing them, the slot stays consumed (the email was already sent). If you delete a vendor before emailing them, no slot was ever used, so nothing changes. Re-adding the same email address after deletion reuses the same slot at no extra cost.',
   },
   {
     q: 'Can I add more vendors than my pack limit?',
