@@ -1218,9 +1218,6 @@ export function MsmeView({ userRole, orgName }: Props) {
                             {upgradeBusy === pack.tier ? 'Redirecting…' : packTier === 'free' ? 'Purchase →' : 'Buy Credits →'}
                           </button>
                         )}
-                        {isDowngrade && !isCurrent && (
-                          <span style={{ fontSize: 11, color: '#64748b', display: 'block', marginTop: 8 }}>Contact support to downgrade</span>
-                        )}
                       </>
                     )}
                   </div>
@@ -1240,11 +1237,6 @@ export function MsmeView({ userRole, orgName }: Props) {
       {/* ── Email schedule settings modal ── */}
       {showSettings && (
         <Modal title="Automated email schedule" onClose={() => setShowSettings(false)}>
-          <p style={{ fontSize: 13, color: '#64748b', marginBottom: 20, lineHeight: 1.6 }}>
-            Configure when automated reminder emails are sent after the first email.
-            You can set up to 5 emails total (email 1 is always sent immediately when you click "Shoot email").
-          </p>
-
           <div style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', marginBottom: 10 }}>
               Email sequence ({draftIntervals.length + 1} emails total)
@@ -1298,10 +1290,6 @@ export function MsmeView({ userRole, orgName }: Props) {
                 + Add another reminder email
               </button>
             )}
-          </div>
-
-          <div style={{ fontSize: 12, color: '#64748b', marginBottom: 20, padding: '10px 14px', background: 'rgba(13,148,136,0.06)', borderRadius: 8 }}>
-            💡 Tip: "After X days" means X days after the previous email in the sequence.
           </div>
 
           {/* CC email */}
