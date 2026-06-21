@@ -147,7 +147,6 @@ export function MsmeView({ userRole, orgName }: Props) {
   const [pendingShootId,  setPendingShootId]  = useState<string | null>(null)
   const [pendingShootName,setPendingShootName] = useState<string | null>(null)
   const [pendingBulkShoot,setPendingBulkShoot] = useState(false)
-
   function showToast(message: string, type: Toast['type'] = 'success') {
     const id = ++toastRef.current
     setToasts(t => [...t, { id, message, type }])
@@ -207,26 +206,36 @@ export function MsmeView({ userRole, orgName }: Props) {
         const cc = d?.cc_email ?? ''
         setCcEmail(cc)
         setDraftCcEmail(cc)
-        if (d?.contact_person?.name) setContactPerson(d.contact_person)
+        if (d?.contact_person?.name) {
+          setContactPerson(d.contact_person)
+          setContactDraft({ name: d.contact_person.name ?? '', email: d.contact_person.email ?? '', phone: d.contact_person.phone ?? '' })
+        }
       })
       .catch(() => {})
   }, [])
 
-  // ── Save email schedule + cc_email ───────────────────────────────────────
+  // ── Save email schedule + cc_email + contact person ─────────────────────
   async function handleSaveSchedule() {
     if (draftCcEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draftCcEmail)) {
       showToast('Enter a valid CC email address', 'error'); return
     }
+    if (contactDraft.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactDraft.email)) {
+      showToast('Enter a valid contact email address', 'error'); return
+    }
+    const contactPayload = contactDraft.name.trim() && contactDraft.email.trim()
+      ? { name: contactDraft.name.trim(), email: contactDraft.email.trim(), phone: contactDraft.phone.trim() || undefined }
+      : null
     setSavingSchedule(true)
-    const res  = await fetch('/api/msme/settings', {
+    const res = await fetch('/api/msme/settings', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ schedule: draftIntervals, cc_email: draftCcEmail || null }),
+      body: JSON.stringify({ schedule: draftIntervals, cc_email: draftCcEmail || null, contact_person: contactPayload }),
     })
     setSavingSchedule(false)
     if (!res.ok) { const d = await res.json(); showToast(d.error ?? 'Failed to save', 'error'); return }
     setIntervalDays(draftIntervals)
     setCcEmail(draftCcEmail)
+    if (contactPayload) setContactPerson({ name: contactPayload.name, email: contactPayload.email, phone: contactPayload.phone ?? '' })
     setShowSettings(false)
     showToast('Settings saved')
   }
@@ -243,33 +252,6 @@ export function MsmeView({ userRole, orgName }: Props) {
     setCouponDiscount(data.discount_percent)
   }
 
-  // ── Save contact person then proceed with shoot ────────────────────────────
-  async function handleSaveContact() {
-    if (!contactDraft.name.trim()) { showToast('Contact name is required', 'error'); return }
-    if (!contactDraft.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactDraft.email)) {
-      showToast('Valid contact email is required', 'error'); return
-    }
-    setSavingContact(true)
-    const res = await fetch('/api/msme/settings', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contact_person: { name: contactDraft.name.trim(), email: contactDraft.email.trim(), phone: contactDraft.phone.trim() || undefined } }),
-    })
-    setSavingContact(false)
-    if (!res.ok) { const d = await res.json(); showToast(d.error ?? 'Failed to save', 'error'); return }
-    const cp = { name: contactDraft.name.trim(), email: contactDraft.email.trim(), phone: contactDraft.phone.trim() }
-    setContactPerson(cp)
-    setShowContactModal(false)
-    // Now fire the pending shoot
-    if (pendingBulkShoot) {
-      setPendingBulkShoot(false)
-      _doBulkShoot()
-    } else if (pendingShootId) {
-      const id = pendingShootId; const name = pendingShootName ?? ''
-      setPendingShootId(null); setPendingShootName(null)
-      _doShootEmail(id, name)
-    }
-  }
 
   // ── Addon purchase ─────────────────────────────────────────────────────────
   async function handleAddon(slots: number, _pricePaise: number) {
@@ -453,8 +435,8 @@ export function MsmeView({ userRole, orgName }: Props) {
     fetchVendors()
   }
 
-  // ── Shoot email (inner — always fires) ───────────────────────────────────
-  async function _doShootEmail(vendorId: string, vendorName: string) {
+  // ── Shoot email ──────────────────────────────────────────────────────────
+  async function handleShootEmail(vendorId: string, vendorName: string) {
     setShootingId(vendorId)
     const res  = await fetch(`/api/msme/vendors/${vendorId}/shoot-email`, { method: 'POST' })
     const data = await res.json()
@@ -464,18 +446,8 @@ export function MsmeView({ userRole, orgName }: Props) {
     fetchVendors()
   }
 
-  // ── Shoot email (public — gates on contact person) ────────────────────────
-  async function handleShootEmail(vendorId: string, vendorName: string) {
-    if (!contactPerson) {
-      setPendingShootId(vendorId); setPendingShootName(vendorName)
-      setContactDraft({ name: '', email: '', phone: '' })
-      setShowContactModal(true); return
-    }
-    _doShootEmail(vendorId, vendorName)
-  }
-
-  // ── Bulk shoot email (inner) ──────────────────────────────────────────────
-  async function _doBulkShoot() {
+  // ── Bulk shoot email ──────────────────────────────────────────────────────
+  async function handleBulkShoot() {
     const ids = Array.from(checkedIds).filter(id => unlockedIds.has(id))
     if (ids.length === 0) return
     setBulkShooting(true)
@@ -492,16 +464,6 @@ export function MsmeView({ userRole, orgName }: Props) {
     if (failed) parts.push(`${failed} failed`)
     showToast(parts.join(' · '), failed > 0 ? 'info' : 'success')
     fetchVendors()
-  }
-
-  // ── Bulk shoot email (public — gates on contact person) ──────────────────
-  async function handleBulkShoot() {
-    if (!contactPerson) {
-      setPendingBulkShoot(true)
-      setContactDraft({ name: '', email: '', phone: '' })
-      setShowContactModal(true); return
-    }
-    _doBulkShoot()
   }
 
   // ── Bulk delete ──────────────────────────────────────────────────────────
@@ -1485,8 +1447,41 @@ export function MsmeView({ userRole, orgName }: Props) {
             </p>
           </div>
 
+          {/* Contact person */}
+          <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 18, marginBottom: 20 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', marginBottom: 4 }}>Contact person</div>
+            <p style={{ fontSize: 12, color: '#64748b', margin: '0 0 12px', lineHeight: 1.5 }}>
+              Vendors will see this in the email footer so they know who to reach for queries.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <input
+                value={contactDraft.name}
+                onChange={e => setContactDraft(d => ({ ...d, name: e.target.value }))}
+                placeholder="Contact name *"
+                style={mi}
+              />
+              <input
+                type="email"
+                value={contactDraft.email}
+                onChange={e => setContactDraft(d => ({ ...d, email: e.target.value }))}
+                placeholder="Contact email *"
+                style={mi}
+              />
+              <input
+                value={contactDraft.phone}
+                onChange={e => setContactDraft(d => ({ ...d, phone: e.target.value }))}
+                placeholder="Phone (optional)"
+                style={mi}
+              />
+            </div>
+          </div>
+
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <button onClick={() => { setShowSettings(false); setDraftCcEmail(ccEmail) }} style={ghostBtn}>Cancel</button>
+            <button onClick={() => {
+              setShowSettings(false)
+              setDraftCcEmail(ccEmail)
+              setContactDraft(contactPerson ? { name: contactPerson.name, email: contactPerson.email, phone: contactPerson.phone } : { name: '', email: '', phone: '' })
+            }} style={ghostBtn}>Cancel</button>
             <button onClick={handleSaveSchedule} disabled={savingSchedule} style={{ ...primaryBtn, opacity: savingSchedule ? 0.7 : 1 }}>
               {savingSchedule ? 'Saving…' : 'Save settings'}
             </button>
@@ -1652,55 +1647,6 @@ export function MsmeView({ userRole, orgName }: Props) {
               </div>
             ))}
           </div>
-        </Modal>
-      )}
-
-      {/* ── Contact person modal ── */}
-      {showContactModal && (
-        <Modal title="Add your contact person" onClose={() => { setShowContactModal(false); setPendingShootId(null); setPendingShootName(null); setPendingBulkShoot(false) }}>
-          <p style={{ fontSize: 13, color: '#64748b', marginBottom: 20, lineHeight: 1.6 }}>
-            Vendors will see this contact in the email footer so they know who to reach for queries or complaints.
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#334155', marginBottom: 4 }}>Contact name *</label>
-              <input
-                value={contactDraft.name}
-                onChange={e => setContactDraft(d => ({ ...d, name: e.target.value }))}
-                placeholder="e.g. Rahul Sharma"
-                style={{ width: '100%', padding: '9px 12px', border: '1px solid #cbd5e1', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }}
-              />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#334155', marginBottom: 4 }}>Contact email *</label>
-              <input
-                type="email"
-                value={contactDraft.email}
-                onChange={e => setContactDraft(d => ({ ...d, email: e.target.value }))}
-                placeholder="rahul@yourfirm.com"
-                style={{ width: '100%', padding: '9px 12px', border: '1px solid #cbd5e1', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }}
-              />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#334155', marginBottom: 4 }}>Phone <span style={{ fontWeight: 400, color: '#94a3b8' }}>optional</span></label>
-              <input
-                value={contactDraft.phone}
-                onChange={e => setContactDraft(d => ({ ...d, phone: e.target.value }))}
-                placeholder="+91 98765 43210"
-                style={{ width: '100%', padding: '9px 12px', border: '1px solid #cbd5e1', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }}
-              />
-            </div>
-          </div>
-          <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 12, lineHeight: 1.5 }}>
-            This is saved once and used for all future emails. You can update it anytime in Email Schedule settings.
-          </p>
-          <button
-            onClick={handleSaveContact}
-            disabled={savingContact}
-            style={{ ...primaryBtn, width: '100%', marginTop: 18 }}
-          >
-            {savingContact ? 'Saving…' : 'Save & send email →'}
-          </button>
         </Modal>
       )}
 
