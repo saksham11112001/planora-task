@@ -1430,6 +1430,10 @@ export function MsmeView({ userRole, orgName }: Props) {
           )}
         </Modal>
       )}
+
+      {/* MSME Help Centre */}
+      <MsmeHelpButton />
+
     </div>
     </div>
   )
@@ -1530,6 +1534,183 @@ function ErrorBox({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '10px 14px', marginBottom: 16 }}>
       <p style={{ color: '#dc2626', fontSize: 13, margin: 0 }}>{children as string}</p>
+    </div>
+  )
+}
+
+// ── MSME Help Centre ─────────────────────────────────────────────────────────
+
+const MSME_FAQ = [
+  {
+    q: 'How do I change the CC email for vendor reminder emails?',
+    a: 'Go to Settings (gear icon) inside the MSME Tracker → Email Settings → enter the CC email address you want on all outgoing vendor reminder emails → Save. By default it uses the org owner\'s email. The CC receives a copy of every email sent to vendors.',
+  },
+  {
+    q: 'How do I change the email frequency or number of reminders?',
+    a: 'Settings → Email Settings → Email Schedule. You can set the number of follow-up emails (1–4 reminders, so 2–5 total emails) and the gap in days between each one. For example: Email 1 on day 0, Email 2 after 7 days, Email 3 after 14 days. Changes apply to new email sequences only — vendors already in progress continue on the old schedule.',
+  },
+  {
+    q: 'What is an email slot and how does it get consumed?',
+    a: 'Each pack gives you a fixed number of vendor email slots (e.g. Pack 20 = 20 slots). A slot is permanently consumed the first time an email is sent to a vendor. If you soft-delete a vendor, the slot stays consumed. Re-adding the same email address later reuses the same slot at no extra cost.',
+  },
+  {
+    q: 'Can I add more vendors than my pack limit?',
+    a: 'You can add unlimited vendors to your list, but you can only send emails to vendors within your slot limit. Vendors beyond the limit appear locked (blurred). Upgrade your pack to unlock more slots. To upgrade, click "Buy Credits" in the top-right of the MSME Tracker.',
+  },
+  {
+    q: 'How do I upgrade or buy more credits?',
+    a: 'Click the "Buy Credits" or "Upgrade Pack" button in the top-right header of the MSME Tracker. Choose a pack tier, fill in your GST billing details (optional but required for a tax invoice), and complete payment via Razorpay. Your new slot limit is activated instantly after payment.',
+  },
+  {
+    q: 'What happens after a vendor submits the MSME form?',
+    a: 'The vendor\'s status changes from Emailed to Submitted. You can see their Udyam number, MSME category, nature of business, and any outstanding amount in the vendor detail panel. If they uploaded a certificate, use the "View Certificate" button to open it. No further emails are sent after submission.',
+  },
+  {
+    q: 'What if a vendor says they are not an MSME?',
+    a: 'The vendor form includes a "No, I am not an MSME" option. When selected, the vendor submits a declaration (their name). The status changes to "Not MSME" in your dashboard. This serves as your compliance record that you asked and received a formal declaration.',
+  },
+  {
+    q: 'How do I view a vendor\'s uploaded certificate?',
+    a: 'Open the vendor\'s detail panel (click anywhere on their row) → scroll to the bottom → click "View Certificate". This opens a secure link to the uploaded PDF or image in a new tab. The link is valid for 15 minutes.',
+  },
+  {
+    q: 'How do I bulk import vendors?',
+    a: 'Click "Import" in the MSME Tracker toolbar → download the Excel template → fill in Vendor Name, Vendor Email, and optional GSTIN → upload. A real-time progress bar shows how many vendors have been imported. Duplicate emails (already in your list) are skipped and reported after import.',
+  },
+  {
+    q: 'How do I export the audit log?',
+    a: 'Click "Export Audit Log" in the toolbar. This downloads a single Excel sheet with all vendors and a full email trail — vendor name, email, GSTIN, status, Udyam details, each email\'s sent date/time, open status, and submission date. Use this for compliance documentation.',
+  },
+  {
+    q: 'How do I send an email to a specific vendor manually?',
+    a: 'Open the vendor\'s detail panel → click "Send Email" to trigger the next email in their sequence. Alternatively, use "Copy Form Link" to get their form URL without sending an email — useful if they want to access it via WhatsApp or another channel instead.',
+  },
+  {
+    q: 'Can I re-send the form to a vendor who already submitted?',
+    a: 'No — once a vendor has submitted (status: Submitted or Not MSME), the form link is marked as used. You can see all submitted data in the vendor detail panel. If data needs to be corrected, contact support.',
+  },
+  {
+    q: 'What is the outstanding amount field on the vendor form?',
+    a: 'This is the amount your firm owes to the vendor as on 31st March (the MSME Act compliance date). If the amount is greater than zero, the vendor must also upload proof of payment or acknowledgement. This information is captured for your MSME disclosure filing.',
+  },
+  {
+    q: 'How long is the vendor\'s form link valid?',
+    a: 'Each form link is valid for 30 days from when the email was sent. After 30 days, the link expires and the vendor cannot submit. You can send a fresh email to reactivate them — this creates a new link and counts as a new email in their sequence.',
+  },
+]
+
+function MsmeHelpButton() {
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const [expanded, setExpanded] = useState<number | null>(null)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) { setSearch(''); setExpanded(null) }
+    else setTimeout(() => (ref.current?.querySelector('input') as HTMLInputElement | null)?.focus(), 60)
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    const fn = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', fn)
+    return () => document.removeEventListener('mousedown', fn)
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    const fn = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    window.addEventListener('keydown', fn)
+    return () => window.removeEventListener('keydown', fn)
+  }, [open])
+
+  const filtered = search.trim()
+    ? MSME_FAQ.filter(f => f.q.toLowerCase().includes(search.toLowerCase()) || f.a.toLowerCase().includes(search.toLowerCase()))
+    : MSME_FAQ
+
+  return (
+    <div ref={ref} style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 200, fontFamily: "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        title="Help Centre"
+        style={{
+          width: 44, height: 44, borderRadius: '50%',
+          background: open ? ACCENT : '#fff',
+          border: `1.5px solid ${open ? ACCENT : '#e2e8f0'}`,
+          boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 18, fontWeight: 700, color: open ? '#fff' : '#64748b',
+          transition: 'all 0.18s',
+        }}
+      >
+        {open ? '×' : '?'}
+      </button>
+
+      {open && (
+        <div style={{
+          position: 'absolute', bottom: 54, right: 0,
+          width: 380, maxHeight: '80vh',
+          background: '#fff', border: '1.5px solid #e2e8f0',
+          borderRadius: 16, boxShadow: '0 8px 40px rgba(0,0,0,0.16)',
+          display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          colorScheme: 'light',
+        }}>
+          {/* Header */}
+          <div style={{ padding: '16px 16px 12px', borderBottom: '1px solid #f1f5f9', background: '#f8fafc', flexShrink: 0 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', marginBottom: 10 }}>MSME Tracker — Help Centre</div>
+            <input
+              value={search}
+              onChange={e => { setSearch(e.target.value); setExpanded(null) }}
+              placeholder={`Search ${MSME_FAQ.length} help articles…`}
+              style={{
+                width: '100%', padding: '9px 12px', border: '1.5px solid #e2e8f0',
+                borderRadius: 8, fontSize: 13, color: '#0f172a', background: '#fff',
+                outline: 'none', boxSizing: 'border-box',
+              }}
+            />
+          </div>
+
+          {/* FAQ list */}
+          <div style={{ overflowY: 'auto', flex: 1, background: '#fff' }}>
+            {filtered.length === 0 ? (
+              <div style={{ padding: '32px 16px', textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
+                No results for &ldquo;{search}&rdquo;
+              </div>
+            ) : filtered.map((item, i) => {
+              const isOpen = expanded === i
+              return (
+                <div key={i} style={{ borderBottom: i < filtered.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
+                  <button
+                    onClick={() => setExpanded(isOpen ? null : i)}
+                    style={{
+                      width: '100%', textAlign: 'left', padding: '12px 16px',
+                      background: isOpen ? 'rgba(13,148,136,0.07)' : 'transparent',
+                      border: 'none', cursor: 'pointer',
+                      display: 'flex', alignItems: 'flex-start', gap: 10,
+                    }}
+                  >
+                    <span style={{ fontSize: 11, fontWeight: 700, color: ACCENT, flexShrink: 0, marginTop: 3, display: 'inline-block', transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.18s' }}>▶</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', lineHeight: 1.45 }}>{item.q}</span>
+                  </button>
+                  {isOpen && (
+                    <div style={{ padding: '0 16px 14px 38px', fontSize: 13, color: '#475569', lineHeight: 1.65, background: 'rgba(13,148,136,0.07)' }}>
+                      {item.a}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Footer */}
+          <div style={{ padding: '10px 16px', borderTop: '1px solid #f1f5f9', background: '#f8fafc', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 12, color: '#94a3b8' }}>Can&apos;t find your answer?</span>
+            <a href="mailto:support@upfloat.co" style={{ fontSize: 12, fontWeight: 600, color: ACCENT, textDecoration: 'underline' }}>
+              Email support →
+            </a>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
