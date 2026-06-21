@@ -1205,7 +1205,7 @@ export function MsmeView({ userRole, orgName }: Props) {
                     ) : (
                       <>
                         <div style={{ fontSize: 18, fontWeight: 800, color: '#0f172a' }}>{pack.quarterly_label}<span style={{ fontSize: 12, fontWeight: 500, color: '#64748b' }}>/qtr</span></div>
-                        <div style={{ fontSize: 11, color: '#64748b' }}>₹{(pack.price_paise / 100).toLocaleString('en-IN')} payable annually · + 18% GST</div>
+                        <div style={{ fontSize: 11, color: '#64748b' }}>payable annually · + 18% GST</div>
                         {!isCurrent && !isDowngrade && (
                           <button
                             onClick={() => handleUpgrade(pack.tier)}
