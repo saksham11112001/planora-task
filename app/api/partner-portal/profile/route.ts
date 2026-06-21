@@ -78,6 +78,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Registration failed — please try again' }, { status: 500 })
   }
 
+  // If this partner was referred by another partner, mark that invite as signed_up
+  if (referredByCode) {
+    const { data: referrerPartner } = await admin
+      .from('standalone_partners')
+      .select('id')
+      .eq('referral_code', referredByCode)
+      .maybeSingle()
+
+    if (referrerPartner) {
+      await admin
+        .from('partner_portal_invites')
+        .update({ signed_up: true, signed_up_at: new Date().toISOString() })
+        .eq('partner_id', referrerPartner.id)
+        .eq('email', email.trim().toLowerCase())
+        .eq('invite_type', 'partner')
+        .eq('signed_up', false)
+    }
+  }
+
   return NextResponse.json({ id: newPartner.id, referral_code: newPartner.referral_code, exists: false })
 }
 

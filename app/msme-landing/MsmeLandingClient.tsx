@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
   Mail,
@@ -491,7 +492,7 @@ function VendorFlowMockup() {
 /* ============================================================
    HERO
 ============================================================ */
-function Hero() {
+function Hero({ loginUrl }: { loginUrl: string }) {
   return (
     <section
       style={{
@@ -571,12 +572,12 @@ function Hero() {
             deadline again
           </h1>
           <p style={{ fontSize: 18, lineHeight: 1.6, color: C.muted, margin: '0 0 30px', maxWidth: 520 }}>
-            Automatically collect Udyam declarations from vendors, track payment timelines, and
+            Automatically collect Udyam declarations from vendors and
             generate Section 43B(h) compliance reports — all in one place.
           </p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginBottom: 34 }}>
             <Link
-              href="/login?redirect=/msme&mode=signup"
+              href={loginUrl}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -1194,7 +1195,7 @@ function Testimonials() {
 /* ============================================================
    CTA SECTION
 ============================================================ */
-function CtaSection() {
+function CtaSection({ loginUrl }: { loginUrl: string }) {
   return (
     <section
       style={{
@@ -1236,7 +1237,7 @@ function CtaSection() {
           Import all your MSME vendors in minutes. No credit card required.
         </p>
         <Link
-          href="/login?redirect=/msme&mode=signup"
+          href={loginUrl}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -1529,6 +1530,11 @@ function GlobalStyles() {
 ============================================================ */
 export function MsmeLandingClient() {
   useMsmeScrollReveal()
+  const searchParams = useSearchParams()
+  const ref = searchParams.get('ref')
+  const loginUrl = ref
+    ? `/login?redirect=/msme&mode=signup&ref=${encodeURIComponent(ref)}`
+    : '/login?redirect=/msme&mode=signup'
   return (
     <div
       style={{
@@ -1541,12 +1547,12 @@ export function MsmeLandingClient() {
     >
       <GlobalStyles />
       <Nav />
-      <Hero />
+      <Hero loginUrl={loginUrl} />
       <HowItWorks />
       <ComplianceExplainer />
       <UnlockTeaser />
       <Testimonials />
-      <CtaSection />
+      <CtaSection loginUrl={loginUrl} />
       <Footer />
       <FloatingBadge />
     </div>

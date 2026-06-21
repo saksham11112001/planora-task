@@ -223,6 +223,30 @@ export async function POST(request: NextRequest) {
           ])
         }
       }
+
+      // ── Also check standalone partner referral code ──────────────────────────
+      if (rawReferralCode) {
+        const inputCode = normaliseCode(rawReferralCode)
+        const { data: standalonePartner } = await admin
+          .from('standalone_partners')
+          .select('id')
+          .eq('referral_code', inputCode)
+          .maybeSingle()
+
+        if (standalonePartner) {
+          // Mark any open MSME invite for this user's email as signed_up
+          const userEmail = user.email?.toLowerCase()
+          if (userEmail) {
+            await admin
+              .from('partner_portal_invites')
+              .update({ signed_up: true, signed_up_at: new Date().toISOString() })
+              .eq('partner_id', standalonePartner.id)
+              .eq('email', userEmail)
+              .eq('invite_type', 'msme')
+              .eq('signed_up', false)
+          }
+        }
+      }
     }
 
     // Add owner member
