@@ -40,11 +40,11 @@ export function msmeVendorEmailHtml(p: Props): string {
     ? `We have sent you ${total - 1} reminder${total - 2 > 0 ? 's' : ''} regarding your MSME registration status, but we have not yet received a response. Kindly submit your details at the earliest using the button below.`
     : isReminder
     ? `We are writing to follow up on our earlier request for your MSME registration details. Your response is still awaited. Kindly complete the short form below at your earliest convenience to ensure uninterrupted payment processing.`
-    : `${p.orgName} is in the process of updating its vendor records for MSME compliance, as mandated under the Micro, Small and Medium Enterprises Development Act (MSMED Act), 2006. We request you to confirm whether your business holds a valid Udyam Registration, or whether it is not registered as an MSME. The process takes less than two minutes.`
+    : `${p.orgName} is updating its vendor records for MSME compliance as required under the Micro, Small and Medium Enterprises Development Act (MSMED Act), 2006. We request you to confirm whether your business holds a valid Udyam Registration, or whether it is not registered as an MSME. The process takes less than two minutes.`
 
   const deadlineColour = isFinal ? '#dc2626' : '#b45309'
 
-  return `<!DOCTYPE html><html>
+  return `<!DOCTYPE html><html lang="en">
 <body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
   <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 16px"><tr><td align="center">
   <table width="580" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:10px;overflow:hidden;border:1px solid #e2e8f0">
@@ -65,55 +65,82 @@ export function msmeVendorEmailHtml(p: Props): string {
       <p style="color:#334155;font-size:14px;margin:0 0 20px;line-height:1.7">${bodyText}</p>
 
       <p style="color:#334155;font-size:14px;margin:0 0 24px;line-height:1.7">
-        This is an <strong>MSME confirmation request</strong> issued in accordance with the requirements of the MSMED Act, 2006.
+        This is an <strong>MSME confirmation request</strong> issued in accordance with the MSMED Act, 2006.
       </p>
 
+      <!-- DPDP Notice -->
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;margin-bottom:20px">
+        <tr><td style="padding:16px 20px">
+          <p style="color:#0f172a;font-size:13px;font-weight:700;margin:0 0 8px">Notice under the Digital Personal Data Protection Act, 2023</p>
+          <p style="color:#374151;font-size:12.5px;line-height:1.7;margin:0">
+            We are collecting the business data listed below solely to verify your MSME status as required under the MSMED Act, 2006.
+            This data will be retained for the duration of our vendor relationship and the period mandated by applicable law, then securely erased.
+            It is processed on our behalf by upFloat (data processor) under contractual safeguards, and will not be shared with any other third party.
+            By submitting the form, you consent to this collection. You may withdraw consent or request correction at any time by writing to our contact person below.
+          </p>
+        </td></tr>
+      </table>
+
       <!-- Checklist -->
-      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:20px;margin-bottom:28px">
-        <p style="color:#0f172a;font-size:13px;font-weight:700;margin:0 0 10px;text-transform:uppercase;letter-spacing:0.05em">If MSME-registered, please keep the following ready:</p>
-        <ul style="margin:0;padding-left:20px;font-size:13px;color:#374151;line-height:2">
-          <li>Udyam Registration Number (format: UDYAM-XX-00-0000000)</li>
-          <li>MSME Category — Micro, Small, or Medium</li>
-          <li>Nature of Business — Manufacturer, Service Provider, or Trader</li>
-          <li>Outstanding receivable amount as on 31st March (if any)</li>
-          <li>Udyam Registration Certificate (PDF or JPG)</li>
-        </ul>
-        <p style="color:#64748b;font-size:12px;margin:10px 0 0;line-height:1.6">
-          If your business is <strong>not registered as an MSME</strong>, you may submit a simple declaration. No certificate is required.
-        </p>
-      </div>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:20px">
+        <tr><td style="padding:16px 20px">
+          <p style="color:#0f172a;font-size:13px;font-weight:700;margin:0 0 10px">If MSME-registered, please keep the following ready:</p>
+          <table role="presentation" cellpadding="0" cellspacing="0">
+            <tr><td style="color:#374151;font-size:13px;line-height:1.9;vertical-align:top;padding-right:6px">•</td><td style="color:#374151;font-size:13px;line-height:1.9">Udyam Registration Number (format: UDYAM-XX-00-0000000)</td></tr>
+            <tr><td style="color:#374151;font-size:13px;line-height:1.9;vertical-align:top;padding-right:6px">•</td><td style="color:#374151;font-size:13px;line-height:1.9">MSME Category — Micro, Small, or Medium</td></tr>
+            <tr><td style="color:#374151;font-size:13px;line-height:1.9;vertical-align:top;padding-right:6px">•</td><td style="color:#374151;font-size:13px;line-height:1.9">Nature of Business — Manufacturer, Service Provider, or Trader</td></tr>
+            <tr><td style="color:#374151;font-size:13px;line-height:1.9;vertical-align:top;padding-right:6px">•</td><td style="color:#374151;font-size:13px;line-height:1.9">Outstanding receivable amount as on 31st March (if any)</td></tr>
+            <tr><td style="color:#374151;font-size:13px;line-height:1.9;vertical-align:top;padding-right:6px">•</td><td style="color:#374151;font-size:13px;line-height:1.9">Udyam Registration Certificate (PDF or JPG)</td></tr>
+          </table>
+          <p style="color:#64748b;font-size:12px;line-height:1.6;margin:10px 0 0">
+            If your business is <strong>not registered as an MSME</strong>, you may submit a simple declaration. No certificate is required.
+          </p>
+        </td></tr>
+      </table>
+
+      <!-- Consent note -->
+      <p style="color:#64748b;font-size:12px;line-height:1.6;margin:0 0 24px">
+        ☐ &nbsp;The submission form will ask you to tick: <em>"I have read the data notice above and consent to ${p.orgName} collecting and processing this information for MSME verification."</em>
+      </p>
 
       <!-- CTA Button -->
-      <table cellpadding="0" cellspacing="0" style="margin-bottom:28px"><tr><td>
-        <a href="${p.formUrl}"
-          style="display:inline-block;background:${ACCENT};color:#fff;text-decoration:none;padding:14px 36px;border-radius:8px;font-size:15px;font-weight:700;letter-spacing:0.01em">
-          Submit MSME Details →
-        </a>
-      </td></tr></table>
+      <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:24px">
+        <tr><td align="center" style="background:${ACCENT};border-radius:8px">
+          <a href="${p.formUrl}"
+            style="display:block;padding:14px 0;font-size:15px;font-weight:700;color:#fff;text-decoration:none;letter-spacing:0.01em">
+            Submit MSME Details →
+          </a>
+        </td></tr>
+      </table>
 
-      <!-- Numbered Notes -->
-      <div style="border-top:1px solid #e2e8f0;padding-top:20px">
-        <p style="color:#0f172a;font-size:13px;font-weight:700;margin:0 0 12px">Notes:</p>
-        <ol style="margin:0;padding-left:20px;font-size:12px;color:#475569;line-height:2">
-          <li>This email has been sent as part of a statutory compliance exercise under the MSMED Act, 2006.</li>
+      <p style="color:#94a3b8;font-size:12px;line-height:1.6;margin:0 0 24px">
+        This link is valid for 30 days. If you have already submitted your details, please disregard this email.
+      </p>
+
+      <!-- Notes -->
+      <div style="border-top:1px solid #e2e8f0;padding-top:18px">
+        <p style="color:#0f172a;font-size:12px;font-weight:700;margin:0 0 10px">Notes:</p>
+        <ol style="margin:0;padding-left:18px;font-size:12px;color:#475569;line-height:2">
+          <li>This email is sent as part of a statutory compliance exercise under the MSMED Act, 2006.</li>
           <li>If you have already submitted your details, kindly disregard this communication.</li>
-          <li style="color:${deadlineColour};font-weight:600">
-            Failure to respond will result in your MSME status being presumed as <em>Not Registered</em> for the purpose of our vendor records. This may affect future payment timelines as per Section 15 of the MSMED Act.
-          </li>
-          <li>${p.orgName} shall not be held liable for any consequence arising from non-submission or incorrect submission of MSME details by the vendor.</li>
-          <li>Your information will be used solely for statutory compliance purposes and will not be shared with any third party.</li>
+          <li style="color:${deadlineColour};font-weight:600">Failure to respond will result in your MSME status being presumed as <em>Not Registered</em> for our vendor records, which may affect payment timelines under Section 15 of the MSMED Act.</li>
+          <li>${p.orgName} shall not be held liable for any consequence arising from non-submission or incorrect submission of MSME details.</li>
         </ol>
       </div>
 
     </td></tr>
 
-    <!-- Footer / Sign-off -->
+    <!-- Footer / Sign-off + Grievance Officer -->
     <tr><td style="padding:20px 36px;background:#f8fafc;border-top:1px solid #e2e8f0">
       <p style="color:#334155;font-size:13px;margin:0 0 4px;line-height:1.6">Regards,<br/><strong>On Behalf of ${p.orgName}</strong></p>
-      ${hasContact ? `<p style="color:#475569;font-size:12px;margin:10px 0 0;line-height:1.7">
-        For queries, please contact:<br/>
-        <strong>${p.contactName}</strong>${p.contactPhone ? ` &nbsp;|&nbsp; ${p.contactPhone}` : ''}<br/>
+      ${hasContact ? `
+      <p style="color:#475569;font-size:12px;margin:12px 0 0;line-height:1.7">
+        <strong style="color:#0f172a">Grievance Officer (DPDP Act, 2023):</strong><br/>
+        ${p.contactName}${p.contactPhone ? ` &nbsp;|&nbsp; ${p.contactPhone}` : ''} &nbsp;—&nbsp;
         <a href="mailto:${p.contactEmail}" style="color:${ACCENT};text-decoration:none">${p.contactEmail}</a>
+      </p>
+      <p style="color:#64748b;font-size:11.5px;margin:6px 0 0;line-height:1.6">
+        <strong>Data Processor:</strong> upFloat, engaged under contractual security and confidentiality safeguards.
       </p>` : ''}
       <p style="color:#94a3b8;font-size:11px;margin:8px 0 0">Powered by upFloat</p>
     </td></tr>
