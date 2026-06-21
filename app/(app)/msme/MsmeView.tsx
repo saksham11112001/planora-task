@@ -59,6 +59,7 @@ export function MsmeView({ userRole, orgName }: Props) {
   const [loading,       setLoading]       = useState(true)
   const [showAdd,       setShowAdd]       = useState(false)
   const [showImport,    setShowImport]    = useState(false)
+  const [showCerts,     setShowCerts]     = useState(false)
   const [selectedId,    setSelectedId]    = useState<string | null>(null)
   const [vendorLimit,   setVendorLimit]   = useState<number>(5)
   const [packTier,      setPackTier]      = useState<string>('free')
@@ -696,6 +697,9 @@ export function MsmeView({ userRole, orgName }: Props) {
           {vendors.length > 0 && (
             <button onClick={handleExport} disabled={exporting} style={{ ...ghostBtn, opacity: exporting ? 0.6 : 1, cursor: exporting ? 'default' : 'pointer' }}>{exporting ? 'Exporting…' : '↓ Export Audit Log'}</button>
           )}
+          {vendors.some(v => v.cert_url) && (
+            <button onClick={() => setShowCerts(true)} style={ghostBtn}>📄 Certificates ({vendors.filter(v => v.cert_url).length})</button>
+          )}
           {canManage && (
             <button data-tour="msme-add-btn" onClick={() => setShowAdd(true)} style={primaryBtn}>+ Add vendor</button>
           )}
@@ -1019,7 +1023,7 @@ export function MsmeView({ userRole, orgName }: Props) {
 
         {/* ── Detail panel ── */}
         {selected && (
-          <div style={{ width: 300, flexShrink: 0, border: `1.5px solid ${ACCENT}40`, borderRadius: 10, overflow: 'hidden', background: '#ffffff', boxShadow: `0 0 0 3px ${ACCENT}10` }}>
+          <div style={{ width: 300, flexShrink: 0, border: `1.5px solid ${ACCENT}40`, borderRadius: 10, overflow: 'hidden', background: '#ffffff', boxShadow: `0 0 0 3px ${ACCENT}10`, position: 'sticky', top: 20, alignSelf: 'flex-start', maxHeight: 'calc(100vh - 40px)', overflowY: 'auto' }}>
             <div style={{ background: `linear-gradient(135deg, ${ACCENT}, #14b8a6)`, padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ color: '#fff', fontSize: 14, fontWeight: 700 }}>
                 {selected.vendor_name}
@@ -1468,6 +1472,32 @@ export function MsmeView({ userRole, orgName }: Props) {
               <button onClick={() => setShowImport(false)} style={{ ...primaryBtn, width: '100%' }}>Done</button>
             </div>
           )}
+        </Modal>
+      )}
+
+      {/* ── Certificates modal ── */}
+      {showCerts && (
+        <Modal title={`Vendor Certificates (${vendors.filter(v => v.cert_url).length})`} onClose={() => setShowCerts(false)} wide>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {vendors.filter(v => v.cert_url).length === 0 ? (
+              <p style={{ color: '#64748b', fontSize: 13 }}>No certificates uploaded yet.</p>
+            ) : vendors.filter(v => v.cert_url).map(v => (
+              <div key={v.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0', gap: 12 }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: 13, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.vendor_name}</div>
+                  <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{v.vendor_email}{v.udyam_number ? ` · ${v.udyam_number}` : ''}</div>
+                  {v.msme_category && <div style={{ fontSize: 11, color: ACCENT, fontWeight: 600, marginTop: 2 }}>{CAT_LABEL[v.msme_category]}</div>}
+                </div>
+                <button
+                  onClick={() => handleViewCert(v.id)}
+                  disabled={viewingCert === v.id}
+                  style={{ ...primaryBtn, padding: '6px 14px', fontSize: 12, flexShrink: 0 }}
+                >
+                  {viewingCert === v.id ? '⏳ Opening…' : '📄 View'}
+                </button>
+              </div>
+            ))}
+          </div>
         </Modal>
       )}
 
