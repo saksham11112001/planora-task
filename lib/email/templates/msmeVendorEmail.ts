@@ -39,10 +39,10 @@ export function msmeVendorEmailHtml(p: Props): string {
     : ''
 
   const bodyText = isFinal
-    ? `As this is our final request, we urge you to submit your details at the earliest. Under the Micro, Small and Medium Enterprises Development Act (MSMED Act), ${p.orgName} is required to verify the MSME status of all vendors. Delays in submission may affect payment processing timelines.`
+    ? `We have sent you ${total - 1} reminder${total - 2 > 0 ? 's' : ''} regarding your MSME registration details, but we have not yet received a response. Please note that under Section 15 of the MSMED Act, 2006, buyers are required to make payment to MSME vendors within 45 days. Non-submission of your MSME status may result in a hold on future payments until compliance is confirmed. We request you to submit your details at the earliest to avoid any disruption.`
     : isReminder
-    ? `Your MSME registration details are still pending. ${p.orgName} requires this information to comply with the MSMED Act, 2006 and ensure your payments are processed without delays.`
-    : `${p.orgName} is collecting MSME registration details from all vendors as part of their statutory compliance obligations under the MSMED Act, 2006. This process takes less than 2 minutes.`
+    ? `We write to follow up on our earlier request for your MSME registration details. ${p.orgName} is required under the MSMED Act, 2006 to verify the MSME status of all vendors. Your details are still awaited. Kindly complete the short form below at your earliest convenience to ensure uninterrupted payment processing.`
+    : `${p.orgName} is in the process of updating its vendor records for MSME compliance, as required under the Micro, Small and Medium Enterprises Development Act (MSMED Act), 2006. As part of this exercise, we request you to confirm whether your business holds a valid Udyam Registration, or if it is not registered as an MSME. The process takes less than two minutes.`
 
   return `<!DOCTYPE html><html>
 <body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
@@ -58,30 +58,32 @@ export function msmeVendorEmailHtml(p: Props): string {
       <h1 style="margin:0 0 8px;color:#0f172a;font-size:20px;font-weight:700">${headline}</h1>
       <p style="color:#64748b;font-size:14px;margin:0 0 16px;line-height:1.6">Dear ${p.vendorName},</p>
       ${priorRef}
-      <p style="color:#64748b;font-size:14px;margin:0 0 24px;line-height:1.6">${bodyText}</p>
+      <p style="color:#334155;font-size:14px;margin:0 0 24px;line-height:1.8">${bodyText}</p>
 
       <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:20px;margin-bottom:24px">
-        <p style="color:#0f172a;font-size:14px;font-weight:600;margin:0 0 12px">Documents and details required:</p>
-        <ul style="margin:0;padding-left:20px;font-size:13px;color:#374151;line-height:1.8">
-          <li>Udyam Registration Number (from your Udyam certificate)</li>
+        <p style="color:#0f172a;font-size:14px;font-weight:600;margin:0 0 12px">If your business is MSME-registered, please keep the following ready:</p>
+        <ul style="margin:0;padding-left:20px;font-size:13px;color:#374151;line-height:1.9">
+          <li>Udyam Registration Number (format: UDYAM-XX-00-0000000)</li>
           <li>MSME Category — Micro, Small, or Medium</li>
-          <li>Nature of business — Manufacturer, Service Provider, or Trader</li>
-          <li>Last outstanding amount as on 31st March</li>
-          <li>Udyam Registration Certificate (PDF/JPG)</li>
+          <li>Nature of Business — Manufacturer, Service Provider, or Trader</li>
+          <li>Outstanding receivable amount as on 31st March (if any)</li>
+          <li>Udyam Registration Certificate (PDF or JPG)</li>
         </ul>
-        <p style="color:#64748b;font-size:12px;margin:12px 0 0">
-          If your business is <strong>not registered as an MSME</strong>, you may submit a declaration to that effect instead.
+        <p style="color:#64748b;font-size:12px;margin:12px 0 0;line-height:1.6">
+          If your business is <strong>not registered as an MSME</strong>, you may submit a simple declaration to that effect. No certificate is required.
         </p>
       </div>
 
-      <a href="${p.formUrl}"
-        style="display:inline-block;background:${ACCENT};color:#fff;text-decoration:none;padding:14px 28px;border-radius:8px;font-size:15px;font-weight:600">
-        Submit MSME Details
-      </a>
+      <table cellpadding="0" cellspacing="0"><tr><td>
+        <a href="${p.formUrl}"
+          style="display:inline-block;background:${ACCENT};color:#fff;text-decoration:none;padding:14px 32px;border-radius:8px;font-size:15px;font-weight:600;letter-spacing:0.01em">
+          Submit MSME Details
+        </a>
+      </td></tr></table>
 
-      <p style="color:#94a3b8;font-size:12px;margin:24px 0 0;line-height:1.5">
+      <p style="color:#94a3b8;font-size:12px;margin:24px 0 0;line-height:1.6">
         This link is valid for 30 days. If you have already submitted your details, please disregard this email.<br/>
-        Your information will be shared only with ${p.orgName} for statutory compliance purposes.
+        Your information will be used solely for statutory compliance purposes by ${p.orgName} and will not be shared with any third party.
       </p>
     </td></tr>
 

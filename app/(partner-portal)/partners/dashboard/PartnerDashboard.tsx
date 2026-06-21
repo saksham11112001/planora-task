@@ -10,8 +10,8 @@ const BORDER = '#e2e8f0'
 const BG     = '#f8fafc'
 const WHITE  = '#ffffff'
 
-const MSME_COMMISSION   = 500
-const PARTNER_COMMISSION = 1000
+const MSME_COMMISSION    = 500  // ₹500 per MSME invite that makes a paid pack purchase
+const PARTNER_COMMISSION = 0    // ₹0 — no commission for referring a partner
 
 interface Partner {
   id: string
@@ -237,7 +237,9 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
   const partnerSignedUp = allInvites.filter(i => i.invite_type === 'partner' && i.signed_up).length
   const totalSignedUp   = msmeSignedUp + partnerSignedUp
   const totalSent       = allInvites.length
-  const commissionEst   = msmeSignedUp * MSME_COMMISSION + partnerSignedUp * PARTNER_COMMISSION
+  // Commission earned only when referred MSME user has made a paid pack purchase
+  const msmePaidCount   = allInvites.filter(i => i.invite_type === 'msme' && i.signed_up && packByEmail[i.email.toLowerCase()]).length
+  const commissionEst   = msmePaidCount * MSME_COMMISSION
 
   // Use API balance if loaded, else compute from withdrawals props
   const displayEarned = earnedPaise !== null ? earnedPaise / 100 : commissionEst
@@ -326,7 +328,7 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
             })}
           </div>
           <div style={{ marginTop: 10, padding: '10px 14px', background: BG, borderRadius: 8, fontSize: 12, color: MUTED, lineHeight: 1.6 }}>
-            Commission rates: <strong style={{ color: DARK }}>₹{MSME_COMMISSION.toLocaleString('en-IN')}/MSME sign-up</strong> · <strong style={{ color: DARK }}>₹{PARTNER_COMMISSION.toLocaleString('en-IN')}/Partner sign-up</strong> · Paid on request (min ₹500).
+            Commission: <strong style={{ color: DARK }}>₹{MSME_COMMISSION.toLocaleString('en-IN')} per MSME user who purchases a pack</strong> · Partner referrals earn no commission · Paid on request (min ₹500).
           </div>
         </div>
 
@@ -480,10 +482,14 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
                           )}
                         </td>
                         <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
-                          {inv.signed_up ? (
-                            <span style={{ fontSize: 13, fontWeight: 700, color: TEAL }}>
-                              ₹{(inv.invite_type === 'msme' ? MSME_COMMISSION : PARTNER_COMMISSION).toLocaleString('en-IN')}
-                            </span>
+                          {inv.invite_type === 'msme' && inv.signed_up ? (
+                            pack ? (
+                              <span style={{ fontSize: 13, fontWeight: 700, color: TEAL }}>₹{MSME_COMMISSION.toLocaleString('en-IN')}</span>
+                            ) : (
+                              <span style={{ fontSize: 12, color: '#94a3b8' }}>Pending purchase</span>
+                            )
+                          ) : inv.invite_type === 'partner' && inv.signed_up ? (
+                            <span style={{ fontSize: 12, color: '#94a3b8' }}>No commission</span>
                           ) : (
                             <span style={{ fontSize: 12, color: '#cbd5e1' }}>—</span>
                           )}
@@ -669,7 +675,7 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
             {[
               ['Invite clients or partners', 'Send an email invite above or share your referral link on WhatsApp.'],
               ['They sign up via your link', 'Anyone who uses your link or code gets tagged to your account automatically.'],
-              ['They upgrade — you earn', `₹${MSME_COMMISSION}/MSME sign-up · ₹${PARTNER_COMMISSION}/Partner sign-up. Tiers unlock at 1, 5, and 10 sign-ups.`],
+              ['They purchase a pack — you earn', `₹${MSME_COMMISSION} when your referred MSME user buys any paid pack. Partner referrals earn no commission. Tiers unlock at 1, 5, and 10 sign-ups.`],
               ['Request payout anytime', 'Min ₹500. Submit your bank details in the Withdraw section above. Processed within 3–5 business days.'],
             ].map(([title, desc], i) => (
               <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
