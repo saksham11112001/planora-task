@@ -820,8 +820,8 @@ export function MsmeView({ userRole, orgName }: Props) {
 
       {/* ── Main layout ── */}
       <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
-        {/* Table */}
-        <div style={{ flex: 1, minWidth: 0 }}>
+        {/* Table — shrinks when detail panel is open to avoid overlap */}
+        <div style={{ flex: 1, minWidth: 0, marginRight: selected ? 320 : 0, transition: 'margin-right 0.2s' }}>
           {loading ? (
             <div style={{ color: '#64748b', textAlign: 'center', padding: 40 }}>Loading…</div>
           ) : filtered.length === 0 ? (
@@ -1011,9 +1011,9 @@ export function MsmeView({ userRole, orgName }: Props) {
           )}
         </div>
 
-        {/* ── Detail panel ── */}
+        {/* ── Detail panel — fixed to viewport so it's always visible ── */}
         {selected && (
-          <div style={{ width: 300, flexShrink: 0, border: `1.5px solid ${ACCENT}40`, borderRadius: 10, overflow: 'hidden', background: '#ffffff', boxShadow: `0 0 0 3px ${ACCENT}10`, position: 'sticky', top: 20, alignSelf: 'flex-start', maxHeight: 'calc(100vh - 40px)', overflowY: 'auto' }}>
+          <div style={{ position: 'fixed', top: 74, right: 24, width: 300, zIndex: 40, border: `1.5px solid ${ACCENT}40`, borderRadius: 10, overflow: 'hidden', background: '#ffffff', boxShadow: '0 8px 32px rgba(0,0,0,0.14)', maxHeight: 'calc(100vh - 94px)', overflowY: 'auto' }}>
             <div style={{ background: `linear-gradient(135deg, ${ACCENT}, #14b8a6)`, padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ color: '#fff', fontSize: 14, fontWeight: 700 }}>
                 {selected.vendor_name}
