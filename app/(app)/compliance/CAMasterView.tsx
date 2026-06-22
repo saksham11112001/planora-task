@@ -1475,23 +1475,25 @@ function TaskRow({
         onManage={onManageTemplates}
       />
 
-      {/* Attach count — read-only, computed from selected templates */}
-      <td style={{ padding: '4px 6px', verticalAlign: 'middle', textAlign: 'center' }}>
-        <span style={{
-          fontSize: 13, fontWeight: 600,
-          color: task.attachment_count > 0 ? 'var(--text-primary)' : 'var(--text-muted)',
-          minWidth: 28, display: 'inline-block',
-        }}>
-          {task.attachment_count > 0 ? task.attachment_count : '—'}
-        </span>
-      </td>
+      {/* Attach count — directly editable; resizes headers array */}
+      <NumberCell
+        value={task.attachment_count}
+        min={0}
+        max={20}
+        editable={editable}
+        onChange={v => {
+          const current = task.attachment_headers ?? []
+          const resized = Array.from({ length: v }, (_, i) => current[i] ?? '')
+          onUpdate({ attachment_count: v, attachment_headers: resized })
+        }}
+      />
 
-      {/* Attach headers — view-only */}
+      {/* Attach headers — editable; labels each required attachment slot */}
       <AttachHeadersCell
         count={task.attachment_count}
         headers={task.attachment_headers}
-        editable={false}
-        onSave={() => {}}
+        editable={editable}
+        onSave={h => onUpdate({ attachment_headers: h, attachment_count: h.length })}
       />
 
       {/* Days before */}
