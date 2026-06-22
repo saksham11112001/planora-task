@@ -97,12 +97,12 @@ export async function POST(
         .limit(1)
         .maybeSingle()
 
-      const requiredCount = Math.max(1, masterTask?.attachment_count ?? 1)
+      const requiredCount = masterTask?.attachment_count ?? 1
       const { data: attachments } = await admin
         .from('task_attachments').select('id').eq('task_id', id).eq('org_id', mb.org_id)
       const actualCount = attachments?.length ?? 0
 
-      if (actualCount < requiredCount) {
+      if (requiredCount > 0 && actualCount < requiredCount) {
         const headers: string[] = masterTask?.attachment_headers ?? []
         const headerList = headers.length > 0 ? ` (${headers.join(', ')})` : ''
         const missing = requiredCount - actualCount
