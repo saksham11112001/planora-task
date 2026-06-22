@@ -1762,6 +1762,24 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
 
   useEffect(() => { fetchTasks(fy) }, [fy, fetchTasks])
 
+  // After tasks load, reconcile displayed counts with localStorage template selections.
+  // taskSel (which templates are active) is stored in localStorage; attachment_count is
+  // in the DB. They can diverge across sessions. This sync runs once per load and only
+  // updates local display state — it does NOT mark pending changes, so no Save button
+  // appears. The DB gets corrected the next time the user explicitly saves any field.
+  useEffect(() => {
+    if (loading || tasks.length === 0) return
+    setTasks(prev => prev.map(t => {
+      const ids = taskSel[t.id] ?? []
+      if (ids.length === 0) return t
+      const merged = mergeTemplateItems(ids, attTemplates)
+      if (merged.length === t.attachment_count &&
+          JSON.stringify(merged) === JSON.stringify(t.attachment_headers)) return t
+      return { ...t, attachment_count: merged.length, attachment_headers: merged }
+    }))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]) // intentionally runs only when loading flips — not on every taskSel/template change
+
   /* ── Close country picker on outside click (and reset step) ── */
   useEffect(() => {
     if (!showCountryPicker) return
