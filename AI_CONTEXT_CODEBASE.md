@@ -1,5 +1,5 @@
 # Planora Task — Codebase Transfer Document
-> Use this at the start of a new chat to give the AI full context. Last updated: 2026-06-17 (Session 20)
+> Use this at the start of a new chat to give the AI full context. Last updated: 2026-06-22 (Session 21)
 
 ---
 
@@ -43,7 +43,7 @@
 | `referral_redemptions` | `id, referrer_org_id, redeemer_org_id, extension_days, created_at` — UNIQUE(redeemer_org_id) |
 | `organisations` (extended) | added: `trial_started_at, trial_extension_days (int default 0), referral_code (text unique), join_code (text unique)` — **requires add_org_codes_trial.sql migration** |
 | `standalone_partners` | `id, user_id, name, email, referral_code, status, created_at` — standalone partner portal |
-| `partner_portal_invites` | `id, partner_id, email, invite_type (msme/partner), invite_count, last_sent_at, signed_up` |
+| `partner_portal_invites` | `id, partner_id, email, invite_type (msme/partner), invite_count, last_sent_at, signed_up (bool), signed_up_at (timestamptz)` |
 | `standalone_partner_withdrawals` | `id, partner_id, amount_paise, account_name, bank_account, bank_ifsc, upi_id, status (requested/processing/paid/rejected), admin_note, created_at, processed_at` — **requires add_standalone_partner_withdrawals.sql migration** |
 | `msme_pack_payments` | `id, org_id, pack_tier, vendor_limit, amount_paise, status (pending/paid/failed), paid_at` — **requires add_msme_pack_billing.sql migration** |
 
@@ -1868,6 +1868,59 @@ CREATE TABLE IF NOT EXISTS partner_portal_invites (
 );
 -- MSME vendor soft-delete:
 ALTER TABLE msme_vendors ADD COLUMN IF NOT EXISTS is_deleted boolean NOT NULL DEFAULT false;
+```
+
+---
+
+### SESSION 21 CHANGES
+
+#### MSME Email Template Redesign (JLL-inspired)
+- **File**: `lib/email/templates/msmeVendorEmail.ts`
+- Dark `#0f172a` header with large org name + "MSME Compliance" subtitle
+- Conversational tone (not legal-heavy): "We noticed you haven't responded…" for reminders
+- DPDP Act 2023 compliance: green notice box "A quick note on your data" (non-legal language)
+- Consent checkbox note before CTA: "The form will ask you to confirm: 'I agree to…'"
+- Full-width teal CTA button
+- Numbered notes section — Note 3 red/amber for final/reminder deadline
+- Footer: "Questions? Contact us:" with contactName/phone/email (= contact person from settings)
+- Props: added `contactName?, contactEmail?, contactPhone?`
+
+#### Contact Person in Email Schedule Modal
+- **File**: `app/(app)/msme/MsmeView.tsx` — contact person fields (name, email, phone) inside the Email Schedule modal only
+- **API**: `app/api/msme/settings/route.ts` GET returns `contact_person`; PATCH saves it as `msme_contact_person` feature key
+- **Shoot email**: `app/api/msme/vendors/[id]/shoot-email/route.ts` reads `msme_contact_person` from `org_feature_settings` and passes to `sendMsmeVendorEmail`
+
+#### MSME Pack Pricing & Add-ons
+- **Quarterly display**: `lib/msme/packs.ts` — `quarterly_label` added to `MsmePack` interface; cards show `₹X/qtr` + "payable annually · + 18% GST" (no annual total)
+- **Add-on slots**: `MSME_ADDON_PACKS` exported from `lib/msme/packs.ts` — 3 tiers: `+20 (₹3,000) / +50 (₹5,500) / +100 (₹9,000)`. Stored in `org_feature_settings` as `msme_addon_slots.extra_slots (int)`
+- **Coupon codes**: `MSME_COUPON_CODES` env var format `CODE:PERCENT,CODE2:PERCENT2`. Validated at `GET /api/msme/coupon`; applied in `POST /api/msme/pay` before Razorpay order
+- **Vendor limit**: now `pack_limit + addon_slots` everywhere (vendors route + shoot-email route)
+
+#### Referral Tagging (end-to-end fix)
+**Bug**: `standalone_partners.referral_code` was never checked during onboarding; `partner_portal_invites.signed_up` was never set to true; MSME landing page dropped `?ref=` before login.
+
+- **`app/msme-landing/MsmeLandingClient.tsx`**: `useSearchParams()` reads `ref` from URL; both `Hero` and `CtaSection` now accept `loginUrl` prop built with `?ref=` appended. Component split into `MsmeLandingInner` (uses hook) + outer `MsmeLandingClient` (Suspense boundary). Fixes Next.js build crash.
+- **`app/api/onboarding/route.ts`** (lines 227–244): after org referral check, also checks `standalone_partners` table for the code. On match, updates `partner_portal_invites.signed_up = true, signed_up_at = now()` for user's email.
+- **`app/api/partner-portal/profile/route.ts`** (POST): after inserting new partner, if `referredByCode` is set, sets `signed_up = true` on referring partner's matching `partner_portal_invites` row.
+
+#### MSME Landing Page (CA-targeted)
+- **Hero headline**: "Waiting for your clients to set up MSME compliance before audit?"
+- **Subtitle**: "Get your clients' MSME compliance ready with just a click of a button — collect Udyam declarations and generate Section 43B(h) reports instantly."
+- **CTA**: "Get Started Free" (was "Start Tracking Free")
+- **Removed**: "track payment timelines" language from hero and MSME invite email
+
+#### Partner Commission
+- `MSME_COMMISSION` in `PartnerDashboard.tsx`: `500 → 200`
+- `MSME_COMMISSION_PAISE` in `withdraw/route.ts`: `50000 → 20000`
+- Partner-to-partner referral: remains ₹0
+
+#### Partner Portal "Already Registered" Fix
+- **`app/(partner-portal)/partners/join/page.tsx`**: catches `signUp` error "already registered" / status 422 → `router.push('/partners/login?already=1')`
+- **`app/(partner-portal)/partners/login/page.tsx`**: shows info banner for `?already=1` param
+
+### New env vars added (Session 21)
+```
+MSME_COUPON_CODES=CODE1:20,CODE2:50   # coupon:discount_percent pairs, comma-separated
 ```
 
 ---

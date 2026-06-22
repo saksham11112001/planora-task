@@ -2,7 +2,7 @@
 **GitHub:** saksham11112001/planora-task  
 **Live URL:** sng-adwisers.com  
 **Stack:** Next.js 15.5 · Supabase (xjaybcthnneppfdgmtaq) · Tailwind v4 · Inngest · Resend · Vercel  
-**Last Updated:** 2026-06-17 (Session 20)
+**Last Updated:** 2026-06-22 (Session 21)
 
 ---
 
@@ -31,6 +31,19 @@
 20. **NEW (Sessions 14–17):** Digest email mode is the default for ALL orgs (when no `org_feature_settings.notification_frequency` record exists, `getOrgNotifMode` returns `'digest'`). Every notification handler MUST check `getOrgNotifMode` or `getOrgNotifModeForUser` before calling a direct send function.
 21. **NEW (Sessions 18–19):** MSME Vendor Compliance Tracker — separate module at `/msme`. Vendors added via form; owner/admin/manager only. Razorpay payment gate for vendor reports (₹99/vendor). Bulk email via Resend (`POST /api/msme/shoot`). Magic-link share for client-facing vendor list. Tables: `msme_vendors`, `msme_payments`. SQL: `supabase/migrations/create_msme_tracker.sql` + `add_msme_payment_status.sql`.
 22. **NEW (Sessions 18–19):** Partner Portal — `/partner` (owner only). CAs earn commissions (Bronze 10% 1–4 referrals / Silver 15% 5–9 / Gold 20% 10+) when orgs join via their referral link. Tables: `partner_commissions`, `partner_payouts`. API: `GET /api/partner` (tier + stats + referred list), `POST /api/partner/payout` (min ₹500, no double-payout guard). Sidebar shows Handshake icon for owners only.
+32. **NEW (Session 21):** MSME Vendor email template redesigned (JLL-inspired) — dark `#0f172a` header with large org name, conversational tone body, DPDP Act 2023 compliance notice box, consent checkbox note, full-width teal CTA, numbered notes section, "Questions? Contact us" footer with contact person. Template file: `lib/email/templates/msmeVendorEmail.ts`.
+33. **NEW (Session 21):** Contact person fields (name, email, phone) saved in `org_feature_settings` as `msme_contact_person` key. Added to **Email Schedule modal only** (not a separate popup). Sent with every vendor email; appears in footer as "Questions? Contact us: [name] · [phone] / [email]".
+34. **NEW (Session 21):** MSME pack pricing — quarterly-only display (`quarterly_label` field on `MsmeAddonPack`). No annual total shown — subtitle reads "payable annually · + 18% GST".
+35. **NEW (Session 21):** MSME add-on vendor slots — after hitting pack limit, partner can buy `+20 / +50 / +100` additional slots via Razorpay. Stored in `org_feature_settings` as `msme_addon_slots.extra_slots`. Counted alongside pack limit in `/api/msme/vendors` and `/api/msme/vendors/[id]/shoot-email`.
+36. **NEW (Session 21):** MSME coupon codes — `MSME_COUPON_CODES` env var (format: `CODE1:20,CODE2:50` = code:discount_percent). Validated server-side at `/api/msme/coupon` (GET). Applied in `/api/msme/pay` (POST) before Razorpay order creation.
+37. **NEW (Session 21):** Referral tagging fixed end-to-end:
+    - MSME landing (`/msme-landing?ref=CODE`): `useSearchParams` reads `ref`, all CTA links pass it to `/login?...&ref=CODE`. Wrapped in `<Suspense>` for Next.js static pre-render.
+    - Login page already stores `ref` in `sessionStorage('upfloat_ref_code')`.
+    - Onboarding API (`/api/onboarding`): now also checks `standalone_partners.referral_code` (was only checking `organisations.referral_code`). On match, sets `partner_portal_invites.signed_up = true`.
+    - Partner join (`/api/partner-portal/profile` POST): after creating new partner, marks referring partner's `partner_portal_invites.signed_up = true`.
+38. **NEW (Session 21):** MSME landing page hero rewritten for CA/accountant audience: "Waiting for your clients to set up MSME compliance before audit?" / "Get your clients' MSME compliance ready with just a click of a button". CTA renamed "Get Started Free". "Track payment timelines" language removed throughout.
+39. **NEW (Session 21):** Partner commission reduced from ₹500 → ₹200 per paid MSME pack referral. Updated in both `PartnerDashboard.tsx` (display) and `withdraw/route.ts` (balance computation). Partner-to-partner referral remains ₹0.
+40. **NEW (Session 21):** Partner portal "already registered" fix — `signUp` error on join page now redirects to `/partners/login?already=1` instead of showing raw error. Login page shows info message for `?already=1`.
 25. **NEW (Session 20):** Standalone Partner Portal withdrawal feature — partners can request payouts (min ₹500) via bank transfer from `/partners/dashboard`. New `standalone_partner_withdrawals` table. API: `GET /api/partner-portal/withdraw` (balance), `POST /api/partner-portal/withdraw` (submit request with IFSC validation, no-duplicate-pending guard). Dashboard shows full withdrawal history with status badges (requested/processing/paid/rejected).
 26. **NEW (Session 20):** Partner portal referral transparency — signed-up MSME referrals now show pack tier purchased, amount paid (₹), and date. Commission per row shown. Data fetched via `users` → `org_members` → `msme_pack_payments` join in server component.
 27. **NEW (Session 20):** Standalone partner portal dark mode fix — `app/(partner-portal)/layout.tsx` now forces light mode via `color-scheme: light !important` CSS and `document.documentElement.classList.remove('dark')` script. Same fix applied to `app/(msme)/layout.tsx` and `app/msme/form/[token]/layout.tsx`.
@@ -335,14 +348,24 @@ app/(app)/import/ImportView.tsx
 app/(msme)/layout.tsx          – Forces light mode; shows MsmeLogoutButton in navbar when logged in
 app/(msme)/MsmeLogoutButton.tsx – Client: signs out via Supabase, redirects to /login?redirect=/msme
 app/(app)/msme/page.tsx        – owner/admin/manager only; redirects others to /dashboard
-app/(app)/msme/MsmeView.tsx    – Client: vendor table (add/edit/remove), Udyam form, bulk email button,
-                                  magic-link share, payment gate (Razorpay ₹99/vendor).
-                                  Excel export generates 2 sheets: "MSME Vendors" + "Email Audit Trail"
-app/api/msme/route.ts          – GET/POST/PATCH/DELETE vendors (org-scoped)
-app/api/msme/shoot/route.ts    – POST: bulk email to all vendors via Resend
-app/api/msme/pay/route.ts      – POST: Razorpay order creation for vendor report unlock
-app/api/msme/email-logs/route.ts – GET: returns all msme_email_log rows for the org (for audit export)
-app/auth/callback/route.ts     – Detects msme. subdomain host → defaults redirect to /msme not /dashboard
+app/(app)/msme/MsmeView.tsx    – Client: vendor table, bulk email, magic-link share, pack upgrade modal
+                                  (quarterly price, add-on slots, coupon code input), email schedule
+                                  modal (also saves contact person name/email/phone). Excel export:
+                                  2 sheets "MSME Vendors" + "Email Audit Trail".
+app/api/msme/route.ts          – GET/POST/PATCH/DELETE vendors; limit = pack_limit + addon_slots
+app/api/msme/vendors/[id]/shoot-email/route.ts – POST: send vendor email; reads msme_contact_person
+                                  from org_feature_settings and passes to email template
+app/api/msme/settings/route.ts – GET/PATCH: email schedule, cc_email, contact_person
+app/api/msme/pay/route.ts      – POST: pack upgrade OR addon_slots Razorpay order (coupon applied);
+                                  PUT: verify signature + write pack/addon to org_feature_settings
+app/api/msme/coupon/route.ts   – GET: validate coupon code from MSME_COUPON_CODES env var
+app/api/msme/email-logs/route.ts – GET: all msme_email_log rows for org (audit export)
+lib/msme/packs.ts              – MSME_PACKS (with quarterly_label) + MSME_ADDON_PACKS
+lib/email/templates/msmeVendorEmail.ts – JLL-inspired template: dark header, DPDP notice,
+                                  checklist box, consent note, contact person footer
+app/msme-landing/MsmeLandingClient.tsx – CA-targeted hero; useSearchParams(ref) passed through
+                                  all CTA links wrapped in <Suspense>
+app/auth/callback/route.ts     – Detects msme. subdomain → defaults redirect to /msme
 ```
 
 **Partner Portal (org-based, legacy)**
@@ -370,7 +393,7 @@ app/api/partner-portal/withdraw/route.ts        – GET: balance (earned/availab
                                                    POST: submit withdrawal (IFSC validation, min ₹500,
                                                    no-duplicate-pending guard)
 Tables: standalone_partners, partner_portal_invites, standalone_partner_withdrawals
-Commission: MSME sign-up ₹500 · Partner sign-up ₹1000
+Commission: MSME paid pack referral ₹200 · Partner-to-partner referral ₹0
 Balance = earned − (requested + processing + paid withdrawals)
 ```
 
