@@ -43,8 +43,8 @@ export async function POST(req: NextRequest) {
 
   const existingEmails = new Set((existingVendors ?? []).map(v => v.vendor_email.toLowerCase()))
 
-  const inserted: string[] = []
-  const skipped:  Array<{ row: number; name: string; reason: string }> = []
+  const skipped: Array<{ row: number; name: string; reason: string }> = []
+  const toInsert: Array<{ org_id: string; vendor_name: string; vendor_email: string; gstin: string | null; is_paid: boolean; payment_status: string; created_by: string }> = []
 
   for (let i = 0; i < rows.length; i++) {
     const row   = rows[i]
@@ -52,31 +52,27 @@ export async function POST(req: NextRequest) {
     const email = row.vendor_email?.toString().trim().toLowerCase()
     const gstin = row.gstin?.toString().trim() || null
 
-    if (!name) { skipped.push({ row: i + 1, name: name ?? '(blank)', reason: 'Name is missing' }); continue }
+    if (!name)                         { skipped.push({ row: i + 1, name: name ?? '(blank)', reason: 'Name is missing' }); continue }
     if (!email || !EMAIL_RE.test(email)) { skipped.push({ row: i + 1, name, reason: 'Invalid or missing email' }); continue }
-    if (existingEmails.has(email)) { skipped.push({ row: i + 1, name, reason: 'Email already exists' }); continue }
+    if (existingEmails.has(email))     { skipped.push({ row: i + 1, name, reason: 'Email already exists' }); continue }
 
-    const { error } = await admin.from('msme_vendors').insert({
-      org_id:         mb.org_id,
-      vendor_name:    name,
-      vendor_email:   email,
-      gstin,
-      is_paid:        true,
-      payment_status: 'free',
-      created_by:     user.id,
-    })
+    existingEmails.add(email) // prevent intra-batch duplicates
+    toInsert.push({ org_id: mb.org_id, vendor_name: name, vendor_email: email, gstin, is_paid: true, payment_status: 'free', created_by: user.id })
+  }
 
+  let insertedCount = 0
+  if (toInsert.length > 0) {
+    const { error } = await admin.from('msme_vendors').insert(toInsert)
     if (error) {
-      skipped.push({ row: i + 1, name, reason: error.message })
-    } else {
-      inserted.push(name)
-      existingEmails.add(email)
+      // Bulk insert failed — surface as a single error rather than partial success
+      return NextResponse.json({ error: `Import failed: ${error.message}` }, { status: 500 })
     }
+    insertedCount = toInsert.length
   }
 
   return NextResponse.json({
     ok: true,
-    inserted: inserted.length,
+    inserted: insertedCount,
     skipped,
     paid_slots: 0,
   })
