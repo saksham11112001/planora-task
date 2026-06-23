@@ -73,6 +73,20 @@ export async function POST(req: NextRequest) {
     const order = await orderRes.json()
     if (!orderRes.ok) return NextResponse.json({ error: order.error?.description ?? 'Order creation failed' }, { status: 500 })
 
+    const admin = createAdminClient()
+    await admin.from('msme_pack_payments').upsert(
+      {
+        org_id:           orgId,
+        pack_tier:        `addon_${addon_slots}`,
+        vendor_limit:     addon_slots,
+        amount_paise:     addonPack.price_paise,
+        gateway:          'razorpay',
+        gateway_order_id: order.id,
+        status:           'pending',
+      },
+      { onConflict: 'gateway_order_id' }
+    )
+
     return NextResponse.json({
       gateway:    'razorpay',
       order_id:   order.id,
@@ -173,6 +187,27 @@ export async function PUT(req: NextRequest) {
 
   // ── Add-on verification ───────────────────────────────────────────────────
   if (addon_slots !== undefined) {
+    // Verify the order belongs to this org and wasn't already processed
+    const { data: addonPayment } = await admin
+      .from('msme_pack_payments')
+      .select('id, org_id, status')
+      .eq('gateway_order_id', razorpay_order_id)
+      .maybeSingle()
+    if (!addonPayment) {
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 })
+    }
+    if (addonPayment.org_id !== mb.org_id) {
+      return NextResponse.json({ error: 'Order does not belong to your organisation' }, { status: 403 })
+    }
+    // Idempotency: already processed
+    if (addonPayment.status === 'paid') {
+      const { data: existingSlots } = await admin
+        .from('org_feature_settings').select('config')
+        .eq('org_id', mb.org_id).eq('feature_key', 'msme_addon_slots').maybeSingle()
+      const extra: number = (existingSlots?.config as any)?.extra_slots ?? 0
+      return NextResponse.json({ ok: true, addon_slots_added: addon_slots, extra_slots: extra })
+    }
+
     const { data: existing } = await admin
       .from('org_feature_settings').select('config')
       .eq('org_id', mb.org_id).eq('feature_key', 'msme_addon_slots').maybeSingle()
@@ -181,11 +216,35 @@ export async function PUT(req: NextRequest) {
       { org_id: mb.org_id, feature_key: 'msme_addon_slots', is_enabled: true, config: { extra_slots: currentExtra + addon_slots } },
       { onConflict: 'org_id,feature_key' }
     )
+    await admin.from('msme_pack_payments').upsert(
+      {
+        org_id:             mb.org_id,
+        pack_tier:          `addon_${addon_slots}`,
+        vendor_limit:       addon_slots,
+        amount_paise:       0,
+        gateway:            'razorpay',
+        gateway_order_id:   razorpay_order_id,
+        gateway_payment_id: razorpay_payment_id,
+        status:             'paid',
+        paid_at:            paidAt,
+      },
+      { onConflict: 'gateway_order_id' }
+    )
     return NextResponse.json({ ok: true, addon_slots_added: addon_slots, extra_slots: currentExtra + addon_slots })
   }
 
   // ── Pack upgrade verification ─────────────────────────────────────────────
   const pack = getPackByTier(pack_tier)
+
+  // Verify the order belongs to this org (prevents cross-org replay)
+  const { data: packPayment } = await admin
+    .from('msme_pack_payments')
+    .select('id, org_id, status')
+    .eq('gateway_order_id', razorpay_order_id)
+    .maybeSingle()
+  if (packPayment && packPayment.org_id !== mb.org_id) {
+    return NextResponse.json({ error: 'Order does not belong to your organisation' }, { status: 403 })
+  }
 
   // Idempotency: if this payment was already processed, return success without re-activating
   const { data: alreadyPaid } = await admin
