@@ -64,17 +64,6 @@ export function msmeVendorEmailHtml(p: Props): string {
 
       <p style="color:#334155;font-size:14px;margin:0 0 24px;line-height:1.7">${bodyText}</p>
 
-      <!-- Data notice -->
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;margin-bottom:20px">
-        <tr><td style="padding:16px 20px">
-          <p style="color:#0f172a;font-size:13px;font-weight:700;margin:0 0 6px">A quick note on your data</p>
-          <p style="color:#374151;font-size:12.5px;line-height:1.7;margin:0">
-            The details you share will only be used for MSME compliance and will not be passed on to anyone else.
-            If you have any questions about how your data is handled, please reach out to our contact person listed at the bottom of this email.
-          </p>
-        </td></tr>
-      </table>
-
       <!-- Checklist -->
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:20px">
         <tr><td style="padding:16px 20px">
@@ -97,8 +86,19 @@ export function msmeVendorEmailHtml(p: Props): string {
         ☐ &nbsp;The form will ask you to confirm: <em>"I agree to ${p.orgName} collecting this information for MSME compliance purposes."</em>
       </p>
 
+      <!-- Notes -->
+      <div style="border-top:1px solid #e2e8f0;padding-top:18px;margin-bottom:24px">
+        <p style="color:#0f172a;font-size:12px;font-weight:700;margin:0 0 10px">A few things to note:</p>
+        <ol style="margin:0;padding-left:18px;font-size:12px;color:#475569;line-height:2">
+          <li>This request is part of a compliance exercise under the MSMED Act, 2006 — not a promotional email.</li>
+          <li style="color:${deadlineColour};font-weight:600">If we do not receive any reply by 18th Oct 2025, we shall presume your organisation is not registered under the MSMED Act, 2006.</li>
+          <li>${p.orgName} will not be liable for any damages demanded at a later date due to non-compliance of the Act arising from your non-response.</li>
+          <li>If you are not the right recipient, please forward this email to the authorised person in your organisation.</li>
+        </ol>
+      </div>
+
       <!-- CTA Button -->
-      <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:24px">
+      <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:20px">
         <tr><td align="center" style="background:${ACCENT};border-radius:8px">
           <a href="${p.formUrl}"
             style="display:block;padding:14px 0;font-size:15px;font-weight:700;color:#fff;text-decoration:none;letter-spacing:0.01em">
@@ -107,20 +107,22 @@ export function msmeVendorEmailHtml(p: Props): string {
         </td></tr>
       </table>
 
-      <p style="color:#94a3b8;font-size:12px;line-height:1.6;margin:0 0 24px">
+      <p style="color:#94a3b8;font-size:12px;line-height:1.6;margin:0 0 20px">
         This link is valid for 30 days. Already submitted? You can ignore this email.
       </p>
 
-      <!-- Notes -->
-      <div style="border-top:1px solid #e2e8f0;padding-top:18px">
-        <p style="color:#0f172a;font-size:12px;font-weight:700;margin:0 0 10px">A few things to note:</p>
-        <ol style="margin:0;padding-left:18px;font-size:12px;color:#475569;line-height:2">
-          <li>This request is part of a compliance exercise under the MSMED Act, 2006 — not a promotional email.</li>
-          <li>If you've already filled in the form, no action is needed.</li>
-          <li style="color:${deadlineColour};font-weight:600">If we don't hear back, we'll have to record your status as <em>Not Registered</em>, which could affect payment timelines under the MSMED Act.</li>
-          <li>${p.orgName} is not responsible for any impact caused by non-submission or incorrect details provided by the vendor.</li>
-        </ol>
-      </div>
+      <!-- Data & Privacy Notice -->
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;margin-bottom:20px">
+        <tr><td style="padding:16px 20px">
+          <p style="color:#0f172a;font-size:13px;font-weight:700;margin:0 0 6px">Data & Privacy Notice</p>
+          <p style="color:#374151;font-size:12px;line-height:1.7;margin:0 0 8px">
+            The above information is collected solely to verify your MSME status as required under the MSMED Act, 2006. It will be retained for the duration of our vendor relationship plus the period mandated under applicable record-retention laws, and securely erased thereafter. It is processed on our behalf by upFloat (data processor) and will not be shared with any third party.
+          </p>
+          <p style="color:#374151;font-size:12px;line-height:1.7;margin:0">
+            By submitting this form, you consent to this collection and processing. You may withdraw consent or request correction/erasure at any time by writing to our Grievance Officer (details below), without affecting the lawfulness of prior processing.
+          </p>
+        </td></tr>
+      </table>
 
     </td></tr>
 
