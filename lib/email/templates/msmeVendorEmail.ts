@@ -81,11 +81,6 @@ export function msmeVendorEmailHtml(p: Props): string {
         </td></tr>
       </table>
 
-      <!-- Consent note -->
-      <p style="color:#64748b;font-size:12px;line-height:1.6;margin:0 0 24px">
-        ☐ &nbsp;The form will ask you to confirm: <em>"I agree to ${p.orgName} collecting this information for MSME compliance purposes."</em>
-      </p>
-
       <!-- Notes -->
       <div style="border-top:1px solid #e2e8f0;padding-top:18px;margin-bottom:24px">
         <p style="color:#0f172a;font-size:12px;font-weight:700;margin:0 0 10px">A few things to note:</p>
