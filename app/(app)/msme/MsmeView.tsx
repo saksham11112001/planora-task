@@ -458,8 +458,9 @@ export function MsmeView({ userRole, orgName }: Props) {
     let sent = 0, failed = 0
     for (const id of ids) {
       const res  = await fetch(`/api/msme/vendors/${id}/shoot-email`, { method: 'POST' })
-      if (!res.ok) { failed++; continue }
-      sent++
+      if (!res.ok) { failed++; } else { sent++ }
+      // 150 ms between requests to stay within Resend's ~10 req/s rate limit
+      await new Promise(r => setTimeout(r, 150))
     }
     setBulkShooting(false)
     setCheckedIds(new Set())
