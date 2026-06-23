@@ -91,7 +91,7 @@ export function msmeVendorEmailHtml(p: Props): string {
         <p style="color:#0f172a;font-size:12px;font-weight:700;margin:0 0 10px">A few things to note:</p>
         <ol style="margin:0;padding-left:18px;font-size:12px;color:#475569;line-height:2">
           <li>This request is part of a compliance exercise under the MSMED Act, 2006 — not a promotional email.</li>
-          <li style="color:${deadlineColour};font-weight:600">If we do not receive any reply by 18th Oct 2025, we shall presume your organisation is not registered under the MSMED Act, 2006.</li>
+          <li style="color:${deadlineColour};font-weight:600">If we do not receive any reply within 15 days of receiving this email, we shall presume your organisation is not registered under the MSMED Act, 2006.</li>
           <li>${p.orgName} will not be liable for any damages demanded at a later date due to non-compliance of the Act arising from your non-response.</li>
           <li>If you are not the right recipient, please forward this email to the authorised person in your organisation.</li>
         </ol>
