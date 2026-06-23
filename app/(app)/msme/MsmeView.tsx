@@ -772,8 +772,14 @@ export function MsmeView({ userRole, orgName }: Props) {
             <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: ACCENT, letterSpacing: '-0.3px' }}>
               MSME Vendor Tracker
             </h1>
-            <span style={{ fontSize: 11, fontWeight: 700, background: packTier === 'free' ? '#f1f5f9' : `${ACCENT}18`, color: packTier === 'free' ? '#64748b' : ACCENT, padding: '3px 10px', borderRadius: 20, border: `1px solid ${packTier === 'free' ? '#e2e8f0' : `${ACCENT}40`}` }}>
-              {packLabel} Plan
+            <span style={{
+              fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
+              ...(packTier === 'free'
+                ? { background: '#f1f5f9', color: '#64748b', border: '1px solid #e2e8f0' }
+                : { background: 'linear-gradient(135deg, #fef3c7, #fde68a)', color: '#92400e', border: '1px solid #d4af37', boxShadow: '0 1px 4px rgba(212,175,55,0.25)' }
+              )
+            }}>
+              {packTier !== 'free' ? `★ ${packLabel} Plan` : `${packLabel} Plan`}
             </span>
           </div>
           <p style={{ margin: '4px 0 0', fontSize: 13, color: '#475569', fontWeight: 500 }}>
@@ -1263,51 +1269,78 @@ export function MsmeView({ userRole, orgName }: Props) {
 
       {/* ── Upgrade Pack modal ── */}
       {showUpgrade && (
-        <Modal title={packTier === 'free' ? 'MSME Vendor Packs' : 'Buy More Credits'} onClose={() => setShowUpgrade(false)} wide>
+        <Modal title={packTier === 'free' ? 'MSME Vendor Packs' : 'Upgrade / Add Vendors'} onClose={() => setShowUpgrade(false)} wide>
           <p style={{ fontSize: 13, color: '#64748b', marginBottom: 20, lineHeight: 1.6 }}>
             {packTier === 'free'
-              ? 'Choose a pack that fits your vendor base. All vendors within your pack limit get full access — automated emails, form links, and compliance tracking.'
-              : `You're on the ${packLabel} plan (${vendorLimit} vendor slots). Purchase additional credits to email more vendors.`}
+              ? 'Choose a plan that fits your vendor base. All vendors within your limit get full access — automated emails, form links, and compliance tracking.'
+              : `You're on the ${packLabel} plan (${vendorLimit} vendor slots). Upgrade to a higher plan or add extra slots below.`}
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {MSME_PACKS.filter(p => p.tier !== 'free').map(pack => {
-              const isCurrent   = pack.tier === packTier
-              // Downgrade = new pack has fewer slots than the current active pack limit
-              const isDowngrade = pack.vendor_limit < vendorLimit
-              // Warn (but don't block) when some vendors would remain locked after upgrade
-              const lockedAfter = Math.max(0, totalEver - pack.vendor_limit)
+              const isCurrent    = pack.tier === packTier
+              const isEnterprise = pack.tier === 'pack_enterprise'
+              const isDowngrade  = pack.vendor_limit < vendorLimit
+              const isRecommended = pack.recommended && !isCurrent && !isDowngrade
+              const lockedAfter  = Math.max(0, totalEver - pack.vendor_limit)
+              const discountedPaise = couponDiscount > 0 ? Math.round(pack.price_paise * (1 - couponDiscount / 100)) : pack.price_paise
+              const discountedLabel = couponDiscount > 0 ? `₹${Math.round(discountedPaise / 100).toLocaleString('en-IN')}` : null
+
+              // Gold luxurious style for current paid plan
+              const isGold = isCurrent && packTier !== 'free'
+              const cardStyle: React.CSSProperties = isGold ? {
+                border: '2px solid #d4af37',
+                borderRadius: 10,
+                padding: '14px 18px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+                background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 50%, #fdf6d3 100%)',
+                boxShadow: '0 2px 12px rgba(212,175,55,0.18)',
+              } : {
+                border: `2px solid ${isRecommended ? ACCENT : '#e2e8f0'}`,
+                borderRadius: 10,
+                padding: '14px 18px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+                background: isRecommended ? `${ACCENT}06` : '#ffffff',
+              }
+
               return (
-                <div key={pack.tier} style={{
-                  border: `2px solid ${isCurrent ? ACCENT : '#e2e8f0'}`,
-                  borderRadius: 10,
-                  padding: '14px 18px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 12,
-                  background: isCurrent ? `${ACCENT}08` : '#ffffff',
-                }}>
+                <div key={pack.tier} style={cardStyle}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontWeight: 700, fontSize: 15, color: '#0f172a' }}>{pack.label}</span>
-                      {isCurrent && <span style={{ fontSize: 11, fontWeight: 700, color: ACCENT, background: `${ACCENT}15`, padding: '2px 8px', borderRadius: 10 }}>Current</span>}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span style={{ fontWeight: 700, fontSize: 15, color: isGold ? '#92400e' : '#0f172a' }}>{pack.label}</span>
+                      {isCurrent && (
+                        <span style={{ fontSize: 11, fontWeight: 700, color: '#92400e', background: '#fde68a', padding: '2px 8px', borderRadius: 10, border: '1px solid #d4af37' }}>
+                          ★ Your Plan
+                        </span>
+                      )}
+                      {isRecommended && (
+                        <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: ACCENT, padding: '2px 8px', borderRadius: 10 }}>
+                          Recommended
+                        </span>
+                      )}
                     </div>
-                    <div style={{ fontSize: 13, color: '#64748b', marginTop: 2 }}>
-                      Up to <strong>{pack.vendor_limit} vendors</strong>
+                    <div style={{ fontSize: 13, color: isGold ? '#78350f' : '#64748b', marginTop: 2 }}>
+                      Up to <strong>{isEnterprise ? '500+' : pack.vendor_limit} vendors</strong>
+                      {!isEnterprise && <span style={{ marginLeft: 6, fontSize: 11, color: isGold ? '#a16207' : '#94a3b8' }}>· {pack.per_vendor}</span>}
                     </div>
                     {!isCurrent && !isDowngrade && lockedAfter > 0 && (
                       <div style={{ fontSize: 11, color: '#b45309', marginTop: 4 }}>
-                        {lockedAfter} vendor{lockedAfter > 1 ? 's' : ''} will remain locked — upgrade to a larger pack to unlock all
+                        {lockedAfter} vendor{lockedAfter > 1 ? 's' : ''} will remain locked — upgrade to a larger plan to unlock all
                       </div>
                     )}
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    {pack.tier === 'pack_500' ? (
+                    {isEnterprise ? (
                       <>
-                        <div style={{ fontSize: 13, color: '#64748b', marginBottom: 4 }}>500+ vendors</div>
+                        <div style={{ fontSize: 13, color: '#64748b', marginBottom: 4 }}>Multi-GSTIN · Custom</div>
                         {!isCurrent && (
                           <a
-                            href="mailto:info@upfloat.co?subject=MSME%20Enterprise%20Pack%20(500%20vendors)"
+                            href="mailto:info@upfloat.co?subject=MSME%20Enterprise%20Pack"
                             style={{ ...primaryBtn, marginTop: 4, padding: '6px 16px', fontSize: 12, textDecoration: 'none', display: 'inline-block' }}
                           >
                             Contact sales →
@@ -1316,15 +1349,21 @@ export function MsmeView({ userRole, orgName }: Props) {
                       </>
                     ) : (
                       <>
-                        <div style={{ fontSize: 18, fontWeight: 800, color: '#0f172a' }}>{pack.quarterly_label}<span style={{ fontSize: 12, fontWeight: 500, color: '#64748b' }}>/qtr</span></div>
-                        <div style={{ fontSize: 11, color: '#64748b' }}>payable annually · + 18% GST</div>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, justifyContent: 'flex-end' }}>
+                          {discountedLabel && <s style={{ fontSize: 12, color: '#94a3b8' }}>{pack.price_label}</s>}
+                          <span style={{ fontSize: 18, fontWeight: 800, color: isGold ? '#92400e' : '#0f172a' }}>
+                            {discountedLabel ?? pack.price_label}
+                          </span>
+                          <span style={{ fontSize: 12, fontWeight: 500, color: isGold ? '#a16207' : '#64748b' }}>/yr</span>
+                        </div>
+                        <div style={{ fontSize: 11, color: isGold ? '#a16207' : '#64748b' }}>+ 18% GST</div>
                         {!isCurrent && !isDowngrade && (
                           <button
                             onClick={() => handleUpgrade(pack.tier)}
                             disabled={upgradeBusy === pack.tier}
                             style={{ ...primaryBtn, marginTop: 8, padding: '6px 16px', fontSize: 12 }}
                           >
-                            {upgradeBusy === pack.tier ? 'Redirecting…' : packTier === 'free' ? 'Purchase →' : 'Buy Credits →'}
+                            {upgradeBusy === pack.tier ? 'Redirecting…' : packTier === 'free' ? 'Purchase →' : 'Upgrade →'}
                           </button>
                         )}
                       </>
@@ -1334,35 +1373,39 @@ export function MsmeView({ userRole, orgName }: Props) {
               )
             })}
           </div>
-          {/* ── Add-on slots section (only for paid plans) ── */}
+
+          {/* ── Add extra slots (for paid users — mapped to pack tiers) ── */}
           {packTier !== 'free' && (
             <div style={{ marginTop: 20, borderTop: '1px solid #e2e8f0', paddingTop: 16 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#334155', marginBottom: 10 }}>
-                Or add more vendor slots to your current plan:
+                Add extra vendor slots to your current plan:
               </div>
-              {MSME_ADDON_PACKS.map(addon => (
-                <div key={addon.slots} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: 8, marginBottom: 8 }}>
-                  <div>
-                    <span style={{ fontWeight: 600, fontSize: 14, color: '#0f172a' }}>{addon.label}</span>
-                    <span style={{ fontSize: 12, color: '#64748b' }}> extra slots</span>
+              {MSME_ADDON_PACKS.map(addon => {
+                const discAddonPaise = couponDiscount > 0 ? Math.round(addon.price_paise * (1 - couponDiscount / 100)) : addon.price_paise
+                return (
+                  <div key={addon.slots} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: 8, marginBottom: 8 }}>
+                    <div>
+                      <span style={{ fontWeight: 600, fontSize: 14, color: '#0f172a' }}>{addon.label}</span>
+                      <span style={{ fontSize: 12, color: '#64748b' }}> extra slots</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <span style={{ fontWeight: 700, fontSize: 15, color: '#0f172a' }}>
+                        {couponDiscount > 0
+                          ? <><s style={{ color: '#94a3b8', fontSize: 12 }}>{addon.price_label}</s> ₹{Math.round(discAddonPaise / 100).toLocaleString('en-IN')}</>
+                          : addon.price_label
+                        }
+                      </span>
+                      <button
+                        onClick={() => handleAddon(addon.slots, addon.price_paise)}
+                        disabled={addonBusy === addon.slots}
+                        style={{ ...primaryBtn, padding: '6px 14px', fontSize: 12 }}
+                      >
+                        {addonBusy === addon.slots ? 'Redirecting…' : 'Add →'}
+                      </button>
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <span style={{ fontWeight: 700, fontSize: 15, color: '#0f172a' }}>
-                      {couponDiscount > 0
-                        ? <><s style={{ color: '#94a3b8', fontSize: 12 }}>{addon.price_label}</s> ₹{Math.round(addon.price_paise * (1 - couponDiscount / 100) / 100).toLocaleString('en-IN')}</>
-                        : addon.price_label
-                      }
-                    </span>
-                    <button
-                      onClick={() => handleAddon(addon.slots, addon.price_paise)}
-                      disabled={addonBusy === addon.slots}
-                      style={{ ...primaryBtn, padding: '6px 14px', fontSize: 12 }}
-                    >
-                      {addonBusy === addon.slots ? 'Redirecting…' : 'Add →'}
-                    </button>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
 
@@ -1379,15 +1422,15 @@ export function MsmeView({ userRole, orgName }: Props) {
                 {couponBusy ? '…' : 'Apply'}
               </button>
             </div>
-            {couponDiscount > 0 && <p style={{ fontSize: 12, color: '#16a34a', margin: '6px 0 0' }}>✓ {couponDiscount}% discount applied to all packs!</p>}
+            {couponDiscount > 0 && <p style={{ fontSize: 12, color: '#16a34a', margin: '6px 0 0' }}>✓ {couponDiscount}% discount applied!</p>}
             {couponError && <p style={{ fontSize: 12, color: '#dc2626', margin: '6px 0 0' }}>{couponError}</p>}
           </div>
 
           <p style={{ fontSize: 11, color: '#64748b', marginTop: 16, lineHeight: 1.5 }}>
-            After payment, your pack activates instantly. Payment via UPI, net banking, or cards — powered by Razorpay.
+            After payment, your plan activates instantly. Payment via UPI, net banking, or cards — powered by Razorpay.
           </p>
           <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 6, lineHeight: 1.5 }}>
-            * 18% GST will be added at checkout. Your GST invoice will be issued after payment.
+            * 18% GST will be added at checkout. Your GST invoice will be emailed after payment.
           </p>
         </Modal>
       )}

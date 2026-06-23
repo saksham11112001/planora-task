@@ -274,6 +274,7 @@ export async function sendInvoiceEmail(p: InvoiceProps) {
   return resend.emails.send({
     from:    FROM,
     to:      p.customerEmail,
+    cc:      'accounts@sgng.in',
     subject: paymentInvoiceSubject(p),
     html:    paymentInvoiceHtml(p),
   })
