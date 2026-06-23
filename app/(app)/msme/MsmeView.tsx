@@ -1374,8 +1374,6 @@ export function MsmeView({ userRole, orgName }: Props) {
             })}
           </div>
 
-          )}
-
           {/* ── Coupon code ── */}
           <div style={{ marginTop: 16, borderTop: '1px solid #e2e8f0', paddingTop: 14 }}>
             <div style={{ display: 'flex', gap: 8 }}>
