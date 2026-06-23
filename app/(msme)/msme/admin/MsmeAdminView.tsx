@@ -7,12 +7,12 @@ const MUTED  = '#64748b'
 const BORDER = '#e2e8f0'
 
 const TIER_LABELS: Record<string, string> = {
-  free:     'Free',
-  pack_20:  'Starter (20)',
-  pack_50:  'Standard (50)',
-  pack_200: 'Professional (200)',
-  pack_250: 'Business (250)',
-  pack_500: 'Enterprise (500)',
+  free:            'Free',
+  pack_25:         'Starter (25)',
+  pack_100:        'Growth (100)',
+  pack_250:        'Professional (250)',
+  pack_500:        'Business (500)',
+  pack_enterprise: 'Enterprise',
 }
 
 const STATUS_LABELS: Record<string, string> = {
