@@ -368,6 +368,14 @@ export function MsmeView({ userRole, orgName }: Props) {
       return
     }
 
+    if (data.free_grant) {
+      setShowUpgrade(false)
+      setPackTier(data.pack_tier)
+      setVendorLimit(data.vendor_limit)
+      showToast('Pack activated for free — enjoy! 🎉', 'success')
+      return
+    }
+
     if (data.gateway === 'razorpay' && data.order_id) {
       setShowUpgrade(false)
       // Load Razorpay checkout script dynamically

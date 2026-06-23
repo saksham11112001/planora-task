@@ -125,6 +125,34 @@ export async function POST(req: NextRequest) {
   const { price_paise: basePaise, label: packLabel, vendor_limit: vendorLimit } = pack
   const chargeablePaise = Math.round(basePaise * 1.18 * (1 - discountPct / 100))
 
+  // ── 100% coupon → skip Razorpay, activate pack directly ──────────────────
+  if (discountPct >= 100) {
+    const admin  = createAdminClient()
+    const paidAt = new Date().toISOString()
+    await admin.from('org_feature_settings').upsert(
+      { org_id: orgId, feature_key: 'msme_pack', is_enabled: true,
+        config: { tier: pack_tier, vendor_limit: vendorLimit, paid_at: paidAt } },
+      { onConflict: 'org_id,feature_key' }
+    )
+    await admin.from('msme_pack_payments').insert({
+      org_id: orgId, pack_tier, vendor_limit: vendorLimit,
+      amount_paise: 0, gateway: 'free_coupon', status: 'paid', paid_at: paidAt,
+    })
+    // Record coupon redemption
+    if (coupon_code) {
+      const { data: couponRow } = await admin.from('coupons').select('id, uses_count')
+        .eq('code', coupon_code.trim().toUpperCase()).maybeSingle()
+      if (couponRow) {
+        await admin.from('coupon_redemptions').upsert(
+          { coupon_id: couponRow.id, org_id: orgId },
+          { onConflict: 'coupon_id,org_id' }
+        )
+        await admin.from('coupons').update({ uses_count: (couponRow.uses_count ?? 0) + 1 }).eq('id', couponRow.id)
+      }
+    }
+    return NextResponse.json({ free_grant: true, pack_tier, vendor_limit: vendorLimit })
+  }
+
   const orderRes  = await fetch('https://api.razorpay.com/v1/orders', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Basic ${basicAuth}` },
