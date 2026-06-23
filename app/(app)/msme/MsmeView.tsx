@@ -1277,11 +1277,10 @@ export function MsmeView({ userRole, orgName }: Props) {
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {MSME_PACKS.filter(p => p.tier !== 'free').map(pack => {
-              const isCurrent    = pack.tier === packTier
-              const isEnterprise = pack.tier === 'pack_enterprise'
-              const isDowngrade  = pack.vendor_limit < vendorLimit
-              const isRecommended = pack.recommended && !isCurrent && !isDowngrade
-              const lockedAfter  = Math.max(0, totalEver - pack.vendor_limit)
+              const isCurrent     = pack.tier === packTier
+              const isEnterprise  = pack.tier === 'pack_enterprise'
+              const isRecommended = pack.recommended && !isCurrent
+              const lockedAfter   = Math.max(0, totalEver - pack.vendor_limit)
               const discountedPaise = couponDiscount > 0 ? Math.round(pack.price_paise * (1 - couponDiscount / 100)) : pack.price_paise
               const discountedLabel = couponDiscount > 0 ? `₹${Math.round(discountedPaise / 100).toLocaleString('en-IN')}` : null
 
@@ -1328,9 +1327,9 @@ export function MsmeView({ userRole, orgName }: Props) {
                       Up to <strong>{isEnterprise ? '500+' : pack.vendor_limit} vendors</strong>
                       {!isEnterprise && <span style={{ marginLeft: 6, fontSize: 11, color: isGold ? '#a16207' : '#94a3b8' }}>· {pack.per_vendor}</span>}
                     </div>
-                    {!isCurrent && !isDowngrade && lockedAfter > 0 && (
+                    {lockedAfter > 0 && (
                       <div style={{ fontSize: 11, color: '#b45309', marginTop: 4 }}>
-                        {lockedAfter} vendor{lockedAfter > 1 ? 's' : ''} will remain locked — upgrade to a larger plan to unlock all
+                        ⚠ {lockedAfter} vendor{lockedAfter > 1 ? 's' : ''} currently locked — buying a larger plan unlocks all
                       </div>
                     )}
                   </div>
@@ -1357,15 +1356,13 @@ export function MsmeView({ userRole, orgName }: Props) {
                           <span style={{ fontSize: 12, fontWeight: 500, color: isGold ? '#a16207' : '#64748b' }}>/yr</span>
                         </div>
                         <div style={{ fontSize: 11, color: isGold ? '#a16207' : '#64748b' }}>+ 18% GST</div>
-                        {!isCurrent && !isDowngrade && (
-                          <button
-                            onClick={() => handleUpgrade(pack.tier)}
-                            disabled={upgradeBusy === pack.tier}
-                            style={{ ...primaryBtn, marginTop: 8, padding: '6px 16px', fontSize: 12 }}
-                          >
-                            {upgradeBusy === pack.tier ? 'Redirecting…' : packTier === 'free' ? 'Purchase →' : 'Upgrade →'}
-                          </button>
-                        )}
+                        <button
+                          onClick={() => handleUpgrade(pack.tier)}
+                          disabled={upgradeBusy === pack.tier}
+                          style={{ ...primaryBtn, marginTop: 8, padding: '6px 16px', fontSize: 12, ...(isCurrent ? { background: '#d4af37', borderColor: '#d4af37' } : {}) }}
+                        >
+                          {upgradeBusy === pack.tier ? 'Redirecting…' : packTier === 'free' ? 'Purchase →' : 'Buy Credits →'}
+                        </button>
                       </>
                     )}
                   </div>
