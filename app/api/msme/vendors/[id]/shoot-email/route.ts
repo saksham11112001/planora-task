@@ -131,18 +131,31 @@ export async function POST(
     }
   } catch {}
 
-  await sendMsmeVendorEmail({
-    to:           vendor.vendor_email,
-    vendorName:   vendor.vendor_name,
-    orgName,
-    formUrl,
-    attemptNo:    attempt,
-    totalEmails:  maxEmails,
-    cc:           ownerEmail,
-    contactName:  contactPerson?.name,
-    contactEmail: contactPerson?.email,
-    contactPhone: contactPerson?.phone,
-  })
+  // Attempt the send — on any Resend error, clean up the orphan token and surface the error
+  let sendError: string | null = null
+  try {
+    const { error: resendErr } = await sendMsmeVendorEmail({
+      to:           vendor.vendor_email,
+      vendorName:   vendor.vendor_name,
+      orgName,
+      formUrl,
+      attemptNo:    attempt,
+      totalEmails:  maxEmails,
+      cc:           ownerEmail,
+      contactName:  contactPerson?.name,
+      contactEmail: contactPerson?.email,
+      contactPhone: contactPerson?.phone,
+    }) ?? {}
+    if (resendErr) sendError = (resendErr as any)?.message ?? 'Email delivery failed'
+  } catch (err) {
+    sendError = err instanceof Error ? err.message : 'Email delivery failed'
+  }
+
+  if (sendError) {
+    // Remove the orphan token so it doesn't accumulate
+    await admin.from('msme_tokens').delete().eq('token_hash', tokenHash)
+    return NextResponse.json({ error: `Failed to send email: ${sendError}` }, { status: 502 })
+  }
 
   await admin.from('msme_vendors').update({
     status: 'emailed',
