@@ -38,18 +38,30 @@ export async function POST(req: NextRequest) {
   const orgName = (mb.organisations as any)?.name ?? 'Organisation'
   const basicAuth = Buffer.from(`${RZP_KEY_ID}:${RZP_KEY_SECRET}`).toString('base64')
 
-  // Resolve coupon discount (validates server-side regardless of client claim)
+  // Resolve coupon discount from DB (validates server-side)
   let discountPct = 0
   if (coupon_code) {
-    const raw = process.env.MSME_COUPON_CODES ?? ''
-    const coupons = Object.fromEntries(
-      raw.split(',').flatMap(c => {
-        const [k, v] = c.split(':')
-        const pct = parseInt(v ?? '0', 10)
-        return k?.trim() && !isNaN(pct) ? [[k.trim().toUpperCase(), pct]] : []
-      })
-    )
-    discountPct = coupons[coupon_code.trim().toUpperCase()] ?? 0
+    const { data: couponRow } = await admin
+      .from('coupons')
+      .select('id, discount_type, discount_percent, max_uses, uses_count, expires_at, is_active, one_time_use')
+      .eq('code', coupon_code.trim().toUpperCase())
+      .eq('is_active', true)
+      .maybeSingle()
+    if (
+      couponRow &&
+      couponRow.discount_type === 'percent' &&
+      couponRow.discount_percent &&
+      !(couponRow.expires_at && new Date(couponRow.expires_at) < new Date()) &&
+      !(couponRow.max_uses != null && (couponRow.uses_count ?? 0) >= couponRow.max_uses)
+    ) {
+      // Check one-time-use per org
+      let alreadyUsed = false
+      if (couponRow.one_time_use) {
+        const { data: ex } = await admin.from('coupon_redemptions').select('id').eq('coupon_id', couponRow.id).eq('org_id', orgId).maybeSingle()
+        alreadyUsed = !!ex
+      }
+      if (!alreadyUsed) discountPct = couponRow.discount_percent
+    }
   }
 
   // ── Add-on order ──────────────────────────────────────────────────────────
@@ -120,7 +132,7 @@ export async function POST(req: NextRequest) {
       amount:   chargeablePaise,
       currency: 'INR',
       receipt:  `msme_${orgId.slice(0, 8)}_${pack_tier}_${Date.now()}`,
-      notes:    { org_id: orgId, pack_tier, org_name: orgName },
+      notes:    { org_id: orgId, pack_tier, org_name: orgName, ...(coupon_code && discountPct > 0 ? { coupon_code: coupon_code.trim().toUpperCase() } : {}) },
     }),
   })
   if (!orderRes.ok) {
