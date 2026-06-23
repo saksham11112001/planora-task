@@ -36,8 +36,7 @@ export async function GET(
       return NextResponse.json({ error: 'Storage not configured' }, { status: 503 })
     }
     const key       = certUrl.slice(3)  // strip "r2:" prefix
-    const fileName  = `${vendor.vendor_name.replace(/[^a-zA-Z0-9 ]/g, '').trim()}-udyam-certificate`
-    const signedUrl = await r2SignedUrl(key, 900, fileName)  // 15-min expiry
+    const signedUrl = await r2SignedUrl(key, 900)  // 15-min expiry, no Content-Disposition → inline viewing
     return NextResponse.json({ url: signedUrl })
   }
 
