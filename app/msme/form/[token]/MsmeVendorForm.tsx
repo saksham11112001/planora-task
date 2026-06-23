@@ -146,6 +146,7 @@ export function MsmeVendorForm({ token }: { token: string }) {
           nature_of_business: natureOfBusiness,
           outstanding_amount: outstandingAmount === '' ? null : outstandingAmount,
           cert_url: certUrl,
+          proof_url: proofUrl,
         }
 
     const res  = await fetch(`/api/msme/submit/${token}`, {

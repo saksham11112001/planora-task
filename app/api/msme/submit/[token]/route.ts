@@ -82,8 +82,9 @@ export async function POST(
     msme_category,
     nature_of_business,
     outstanding_amount,
-    // cert_url is set separately via file upload
+    // cert_url and proof_url are set separately via file upload
     cert_url,
+    proof_url,
   } = body
 
   if (is_not_msme) {
@@ -130,7 +131,8 @@ export async function POST(
       msme_category,
       nature_of_business,
       outstanding_amount: outstanding_amount !== '' && outstanding_amount !== null ? Number(outstanding_amount) : null,
-      cert_url: cert_url ?? null,
+      cert_url:  cert_url  ?? null,
+      proof_url: proof_url ?? null,
       submitted_at: new Date().toISOString(),
     }).eq('id', tokenRow.vendor_id)
   }

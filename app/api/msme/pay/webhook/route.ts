@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
   const pack_tier  = notes?.pack_tier
   const orgId      = notes?.org_id
 
-  if (!orderId || !orgId) {
+  if (!orderId || !paymentId || !orgId) {
     return NextResponse.json({ ok: true, skipped: true })
   }
 
@@ -67,15 +67,38 @@ export async function POST(req: NextRequest) {
 
   // ── Add-on order webhook ───────────────────────────────────────────────────
   if (orderType === 'addon' && !isNaN(addonSlots) && addonSlots > 0) {
-    const { data: existing } = await admin
-      .from('org_feature_settings').select('config')
-      .eq('org_id', orgId).eq('feature_key', 'msme_addon_slots').maybeSingle()
-    const currentExtra: number = (existing?.config as any)?.extra_slots ?? 0
-    await admin.from('org_feature_settings').upsert(
-      { org_id: orgId, feature_key: 'msme_addon_slots', is_enabled: true, config: { extra_slots: currentExtra + addonSlots } },
-      { onConflict: 'org_id,feature_key' }
-    )
-    console.log('[msme/webhook] Addon slots activated', { orgId, addonSlots, total: currentExtra + addonSlots })
+    // Idempotency: skip if already paid
+    const { data: alreadyPaidAddon } = await admin
+      .from('msme_pack_payments')
+      .select('id')
+      .eq('gateway_payment_id', paymentId)
+      .eq('status', 'paid')
+      .maybeSingle()
+    if (!alreadyPaidAddon) {
+      const { data: existing } = await admin
+        .from('org_feature_settings').select('config')
+        .eq('org_id', orgId).eq('feature_key', 'msme_addon_slots').maybeSingle()
+      const currentExtra: number = (existing?.config as any)?.extra_slots ?? 0
+      await admin.from('org_feature_settings').upsert(
+        { org_id: orgId, feature_key: 'msme_addon_slots', is_enabled: true, config: { extra_slots: currentExtra + addonSlots } },
+        { onConflict: 'org_id,feature_key' }
+      )
+      await admin.from('msme_pack_payments').upsert(
+        {
+          org_id:             orgId,
+          pack_tier:          `addon_${addonSlots}`,
+          vendor_limit:       addonSlots,
+          amount_paise:       0,
+          gateway:            'razorpay',
+          gateway_order_id:   orderId,
+          gateway_payment_id: paymentId,
+          status:             'paid',
+          paid_at:            paidAt,
+        },
+        { onConflict: 'gateway_order_id' }
+      )
+      console.log('[msme/webhook] Addon slots activated', { orgId, addonSlots, total: currentExtra + addonSlots })
+    }
     return NextResponse.json({ ok: true })
   }
 
@@ -106,7 +129,7 @@ export async function POST(req: NextRequest) {
       amount_paise:       pack.price_paise,
       gateway:            'razorpay',
       gateway_order_id:   orderId,
-      gateway_payment_id: paymentId ?? '',
+      gateway_payment_id: paymentId,
       status:             'paid',
       paid_at:            paidAt,
     },

@@ -226,18 +226,20 @@ export function MsmeView({ userRole, orgName }: Props) {
       ? { name: contactDraft.name.trim(), email: contactDraft.email.trim(), phone: contactDraft.phone.trim() || undefined }
       : null
     setSavingSchedule(true)
-    const res = await fetch('/api/msme/settings', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ schedule: draftIntervals, cc_email: draftCcEmail || null, contact_person: contactPayload }),
-    })
-    setSavingSchedule(false)
-    if (!res.ok) { const d = await res.json(); showToast(d.error ?? 'Failed to save', 'error'); return }
-    setIntervalDays(draftIntervals)
-    setCcEmail(draftCcEmail)
-    if (contactPayload) setContactPerson({ name: contactPayload.name, email: contactPayload.email, phone: contactPayload.phone ?? '' })
-    setShowSettings(false)
-    showToast('Settings saved')
+    try {
+      const res = await fetch('/api/msme/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ schedule: draftIntervals, cc_email: draftCcEmail || null, contact_person: contactPayload }),
+      })
+      if (!res.ok) { const d = await res.json(); showToast(d.error ?? 'Failed to save', 'error'); return }
+      setIntervalDays(draftIntervals)
+      setCcEmail(draftCcEmail)
+      if (contactPayload) setContactPerson({ name: contactPayload.name, email: contactPayload.email, phone: contactPayload.phone ?? '' })
+      setShowSettings(false)
+      showToast('Settings saved')
+    } catch { showToast('Network error — please try again', 'error') }
+    finally { setSavingSchedule(false) }
   }
 
 
@@ -245,11 +247,13 @@ export function MsmeView({ userRole, orgName }: Props) {
   async function handleApplyCoupon() {
     if (!couponCode.trim()) { setCouponError('Enter a coupon code'); return }
     setCouponBusy(true); setCouponError('')
-    const res = await fetch(`/api/msme/coupon?code=${encodeURIComponent(couponCode.trim())}`)
-    const data = await res.json()
-    setCouponBusy(false)
-    if (!res.ok) { setCouponError(data.error ?? 'Invalid coupon'); setCouponDiscount(0); return }
-    setCouponDiscount(data.discount_percent)
+    try {
+      const res = await fetch(`/api/msme/coupon?code=${encodeURIComponent(couponCode.trim())}`)
+      const data = await res.json()
+      if (!res.ok) { setCouponError(data.error ?? 'Invalid coupon'); setCouponDiscount(0); return }
+      setCouponDiscount(data.discount_percent)
+    } catch { setCouponError('Network error — please try again') }
+    finally { setCouponBusy(false) }
   }
 
 
@@ -454,8 +458,9 @@ export function MsmeView({ userRole, orgName }: Props) {
     let sent = 0, failed = 0
     for (const id of ids) {
       const res  = await fetch(`/api/msme/vendors/${id}/shoot-email`, { method: 'POST' })
-      if (!res.ok) { failed++; continue }
-      sent++
+      if (!res.ok) { failed++; } else { sent++ }
+      // 150 ms between requests to stay within Resend's ~10 req/s rate limit
+      await new Promise(r => setTimeout(r, 150))
     }
     setBulkShooting(false)
     setCheckedIds(new Set())
