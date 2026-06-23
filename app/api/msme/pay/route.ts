@@ -190,7 +190,7 @@ export async function PUT(req: NextRequest) {
     // Verify the order belongs to this org and wasn't already processed
     const { data: addonPayment } = await admin
       .from('msme_pack_payments')
-      .select('id, org_id, status')
+      .select('id, org_id, status, amount_paise')
       .eq('gateway_order_id', razorpay_order_id)
       .maybeSingle()
     if (!addonPayment) {
@@ -221,7 +221,7 @@ export async function PUT(req: NextRequest) {
         org_id:             mb.org_id,
         pack_tier:          `addon_${addon_slots}`,
         vendor_limit:       addon_slots,
-        amount_paise:       0,
+        amount_paise:       addonPayment.amount_paise ?? 0,
         gateway:            'razorpay',
         gateway_order_id:   razorpay_order_id,
         gateway_payment_id: razorpay_payment_id,
@@ -235,6 +235,9 @@ export async function PUT(req: NextRequest) {
 
   // ── Pack upgrade verification ─────────────────────────────────────────────
   const pack = getPackByTier(pack_tier)
+  if (pack.tier === 'free') {
+    return NextResponse.json({ error: 'Cannot downgrade to free tier via payment verification' }, { status: 400 })
+  }
 
   // Verify the order belongs to this org (prevents cross-org replay)
   const { data: packPayment } = await admin

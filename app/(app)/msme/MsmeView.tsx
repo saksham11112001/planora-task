@@ -260,12 +260,15 @@ export function MsmeView({ userRole, orgName }: Props) {
   // ── Addon purchase ─────────────────────────────────────────────────────────
   async function handleAddon(slots: number, _pricePaise: number) {
     setAddonBusy(slots)
-    const res = await fetch('/api/msme/pay', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ addon_slots: slots, ...(couponCode && couponDiscount > 0 ? { coupon_code: couponCode } : {}) }),
-    })
-    const data = await res.json()
+    let res: Response, data: any
+    try {
+      res = await fetch('/api/msme/pay', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ addon_slots: slots, ...(couponCode && couponDiscount > 0 ? { coupon_code: couponCode } : {}) }),
+      })
+      data = await res.json()
+    } catch { showToast('Network error — please try again', 'error'); setAddonBusy(null); return }
     setAddonBusy(null)
     if (!res.ok) {
       if (res.status === 503) { showToast('Payment gateway not configured. Contact support.', 'info'); return }
@@ -293,15 +296,17 @@ export function MsmeView({ userRole, orgName }: Props) {
           prefill: { email: data.email, name: data.org_name },
           theme: { color: '#0d9488' },
           handler: async (response: any) => {
-            const verifyRes = await fetch('/api/msme/pay', {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ addon_slots: slots, razorpay_order_id: response.razorpay_order_id, razorpay_payment_id: response.razorpay_payment_id, razorpay_signature: response.razorpay_signature }),
-            })
-            const verifyData = await verifyRes.json()
-            if (!verifyRes.ok) { showToast(verifyData.error ?? 'Verification failed', 'error'); return }
-            setVendorLimit(v => v + slots)
-            showToast(`+${slots} vendor slots added! 🎉`, 'success')
+            try {
+              const verifyRes = await fetch('/api/msme/pay', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ addon_slots: slots, razorpay_order_id: response.razorpay_order_id, razorpay_payment_id: response.razorpay_payment_id, razorpay_signature: response.razorpay_signature }),
+              })
+              const verifyData = await verifyRes.json()
+              if (!verifyRes.ok) { showToast(verifyData.error ?? 'Verification failed', 'error'); return }
+              setVendorLimit(v => v + slots)
+              showToast(`+${slots} vendor slots added! 🎉`, 'success')
+            } catch { showToast('Network error during payment verification. Your slots will be added shortly via webhook.', 'info') }
           },
           modal: { ondismiss: () => showToast('Payment cancelled', 'info') },
         })

@@ -48,6 +48,10 @@ export async function PATCH(
   if (body.pan !== undefined) allowed.pan = body.pan?.trim().toUpperCase() || null
   if (body.udyam_registered_on !== undefined) allowed.udyam_registered_on = body.udyam_registered_on || null
 
+  if (Object.keys(allowed).length === 0) {
+    return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
+  }
+
   const { error } = await admin
     .from('msme_vendors')
     .update(allowed)
