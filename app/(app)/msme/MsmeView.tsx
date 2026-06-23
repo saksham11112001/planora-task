@@ -1279,7 +1279,9 @@ export function MsmeView({ userRole, orgName }: Props) {
             {MSME_PACKS.filter(p => p.tier !== 'free').map(pack => {
               const isCurrent    = pack.tier === packTier
               const isEnterprise = pack.tier === 'pack_enterprise'
-              const isDowngrade  = pack.vendor_limit < vendorLimit
+              // Downgrade = pack has fewer slots than the current pack's base limit (ignore addon slots)
+              const currentPackLimit = MSME_PACKS.find(p => p.tier === packTier)?.vendor_limit ?? 0
+              const isDowngrade  = pack.vendor_limit < currentPackLimit
               const isRecommended = pack.recommended && !isCurrent && !isDowngrade
               const lockedAfter  = Math.max(0, totalEver - pack.vendor_limit)
               const discountedPaise = couponDiscount > 0 ? Math.round(pack.price_paise * (1 - couponDiscount / 100)) : pack.price_paise
@@ -1357,13 +1359,13 @@ export function MsmeView({ userRole, orgName }: Props) {
                           <span style={{ fontSize: 12, fontWeight: 500, color: isGold ? '#a16207' : '#64748b' }}>/yr</span>
                         </div>
                         <div style={{ fontSize: 11, color: isGold ? '#a16207' : '#64748b' }}>+ 18% GST</div>
-                        {!isCurrent && !isDowngrade && (
+                        {!isDowngrade && (
                           <button
                             onClick={() => handleUpgrade(pack.tier)}
                             disabled={upgradeBusy === pack.tier}
-                            style={{ ...primaryBtn, marginTop: 8, padding: '6px 16px', fontSize: 12 }}
+                            style={{ ...primaryBtn, marginTop: 8, padding: '6px 16px', fontSize: 12, ...(isCurrent ? { background: '#d4af37', borderColor: '#d4af37' } : {}) }}
                           >
-                            {upgradeBusy === pack.tier ? 'Redirecting…' : packTier === 'free' ? 'Purchase →' : 'Upgrade →'}
+                            {upgradeBusy === pack.tier ? 'Redirecting…' : packTier === 'free' ? 'Purchase →' : isCurrent ? 'Buy Credits →' : 'Upgrade →'}
                           </button>
                         )}
                       </>
