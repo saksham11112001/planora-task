@@ -73,6 +73,9 @@ export async function POST(
   if (new Date(tokenRow.expires_at) < new Date()) {
     return NextResponse.json({ error: 'Link has expired. Please ask the sender to resend the email.' }, { status: 410 })
   }
+  if (tokenRow.used_at) {
+    return NextResponse.json({ error: 'This link has already been used. Contact the sender if you need to make changes.' }, { status: 410 })
+  }
 
   const body = await req.json()
   const {
@@ -93,13 +96,17 @@ export async function POST(
       return NextResponse.json({ error: 'Please enter your name for the declaration' }, { status: 400 })
     }
 
-    await admin.from('msme_vendors').update({
+    const { error: notMsmeErr } = await admin.from('msme_vendors').update({
       status: 'not_msme',
       is_not_msme: true,
       declarant_name: declarant_name.trim(),
       declared_at: new Date().toISOString(),
       submitted_at: new Date().toISOString(),
     }).eq('id', tokenRow.vendor_id)
+    if (notMsmeErr) {
+      console.error('[msme/submit] not_msme update failed:', notMsmeErr.message)
+      return NextResponse.json({ error: 'Failed to save your declaration. Please try again.' }, { status: 500 })
+    }
 
   } else {
     // MSME submission path
@@ -125,7 +132,7 @@ export async function POST(
       }
     }
 
-    await admin.from('msme_vendors').update({
+    const { error: submitErr } = await admin.from('msme_vendors').update({
       status: 'submitted',
       udyam_number: udyamClean,
       msme_category,
@@ -135,6 +142,10 @@ export async function POST(
       proof_url: proof_url ?? null,
       submitted_at: new Date().toISOString(),
     }).eq('id', tokenRow.vendor_id)
+    if (submitErr) {
+      console.error('[msme/submit] vendor update failed:', submitErr.message)
+      return NextResponse.json({ error: 'Failed to save your submission. Please try again.' }, { status: 500 })
+    }
   }
 
   // Mark token as used (don't delete — keeps audit trail)

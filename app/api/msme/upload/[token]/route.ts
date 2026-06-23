@@ -59,8 +59,9 @@ export async function POST(
     certUrl = urlData.publicUrl
   }
 
-  // Persist cert_url on the vendor record immediately (form submit will also send it)
-  await admin.from('msme_vendors').update({ cert_url: certUrl }).eq('id', tokenRow.vendor_id)
+  // Persist cert_url on the vendor record immediately (form submit will also send it as a backup)
+  const { error: urlErr } = await admin.from('msme_vendors').update({ cert_url: certUrl }).eq('id', tokenRow.vendor_id)
+  if (urlErr) console.error('[msme/upload] cert_url pre-save failed (non-fatal):', urlErr.message)
 
   return NextResponse.json({ ok: true, cert_url: certUrl })
 }

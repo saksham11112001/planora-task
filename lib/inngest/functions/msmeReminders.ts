@@ -31,10 +31,10 @@ export const msmeReminders = inngest.createFunction(
 
     if (vendors.length === 0) return { vendors_checked: 0, emails_sent: 0 }
 
-    // Fetch schedule configs and CC email settings for all orgs that have vendors due
+    // Fetch schedule configs, CC email, and contact person settings for all orgs that have vendors due
     const orgIds = [...new Set(vendors.map(v => v.org_id))]
-    const { scheduleMap, ccMap } = await step.run('fetch-org-settings', async () => {
-      const [{ data: schedRows }, { data: ccRows }] = await Promise.all([
+    const { scheduleMap, ccMap, contactMap } = await step.run('fetch-org-settings', async () => {
+      const [{ data: schedRows }, { data: ccRows }, { data: contactRows }] = await Promise.all([
         admin
           .from('org_feature_settings')
           .select('org_id, config')
@@ -44,6 +44,11 @@ export const msmeReminders = inngest.createFunction(
           .from('org_feature_settings')
           .select('org_id, config')
           .eq('feature_key', 'msme_cc_email')
+          .in('org_id', orgIds),
+        admin
+          .from('org_feature_settings')
+          .select('org_id, config')
+          .eq('feature_key', 'msme_contact_person')
           .in('org_id', orgIds),
       ])
       const scheduleMap: Record<string, number[]> = {}
@@ -55,7 +60,11 @@ export const msmeReminders = inngest.createFunction(
         const email = (row.config as { email?: string } | null)?.email
         if (email) ccMap[row.org_id] = email
       }
-      return { scheduleMap, ccMap }
+      const contactMap: Record<string, { name?: string; email?: string; phone?: string } | null> = {}
+      for (const row of contactRows ?? []) {
+        contactMap[row.org_id] = (row.config as { name?: string; email?: string; phone?: string } | null) ?? null
+      }
+      return { scheduleMap, ccMap, contactMap }
     })
 
     let emailsSent = 0
@@ -75,24 +84,27 @@ export const msmeReminders = inngest.createFunction(
         const lastEmailed  = new Date(vendor.last_emailed_at!)
         const sendAfter    = new Date(lastEmailed.getTime() + daysToWait * 86400_000)
 
-        // Only send if we're on or past the due date (but not more than 1 day over, to avoid re-sending)
-        const oneDayMs = 86400_000
-        if (now < sendAfter || now.getTime() - sendAfter.getTime() > oneDayMs) continue
+        // Only send if we're on or past the due date
+        if (now < sendAfter) continue
 
         const orgName = (vendor.organisations as any)?.name ?? 'Your firm'
         const attemptNo = (vendor.email_count + 1) as 2 | 3 | 4 | 5
 
-        // Generate fresh magic-link token
+        // Generate fresh magic-link token — skip this vendor if token mint fails
+        // (sending a broken /msme/form/<uuid> URL would confuse the vendor)
         const tokenRes = await fetch(`${APP_URL}/api/msme/tokens`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-inngest-secret': process.env.INNGEST_SIGNING_KEY ?? '' },
           body: JSON.stringify({ vendor_id: vendor.id }),
         })
-        let formUrl = `${APP_URL}/msme/form/${vendor.id}`
-        if (tokenRes.ok) {
-          const { token } = await tokenRes.json()
-          formUrl = `${APP_URL}/msme/form/${token}`
+        if (!tokenRes.ok) {
+          console.error('[msme-reminders] token mint failed for vendor', vendor.id, await tokenRes.text())
+          continue
         }
+        const { token } = await tokenRes.json()
+        const formUrl = `${APP_URL}/msme/form/${token}`
+
+        const contactPerson = contactMap[vendor.org_id] ?? null
 
         try {
           await sendMsmeVendorEmail({
@@ -102,7 +114,10 @@ export const msmeReminders = inngest.createFunction(
             formUrl,
             attemptNo,
             totalEmails: maxEmails,
-            cc: ccMap[vendor.org_id],
+            cc:           ccMap[vendor.org_id],
+            contactName:  contactPerson?.name,
+            contactEmail: contactPerson?.email,
+            contactPhone: contactPerson?.phone,
           })
           await admin.from('msme_vendors').update({
             email_count: attemptNo,
