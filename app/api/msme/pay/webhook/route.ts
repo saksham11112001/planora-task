@@ -147,6 +147,23 @@ export async function POST(req: NextRequest) {
     { onConflict: 'gateway_order_id' }
   )
 
+  // Record coupon redemption if one was used
+  const couponCode = notes?.coupon_code
+  if (couponCode) {
+    const { data: couponRow } = await admin
+      .from('coupons')
+      .select('id, uses_count')
+      .eq('code', couponCode.toUpperCase())
+      .maybeSingle()
+    if (couponRow) {
+      await admin.from('coupon_redemptions').upsert(
+        { coupon_id: couponRow.id, org_id: orgId },
+        { onConflict: 'coupon_id,org_id' }
+      )
+      await admin.from('coupons').update({ uses_count: (couponRow.uses_count ?? 0) + 1 }).eq('id', couponRow.id)
+    }
+  }
+
   console.log('[msme/webhook] Pack activated via webhook', { orgId, pack_tier, vendor_limit: pack.vendor_limit })
   return NextResponse.json({ ok: true })
 }

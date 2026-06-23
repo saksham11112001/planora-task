@@ -462,9 +462,18 @@ export function CouponsView({ initialCoupons }: Props) {
                       onChange={e => setF('plan_tier', e.target.value)}
                       style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1.5px solid var(--border)', background: 'var(--surface)', fontSize: 13, color: 'var(--text-primary)', outline: 'none' }}
                     >
-                      <option value="starter">Starter</option>
-                      <option value="pro">Pro</option>
-                      <option value="business">Business</option>
+                      <optgroup label="upFloat Plans">
+                        <option value="starter">Starter</option>
+                        <option value="pro">Pro</option>
+                        <option value="business">Business</option>
+                      </optgroup>
+                      <optgroup label="MSME Packs">
+                        <option value="pack_25">MSME Starter (25v)</option>
+                        <option value="pack_100">MSME Growth (100v)</option>
+                        <option value="pack_250">MSME Professional (250v)</option>
+                        <option value="pack_500">MSME Business (500v)</option>
+                        <option value="pack_enterprise">MSME Enterprise</option>
+                      </optgroup>
                     </select>
                   </div>
                   <div>
