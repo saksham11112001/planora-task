@@ -75,9 +75,9 @@ export function MsmeVendorForm({ token }: { token: string }) {
 
   useEffect(() => {
     fetch(`/api/msme/submit/${token}`)
-      .then(r => r.json())
-      .then(d => {
-        if (d.error) { setError(d.error); setLoading(false); return }
+      .then(async r => {
+        const d = await r.json().catch(() => ({ error: 'Failed to load the form. Please try again or ask the sender to resend the link.' }))
+        if (!r.ok || d.error) { setError(d.error ?? 'Failed to load the form.'); setLoading(false); return }
         setInfo(d)
         if (d.already_submitted) setSubmitted(true)
         setLoading(false)

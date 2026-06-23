@@ -447,10 +447,17 @@ export function MsmeView({ userRole, orgName }: Props) {
   // ── Shoot email ──────────────────────────────────────────────────────────
   async function handleShootEmail(vendorId: string, vendorName: string) {
     setShootingId(vendorId)
-    const res  = await fetch(`/api/msme/vendors/${vendorId}/shoot-email`, { method: 'POST' })
-    const data = await res.json()
+    let res: Response, data: any
+    try {
+      res  = await fetch(`/api/msme/vendors/${vendorId}/shoot-email`, { method: 'POST' })
+      data = await res.json()
+    } catch { setShootingId(null); showToast('Network error — please try again', 'error'); return }
     setShootingId(null)
-    if (!res.ok) { showToast(data.error ?? 'Failed to send email', 'error'); return }
+    if (!res.ok) {
+      const msg = data.error ?? 'Failed to send email'
+      showToast(msg, res.status === 403 && msg.includes('slot') ? 'info' : 'error')
+      return
+    }
     showToast(`Email sent to ${vendorName} (attempt ${data.attempt}/${intervalDays.length + 1})`)
     fetchVendors()
   }
@@ -617,7 +624,10 @@ export function MsmeView({ userRole, orgName }: Props) {
         return
       }
       totalInserted += data.inserted ?? 0
-      if (Array.isArray(data.skipped)) allSkipped.push(...data.skipped)
+      if (Array.isArray(data.skipped)) {
+        // Offset row numbers by batch start so they reflect position in the original file
+        allSkipped.push(...data.skipped.map((s: {row:number;name:string;reason:string}) => ({ ...s, row: s.row + i })))
+      }
       totalPaidSlots = data.paid_slots ?? totalPaidSlots
       setImportProgress({ done: Math.min(i + BATCH, importRows.length), total: importRows.length })
     }

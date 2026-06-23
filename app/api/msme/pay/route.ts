@@ -293,7 +293,7 @@ export async function PUT(req: NextRequest) {
     const gstDetails    = gstRow?.config as any ?? null
     const orgName       = orgRow?.name ?? ''
     const chargeablePaise = Math.round(pack.price_paise * 1.18)
-    const invoiceNum    = `INV-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${Math.random().toString(36).slice(2,8).toUpperCase()}`
+    const invoiceNum    = `INV-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`
 
     await sendInvoiceEmail({
       invoiceNumber:   invoiceNum,
