@@ -35,6 +35,18 @@ export async function POST(req: NextRequest) {
 
   const admin = createAdminClient()
 
+  // Cap total vendor rows per org to 2000 (prevents runaway DB growth on free plans)
+  const { count: totalVendors } = await admin
+    .from('msme_vendors')
+    .select('id', { count: 'exact', head: true })
+    .eq('org_id', mb.org_id)
+  const TOTAL_ROW_CAP = 2000
+  if ((totalVendors ?? 0) + rows.length > TOTAL_ROW_CAP) {
+    return NextResponse.json({
+      error: `Import would exceed the ${TOTAL_ROW_CAP}-vendor storage limit. You currently have ${totalVendors ?? 0} vendors.`,
+    }, { status: 422 })
+  }
+
   // Get existing emails (all rows incl. soft-deleted) to avoid duplicates
   const { data: existingVendors } = await admin
     .from('msme_vendors')

@@ -260,12 +260,15 @@ export function MsmeView({ userRole, orgName }: Props) {
   // ── Addon purchase ─────────────────────────────────────────────────────────
   async function handleAddon(slots: number, _pricePaise: number) {
     setAddonBusy(slots)
-    const res = await fetch('/api/msme/pay', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ addon_slots: slots, ...(couponCode && couponDiscount > 0 ? { coupon_code: couponCode } : {}) }),
-    })
-    const data = await res.json()
+    let res: Response, data: any
+    try {
+      res = await fetch('/api/msme/pay', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ addon_slots: slots, ...(couponCode && couponDiscount > 0 ? { coupon_code: couponCode } : {}) }),
+      })
+      data = await res.json()
+    } catch { showToast('Network error — please try again', 'error'); setAddonBusy(null); return }
     setAddonBusy(null)
     if (!res.ok) {
       if (res.status === 503) { showToast('Payment gateway not configured. Contact support.', 'info'); return }
@@ -293,15 +296,17 @@ export function MsmeView({ userRole, orgName }: Props) {
           prefill: { email: data.email, name: data.org_name },
           theme: { color: '#0d9488' },
           handler: async (response: any) => {
-            const verifyRes = await fetch('/api/msme/pay', {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ addon_slots: slots, razorpay_order_id: response.razorpay_order_id, razorpay_payment_id: response.razorpay_payment_id, razorpay_signature: response.razorpay_signature }),
-            })
-            const verifyData = await verifyRes.json()
-            if (!verifyRes.ok) { showToast(verifyData.error ?? 'Verification failed', 'error'); return }
-            setVendorLimit(v => v + slots)
-            showToast(`+${slots} vendor slots added! 🎉`, 'success')
+            try {
+              const verifyRes = await fetch('/api/msme/pay', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ addon_slots: slots, razorpay_order_id: response.razorpay_order_id, razorpay_payment_id: response.razorpay_payment_id, razorpay_signature: response.razorpay_signature }),
+              })
+              const verifyData = await verifyRes.json()
+              if (!verifyRes.ok) { showToast(verifyData.error ?? 'Verification failed', 'error'); return }
+              setVendorLimit(v => v + slots)
+              showToast(`+${slots} vendor slots added! 🎉`, 'success')
+            } catch { showToast('Network error during payment verification. Your slots will be added shortly via webhook.', 'info') }
           },
           modal: { ondismiss: () => showToast('Payment cancelled', 'info') },
         })
@@ -442,10 +447,17 @@ export function MsmeView({ userRole, orgName }: Props) {
   // ── Shoot email ──────────────────────────────────────────────────────────
   async function handleShootEmail(vendorId: string, vendorName: string) {
     setShootingId(vendorId)
-    const res  = await fetch(`/api/msme/vendors/${vendorId}/shoot-email`, { method: 'POST' })
-    const data = await res.json()
+    let res: Response, data: any
+    try {
+      res  = await fetch(`/api/msme/vendors/${vendorId}/shoot-email`, { method: 'POST' })
+      data = await res.json()
+    } catch { setShootingId(null); showToast('Network error — please try again', 'error'); return }
     setShootingId(null)
-    if (!res.ok) { showToast(data.error ?? 'Failed to send email', 'error'); return }
+    if (!res.ok) {
+      const msg = data.error ?? 'Failed to send email'
+      showToast(msg, res.status === 403 && msg.includes('slot') ? 'info' : 'error')
+      return
+    }
     showToast(`Email sent to ${vendorName} (attempt ${data.attempt}/${intervalDays.length + 1})`)
     fetchVendors()
   }
@@ -612,7 +624,10 @@ export function MsmeView({ userRole, orgName }: Props) {
         return
       }
       totalInserted += data.inserted ?? 0
-      if (Array.isArray(data.skipped)) allSkipped.push(...data.skipped)
+      if (Array.isArray(data.skipped)) {
+        // Offset row numbers by batch start so they reflect position in the original file
+        allSkipped.push(...data.skipped.map((s: {row:number;name:string;reason:string}) => ({ ...s, row: s.row + i })))
+      }
       totalPaidSlots = data.paid_slots ?? totalPaidSlots
       setImportProgress({ done: Math.min(i + BATCH, importRows.length), total: importRows.length })
     }

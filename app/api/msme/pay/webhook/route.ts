@@ -31,7 +31,10 @@ export async function POST(req: NextRequest) {
     .update(rawBody)
     .digest('hex')
 
-  if (expected !== signature) {
+  const sigBuf = Buffer.from(signature, 'hex')
+  const expBuf = Buffer.from(expected, 'hex')
+  const sigValid = sigBuf.length === expBuf.length && crypto.timingSafeEqual(sigBuf, expBuf)
+  if (!sigValid) {
     console.warn('[msme/webhook] Signature mismatch — possible spoofed request')
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
   }
@@ -48,11 +51,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, skipped: true })
   }
 
-  const order      = event.payload?.order?.entity   as Record<string, any> | undefined
-  const payment    = event.payload?.payment?.entity as Record<string, any> | undefined
-  const orderId    = order?.id    as string | undefined
-  const paymentId  = payment?.id  as string | undefined
-  const notes      = order?.notes as Record<string, string> | undefined
+  const order         = event.payload?.order?.entity   as Record<string, any> | undefined
+  const payment       = event.payload?.payment?.entity as Record<string, any> | undefined
+  const orderId       = order?.id     as string | undefined
+  const paymentId     = payment?.id   as string | undefined
+  const paymentAmount = payment?.amount as number | undefined
+  const notes         = order?.notes  as Record<string, string> | undefined
   const pack_tier  = notes?.pack_tier
   const orgId      = notes?.org_id
 
@@ -75,20 +79,13 @@ export async function POST(req: NextRequest) {
       .eq('status', 'paid')
       .maybeSingle()
     if (!alreadyPaidAddon) {
-      const { data: existing } = await admin
-        .from('org_feature_settings').select('config')
-        .eq('org_id', orgId).eq('feature_key', 'msme_addon_slots').maybeSingle()
-      const currentExtra: number = (existing?.config as any)?.extra_slots ?? 0
-      await admin.from('org_feature_settings').upsert(
-        { org_id: orgId, feature_key: 'msme_addon_slots', is_enabled: true, config: { extra_slots: currentExtra + addonSlots } },
-        { onConflict: 'org_id,feature_key' }
-      )
-      await admin.from('msme_pack_payments').upsert(
+      // Mark payment as paid first (atomic — prevents duplicate slot grants if webhook fires twice)
+      const { error: markErr } = await admin.from('msme_pack_payments').upsert(
         {
           org_id:             orgId,
           pack_tier:          `addon_${addonSlots}`,
           vendor_limit:       addonSlots,
-          amount_paise:       0,
+          amount_paise:       paymentAmount ?? 0,
           gateway:            'razorpay',
           gateway_order_id:   orderId,
           gateway_payment_id: paymentId,
@@ -96,6 +93,20 @@ export async function POST(req: NextRequest) {
           paid_at:            paidAt,
         },
         { onConflict: 'gateway_order_id' }
+      )
+      if (markErr) {
+        console.error('[msme/webhook] payment mark failed, aborting slot grant', markErr.message)
+        return NextResponse.json({ error: 'Payment record update failed' }, { status: 500 })
+      }
+      // Then increment slot count (read-modify-write is acceptable here because the
+      // payment row above acts as the idempotency gate — only one caller wins the upsert)
+      const { data: existing } = await admin
+        .from('org_feature_settings').select('config')
+        .eq('org_id', orgId).eq('feature_key', 'msme_addon_slots').maybeSingle()
+      const currentExtra: number = (existing?.config as any)?.extra_slots ?? 0
+      await admin.from('org_feature_settings').upsert(
+        { org_id: orgId, feature_key: 'msme_addon_slots', is_enabled: true, config: { extra_slots: currentExtra + addonSlots } },
+        { onConflict: 'org_id,feature_key' }
       )
       console.log('[msme/webhook] Addon slots activated', { orgId, addonSlots, total: currentExtra + addonSlots })
     }
@@ -126,7 +137,7 @@ export async function POST(req: NextRequest) {
       org_id:             orgId,
       pack_tier,
       vendor_limit:       pack.vendor_limit,
-      amount_paise:       pack.price_paise,
+      amount_paise:       paymentAmount ?? pack.price_paise,
       gateway:            'razorpay',
       gateway_order_id:   orderId,
       gateway_payment_id: paymentId,

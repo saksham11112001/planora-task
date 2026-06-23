@@ -42,11 +42,20 @@ export async function PATCH(
   }
 
   const allowed: Record<string, unknown> = {}
-  if (body.vendor_email) allowed.vendor_email = body.vendor_email.trim().toLowerCase()
+  if (body.vendor_email != null && body.vendor_email !== '') allowed.vendor_email = body.vendor_email.trim().toLowerCase()
   if (body.vendor_name)  allowed.vendor_name  = body.vendor_name.trim()
   if (body.gstin !== undefined) allowed.gstin = body.gstin?.trim() || null
   if (body.pan !== undefined) allowed.pan = body.pan?.trim().toUpperCase() || null
-  if (body.udyam_registered_on !== undefined) allowed.udyam_registered_on = body.udyam_registered_on || null
+  if (body.udyam_registered_on !== undefined) {
+    if (body.udyam_registered_on && !/^\d{4}-\d{2}-\d{2}$/.test(body.udyam_registered_on)) {
+      return NextResponse.json({ error: 'udyam_registered_on must be in YYYY-MM-DD format' }, { status: 400 })
+    }
+    allowed.udyam_registered_on = body.udyam_registered_on || null
+  }
+
+  if (Object.keys(allowed).length === 0) {
+    return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
+  }
 
   const { error } = await admin
     .from('msme_vendors')
