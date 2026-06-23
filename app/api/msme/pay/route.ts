@@ -70,8 +70,11 @@ export async function POST(req: NextRequest) {
         notes:    { org_id: orgId, order_type: 'addon', addon_slots: String(addon_slots), org_name: orgName },
       }),
     })
+    if (!orderRes.ok) {
+      const errBody = await orderRes.json().catch(() => ({}))
+      return NextResponse.json({ error: (errBody as any).error?.description ?? 'Order creation failed' }, { status: 500 })
+    }
     const order = await orderRes.json()
-    if (!orderRes.ok) return NextResponse.json({ error: order.error?.description ?? 'Order creation failed' }, { status: 500 })
 
     const admin = createAdminClient()
     await admin.from('msme_pack_payments').upsert(
@@ -120,10 +123,11 @@ export async function POST(req: NextRequest) {
       notes:    { org_id: orgId, pack_tier, org_name: orgName },
     }),
   })
-  const order = await orderRes.json()
   if (!orderRes.ok) {
-    return NextResponse.json({ error: order.error?.description ?? 'Order creation failed' }, { status: 500 })
+    const errBody = await orderRes.json().catch(() => ({}))
+    return NextResponse.json({ error: (errBody as any).error?.description ?? 'Order creation failed' }, { status: 500 })
   }
+  const order = await orderRes.json()
 
   const admin = createAdminClient()
   await admin.from('msme_pack_payments').upsert(
@@ -131,7 +135,7 @@ export async function POST(req: NextRequest) {
       org_id:           orgId,
       pack_tier,
       vendor_limit:     vendorLimit,
-      amount_paise:     basePaise,
+      amount_paise:     chargeablePaise,  // actual charged amount (includes GST + coupon discount)
       gateway:          'razorpay',
       gateway_order_id: order.id,
       status:           'pending',
@@ -178,7 +182,10 @@ export async function PUT(req: NextRequest) {
     .update(`${razorpay_order_id}|${razorpay_payment_id}`)
     .digest('hex')
 
-  if (expectedSig !== razorpay_signature) {
+  const sigBuf = Buffer.from(razorpay_signature, 'hex')
+  const expBuf = Buffer.from(expectedSig, 'hex')
+  const sigValid = sigBuf.length === expBuf.length && crypto.timingSafeEqual(sigBuf, expBuf)
+  if (!sigValid) {
     return NextResponse.json({ error: 'Payment verification failed — invalid signature' }, { status: 400 })
   }
 
@@ -242,10 +249,13 @@ export async function PUT(req: NextRequest) {
   // Verify the order belongs to this org (prevents cross-org replay)
   const { data: packPayment } = await admin
     .from('msme_pack_payments')
-    .select('id, org_id, status')
+    .select('id, org_id, status, amount_paise')
     .eq('gateway_order_id', razorpay_order_id)
     .maybeSingle()
-  if (packPayment && packPayment.org_id !== mb.org_id) {
+  if (!packPayment) {
+    return NextResponse.json({ error: 'Order not found' }, { status: 404 })
+  }
+  if (packPayment.org_id !== mb.org_id) {
     return NextResponse.json({ error: 'Order does not belong to your organisation' }, { status: 403 })
   }
 
@@ -292,7 +302,8 @@ export async function PUT(req: NextRequest) {
     ])
     const gstDetails    = gstRow?.config as any ?? null
     const orgName       = orgRow?.name ?? ''
-    const chargeablePaise = Math.round(pack.price_paise * 1.18)
+    // Use the actual amount_paise from the order record (includes coupon discount + GST)
+    const actualAmountPaise = packPayment.amount_paise ?? Math.round(pack.price_paise * 1.18)
     const invoiceNum    = `INV-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`
 
     await sendInvoiceEmail({
@@ -302,7 +313,7 @@ export async function PUT(req: NextRequest) {
       orgName,
       gstDetails,
       itemDescription: `MSME Tracker — ${pack.label} Pack (${pack.vendor_limit} vendors)`,
-      amountPaise:     chargeablePaise,
+      amountPaise:     actualAmountPaise,
       paymentId:       razorpay_payment_id,
     })
   } catch { /* never block payment success */ }

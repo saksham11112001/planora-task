@@ -94,7 +94,7 @@ export const msmeReminders = inngest.createFunction(
         // (sending a broken /msme/form/<uuid> URL would confuse the vendor)
         const tokenRes = await fetch(`${APP_URL}/api/msme/tokens`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-inngest-secret': process.env.INNGEST_SIGNING_KEY ?? '' },
+          headers: { 'Content-Type': 'application/json', 'x-msme-internal-secret': process.env.MSME_INTERNAL_SECRET ?? '' },
           body: JSON.stringify({ vendor_id: vendor.id }),
         })
         if (!tokenRes.ok) {

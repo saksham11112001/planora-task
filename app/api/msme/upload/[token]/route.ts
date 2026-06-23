@@ -16,13 +16,16 @@ export async function POST(
 
   const { data: tokenRow } = await admin
     .from('msme_tokens')
-    .select('id, vendor_id, org_id, expires_at')
+    .select('id, vendor_id, org_id, expires_at, used_at')
     .eq('token_hash', tokenHash)
     .maybeSingle()
 
   if (!tokenRow) return NextResponse.json({ error: 'Invalid link' }, { status: 404 })
   if (new Date(tokenRow.expires_at) < new Date()) {
     return NextResponse.json({ error: 'Link expired' }, { status: 410 })
+  }
+  if (tokenRow.used_at) {
+    return NextResponse.json({ error: 'This link has already been used' }, { status: 410 })
   }
 
   const formData = await req.formData()
@@ -38,8 +41,17 @@ export async function POST(
   }
 
   const buffer = Buffer.from(await file.arrayBuffer())
-  const ext    = file.name.split('.').pop() ?? 'pdf'
-  const key    = `msme/${tokenRow.org_id}/${tokenRow.vendor_id}/${Date.now()}.${ext}`
+
+  // Validate file magic bytes server-side — never trust client-reported Content-Type
+  const magic = buffer.subarray(0, 8)
+  const isPdf  = magic[0] === 0x25 && magic[1] === 0x50 && magic[2] === 0x44 && magic[3] === 0x46  // %PDF
+  const isJpeg = magic[0] === 0xFF && magic[1] === 0xD8 && magic[2] === 0xFF
+  const isPng  = magic[0] === 0x89 && magic[1] === 0x50 && magic[2] === 0x4E && magic[3] === 0x47  // \x89PNG
+  if (!isPdf && !isJpeg && !isPng) {
+    return NextResponse.json({ error: 'File content does not match an accepted format (PDF, JPG, or PNG)' }, { status: 400 })
+  }
+  const ext = isPdf ? 'pdf' : isJpeg ? 'jpg' : 'png'
+  const key = `msme/${tokenRow.org_id}/${tokenRow.vendor_id}/${Date.now()}.${ext}`
 
   let certUrl: string
 

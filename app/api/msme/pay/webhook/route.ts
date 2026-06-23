@@ -31,7 +31,10 @@ export async function POST(req: NextRequest) {
     .update(rawBody)
     .digest('hex')
 
-  if (expected !== signature) {
+  const sigBuf = Buffer.from(signature, 'hex')
+  const expBuf = Buffer.from(expected, 'hex')
+  const sigValid = sigBuf.length === expBuf.length && crypto.timingSafeEqual(sigBuf, expBuf)
+  if (!sigValid) {
     console.warn('[msme/webhook] Signature mismatch — possible spoofed request')
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
   }
@@ -48,11 +51,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, skipped: true })
   }
 
-  const order      = event.payload?.order?.entity   as Record<string, any> | undefined
-  const payment    = event.payload?.payment?.entity as Record<string, any> | undefined
-  const orderId    = order?.id    as string | undefined
-  const paymentId  = payment?.id  as string | undefined
-  const notes      = order?.notes as Record<string, string> | undefined
+  const order         = event.payload?.order?.entity   as Record<string, any> | undefined
+  const payment       = event.payload?.payment?.entity as Record<string, any> | undefined
+  const orderId       = order?.id     as string | undefined
+  const paymentId     = payment?.id   as string | undefined
+  const paymentAmount = payment?.amount as number | undefined
+  const notes         = order?.notes  as Record<string, string> | undefined
   const pack_tier  = notes?.pack_tier
   const orgId      = notes?.org_id
 
@@ -88,7 +92,7 @@ export async function POST(req: NextRequest) {
           org_id:             orgId,
           pack_tier:          `addon_${addonSlots}`,
           vendor_limit:       addonSlots,
-          amount_paise:       0,
+          amount_paise:       paymentAmount ?? 0,
           gateway:            'razorpay',
           gateway_order_id:   orderId,
           gateway_payment_id: paymentId,
@@ -126,7 +130,7 @@ export async function POST(req: NextRequest) {
       org_id:             orgId,
       pack_tier,
       vendor_limit:       pack.vendor_limit,
-      amount_paise:       pack.price_paise,
+      amount_paise:       paymentAmount ?? pack.price_paise,
       gateway:            'razorpay',
       gateway_order_id:   orderId,
       gateway_payment_id: paymentId,

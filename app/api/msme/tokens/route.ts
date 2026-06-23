@@ -5,8 +5,15 @@ import { createAdminClient }         from '@/lib/supabase/admin'
 import crypto                        from 'crypto'
 
 export async function POST(req: NextRequest) {
-  const secret = req.headers.get('x-inngest-secret')
-  if (!secret || secret !== process.env.INNGEST_SIGNING_KEY) {
+  const secret         = req.headers.get('x-msme-internal-secret') ?? ''
+  const expectedSecret = process.env.MSME_INTERNAL_SECRET ?? ''
+  // Require a non-empty secret and compare with constant-time equality to prevent timing attacks
+  if (
+    !expectedSecret ||
+    !secret ||
+    secret.length !== expectedSecret.length ||
+    !crypto.timingSafeEqual(Buffer.from(secret), Buffer.from(expectedSecret))
+  ) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
@@ -16,11 +23,15 @@ export async function POST(req: NextRequest) {
   const admin = createAdminClient()
   const { data: vendor } = await admin
     .from('msme_vendors')
-    .select('org_id')
+    .select('org_id, status')
     .eq('id', vendor_id)
     .maybeSingle()
 
   if (!vendor) return NextResponse.json({ error: 'Vendor not found' }, { status: 404 })
+  // Only mint tokens for vendors still awaiting submission
+  if (vendor.status !== 'emailed') {
+    return NextResponse.json({ error: 'Vendor has already submitted or is not in emailed state' }, { status: 422 })
+  }
 
   const rawToken  = crypto.randomBytes(32).toString('hex')
   const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex')
