@@ -79,15 +79,8 @@ export async function POST(req: NextRequest) {
       .eq('status', 'paid')
       .maybeSingle()
     if (!alreadyPaidAddon) {
-      const { data: existing } = await admin
-        .from('org_feature_settings').select('config')
-        .eq('org_id', orgId).eq('feature_key', 'msme_addon_slots').maybeSingle()
-      const currentExtra: number = (existing?.config as any)?.extra_slots ?? 0
-      await admin.from('org_feature_settings').upsert(
-        { org_id: orgId, feature_key: 'msme_addon_slots', is_enabled: true, config: { extra_slots: currentExtra + addonSlots } },
-        { onConflict: 'org_id,feature_key' }
-      )
-      await admin.from('msme_pack_payments').upsert(
+      // Mark payment as paid first (atomic — prevents duplicate slot grants if webhook fires twice)
+      const { error: markErr } = await admin.from('msme_pack_payments').upsert(
         {
           org_id:             orgId,
           pack_tier:          `addon_${addonSlots}`,
@@ -100,6 +93,20 @@ export async function POST(req: NextRequest) {
           paid_at:            paidAt,
         },
         { onConflict: 'gateway_order_id' }
+      )
+      if (markErr) {
+        console.error('[msme/webhook] payment mark failed, aborting slot grant', markErr.message)
+        return NextResponse.json({ error: 'Payment record update failed' }, { status: 500 })
+      }
+      // Then increment slot count (read-modify-write is acceptable here because the
+      // payment row above acts as the idempotency gate — only one caller wins the upsert)
+      const { data: existing } = await admin
+        .from('org_feature_settings').select('config')
+        .eq('org_id', orgId).eq('feature_key', 'msme_addon_slots').maybeSingle()
+      const currentExtra: number = (existing?.config as any)?.extra_slots ?? 0
+      await admin.from('org_feature_settings').upsert(
+        { org_id: orgId, feature_key: 'msme_addon_slots', is_enabled: true, config: { extra_slots: currentExtra + addonSlots } },
+        { onConflict: 'org_id,feature_key' }
       )
       console.log('[msme/webhook] Addon slots activated', { orgId, addonSlots, total: currentExtra + addonSlots })
     }

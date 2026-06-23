@@ -103,7 +103,7 @@ export async function POST(
   }
 
   const orgName = (mb.organisations as any)?.name ?? 'Your business'
-  const attempt = (vendor.email_count + 1) as 1 | 2 | 3 | 4 | 5
+  const attempt = Math.min(vendor.email_count + 1, 5) as 1 | 2 | 3 | 4 | 5
 
   // Fetch CC email + contact person setting
   let ownerEmail: string | undefined
@@ -129,7 +129,7 @@ export async function POST(
         ownerEmail = ownerUser?.email ?? undefined
       }
     }
-  } catch {}
+  } catch (e) { console.warn('[shoot-email] CC/contact lookup failed (email will send without CC):', (e as Error)?.message) }
 
   // Attempt the send — on any Resend error, clean up the orphan token and surface the error
   let sendError: string | null = null

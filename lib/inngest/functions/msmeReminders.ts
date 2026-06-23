@@ -26,6 +26,7 @@ export const msmeReminders = inngest.createFunction(
         .gte('email_count', 1)
         .lte('email_count', 4)  // max 5 emails (email_count 1–4 still have follow-ups pending)
         .not('last_emailed_at', 'is', null)
+        .limit(500)  // cap per run to stay within Inngest 4MB step result limit
       return data ?? []
     })
 
@@ -69,29 +70,25 @@ export const msmeReminders = inngest.createFunction(
 
     let emailsSent = 0
 
-    await step.run('send-due-reminders', async () => {
-      for (const vendor of vendors) {
-        const intervalDays: number[] = scheduleMap[vendor.org_id] ?? DEFAULT_EMAIL_SCHEDULE
-        const maxEmails = intervalDays.length + 1  // email 1 is the initial shoot
+    // Process each vendor in its own step so a failure doesn't block others
+    // and so Inngest can checkpoint progress (prevents timeout on large batches)
+    for (const vendor of vendors) {
+      const intervalDays: number[] = scheduleMap[vendor.org_id] ?? DEFAULT_EMAIL_SCHEDULE
+      const maxEmails = intervalDays.length + 1
 
-        // vendor.email_count is the number already sent; if it's >= maxEmails, skip
-        if (vendor.email_count >= maxEmails) continue
+      if (vendor.email_count >= maxEmails) continue
 
-        // How many days to wait after the last email before sending the next
-        const daysToWait = intervalDays[vendor.email_count - 1]
-        if (daysToWait == null) continue
+      const daysToWait = intervalDays[vendor.email_count - 1]
+      if (daysToWait == null) continue
 
-        const lastEmailed  = new Date(vendor.last_emailed_at!)
-        const sendAfter    = new Date(lastEmailed.getTime() + daysToWait * 86400_000)
+      const lastEmailed = new Date(vendor.last_emailed_at!)
+      const sendAfter   = new Date(lastEmailed.getTime() + daysToWait * 86400_000)
+      if (now < sendAfter) continue
 
-        // Only send if we're on or past the due date
-        if (now < sendAfter) continue
+      const sent = await step.run(`send-reminder-${vendor.id}`, async () => {
+        const orgName   = (vendor.organisations as any)?.name ?? 'Your firm'
+        const attemptNo = Math.min(vendor.email_count + 1, 5) as 2 | 3 | 4 | 5
 
-        const orgName = (vendor.organisations as any)?.name ?? 'Your firm'
-        const attemptNo = (vendor.email_count + 1) as 2 | 3 | 4 | 5
-
-        // Generate fresh magic-link token — skip this vendor if token mint fails
-        // (sending a broken /msme/form/<uuid> URL would confuse the vendor)
         const tokenRes = await fetch(`${APP_URL}/api/msme/tokens`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-msme-internal-secret': process.env.MSME_INTERNAL_SECRET ?? '' },
@@ -99,26 +96,26 @@ export const msmeReminders = inngest.createFunction(
         })
         if (!tokenRes.ok) {
           console.error('[msme-reminders] token mint failed for vendor', vendor.id, await tokenRes.text())
-          continue
+          return false
         }
         const { token } = await tokenRes.json()
         const formUrl = `${APP_URL}/msme/form/${token}`
-
         const contactPerson = contactMap[vendor.org_id] ?? null
 
         try {
-          await sendMsmeVendorEmail({
-            to: vendor.vendor_email,
-            vendorName: vendor.vendor_name,
+          const { error: sendErr } = await sendMsmeVendorEmail({
+            to:           vendor.vendor_email,
+            vendorName:   vendor.vendor_name,
             orgName,
             formUrl,
             attemptNo,
-            totalEmails: maxEmails,
+            totalEmails:  maxEmails,
             cc:           ccMap[vendor.org_id],
             contactName:  contactPerson?.name,
             contactEmail: contactPerson?.email,
             contactPhone: contactPerson?.phone,
-          })
+          }) ?? {}
+          if (sendErr) { console.error('[msme-reminders] send failed', vendor.id, sendErr); return false }
           await admin.from('msme_vendors').update({
             email_count: attemptNo,
             last_emailed_at: new Date().toISOString(),
@@ -126,12 +123,14 @@ export const msmeReminders = inngest.createFunction(
           await admin.from('msme_email_log').insert({
             vendor_id: vendor.id, org_id: vendor.org_id, attempt_no: attemptNo,
           })
-          emailsSent++
+          return true
         } catch (e) {
           console.error('[msme-reminders] send failed', vendor.id, e)
+          return false
         }
-      }
-    })
+      })
+      if (sent) emailsSent++
+    }
 
     return { vendors_checked: vendors.length, emails_sent: emailsSent }
   }
