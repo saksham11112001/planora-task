@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import MsmeWalkthrough from './MsmeWalkthrough'
 import MsmeTour        from './MsmeTour'
 import * as XLSX from 'xlsx'
-import { MSME_PACKS, MSME_ADDON_PACKS } from '@/lib/msme/packs'
+import { MSME_PACKS } from '@/lib/msme/packs'
 import { createClient } from '@/lib/supabase/client'
 
 const ACCENT = '#0d9488'
@@ -1373,41 +1373,6 @@ export function MsmeView({ userRole, orgName }: Props) {
               )
             })}
           </div>
-
-          {/* ── Add extra slots (for paid users — mapped to pack tiers) ── */}
-          {packTier !== 'free' && (
-            <div style={{ marginTop: 20, borderTop: '1px solid #e2e8f0', paddingTop: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#334155', marginBottom: 10 }}>
-                Add extra vendor slots to your current plan:
-              </div>
-              {MSME_ADDON_PACKS.map(addon => {
-                const discAddonPaise = couponDiscount > 0 ? Math.round(addon.price_paise * (1 - couponDiscount / 100)) : addon.price_paise
-                return (
-                  <div key={addon.slots} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: 8, marginBottom: 8 }}>
-                    <div>
-                      <span style={{ fontWeight: 600, fontSize: 14, color: '#0f172a' }}>{addon.label}</span>
-                      <span style={{ fontSize: 12, color: '#64748b' }}> extra slots</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <span style={{ fontWeight: 700, fontSize: 15, color: '#0f172a' }}>
-                        {couponDiscount > 0
-                          ? <><s style={{ color: '#94a3b8', fontSize: 12 }}>{addon.price_label}</s> ₹{Math.round(discAddonPaise / 100).toLocaleString('en-IN')}</>
-                          : addon.price_label
-                        }
-                      </span>
-                      <button
-                        onClick={() => handleAddon(addon.slots, addon.price_paise)}
-                        disabled={addonBusy === addon.slots}
-                        style={{ ...primaryBtn, padding: '6px 14px', fontSize: 12 }}
-                      >
-                        {addonBusy === addon.slots ? 'Redirecting…' : 'Add →'}
-                      </button>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
 
           {/* ── Coupon code ── */}
           <div style={{ marginTop: 16, borderTop: '1px solid #e2e8f0', paddingTop: 14 }}>
