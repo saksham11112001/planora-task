@@ -577,12 +577,13 @@ function PortalShell({
 }) {
   return (
     <div style={{
-      minHeight: '100vh',
+      height: '100vh',
       background: '#f1f5f9',
       fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
       colorScheme: 'light',
       display: 'flex',
       flexDirection: 'column',
+      overflow: 'hidden',
     }}>
       {/* Top header */}
       <div data-tour="portal-header" style={{ background: DARK, padding: '0 24px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
