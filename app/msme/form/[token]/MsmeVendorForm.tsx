@@ -574,7 +574,7 @@ export function MsmeVendorForm({ token }: { token: string }) {
                   background: proofUrl ? `${ACCENT}06` : '#fffbeb',
                   transition: 'border-color 0.15s, background 0.15s',
                 }}>
-                  <input type="file" accept=".pdf,.jpg,.jpeg,.png,.xlsx,.xls,.csv" onChange={handleProofFileChange} style={{ display: 'none' }} />
+                  <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={handleProofFileChange} style={{ display: 'none' }} />
                   {uploadingProof ? (
                     <>
                       <div style={{ fontSize: 24 }}>⏳</div>
@@ -594,7 +594,7 @@ export function MsmeVendorForm({ token }: { token: string }) {
                       <span style={{ fontSize: 13, color: '#1e293b', fontWeight: 600 }}>
                         {isMobile ? 'Tap to upload' : 'Click to upload'} proof document
                       </span>
-                      <span style={{ fontSize: 11, color: '#64748b' }}>PDF, JPG, PNG, Excel or CSV · max 5 MB</span>
+                      <span style={{ fontSize: 11, color: '#64748b' }}>PDF, JPG or PNG · max 5 MB</span>
                     </>
                   )}
                 </label>
