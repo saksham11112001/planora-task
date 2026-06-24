@@ -255,7 +255,7 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
   const tier            = getTier(totalSignedUp)
 
   return (
-    <div style={{ minHeight: '100vh', background: BG, colorScheme: 'light', fontFamily: "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif", color: DARK, display: 'flex', flexDirection: 'column' }}>
+    <div style={{ height: '100vh', background: BG, colorScheme: 'light', fontFamily: "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif", color: DARK, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
       {showTour && <PartnerTour onDone={() => setShowTour(false)} onTabChange={setActiveTab} />}
 
