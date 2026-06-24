@@ -327,8 +327,6 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
             </button>
           ))}
 
-          <div style={{ flex: 1 }} />
-
           {/* Mini KPI in sidebar */}
           <div data-tour="partner-quick-stats" style={{ padding: '14px 16px', borderTop: `1px solid #f1f5f9` }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Quick Stats</div>
