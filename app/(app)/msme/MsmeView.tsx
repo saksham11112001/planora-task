@@ -30,6 +30,8 @@ interface Vendor {
   last_emailed_at: string | null
   is_paid: boolean
   created_at: string
+  email_bounced: boolean
+  bounce_reason: string | null
 }
 
 const STATUS_LABEL: Record<Vendor['status'], string> = {
@@ -68,6 +70,7 @@ export function MsmeView({ userRole, orgName }: Props) {
   const [shootingId,    setShootingId]    = useState<string | null>(null)
   const [deletingId,    setDeletingId]    = useState<string | null>(null)
   const [filterStatus,  setFilterStatus]  = useState<string>('all')
+  const [showBounced,   setShowBounced]   = useState(false)
   const [search,        setSearch]        = useState('')
   const [toasts,        setToasts]        = useState<Toast[]>([])
   const [showTour,      setShowTour]      = useState(false)
@@ -79,6 +82,7 @@ export function MsmeView({ userRole, orgName }: Props) {
   const [checkedIds,    setCheckedIds]    = useState<Set<string>>(new Set())
   const [bulkShooting,  setBulkShooting]  = useState(false)
   const [bulkProgress,  setBulkProgress]  = useState<{ sent: number; total: number } | null>(null)
+  const [bulkErrors,    setBulkErrors]    = useState<Array<{ vendor_name: string; vendor_email: string; reason: string }> | null>(null)
   const [viewingCert,   setViewingCert]   = useState<string | null>(null)
   const toastRef = useRef(0)
 
@@ -148,6 +152,20 @@ export function MsmeView({ userRole, orgName }: Props) {
   const [pendingShootId,  setPendingShootId]  = useState<string | null>(null)
   const [pendingShootName,setPendingShootName] = useState<string | null>(null)
   const [pendingBulkShoot,setPendingBulkShoot] = useState(false)
+  function parseSendError(raw: string): string {
+    try {
+      const jsonStr = raw.replace(/^Failed to send email:\s*/, '').replace(/^[^{]*({.*})[^}]*$/, '$1')
+      const parsed = JSON.parse(jsonStr)
+      const msg: string = parsed.message ?? ''
+      if (msg.toLowerCase().includes('email is not valid') || msg.toLowerCase().includes('invalid email')) {
+        return 'Invalid email address — click ✎ to correct it'
+      }
+      return msg || raw
+    } catch {
+      return raw
+    }
+  }
+
   function showToast(message: string, type: Toast['type'] = 'success') {
     const id = ++toastRef.current
     setToasts(t => [...t, { id, message, type }])
@@ -463,8 +481,9 @@ export function MsmeView({ userRole, orgName }: Props) {
     } catch { setShootingId(null); showToast('Network error — please try again', 'error'); return }
     setShootingId(null)
     if (!res.ok) {
-      const msg = data.error ?? 'Failed to send email'
-      showToast(msg, res.status === 403 && msg.includes('slot') ? 'info' : 'error')
+      const raw = data.error ?? 'Failed to send email'
+      const msg = parseSendError(raw)
+      showToast(`${vendorName}: ${msg}`, res.status === 403 && raw.includes('slot') ? 'info' : 'error')
       return
     }
     showToast(`Email sent to ${vendorName} (attempt ${data.attempt}/${intervalDays.length + 1})`)
@@ -503,15 +522,20 @@ export function MsmeView({ userRole, orgName }: Props) {
       }
 
       const parts: string[] = []
-      if (data.sent)              parts.push(`${data.sent} email${data.sent > 1 ? 's' : ''} sent ✓`)
-      if (data.failed)            parts.push(`${data.failed} failed`)
-      if (data.skipped_slot_limit) parts.push(`${data.skipped_slot_limit} skipped (slot limit reached)`)
+      if (data.sent)               parts.push(`${data.sent} email${data.sent > 1 ? 's' : ''} sent ✓`)
+      if (data.failed)             parts.push(`${data.failed} failed`)
+      if (data.skipped_slot_limit) parts.push(`${data.skipped_slot_limit} skipped (slot limit)`)
 
       if (data.errors?.length) {
-        const names = data.errors.slice(0, 3).map((e: any) => e.vendor_name).join(', ')
-        showToast(`${parts.join(' · ')} — failed: ${names}${data.errors.length > 3 ? ` +${data.errors.length - 3} more` : ''}`, 'error')
+        setBulkErrors(data.errors.map((e: any) => ({
+          vendor_name:  e.vendor_name,
+          vendor_email: e.vendor_email,
+          reason:       parseSendError(e.reason),
+        })))
+        showToast(parts.join(' · ') || 'Send completed with errors', 'info')
       } else {
-        showToast(parts.join(' · ') || 'No emails sent', data.failed > 0 ? 'info' : 'success')
+        setBulkErrors(null)
+        showToast(parts.join(' · ') || 'No emails sent', 'success')
       }
     } catch {
       setBulkShooting(false)
@@ -774,6 +798,7 @@ export function MsmeView({ userRole, orgName }: Props) {
       return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
     })
 
+  const bouncedVendors  = vendors.filter(v => v.email_bounced)
   const completedCount  = vendors.filter(v => v.status === 'submitted' || v.status === 'not_msme').length
   const exhaustedCount  = vendors.filter(v => v.email_count >= maxEmails && v.status === 'emailed').length
   const completionPct   = total > 0 ? Math.round((completedCount / total) * 100) : 0
@@ -950,6 +975,52 @@ export function MsmeView({ userRole, orgName }: Props) {
         </div>
       )}
 
+      {/* ── Bounced email alert ── */}
+      {bouncedVendors.length > 0 && (
+        <div
+          onClick={() => setShowBounced(b => !b)}
+          style={{ background: '#fef2f2', border: '1.5px solid #fecaca', borderRadius: 10, padding: '12px 16px', marginBottom: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 18 }}>⚠️</span>
+            <div>
+              <p style={{ margin: 0, fontWeight: 700, color: '#dc2626', fontSize: 14 }}>
+                {bouncedVendors.length} invalid email address{bouncedVendors.length > 1 ? 'es' : ''} detected
+              </p>
+              <p style={{ margin: '2px 0 0', fontSize: 12, color: '#b45309' }}>
+                These vendors never received your email. Click to view and fix them.
+              </p>
+            </div>
+          </div>
+          <span style={{ fontSize: 12, fontWeight: 600, color: '#dc2626' }}>{showBounced ? '▲ Hide' : '▼ Show'}</span>
+        </div>
+      )}
+
+      {/* ── Bounced vendors list (only when expanded) ── */}
+      {showBounced && bouncedVendors.length > 0 && (
+        <div style={{ background: '#fff5f5', border: '1.5px solid #fecaca', borderRadius: 10, padding: '14px 16px', marginBottom: 16 }}>
+          <p style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: '#dc2626' }}>Invalid / bounced email addresses — fix these and re-shoot</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {bouncedVendors.map(v => (
+              <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#fff', border: '1px solid #fecaca', borderRadius: 8, padding: '10px 14px' }}>
+                <span style={{ fontSize: 14, flexShrink: 0 }}>✕</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ margin: 0, fontWeight: 600, fontSize: 13, color: '#0f172a' }}>{v.vendor_name}</p>
+                  <p style={{ margin: '2px 0 0', fontSize: 12, color: '#dc2626', wordBreak: 'break-all' }}>{v.vendor_email}</p>
+                  {v.bounce_reason && <p style={{ margin: '1px 0 0', fontSize: 11, color: '#b45309' }}>{v.bounce_reason}</p>}
+                </div>
+                <button
+                  onClick={e => { e.stopPropagation(); setSelectedId(v.id); setEditingEmail(v.id); setEditEmailVal(v.vendor_email) }}
+                  style={{ background: '#dc2626', color: '#fff', border: 'none', borderRadius: 6, padding: '5px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
+                >
+                  ✎ Fix email
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ── Filters + search ── */}
       <div data-tour="msme-filters" style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
         {(['all', 'pending', 'emailed', 'submitted', 'not_msme'] as const).map(s => {
@@ -1005,6 +1076,28 @@ export function MsmeView({ userRole, orgName }: Props) {
                   </button>
                 )}
                 <button onClick={() => setCheckedIds(new Set())} style={{ ...ghostBtn, padding: '7px 12px', fontSize: 12 }}>Clear</button>
+              </div>
+            )}
+
+            {/* Bulk send error panel */}
+            {bulkErrors && bulkErrors.length > 0 && (
+              <div style={{ background: '#fef2f2', border: '1.5px solid #fecaca', borderRadius: 10, padding: '14px 16px', marginBottom: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#dc2626' }}>⚠ {bulkErrors.length} email{bulkErrors.length > 1 ? 's' : ''} failed — fix the email addresses below and re-shoot</span>
+                  <button onClick={() => setBulkErrors(null)} style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: '0 2px' }}>×</button>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {bulkErrors.map((e, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12 }}>
+                      <span style={{ color: '#dc2626', fontWeight: 700, flexShrink: 0 }}>✕</span>
+                      <div>
+                        <span style={{ fontWeight: 600, color: '#0f172a' }}>{e.vendor_name}</span>
+                        <span style={{ color: '#64748b', marginLeft: 6 }}>{e.vendor_email}</span>
+                        <span style={{ color: '#dc2626', marginLeft: 6 }}>— {e.reason}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
