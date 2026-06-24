@@ -154,8 +154,8 @@ export function MsmeView({ userRole, orgName }: Props) {
     setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 4000)
   }
 
-  const fetchVendors = useCallback(async () => {
-    setLoading(true)
+  const fetchVendors = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     try {
       const res  = await fetch('/api/msme/vendors')
       const data = await res.json()
@@ -168,7 +168,7 @@ export function MsmeView({ userRole, orgName }: Props) {
     } catch (e) {
       console.error('[MsmeView] fetchVendors failed', e)
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [])
 
@@ -450,7 +450,7 @@ export function MsmeView({ userRole, orgName }: Props) {
     setShowAdd(false)
     setVendorName(''); setVendorEmail(''); setGstin('')
     showToast(`${vendorName} added successfully`)
-    fetchVendors()
+    fetchVendors(true)
   }
 
   // ── Shoot email ──────────────────────────────────────────────────────────
@@ -468,7 +468,7 @@ export function MsmeView({ userRole, orgName }: Props) {
       return
     }
     showToast(`Email sent to ${vendorName} (attempt ${data.attempt}/${intervalDays.length + 1})`)
-    fetchVendors()
+    fetchVendors(true)
   }
 
   // ── Bulk shoot email ──────────────────────────────────────────────────────
@@ -498,7 +498,7 @@ export function MsmeView({ userRole, orgName }: Props) {
 
       if (!res.ok) {
         showToast(data.error ?? 'Bulk send failed', 'error')
-        fetchVendors()
+        fetchVendors(true)
         return
       }
 
@@ -518,7 +518,7 @@ export function MsmeView({ userRole, orgName }: Props) {
       setBulkProgress(null)
       showToast('Network error during bulk send', 'error')
     }
-    fetchVendors()
+    fetchVendors(true)
   }
 
   // ── Bulk delete ──────────────────────────────────────────────────────────
@@ -537,7 +537,7 @@ export function MsmeView({ userRole, orgName }: Props) {
     if (failed)  parts.push(`${failed} failed`)
     showToast(parts.join(' · '), failed > 0 ? 'info' : 'success')
     if (selectedId && checkedIds.has(selectedId)) setSelectedId(null)
-    fetchVendors()
+    fetchVendors(true)
   }
 
   // ── View vendor certificate ───────────────────────────────────────────────
@@ -564,7 +564,7 @@ export function MsmeView({ userRole, orgName }: Props) {
     if (!res.ok) { showToast('Failed to remove vendor', 'error'); return }
     setSelectedId(null)
     showToast('Vendor removed')
-    fetchVendors()
+    fetchVendors(true)
   }
 
   // ── Copy link ──────────────────────────────────────────────────────────────
@@ -593,7 +593,7 @@ export function MsmeView({ userRole, orgName }: Props) {
     if (!res.ok) { showToast('Failed to update email', 'error'); return }
     setEditingEmail(null)
     showToast('Email updated')
-    fetchVendors()
+    fetchVendors(true)
   }
 
   // ── Excel/CSV import ───────────────────────────────────────────────────────
@@ -673,7 +673,7 @@ export function MsmeView({ userRole, orgName }: Props) {
     setImporting(false)
     setImportProgress(null)
     setImportResult({ inserted: totalInserted, skipped: allSkipped, paid_slots: totalPaidSlots })
-    fetchVendors()
+    fetchVendors(true)
   }
 
   function handleDownloadTemplate() {
