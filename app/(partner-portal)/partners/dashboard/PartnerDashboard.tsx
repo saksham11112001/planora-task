@@ -277,7 +277,7 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
             <span style={{ fontSize: 12, fontWeight: 700, color: tier.color }}>{tier.label}</span>
           </div>
           <span style={{ fontSize: 13, color: MUTED }}>Hi, {partner.name.split(' ')[0]}</span>
-          <button onClick={() => setShowTour(true)} style={{ fontSize: 12, fontWeight: 600, color: ACCENT, background: 'rgba(13,148,136,0.1)', border: '1px solid rgba(13,148,136,0.3)', borderRadius: 7, padding: '5px 12px', cursor: 'pointer', colorScheme: 'light' }}>
+          <button onClick={() => setShowTour(true)} style={{ fontSize: 12, fontWeight: 600, color: TEAL, background: 'rgba(13,148,136,0.1)', border: '1px solid rgba(13,148,136,0.3)', borderRadius: 7, padding: '5px 12px', cursor: 'pointer', colorScheme: 'light' }}>
             ? Take a tour
           </button>
           <button onClick={handleLogout} style={{ fontSize: 12, color: MUTED, background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 7, padding: '5px 12px', cursor: 'pointer', colorScheme: 'light' }}>
