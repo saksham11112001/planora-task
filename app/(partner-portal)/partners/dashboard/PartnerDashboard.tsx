@@ -1,6 +1,7 @@
 'use client'
 import { useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import PartnerTour from './PartnerTour'
 
 const TEAL   = '#0d9488'
 const PURPLE = '#7c3aed'
@@ -119,6 +120,7 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
     .sort((a, b) => new Date(b.last_sent_at).getTime() - new Date(a.last_sent_at).getTime())
 
   const [activeTab,  setActiveTab]  = useState<Tab>('about')
+  const [showTour,   setShowTour]   = useState(false)
   const [allInvites, setAllInvites] = useState<Invite[]>(combined)
   const [emails,     setEmails]     = useState<string[]>([''])
   const [invType,    setInvType]    = useState<'msme' | 'partner'>('msme')
@@ -255,8 +257,10 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
   return (
     <div style={{ minHeight: '100vh', background: BG, colorScheme: 'light', fontFamily: "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif", color: DARK, display: 'flex', flexDirection: 'column' }}>
 
+      {showTour && <PartnerTour onDone={() => setShowTour(false)} onTabChange={setActiveTab} />}
+
       {/* Top nav */}
-      <nav style={{
+      <nav data-tour="partner-nav" style={{
         background: WHITE, borderBottom: `1px solid ${BORDER}`,
         padding: '0 24px', height: 56,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -273,6 +277,9 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
             <span style={{ fontSize: 12, fontWeight: 700, color: tier.color }}>{tier.label}</span>
           </div>
           <span style={{ fontSize: 13, color: MUTED }}>Hi, {partner.name.split(' ')[0]}</span>
+          <button onClick={() => setShowTour(true)} style={{ fontSize: 12, fontWeight: 600, color: ACCENT, background: 'rgba(13,148,136,0.1)', border: '1px solid rgba(13,148,136,0.3)', borderRadius: 7, padding: '5px 12px', cursor: 'pointer', colorScheme: 'light' }}>
+            ? Take a tour
+          </button>
           <button onClick={handleLogout} style={{ fontSize: 12, color: MUTED, background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 7, padding: '5px 12px', cursor: 'pointer', colorScheme: 'light' }}>
             Logout
           </button>
@@ -299,7 +306,7 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
 
         {/* Sidebar */}
-        <aside style={{ width: 220, background: WHITE, borderRight: `1px solid ${BORDER}`, padding: '24px 0', flexShrink: 0, display: 'flex', flexDirection: 'column' }} className="partner-sidebar">
+        <aside data-tour="partner-sidebar" style={{ width: 220, background: WHITE, borderRight: `1px solid ${BORDER}`, padding: '24px 0', flexShrink: 0, display: 'flex', flexDirection: 'column' }} className="partner-sidebar">
           <div style={{ padding: '0 16px 14px', borderBottom: `1px solid #f1f5f9`, marginBottom: 8 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Partner Portal</div>
             <div style={{ fontSize: 12, color: TEAL, fontFamily: 'monospace', fontWeight: 700, marginTop: 4 }}>{partner.referral_code}</div>
@@ -323,7 +330,7 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
           <div style={{ flex: 1 }} />
 
           {/* Mini KPI in sidebar */}
-          <div style={{ padding: '14px 16px', borderTop: `1px solid #f1f5f9` }}>
+          <div data-tour="partner-quick-stats" style={{ padding: '14px 16px', borderTop: `1px solid #f1f5f9` }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Quick Stats</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
@@ -401,7 +408,7 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
               </div>
 
               {/* Referral links */}
-              <div style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 20, borderLeft: `4px solid #2563eb` }}>
+              <div data-tour="partner-referral" style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 20, borderLeft: `4px solid #2563eb` }}>
                 <div style={{ fontWeight: 700, fontSize: 14, color: DARK, marginBottom: 4 }}>Your Referral Links</div>
                 <p style={{ fontSize: 13, color: MUTED, margin: '0 0 18px', lineHeight: 1.6 }}>
                   Share these directly — code <strong style={{ fontFamily: 'monospace', color: TEAL }}>{partner.referral_code}</strong> is embedded in both.
@@ -434,7 +441,7 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
               <PageHeader title="My KPIs" subtitle="Your performance at a glance" />
 
               {/* KPI grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 28 }}>
+              <div data-tour="partner-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 28 }}>
                 <KpiCard label="Commission Earned" value={`₹${commissionEst.toLocaleString('en-IN')}`} sub="estimated · pending review" accent={TEAL} top />
                 <KpiCard label="Total Sign-ups"    value={String(totalSignedUp)} sub="referred users joined"  accent="#16a34a" />
                 <KpiCard label="Total Invites Sent" value={String(totalSent)}   sub="emails dispatched"      accent="#2563eb" />
@@ -443,7 +450,7 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
               </div>
 
               {/* Tier progress */}
-              <div style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 12, padding: '20px 24px', marginBottom: 24, borderLeft: `4px solid #b45309` }}>
+              <div data-tour="partner-tier" style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 12, padding: '20px 24px', marginBottom: 24, borderLeft: `4px solid #b45309` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                   <span style={{ fontSize: 14, fontWeight: 700, color: DARK }}>Partner Tier Progress</span>
                   <div style={{ background: tier.bg, border: `1.5px solid ${tier.color}40`, borderRadius: 20, padding: '4px 14px', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -505,7 +512,7 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
               <PageHeader title="Send Invites" subtitle="Invite businesses to MSME Tracker or people to join the Partner Program" />
 
               {/* Send invite form */}
-              <div style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 24, marginBottom: 24, borderLeft: `4px solid ${PURPLE}` }}>
+              <div data-tour="partner-invite-form" style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 24, marginBottom: 24, borderLeft: `4px solid ${PURPLE}` }}>
                 <div style={{ fontWeight: 700, fontSize: 15, color: DARK, marginBottom: 4 }}>Send an invite</div>
                 <p style={{ fontSize: 13, color: MUTED, margin: '0 0 16px', lineHeight: 1.6 }}>
                   Choose what to invite them to, then enter their email.
@@ -564,7 +571,7 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
               </div>
 
               {/* Referred users table */}
-              <div style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 12, overflow: 'hidden' }}>
+              <div data-tour="partner-invited-table" style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 12, overflow: 'hidden' }}>
                 <div style={{ padding: '14px 20px', borderBottom: `1px solid ${BORDER}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: `${TEAL}06`, borderLeft: `4px solid ${TEAL}` }}>
                   <div>
                     <span style={{ fontWeight: 700, fontSize: 14, color: DARK }}>Referred Users</span>
@@ -648,7 +655,7 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
               <PageHeader title="Withdraw Earnings" subtitle="Request a payout to your bank account" />
 
               {/* Balance cards */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 24 }}>
+              <div data-tour="partner-balance" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 24 }}>
                 <div style={{ background: BG, border: `1px solid ${BORDER}`, borderRadius: 10, padding: '16px 18px' }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Total Earned</div>
                   <div style={{ fontSize: 26, fontWeight: 800, color: TEAL }}>₹{displayEarned.toLocaleString('en-IN')}</div>
@@ -676,7 +683,7 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
                   Minimum withdrawal amount is ₹500. Your available balance is ₹{displayAvail.toLocaleString('en-IN')}.
                 </div>
               ) : (
-                <div style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 24, marginBottom: 24 }}>
+                <div data-tour="partner-withdraw-form" style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 24, marginBottom: 24 }}>
                   <div style={{ fontWeight: 700, fontSize: 14, color: DARK, marginBottom: 16 }}>Request a withdrawal</div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
                     <div>
