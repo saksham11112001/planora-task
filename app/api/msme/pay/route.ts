@@ -37,6 +37,7 @@ export async function POST(req: NextRequest) {
   const orgId   = mb.org_id
   const orgName = (mb.organisations as any)?.name ?? 'Organisation'
   const basicAuth = Buffer.from(`${RZP_KEY_ID}:${RZP_KEY_SECRET}`).toString('base64')
+  const admin   = createAdminClient()
 
   // Resolve coupon discount from DB (validates server-side)
   let discountPct = 0
@@ -88,7 +89,6 @@ export async function POST(req: NextRequest) {
     }
     const order = await orderRes.json()
 
-    const admin = createAdminClient()
     await admin.from('msme_pack_payments').upsert(
       {
         org_id:           orgId,
@@ -127,7 +127,6 @@ export async function POST(req: NextRequest) {
 
   // ── 100% coupon → skip Razorpay, activate pack directly ──────────────────
   if (discountPct >= 100) {
-    const admin  = createAdminClient()
     const paidAt = new Date().toISOString()
     await admin.from('org_feature_settings').upsert(
       { org_id: orgId, feature_key: 'msme_pack', is_enabled: true,
@@ -169,7 +168,6 @@ export async function POST(req: NextRequest) {
   }
   const order = await orderRes.json()
 
-  const admin = createAdminClient()
   await admin.from('msme_pack_payments').upsert(
     {
       org_id:           orgId,
