@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
 import { fmtDate } from '@/lib/utils/format'
+import PortalTour from './PortalTour'
 
 interface DocType {
   id: string
@@ -68,6 +69,7 @@ export function PortalView({ rawToken }: Props) {
   const [data, setData]       = useState<PortalData | null>(null)
   const [error, setError]     = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [showTour, setShowTour] = useState(false)
 
   async function fetchData() {
     try {
@@ -91,20 +93,23 @@ export function PortalView({ rawToken }: Props) {
   if (!data)   return null
 
   return (
-    <PortalShell orgName={data.org.name} clientName={data.client.name}>
+    <PortalShell orgName={data.org.name} clientName={data.client.name} onTour={() => setShowTour(true)}>
+      {showTour && <PortalTour onDone={() => setShowTour(false)} />}
+
       {/* Upcoming document deadlines */}
-      <Section title="Upcoming Filing Deadlines" count={data.upcoming.length}>
+      <Section data-tour="portal-deadlines" title="Upcoming Filing Deadlines" count={data.upcoming.length}>
         {data.upcoming.length === 0 ? (
           <EmptyCard text="No upcoming compliance tasks in the next 60 days." />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {data.upcoming.map(task => (
+            {data.upcoming.map((task, i) => (
               <TaskCard
                 key={task.instance_id}
                 task={task}
                 rawToken={rawToken}
                 onUploaded={fetchData}
                 docTypes={data.doc_types}
+                dataTour={i === 0 ? 'portal-task-card' : undefined}
               />
             ))}
           </div>
@@ -112,39 +117,43 @@ export function PortalView({ rawToken }: Props) {
       </Section>
 
       {/* Evergreen document vault */}
-      <Section title="Permanent Documents" subtitle="Uploaded once, valid indefinitely">
-        <EvergreenVault
-          uploads={data.evergreen}
-          docTypes={data.doc_types.filter(d => d.category === 'evergreen')}
-          rawToken={rawToken}
-          onUploaded={fetchData}
-        />
-      </Section>
+      <div data-tour="portal-permanent">
+        <Section title="Permanent Documents" subtitle="Uploaded once, valid indefinitely">
+          <EvergreenVault
+            uploads={data.evergreen}
+            docTypes={data.doc_types.filter(d => d.category === 'evergreen')}
+            rawToken={rawToken}
+            onUploaded={fetchData}
+          />
+        </Section>
+      </div>
 
       {/* Filing history */}
       {data.history.length > 0 && (
-        <Section title="Filing History" subtitle="Completed in the last 6 months">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {data.history.map(h => (
-              <div key={h.instance_id} style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '12px 16px', background: '#f8fafc',
-                border: '1px solid #e2e8f0', borderRadius: '8px',
-              }}>
-                <div>
-                  <div style={{ fontSize: '14px', fontWeight: 500, color: '#0f172a' }}>{h.task_title}</div>
-                  <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
-                    Due {fmtDate(h.due_date)}{h.assignee_name ? ` · ${h.assignee_name}` : ''}
+        <div data-tour="portal-history">
+          <Section title="Filing History" subtitle="Completed in the last 6 months">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {data.history.map(h => (
+                <div key={h.instance_id} style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '12px 16px', background: '#f8fafc',
+                  border: '1px solid #e2e8f0', borderRadius: '8px',
+                }}>
+                  <div>
+                    <div style={{ fontSize: '14px', fontWeight: 500, color: '#0f172a' }}>{h.task_title}</div>
+                    <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
+                      Due {fmtDate(h.due_date)}{h.assignee_name ? ` · ${h.assignee_name}` : ''}
+                    </div>
                   </div>
+                  <span style={{
+                    fontSize: '12px', fontWeight: 600, color: '#16a34a',
+                    background: 'rgba(22,163,74,0.1)', padding: '3px 10px', borderRadius: '20px',
+                  }}>✓ Filed</span>
                 </div>
-                <span style={{
-                  fontSize: '12px', fontWeight: 600, color: '#16a34a',
-                  background: 'rgba(22,163,74,0.1)', padding: '3px 10px', borderRadius: '20px',
-                }}>✓ Filed</span>
-              </div>
-            ))}
-          </div>
-        </Section>
+              ))}
+            </div>
+          </Section>
+        </div>
       )}
     </PortalShell>
   )
@@ -152,17 +161,18 @@ export function PortalView({ rawToken }: Props) {
 
 // ── Task card with checklist ────────────────────────────────────────────────
 
-function TaskCard({ task, rawToken, onUploaded, docTypes }: {
+function TaskCard({ task, rawToken, onUploaded, docTypes, dataTour }: {
   task: UpcomingTask
   rawToken: string
   onUploaded: () => void
   docTypes: DocType[]
+  dataTour?: string
 }) {
   const daysUntilCollection = daysBetween(new Date().toISOString().split('T')[0], task.collection_deadline)
   const urgency = daysUntilCollection <= 0 ? '#dc2626' : daysUntilCollection <= 2 ? '#ea580c' : daysUntilCollection <= 7 ? '#ca8a04' : '#0d9488'
 
   return (
-    <div style={{
+    <div data-tour={dataTour} style={{
       border: `1px solid #e2e8f0`,
       borderLeft: `4px solid ${urgency}`,
       borderRadius: '10px',
@@ -394,7 +404,7 @@ function EvergreenVault({ uploads, docTypes, rawToken, onUploaded }: {
 
 // ── Shell + helpers ─────────────────────────────────────────────────────────
 
-function PortalShell({ orgName, clientName, children }: { orgName: string; clientName: string; children: React.ReactNode }) {
+function PortalShell({ orgName, clientName, children, onTour }: { orgName: string; clientName: string; children: React.ReactNode; onTour?: () => void }) {
   return (
     <div style={{
       minHeight: '100vh', background: '#f8fafc',
@@ -402,12 +412,23 @@ function PortalShell({ orgName, clientName, children }: { orgName: string; clien
       colorScheme: 'light',
     }}>
       {/* Header */}
-      <div style={{ background: '#0f172a', padding: '16px 0' }}>
+      <div data-tour="portal-header" style={{ background: '#0f172a', padding: '16px 0' }}>
         <div style={{ maxWidth: '760px', margin: '0 auto', padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <span style={{ color: '#fff', fontSize: '16px', fontWeight: 700 }}>⚡ {orgName}</span>
           </div>
-          {clientName && <span style={{ fontSize: '13px', color: '#94a3b8' }}>Client Portal · {clientName}</span>}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {clientName && <span style={{ fontSize: '13px', color: '#94a3b8' }}>Client Portal · {clientName}</span>}
+            {onTour && (
+              <button
+                data-tour="portal-tour-btn"
+                onClick={onTour}
+                style={{ fontSize: '12px', fontWeight: 600, color: '#0d9488', background: 'rgba(13,148,136,0.15)', border: '1px solid rgba(13,148,136,0.3)', borderRadius: 6, padding: '4px 12px', cursor: 'pointer' }}
+              >
+                ? Take a tour
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -424,9 +445,9 @@ function PortalShell({ orgName, clientName, children }: { orgName: string; clien
   )
 }
 
-function Section({ title, subtitle, count, children }: { title: string; subtitle?: string; count?: number; children: React.ReactNode }) {
+function Section({ title, subtitle, count, children, 'data-tour': dataTour }: { title: string; subtitle?: string; count?: number; children: React.ReactNode; 'data-tour'?: string }) {
   return (
-    <div style={{ marginBottom: '32px' }}>
+    <div data-tour={dataTour} style={{ marginBottom: '32px' }}>
       <div style={{ marginBottom: '12px' }}>
         <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a', margin: 0, display: 'inline' }}>
           {title}

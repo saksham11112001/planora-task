@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
   ] = await Promise.all([
     admin
       .from('msme_vendors')
-      .select('id, vendor_name, vendor_email, gstin, pan, status, payment_status, udyam_number, udyam_registered_on, msme_category, nature_of_business, outstanding_amount, cert_url, is_not_msme, declarant_name, declared_at, submitted_at, email_count, last_emailed_at, is_paid, created_at')
+      .select('id, vendor_name, vendor_email, gstin, pan, status, payment_status, udyam_number, udyam_registered_on, msme_category, nature_of_business, outstanding_amount, cert_url, is_not_msme, declarant_name, declared_at, submitted_at, email_count, last_emailed_at, is_paid, created_at, email_bounced, bounce_reason')
       .eq('org_id', mb.org_id)
       .eq('is_deleted', false)
       .order('created_at', { ascending: false }),
