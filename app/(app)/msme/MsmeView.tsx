@@ -1016,10 +1016,10 @@ export function MsmeView({ userRole, orgName }: Props) {
                       <input
                         type="checkbox"
                         style={{ accentColor: ACCENT, cursor: 'pointer' }}
-                        checked={checkedIds.size > 0 && filtered.filter(v => unlockedIds.has(v.id)).every(v => checkedIds.has(v.id))}
+                        checked={checkedIds.size > 0 && filtered.filter(v => unlockedIds.has(v.id) && v.status !== 'submitted' && v.status !== 'not_msme').every(v => checkedIds.has(v.id))}
                         onChange={e => {
-                          const unlocked = filtered.filter(v => unlockedIds.has(v.id))
-                          if (e.target.checked) setCheckedIds(new Set(unlocked.map(v => v.id)))
+                          const shootable = filtered.filter(v => unlockedIds.has(v.id) && v.status !== 'submitted' && v.status !== 'not_msme')
+                          if (e.target.checked) setCheckedIds(new Set(shootable.map(v => v.id)))
                           else setCheckedIds(new Set())
                         }}
                       />
@@ -1079,17 +1079,19 @@ export function MsmeView({ userRole, orgName }: Props) {
                         }}
                       >
                         <td style={{ padding: '12px 14px', width: 36 }} onClick={e => e.stopPropagation()}>
-                          <input
-                            type="checkbox"
-                            style={{ accentColor: ACCENT, cursor: 'pointer' }}
-                            checked={checkedIds.has(v.id)}
-                            onChange={e => {
-                              const next = new Set(checkedIds)
-                              if (e.target.checked) next.add(v.id)
-                              else next.delete(v.id)
-                              setCheckedIds(next)
-                            }}
-                          />
+                          {v.status !== 'submitted' && v.status !== 'not_msme' && (
+                            <input
+                              type="checkbox"
+                              style={{ accentColor: ACCENT, cursor: 'pointer' }}
+                              checked={checkedIds.has(v.id)}
+                              onChange={e => {
+                                const next = new Set(checkedIds)
+                                if (e.target.checked) next.add(v.id)
+                                else next.delete(v.id)
+                                setCheckedIds(next)
+                              }}
+                            />
+                          )}
                         </td>
                         <td style={{ padding: '12px 14px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

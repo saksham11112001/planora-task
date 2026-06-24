@@ -146,7 +146,7 @@ export async function POST(
       contactEmail: contactPerson?.email,
       contactPhone: contactPerson?.phone,
     }) ?? {}
-    if (resendErr) sendError = (resendErr as any)?.message ?? 'Email delivery failed'
+    if (resendErr) sendError = typeof resendErr === 'string' ? resendErr : (resendErr as any)?.message ?? 'Email delivery failed'
   } catch (err) {
     sendError = err instanceof Error ? err.message : 'Email delivery failed'
   }
