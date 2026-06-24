@@ -117,7 +117,7 @@ export async function POST(req: NextRequest) {
       if (sendErr) {
         // Clean up orphan token on failure
         await admin.from('msme_tokens').delete().eq('token_hash', tokenHash)
-        throw new Error((sendErr as any)?.message ?? 'Email delivery failed')
+        throw new Error(typeof sendErr === 'string' ? sendErr : (sendErr as any)?.message ?? 'Email delivery failed')
       }
 
       // Update vendor record
