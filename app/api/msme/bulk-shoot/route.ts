@@ -140,8 +140,8 @@ export async function POST(req: NextRequest) {
 
   const sent   = results.filter(r => r.status === 'fulfilled').length
   const errors = results
-    .map((r, i) => r.status === 'rejected' ? { vendor_id: eligible[i].id, vendor_name: eligible[i].vendor_name, reason: (r.reason as Error)?.message ?? 'Unknown error' } : null)
-    .filter(Boolean) as { vendor_id: string; vendor_name: string; reason: string }[]
+    .map((r, i) => r.status === 'rejected' ? { vendor_id: eligible[i].id, vendor_name: eligible[i].vendor_name, vendor_email: eligible[i].vendor_email, reason: (r.reason as Error)?.message ?? 'Unknown error' } : null)
+    .filter(Boolean) as { vendor_id: string; vendor_name: string; vendor_email: string; reason: string }[]
 
   return NextResponse.json({
     sent,
