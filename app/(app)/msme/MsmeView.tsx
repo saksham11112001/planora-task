@@ -78,6 +78,7 @@ export function MsmeView({ userRole, orgName }: Props) {
   const [savingEmail,   setSavingEmail]   = useState(false)
   const [checkedIds,    setCheckedIds]    = useState<Set<string>>(new Set())
   const [bulkShooting,  setBulkShooting]  = useState(false)
+  const [bulkProgress,  setBulkProgress]  = useState<{ sent: number; total: number } | null>(null)
   const [viewingCert,   setViewingCert]   = useState<string | null>(null)
   const toastRef = useRef(0)
 
@@ -474,20 +475,49 @@ export function MsmeView({ userRole, orgName }: Props) {
   async function handleBulkShoot() {
     const ids = Array.from(checkedIds).filter(id => unlockedIds.has(id))
     if (ids.length === 0) return
-    setBulkShooting(true)
-    let sent = 0, failed = 0
-    for (const id of ids) {
-      const res  = await fetch(`/api/msme/vendors/${id}/shoot-email`, { method: 'POST' })
-      if (!res.ok) { failed++; } else { sent++ }
-      // 150 ms between requests to stay within Resend's ~10 req/s rate limit
-      await new Promise(r => setTimeout(r, 150))
-    }
-    setBulkShooting(false)
+
+    // Optimistic update: immediately mark eligible vendors as emailed in local state
+    setVendors(prev => prev.map(v =>
+      ids.includes(v.id) && v.email_count === 0 && v.status !== 'submitted' && v.status !== 'not_msme'
+        ? { ...v, status: 'emailed' as const, email_count: 1 }
+        : v
+    ))
     setCheckedIds(new Set())
-    const parts: string[] = []
-    if (sent)   parts.push(`${sent} email${sent > 1 ? 's' : ''} sent`)
-    if (failed) parts.push(`${failed} failed`)
-    showToast(parts.join(' · '), failed > 0 ? 'info' : 'success')
+    setBulkShooting(true)
+    setBulkProgress({ sent: 0, total: ids.length })
+
+    try {
+      const res  = await fetch('/api/msme/bulk-shoot', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ vendor_ids: ids }),
+      })
+      const data = await res.json()
+      setBulkShooting(false)
+      setBulkProgress(null)
+
+      if (!res.ok) {
+        showToast(data.error ?? 'Bulk send failed', 'error')
+        fetchVendors()
+        return
+      }
+
+      const parts: string[] = []
+      if (data.sent)              parts.push(`${data.sent} email${data.sent > 1 ? 's' : ''} sent ✓`)
+      if (data.failed)            parts.push(`${data.failed} failed`)
+      if (data.skipped_slot_limit) parts.push(`${data.skipped_slot_limit} skipped (slot limit reached)`)
+
+      if (data.errors?.length) {
+        const names = data.errors.slice(0, 3).map((e: any) => e.vendor_name).join(', ')
+        showToast(`${parts.join(' · ')} — failed: ${names}${data.errors.length > 3 ? ` +${data.errors.length - 3} more` : ''}`, 'error')
+      } else {
+        showToast(parts.join(' · ') || 'No emails sent', data.failed > 0 ? 'info' : 'success')
+      }
+    } catch {
+      setBulkShooting(false)
+      setBulkProgress(null)
+      showToast('Network error during bulk send', 'error')
+    }
     fetchVendors()
   }
 
@@ -963,7 +993,7 @@ export function MsmeView({ userRole, orgName }: Props) {
                   disabled={bulkShooting}
                   style={{ ...primaryBtn, padding: '7px 16px', fontSize: 13 }}
                 >
-                  {bulkShooting ? 'Sending…' : `✉ Email ${checkedIds.size} selected`}
+                  {bulkShooting ? `Sending ${bulkProgress?.total ?? checkedIds.size} emails…` : `✉ Email ${checkedIds.size} selected`}
                 </button>
                 {canAdmin && (
                   <button
