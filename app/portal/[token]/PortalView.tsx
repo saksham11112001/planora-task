@@ -702,7 +702,7 @@ function PortalShell({
         </aside>
 
         {/* Main content */}
-        <main style={{ flex: 1, overflowY: 'auto', padding: '32px 32px 80px' }}>
+        <main style={{ flex: 1, overflowY: 'auto', padding: '32px 32px 80px', overscrollBehavior: 'contain' }}>
           {children}
         </main>
       </div>

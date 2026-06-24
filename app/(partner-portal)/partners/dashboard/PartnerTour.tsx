@@ -102,35 +102,42 @@ export default function PartnerTour({ onDone, onTabChange }: Props) {
   const [vp,   setVp]   = useState({ w: 1280, h: 800 })
   const rafRef = useRef<number | null>(null)
 
+  // Lock body scroll while tour is active
+  useEffect(() => {
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
+  }, [])
+
   const measure = useCallback((stepIdx: number) => {
     const s  = STEPS[stepIdx]
     const el = document.querySelector(s.selector) as HTMLElement | null
     if (!el) { setRect(null); return }
-    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
     setTimeout(() => {
       const r = el.getBoundingClientRect()
       setRect({ x: r.left, y: r.top, w: r.width, h: r.height })
-    }, 150)
+    }, 180)
   }, [])
 
   const goToStep = useCallback((n: number) => {
     const s = STEPS[n]
-    if (s.tab) {
-      onTabChange(s.tab)
-      // Wait for tab content to render before measuring
-      setTimeout(() => measure(n), 250)
-    } else {
-      measure(n)
-    }
     setStep(n)
     setRect(null)
+    if (s.tab) {
+      onTabChange(s.tab)
+      // Wait for tab content to render then measure
+      setTimeout(() => measure(n), 380)
+    } else {
+      setTimeout(() => measure(n), 60)
+    }
   }, [measure, onTabChange])
 
   useEffect(() => {
     setVp({ w: window.innerWidth, h: window.innerHeight })
     const s = STEPS[step]
     if (s.tab) onTabChange(s.tab)
-    measure(step)
+    setTimeout(() => measure(step), s.tab ? 380 : 60)
     const onResize = () => { setVp({ w: window.innerWidth, h: window.innerHeight }); measure(step) }
     window.addEventListener('resize', onResize)
     return () => { window.removeEventListener('resize', onResize); if (rafRef.current) cancelAnimationFrame(rafRef.current) }
@@ -164,20 +171,28 @@ export default function PartnerTour({ onDone, onTabChange }: Props) {
   const TOOLTIP_OFFSET = 16
 
   function tooltipStyle(): React.CSSProperties {
-    if (!rect) return { position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: TOOLTIP_W, zIndex: 10001 }
+    const base = { width: TOOLTIP_W, zIndex: 10001 } as React.CSSProperties
+    if (!rect) return { ...base, position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }
+
+    const TOOLTIP_H  = 220  // conservative max height estimate
     const spaceBelow = vp.h - (spotY + spotH)
     const spaceAbove = spotY
     const spaceRight = vp.w - (spotX + spotW)
     const midX = spotX + spotW / 2
     const midY = spotY + spotH / 2
+
     let prefer = s.prefer
-    if (prefer === 'bottom' && spaceBelow < 180 && spaceAbove > 180) prefer = 'top'
-    if (prefer === 'top'    && spaceAbove < 180 && spaceBelow > 180) prefer = 'bottom'
-    if (prefer === 'right'  && spaceRight < TOOLTIP_W + 20)          prefer = 'left'
-    if (prefer === 'bottom') return { position: 'fixed', top: spotY + spotH + TOOLTIP_OFFSET, left: Math.max(12, Math.min(midX - TOOLTIP_W / 2, vp.w - TOOLTIP_W - 12)), width: TOOLTIP_W, zIndex: 10001 }
-    if (prefer === 'top')    return { position: 'fixed', bottom: vp.h - spotY + TOOLTIP_OFFSET, left: Math.max(12, Math.min(midX - TOOLTIP_W / 2, vp.w - TOOLTIP_W - 12)), width: TOOLTIP_W, zIndex: 10001 }
-    if (prefer === 'right')  return { position: 'fixed', top: Math.max(12, Math.min(midY - 90, vp.h - 200)), left: spotX + spotW + TOOLTIP_OFFSET, width: TOOLTIP_W, zIndex: 10001 }
-    return { position: 'fixed', top: Math.max(12, Math.min(midY - 90, vp.h - 200)), right: vp.w - spotX + TOOLTIP_OFFSET, width: TOOLTIP_W, zIndex: 10001 }
+    if (prefer === 'bottom' && spaceBelow < TOOLTIP_H + 20 && spaceAbove > TOOLTIP_H + 20) prefer = 'top'
+    if (prefer === 'top'    && spaceAbove < TOOLTIP_H + 20 && spaceBelow > TOOLTIP_H + 20) prefer = 'bottom'
+    if (prefer === 'right'  && spaceRight  < TOOLTIP_W + 20) prefer = 'left'
+
+    const clampLeft = (x: number) => Math.max(12, Math.min(x, vp.w - TOOLTIP_W - 12))
+    const clampTop  = (y: number) => Math.max(12, Math.min(y, vp.h - TOOLTIP_H - 12))
+
+    if (prefer === 'bottom') return { ...base, position: 'fixed', top: clampTop(spotY + spotH + TOOLTIP_OFFSET), left: clampLeft(midX - TOOLTIP_W / 2) }
+    if (prefer === 'top')    return { ...base, position: 'fixed', top: clampTop(spotY - TOOLTIP_H - TOOLTIP_OFFSET), left: clampLeft(midX - TOOLTIP_W / 2) }
+    if (prefer === 'right')  return { ...base, position: 'fixed', top: clampTop(midY - TOOLTIP_H / 2), left: Math.min(spotX + spotW + TOOLTIP_OFFSET, vp.w - TOOLTIP_W - 12) }
+    return { ...base, position: 'fixed', top: clampTop(midY - TOOLTIP_H / 2), left: clampLeft(spotX - TOOLTIP_W - TOOLTIP_OFFSET) }
   }
 
   const isFirst       = step === 0
