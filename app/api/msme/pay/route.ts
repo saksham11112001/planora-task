@@ -121,6 +121,9 @@ export async function POST(req: NextRequest) {
   if (pack.tier === 'free') {
     return NextResponse.json({ error: 'Free tier does not require payment' }, { status: 400 })
   }
+  if (pack.tier === 'pack_enterprise') {
+    return NextResponse.json({ error: 'Enterprise plans are not purchasable online. Contact support@upfloat.co.' }, { status: 400 })
+  }
 
   const { price_paise: basePaise, label: packLabel, vendor_limit: vendorLimit } = pack
   const chargeablePaise = Math.round(basePaise * 1.18 * (1 - discountPct / 100))
@@ -235,7 +238,7 @@ export async function PUT(req: NextRequest) {
     // Verify the order belongs to this org and wasn't already processed
     const { data: addonPayment } = await admin
       .from('msme_pack_payments')
-      .select('id, org_id, status, amount_paise')
+      .select('id, org_id, status, amount_paise, pack_tier')
       .eq('gateway_order_id', razorpay_order_id)
       .maybeSingle()
     if (!addonPayment) {
@@ -243,6 +246,10 @@ export async function PUT(req: NextRequest) {
     }
     if (addonPayment.org_id !== mb.org_id) {
       return NextResponse.json({ error: 'Order does not belong to your organisation' }, { status: 403 })
+    }
+    // Prevent tier-swap: verify the order was actually for this addon size
+    if (addonPayment.pack_tier !== `addon_${addon_slots}`) {
+      return NextResponse.json({ error: 'Addon slots do not match the original order' }, { status: 400 })
     }
     // Idempotency: already processed
     if (addonPayment.status === 'paid') {
@@ -283,11 +290,14 @@ export async function PUT(req: NextRequest) {
   if (pack.tier === 'free') {
     return NextResponse.json({ error: 'Cannot downgrade to free tier via payment verification' }, { status: 400 })
   }
+  if (pack.tier === 'pack_enterprise') {
+    return NextResponse.json({ error: 'Enterprise plans are not purchasable online' }, { status: 400 })
+  }
 
   // Verify the order belongs to this org (prevents cross-org replay)
   const { data: packPayment } = await admin
     .from('msme_pack_payments')
-    .select('id, org_id, status, amount_paise')
+    .select('id, org_id, status, amount_paise, pack_tier')
     .eq('gateway_order_id', razorpay_order_id)
     .maybeSingle()
   if (!packPayment) {
@@ -295,6 +305,10 @@ export async function PUT(req: NextRequest) {
   }
   if (packPayment.org_id !== mb.org_id) {
     return NextResponse.json({ error: 'Order does not belong to your organisation' }, { status: 403 })
+  }
+  // Prevent tier-swap attack: verify request pack_tier matches what was actually ordered
+  if (packPayment.pack_tier !== pack_tier) {
+    return NextResponse.json({ error: 'Pack tier does not match the original order' }, { status: 400 })
   }
 
   // Idempotency: if this payment was already processed, return success without re-activating
