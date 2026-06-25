@@ -72,12 +72,28 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         redirect('/dashboard')
       }
 
-      // 2. Check if this user is a standalone partner — send to partner portal
-      const { data: standalonePartner } = await admin
+      // 2. Check if this user is a standalone partner — send to partner portal.
+      //    Check by user_id first; fall back to email for users who signed up as partners
+      //    but haven't yet visited /partners/dashboard to get their user_id linked.
+      let { data: standalonePartner } = await admin
         .from('standalone_partners')
         .select('id')
         .eq('user_id', user.id)
         .maybeSingle()
+
+      if (!standalonePartner && user.email) {
+        const { data: byEmail } = await admin
+          .from('standalone_partners')
+          .select('id')
+          .eq('email', user.email.toLowerCase())
+          .is('user_id', null)
+          .maybeSingle()
+        if (byEmail) {
+          // Link user_id now so future checks work via user_id
+          await admin.from('standalone_partners').update({ user_id: user.id }).eq('id', byEmail.id)
+          standalonePartner = byEmail
+        }
+      }
 
       if (standalonePartner) redirect('/partners/dashboard')
 

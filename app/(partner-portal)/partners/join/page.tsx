@@ -25,6 +25,20 @@ export default function PartnerJoinPage() {
     })
   }, [])
 
+  // Called in all paths to ensure the partner profile row exists
+  async function ensurePartnerProfile(nameVal: string, emailVal: string, phoneVal: string, refCodeVal: string) {
+    await fetch('/api/partner-portal/profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name:        nameVal,
+        email:       emailVal,
+        phone:       phoneVal || null,
+        referred_by: refCodeVal || null,
+      }),
+    })
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!name.trim())    { setError('Name is required'); return }
@@ -42,17 +56,20 @@ export default function PartnerJoinPage() {
         options: { emailRedirectTo: `${window.location.origin}/auth/callback?next=/partners/dashboard` },
       })
       if (signUpErr) {
-        // If the user already has an account, send them to login instead of showing a raw error
+        // If the user already has an account, create their partner profile then send them to login.
+        // Without this, existing Supabase users could never become partners because signUp()
+        // fails before the profile API is ever called, causing an infinite join→login→dashboard loop.
         if (signUpErr.message.toLowerCase().includes('already registered') ||
             signUpErr.message.toLowerCase().includes('already been registered') ||
             signUpErr.status === 422) {
+          await ensurePartnerProfile(name.trim(), email.trim().toLowerCase(), phone.trim(), refCode.trim())
           router.push('/partners/login?already=1')
           return
         }
         setError(signUpErr.message); return
       }
 
-      // Register partner profile
+      // Register partner profile (idempotent — safe to call even if record already exists)
       const res = await fetch('/api/partner-portal/profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
