@@ -3,6 +3,7 @@
 import { CustomFieldsPanel } from '@/components/tasks/CustomFieldsPanel'
 import type { CustomFieldDef } from '@/components/tasks/CustomFieldsPanel'
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { X, ThumbsUp, ThumbsDown, Flag, Calendar, User, Briefcase, Send, Clock, Sparkles, ShieldCheck, RefreshCw, FolderPlus, ArrowRightLeft, ExternalLink, Link2, Repeat2, DollarSign } from 'lucide-react'
 import { FREQ_LABEL, FrequencyPickerButton } from '@/components/tasks/InlineRecurringTask'
@@ -206,7 +207,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
         })
         .catch(() => {})
     }
-  }, [task?.id, (task as any)?.is_billable, (task as any)?.billable_amount])
+  }, [task?.id, (task as any)?.is_billable, (task as any)?.billable_amount, (task as any)?.next_occurrence_date, (task as any)?.frequency])
 
   /* auto-grow textarea */
   useEffect(() => {
@@ -857,7 +858,12 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
   const client      = clients.find(c => c.id === clientId)
   const myName      = members.find(m => m.id === currentUserId)?.name ?? 'U'
 
-  return (
+  // Portal root — render outside .page-container so position:fixed is never
+  // trapped by ancestor transforms or overflow:auto containers.
+  const [portalRoot, setPortalRoot] = useState<Element | null>(null)
+  useEffect(() => { setPortalRoot(document.body) }, [])
+
+  const panelJsx = (
     <>
       {/* Backdrop — hidden on mobile (panel is fullscreen, tap close btn instead) */}
       {isOpen && (
@@ -2449,6 +2455,9 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
       )}
     </>
   )
+
+  if (!portalRoot) return null
+  return createPortal(panelJsx, portalRoot)
 }
 
 function RecurringTemplateBanner({ task, canEdit, onDone }: { task: any; canEdit: boolean; onDone?: () => void }) {
