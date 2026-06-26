@@ -1368,6 +1368,58 @@ export function LandingClient(props: Props) {
               </span>
               <span style={{ fontSize: 12.5, fontWeight: 600, color: '#5eead4' }}>GST Filed Successfully</span>
             </div>
+
+            {/* ── 3D orbit ring — depth decoration ────────────────── */}
+            <div
+              className="lp-3d-ring"
+              style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                width: 270,
+                height: 270,
+                marginLeft: -135,
+                marginTop: -135,
+                borderRadius: '50%',
+                border: '1.5px solid rgba(13,148,136,0.28)',
+                background: 'radial-gradient(ellipse, rgba(13,148,136,0.04) 0%, transparent 68%)',
+                boxShadow: '0 0 28px 4px rgba(13,148,136,0.07) inset',
+                pointerEvents: 'none',
+                zIndex: 2,
+              }}
+            />
+
+            {/* ── 3D floating stat card ────────────────────────────── */}
+            <div
+              className="lp-3d-card"
+              style={{
+                position: 'absolute',
+                top: '37%',
+                right: '-52px',
+                width: 140,
+                background: 'rgba(15,23,42,0.92)',
+                border: '1px solid rgba(13,148,136,0.28)',
+                borderRadius: 13,
+                padding: '11px 13px',
+                backdropFilter: 'blur(12px)',
+                boxShadow: '0 24px 50px -14px rgba(0,0,0,0.65)',
+                zIndex: 9,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                <span style={{ width: 20, height: 20, borderRadius: 6, background: 'rgba(13,148,136,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <CheckSquare size={11} color={TEAL} />
+                </span>
+                <span style={{ fontSize: 9.5, fontWeight: 600, color: '#64748b', letterSpacing: 0.3 }}>THIS WEEK</span>
+              </div>
+              <div style={{ fontSize: 26, fontWeight: 800, color: '#f1f5f9', lineHeight: 1 }}>
+                94<span style={{ fontSize: 13, color: TEAL }}>%</span>
+              </div>
+              <div style={{ fontSize: 10, color: '#64748b', marginTop: 3 }}>tasks on time</div>
+              <div style={{ marginTop: 8, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.05)' }}>
+                <div style={{ width: '94%', height: '100%', borderRadius: 2, background: `linear-gradient(90deg, ${TEAL}, ${PURPLE})` }} />
+              </div>
+            </div>
           </div>
         </div>
 
@@ -1787,6 +1839,24 @@ const CSS = `
   100% { transform: translate(var(--dx), var(--dy)) rotate(540deg); opacity: 0; }
 }
 .lp-confetti { animation: lp-confetti-fall 1.6s ease-out forwards; }
+
+/* ── 3D floating / orbiting animations ──────────────────────────── */
+@keyframes lp-3d-card-float {
+  0%, 100% { transform: perspective(700px) translateY(0px) rotateX(8deg) rotateY(-6deg); }
+  35%       { transform: perspective(700px) translateY(-18px) rotateX(2deg) rotateY(7deg); }
+  68%       { transform: perspective(700px) translateY(12px) rotateX(13deg) rotateY(-9deg); }
+}
+@keyframes lp-3d-ring-spin {
+  0%   { transform: perspective(600px) rotateX(72deg) rotateZ(0deg); }
+  100% { transform: perspective(600px) rotateX(72deg) rotateZ(360deg); }
+}
+@keyframes lp-3d-ring-pulse {
+  0%, 100% { opacity: 0.5; }
+  50%       { opacity: 0.22; }
+}
+.lp-3d-card { animation: lp-3d-card-float 9s ease-in-out infinite; transition: box-shadow 0.3s ease; }
+.lp-3d-ring { animation: lp-3d-ring-spin 14s linear infinite, lp-3d-ring-pulse 7s ease-in-out infinite; }
+/* ──────────────────────────────────────────────────────────────── */
 
 a[style] { -webkit-tap-highlight-color: transparent; }
 .lp-nav-links a:hover, .lp-footer a:hover { color: #e2e8f0 !important; }
