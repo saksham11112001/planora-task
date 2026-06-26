@@ -2,7 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getSessionUser } from '@/lib/supabase/cached'
 import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { CalendarView } from './CalendarView'
-import { shiftDays } from '@/lib/utils/recurringSchedule'
+import { shiftDays, nextOccurrence } from '@/lib/utils/recurringSchedule'
 
 const TASK_SELECT = 'id, title, status, priority, due_date, next_occurrence_date, is_recurring, parent_task_id, parent_recurring_id, project_id, assignee_id, approver_id, approval_status, approval_required, client_id, frequency, custom_fields, is_billable, billable_amount, projects(id,name,color), assignee:users!tasks_assignee_id_fkey(id,name), approver:users!tasks_approver_id_fkey(id,name)'
 
@@ -63,6 +63,22 @@ export async function CalendarFetcher() {
   ])
 
   const memberList = (members ?? []).map((m: any) => ({ id: m.users?.id ?? m.user_id, name: m.users?.name ?? 'Unknown' }))
+
+  // Self-heal: fix recurring tasks whose next_occurrence_date was miscalculated by the old
+  // monthly_days: bug (always returned 1st of month). Fire-and-forget, doesn't block render.
+  const todayHeal = new Date().toISOString().split('T')[0]
+  const healTargets = (recurringTemplates ?? []).filter((t: any) => {
+    const g = t.custom_fields?._granular_frequency as string | undefined
+    if (!g || !t.next_occurrence_date) return false
+    const expected = nextOccurrence(g, shiftDays(todayHeal, -1))
+    return t.next_occurrence_date !== expected && t.next_occurrence_date < expected
+  })
+  if (healTargets.length > 0) {
+    Promise.all(healTargets.map((t: any) => {
+      const g = t.custom_fields?._granular_frequency as string
+      return supabase.from('tasks').update({ next_occurrence_date: nextOccurrence(g, shiftDays(todayHeal, -1)) }).eq('id', t.id)
+    })).catch(() => {})
+  }
 
   const clientMap: Record<string, { id: string; name: string; color: string }> = {}
   ;(clients ?? []).forEach((c: any) => { clientMap[c.id] = c })
