@@ -3,7 +3,7 @@ import { createAdminClient }   from '@/lib/supabase/admin'
 import { NextResponse }        from 'next/server'
 import type { NextRequest }    from 'next/server'
 import { assertCan }           from '@/lib/utils/permissionGate'
-import { normalizeFrequency, nextOccurrence, isValidGranularFrequency } from '@/lib/utils/recurringSchedule'
+import { normalizeFrequency, nextOccurrence, shiftDays, isValidGranularFrequency } from '@/lib/utils/recurringSchedule'
 
 const VALID_PRIORITIES = ['low', 'medium', 'high', 'urgent']
 import { dbError } from '@/lib/api-error'
@@ -30,7 +30,10 @@ export async function POST(request: NextRequest) {
 
   const today       = start_date || new Date().toISOString().split('T')[0]
   const dbFrequency = normalizeFrequency(frequency)
-  const nextDate    = nextOccurrence(frequency, today)
+  // Use yesterday as the reference so that if today IS an occurrence date the first
+  // spawn happens today (the cron picks it up immediately). nextOccurrence is strictly
+  // "after" the reference, so shifting back by one day includes today.
+  const nextDate    = nextOccurrence(frequency, shiftDays(today, -1))
 
   const { data: task, error } = await admin.from('tasks').insert({
     org_id:               mb.org_id,
@@ -94,7 +97,7 @@ export async function PATCH(request: NextRequest) {
   if (priority && !VALID_PRIORITIES.includes(priority)) return NextResponse.json({ error: `Invalid priority "${priority}". Must be one of: low, medium, high, urgent` }, { status: 400 })
   const today       = new Date().toISOString().split('T')[0]
   const dbFrequency = frequency ? normalizeFrequency(frequency) : undefined
-  const nextDate    = frequency ? nextOccurrence(frequency, today) : undefined
+  const nextDate    = frequency ? nextOccurrence(frequency, shiftDays(today, -1)) : undefined
 
   const admin = createAdminClient()
 
