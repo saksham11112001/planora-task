@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getSessionUser } from '@/lib/supabase/cached'
 import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { RecurringView } from './RecurringView'
+import { nextOccurrence, shiftDays } from '@/lib/utils/recurringSchedule'
 
 const TASK_SELECT = 'id, title, status, priority, frequency, next_occurrence_date, assignee_id, approver_id, client_id, created_by, created_at, updated_at, is_billable, billable_amount, custom_fields, assignee:users!tasks_assignee_id_fkey(id, name), approver:users!tasks_approver_id_fkey(id, name), creator:users!tasks_created_by_fkey(id, name), projects(id, name, color), clients(id, name, color)'
 
@@ -35,6 +36,26 @@ export async function RecurringFetcher() {
     name: (m.users as any)?.name ?? 'Unknown',
     role: (m as any).role ?? 'member',
   }))
+
+  // Self-heal: fix any recurring tasks whose next_occurrence_date was miscalculated
+  // by the old bug (monthly_days: falling through to the monthly_ branch and always
+  // returning the 1st of the month). Run in background — doesn't block page render.
+  const today = new Date().toISOString().split('T')[0]
+  const tasksToFix = (tasks ?? []).filter((t: any) => {
+    const granular = t.custom_fields?._granular_frequency as string | undefined
+    if (!granular || !t.next_occurrence_date) return false
+    const correct = nextOccurrence(granular, shiftDays(today, -1))
+    // Fix if stored date is in the past (missed occurrence) OR simply wrong for the frequency
+    return t.next_occurrence_date !== correct && t.next_occurrence_date < correct
+  })
+  if (tasksToFix.length > 0) {
+    // Fire-and-forget — don't await so page loads immediately with fresh data on next visit
+    Promise.all(tasksToFix.map((t: any) => {
+      const granular = t.custom_fields?._granular_frequency as string
+      const correct  = nextOccurrence(granular, shiftDays(today, -1))
+      return supabase.from('tasks').update({ next_occurrence_date: correct }).eq('id', t.id)
+    })).catch(() => {})
+  }
 
   return (
     <RecurringView
