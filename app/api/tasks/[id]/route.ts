@@ -5,7 +5,7 @@ import { NextResponse }       from 'next/server'
 import type { NextRequest }   from 'next/server'
 import { assertCan }          from '@/lib/utils/permissionGate'
 import { dbError }             from '@/lib/api-error'
-import { nextOccurrence, normalizeFrequency, isValidGranularFrequency } from '@/lib/utils/recurringSchedule'
+import { nextOccurrence, normalizeFrequency, isValidGranularFrequency, shiftDays } from '@/lib/utils/recurringSchedule'
 import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
 
 const VALID_PRIORITIES    = ['low', 'medium', 'high', 'urgent']
@@ -224,7 +224,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const granularFreq = updates.frequency as string
     if (!('next_occurrence_date' in updates)) {
       const today = new Date().toISOString().split('T')[0]
-      updates.next_occurrence_date = nextOccurrence(granularFreq, today)
+      updates.next_occurrence_date = nextOccurrence(granularFreq, shiftDays(today, -1))
     }
     // Persist granular value so multi-day variants (weekly_days:sat,sun) survive round-trips.
     // inferGranularFrequency can only recover a single day from next_occurrence_date.

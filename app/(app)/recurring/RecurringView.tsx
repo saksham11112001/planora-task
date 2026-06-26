@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { RefreshCw, X, Pencil, User, Trash2, SortAsc, Copy } from 'lucide-react'
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
 import { InlineRecurringTask, FREQ_LABEL } from '@/components/tasks/InlineRecurringTask'
-import { inferGranularFrequency, nextOccurrence } from '@/lib/utils/recurringSchedule'
+import { inferGranularFrequency, nextOccurrence, shiftDays } from '@/lib/utils/recurringSchedule'
 import { fmtDate } from '@/lib/utils/format'
 import { toast, useFilterStore } from '@/store/appStore'
 import { UniversalFilterBar } from '@/components/filters/UniversalFilterBar'
@@ -101,6 +101,8 @@ export function RecurringView({
   const [, startT] = useTransition()
 
   const [localTasks, setLocalTasks] = useState<Task[]>(initialTasks)
+  // Sync server data into localTasks after router.refresh() (useState only sets initial value).
+  useEffect(() => { setLocalTasks(initialTasks) }, [initialTasks])
   const [viewTab, setViewTab] = useState<'List' | 'Board'>('List')
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const panelHasUpdates = useRef(false)
@@ -363,7 +365,7 @@ export function RecurringView({
     setFreqPickerOpen(false)
     const today    = new Date().toISOString().split('T')[0]
     const dbFreq   = normalizeFrequency(granularFreq)
-    const nextDate = nextOccurrence(granularFreq, today)
+    const nextDate = nextOccurrence(granularFreq, shiftDays(today, -1))
     const results  = await Promise.all(ids.map(id =>
       fetch(`/api/recurring/${id}`, {
         method: 'PATCH',
