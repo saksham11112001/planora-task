@@ -624,8 +624,59 @@ function Hero({ loginUrl }: { loginUrl: string }) {
         </div>
 
         {/* RIGHT */}
-        <div style={{ animation: 'msme-slide-left 0.9s ease both' }}>
+        <div style={{ animation: 'msme-slide-left 0.9s ease both', position: 'relative' }}>
           <VendorFlowMockup />
+
+          {/* ── 3D orbit ring ─────────────────────────────────── */}
+          <div
+            className="msme-3d-ring"
+            style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              width: 290,
+              height: 290,
+              marginLeft: -145,
+              marginTop: -145,
+              borderRadius: '50%',
+              border: '1.5px solid rgba(13,148,136,0.22)',
+              background: 'radial-gradient(ellipse, rgba(13,148,136,0.05) 0%, transparent 65%)',
+              pointerEvents: 'none',
+              zIndex: 0,
+            }}
+          />
+
+          {/* ── 3D floating stat card ─────────────────────────── */}
+          <div
+            className="msme-3d-card"
+            style={{
+              position: 'absolute',
+              top: '12%',
+              right: '-40px',
+              width: 148,
+              background: 'rgba(255,255,255,0.92)',
+              border: '1px solid rgba(13,148,136,0.22)',
+              borderRadius: 13,
+              padding: '11px 13px',
+              backdropFilter: 'blur(12px)',
+              boxShadow: '0 18px 45px -12px rgba(13,148,136,0.22)',
+              zIndex: 10,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 7 }}>
+              <span style={{ width: 20, height: 20, borderRadius: 6, background: 'rgba(13,148,136,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <ShieldCheck size={11} color={C.teal} />
+              </span>
+              <span style={{ fontSize: 9.5, fontWeight: 700, color: C.muted, letterSpacing: 0.3 }}>COMPLIANT</span>
+            </div>
+            <div style={{ fontSize: 24, fontWeight: 900, color: C.text, lineHeight: 1 }}>
+              43B<span style={{ fontSize: 12, color: C.teal }}>(h)</span>
+            </div>
+            <div style={{ fontSize: 10, color: C.muted, marginTop: 3 }}>auto-detected</div>
+            <div style={{ marginTop: 8, height: 3, borderRadius: 2, background: 'rgba(0,0,0,0.05)' }}>
+              <div style={{ width: '100%', height: '100%', borderRadius: 2, background: `linear-gradient(90deg, ${C.teal}, ${C.emerald})` }} />
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -1495,6 +1546,21 @@ function GlobalStyles() {
       @keyframes msme-dash {
         to { background-position: 200px 0; }
       }
+      @keyframes msme-3d-card-float {
+        0%, 100% { transform: perspective(700px) translateY(0px) rotateX(8deg) rotateY(-6deg); }
+        35%       { transform: perspective(700px) translateY(-18px) rotateX(2deg) rotateY(7deg); }
+        68%       { transform: perspective(700px) translateY(12px) rotateX(13deg) rotateY(-9deg); }
+      }
+      @keyframes msme-3d-ring-spin {
+        0%   { transform: perspective(600px) rotateX(72deg) rotateZ(0deg); }
+        100% { transform: perspective(600px) rotateX(72deg) rotateZ(360deg); }
+      }
+      @keyframes msme-3d-ring-pulse {
+        0%, 100% { opacity: 0.45; }
+        50%       { opacity: 0.18; }
+      }
+      .msme-3d-card { animation: msme-3d-card-float 9s ease-in-out infinite; }
+      .msme-3d-ring { animation: msme-3d-ring-spin 14s linear infinite, msme-3d-ring-pulse 7s ease-in-out infinite; }
 
       .msme-reveal {
         opacity: 0;
