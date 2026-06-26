@@ -6,7 +6,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { X, ThumbsUp, ThumbsDown, Flag, Calendar, User, Briefcase, Send, Clock, Sparkles, ShieldCheck, RefreshCw, FolderPlus, ArrowRightLeft, ExternalLink, Link2, Repeat2, DollarSign } from 'lucide-react'
 import { FREQ_LABEL, FrequencyPickerButton } from '@/components/tasks/InlineRecurringTask'
-import { nextOccurrence, inferGranularFrequency } from '@/lib/utils/recurringSchedule'
+import { nextOccurrence, inferGranularFrequency, shiftDays } from '@/lib/utils/recurringSchedule'
 import { cn }             from '@/lib/utils/cn'
 import { PRIORITY_CONFIG, STATUS_CONFIG } from '@/types'
 import type { Task }      from '@/types'
@@ -1615,7 +1615,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                           // Recalculate next occurrence from today so the date
                           // reflects the new schedule immediately — not the old one.
                           const today       = new Date().toISOString().split('T')[0]
-                          const newNextDate = nextOccurrence(freq, today)
+                          const newNextDate = nextOccurrence(freq, shiftDays(today, -1))
                           setRecurNextDate(newNextDate)
                           patch({ frequency: freq, next_occurrence_date: newNextDate })
                         }}
