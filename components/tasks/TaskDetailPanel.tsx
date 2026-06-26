@@ -559,33 +559,46 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     const current: string[] = (task as any).custom_fields?._blocked_by ?? []
     if (current.includes(blockingTaskId)) { setBlockingSearch(''); setBlockingResults([]); return }
     const newBlockedBy = [...current, blockingTaskId]
-    setBlockingSearch(''); setBlockingResults([])
-    // Use title from search results immediately — no extra round-trip
     const knownTitle = blockingResults.find(r => r.id === blockingTaskId)?.title
       ?? blockingTasks.find(t => t.id === blockingTaskId)?.title
       ?? blockingTaskId
+    setBlockingSearch(''); setBlockingResults([])
+    // Optimistically add dependency
+    setBlockingTasks(p => [...p.filter(t => t.id !== blockingTaskId), { id: blockingTaskId, title: knownTitle }])
+    onUpdated?.({ custom_fields: { ...(task as any).custom_fields, _blocked_by: newBlockedBy } })
     const res = await fetch(`/api/tasks/${task.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ custom_fields: { _blocked_by: newBlockedBy } }),
     })
     if (res.ok) {
-      setBlockingTasks(p => [...p.filter(t => t.id !== blockingTaskId), { id: blockingTaskId, title: knownTitle }])
-      onUpdated?.({ custom_fields: { ...(task as any).custom_fields, _blocked_by: newBlockedBy } })
       toast.success('Blocking task added')
-    } else toast.error('Failed to add dependency')
+    } else {
+      // Rollback
+      setBlockingTasks(p => p.filter(t => t.id !== blockingTaskId))
+      onUpdated?.({ custom_fields: { ...(task as any).custom_fields, _blocked_by: current } })
+      toast.error('Failed to add dependency')
+    }
   }
 
   async function removeBlockedBy(blockingTaskId: string) {
     if (!task) return
-    const newBlockedBy = ((task as any).custom_fields?._blocked_by ?? []).filter((id: string) => id !== blockingTaskId)
+    const prevBlockedBy: string[] = (task as any).custom_fields?._blocked_by ?? []
+    const newBlockedBy = prevBlockedBy.filter((id: string) => id !== blockingTaskId)
+    // Optimistically remove dependency
+    setBlockingTasks(p => p.filter(t => t.id !== blockingTaskId))
+    onUpdated?.({ custom_fields: { ...(task as any).custom_fields, _blocked_by: newBlockedBy } })
     const res = await fetch(`/api/tasks/${task.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ custom_fields: { _blocked_by: newBlockedBy } }),
     })
     if (res.ok) {
-      onUpdated?.({ custom_fields: { ...(task as any).custom_fields, _blocked_by: newBlockedBy } })
       toast.success('Dependency removed')
-    } else toast.error('Failed to remove dependency')
+    } else {
+      // Rollback
+      setBlockingTasks(p => [...p, ...blockingTasks.filter(t => t.id === blockingTaskId)])
+      onUpdated?.({ custom_fields: { ...(task as any).custom_fields, _blocked_by: prevBlockedBy } })
+      toast.error('Failed to remove dependency')
+    }
   }
 
   /* ── "Blocks" reverse side: this task blocks other tasks ──────── */
@@ -630,18 +643,26 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
   // Remove "this task blocks task X" = remove this task's id from task X's _blocked_by
   async function removeBlocksTask(targetTaskId: string) {
     if (!task) return
+    // Optimistically remove from UI before fetching target task's current data
+    const snapshot = blocksTasks.find(t => t.id === targetTaskId)
+    setBlocksTasks(p => p.filter(t => t.id !== targetTaskId))
     const tr = await fetch(`/api/tasks/${targetTaskId}`)
     const td = await tr.json()
-    if (!td.data) { toast.error('Task not found'); return }
+    if (!td.data) {
+      if (snapshot) setBlocksTasks(p => [...p, snapshot])  // rollback
+      toast.error('Task not found'); return
+    }
     const newBlockedBy = (td.data.custom_fields?._blocked_by ?? []).filter((id: string) => id !== task.id)
     const res = await fetch(`/api/tasks/${targetTaskId}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ custom_fields: { _blocked_by: newBlockedBy } }),
     })
     if (res.ok) {
-      setBlocksTasks(p => p.filter(t => t.id !== targetTaskId))
       toast.success('Block link removed')
-    } else toast.error('Failed to remove block link')
+    } else {
+      if (snapshot) setBlocksTasks(p => [...p, snapshot])  // rollback
+      toast.error('Failed to remove block link')
+    }
   }
 
   async function loadAttachments(taskId: string) {
@@ -705,6 +726,10 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
 
   async function markAsNil() {
     if (!task) return
+    // Optimistically insert a placeholder so the NIL row appears immediately
+    const tempId = `nil-temp-${Date.now()}`
+    const placeholder = { id: tempId, file_name: 'Not available (nil)', drive_url: 'nil', attachment_type: 'link', file_size: 0, mime_type: 'text/uri-list', storage_path: '', created_at: new Date().toISOString(), uploaded_by: null, uploader: null }
+    setAttachments(p => [placeholder as any, ...p])
     setUploading(true)
     const r = await fetch(`/api/tasks/${task.id}/attachments`, {
       method: 'POST',
@@ -712,8 +737,14 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
       body: JSON.stringify({ drive_url: 'nil', file_name: 'Not available (nil)', attachment_type: 'link' }),
     })
     const d = await r.json()
-    if (r.ok) { setAttachments(p => [d.data, ...p]); toast.success('Marked as NIL — document noted as unavailable') }
-    else toast.error(d.error ?? 'Failed to mark as NIL')
+    if (r.ok) {
+      // Replace placeholder with real row from server
+      setAttachments(p => p.map(a => a.id === tempId ? d.data : a))
+      toast.success('Marked as NIL — document noted as unavailable')
+    } else {
+      setAttachments(p => p.filter(a => a.id !== tempId))  // rollback
+      toast.error(d.error ?? 'Failed to mark as NIL')
+    }
     setUploading(false)
   }
 
@@ -2470,7 +2501,9 @@ function RecurringTemplateBanner({ task, canEdit, onDone }: { task: any; canEdit
 
   async function completeOccurrence() {
     if (!slotDate) return
-    setBusy(true); setErr(null)
+    // Optimistically mark done immediately
+    setDone(true); setBusy(true); setErr(null)
+    setTimeout(() => onDone?.(), 600)
     try {
       const res  = await fetch(`/api/tasks/${task.id}/complete-occurrence`, {
         method:  'POST',
@@ -2478,10 +2511,8 @@ function RecurringTemplateBanner({ task, canEdit, onDone }: { task: any; canEdit
         body:    JSON.stringify({ date: slotDate }),
       })
       const json = await res.json()
-      if (!res.ok) { setErr(json.error ?? 'Failed'); return }
-      setDone(true)
-      setTimeout(() => onDone?.(), 1000)
-    } catch { setErr('Network error') }
+      if (!res.ok) { setDone(false); setErr(json.error ?? 'Failed') }
+    } catch { setDone(false); setErr('Network error') }
     finally   { setBusy(false) }
   }
 

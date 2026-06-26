@@ -36,17 +36,21 @@ export function CustomFieldsPanel({ taskId, fieldDefs, existing = {}, onSaved, r
   }
 
   async function save() {
+    // Optimistically mark as saved so UI reacts instantly
+    const snapshot = { ...values }
+    setChanged(false)
+    onSaved?.(values)
     setSaving(true)
     try {
       const res = await fetch(`/api/tasks/${taskId}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ custom_fields: values }),
+        body: JSON.stringify({ custom_fields: snapshot }),
       })
       if (res.ok) {
         toast.success('Custom fields saved ✓')
-        setChanged(false)
-        onSaved?.(values)
       } else {
+        // Rollback
+        setChanged(true)
         toast.error('Failed to save')
       }
     } finally { setSaving(false) }

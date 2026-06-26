@@ -629,6 +629,10 @@ export function ApprovalsView({ pending: initialPending, history, clients }: Pro
   }
 
   async function decide(taskId: string, decision: 'approve' | 'reject', comment?: string) {
+    // Optimistically remove from pending list immediately
+    const snapshot = pending.find(t => t.id === taskId)
+    setPending(p => p.filter(t => t.id !== taskId))
+    setSelectedIds(p => { const s = new Set(p); s.delete(taskId); return s })
     setProcessing(p => new Set(p).add(taskId))
     const res = await fetch(`/api/tasks/${taskId}/approve`, {
       method: 'POST',
@@ -637,11 +641,11 @@ export function ApprovalsView({ pending: initialPending, history, clients }: Pro
     })
     setProcessing(p => { const s = new Set(p); s.delete(taskId); return s })
     if (res.ok) {
-      setPending(p => p.filter(t => t.id !== taskId))
-      setSelectedIds(p => { const s = new Set(p); s.delete(taskId); return s })
       toast.success(decision === 'approve' ? '✓ Task approved' : 'Returned to assignee')
       startT(() => router.refresh())
     } else {
+      // Rollback — put task back in list
+      if (snapshot) setPending(p => [...p, snapshot])
       const d = await res.json().catch(() => ({}))
       toast.error(d.error ?? 'Action failed')
     }
