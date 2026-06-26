@@ -163,27 +163,43 @@ export function TeamView({ members: initialMembers, canManage, isAdmin = false, 
       setTimeout(() => setRemoveConfirm(c => c === userId ? null : c), 4000)
       return
     }
-    setRemovingId(userId); setRemoveConfirm(null)
+    setRemoveConfirm(null)
+    // Optimistically remove from list
+    const snapshot = members.find(m => m.id === userId)
+    setMembers(p => p.filter(m => m.id !== userId))
+    setRemovingId(userId)
     const res = await fetch('/api/team', {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id: userId, is_active: false }),
     })
     setRemovingId(null)
     if (res.ok) { toast.success(`${memberName} removed from the workspace`); router.refresh() }
-    else { const d = await res.json().catch(() => ({})); toast.error(d.error ?? 'Failed to remove member') }
+    else {
+      // Rollback
+      if (snapshot) setMembers(p => [...p, snapshot])
+      const d = await res.json().catch(() => ({})); toast.error(d.error ?? 'Failed to remove member')
+    }
   }
 
   // ── Role change ────────────────────────────────────────────────────────────
   async function changeRole(userId: string, newRole: string) {
     if (!userId || userId === 'undefined') { toast.error('Cannot identify member — please refresh and try again.'); return }
+    // Optimistically update role
+    const prevRole = members.find(m => m.id === userId)?.role
+    setMembers(p => p.map(m => m.id === userId ? { ...m, role: newRole } : m))
+    setRoleEditing(null); setRoleDropPos(null)
     setSaving(userId)
     const res = await fetch('/api/team', {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id: userId, role: newRole }),
     })
-    setSaving(null); setRoleEditing(null); setRoleDropPos(null)
+    setSaving(null)
     if (res.ok) { toast.success('Role updated'); router.refresh() }
-    else { const d = await res.json(); toast.error(d.error ?? 'Failed to update role') }
+    else {
+      // Rollback
+      if (prevRole) setMembers(p => p.map(m => m.id === userId ? { ...m, role: prevRole } : m))
+      const d = await res.json(); toast.error(d.error ?? 'Failed to update role')
+    }
   }
 
   // ── Edit member info ───────────────────────────────────────────────────────
@@ -192,6 +208,10 @@ export function TeamView({ members: initialMembers, canManage, isAdmin = false, 
   async function saveMemberEdit(e: React.FormEvent) {
     e.preventDefault()
     if (!editingMember || !editName.trim()) return
+    // Optimistically apply name/phone changes
+    const prevName = editingMember.name; const prevPhone = editingMember.phone_number
+    setMembers(p => p.map(m => m.id === editingMember.id ? { ...m, name: editName.trim(), phone_number: editPhone.trim() || null } : m))
+    setEditingMember(null)
     setEditSaving(true)
     const res = await fetch('/api/team', {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
@@ -199,8 +219,12 @@ export function TeamView({ members: initialMembers, canManage, isAdmin = false, 
     })
     setEditSaving(false)
     const d = await res.json().catch(() => ({}))
-    if (res.ok) { toast.success('Member info updated'); setEditingMember(null); router.refresh() }
-    else toast.error(d.error ?? 'Failed to update member')
+    if (res.ok) { toast.success('Member info updated'); router.refresh() }
+    else {
+      // Rollback
+      setMembers(p => p.map(m => m.id === editingMember.id ? { ...m, name: prevName, phone_number: prevPhone } : m))
+      toast.error(d.error ?? 'Failed to update member')
+    }
   }
 
   return (

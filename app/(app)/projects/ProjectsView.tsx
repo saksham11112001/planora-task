@@ -25,9 +25,10 @@ const STATUS_TABS = [
   { key: 'completed', label: 'Completed' },
 ]
 
-export function ProjectsView({ projects, counts, clients, canManage }: Props) {
+export function ProjectsView({ projects: initialProjects, counts, clients, canManage }: Props) {
   const router = useRouter()
   const [, startT] = useTransition()
+  const [localProjects, setLocalProjects] = useState<Project[]>(initialProjects)
   const [search,       setSearch]       = useState('')
   const [clientFilter, setClientFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -41,7 +42,7 @@ export function ProjectsView({ projects, counts, clients, canManage }: Props) {
     setCollapsed(prev => { const s = new Set(prev); s.has(key) ? s.delete(key) : s.add(key); return s })
   }
 
-  const filtered = projects.filter(p => {
+  const filtered = localProjects.filter(p => {
     if (statusFilter !== 'all' && p.status !== statusFilter) return false
     if (clientFilter && p.client?.id !== clientFilter) return false
     if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false
@@ -56,9 +57,16 @@ export function ProjectsView({ projects, counts, clients, canManage }: Props) {
 
   async function deleteProject(id: string, name: string) {
     if (!confirm(`Archive project "${name}"? All tasks will be preserved.`)) return
+    // Optimistically remove from list
+    const snapshot = localProjects.find(p => p.id === id)
+    setLocalProjects(p => p.filter(proj => proj.id !== id))
     const res = await fetch(`/api/projects/${id}`, { method: 'DELETE' })
     if (res.ok) refresh()
-    else { const d = await res.json().catch(() => ({})); toast.error(d.error ?? 'Could not delete project') }
+    else {
+      // Rollback
+      if (snapshot) setLocalProjects(p => [...p, snapshot])
+      const d = await res.json().catch(() => ({})); toast.error(d.error ?? 'Could not delete project')
+    }
   }
 
   async function cloneProject(id: string, name: string) {
