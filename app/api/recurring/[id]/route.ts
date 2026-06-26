@@ -3,7 +3,7 @@ import { createAdminClient }   from '@/lib/supabase/admin'
 import { NextResponse }        from 'next/server'
 import type { NextRequest }    from 'next/server'
 import { assertCan }           from '@/lib/utils/permissionGate'
-import { normalizeFrequency, nextOccurrence, isValidGranularFrequency } from '@/lib/utils/recurringSchedule'
+import { normalizeFrequency, nextOccurrence, shiftDays, isValidGranularFrequency } from '@/lib/utils/recurringSchedule'
 
 const VALID_PRIORITIES = ['low', 'medium', 'high', 'urgent']
 import { dbError } from '@/lib/api-error'
@@ -25,7 +25,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (priority && !VALID_PRIORITIES.includes(priority)) return NextResponse.json({ error: `Invalid priority "${priority}". Must be one of: low, medium, high, urgent` }, { status: 400 })
   const today       = new Date().toISOString().split('T')[0]
   const dbFrequency = frequency ? normalizeFrequency(frequency) : undefined
-  const nextDate    = frequency ? nextOccurrence(frequency, today) : undefined
+  const nextDate    = frequency ? nextOccurrence(frequency, shiftDays(today, -1)) : undefined
 
   // Merge _granular_frequency into existing custom_fields so the display label stays in sync.
   let customFieldsUpdate: Record<string, unknown> | undefined

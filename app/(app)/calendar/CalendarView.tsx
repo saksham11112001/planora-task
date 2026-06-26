@@ -90,7 +90,22 @@ function prevOccurrence(freq: string, dateStr: string): string {
   const dt = new Date(y, m - 1, d)  // local midnight, no UTC shift
   if (freq.startsWith('weekly_days:') || freq.startsWith('weekly_')) {
     dt.setDate(dt.getDate() - 7)
-  } else if (freq.startsWith('monthly_days:') || freq.startsWith('monthly_')) {
+  } else if (freq.startsWith('monthly_days:')) {
+    // Find the largest listed day that is strictly before the current day-of-month;
+    // if none exists, take the largest listed day in the previous month.
+    const days = freq.replace('monthly_days:', '').split(',').map(Number).sort((a, b) => a - b)
+    const curDay = dt.getDate()
+    const earlier = days.filter(d2 => d2 < curDay)
+    if (earlier.length > 0) {
+      const prevDay = earlier[earlier.length - 1]
+      const lastOfMonth = new Date(dt.getFullYear(), dt.getMonth() + 1, 0).getDate()
+      dt.setDate(Math.min(prevDay, lastOfMonth))
+    } else {
+      dt.setMonth(dt.getMonth() - 1)
+      const lastOfPrevMonth = new Date(dt.getFullYear(), dt.getMonth() + 1, 0).getDate()
+      dt.setDate(Math.min(days[days.length - 1], lastOfPrevMonth))
+    }
+  } else if (freq.startsWith('monthly_')) {
     dt.setMonth(dt.getMonth() - 1)
   } else if (freq.startsWith('quarterly_')) {
     dt.setMonth(dt.getMonth() - 3)
