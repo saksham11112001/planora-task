@@ -33,7 +33,10 @@ export async function GET(req: NextRequest) {
   const { data, error } = await q
 
   if (error) return NextResponse.json(dbError(error, 'ca/master'), { status: 500 })
-  return NextResponse.json({ data: data ?? [] })
+  // Master tasks rarely change — cache aggressively
+  return NextResponse.json({ data: data ?? [] }, {
+    headers: { 'Cache-Control': 'private, max-age=300, stale-while-revalidate=3600' },
+  })
 }
 
 export async function POST(req: NextRequest) {

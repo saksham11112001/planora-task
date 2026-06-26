@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
   // Ghost admin is never visible in member lists
   const filtered = (data ?? []).filter((m: any) => !isGhostAdmin(m.user_id))
   return NextResponse.json({ data: filtered }, {
-    headers: { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' },
+    headers: { 'Cache-Control': 'private, max-age=120, stale-while-revalidate=600' },
   })
 }
 

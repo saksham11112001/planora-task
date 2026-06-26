@@ -39,7 +39,9 @@ export async function GET(req: NextRequest) {
   const { data, error } = await query
 
   if (error) return NextResponse.json(dbError(error, 'ca/assignments'), { status: 500 })
-  return NextResponse.json({ data: data ?? [] })
+  return NextResponse.json({ data: data ?? [] }, {
+    headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=300' },
+  })
 }
 
 export async function POST(req: NextRequest) {

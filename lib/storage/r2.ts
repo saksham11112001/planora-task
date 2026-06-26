@@ -18,6 +18,8 @@ import {
 } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
+export { PutObjectCommand }
+
 // ── Configuration ─────────────────────────────────────────────────────────────
 
 const R2_ACCOUNT_ID       = process.env.R2_ACCOUNT_ID
@@ -88,6 +90,29 @@ export async function deleteFromR2(key: string): Promise<void> {
   } catch {
     // Key not found — nothing to delete
   }
+}
+
+/**
+ * Generate a presigned PUT URL so the browser can upload directly to R2,
+ * bypassing Vercel entirely (zero Vercel bandwidth used for the upload).
+ *
+ * Requires R2 CORS to allow PUT from your domain. Set once in Cloudflare
+ * dashboard → R2 → bucket → Settings → CORS:
+ *   AllowedOrigins: ["https://upfloat.co"]
+ *   AllowedMethods: ["PUT"]
+ *   AllowedHeaders: ["Content-Type"]
+ */
+export async function r2PresignedPutUrl(
+  key:         string,
+  contentType: string,
+  expiresIn =  300,
+): Promise<string> {
+  const cmd = new PutObjectCommand({
+    Bucket:      R2_BUCKET,
+    Key:         key,
+    ContentType: contentType,
+  })
+  return getSignedUrl(r2(), cmd, { expiresIn })
 }
 
 /**

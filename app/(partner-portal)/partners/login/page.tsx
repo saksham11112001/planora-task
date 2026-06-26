@@ -20,7 +20,7 @@ function PartnerLoginInner() {
       setInfo('Account created! Please check your email to confirm your address, then sign in.')
     }
     if (params.get('already') === '1') {
-      setInfo('You already have a partner account. Please sign in below.')
+      setInfo('An account with this email already exists. Please sign in to connect to the partner program.')
     }
   }, [params])
 
