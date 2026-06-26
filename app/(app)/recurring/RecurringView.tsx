@@ -191,7 +191,8 @@ export function RecurringView({
       setSelectedTask(prev => prev ? { ...prev, ...enriched } as Task : null)
       panelHasUpdates.current = true
     }
-    startT(() => router.refresh())
+    // Do NOT router.refresh() on every field update — local state is already updated
+    // optimistically above. A single refresh happens when the panel closes (see onClose).
   }
 
   // Pre-fetch subtasks when a task is selected so the expand arrow is instant
@@ -1249,8 +1250,8 @@ export function RecurringView({
         onClose={() => {
           if (panelHasUpdates.current) {
             if (selectedTask) setLocalTasks(prev => prev.map(t => t.id === panelTaskIdRef.current ? { ...t, ...selectedTask as unknown as Task } : t))
-            toast.success('Task updated')
             panelHasUpdates.current = false
+            startT(() => router.refresh())  // single refresh on close, not on every field edit
           }
           setSelectedTask(null)
         }}

@@ -141,6 +141,22 @@ export function nextOccurrence(freq: string, from: string): string {
     }
   }
 
+  // ── Multi-day monthly: monthly_days:1,15,25 ─────────────────────────────
+  // MUST be checked before the generic monthly_ branch below.
+  if (freq.startsWith('monthly_days:')) {
+    const days = freq.replace('monthly_days:', '').split(',').map(Number).sort((a, b) => a - b)
+    const refDay = ref.getDate()
+    for (const day of days) {
+      const lastDay = new Date(ref.getFullYear(), ref.getMonth() + 1, 0).getDate()
+      const candidate = Math.min(day, lastDay)
+      if (candidate > refDay) return toDateStr(new Date(ref.getFullYear(), ref.getMonth(), candidate))
+    }
+    const yr = ref.getMonth() === 11 ? ref.getFullYear() + 1 : ref.getFullYear()
+    const mo = (ref.getMonth() + 1) % 12
+    const lastDay = new Date(yr, mo + 1, 0).getDate()
+    return toDateStr(new Date(yr, mo, Math.min(days[0], lastDay)))
+  }
+
   // ── Monthly with a fixed day of month ────────────────────────────────────
   if (freq.startsWith('monthly_')) {
     const suffix = freq.replace('monthly_', '')
@@ -165,21 +181,6 @@ export function nextOccurrence(freq: string, from: string): string {
     const next = targets.find(d => d > refDay)
     const diff  = next !== undefined ? next - refDay : targets[0] + 7 - refDay
     return toDateStr(new Date(ref.getTime() + diff * 86_400_000))
-  }
-
-  // ── Multi-day monthly: monthly_days:1,15,25 ──────────────────────────────
-  if (freq.startsWith('monthly_days:')) {
-    const days = freq.replace('monthly_days:', '').split(',').map(Number).sort((a, b) => a - b)
-    const refDay = ref.getDate()
-    for (const day of days) {
-      const lastDay = new Date(ref.getFullYear(), ref.getMonth() + 1, 0).getDate()
-      const candidate = Math.min(day, lastDay)
-      if (candidate > refDay) return toDateStr(new Date(ref.getFullYear(), ref.getMonth(), candidate))
-    }
-    const yr = ref.getMonth() === 11 ? ref.getFullYear() + 1 : ref.getFullYear()
-    const mo = (ref.getMonth() + 1) % 12
-    const lastDay = new Date(yr, mo + 1, 0).getDate()
-    return toDateStr(new Date(yr, mo, Math.min(days[0], lastDay)))
   }
 
   // ── Weekly with a fixed weekday ──────────────────────────────────────────
