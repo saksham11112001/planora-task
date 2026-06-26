@@ -43,12 +43,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role, can_view_all_tasks')
   if (!mb) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   const admin = createAdminClient()
-  // Verify task exists in this org and user has access
-  const canSeeAll = ['owner','admin','manager'].includes(mb.role) || mb.can_view_all_tasks
-  const taskQ2 = admin.from('tasks').select('id').eq('id', id).eq('org_id', mb.org_id)
-  const taskFilter2 = canSeeAll ? taskQ2 : taskQ2.or(`assignee_id.eq.${user.id},approver_id.eq.${user.id}`)
-  const { data: taskAccess2 } = await taskFilter2.maybeSingle()
-  if (!taskAccess2) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const contentType = req.headers.get('content-type') ?? ''
 
