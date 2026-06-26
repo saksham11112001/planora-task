@@ -398,15 +398,39 @@ function ChecklistRow({ item, taskId, periodKey, rawToken, onUploaded, docTypes 
     setUploading(true)
     setErr(null)
     try {
-      const form = new FormData()
-      form.append('file', file)
-      form.append('period_key', periodKey)
-      form.append('header_name', item.header)
-      form.append('task_id', taskId)
-      if (docTypeId) form.append('document_type_id', docTypeId)
-      const res = await fetch(`/api/portal/${rawToken}/upload`, { method: 'POST', body: form })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? 'Upload failed')
+      // Try presigned direct-to-R2 upload first (zero Vercel bandwidth for file bytes)
+      const presignRes = await fetch(`/api/portal/${rawToken}/upload/presign`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: file.name, content_type: file.type || 'application/octet-stream', size: file.size, document_type_id: docTypeId, period_key: periodKey }),
+      })
+      if (presignRes.ok) {
+        const { upload_url, key } = await presignRes.json()
+        const putRes = await fetch(upload_url, {
+          method: 'PUT',
+          headers: { 'Content-Type': file.type || 'application/octet-stream' },
+          body: file,
+        })
+        if (!putRes.ok) throw new Error('Direct upload to storage failed')
+        const res = await fetch(`/api/portal/${rawToken}/upload`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ storage_key: key, file_name: file.name, file_size: file.size, mime_type: file.type, document_type_id: docTypeId, period_key: periodKey, task_id: taskId, header_name: item.header }),
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error ?? 'Upload failed')
+      } else {
+        // Fallback: send file through Vercel (R2 CORS not configured)
+        const form = new FormData()
+        form.append('file', file)
+        form.append('period_key', periodKey)
+        form.append('header_name', item.header)
+        form.append('task_id', taskId)
+        if (docTypeId) form.append('document_type_id', docTypeId)
+        const res = await fetch(`/api/portal/${rawToken}/upload`, { method: 'POST', body: form })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error ?? 'Upload failed')
+      }
       onUploaded()
     } catch (e: any) {
       setErr(e.message)
@@ -482,13 +506,31 @@ function EvergreenVault({ uploads, docTypes, rawToken, onUploaded }: {
     setUploading(p => ({ ...p, [dtId]: true }))
     setErrors(p => ({ ...p, [dtId]: '' }))
     try {
-      const form = new FormData()
-      form.append('file', file)
-      form.append('document_type_id', dtId)
-      form.append('period_key', 'evergreen')
-      const res = await fetch(`/api/portal/${rawToken}/upload`, { method: 'POST', body: form })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? 'Upload failed')
+      const presignRes = await fetch(`/api/portal/${rawToken}/upload/presign`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: file.name, content_type: file.type || 'application/octet-stream', size: file.size, document_type_id: dtId, period_key: 'evergreen' }),
+      })
+      if (presignRes.ok) {
+        const { upload_url, key } = await presignRes.json()
+        const putRes = await fetch(upload_url, { method: 'PUT', headers: { 'Content-Type': file.type || 'application/octet-stream' }, body: file })
+        if (!putRes.ok) throw new Error('Direct upload to storage failed')
+        const res = await fetch(`/api/portal/${rawToken}/upload`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ storage_key: key, file_name: file.name, file_size: file.size, mime_type: file.type, document_type_id: dtId, period_key: 'evergreen' }),
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error ?? 'Upload failed')
+      } else {
+        const form = new FormData()
+        form.append('file', file)
+        form.append('document_type_id', dtId)
+        form.append('period_key', 'evergreen')
+        const res = await fetch(`/api/portal/${rawToken}/upload`, { method: 'POST', body: form })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error ?? 'Upload failed')
+      }
       onUploaded()
     } catch (e: any) {
       setErrors(p => ({ ...p, [dtId]: e.message }))

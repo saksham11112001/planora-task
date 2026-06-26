@@ -30,6 +30,40 @@ export async function POST(
 
   const { org_id, client_id } = tokenRow
 
+  // 2a. Presigned-upload completion path: browser uploaded directly to R2.
+  //     Body is JSON with { storage_key, file_name, file_size, mime_type, document_type_id, period_key }.
+  //     We skip all file-byte handling and go straight to DB recording.
+  const reqContentType = req.headers.get('content-type') ?? ''
+  if (reqContentType.includes('application/json')) {
+    const body = await req.json()
+    const { storage_key, file_name, file_size, mime_type, document_type_id: dtId, period_key: pk, task_id: taskId, header_name: hName } = body
+    if (!storage_key) return NextResponse.json({ error: 'storage_key required' }, { status: 400 })
+    if (!pk)          return NextResponse.json({ error: 'period_key required' },  { status: 400 })
+
+    const r2SignedUrl = await import('@/lib/storage/r2').then(m => m.r2SignedUrl)
+    const publicUrl   = await r2SignedUrl(storage_key, 604800)
+
+    if (!dtId && taskId) {
+      await admin.from('task_attachments').insert({
+        task_id: taskId, org_id, file_url: publicUrl, file_name: file_name ?? storage_key.split('/').pop(),
+        file_size: file_size ?? 0, mime_type: mime_type ?? 'application/octet-stream',
+        uploaded_by: null, attachment_type: 'client_upload', drive_url: null,
+      })
+      return NextResponse.json({ success: true })
+    }
+
+    if (dtId) {
+      const { data: docType } = await admin.from('client_document_types').select('id, name, category, linked_task_types').eq('id', dtId).eq('org_id', org_id).eq('is_active', true).maybeSingle()
+      if (!docType) return NextResponse.json({ error: 'Document type not found' }, { status: 404 })
+      await admin.from('client_document_uploads').delete().eq('client_id', client_id).eq('document_type_id', dtId).eq('period_key', pk)
+      const { data: upload } = await admin.from('client_document_uploads').insert({ org_id, client_id, document_type_id: dtId, period_key: pk, file_url: publicUrl, file_name: file_name ?? storage_key.split('/').pop(), file_size: file_size ?? 0, mime_type: mime_type ?? '' }).select('id').maybeSingle()
+      if (upload) await autoLinkToTasks({ admin, upload, docType, org_id, client_id, periodKey: pk, publicUrl, fileName: file_name, fileSize: file_size ?? 0, mimeType: mime_type ?? '' })
+      return NextResponse.json({ success: true, upload_id: upload?.id })
+    }
+
+    return NextResponse.json({ error: 'document_type_id or task_id required' }, { status: 400 })
+  }
+
   // 2. Reject oversized requests BEFORE parsing the body into memory.
   // Content-Length is set by all standard HTTP clients. Checking here prevents
   // a 500 MB multipart from being buffered into RAM before we can reject it.

@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
   const { data, error } = await projectQuery
   if (error) return NextResponse.json(dbError(error, 'projects'), { status: 500 })
   return NextResponse.json({ data }, {
-    headers: { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' },
+    headers: { 'Cache-Control': 'private, max-age=120, stale-while-revalidate=600' },
   })
 }
 

@@ -653,15 +653,46 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
 
   async function uploadFile(e: React.ChangeEvent<HTMLInputElement>) {
     if (!task || !e.target.files?.[0]) return
+    const file = e.target.files[0]
     setUploading(true)
-    const form = new FormData()
-    form.append('file', e.target.files[0])
-    const r = await fetch(`/api/tasks/${task.id}/attachments`, { method: 'POST', body: form })
-    const d = await r.json()
-    if (r.ok) { setAttachments(p => [d.data, ...p]); toast.success('File uploaded') }
-    else toast.error(d.error ?? 'Upload failed')
-    setUploading(false)
-    e.target.value = ''
+    try {
+      // Try presigned direct-to-R2 upload first (zero Vercel bandwidth for file bytes)
+      const presignRes = await fetch('/api/storage/presign-upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ task_id: task.id, filename: file.name, content_type: file.type || 'application/octet-stream', size: file.size }),
+      })
+      if (presignRes.ok) {
+        const { upload_url, key } = await presignRes.json()
+        const putRes = await fetch(upload_url, {
+          method: 'PUT',
+          headers: { 'Content-Type': file.type || 'application/octet-stream' },
+          body: file,
+        })
+        if (!putRes.ok) throw new Error('Direct upload to storage failed')
+        const r = await fetch(`/api/tasks/${task.id}/attachments`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ storage_key: key, file_name: file.name, file_size: file.size, mime_type: file.type }),
+        })
+        const d = await r.json()
+        if (r.ok) { setAttachments(p => [d.data, ...p]); toast.success('File uploaded') }
+        else toast.error(d.error ?? 'Upload failed')
+      } else {
+        // Fallback: send file through Vercel (R2 not configured or CORS not set up)
+        const form = new FormData()
+        form.append('file', file)
+        const r = await fetch(`/api/tasks/${task.id}/attachments`, { method: 'POST', body: form })
+        const d = await r.json()
+        if (r.ok) { setAttachments(p => [d.data, ...p]); toast.success('File uploaded') }
+        else toast.error(d.error ?? 'Upload failed')
+      }
+    } catch {
+      toast.error('Upload failed — please try again')
+    } finally {
+      setUploading(false)
+      e.target.value = ''
+    }
   }
 
   async function deleteAttachment(attId: string, storagePath: string) {

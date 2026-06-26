@@ -53,9 +53,23 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const contentType = req.headers.get('content-type') ?? ''
 
   if (contentType.includes('application/json')) {
-    // Drive link / external URL attachment
     const body = await req.json()
-    const { drive_url, file_name, attachment_type } = body
+    const { drive_url, file_name, attachment_type, storage_key, file_size, mime_type } = body
+
+    // Presigned-upload completion path: browser uploaded directly to R2, we just record the DB row
+    if (storage_key) {
+      const { data: row, error: dbErr } = await admin.from('task_attachments').insert({
+        task_id: id, org_id: mb.org_id, uploaded_by: user.id,
+        file_name: file_name ?? storage_key.split('/').pop() ?? 'file',
+        file_size: file_size ?? 0,
+        mime_type:    mime_type ?? 'application/octet-stream',
+        storage_path: storage_key,
+      }).select('*').maybeSingle()
+      if (dbErr) return NextResponse.json(dbError(dbErr, 'tasks/[id]/attachments'), { status: 500 })
+      return NextResponse.json({ data: row ?? { id: 'ok', storage_path: storage_key } }, { status: 201 })
+    }
+
+    // Drive link / external URL attachment
     if (!drive_url) return NextResponse.json({ error: 'drive_url required' }, { status: 400 })
     // 'nil' is a valid sentinel meaning "document not available"
     const isNilSentinel = drive_url === 'nil'
