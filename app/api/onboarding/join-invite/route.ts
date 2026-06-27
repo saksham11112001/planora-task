@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
         },
       })
     } catch {}
-    return NextResponse.json({ success: true, org_name: org.name })
+    return NextResponse.json({ success: true, org_id: org.id, org_name: org.name })
   } catch (err: any) {
     return NextResponse.json(dbError(err, 'onboarding/join-invite'), { status: 500 })
   }
