@@ -1,6 +1,7 @@
 import { redirect }          from 'next/navigation'
 import { createClient }      from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { generateCode }      from '@/lib/utils/codeGen'
 import { PartnerDashboard }  from './PartnerDashboard'
 
 export const metadata = { title: 'Partner Dashboard' }
@@ -35,6 +36,57 @@ export default async function PartnerDashboardPage() {
         .update({ user_id: user.id })
         .eq('id', byEmail.id)
       partner = byEmail
+    }
+  }
+
+  // No standalone_partners record — auto-register this authenticated user so
+  // org members and existing Planora users can access the partner portal without
+  // having to create a separate password-based account.
+  if (!partner && user.email) {
+    // Get display name from users table (org profile) or fall back to email prefix
+    const { data: userProfile } = await admin
+      .from('users')
+      .select('name, phone_number')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    const displayName = (userProfile as any)?.name?.trim() || user.email.split('@')[0]
+    const phone       = (userProfile as any)?.phone_number ?? null
+
+    // Generate a unique referral code
+    let refCode = generateCode(8)
+    const { data: clash } = await admin.from('standalone_partners').select('id').eq('referral_code', refCode).maybeSingle()
+    if (clash) refCode = generateCode(8)
+
+    const { data: created } = await admin
+      .from('standalone_partners')
+      .insert({
+        user_id:       user.id,
+        name:          displayName,
+        email:         user.email.toLowerCase(),
+        phone:         phone,
+        referral_code: refCode,
+        status:        'active',
+      })
+      .select('id, name, email, referral_code, status, created_at')
+      .maybeSingle()
+
+    if (created) {
+      partner = created
+    } else {
+      // Fallback: if insert failed (e.g. email unique conflict from a race), try fetching again
+      const { data: retry } = await admin
+        .from('standalone_partners')
+        .select('id, name, email, referral_code, status, created_at')
+        .eq('email', user.email.toLowerCase())
+        .maybeSingle()
+      if (retry) {
+        // Link user_id if missing
+        if (!(retry as any).user_id) {
+          await admin.from('standalone_partners').update({ user_id: user.id }).eq('id', (retry as any).id)
+        }
+        partner = retry
+      }
     }
   }
 

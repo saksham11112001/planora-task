@@ -137,6 +137,13 @@ export default function OnboardingPage() {
           const data = await res.json()
           setJoinedOrg(data.org_name ?? '')
           setPhase('joined')
+          // Set the active org cookie before redirecting so layout.tsx finds the membership
+          if (data.org_id) {
+            await fetch('/api/org/switch', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ org_id: data.org_id }),
+            })
+          }
           setTimeout(() => { router.push('/dashboard'); router.refresh() }, 1800)
         } else {
           const data = await res.json()
@@ -163,6 +170,13 @@ export default function OnboardingPage() {
       if (!res.ok) { setError(data.error ?? 'Invalid join code'); return }
       setJoinedOrg(data.org_name ?? '')
       setPhase('joined')
+      // Set the active org cookie before redirecting so layout.tsx finds the membership
+      if (data.org_id) {
+        await fetch('/api/org/switch', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ org_id: data.org_id }),
+        })
+      }
       setTimeout(() => { router.push('/dashboard'); router.refresh() }, 1800)
     } catch { setError('Network error — please try again') } finally { setSaving(false) }
   }
