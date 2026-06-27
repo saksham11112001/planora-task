@@ -240,6 +240,7 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
 
   async function handleLogout() {
     await createClient().auth.signOut()
+    document.cookie = 'upfloat_active_org=; Max-Age=0; path=/'
     window.location.href = '/partners/login'
   }
 
