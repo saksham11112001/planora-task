@@ -19,7 +19,7 @@ export default function PartnerJoinPage() {
 
   useEffect(() => {
     const ref = new URLSearchParams(window.location.search).get('ref')
-    if (ref) setRefCode(ref)
+    if (ref) setRefCode(ref.toUpperCase().replace(/[^A-Z0-9]/g, ''))
     createClient().auth.getUser().then(({ data }) => {
       if (data.user?.email) setEmail(data.user.email)
     })

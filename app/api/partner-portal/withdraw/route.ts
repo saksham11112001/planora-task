@@ -19,8 +19,8 @@ async function getPartnerOrError(admin: ReturnType<typeof createAdminClient>, us
 }
 
 async function computeBalance(admin: ReturnType<typeof createAdminClient>, partnerId: string) {
-  // Earned = MSME invites where referred org has made a paid pack purchase × ₹200
-  // Partner referrals earn ₹0 — no commission for referring a partner
+  // Earned = number of invited MSME emails where the user's org has made a paid pack purchase × ₹200
+  // Each invited email counts as AT MOST ONE commission, even if that user belongs to multiple orgs.
   const { data: msmeInvites } = await admin
     .from('partner_portal_invites')
     .select('email')
@@ -38,23 +38,41 @@ async function computeBalance(admin: ReturnType<typeof createAdminClient>, partn
       .in('email', emails)
 
     if (users && users.length > 0) {
+      // Map email → userId for later per-email check
+      const emailToUserId: Record<string, string> = {}
+      users.forEach((u: { id: string; email: string }) => { emailToUserId[u.email.toLowerCase()] = u.id })
+
       const userIds = users.map((u: { id: string }) => u.id)
 
       const { data: members } = await admin
         .from('org_members')
-        .select('org_id')
+        .select('user_id, org_id')
         .in('user_id', userIds)
 
       if (members && members.length > 0) {
-        const orgIds = [...new Set(members.map((m: { org_id: string }) => m.org_id))]
+        // Map userId → list of org_ids (one user can be in multiple orgs)
+        const userToOrgIds: Record<string, string[]> = {}
+        members.forEach((m: { user_id: string; org_id: string }) => {
+          if (!userToOrgIds[m.user_id]) userToOrgIds[m.user_id] = []
+          userToOrgIds[m.user_id].push(m.org_id)
+        })
 
-        const { count } = await admin
+        // Fetch all paid org_ids in one query
+        const allOrgIds = [...new Set(members.map((m: { org_id: string }) => m.org_id))]
+        const { data: paidPacks } = await admin
           .from('msme_pack_payments')
-          .select('id', { count: 'exact', head: true })
-          .in('org_id', orgIds)
+          .select('org_id')
+          .in('org_id', allOrgIds)
           .eq('status', 'paid')
+        const paidOrgSet = new Set((paidPacks ?? []).map((p: { org_id: string }) => p.org_id))
 
-        paidMsmeCount = count ?? 0
+        // Count each invited email exactly once if ANY of their orgs has a paid pack
+        for (const email of emails) {
+          const userId = emailToUserId[email]
+          if (!userId) continue
+          const orgIds = userToOrgIds[userId] ?? []
+          if (orgIds.some(orgId => paidOrgSet.has(orgId))) paidMsmeCount++
+        }
       }
     }
   }

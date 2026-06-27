@@ -101,7 +101,7 @@ export async function POST(req: NextRequest) {
 
   for (const email of emails) {
     const normalEmail = email.trim().toLowerCase()
-    if (!normalEmail.includes('@')) { failed++; continue }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalEmail)) { failed++; continue }
 
     const html    = invite_type === 'msme' ? msmeInviteHtml(partner.name, msmeUrl) : partnerInviteHtml(partner.name, joinUrl)
     const subject = invite_type === 'msme'
