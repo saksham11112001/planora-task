@@ -53,10 +53,13 @@ export default async function PartnerDashboardPage() {
     const displayName = (userProfile as any)?.name?.trim() || user.email.split('@')[0]
     const phone       = (userProfile as any)?.phone_number ?? null
 
-    // Generate a unique referral code
+    // Generate a unique referral code — retry up to 5 times to handle collision
     let refCode = generateCode(8)
-    const { data: clash } = await admin.from('standalone_partners').select('id').eq('referral_code', refCode).maybeSingle()
-    if (clash) refCode = generateCode(8)
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const { data: clash } = await admin.from('standalone_partners').select('id').eq('referral_code', refCode).maybeSingle()
+      if (!clash) break
+      refCode = generateCode(8)
+    }
 
     const { data: created } = await admin
       .from('standalone_partners')
@@ -127,12 +130,12 @@ export default async function PartnerDashboardPage() {
         .in('user_id', userIds)
 
       if (members && members.length > 0) {
-        const orgIds = members.map((m: { user_id: string; org_id: string }) => m.org_id)
+        const allOrgIds = [...new Set(members.map((m: { org_id: string }) => m.org_id))]
 
         const { data: payments } = await admin
           .from('msme_pack_payments')
           .select('org_id, pack_tier, amount_paise, paid_at')
-          .in('org_id', orgIds)
+          .in('org_id', allOrgIds)
           .eq('status', 'paid')
           .order('paid_at', { ascending: false })
 
@@ -141,11 +144,14 @@ export default async function PartnerDashboardPage() {
           emailToUserId[u.email.toLowerCase()] = u.id
         })
 
-        const userToOrg: Record<string, string> = {}
+        // Map userId → ALL org_ids (one user can be in multiple orgs)
+        const userToOrgIds: Record<string, string[]> = {}
         members.forEach((m: { user_id: string; org_id: string }) => {
-          if (!userToOrg[m.user_id]) userToOrg[m.user_id] = m.org_id
+          if (!userToOrgIds[m.user_id]) userToOrgIds[m.user_id] = []
+          userToOrgIds[m.user_id].push(m.org_id)
         })
 
+        // Latest paid pack per org_id
         const latestByOrg: Record<string, { packTier: string; amountPaise: number; paidAt: string }> = {}
         ;(payments ?? []).forEach((p: { org_id: string; pack_tier: string; amount_paise: number; paid_at: string }) => {
           if (!latestByOrg[p.org_id]) {
@@ -153,13 +159,15 @@ export default async function PartnerDashboardPage() {
           }
         })
 
+        // For display: show the first paid pack found across any of the user's orgs
         signedUpMsmeEmails.forEach(email => {
           const userId = emailToUserId[email]
           if (!userId) return
-          const orgId = userToOrg[userId]
-          if (!orgId) return
-          const payment = latestByOrg[orgId]
-          if (payment) packByEmail[email] = payment
+          const orgIds = userToOrgIds[userId] ?? []
+          for (const orgId of orgIds) {
+            const payment = latestByOrg[orgId]
+            if (payment) { packByEmail[email] = payment; break }
+          }
         })
       }
     }

@@ -54,11 +54,13 @@ export async function POST(req: NextRequest) {
     if (referrer) referredByCode = referred_by.trim().toUpperCase()
   }
 
-  // Generate unique referral code
+  // Generate unique referral code — retry up to 5 times to handle collision
   let refCode = generateCode(8)
-  // Ensure uniqueness (extremely unlikely collision but be safe)
-  const { data: clash } = await admin.from('standalone_partners').select('id').eq('referral_code', refCode).maybeSingle()
-  if (clash) refCode = generateCode(8)
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const { data: clash } = await admin.from('standalone_partners').select('id').eq('referral_code', refCode).maybeSingle()
+    if (!clash) break
+    refCode = generateCode(8)
+  }
 
   const { data: newPartner, error } = await admin
     .from('standalone_partners')
