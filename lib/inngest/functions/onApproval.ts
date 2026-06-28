@@ -44,11 +44,12 @@ export const onApprovalRequested = inngest.createFunction(
     // Email is always sent by default for approvals, but max 1 per day
     if (managerUserId && !(await acquireEmailSlot(managerUserId, 'approval_requested'))) return { skipped: 'daily_limit' }
     await sendApprovalRequestedEmail({
-      to:            d.manager_email,
-      taskId:        d.task_id,
-      taskTitle:     d.task_title,
-      submitterName: d.submitter_name,
-      orgName:       d.org_name,
+      to:             d.manager_email,
+      taskId:         d.task_id,
+      taskTitle:      d.task_title,
+      submitterName:  d.submitter_name,
+      orgName:        d.org_name,
+      managerUserId:  managerUserId ?? null,
     })
 
     if (sendWA && d.manager_phone) {

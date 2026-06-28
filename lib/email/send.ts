@@ -1,4 +1,5 @@
 import { resend, FROM }           from './resend'
+import { generateActionToken }   from './actionToken'
 import { welcomeEmailHtml, welcomeEmailSubject, day2EmailHtml, day2EmailSubject } from './templates/welcomeEmail'
 import { trialExpiringSoonHtml, trialExpiringSoonSubject, trialExpiredHtml, trialExpiredSubject } from './templates/trialEmail'
 import { taskAssignedHtml, taskAssignedText }     from './templates/taskAssigned'
@@ -23,17 +24,30 @@ function taskUrl(taskId: string, projectId?: string | null) {
   return projectId ? `${APP_URL}/projects/${projectId}` : `${APP_URL}/inbox`
 }
 
+function actionUrl(taskId: string, userId: string, action: Parameters<typeof generateActionToken>[2]) {
+  const token = generateActionToken(taskId, userId, action)
+  return `${APP_URL}/api/tasks/email-action?t=${token}`
+}
+
 // ── Send task assigned email ──────────────────────────────────────────────
 export async function sendTaskAssignedEmail(p: {
   to: string; assigneeName: string; assignerName: string
   taskId: string; taskTitle: string; orgName: string
   dueDate?: string | null; projectName?: string | null; projectId?: string | null
+  assigneeUserId?: string | null; approvalRequired?: boolean | null
 }) {
   const url = taskUrl(p.taskId, p.projectId)
+  let aUrl: string | null = null
+  let aLabel: string | null = null
+  if (p.assigneeUserId) {
+    const act = p.approvalRequired ? 'submit' : 'complete'
+    aUrl   = actionUrl(p.taskId, p.assigneeUserId, act)
+    aLabel = p.approvalRequired ? 'Submit for Approval' : 'Mark Complete'
+  }
   return resend.emails.send({
     from: FROM, to: p.to,
     subject: `New task assigned: ${p.taskTitle}`,
-    html: taskAssignedHtml({ ...p, taskUrl: url }),
+    html: taskAssignedHtml({ ...p, taskUrl: url, actionUrl: aUrl, actionLabel: aLabel }),
     text: taskAssignedText({ ...p, taskUrl: url }),
   })
 }
@@ -57,12 +71,15 @@ export async function sendDueSoonEmail(p: {
 export async function sendApprovalRequestedEmail(p: {
   to: string; taskId: string; taskTitle: string
   submitterName: string; orgName: string; projectId?: string | null
+  managerUserId?: string | null
 }) {
-  const url = taskUrl(p.taskId, p.projectId)
+  const url        = taskUrl(p.taskId, p.projectId)
+  const approveUrl = p.managerUserId ? actionUrl(p.taskId, p.managerUserId, 'approve') : null
+  const rejectUrl  = p.managerUserId ? actionUrl(p.taskId, p.managerUserId, 'reject')  : null
   return resend.emails.send({
     from: FROM, to: p.to,
     subject: `🔔 Approval needed: ${p.taskTitle}`,
-    html: approvalRequestedHtml({ ...p, taskUrl: url }),
+    html: approvalRequestedHtml({ ...p, taskUrl: url, approveUrl, rejectUrl }),
   })
 }
 

@@ -1,6 +1,19 @@
 export function approvalRequestedHtml(p: {
   taskTitle: string; submitterName: string; orgName: string; taskUrl: string
+  approveUrl?: string | null; rejectUrl?: string | null
 }): string {
+  const actionButtons = (p.approveUrl && p.rejectUrl)
+    ? `<table cellpadding="0" cellspacing="0" style="margin-top:8px"><tr>
+        <td style="padding-right:10px">
+          <a href="${p.approveUrl}" style="display:inline-block;background:#16a34a;color:#fff;text-decoration:none;padding:11px 22px;border-radius:8px;font-size:14px;font-weight:700">✅ Approve</a>
+        </td>
+        <td>
+          <a href="${p.rejectUrl}" style="display:inline-block;background:#fff;color:#dc2626;text-decoration:none;padding:11px 22px;border-radius:8px;font-size:14px;font-weight:700;border:1.5px solid #fca5a5">↩ Reject</a>
+        </td>
+      </tr></table>
+      <p style="margin:14px 0 0;font-size:12px;color:#94a3b8">Or <a href="${p.taskUrl}" style="color:#0d9488">open in app</a> to add a rejection reason.</p>`
+    : `<a href="${p.taskUrl}" style="display:inline-block;background:#0d9488;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-size:14px;font-weight:600">Review &amp; approve →</a>`
+
   return `<!DOCTYPE html><html>
 <body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
   <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 16px"><tr><td align="center">
@@ -13,7 +26,7 @@ export function approvalRequestedHtml(p: {
       <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:20px;margin-bottom:24px">
         <p style="color:#0f172a;font-size:16px;font-weight:600;margin:0">${p.taskTitle}</p>
       </div>
-      <a href="${p.taskUrl}" style="display:inline-block;background:#0d9488;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-size:14px;font-weight:600">Review & approve →</a>
+      ${actionButtons}
     </td></tr>
   </table>
   </td></tr></table>
