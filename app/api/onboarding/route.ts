@@ -12,6 +12,16 @@ export async function POST(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
+    // ── Email verification gate ───────────────────────────────────────────────
+    // OAuth providers (Google, Microsoft) set email_confirmed_at automatically.
+    // Magic-link users also get it set on first click.
+    // Email+password signups must complete the OTP step first.
+    const isEmailConfirmed = !!user.email_confirmed_at
+    const isOtpVerified    = user.user_metadata?.email_otp_verified === true
+    if (!isEmailConfirmed && !isOtpVerified) {
+      return NextResponse.json({ error: 'Please verify your email address before creating an organisation' }, { status: 403 })
+    }
+
     const body = await request.json()
     const { name, org_name, industry, team_size, phone, referral_code: rawReferralCode, how_did_you_hear, role_title, country, practice_type, years_in_practice, current_tool, pain_point } = body
     if (!org_name?.trim()) return NextResponse.json({ error: 'Organisation name required' }, { status: 400 })
@@ -93,6 +103,11 @@ export async function POST(request: NextRequest) {
       .eq('user_id', user.id)
       .eq('role', 'owner')
     const isFirstOrg = (ownedOrgCount ?? 0) === 0
+
+    // Hard cap: max 3 owned orgs per account (prevents org farming)
+    if ((ownedOrgCount ?? 0) >= 3) {
+      return NextResponse.json({ error: 'You have reached the maximum of 3 organisations per account. Please contact support if you need more.' }, { status: 429 })
+    }
 
     // ── One active trial per phone number ──────────────────────────────────────
     // If this is the user's first org (would be trialing), ensure no OTHER account

@@ -1,7 +1,8 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Zap, Building2, Users, ChevronRight, CheckCircle, UserCircle2, KeyRound, PlusCircle, Megaphone, Phone } from 'lucide-react'
+import { Zap, Building2, Users, ChevronRight, CheckCircle, UserCircle2, KeyRound, PlusCircle, Megaphone, Phone, Mail } from 'lucide-react'
+import { trackEvent } from '@/components/analytics/PostHogProvider'
 import { createClient } from '@/lib/supabase/client'
 
 const COUNTRIES = [
@@ -30,7 +31,7 @@ const PAIN_POINTS = [
   'All of the above',
 ]
 
-type Phase = 'checking' | 'entry' | 'join-code' | 'form' | 'joining' | 'joined'
+type Phase = 'checking' | 'entry' | 'join-code' | 'form' | 'otp' | 'joining' | 'joined'
 
 interface InviteData { orgId: string; role: string }
 
@@ -39,11 +40,16 @@ export default function OnboardingPage() {
 
   const [phase,      setPhase]      = useState<Phase>('checking')
   const [step,       setStep]       = useState(0)   // 0 = profile, 1 = org, 2 = team, 3 = summary
-  const [saving,     setSaving]     = useState(false)
-  const [error,      setError]      = useState('')
-  const [inviteData, setInviteData] = useState<InviteData | null>(null)
-  const [joinedOrg,  setJoinedOrg]  = useState('')
-  const [joinCode,   setJoinCode]   = useState('')
+  const [saving,       setSaving]       = useState(false)
+  const [error,        setError]        = useState('')
+  const [inviteData,   setInviteData]   = useState<InviteData | null>(null)
+  const [joinedOrg,    setJoinedOrg]    = useState('')
+  const [joinCode,     setJoinCode]     = useState('')
+  const [needsOtp,     setNeedsOtp]     = useState(false)
+  const [otpCode,      setOtpCode]      = useState('')
+  const [otpSending,   setOtpSending]   = useState(false)
+  const [otpVerifying, setOtpVerifying] = useState(false)
+  const [otpSent,      setOtpSent]      = useState(false)
 
   const [form, setForm] = useState({
     name:              '',
@@ -99,6 +105,12 @@ export default function OnboardingPage() {
         setInviteData({ orgId: invitedOrgId, role: invitedRole })
       }
 
+      // Check if email OTP verification will be needed for org creation.
+      // OAuth and magic-link users already have email_confirmed_at set — skip OTP.
+      const isEmailConfirmed = !!user.email_confirmed_at
+      const isOtpVerified    = user.user_metadata?.email_otp_verified === true
+      setNeedsOtp(!isEmailConfirmed && !isOtpVerified && !invitedOrgId)
+
       // No invite — show entry choice (create org or join via code)
       if (!invitedOrgId) {
         setPhase('entry')
@@ -152,8 +164,13 @@ export default function OnboardingPage() {
       } catch { setError('Network error — please try again') }
       finally { setSaving(false) }
     } else {
-      // Fresh signup — advance to org setup
-      setStep(1)
+      // Fresh signup — verify email first if needed, then advance to org setup
+      if (needsOtp) {
+        setPhase('otp')
+        sendOtp()
+      } else {
+        setStep(1)
+      }
     }
   }
 
@@ -181,6 +198,37 @@ export default function OnboardingPage() {
     } catch { setError('Network error — please try again') } finally { setSaving(false) }
   }
 
+  // ── Email OTP: send ─────────────────────────────────────────────────────
+  async function sendOtp() {
+    setOtpSending(true); setOtpSent(false); setError('')
+    try {
+      const res  = await fetch('/api/auth/email-otp/send', { method: 'POST' })
+      const data = await res.json()
+      if (data.already_verified) {
+        setNeedsOtp(false); setPhase('form'); setStep(1); return
+      }
+      if (!res.ok) { setError(data.error ?? 'Failed to send verification code'); return }
+      setOtpSent(true)
+    } catch { setError('Network error — please try again') }
+    finally   { setOtpSending(false) }
+  }
+
+  // ── Email OTP: verify ────────────────────────────────────────────────────
+  async function handleVerifyOtp() {
+    if (otpCode.length !== 6) { setError('Enter the 6-digit code from your email'); return }
+    setOtpVerifying(true); setError('')
+    try {
+      const res  = await fetch('/api/auth/email-otp/verify', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body:   JSON.stringify({ otp: otpCode }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setError(data.error ?? 'Verification failed'); return }
+      setNeedsOtp(false); setOtpCode(''); setPhase('form'); setStep(1)
+    } catch { setError('Network error — please try again') }
+    finally   { setOtpVerifying(false) }
+  }
+
   // ── Final submit (fresh signup, after step 3) ────────────────────────────
   async function handleSubmit() {
     if (!form.org_name.trim()) { setError('Organisation name is required'); return }
@@ -206,6 +254,7 @@ export default function OnboardingPage() {
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error ?? 'Failed to create organisation'); return }
+      trackEvent('org_created', { org_name: form.org_name, country: form.country, industry: form.industry, team_size: form.team_size })
       // Set the new org as active before redirecting so the cookie points to it
       if (data.org_id) {
         await fetch('/api/org/switch', {
@@ -265,6 +314,77 @@ export default function OnboardingPage() {
             You&apos;ve joined <strong>{joinedOrg}</strong>.<br/>Taking you to your dashboard…
           </p>
           <Dots color="#0d9488" style={{ marginTop: 20 }}/>
+        </div>
+      </div>
+    )
+  }
+
+  /* ── Email OTP verification ─────────────────────────────────────── */
+  if (phase === 'otp') {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4"
+        style={{ background: 'linear-gradient(135deg,#134e4a 0%,#0f766e 50%,#0d9488 100%)' }}>
+        <div className="w-full max-w-md">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center gap-2.5 mb-3">
+              <div className="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center">
+                <Zap className="h-6 w-6 text-white"/>
+              </div>
+              <span className="text-2xl font-bold text-white">upFloat</span>
+            </div>
+            <p className="text-teal-200 text-sm">One quick step to secure your account</p>
+          </div>
+          <div className="bg-white rounded-2xl p-8 shadow-2xl">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="h-10 w-10 rounded-xl bg-teal-50 flex items-center justify-center">
+                <Mail className="h-5 w-5 text-teal-600"/>
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Verify your email</h2>
+                <p className="text-sm text-gray-500">We sent a 6-digit code to <strong>{form.email}</strong></p>
+              </div>
+            </div>
+            {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>}
+            {otpSending && !error && (
+              <div className="mb-4 p-3 bg-teal-50 border border-teal-200 rounded-lg text-sm text-teal-700">Sending code…</div>
+            )}
+            {otpSent && !otpSending && !error && (
+              <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
+                Code sent — check your inbox (and spam folder).
+              </div>
+            )}
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Verification code</label>
+                <input
+                  value={otpCode}
+                  onChange={e => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  className="input font-mono tracking-widest text-center text-2xl"
+                  placeholder="000000"
+                  maxLength={6}
+                  autoFocus
+                  inputMode="numeric"
+                  onKeyDown={e => e.key === 'Enter' && handleVerifyOtp()}
+                />
+              </div>
+            </div>
+            <button onClick={handleVerifyOtp} disabled={otpVerifying || otpCode.length !== 6}
+              className="w-full mt-6 btn btn-brand flex items-center justify-center gap-2">
+              {otpVerifying ? 'Verifying…' : 'Verify email'}
+              {!otpVerifying && <ChevronRight className="h-4 w-4"/>}
+            </button>
+            <div className="mt-4 flex items-center justify-center gap-3 text-sm">
+              <button onClick={() => { setError(''); setOtpCode(''); sendOtp() }} disabled={otpSending}
+                className="text-teal-600 hover:text-teal-700 font-medium disabled:opacity-50">
+                {otpSending ? 'Sending…' : 'Resend code'}
+              </button>
+              <span className="text-gray-300">·</span>
+              <button onClick={() => { setError(''); setOtpCode(''); setOtpSent(false); setPhase('form'); setStep(0) }}
+                className="text-gray-500 hover:text-gray-700">
+                Back
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     )
