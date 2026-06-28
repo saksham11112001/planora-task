@@ -11,6 +11,7 @@ import { useAppStore }    from '@/store/appStore'
 import type { OrgSummary } from '@/store/appStore'
 import { OnboardingChecklist } from '@/components/walkthrough/OnboardingChecklist'
 import { HelpButton }          from '@/components/walkthrough/HelpButton'
+import { identifyUser }        from '@/components/analytics/PostHogProvider'
 
 const WalkthroughOverlay    = lazy(() => import('@/components/walkthrough/WalkthroughOverlay').then(m => ({ default: m.WalkthroughOverlay })))
 const InteractiveOnboarding = lazy(() => import('@/components/walkthrough/InteractiveOnboarding').then(m => ({ default: m.InteractiveOnboarding })))
@@ -53,6 +54,7 @@ export function AppShell({ user, org, role, workspaceId, allOrgs, children }: Pr
 
   useEffect(() => {
     setSession({ user, org, role, workspaceId, allOrgs })
+    identifyUser(user.id, { email: user.email, name: user.name, org_id: org.id, org_name: org.name, plan: org.plan_tier, role })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user.id, org.id, role, workspaceId, setSession, allOrgsKey])
 

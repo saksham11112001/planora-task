@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Zap, Building2, Users, ChevronRight, CheckCircle, UserCircle2, KeyRound, PlusCircle, Megaphone, Phone, Mail } from 'lucide-react'
+import { trackEvent } from '@/components/analytics/PostHogProvider'
 import { createClient } from '@/lib/supabase/client'
 
 const COUNTRIES = [
@@ -253,6 +254,7 @@ export default function OnboardingPage() {
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error ?? 'Failed to create organisation'); return }
+      trackEvent('org_created', { org_name: form.org_name, country: form.country, industry: form.industry, team_size: form.team_size })
       // Set the new org as active before redirecting so the cookie points to it
       if (data.org_id) {
         await fetch('/api/org/switch', {
