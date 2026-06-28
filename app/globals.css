@@ -2042,6 +2042,24 @@ html.dark [style*="background: #e5e7eb"] { background: var(--border) !important;
 html.dark [style*="background: '#e2e8f0'"],
 html.dark [style*="background: #e2e8f0"] { background: var(--border) !important; }
 
+/* Dark green text (used in green-tinted panels) — make readable in dark mode */
+html.dark [style*="color: '#065f46'"],
+html.dark [style*="color: #065f46"] { color: #34d399 !important; }
+html.dark [style*="color: '#166534'"],
+html.dark [style*="color: #166534"] { color: #34d399 !important; }
+
+/* Green-tinted border overrides */
+html.dark [style*="border: '1px solid #d1fae5'"],
+html.dark [style*="border: 1px solid #d1fae5"] { border-color: rgba(16,185,129,0.25) !important; }
+html.dark [style*="border: '1px solid #bbf7d0'"],
+html.dark [style*="border: 1px solid #bbf7d0"] { border-color: rgba(16,185,129,0.25) !important; }
+html.dark [style*="border: '1px solid #a7f3d0'"],
+html.dark [style*="border: 1px solid #a7f3d0"] { border-color: rgba(16,185,129,0.25) !important; }
+
+/* Green-tinted background overrides */
+html.dark [style*="background: 'linear-gradient(135deg, #f0fdf4"],
+html.dark [style*="background: linear-gradient(135deg, #f0fdf4"] { background: rgba(16,185,129,0.08) !important; }
+
 /* Gray text on light backgrounds — make them use CSS vars */
 html.dark [style*="color: '#374151'"],
 html.dark [style*="color: #374151"] { color: var(--text-secondary) !important; }

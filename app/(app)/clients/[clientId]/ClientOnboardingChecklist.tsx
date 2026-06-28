@@ -69,9 +69,9 @@ export default function ClientOnboardingChecklist({ clientId, clientName, canMan
   return (
     <div
       style={{
-        border: '1px solid #d1fae5',
+        border: '1px solid rgba(16,185,129,0.25)',
         borderRadius: 10,
-        background: '#f0fdf4',
+        background: 'rgba(16,185,129,0.06)',
         marginBottom: 24,
         overflow: 'hidden',
       }}
@@ -90,10 +90,10 @@ export default function ClientOnboardingChecklist({ clientId, clientName, canMan
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 16 }}>📋</span>
-          <span style={{ fontWeight: 600, fontSize: 14, color: '#065f46' }}>
+          <span style={{ fontWeight: 600, fontSize: 14, color: '#10b981' }}>
             Client Onboarding Checklist
           </span>
-          <span style={{ fontSize: 12, color: '#6b7280', marginLeft: 4 }}>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 4 }}>
             {doneCount}/{STEPS.length} done
           </span>
         </div>
@@ -104,15 +104,15 @@ export default function ClientOnboardingChecklist({ clientId, clientName, canMan
               fontSize: 11,
               padding: '2px 8px',
               borderRadius: 5,
-              border: '1px solid #a7f3d0',
+              border: '1px solid rgba(16,185,129,0.3)',
               background: 'transparent',
-              color: '#6b7280',
+              color: 'var(--text-muted)',
               cursor: 'pointer',
             }}
           >
             Dismiss
           </button>
-          <span style={{ fontSize: 12, color: '#6b7280' }}>{collapsed ? '▸' : '▾'}</span>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{collapsed ? '▸' : '▾'}</span>
         </div>
       </div>
 
@@ -120,7 +120,7 @@ export default function ClientOnboardingChecklist({ clientId, clientName, canMan
         <div style={{ padding: '0 16px 16px' }}>
           {/* Progress bar */}
           <div style={{ marginBottom: 12 }}>
-            <div style={{ height: 6, background: '#d1fae5', borderRadius: 4, overflow: 'hidden' }}>
+            <div style={{ height: 6, background: 'rgba(16,185,129,0.2)', borderRadius: 4, overflow: 'hidden' }}>
               <div
                 style={{
                   height: '100%',
@@ -146,7 +146,7 @@ export default function ClientOnboardingChecklist({ clientId, clientName, canMan
                     gap: 10,
                     cursor: 'pointer',
                     fontSize: 13,
-                    color: done ? '#9ca3af' : '#1f2937',
+                    color: done ? 'var(--text-muted)' : 'var(--text-primary)',
                     textDecoration: done ? 'line-through' : 'none',
                   }}
                 >
@@ -168,10 +168,10 @@ export default function ClientOnboardingChecklist({ clientId, clientName, canMan
               style={{
                 marginTop: 14,
                 padding: '10px 14px',
-                background: '#dcfce7',
+                background: 'rgba(16,185,129,0.12)',
                 borderRadius: 7,
                 fontSize: 13,
-                color: '#166534',
+                color: '#10b981',
                 fontWeight: 600,
                 textAlign: 'center',
               }}
