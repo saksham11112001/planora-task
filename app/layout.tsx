@@ -4,6 +4,7 @@ import './globals.css'
 import { ThemeProvider }       from '@/components/theme/ThemeProvider'
 
 const inter = Inter({ subsets: ['latin'], display: 'swap', variable: '--font-inter' })
+import { Suspense }              from 'react'
 import { NavigationProgress }   from '@/components/ui/NavigationProgress'
 import { KeyboardShortcuts }     from '@/components/ui/KeyboardShortcuts'
 import { PostHogPageTracker }    from '@/components/analytics/PostHogProvider'
@@ -93,7 +94,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body style={{ fontSize: '15px' }}>
         <NavigationProgress />
         <KeyboardShortcuts />
-        <PostHogPageTracker />
+        <Suspense fallback={null}><PostHogPageTracker /></Suspense>
         <CookieConsentBanner />
         <ThemeProvider>
           {children}
