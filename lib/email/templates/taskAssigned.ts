@@ -1,11 +1,13 @@
 interface Props {
-  taskTitle:   string
+  taskTitle:    string
   assigneeName: string
   assignerName: string
-  orgName:     string
-  dueDate?:    string | null
+  orgName:      string
+  dueDate?:     string | null
   projectName?: string | null
-  taskUrl:     string
+  taskUrl:      string
+  actionUrl?:   string | null   // one-click complete or submit-for-approval URL
+  actionLabel?: string | null   // e.g. "Mark Complete" or "Submit for Approval"
 }
 
 export function taskAssignedHtml(p: Props): string {
@@ -42,6 +44,7 @@ export function taskAssignedHtml(p: Props): string {
             ${due}
           </div>
           <a href="${p.taskUrl}" style="display:inline-block;background:#0d9488;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:8px;font-size:14px;font-weight:600">View task →</a>
+          ${p.actionUrl ? `<a href="${p.actionUrl}" style="display:inline-block;margin-left:10px;background:#f0fdfa;color:#0d9488;text-decoration:none;padding:12px 24px;border-radius:8px;font-size:14px;font-weight:600;border:1.5px solid #99f6e4">${p.actionLabel ?? 'Mark Complete'} ✓</a>` : ''}
         </td></tr>
         <!-- Footer -->
         <tr><td style="padding:16px 32px;border-top:1px solid #f1f5f9">

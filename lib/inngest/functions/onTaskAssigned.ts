@@ -35,16 +35,22 @@ export const onTaskAssigned = inngest.createFunction(
         })
         results.push('queued_for_digest')
       } else {
+        // Fetch approval_required to show the right action button
+        const { data: task } = await admin.from('tasks')
+          .select('approval_required').eq('id', d.task_id).maybeSingle()
+
         // Immediate mode — send every assignment email, no daily cap
         await sendTaskAssignedEmail({
-          to:           d.assignee_email,
-          assigneeName: d.assignee_email.split('@')[0],
-          assignerName: d.assigner_name,
-          taskId:       d.task_id,
-          taskTitle:    d.task_title,
-          orgName:      d.org_name,
-          dueDate:      d.due_date,
-          projectName:  d.project_name,
+          to:               d.assignee_email,
+          assigneeName:     d.assignee_email.split('@')[0],
+          assignerName:     d.assigner_name,
+          taskId:           d.task_id,
+          taskTitle:        d.task_title,
+          orgName:          d.org_name,
+          dueDate:          d.due_date,
+          projectName:      d.project_name,
+          assigneeUserId:   d.assignee_id,
+          approvalRequired: task?.approval_required ?? false,
         })
         results.push('email_sent')
       }
