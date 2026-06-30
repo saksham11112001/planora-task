@@ -68,8 +68,9 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/portal/') ||
     pathname.startsWith('/partners/') ||   // standalone partner portal — its own auth
     pathname.startsWith('/msme-landing') || // public MSME product page
-    pathname.startsWith('/msme/form/') ||  // vendor compliance form — no login required
-    pathname.startsWith('/task-action') || // email action result page — public
+    pathname.startsWith('/msme/form/') ||        // vendor compliance form — no login required
+    pathname.startsWith('/msme/unsubscribed') ||  // unsubscribe confirmation page — public
+    pathname.startsWith('/task-action') ||         // email action result page — public
     pathname.startsWith('/_next/') ||
     pathname.includes('.')
   ) {

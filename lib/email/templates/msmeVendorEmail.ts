@@ -1,12 +1,13 @@
 interface Props {
-  vendorName:    string
-  orgName:       string
-  formUrl:       string
-  attemptNo:     1 | 2 | 3 | 4 | 5
-  totalEmails?:  number
-  contactName?:  string
-  contactEmail?: string
-  contactPhone?: string
+  vendorName:      string
+  orgName:         string
+  formUrl:         string
+  unsubscribeUrl?: string | null
+  attemptNo:       1 | 2 | 3 | 4 | 5
+  totalEmails?:    number
+  contactName?:    string
+  contactEmail?:   string
+  contactPhone?:   string
 }
 
 const ACCENT = '#0d9488'
@@ -131,6 +132,10 @@ export function msmeVendorEmailHtml(p: Props): string {
         <a href="mailto:${p.contactEmail}" style="color:${ACCENT};text-decoration:none">${p.contactEmail}</a>
       </p>` : ''}
       <p style="color:#94a3b8;font-size:11px;margin:8px 0 0">Powered by upFloat</p>
+      ${p.unsubscribeUrl ? `<p style="color:#cbd5e1;font-size:10px;margin:10px 0 0">
+        Don't want future emails about this?
+        <a href="${p.unsubscribeUrl}" style="color:#94a3b8;text-decoration:underline">Unsubscribe</a>
+      </p>` : ''}
     </td></tr>
 
   </table>

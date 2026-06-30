@@ -273,7 +273,8 @@ export async function sendOnboardingNudgeEmail(p: {
 // ── MSME vendor form invitation ───────────────────────────────────────────
 export async function sendMsmeVendorEmail(p: {
   to: string; vendorName: string; orgName: string
-  formUrl: string; attemptNo: 1 | 2 | 3 | 4 | 5; totalEmails?: number; cc?: string
+  formUrl: string; unsubscribeUrl?: string | null
+  attemptNo: 1 | 2 | 3 | 4 | 5; totalEmails?: number; cc?: string
   contactName?: string; contactEmail?: string; contactPhone?: string
 }) {
   const msmeDomain = (process.env.FROM_EMAIL ?? 'noreply@upfloat.co').replace(/.*<|>/g, '')
