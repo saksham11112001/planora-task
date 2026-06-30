@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>upFloat – MSME Vendor Compliance</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f1f5f9;padding:40px 16px}
+  .card{max-width:620px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;border:1px solid #e2e8f0;box-shadow:0 4px 24px rgba(0,0,0,.08)}
+  .header{background:linear-gradient(135deg,#7c2d12 0%,#ea580c 100%);padding:32px 36px;display:flex;align-items:center;gap:16px}
+  .header-icon{width:52px;height:52px;background:rgba(255,255,255,.15);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0}
+  .header-text h1{color:#fff;font-size:22px;font-weight:800;letter-spacing:.01em}
+  .header-text p{color:#fed7aa;font-size:12px;margin-top:4px;text-transform:uppercase;letter-spacing:.05em}
+  .steps{padding:32px 36px}
+  .step{display:flex;gap:16px;margin-bottom:28px;position:relative}
+  .step:not(:last-child)::after{content:'';position:absolute;left:19px;top:44px;width:2px;height:calc(100% - 12px);background:#e2e8f0;z-index:0}
+  .step-num{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0;z-index:1}
+  .n1{background:#ea580c;color:#fff}
+  .n2{background:#0d9488;color:#fff}
+  .n3{background:#7c3aed;color:#fff}
+  .n4{background:#2563eb;color:#fff}
+  .n5{background:#059669;color:#fff}
+  .n6{background:#d97706;color:#fff}
+  .step-body{flex:1;padding-top:6px}
+  .step-body h3{font-size:14px;font-weight:700;color:#0f172a;margin-bottom:4px}
+  .step-body p{font-size:12px;color:#64748b;line-height:1.6;margin-bottom:8px}
+  .mock{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;font-size:11px;color:#475569}
+  .mock .label{font-weight:700;color:#0f172a;margin-bottom:6px;font-size:11px}
+  .mock .row{display:flex;align-items:center;gap:6px;margin:4px 0}
+  .pill{border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700;color:#fff;display:inline-block}
+  .pill.orange{background:#ea580c}
+  .pill.teal{background:#0d9488}
+  .pill.green{background:#059669}
+  .pill.amber{background:#d97706}
+  .pill.blue{background:#2563eb}
+  .pill.gray{background:#64748b}
+  .pill.red{background:#dc2626}
+  .vendor-item{display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f1f5f9;font-size:11px}
+  .vendor-item:last-child{border-bottom:none}
+  .stat-row{display:flex;gap:8px;margin-top:6px}
+  .stat{flex:1;background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:8px;text-align:center}
+  .stat .num{font-size:18px;font-weight:800;color:#ea580c}
+  .stat .lbl{font-size:9px;color:#64748b;margin-top:2px}
+  .benefits{margin:0 36px 32px;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:18px 20px}
+  .benefits h2{font-size:13px;font-weight:800;color:#9a3412;margin-bottom:12px}
+  .benefits li{font-size:12px;color:#374151;line-height:1.8;margin-left:16px}
+  .act-box{background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 14px;font-size:11px;color:#991b1b;margin-top:6px}
+  .footer{background:#7c2d12;padding:18px 36px;display:flex;align-items:center;justify-content:space-between}
+  .footer span{color:#94a3b8;font-size:11px}
+  .footer strong{color:#fb923c}
+</style>
+</head>
+<body>
+<div class="card">
+
+  <div class="header">
+    <div class="header-icon">🏭</div>
+    <div class="header-text">
+      <h1>MSME VENDOR COMPLIANCE</h1>
+      <p>Collect MSME certificates from all your vendors — automated, trackable, audit-ready</p>
+    </div>
+  </div>
+
+  <div class="steps">
+
+    <div class="step">
+      <div class="step-num n1">01</div>
+      <div class="step-body">
+        <h3>Go to MSME Module</h3>
+        <p>Click <strong>MSME</strong> in the left sidebar. This module is dedicated to MSMED Act, 2006 compliance — collecting Udyam details from your vendors.</p>
+        <div class="act-box">
+          ⚠️ <strong>Why this matters:</strong> Under MSMED Act, 2006 — if you pay an MSME vendor late, you owe 3× bank rate as interest. You must disclose outstanding MSME dues in your annual accounts.
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num n2">02</div>
+      <div class="step-body">
+        <h3>Add Your Vendors</h3>
+        <p>Click <strong>+ Add Vendor</strong> or import from Excel. Add vendor name and email — that's all you need to get started.</p>
+        <div class="mock">
+          <div class="label">Add Vendor</div>
+          <div class="row">🏢 <span>Vendor name: Rajesh Fabricators</span></div>
+          <div class="row">📧 <span>Email: accounts@rajeshfab.com</span></div>
+          <div class="row" style="margin-top:6px"><span class="pill orange">Add Vendor →</span></div>
+          <div class="row" style="margin-top:4px;font-size:10px;color:#94a3b8">Or upload bulk Excel — 100s of vendors at once</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num n3">03</div>
+      <div class="step-body">
+        <h3>Send Compliance Email in One Click</h3>
+        <p>Select vendors and click <strong>Send Email</strong>. upFloat fires a professional compliance email with a secure form link — your vendor doesn't need to log in or create an account.</p>
+        <div class="mock">
+          <div class="label">Vendor List</div>
+          <div class="vendor-item"><span>☑ Rajesh Fabricators</span><span class="pill gray">Not Sent</span></div>
+          <div class="vendor-item"><span>☑ Patel Steel Works</span><span class="pill gray">Not Sent</span></div>
+          <div class="vendor-item"><span>☑ Kumar Traders</span><span class="pill gray">Not Sent</span></div>
+          <div class="row" style="margin-top:8px"><span class="pill orange">📧 Send Emails (3 selected)</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num n4">04</div>
+      <div class="step-body">
+        <h3>Vendor Fills the Form — No Login Needed</h3>
+        <p>Your vendor clicks the link, opens a simple form, and declares whether they are MSME-registered. If yes, they enter their Udyam number and upload the certificate.</p>
+        <div class="mock">
+          <div class="label">🔗 Vendor Form (opens in browser, no account needed)</div>
+          <div class="row">✅ <span>Are you registered under MSME / Udyam?</span></div>
+          <div class="row" style="padding-left:16px">○ Yes &nbsp;&nbsp; ○ No — Not an MSME</div>
+          <div class="row" style="margin-top:4px">📋 Udyam No: UDYAM-MH-00-0012345</div>
+          <div class="row">📂 Category: Micro / Small / Medium</div>
+          <div class="row">📎 Upload Udyam Certificate (PDF/JPG)</div>
+          <div class="row" style="margin-top:6px"><span class="pill teal">Submit →</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num n5">05</div>
+      <div class="step-body">
+        <h3>Track Response Status in Real Time</h3>
+        <p>See at a glance which vendors have responded, which are MSME-registered, and which haven't replied yet. Send automatic follow-up reminders.</p>
+        <div class="mock">
+          <div class="stat-row">
+            <div class="stat"><div class="num">42</div><div class="lbl">Total vendors</div></div>
+            <div class="stat"><div class="num" style="color:#059669">28</div><div class="lbl">Submitted</div></div>
+            <div class="stat"><div class="num" style="color:#d97706">11</div><div class="lbl">Emailed</div></div>
+            <div class="stat"><div class="num" style="color:#64748b">3</div><div class="lbl">Not sent</div></div>
+          </div>
+          <div class="vendor-item" style="margin-top:8px"><span>Rajesh Fabricators</span><span class="pill green">MSME ✓</span></div>
+          <div class="vendor-item"><span>Patel Steel Works</span><span class="pill teal">Submitted</span></div>
+          <div class="vendor-item"><span>Kumar Traders</span><span class="pill amber">Emailed</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num n6">06</div>
+      <div class="step-body">
+        <h3>Auto Follow-Up Emails — Set &amp; Forget</h3>
+        <p>Configure an email schedule (e.g. Day 7, Day 15, Day 25). upFloat sends reminders automatically to vendors who haven't responded — escalating with each attempt.</p>
+        <div class="mock">
+          <div class="label">Email Schedule (default)</div>
+          <div class="row">📧 <span>Day 0 — Initial email sent</span></div>
+          <div class="row">📧 <span>Day 7 — Gentle reminder</span></div>
+          <div class="row">📧 <span>Day 14 — Reminder #2</span></div>
+          <div class="row">📧 <span>Day 21 — Reminder #3</span></div>
+          <div class="row">📧 <span>Day 30 — <strong style="color:#dc2626">Final reminder</strong></span></div>
+          <div class="row" style="margin-top:4px;font-size:10px;color:#94a3b8">Schedule is configurable. Responded vendors are automatically skipped.</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="benefits">
+    <h2>✨ Why upFloat MSME saves you from penalties</h2>
+    <ul>
+      <li>MSMED Act, 2006 compliance — avoid 3× interest on delayed MSME payments</li>
+      <li>Audit-ready: all responses stored with timestamp, Udyam number, and certificate</li>
+      <li>Vendor fills the form without creating an account — higher response rates</li>
+      <li>Auto follow-up emails — no manual chasing over WhatsApp</li>
+      <li>Unsubscribe link in every email — prevents spam complaints</li>
+      <li>Full response history — who submitted when, Udyam number, certificate stored</li>
+    </ul>
+  </div>
+
+  <div class="footer">
+    <span>Powered by <strong>upFloat</strong></span>
+    <span style="color:#64748b;font-size:10px">upfloat.co &nbsp;·&nbsp; support@upfloat.co</span>
+  </div>
+
+</div>
+</body>
+</html>

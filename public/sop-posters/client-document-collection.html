@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>upFloat – Client Document Collection</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f1f5f9;padding:40px 16px}
+  .card{max-width:620px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;border:1px solid #e2e8f0;box-shadow:0 4px 24px rgba(0,0,0,.08)}
+  .header{background:linear-gradient(135deg,#064e3b 0%,#0d9488 100%);padding:32px 36px;display:flex;align-items:center;gap:16px}
+  .header-icon{width:52px;height:52px;background:rgba(255,255,255,.15);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0}
+  .header-text h1{color:#fff;font-size:22px;font-weight:800;letter-spacing:.01em}
+  .header-text p{color:#a7f3d0;font-size:12px;margin-top:4px;text-transform:uppercase;letter-spacing:.05em}
+  .steps{padding:32px 36px}
+  .step{display:flex;gap:16px;margin-bottom:28px;position:relative}
+  .step:not(:last-child)::after{content:'';position:absolute;left:19px;top:44px;width:2px;height:calc(100% - 12px);background:#e2e8f0;z-index:0}
+  .step-num{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0;z-index:1}
+  .n1{background:#0d9488;color:#fff}
+  .n2{background:#0891b2;color:#fff}
+  .n3{background:#7c3aed;color:#fff}
+  .n4{background:#d97706;color:#fff}
+  .n5{background:#059669;color:#fff}
+  .step-body{flex:1;padding-top:6px}
+  .step-body h3{font-size:14px;font-weight:700;color:#0f172a;margin-bottom:4px}
+  .step-body p{font-size:12px;color:#64748b;line-height:1.6;margin-bottom:8px}
+  .mock{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;font-size:11px;color:#475569}
+  .mock .label{font-weight:700;color:#0f172a;margin-bottom:6px;font-size:11px}
+  .mock .row{display:flex;align-items:center;gap:6px;margin:4px 0}
+  .pill{border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700;color:#fff;display:inline-block}
+  .pill.teal{background:#0d9488}
+  .pill.green{background:#059669}
+  .pill.amber{background:#d97706}
+  .pill.red{background:#dc2626}
+  .pill.blue{background:#2563eb}
+  .pill.gray{background:#64748b}
+  .pill.outline-teal{background:transparent;border:1px solid #0d9488;color:#0d9488}
+  .doc-item{display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f1f5f9;font-size:11px}
+  .doc-item:last-child{border-bottom:none}
+  .portal-box{background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:10px 14px;font-size:11px}
+  .benefits{margin:0 36px 32px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:18px 20px}
+  .benefits h2{font-size:13px;font-weight:800;color:#065f46;margin-bottom:12px}
+  .benefits li{font-size:12px;color:#374151;line-height:1.8;margin-left:16px}
+  .footer{background:#064e3b;padding:18px 36px;display:flex;align-items:center;justify-content:space-between}
+  .footer span{color:#94a3b8;font-size:11px}
+  .footer strong{color:#34d399}
+</style>
+</head>
+<body>
+<div class="card">
+
+  <div class="header">
+    <div class="header-icon">📁</div>
+    <div class="header-text">
+      <h1>CLIENT DOCUMENT COLLECTION</h1>
+      <p>Stop chasing documents on WhatsApp — get a secure upload link in seconds</p>
+    </div>
+  </div>
+
+  <div class="steps">
+
+    <div class="step">
+      <div class="step-num n1">01</div>
+      <div class="step-body">
+        <h3>Open the Client's Service</h3>
+        <p>Go to <strong>Clients</strong> → select a client → open a task or service (e.g. ITR Filing, GST Registration).</p>
+        <div class="mock">
+          <div class="label">Sharma Enterprises → ITR Filing FY 2025-26</div>
+          <div class="row">📋 Status: <span class="pill amber">In Progress</span></div>
+          <div class="row">👤 Assigned to: Priya Mehta</div>
+          <div class="row">📅 Due: 31 Jul 2026</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num n2">02</div>
+      <div class="step-body">
+        <h3>Open the Client Portal</h3>
+        <p>Inside the task, click <strong>Share Portal Link</strong>. This generates a secure magic link for your client — valid without any login or account creation.</p>
+        <div class="mock">
+          <div style="display:flex;gap:2px;border-bottom:1px solid #e2e8f0;margin-bottom:8px">
+            <span style="padding:4px 10px;font-size:10px;font-weight:600;color:#94a3b8">Overview</span>
+            <span style="padding:4px 10px;font-size:10px;font-weight:600;background:#0d9488;color:#fff;border-radius:4px 4px 0 0">Documents</span>
+            <span style="padding:4px 10px;font-size:10px;font-weight:600;color:#94a3b8">Deadlines</span>
+          </div>
+          <div class="row">🔗 <span style="color:#0d9488;font-weight:700">Share Portal Link →</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num n3">03</div>
+      <div class="step-body">
+        <h3>Client Sees a Document Checklist</h3>
+        <p>The portal shows exactly what documents are needed for this service. Required docs are marked clearly — client knows exactly what to upload.</p>
+        <div class="mock">
+          <div class="label">Client Portal — ITR Filing FY 2025-26</div>
+          <div class="row">📄 <span>PAN Card &nbsp;<span class="pill red">Required</span></span></div>
+          <div class="row">📄 <span>Form 16 &nbsp;<span class="pill red">Required</span></span></div>
+          <div class="row">📄 <span>Bank Statement &nbsp;<span class="pill gray">Optional</span></span></div>
+          <div class="row">📅 <span style="color:#94a3b8;font-size:10px">Deadline: 20 Jul 2026</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num n4">04</div>
+      <div class="step-body">
+        <h3>Share the Secure Upload Link</h3>
+        <p>upFloat generates a unique secure link. Share it via <strong>WhatsApp, email, or SMS</strong> — your client doesn't need to create an account.</p>
+        <div class="portal-box">
+          <div style="font-weight:700;color:#9a3412;font-size:11px;margin-bottom:6px">🔗 Secure Upload Link Generated</div>
+          <div style="background:#fff;border:1px solid #fed7aa;border-radius:4px;padding:6px 10px;font-size:10px;color:#0d9488;word-break:break-all">https://upfloat.co/portal/abc123xyz</div>
+          <div style="margin-top:8px;display:flex;gap:6px">
+            <span class="pill teal">📋 Copy Link</span>
+            <span class="pill blue">📱 Share on WhatsApp</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num n5">05</div>
+      <div class="step-body">
+        <h3>Client Uploads — You're Notified</h3>
+        <p>Your client opens the link (no login needed), sees the document checklist, and uploads directly. You get an email the moment each file is uploaded.</p>
+        <div class="mock">
+          <div class="label">Client Portal — Sharma Enterprises</div>
+          <div class="doc-item"><span>📄 PAN Card.pdf</span><span class="pill green">Uploaded ✓</span></div>
+          <div class="doc-item"><span>📄 Form 16.pdf</span><span class="pill green">Uploaded ✓</span></div>
+          <div class="doc-item"><span>📄 Bank Statement.pdf</span><span class="pill gray">Pending</span></div>
+          <div style="margin-top:8px;font-size:10px;color:#94a3b8">📧 You received: "Client uploaded Form 16"</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="benefits">
+    <h2>✨ No more document chaos</h2>
+    <ul>
+      <li>Client uploads without creating an upFloat account — just open the link</li>
+      <li>All files auto-saved under the correct service / task</li>
+      <li>Client sees clearly what's required vs optional — no confusion</li>
+      <li>Magic link expires automatically — no security risk</li>
+      <li>Email notification the moment a file is uploaded</li>
+      <li>Complete audit trail — who uploaded what and when</li>
+    </ul>
+  </div>
+
+  <div class="footer">
+    <span>Powered by <strong>upFloat</strong></span>
+    <span style="color:#64748b;font-size:10px">upfloat.co &nbsp;·&nbsp; support@upfloat.co</span>
+  </div>
+
+</div>
+</body>
+</html>
