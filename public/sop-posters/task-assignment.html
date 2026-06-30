@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>upFloat – Task Assignment & Approval Workflow</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f1f5f9;padding:40px 16px}
+  .card{max-width:620px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;border:1px solid #e2e8f0;box-shadow:0 4px 24px rgba(0,0,0,.08)}
+  .header{background:linear-gradient(135deg,#1e3a5f 0%,#2563eb 100%);padding:32px 36px;display:flex;align-items:center;gap:16px}
+  .header-icon{width:52px;height:52px;background:rgba(255,255,255,.15);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0}
+  .header-text h1{color:#fff;font-size:22px;font-weight:800;letter-spacing:.01em}
+  .header-text p{color:#bfdbfe;font-size:12px;margin-top:4px;text-transform:uppercase;letter-spacing:.05em}
+  .steps{padding:32px 36px}
+  .step{display:flex;gap:16px;margin-bottom:28px;position:relative}
+  .step:not(:last-child)::after{content:'';position:absolute;left:19px;top:44px;width:2px;height:calc(100% - 12px);background:#e2e8f0;z-index:0}
+  .step-num{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0;z-index:1}
+  .n1{background:#2563eb;color:#fff}
+  .n2{background:#7c3aed;color:#fff}
+  .n3{background:#0d9488;color:#fff}
+  .n4{background:#d97706;color:#fff}
+  .n5{background:#059669;color:#fff}
+  .n6{background:#dc2626;color:#fff}
+  .step-body{flex:1;padding-top:6px}
+  .step-body h3{font-size:14px;font-weight:700;color:#0f172a;margin-bottom:4px}
+  .step-body p{font-size:12px;color:#64748b;line-height:1.6;margin-bottom:8px}
+  .mock{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;font-size:11px;color:#475569}
+  .mock .label{font-weight:700;color:#0f172a;margin-bottom:6px;font-size:11px}
+  .mock .row{display:flex;align-items:center;gap:6px;margin:4px 0}
+  .pill{border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700;color:#fff}
+  .pill.blue{background:#2563eb}
+  .pill.green{background:#059669}
+  .pill.amber{background:#d97706}
+  .pill.red{background:#dc2626}
+  .pill.purple{background:#7c3aed}
+  .pill.teal{background:#0d9488}
+  .flow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .flow-node{background:#fff;border:1.5px solid #2563eb;border-radius:6px;padding:4px 10px;font-size:10px;font-weight:700;color:#2563eb}
+  .flow-arrow{color:#94a3b8;font-size:12px}
+  .benefits{margin:0 36px 32px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:18px 20px}
+  .benefits h2{font-size:13px;font-weight:800;color:#1e40af;margin-bottom:12px}
+  .benefits li{font-size:12px;color:#374151;line-height:1.8;margin-left:16px}
+  .footer{background:#1e3a5f;padding:18px 36px;display:flex;align-items:center;justify-content:space-between}
+  .footer span{color:#94a3b8;font-size:11px}
+  .footer strong{color:#60a5fa}
+</style>
+</head>
+<body>
+<div class="card">
+
+  <div class="header">
+    <div class="header-icon">✅</div>
+    <div class="header-text">
+      <h1>TASK ASSIGNMENT &amp; APPROVAL</h1>
+      <p>Create → Assign → Approve — your entire team workflow in one place</p>
+    </div>
+  </div>
+
+  <div class="steps">
+
+    <div class="step">
+      <div class="step-num n1">01</div>
+      <div class="step-body">
+        <h3>Create a Task</h3>
+        <p>Go to <strong>Tasks</strong> (or open any Project) → click <strong>+ New Task</strong>. Add a title, description, due date, and priority.</p>
+        <div class="mock">
+          <div class="label">New Task</div>
+          <div class="row">📝 <span>Title: Prepare Balance Sheet — FY 2025-26</span></div>
+          <div class="row">📅 <span>Due: 30 Sep 2026 &nbsp;·&nbsp; Priority: <span class="pill red">High</span></span></div>
+          <div class="row">📁 <span>Project: Sharma Enterprises</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num n2">02</div>
+      <div class="step-body">
+        <h3>Assign to a Team Member</h3>
+        <p>Pick an assignee from your team. Toggle <strong>Approval Required</strong> if you want to review the work before it's marked done.</p>
+        <div class="mock">
+          <div class="row">👤 <span>Assignee: <strong>Rahul Sharma</strong></span></div>
+          <div class="row">🔐 <span>Approval required: <strong style="color:#059669">Yes</strong></span></div>
+          <div class="row" style="margin-top:6px"><span class="pill blue">Assign Task →</span></div>
+          <div class="row" style="margin-top:6px;color:#94a3b8;font-size:10px">📧 Rahul gets an email notification instantly</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num n3">03</div>
+      <div class="step-body">
+        <h3>Assignee Works on the Task</h3>
+        <p>Rahul sees the task in <strong>My Tasks</strong>. He can add comments, attach files, and update status as he progresses.</p>
+        <div class="mock">
+          <div class="row">🗂️ <span>Balance Sheet — FY 2025-26 &nbsp;<span class="pill amber">In Progress</span></span></div>
+          <div class="row">💬 <span>Comment: "Draft ready, please review"</span></div>
+          <div class="row">📎 <span>balance_sheet_draft_v2.xlsx</span></div>
+          <div class="row" style="margin-top:6px"><span class="pill teal">Submit for Approval →</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num n4">04</div>
+      <div class="step-body">
+        <h3>Manager Gets Notified Instantly</h3>
+        <p>You receive an email with <strong>one-click Approve / Reject buttons</strong> — no need to log in to upFloat.</p>
+        <div class="mock">
+          <div class="label">📧 Email: Approval needed — Balance Sheet</div>
+          <div class="row">👤 <span>Submitted by Rahul Sharma</span></div>
+          <div class="row" style="margin-top:6px;gap:8px">
+            <span class="pill green">✅ Approve</span>
+            <span class="pill red">↩ Reject</span>
+            <span style="font-size:10px;color:#94a3b8">— click directly from email</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num n5">05</div>
+      <div class="step-body">
+        <h3>Approve or Reject in One Click</h3>
+        <p>Click <strong>Approve</strong> in the email — the task is marked done automatically. Click <strong>Reject</strong> — it goes back to Rahul with a notification to fix and resubmit.</p>
+        <div class="flow">
+          <div class="flow-node">Submitted</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node" style="border-color:#059669;color:#059669">Approved ✓</div>
+          <div class="flow-arrow" style="color:#dc2626">or</div>
+          <div class="flow-node" style="border-color:#dc2626;color:#dc2626">Rejected ↩</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node" style="border-color:#d97706;color:#d97706">Rework</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num n6">06</div>
+      <div class="step-body">
+        <h3>Set Recurring Tasks — Never Miss Again</h3>
+        <p>For tasks that repeat (monthly GST, weekly reports) — set a <strong>Frequency</strong>. upFloat auto-creates the next occurrence when the current one is done.</p>
+        <div class="mock">
+          <div class="row">🔄 <span>Frequency: <strong>Monthly on the 20th</strong></span></div>
+          <div class="row">📅 <span>Next occurrence auto-created: <strong>Aug 20</strong></span></div>
+          <div class="row" style="color:#94a3b8;font-size:10px;margin-top:4px">Supports: daily · weekly · monthly · quarterly · annual</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="benefits">
+    <h2>✨ Why teams love upFloat Tasks</h2>
+    <ul>
+      <li>One-click approve/reject directly from your email — no login needed</li>
+      <li>Automatic due-soon reminders so nothing slips through</li>
+      <li>Recurring tasks auto-spawn — monthly, quarterly, annual</li>
+      <li>Escalation alerts to managers when tasks go overdue</li>
+      <li>Full comment + attachment thread on every task</li>
+      <li>Board / List / Calendar view — work the way you like</li>
+    </ul>
+  </div>
+
+  <div class="footer">
+    <span>Powered by <strong>upFloat</strong></span>
+    <span style="color:#64748b;font-size:10px">upfloat.co &nbsp;·&nbsp; support@upfloat.co</span>
+  </div>
+
+</div>
+</body>
+</html>

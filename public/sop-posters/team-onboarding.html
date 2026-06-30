@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>upFloat – Team Onboarding</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f1f5f9;padding:40px 16px}
+  .card{max-width:620px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;border:1px solid #e2e8f0;box-shadow:0 4px 24px rgba(0,0,0,.08)}
+  .header{background:linear-gradient(135deg,#3730a3 0%,#7c3aed 100%);padding:32px 36px;display:flex;align-items:center;gap:16px}
+  .header-icon{width:52px;height:52px;background:rgba(255,255,255,.15);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0}
+  .header-text h1{color:#fff;font-size:22px;font-weight:800;letter-spacing:.01em}
+  .header-text p{color:#c4b5fd;font-size:12px;margin-top:4px;text-transform:uppercase;letter-spacing:.05em}
+  .steps{padding:32px 36px}
+  .step{display:flex;gap:16px;margin-bottom:28px;position:relative}
+  .step:not(:last-child)::after{content:'';position:absolute;left:19px;top:44px;width:2px;height:calc(100% - 12px);background:#e2e8f0;z-index:0}
+  .step-num{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0;z-index:1}
+  .n1{background:#7c3aed;color:#fff}
+  .n2{background:#2563eb;color:#fff}
+  .n3{background:#0d9488;color:#fff}
+  .n4{background:#d97706;color:#fff}
+  .n5{background:#059669;color:#fff}
+  .step-body{flex:1;padding-top:6px}
+  .step-body h3{font-size:14px;font-weight:700;color:#0f172a;margin-bottom:4px}
+  .step-body p{font-size:12px;color:#64748b;line-height:1.6;margin-bottom:8px}
+  .mock{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;font-size:11px;color:#475569}
+  .mock .label{font-weight:700;color:#0f172a;margin-bottom:6px;font-size:11px}
+  .mock .row{display:flex;align-items:center;gap:6px;margin:4px 0}
+  .pill{border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700;color:#fff;display:inline-block}
+  .pill.purple{background:#7c3aed}
+  .pill.blue{background:#2563eb}
+  .pill.teal{background:#0d9488}
+  .pill.green{background:#059669}
+  .pill.amber{background:#d97706}
+  .pill.gray{background:#64748b}
+  .role-table{width:100%;border-collapse:collapse;font-size:10px;margin-top:4px}
+  .role-table th{background:#0f172a;color:#fff;padding:5px 8px;text-align:left;font-weight:700}
+  .role-table td{padding:5px 8px;border-bottom:1px solid #f1f5f9;color:#374151;vertical-align:top}
+  .role-table tr:last-child td{border-bottom:none}
+  .member-item{display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f1f5f9;font-size:11px}
+  .member-item:last-child{border-bottom:none}
+  .avatar{width:22px;height:22px;border-radius:50%;background:#7c3aed;color:#fff;font-size:9px;font-weight:700;display:inline-flex;align-items:center;justify-content:center}
+  .benefits{margin:0 36px 32px;background:#faf5ff;border:1px solid #ddd6fe;border-radius:10px;padding:18px 20px}
+  .benefits h2{font-size:13px;font-weight:800;color:#4c1d95;margin-bottom:12px}
+  .benefits li{font-size:12px;color:#374151;line-height:1.8;margin-left:16px}
+  .footer{background:#3730a3;padding:18px 36px;display:flex;align-items:center;justify-content:space-between}
+  .footer span{color:#94a3b8;font-size:11px}
+  .footer strong{color:#a5b4fc}
+</style>
+</head>
+<body>
+<div class="card">
+
+  <div class="header">
+    <div class="header-icon">👥</div>
+    <div class="header-text">
+      <h1>TEAM ONBOARDING</h1>
+      <p>Add your entire CA team, set roles, and control who can do what</p>
+    </div>
+  </div>
+
+  <div class="steps">
+
+    <div class="step">
+      <div class="step-num n1">01</div>
+      <div class="step-body">
+        <h3>Go to Settings → Team</h3>
+        <p>Click your firm name at the top left → <strong>Settings</strong> → <strong>Team Members</strong>. You'll see everyone currently in your workspace.</p>
+        <div class="mock">
+          <div class="member-item">
+            <span><span class="avatar">RS</span> &nbsp;Rahul Sharma</span>
+            <span class="pill purple">Owner</span>
+          </div>
+          <div class="member-item">
+            <span><span class="avatar" style="background:#2563eb">PM</span> &nbsp;Priya Mehta</span>
+            <span class="pill blue">Admin</span>
+          </div>
+          <div class="member-item">
+            <span><span class="avatar" style="background:#0d9488">AK</span> &nbsp;Anil Kumar</span>
+            <span class="pill teal">Manager</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num n2">02</div>
+      <div class="step-body">
+        <h3>Invite a Team Member</h3>
+        <p>Click <strong>+ Invite Member</strong>. Enter their email and assign a role. They receive an email with a join link — no setup required on their end.</p>
+        <div class="mock">
+          <div class="label">Invite Member</div>
+          <div class="row">📧 <span>Email: sneha.joshi@sgng.in</span></div>
+          <div class="row">👤 <span>Role: <strong>Member</strong></span></div>
+          <div class="row" style="margin-top:6px"><span class="pill purple">Send Invite →</span></div>
+          <div class="row" style="margin-top:4px;font-size:10px;color:#94a3b8">📧 Sneha receives a join link instantly</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num n3">03</div>
+      <div class="step-body">
+        <h3>Understand the Role Hierarchy</h3>
+        <p>upFloat has 5 roles. Pick the right one for each team member to control what they can see and do.</p>
+        <table class="role-table">
+          <tr><th>Role</th><th>What they can do</th></tr>
+          <tr><td><span class="pill purple">Owner</span></td><td>Full access. Billing, settings, delete org.</td></tr>
+          <tr><td><span class="pill blue">Admin</span></td><td>All features. Cannot change billing.</td></tr>
+          <tr><td><span class="pill teal">Manager</span></td><td>Create + assign tasks. Approve work.</td></tr>
+          <tr><td><span class="pill gray">Member</span></td><td>Work on assigned tasks. View clients.</td></tr>
+          <tr><td><span class="pill gray" style="background:#94a3b8">Viewer</span></td><td>Read-only. Cannot create or edit anything.</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num n4">04</div>
+      <div class="step-body">
+        <h3>Assign Tasks to Team Members</h3>
+        <p>Once the team is set up, assign tasks directly to individuals. Each person has a personalised <strong>My Tasks</strong> view showing only their work.</p>
+        <div class="mock">
+          <div class="label">My Tasks — Sneha Joshi</div>
+          <div class="member-item"><span>GSTR-3B — Sharma Ent.</span><span class="pill amber">Due Aug 20</span></div>
+          <div class="member-item"><span>TDS Return Q1 — Mehta</span><span class="pill teal">In Progress</span></div>
+          <div class="member-item"><span>Form 16 — Gupta & Co.</span><span class="pill green">Done ✓</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num n5">05</div>
+      <div class="step-body">
+        <h3>Customise Permissions Per Role</h3>
+        <p>In <strong>Settings → Permissions</strong>, fine-tune exactly what each role can do — e.g. allow Members to assign tasks, restrict Managers from deleting clients.</p>
+        <div class="mock">
+          <div class="label">Permission Settings</div>
+          <div class="row">✅ <span>tasks.assign &nbsp;→ <span class="pill teal">Manager</span> <span class="pill gray">Member</span></span></div>
+          <div class="row">✅ <span>clients.create &nbsp;→ <span class="pill blue">Admin</span> <span class="pill teal">Manager</span></span></div>
+          <div class="row">❌ <span>clients.delete &nbsp;→ <span class="pill purple">Owner</span> <span class="pill blue">Admin</span> only</span></div>
+          <div class="row" style="font-size:10px;color:#94a3b8;margin-top:4px">Changes apply instantly — no restart needed</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="benefits">
+    <h2>✨ Built for CA firms with growing teams</h2>
+    <ul>
+      <li>5-level role hierarchy — Owner, Admin, Manager, Member, Viewer</li>
+      <li>Fine-grained permission controls per feature</li>
+      <li>Every team member gets personalised My Tasks — no noise</li>
+      <li>Approval flows — seniors review before work is marked done</li>
+      <li>Morning digest email — see all pending approvals in one shot</li>
+      <li>Onboarding walkthrough for new members — they're productive from day one</li>
+    </ul>
+  </div>
+
+  <div class="footer">
+    <span>Powered by <strong>upFloat</strong></span>
+    <span style="color:#64748b;font-size:10px">upfloat.co &nbsp;·&nbsp; support@upfloat.co</span>
+  </div>
+
+</div>
+</body>
+</html>

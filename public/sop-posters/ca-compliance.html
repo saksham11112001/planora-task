@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>upFloat – CA Compliance Workflow</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f1f5f9;padding:40px 16px}
+  .card{max-width:620px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;border:1px solid #e2e8f0;box-shadow:0 4px 24px rgba(0,0,0,.08)}
+  /* Header */
+  .header{background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);padding:32px 36px;display:flex;align-items:center;gap:16px}
+  .header-icon{width:52px;height:52px;background:rgba(16,185,129,.18);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0}
+  .header-text h1{color:#fff;font-size:22px;font-weight:800;letter-spacing:.01em}
+  .header-text p{color:#94a3b8;font-size:12px;margin-top:4px;text-transform:uppercase;letter-spacing:.05em}
+  /* Steps */
+  .steps{padding:32px 36px}
+  .step{display:flex;gap:16px;margin-bottom:28px;position:relative}
+  .step:not(:last-child)::after{content:'';position:absolute;left:19px;top:44px;width:2px;height:calc(100% - 12px);background:linear-gradient(#e2e8f0,#e2e8f0);z-index:0}
+  .step-num{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0;z-index:1}
+  .step-num.teal{background:#0d9488;color:#fff}
+  .step-num.navy{background:#1e3a5f;color:#fff}
+  .step-num.green{background:#059669;color:#fff}
+  .step-num.amber{background:#d97706;color:#fff}
+  .step-num.blue{background:#2563eb;color:#fff}
+  .step-num.purple{background:#7c3aed;color:#fff}
+  .step-body{flex:1;padding-top:6px}
+  .step-body h3{font-size:14px;font-weight:700;color:#0f172a;margin-bottom:4px}
+  .step-body p{font-size:12px;color:#64748b;line-height:1.6;margin-bottom:8px}
+  .mock{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;font-size:11px;color:#475569}
+  .mock .label{font-weight:700;color:#0f172a;margin-bottom:4px;font-size:11px}
+  .mock .row{display:flex;align-items:center;gap:6px;margin:3px 0}
+  .mock .pill{background:#0d9488;color:#fff;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700}
+  .mock .pill.blue{background:#2563eb}
+  .mock .pill.amber{background:#d97706}
+  .mock .pill.red{background:#dc2626}
+  .mock .pill.green{background:#059669}
+  .mock .pill.gray{background:#64748b}
+  .mock .pill.outline{background:transparent;border:1px solid #0d9488;color:#0d9488}
+  .mock .tag{border:1px solid #e2e8f0;border-radius:4px;padding:2px 7px;font-size:10px;color:#64748b}
+  .mock-tabs{display:flex;gap:2px;border-bottom:1px solid #e2e8f0;margin-bottom:8px}
+  .mock-tabs span{padding:4px 10px;font-size:10px;font-weight:600;border-radius:4px 4px 0 0}
+  .mock-tabs span.active{background:#0d9488;color:#fff}
+  .mock-tabs span.inactive{color:#94a3b8}
+  .mock-list-item{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #f1f5f9}
+  .mock-list-item:last-child{border-bottom:none}
+  /* Benefits */
+  .benefits{margin:0 36px 32px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:18px 20px}
+  .benefits h2{font-size:13px;font-weight:800;color:#065f46;margin-bottom:12px}
+  .benefits li{font-size:12px;color:#374151;line-height:1.8;margin-left:16px}
+  /* Footer */
+  .footer{background:#0f172a;padding:18px 36px;display:flex;align-items:center;justify-content:space-between}
+  .footer span{color:#94a3b8;font-size:11px}
+  .footer strong{color:#10b981}
+</style>
+</head>
+<body>
+<div class="card">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-icon">⚖️</div>
+    <div class="header-text">
+      <h1>CA COMPLIANCE WORKFLOW</h1>
+      <p>Never miss a filing deadline again — automated tracking for all 69+ statutory tasks</p>
+    </div>
+  </div>
+
+  <!-- Steps -->
+  <div class="steps">
+
+    <div class="step">
+      <div class="step-num teal">01</div>
+      <div class="step-body">
+        <h3>Add Your Client</h3>
+        <p>Go to <strong>Clients</strong> → click <strong>+ New Client</strong>. Enter the client's name, entity type (Individual / Company / LLP / Partnership), and assign a CA team member.</p>
+        <div class="mock">
+          <div class="label">New Client</div>
+          <div class="row">📋 <span>Name: Sharma Enterprises Pvt. Ltd.</span></div>
+          <div class="row">🏢 <span>Entity: Private Limited</span></div>
+          <div class="row">👤 <span>Assigned CA: Priya Mehta</span></div>
+          <div class="row" style="margin-top:6px"><span class="pill">Save Client →</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num navy">02</div>
+      <div class="step-body">
+        <h3>Open Compliance Module</h3>
+        <p>Click <strong>Compliance</strong> in the left sidebar. Select the client from the dropdown at the top to see their compliance calendar.</p>
+        <div class="mock">
+          <div class="mock-tabs">
+            <span class="active">Compliance</span>
+            <span class="inactive">Tasks</span>
+            <span class="inactive">Clients</span>
+          </div>
+          <div class="row">🔽 <span style="color:#0f172a;font-weight:700">Sharma Enterprises Pvt. Ltd.</span></div>
+          <div class="row" style="margin-top:4px"><span class="tag">ITR</span> <span class="tag">GST</span> <span class="tag">TDS</span> <span class="tag">ROC</span> <span class="tag">+12 more</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num green">03</div>
+      <div class="step-body">
+        <h3>Assign Compliance Tasks</h3>
+        <p>Click <strong>Assign Tasks</strong> to auto-generate all statutory tasks from the master catalogue. Deadlines are pre-filled based on the financial year. Assign each to a team member.</p>
+        <div class="mock">
+          <div class="label">Auto-generated tasks</div>
+          <div class="mock-list-item"><span>ITR Filing (July 31)</span><span class="pill green">Assigned</span></div>
+          <div class="mock-list-item"><span>GSTR-3B (Aug 20)</span><span class="pill amber">Pending</span></div>
+          <div class="mock-list-item"><span>TDS Return Q1 (Jul 31)</span><span class="pill amber">Pending</span></div>
+          <div class="mock-list-item"><span>Form 16 (Jun 15)</span><span class="pill green">Done ✓</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num amber">04</div>
+      <div class="step-body">
+        <h3>Track Progress in Real Time</h3>
+        <p>Your team members see their tasks in <strong>My Tasks</strong>. They update status as they work — Pending → In Progress → Submitted for Approval → Done.</p>
+        <div class="mock">
+          <div class="row">🟡 <span>GSTR-3B &nbsp;<span class="pill amber">In Progress</span></span></div>
+          <div class="row">🔵 <span>TDS Return &nbsp;<span class="pill blue">Review Pending</span></span></div>
+          <div class="row">🟢 <span>ITR Filing &nbsp;<span class="pill green">Approved ✓</span></span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num blue">05</div>
+      <div class="step-body">
+        <h3>Get Notified — No Chasing Needed</h3>
+        <p>upFloat sends automatic reminders to your team when deadlines approach. You get an email the moment someone submits a task for your approval.</p>
+        <div class="mock">
+          <div class="row">📧 <span><strong>Due soon:</strong> GSTR-3B — 2 days left</span></div>
+          <div class="row">🔔 <span><strong>Approval needed:</strong> TDS Return Q1</span></div>
+          <div class="row" style="margin-top:6px"><span class="pill blue">✅ Approve</span> &nbsp; <span class="pill red">↩ Reject</span> <span style="font-size:10px;color:#94a3b8;margin-left:4px">directly from email</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num purple">06</div>
+      <div class="step-body">
+        <h3>Mark NIL Returns Instantly</h3>
+        <p>For months with no transactions, mark the task as NIL Return in one click — it's logged and timestamped for audit purposes.</p>
+        <div class="mock">
+          <div class="row">📋 <span>GSTR-3B — June 2026</span></div>
+          <div class="row" style="margin-top:4px"><span class="pill outline">Mark as NIL Return</span></div>
+          <div class="row" style="margin-top:4px;color:#94a3b8;font-size:10px">✓ Logged at 10:32 AM by Priya Mehta</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Benefits -->
+  <div class="benefits">
+    <h2>✨ Why CAs love upFloat Compliance</h2>
+    <ul>
+      <li>69+ statutory tasks pre-loaded — ITR, GST, TDS, ROC, PF, ESI and more</li>
+      <li>Deadlines auto-calculated. No manual calendar maintenance.</li>
+      <li>One-click approve/reject directly from your email inbox</li>
+      <li>NIL return logging with full audit trail</li>
+      <li>Escalation alerts when tasks go overdue</li>
+      <li>Works across all entity types — Individual, Company, LLP, Partnership, HUF</li>
+    </ul>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <span>Powered by <strong>upFloat</strong></span>
+    <span style="color:#64748b;font-size:10px">upfloat.co &nbsp;·&nbsp; support@upfloat.co</span>
+  </div>
+
+</div>
+</body>
+</html>
