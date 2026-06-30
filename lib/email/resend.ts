@@ -45,6 +45,13 @@ async function brevoSend(payload: SendPayload): Promise<{ data: null; error: str
     sender:  parseAddress(payload.from),
     to:      toList(payload.to),
     subject: payload.subject,
+    // Mark as transactional so Brevo routes through the transactional pipeline
+    // and suppresses the List-Unsubscribe / Precedence:bulk headers that
+    // cause iPhone Mail to show the "mailing list" badge and hurt deliverability.
+    headers: {
+      'X-Mailer':   'upFloat',
+      'Precedence': 'normal',
+    },
   }
   if (payload.html)  body.htmlContent = payload.html
   if (payload.text)  body.textContent = payload.text
