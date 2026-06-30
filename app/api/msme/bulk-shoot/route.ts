@@ -62,15 +62,16 @@ export async function POST(req: NextRequest) {
   // Fetch all requested vendors in one query (scoped to this org)
   const { data: vendors } = await admin
     .from('msme_vendors')
-    .select('id, vendor_name, vendor_email, status, email_count')
+    .select('id, vendor_name, vendor_email, status, email_count, email_bounced')
     .eq('org_id', mb.org_id)
     .eq('is_deleted', false)
+    .eq('email_bounced', false)  // never email opted-out or bounced vendors
     .in('id', vendor_ids)
 
   if (!vendors?.length) return NextResponse.json({ sent: 0, failed: 0, errors: [] })
 
   // Split into new (never emailed) vs re-shoots
-  const newVendors    = vendors.filter(v => v.email_count === 0)
+  const newVendors     = vendors.filter(v => v.email_count === 0)
   const reshootVendors = vendors.filter(v => v.email_count > 0 && v.email_count < maxEmails && v.status !== 'submitted' && v.status !== 'not_msme')
 
   // Only allow up to slotsRemaining new vendors
@@ -99,19 +100,21 @@ export async function POST(req: NextRequest) {
         expires_at: expiresAt,
       })
 
-      const formUrl = `${APP_URL}/msme/form/${rawToken}`
+      const formUrl        = `${APP_URL}/msme/form/${rawToken}`
+      const unsubscribeUrl = `${APP_URL}/api/msme/unsubscribe/${rawToken}`
 
       const { error: sendErr } = await sendMsmeVendorEmail({
-        to:           vendor.vendor_email,
-        vendorName:   vendor.vendor_name,
+        to:             vendor.vendor_email,
+        vendorName:     vendor.vendor_name,
         orgName,
         formUrl,
-        attemptNo:    attempt,
-        totalEmails:  maxEmails,
+        unsubscribeUrl,
+        attemptNo:      attempt,
+        totalEmails:    maxEmails,
         cc,
-        contactName:  contactPerson?.name,
-        contactEmail: contactPerson?.email,
-        contactPhone: contactPerson?.phone,
+        contactName:    contactPerson?.name,
+        contactEmail:   contactPerson?.email,
+        contactPhone:   contactPerson?.phone,
       }) ?? {}
 
       if (sendErr) {

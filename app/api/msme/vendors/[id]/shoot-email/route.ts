@@ -38,12 +38,15 @@ export async function POST(
 
   const { data: vendor } = await admin
     .from('msme_vendors')
-    .select('id, vendor_name, vendor_email, status, email_count, created_at')
+    .select('id, vendor_name, vendor_email, status, email_count, email_bounced, created_at')
     .eq('id', id)
     .eq('org_id', mb.org_id)
     .maybeSingle()
 
   if (!vendor) return NextResponse.json({ error: 'Vendor not found' }, { status: 404 })
+  if (vendor.email_bounced) {
+    return NextResponse.json({ error: 'This vendor has unsubscribed or their email bounced — cannot send further emails.' }, { status: 422 })
+  }
 
   // ── Lock check: enforce email-slot limit server-side ──────────────────────
   // A slot is consumed when the first email is sent to a vendor (email_count 0→1).
@@ -95,7 +98,8 @@ export async function POST(
     expires_at: expiresAt,
   })
 
-  const formUrl = `${APP_URL}/msme/form/${rawToken}`
+  const formUrl        = `${APP_URL}/msme/form/${rawToken}`
+  const unsubscribeUrl = `${APP_URL}/api/msme/unsubscribe/${rawToken}`
 
   if (copyOnly) {
     // Return link only — no email sent, no email_count increment
@@ -135,16 +139,17 @@ export async function POST(
   let sendError: string | null = null
   try {
     const { error: resendErr } = await sendMsmeVendorEmail({
-      to:           vendor.vendor_email,
-      vendorName:   vendor.vendor_name,
+      to:             vendor.vendor_email,
+      vendorName:     vendor.vendor_name,
       orgName,
       formUrl,
-      attemptNo:    attempt,
-      totalEmails:  maxEmails,
-      cc:           ownerEmail,
-      contactName:  contactPerson?.name,
-      contactEmail: contactPerson?.email,
-      contactPhone: contactPerson?.phone,
+      unsubscribeUrl,
+      attemptNo:      attempt,
+      totalEmails:    maxEmails,
+      cc:             ownerEmail,
+      contactName:    contactPerson?.name,
+      contactEmail:   contactPerson?.email,
+      contactPhone:   contactPerson?.phone,
     }) ?? {}
     if (resendErr) sendError = typeof resendErr === 'string' ? resendErr : (resendErr as any)?.message ?? 'Email delivery failed'
   } catch (err) {
