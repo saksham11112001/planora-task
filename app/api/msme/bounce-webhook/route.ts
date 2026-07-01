@@ -43,14 +43,14 @@ export async function POST(req: NextRequest) {
       : 'Delivery failed'
 
     // Update all vendors with this email across all orgs — one email may appear in multiple orgs
-    const { count } = await admin
+    const { data: updated } = await admin
       .from('msme_vendors')
       .update({ email_bounced: true, bounce_reason: reason })
       .eq('vendor_email', email)
       .eq('email_bounced', false) // idempotent
-      .select('id', { count: 'exact', head: true })
+      .select('id')
 
-    marked += count ?? 0
+    marked += updated?.length ?? 0
   }
 
   return NextResponse.json({ ok: true, marked })

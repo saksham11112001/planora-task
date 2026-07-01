@@ -294,7 +294,7 @@ export function ProjectsView({ projects: initialProjects, counts, clients, canMa
         <div>
           <h1 style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.2 }}>Projects</h1>
           <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-            {filtered.length} of {projects.length} project{projects.length !== 1 ? 's' : ''}
+            {filtered.length} of {localProjects.length} project{localProjects.length !== 1 ? 's' : ''}
             {clientFilter ? ' · filtered by client' : ''}
           </p>
         </div>
@@ -333,7 +333,7 @@ export function ProjectsView({ projects: initialProjects, counts, clients, canMa
         {/* Status tabs */}
         <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
           {STATUS_TABS.map(t => {
-            const count = t.key === 'all' ? projects.length : projects.filter(p => p.status === t.key).length
+            const count = t.key === 'all' ? localProjects.length : localProjects.filter(p => p.status === t.key).length
             return (
               <button key={t.key} onClick={() => setStatusFilter(t.key)}
                 style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px',

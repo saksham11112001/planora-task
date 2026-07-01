@@ -177,6 +177,11 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (insertErr) {
+    // 23505 = the partial unique index rejected a concurrent duplicate open request.
+    // This is the authoritative guard against the check-then-insert race above.
+    if ((insertErr as any).code === '23505') {
+      return NextResponse.json({ error: 'You already have a withdrawal request in progress. Please wait for it to be processed.' }, { status: 409 })
+    }
     console.error('[partner-portal/withdraw] insert failed:', insertErr.message)
     return NextResponse.json({ error: 'Failed to submit withdrawal request' }, { status: 500 })
   }
