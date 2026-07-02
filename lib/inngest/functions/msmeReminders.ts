@@ -1,7 +1,7 @@
 import { inngest }              from '@/lib/inngest/client'
 import { createAdminClient }    from '@/lib/supabase/admin'
 import { sendMsmeVendorEmail }  from '@/lib/email/send'
-import { DEFAULT_EMAIL_SCHEDULE } from '@/app/api/msme/settings/route'
+import { DEFAULT_EMAIL_SCHEDULE } from '@/lib/msme/emailSchedule'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://upfloat.co'
 

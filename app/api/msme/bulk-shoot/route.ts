@@ -6,7 +6,7 @@ import { createClient }             from '@/lib/supabase/server'
 import { createAdminClient }        from '@/lib/supabase/admin'
 import { getApiOrgMembership }      from '@/lib/supabase/apiActiveOrg'
 import { sendMsmeVendorEmail }      from '@/lib/email/send'
-import { DEFAULT_EMAIL_SCHEDULE }   from '@/app/api/msme/settings/route'
+import { DEFAULT_EMAIL_SCHEDULE }   from '@/lib/msme/emailSchedule'
 import crypto                       from 'crypto'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://upfloat.co'
