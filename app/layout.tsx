@@ -9,6 +9,7 @@ import { NavigationProgress }   from '@/components/ui/NavigationProgress'
 import { KeyboardShortcuts }     from '@/components/ui/KeyboardShortcuts'
 import { PostHogPageTracker }    from '@/components/analytics/PostHogProvider'
 import { CookieConsentBanner }   from '@/components/analytics/CookieConsentBanner'
+import { SentryInit }            from '@/components/analytics/SentryInit'
 
 export const metadata: Metadata = {
   title:       { default: 'upFloat — Task & Practice Management for CA Firms', template: '%s | upFloat' },
@@ -92,6 +93,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         `}}/>
       </head>
       <body style={{ fontSize: '15px' }}>
+        <SentryInit />
         <NavigationProgress />
         <KeyboardShortcuts />
         <Suspense fallback={null}><PostHogPageTracker /></Suspense>

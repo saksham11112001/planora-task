@@ -2,9 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient }             from '@/lib/supabase/server'
 import { createAdminClient }        from '@/lib/supabase/admin'
 import { getApiOrgMembership }      from '@/lib/supabase/apiActiveOrg'
-
-// Default: 5 emails total, at day 0 (immediate), 7, 14, 21, 30
-export const DEFAULT_EMAIL_SCHEDULE = [7, 14, 21, 30]  // gaps between emails 1→2, 2→3, 3→4, 4→5
+import { DEFAULT_EMAIL_SCHEDULE }   from '@/lib/msme/emailSchedule'
 
 export async function GET(req: NextRequest) {
   const supabase = await createClient()

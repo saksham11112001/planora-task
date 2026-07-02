@@ -40,6 +40,25 @@ const config: NextConfig = {
         source: '/favicon.svg',
         headers: [{ key: 'Cache-Control', value: 'public, max-age=86400' }],
       },
+      // Baseline security headers on every response.
+      // NOTE: intentionally NO Content-Security-Policy — a strict CSP would break
+      // the inline theme script, PostHog, Razorpay checkout, and Supabase. Add one
+      // later in report-only mode and validate before enforcing.
+      {
+        source: '/(.*)',
+        headers: [
+          // Force HTTPS for 2 years across all subdomains (msme.upfloat.co etc.)
+          { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains' },
+          // Stop browsers guessing content types (MIME-sniffing attacks)
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          // Prevent the app being framed by other sites (clickjacking)
+          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+          // Don't leak full URLs to third-party sites
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          // Deny powerful browser features the app doesn't use
+          { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()' },
+        ],
+      },
     ]
   },
 }
