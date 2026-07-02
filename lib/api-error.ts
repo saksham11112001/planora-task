@@ -7,6 +7,8 @@
  *   if (error) return NextResponse.json({ error: friendlyError(error, 'tasks') }, { status: 500 })
  */
 
+import * as Sentry from '@sentry/nextjs'
+
 type AnyError = { message?: string } | string | unknown
 
 /**
@@ -17,6 +19,14 @@ type AnyError = { message?: string } | string | unknown
 export function friendlyError(err: AnyError, context = 'api'): string {
   const raw = typeof err === 'string' ? err : (err as any)?.message ?? ''
   console.error(`[${context}] ${raw}`)
+
+  // Report to Sentry for launch-time visibility (no-op until DSN is configured).
+  // Wrapped so error monitoring can never itself break error handling.
+  try {
+    Sentry.captureException(err instanceof Error ? err : new Error(raw || 'unknown error'), {
+      tags: { context },
+    })
+  } catch { /* ignore */ }
 
   const msg = raw.toLowerCase()
 

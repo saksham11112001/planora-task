@@ -45,7 +45,7 @@ export async function middleware(request: NextRequest) {
     else if (pathname.startsWith('/api/org/join'))           bucket = 'join'
 
     const cfg    = RATE_LIMITS[bucket]
-    const result = checkRateLimit(ip, bucket, cfg.max, cfg.windowMs)
+    const result = await checkRateLimit(ip, bucket, cfg.max, cfg.windowMs)
 
     if (!result.allowed) return buildRateLimitResponse(result)
 
