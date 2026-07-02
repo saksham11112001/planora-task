@@ -114,8 +114,11 @@ export function msmeVendorEmailHtml(p: Props): string {
           <p style="color:#374151;font-size:12px;line-height:1.7;margin:0 0 8px">
             The above information is collected solely to verify your MSME status as required under the MSMED Act, 2006. It will be retained for the duration of our vendor relationship plus the period mandated under applicable record-retention laws, and securely erased thereafter. It is processed on our behalf by upFloat (data processor) and will not be shared with any third party.
           </p>
-          <p style="color:#374151;font-size:12px;line-height:1.7;margin:0">
+          <p style="color:#374151;font-size:12px;line-height:1.7;margin:0 0 8px">
             By submitting this form, you consent to this collection and processing. You may withdraw consent or request correction/erasure at any time by writing to our Grievance Officer (details below), without affecting the lawfulness of prior processing.
+          </p>
+          <p style="color:#374151;font-size:12px;line-height:1.7;margin:0">
+            Full privacy notice: <a href="https://upfloat.co/msme/privacy" style="color:#0d9488;text-decoration:underline">upfloat.co/msme/privacy</a>
           </p>
         </td></tr>
       </table>

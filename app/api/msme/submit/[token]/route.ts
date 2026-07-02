@@ -78,6 +78,13 @@ export async function POST(
   }
 
   const body = await req.json()
+
+  // DPDP Act, 2023: processing is consent-based — refuse submissions without
+  // the explicit consent flag set by the form's consent checkbox.
+  if (body.consent !== true) {
+    return NextResponse.json({ error: 'Consent is required to submit this form (Digital Personal Data Protection Act, 2023).' }, { status: 400 })
+  }
+
   const {
     is_not_msme,
     declarant_name,
@@ -157,6 +164,14 @@ export async function POST(
       return NextResponse.json({ error: 'Failed to save your submission. Please try again.' }, { status: 500 })
     }
   }
+
+  // Record consent timestamp (DPDP audit trail). Separate best-effort update so
+  // a deployment that precedes the add_msme_consent migration can never block
+  // vendor submissions — the column simply isn't written until it exists.
+  const { error: consentErr } = await admin.from('msme_vendors')
+    .update({ consent_at: new Date().toISOString() })
+    .eq('id', tokenRow.vendor_id).eq('org_id', tokenRow.org_id)
+  if (consentErr) console.warn('[msme/submit] consent_at not recorded (run add_msme_consent migration):', consentErr.message)
 
   // Mark token as used (don't delete — keeps audit trail)
   await admin.from('msme_tokens').update({ used_at: new Date().toISOString() }).eq('id', tokenRow.id)
