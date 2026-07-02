@@ -21,6 +21,51 @@ export function msmeVendorEmailSubject(p: Props): string {
   return `Reminder ${p.attemptNo}: MSME certificate details still pending — ${p.orgName}`
 }
 
+// Plain-text alternative part. HTML-only email is a classic spam-filter
+// negative signal — always send multipart/alternative with a text version.
+export function msmeVendorEmailText(p: Props): string {
+  const total      = p.totalEmails ?? 5
+  const isReminder = p.attemptNo > 1
+  const isFinal    = p.attemptNo === total
+
+  const intro = isFinal
+    ? `FINAL REMINDER: We've sent ${total - 1} earlier email${total - 2 > 0 ? 's' : ''} but haven't received your MSME details yet.`
+    : isReminder
+    ? `REMINDER: We're following up on our earlier request for your MSME registration details.`
+    : `${p.orgName} is collecting MSME registration details from all vendors, as required under the MSMED Act, 2006.`
+
+  return [
+    `Dear Sir/Madam,`,
+    `${p.vendorName}`,
+    ``,
+    intro,
+    ``,
+    `Please fill in the short form (takes less than 2 minutes):`,
+    p.formUrl,
+    ``,
+    `If you are MSME-registered, keep handy: your Udyam Registration Number`,
+    `(UDYAM-XX-00-0000000), MSME category (Micro/Small/Medium), nature of`,
+    `business, outstanding receivable amount as on 31st March (if any), and`,
+    `your Udyam Registration Certificate (PDF or JPG).`,
+    ``,
+    `Not an MSME? You can simply declare that on the form - no certificate needed.`,
+    ``,
+    `Note: if we do not receive any reply within 15 days, we shall presume your`,
+    `organisation is not registered under the MSMED Act, 2006.`,
+    ``,
+    `This link is valid for 30 days. Already submitted? Please ignore this email.`,
+    ``,
+    `Privacy notice: https://upfloat.co/msme/privacy`,
+    ``,
+    `Warm regards,`,
+    `On behalf of ${p.orgName}`,
+    ...(p.contactName && p.contactEmail ? [``, `Questions? Contact ${p.contactName}${p.contactPhone ? ` (${p.contactPhone})` : ''} - ${p.contactEmail}`] : []),
+    ``,
+    `Powered by upFloat`,
+    ...(p.unsubscribeUrl ? [``, `Don't want future emails about this? Unsubscribe: ${p.unsubscribeUrl}`] : []),
+  ].join('\n')
+}
+
 export function msmeVendorEmailHtml(p: Props): string {
   const hasContact = p.contactName && p.contactEmail
   const total      = p.totalEmails ?? 5
