@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient }              from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/supabase/authUser'
 import { createAdminClient }         from '@/lib/supabase/admin'
 import crypto                        from 'crypto'
 import { getApiOrgMembership }       from '@/lib/supabase/apiActiveOrg'
@@ -11,7 +12,7 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://upfloat.co'
 // Returns: { token_url, expires_at }
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthUser(supabase)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')
@@ -70,7 +71,7 @@ export async function POST(req: NextRequest) {
 // Body: { client_id: string }
 export async function DELETE(req: NextRequest) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthUser(supabase)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')
@@ -101,7 +102,7 @@ export async function DELETE(req: NextRequest) {
 // Returns token metadata (no raw token) for the CA team UI
 export async function GET(req: NextRequest) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthUser(supabase)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')

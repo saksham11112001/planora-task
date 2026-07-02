@@ -1,4 +1,5 @@
 import { createClient }      from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/supabase/authUser'
 import { createAdminClient }  from '@/lib/supabase/admin'
 import { NextResponse }       from 'next/server'
 import type { NextRequest }   from 'next/server'
@@ -8,7 +9,7 @@ import { todayStr }            from '@/lib/utils/format'
 /** Returns a map of clientId → number of at-risk tasks (due ≤7 days, status = todo) */
 export async function GET(req: NextRequest) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthUser(supabase)
   if (!user) return NextResponse.json({ data: {} })
 
   const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')

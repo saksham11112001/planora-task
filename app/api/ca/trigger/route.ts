@@ -1,5 +1,6 @@
 import { NextResponse }        from 'next/server'
 import { createClient }        from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/supabase/authUser'
 import { createAdminClient }   from '@/lib/supabase/admin'
 import { dbError } from '@/lib/api-error'
 import type { NextRequest }    from 'next/server'
@@ -13,7 +14,7 @@ import { shiftDays }           from '@/lib/utils/recurringSchedule'
  */
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthUser(supabase)
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
   const mb = await getApiOrgMembership(supabase, user.id, request, 'org_id, role')
