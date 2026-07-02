@@ -17,25 +17,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       getUserOrgs(user.id),
     ])
 
-    // Repair: reactivate memberships incorrectly deactivated by a past provision/join-invite bug
-    // that set is_active=false on all other orgs when a user accepted an invite.
-    // Only runs when user has fewer than 2 active orgs (self-healing: skipped once fixed).
-    if (allOrgs.length < 2) {
-      const { createAdminClient: _adminForRepair } = await import('@/lib/supabase/admin')
-      const adminRepair = _adminForRepair()
-      const { data: inactiveRows } = await adminRepair
-        .from('org_members')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('is_active', false)
-
-      if (inactiveRows && inactiveRows.length > 0) {
-        await adminRepair.from('org_members')
-          .update({ is_active: true })
-          .in('id', inactiveRows.map((m: any) => m.id))
-        redirect('/dashboard')
-      }
-    }
+    // NOTE: a previous "repair" block here blanket-reactivated ALL of a user's
+    // inactive memberships (patching an old provision/join-invite bug that has
+    // since been fixed at source). It has been removed because is_active=false
+    // is ALSO how "Remove member" works — the repair silently resurrected
+    // deliberately-removed members into orgs they were kicked from (cross-org
+    // data exposure). Never blanket-reactivate memberships.
 
     // No active membership — try to recover before giving up
     if (!membership) {
