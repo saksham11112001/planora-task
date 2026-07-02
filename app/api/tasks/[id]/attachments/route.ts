@@ -1,4 +1,5 @@
 import { createClient }      from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/supabase/authUser'
 import { createAdminClient }  from '@/lib/supabase/admin'
 import { NextResponse }       from 'next/server'
 import type { NextRequest }   from 'next/server'
@@ -12,7 +13,7 @@ export const maxDuration = 60
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthUser(supabase)
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role, can_view_all_tasks')
   if (!mb) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -38,7 +39,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthUser(supabase)
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role, can_view_all_tasks')
   if (!mb) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -161,7 +162,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const attId = req.nextUrl.searchParams.get('attachment_id')
   if (!attId) return NextResponse.json({ error: 'attachment_id required' }, { status: 400 })
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthUser(supabase)
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })

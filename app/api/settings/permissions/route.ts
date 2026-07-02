@@ -1,4 +1,5 @@
 import { createClient }      from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/supabase/authUser'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse }       from 'next/server'
 import type { NextRequest }   from 'next/server'
@@ -11,7 +12,7 @@ function isPaid(planTier: string, status: string, trialEndsAt: string | null): b
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthUser(supabase)
   if (!user) return NextResponse.json({ data: null })
   const mb = await getApiOrgMembership(supabase, user.id, request, 'org_id')
   if (!mb) return NextResponse.json({ data: null })
@@ -33,7 +34,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthUser(supabase)
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
   const mb = await getApiOrgMembership(supabase, user.id, request, 'org_id, role, organisations(plan_tier, status, trial_ends_at)')

@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient }             from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/supabase/authUser'
 import { createAdminClient }        from '@/lib/supabase/admin'
 import { getApiOrgMembership }      from '@/lib/supabase/apiActiveOrg'
 import { MSME_PACKS, getPackByTier, MSME_ADDON_PACKS } from '@/lib/msme/packs'
@@ -15,7 +16,7 @@ const RZP_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET
 // ── POST /api/msme/pay  { pack_tier }  → creates Razorpay order ───────────────
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthUser(supabase)
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
   const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role, organisations(name)')
@@ -199,7 +200,7 @@ export async function POST(req: NextRequest) {
 //     Verify Razorpay signature → activate pack ───────────────────────────────
 export async function PUT(req: NextRequest) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthUser(supabase)
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
   const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')

@@ -1,4 +1,5 @@
 import { createClient }      from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/supabase/authUser'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse }       from 'next/server'
 import type { NextRequest }   from 'next/server'
@@ -258,7 +259,7 @@ function findSheetName(sheets: SheetMap, predicates: Array<(name: string) => boo
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const user = await getAuthUser(supabase)
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })

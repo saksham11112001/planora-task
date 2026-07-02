@@ -2,6 +2,7 @@
 // Handles both 'msme' and 'partner' invite types.
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient }             from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/supabase/authUser'
 import { createAdminClient }        from '@/lib/supabase/admin'
 import { resend, FROM }             from '@/lib/email/resend'
 
@@ -69,7 +70,7 @@ function partnerInviteHtml(partnerName: string, joinUrl: string): string {
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthUser(supabase)
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
   const body = await req.json()

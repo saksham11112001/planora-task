@@ -3,6 +3,7 @@
 // POST → submits a new withdrawal request (min ₹500, no duplicate pending)
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient }             from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/supabase/authUser'
 import { createAdminClient }        from '@/lib/supabase/admin'
 
 const MSME_COMMISSION_PAISE    = 20000   // ₹200 per MSME paid pack
@@ -97,7 +98,7 @@ async function computeBalance(admin: ReturnType<typeof createAdminClient>, partn
 
 export async function GET(req: NextRequest) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthUser(supabase)
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
   const admin   = createAdminClient()
@@ -122,7 +123,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthUser(supabase)
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
   const admin   = createAdminClient()

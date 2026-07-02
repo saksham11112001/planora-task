@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/supabase/authUser'
 
 /* ── State code → State name ────────────────────────────────────── */
 const STATE_CODES: Record<string, string> = {
@@ -66,7 +67,7 @@ function normaliseSurepass(raw: any, gstin: string) {
 export async function GET(req: NextRequest) {
   // Auth gate — must be a logged-in org member
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthUser(supabase)
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
   const gstin = (req.nextUrl.searchParams.get('gstin') ?? '').trim().toUpperCase()

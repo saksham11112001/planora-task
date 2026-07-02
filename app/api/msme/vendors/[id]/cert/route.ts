@@ -2,6 +2,7 @@
 // Handles both R2-stored files (r2:key) and public Supabase Storage URLs.
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient }             from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/supabase/authUser'
 import { createAdminClient }        from '@/lib/supabase/admin'
 import { getApiOrgMembership }      from '@/lib/supabase/apiActiveOrg'
 import { r2SignedUrl, R2_CONFIGURED } from '@/lib/storage/r2'
@@ -12,7 +13,7 @@ export async function GET(
 ) {
   const { id } = await params
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthUser(supabase)
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
   const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')

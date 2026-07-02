@@ -2,6 +2,7 @@
 // skipping Vercel entirely (no bandwidth used for the upload itself).
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient }             from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/supabase/authUser'
 import { getApiOrgMembership }      from '@/lib/supabase/apiActiveOrg'
 import { R2_CONFIGURED, R2_BUCKET, r2PresignedPutUrl } from '@/lib/storage/r2'
 
@@ -26,7 +27,7 @@ export async function POST(req: NextRequest) {
   }
 
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthUser(supabase)
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id')
   if (!mb) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })

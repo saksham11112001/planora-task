@@ -1,4 +1,5 @@
 import { createClient }   from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/supabase/authUser'
 import { NextResponse }    from 'next/server'
 import type { NextRequest } from 'next/server'
 import { dbError }         from '@/lib/api-error'
@@ -8,7 +9,7 @@ const SETUP_FEE_PAISE = 49900 // ₹499 in paise
 
 export async function POST(_req: NextRequest) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthUser(supabase)
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
   const mb = await getApiOrgMembership(supabase, user.id, _req, 'org_id, role, organisations(name, razorpay_customer_id, setup_fee_paid)')
