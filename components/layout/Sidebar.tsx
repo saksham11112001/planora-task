@@ -308,7 +308,6 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
         {nav.one_time_tasks && (
           <div className="group/nav" style={{ position:'relative', display:'flex', alignItems:'center', margin:'1px 4px' }}>
             <Link href="/inbox" prefetch={true}
-              onClick={() => { if (!isActive('/inbox')) router.refresh() }}
               style={{
                 flex:1, display:'flex', alignItems:'center', gap:9,
                 padding:'7px 10px', borderRadius:7, fontSize:13,
@@ -337,7 +336,6 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
         {nav.recurring_tasks && (
           <div className="group/nav" style={{ position:'relative', display:'flex', alignItems:'center', margin:'1px 4px' }}>
             <Link href="/recurring" prefetch={true}
-              onClick={() => { if (!isActive('/recurring')) router.refresh() }}
               style={{
                 flex:1, display:'flex', alignItems:'center', gap:9,
                 padding:'7px 10px', borderRadius:7, fontSize:13,
@@ -746,10 +744,8 @@ function Div() {
 function SI({ href, active, icon, label, badge }: {
   href: string; active: boolean; icon: React.ReactNode; label: string; badge?: number
 }) {
-  const router = useRouter()
   return (
     <Link href={href} prefetch={true}
-      onClick={() => { if (!active) router.refresh() }}
       style={{
         display: 'flex', alignItems: 'center', gap: 9,
         padding: '7px 10px', borderRadius: 7, fontSize: 13,

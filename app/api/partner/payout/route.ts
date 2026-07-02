@@ -63,7 +63,14 @@ export async function POST(req: NextRequest) {
     .select('id')
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    // 23505 = partial unique index rejected a concurrent duplicate open payout.
+    // Authoritative guard against the check-then-insert race above.
+    if ((error as any).code === '23505') {
+      return NextResponse.json({ error: 'A payout request is already in progress' }, { status: 409 })
+    }
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
 
   // Link commissions to this payout
   await admin

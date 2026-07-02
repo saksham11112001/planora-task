@@ -12,8 +12,9 @@ import { nextOccurrence }      from '@/lib/utils/recurringSchedule'
 // "Complete this occurrence" on a past calendar slot showing a template.
 export async function POST(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -35,7 +36,7 @@ export async function POST(
   // Fetch the template
   const { data: template } = await admin.from('tasks')
     .select('id, org_id, title, priority, assignee_id, project_id, client_id, approval_required, is_recurring, parent_task_id, frequency, custom_fields, next_occurrence_date')
-    .eq('id', params.id)
+    .eq('id', id)
     .eq('org_id', mb.org_id)
     .maybeSingle()
 

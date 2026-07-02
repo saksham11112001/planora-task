@@ -1597,6 +1597,17 @@ function MsmeLandingInner() {
   useMsmeScrollReveal()
   const searchParams = useSearchParams()
   const ref = searchParams.get('ref')
+
+  // Persist the partner referral code as soon as the visitor lands, so attribution
+  // survives regardless of which signup/login button they click. Onboarding reads
+  // and clears this key. Only write when a ref is present so an organic revisit
+  // never clobbers a code stored from an earlier referred visit in the same tab.
+  useEffect(() => {
+    if (ref) {
+      try { sessionStorage.setItem('upfloat_ref_code', ref) } catch { /* private mode */ }
+    }
+  }, [ref])
+
   const loginUrl = ref
     ? `/login?redirect=/msme&mode=signup&ref=${encodeURIComponent(ref)}`
     : '/login?redirect=/msme&mode=signup'

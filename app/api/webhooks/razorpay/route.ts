@@ -8,11 +8,24 @@ export async function POST(request: NextRequest) {
   const body   = await request.text()
   const sig    = request.headers.get('x-razorpay-signature') ?? ''
 
-  // Verify signature
-  const expected = crypto.createHmac('sha256', secret).update(body).digest('hex')
-  if (expected !== sig) return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
+  if (!secret) {
+    console.error('[razorpay] RAZORPAY_WEBHOOK_SECRET not set')
+    return NextResponse.json({ error: 'Webhook not configured' }, { status: 503 })
+  }
 
-  const event   = JSON.parse(body)
+  // Verify signature (timing-safe — never use plain string compare on a MAC)
+  const expected = crypto.createHmac('sha256', secret).update(body).digest('hex')
+  const sigBuf   = Buffer.from(sig, 'hex')
+  const expBuf   = Buffer.from(expected, 'hex')
+  const sigValid = sigBuf.length === expBuf.length && crypto.timingSafeEqual(sigBuf, expBuf)
+  if (!sigValid) return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
+
+  let event: any
+  try {
+    event = JSON.parse(body)
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
   const payload = event.payload
   const admin   = createAdminClient()
 

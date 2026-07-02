@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
 
       if (emailErr) {
         failed++
-        results.push({ email, ok: false, error: emailErr.message })
+        results.push({ email, ok: false, error: emailErr })
         continue
       }
 
