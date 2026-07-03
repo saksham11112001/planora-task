@@ -49,11 +49,22 @@ export async function GET(request: NextRequest) {
 
   const isRecovery = url.searchParams.get('recovery') === '1'
 
-  const { data: { user }, error } = await supabase.auth.exchangeCodeForSession(code)
+  let { data: { user }, error } = await supabase.auth.exchangeCodeForSession(code)
 
   if (error || !user) {
-    console.error('[auth/callback] exchangeCodeForSession failed:', error?.message)
-    return NextResponse.redirect(new URL('/login?error=auth_failed&hint=try_again', request.url))
+    // Auth codes are single-use. The exchange commonly fails on REPLAY:
+    // email security scanners pre-fetching the magic link, double-clicks, or
+    // the user refreshing the callback URL. In those cases the FIRST exchange
+    // already established a session cookie — so before failing, check whether
+    // the browser is in fact already signed in and continue if so.
+    const { data: { user: existingUser } } = await supabase.auth.getUser()
+    if (existingUser) {
+      console.warn('[auth/callback] code exchange failed but session exists — continuing (replayed link):', error?.message)
+      user = existingUser
+    } else {
+      console.error('[auth/callback] exchangeCodeForSession failed:', error?.message)
+      return NextResponse.redirect(new URL('/login?error=auth_failed&hint=try_again', request.url))
+    }
   }
 
   // Password-reset flow: user is now authenticated; send them to set their new password.
