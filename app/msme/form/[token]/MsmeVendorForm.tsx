@@ -46,6 +46,7 @@ export function MsmeVendorForm({ token }: { token: string }) {
   const [info,       setInfo]       = useState<VendorInfo | null>(null)
   const [error,      setError]      = useState<string | null>(null)
   const [submitted,  setSubmitted]  = useState(false)
+  const [consentGiven, setConsentGiven] = useState(false)
 
   // Page navigation
   const [page, setPage] = useState<1 | 2 | 3>(1)
@@ -125,6 +126,11 @@ export function MsmeVendorForm({ token }: { token: string }) {
   async function handleSubmit() {
     setFormError(null)
 
+    if (!consentGiven) {
+      setFormError('Please tick the consent checkbox to proceed — it is required under the Digital Personal Data Protection Act, 2023.')
+      return
+    }
+
     if (isMsme === false) {
       // Non-MSME declaration
       if (!declarantName.trim()) { setFormError('Please enter your full name for the declaration.'); return }
@@ -138,8 +144,9 @@ export function MsmeVendorForm({ token }: { token: string }) {
 
     setSaving(true)
     const payload = isMsme === false
-      ? { is_not_msme: true, declarant_name: declarantName }
+      ? { is_not_msme: true, declarant_name: declarantName, consent: true }
       : {
+          consent: true,
           is_not_msme: false,
           udyam_number: udyamClean,
           msme_category: msmeCategory,
@@ -349,6 +356,8 @@ export function MsmeVendorForm({ token }: { token: string }) {
                 </div>
               </div>
             )}
+
+            {isMsme === false && <ConsentCheckbox checked={consentGiven} onChange={setConsentGiven} />}
 
             {formError && <ErrorBox>{formError}</ErrorBox>}
 
@@ -601,6 +610,8 @@ export function MsmeVendorForm({ token }: { token: string }) {
               </div>
             )}
 
+            <ConsentCheckbox checked={consentGiven} onChange={setConsentGiven} />
+
             {formError && <ErrorBox>{formError}</ErrorBox>}
 
             <div style={{ display: 'flex', gap: 10 }}>
@@ -622,11 +633,39 @@ export function MsmeVendorForm({ token }: { token: string }) {
         )}
 
         <p style={{ color: '#64748b', fontSize: 11, textAlign: 'center', marginTop: 20, lineHeight: 1.6 }}>
-          Your information is shared only with {info?.org_name} for MSME compliance purposes.<br/>
+          Your information is shared only with {info?.org_name} for MSME compliance purposes.{' '}
+          <a href="/msme/privacy" target="_blank" rel="noopener noreferrer" style={{ color: '#0d9488', textDecoration: 'underline' }}>Privacy Notice</a><br/>
           Powered by upFloat
         </p>
       </div>
     </div>
+  )
+}
+
+// DPDP Act, 2023: consent must be a clear affirmative action, informed by a
+// notice describing the data, purpose, and the data principal's rights.
+function ConsentCheckbox({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label style={{
+      display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer',
+      background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8,
+      padding: '12px 14px', marginBottom: 16,
+    }}>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={e => onChange(e.target.checked)}
+        style={{ marginTop: 2, width: 16, height: 16, accentColor: '#0d9488', flexShrink: 0 }}
+      />
+      <span style={{ fontSize: 12, color: '#475569', lineHeight: 1.6 }}>
+        I consent to the collection and processing of the information submitted in this form
+        (including my name and business details) for the purpose of MSME status verification
+        under the MSMED Act, 2006 and Section 43B(h) compliance, as described in the{' '}
+        <a href="/msme/privacy" target="_blank" rel="noopener noreferrer" style={{ color: '#0d9488', textDecoration: 'underline' }}>
+          Privacy Notice
+        </a>. I understand I can withdraw consent or request correction/erasure of my data at any time.
+      </span>
+    </label>
   )
 }
 

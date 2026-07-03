@@ -16,7 +16,7 @@ import { clientUploadNotifyHtml, clientUploadNotifySubject } from './templates/c
 import { reEngagementHtml, reEngagementSubject } from './templates/reEngagementEmail'
 import { onboardingNudgeHtml, onboardingNudgeSubject } from './templates/onboardingNudgeEmail'
 import { upgradePushHtml, upgradePushSubject } from './templates/upgradePushEmail'
-import { msmeVendorEmailHtml, msmeVendorEmailSubject } from './templates/msmeVendorEmail'
+import { msmeVendorEmailHtml, msmeVendorEmailText, msmeVendorEmailSubject } from './templates/msmeVendorEmail'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://upfloat.co'
 
@@ -284,6 +284,7 @@ export async function sendMsmeVendorEmail(p: {
     ...(p.cc ? { cc: [p.cc] } : {}),
     subject: msmeVendorEmailSubject(p),
     html:    msmeVendorEmailHtml(p),
+    text:    msmeVendorEmailText(p),
   })
 }
 

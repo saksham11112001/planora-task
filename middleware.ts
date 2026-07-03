@@ -70,6 +70,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/msme-landing') || // public MSME product page
     pathname.startsWith('/msme/form/') ||        // vendor compliance form — no login required
     pathname.startsWith('/msme/unsubscribed') ||  // unsubscribe confirmation page — public
+    pathname.startsWith('/msme/privacy') ||       // DPDP privacy notice — public
     pathname.startsWith('/task-action') ||         // email action result page — public
     pathname.startsWith('/_next/') ||
     pathname.includes('.')
