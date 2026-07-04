@@ -71,16 +71,23 @@ async function runDigest(slot: 'morning' | 'evening') {
       const slotLabel = slot === 'morning' ? '8 AM' : '6 PM'
 
       try {
-        await resend.emails.send({
+        // The Brevo wrapper RETURNS errors rather than throwing — check the
+        // result explicitly. Marking items sent on a failed send silently
+        // destroys the user's digest (it never retries).
+        const { error: sendErr } = await resend.emails.send({
           from:    FROM,
           to:      userEmail,
           subject: `📬 upFloat digest (${slotLabel} IST) — ${items.length} update${items.length === 1 ? '' : 's'}`,
           html,
-        })
-        allSentIds.push(...items.map(i => i.id))
-        totalSent++
+        }) ?? {}
+        if (sendErr) {
+          console.error('[digest] Brevo rejected send to', userEmail, '—', sendErr, '(items left queued for next slot)')
+        } else {
+          allSentIds.push(...items.map(i => i.id))
+          totalSent++
+        }
       } catch (err) {
-        console.error('[digest] Failed to send to', userEmail, err)
+        console.error('[digest] Failed to send to', userEmail, err, '(items left queued for next slot)')
       }
     }
   }
