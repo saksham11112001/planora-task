@@ -14,6 +14,7 @@ import {
   Check,
   Shield,
 } from 'lucide-react'
+import { ScrollProgressBar, StickyCTA, Floating3DShapes, Marquee } from '@/components/landing/Wow'
 
 interface Props {
   sym: string
@@ -1084,6 +1085,9 @@ export function LandingClient(props: Props) {
     <div style={{ background: BG, color: '#e2e8f0', minHeight: '100vh', overflowX: 'hidden', position: 'relative' }}>
       <style>{CSS}</style>
 
+      <ScrollProgressBar accent={TEAL} />
+      <StickyCTA href="/login?mode=signup" label="Start free — no credit card" accent={TEAL} />
+
       {confetti && <Confetti origin={confetti} />}
 
       {/* ============ NAV ============ */}
@@ -1149,6 +1153,7 @@ export function LandingClient(props: Props) {
         }}
       >
         <ParticleCanvas />
+        <Floating3DShapes accent="#14b8a6" />
 
         {/* glow orbs */}
         <div
@@ -1274,7 +1279,16 @@ export function LandingClient(props: Props) {
               </a>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 36 }}>
+            {/* Free-to-start trust signals — reduce signup friction */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 18px', marginTop: 18 }}>
+              {['Free forever plan', 'No credit card required', 'Set up in 2 minutes'].map(t => (
+                <span key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: '#94a3b8' }}>
+                  <Check size={13} style={{ color: '#22c55e' }} /> {t}
+                </span>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 30 }}>
               <Avatars />
               <span style={{ fontSize: 13.5, color: '#64748b' }}>Trusted by 500+ finance professionals</span>
             </div>
@@ -1443,6 +1457,15 @@ export function LandingClient(props: Props) {
           <span className="lp-scanline" style={{ width: 3, height: 7, borderRadius: 3, background: TEAL }} />
         </div>
       </section>
+
+      {/* ============ FEATURE MARQUEE ============ */}
+      <div style={{ padding: '18px 0 6px' }}>
+        <Marquee dark accent="#14b8a6" items={[
+          'Free forever plan', 'No credit card', 'CA Compliance calendar', 'Recurring task autopilot',
+          'One-click email approvals', 'Client portal', 'MSME 43B(h) Tracker', 'Team roles & permissions',
+          'WhatsApp-free document collection', 'Made in India',
+        ]} />
+      </div>
 
       {/* ============ STATS ============ */}
       <section
