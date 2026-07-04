@@ -19,15 +19,20 @@ export async function getOrgNotifModeForUser(
   userId: string
 ): Promise<{ mode: NotifMode; orgId: string | null }> {
   const admin = createAdminClient()
-  const { data: mb } = await admin
+  // NOTE: not maybeSingle() — users can belong to MULTIPLE orgs, and
+  // maybeSingle() errors on >1 row, which silently dropped multi-org users
+  // out of digest mode. Take the oldest membership as the stable default.
+  const { data: rows } = await admin
     .from('org_members')
     .select('org_id')
     .eq('user_id', userId)
     .eq('is_active', true)
-    .maybeSingle()
-  if (!mb?.org_id) return { mode: 'immediate', orgId: null }
-  const mode = await getOrgNotifMode(mb.org_id)
-  return { mode, orgId: mb.org_id }
+    .order('created_at', { ascending: true })
+    .limit(1)
+  const orgId = rows?.[0]?.org_id ?? null
+  if (!orgId) return { mode: 'immediate', orgId: null }
+  const mode = await getOrgNotifMode(orgId)
+  return { mode, orgId }
 }
 
 // ── Queue a notification for digest delivery ──────────────────────────────
