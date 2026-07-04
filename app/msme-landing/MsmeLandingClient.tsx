@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import { ScrollProgressBar, StickyCTA, Marquee, Reveal, AuroraBackground, Floating3DShapes } from '@/components/landing/Wow'
 import {
   Mail,
   Clock,
@@ -502,6 +503,10 @@ function Hero({ loginUrl }: { loginUrl: string }) {
         overflow: 'hidden',
       }}
     >
+      {/* layered 3D backdrop: drifting aurora + tumbling 3D shapes */}
+      <AuroraBackground hue="teal" />
+      <Floating3DShapes accent="#0d9488" />
+
       {/* decorative floating blobs */}
       <div
         style={{
@@ -1613,13 +1618,22 @@ function MsmeLandingInner() {
     : '/login?redirect=/msme&mode=signup'
   return (
     <>
+      <ScrollProgressBar accent="#0d9488" />
+      {/* Sticky CTA uses loginUrl so partner ?ref= attribution is preserved */}
+      <StickyCTA href={loginUrl} label="Start free — no credit card" accent="#0d9488" />
       <Nav />
       <Hero loginUrl={loginUrl} />
-      <HowItWorks />
-      <ComplianceExplainer />
-      <UnlockTeaser />
-      <Testimonials />
-      <CtaSection loginUrl={loginUrl} />
+      <div style={{ padding: '10px 0' }}>
+        <Marquee accent="#0d9488" items={[
+          'Free to start', 'No credit card', 'Section 43B(h) ready', 'Udyam auto-verification',
+          'Vendors need no login', 'Auto follow-up emails', 'Audit-ready exports', 'DPDP-compliant consent',
+        ]} />
+      </div>
+      <Reveal><HowItWorks /></Reveal>
+      <Reveal><ComplianceExplainer /></Reveal>
+      <Reveal><UnlockTeaser /></Reveal>
+      <Reveal><Testimonials /></Reveal>
+      <Reveal><CtaSection loginUrl={loginUrl} /></Reveal>
       <Footer />
       <FloatingBadge />
     </>
