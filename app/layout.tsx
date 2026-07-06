@@ -60,6 +60,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     // suppressHydrationWarning still needed for ThemeProvider useEffect
     <html lang="en" suppressHydrationWarning style={{ backgroundColor: '#ffffff' }} className={inter.variable}>
       <head>
+        {/* Warm up the Supabase connection early — the browser client calls it
+            directly (auth/session refresh). On slow networks the DNS + TLS
+            handshake alone can cost seconds; preconnect does it in parallel
+            with page load instead of blocking the first auth call. */}
+        {process.env.NEXT_PUBLIC_SUPABASE_URL && (
+          <>
+            <link rel="preconnect" href={process.env.NEXT_PUBLIC_SUPABASE_URL} crossOrigin="anonymous" />
+            <link rel="dns-prefetch" href={process.env.NEXT_PUBLIC_SUPABASE_URL} />
+          </>
+        )}
         {/* Apply saved theme before paint to avoid flash */}
         <script dangerouslySetInnerHTML={{ __html: `
           try {

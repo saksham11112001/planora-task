@@ -15,9 +15,20 @@ const config: NextConfig = {
   // Experimental optimizations
   experimental: {
     optimizePackageImports: ['lucide-react', 'recharts', '@supabase/supabase-js'],
-    // Keep at 0 — auth layout reads session cookies on every request.
-    // Caching dynamic pages could serve stale org/session data to the wrong user.
-    staleTimes: { dynamic: 0 },
+    // Client router cache for dynamic pages: 30s. This is what makes repeat
+    // navigation (sidebar clicks, back/forward) instant on slow connections —
+    // the RSC payload is served from the per-tab in-memory cache instead of
+    // re-downloading over the network.
+    //
+    // Safety analysis (why the old "keep at 0" concern doesn't apply):
+    //  - the router cache is per-browser-tab; it can never serve one user's
+    //    data to another user
+    //  - org switching does window.location.href (hard reload) which bypasses
+    //    and clears the router cache — no stale-org risk
+    //  - page content freshness is owned by the client views (they fetch from
+    //    /api/* on mount and use optimistic updates); the cached RSC payload
+    //    mostly carries the shell/session, which changes rarely
+    staleTimes: { dynamic: 30 },
   },
 
   // xlsx uses native Node.js modules — prevent webpack from bundling it
