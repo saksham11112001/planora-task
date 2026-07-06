@@ -278,7 +278,11 @@ export async function sendMsmeVendorEmail(p: {
   contactName?: string; contactEmail?: string; contactPhone?: string
 }) {
   const msmeDomain = (process.env.FROM_EMAIL ?? 'noreply@upfloat.co').replace(/.*<|>/g, '')
-  const msmeFrom   = `MSME Compliance <${msmeDomain}>`
+  // Display name = the requesting business (e.g. "SGNG & Associates"), so the
+  // vendor's inbox shows who is actually asking — not a generic product name.
+  // Strip characters that could break or spoof the From header.
+  const safeOrgName = p.orgName.replace(/[<>"\r\n;,]/g, '').trim().slice(0, 60) || 'MSME Compliance'
+  const msmeFrom    = `${safeOrgName} <${msmeDomain}>`
   return resend.emails.send({
     from: msmeFrom, to: p.to,
     ...(p.cc ? { cc: [p.cc] } : {}),
