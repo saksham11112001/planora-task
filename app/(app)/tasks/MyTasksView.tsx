@@ -584,26 +584,14 @@ export function MyTasksView({
   }
 
   async function cloneTask(task: Task) {
-    const res = await fetch('/api/tasks', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title:             `${task.title} (copy)`,
-        status:            'todo',
-        priority:          task.priority,
-        assignee_id:       task.assignee_id ?? null,
-        client_id:         (task as any).client_id ?? null,
-        project_id:        (task as any).project_id ?? null,
-        approver_id:       (task as any).approver_id ?? null,
-        approval_required: (task as any).approval_required ?? false,
-        due_date:          task.due_date ?? null,
-        custom_fields:     (task as any).custom_fields ?? null,
-      }),
-    })
+    // Server-side clone copies the task AND its subtasks in one call
+    const res = await fetch(`/api/tasks/${task.id}/clone`, { method: 'POST' })
     const d = await res.json()
     if (!res.ok) { toast.error(d.error ?? 'Clone failed'); return }
     const newTask = d.data ?? d
     if (newTask?.id) setTasks(prev => [{ ...newTask, assignee: (task as any).assignee, client: (task as any).client } as Task, ...prev])
-    toast.success('Task cloned')
+    const n = d.subtasks_cloned ?? 0
+    toast.success(n > 0 ? `Task cloned with ${n} subtask${n === 1 ? '' : 's'}` : 'Task cloned')
   }
 
   async function patchTaskField(taskId: string, field: string, value: unknown) {
