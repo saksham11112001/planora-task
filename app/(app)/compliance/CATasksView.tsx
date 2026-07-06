@@ -761,17 +761,23 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
                           const ov = isOverdue(task.due_date, task.status)
                           const sc = STATUS_CONFIG[task.status] ?? STATUS_CONFIG.todo
                           const pc = PRIORITY_COLOR[task.priority] ?? PRIORITY_COLOR.none
+                          // Unassigned compliance work needs immediate attention — full-row
+                          // amber highlight (same pattern as MyTasksView unassigned rows).
+                          const isUnassigned = !task.assignee_id && task.status !== 'completed'
+                          const rowBg = checked.has(task.id) ? 'var(--brand-light)'
+                            : isUnassigned ? 'rgba(245,158,11,0.10)' : 'transparent'
                           return (
                             <div key={task.id} className="group" data-tour="compliance-task-row"
                               style={{
                                 display: 'grid', gridTemplateColumns: '28px 1fr 80px 80px 80px 80px 60px',
                                 alignItems: 'center', padding: '0 18px', minHeight: 38,
                                 borderBottom: '1px solid var(--border-light)', cursor: 'pointer',
-                                background: checked.has(task.id) ? 'var(--brand-light)' : 'transparent',
+                                background: rowBg,
+                                boxShadow: isUnassigned ? 'inset 3px 0 0 #f59e0b' : undefined,
                                 transition: 'background 0.1s',
                               }}
-                              onMouseEnter={e => { if (!checked.has(task.id)) (e.currentTarget as HTMLElement).style.background = 'var(--surface-subtle)' }}
-                              onMouseLeave={e => { if (!checked.has(task.id)) (e.currentTarget as HTMLElement).style.background = 'transparent' }}
+                              onMouseEnter={e => { if (!checked.has(task.id)) (e.currentTarget as HTMLElement).style.background = isUnassigned ? 'rgba(245,158,11,0.18)' : 'var(--surface-subtle)' }}
+                              onMouseLeave={e => { if (!checked.has(task.id)) (e.currentTarget as HTMLElement).style.background = isUnassigned ? 'rgba(245,158,11,0.10)' : 'transparent' }}
                               onClick={() => setSelTask(task)}>
 
                   <input type="checkbox" checked={checked.has(task.id)}
@@ -1036,13 +1042,17 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
                     ) : visible.filter(t => t.status === col.key).map(task => {
                       const ov = isOverdue(task.due_date, task.status)
                       const pc = PRIORITY_COLOR[task.priority] ?? PRIORITY_COLOR.none
+                      // Unassigned compliance card — amber highlight, matches list view
+                      const isUnassigned = !task.assignee_id && task.status !== 'completed'
                       return (
                         <div key={task.id}
                           onClick={() => setSelTask(task)}
                           style={{
-                            background: 'var(--surface)', borderRadius: 8, padding: '9px 10px',
-                            cursor: 'pointer', border: '1px solid var(--border)',
-                            borderLeft: '3px solid rgba(217,119,6,0.5)',
+                            background: isUnassigned ? 'rgba(245,158,11,0.10)' : 'var(--surface)',
+                            borderRadius: 8, padding: '9px 10px',
+                            cursor: 'pointer',
+                            border: isUnassigned ? '1px solid rgba(245,158,11,0.45)' : '1px solid var(--border)',
+                            borderLeft: isUnassigned ? '3px solid #f59e0b' : '3px solid rgba(217,119,6,0.5)',
                             boxShadow: '0 1px 3px rgba(0,0,0,0.05)', transition: 'box-shadow 0.12s',
                           }}
                           onMouseEnter={e => (e.currentTarget as HTMLElement).style.boxShadow = '0 3px 10px rgba(0,0,0,0.1)'}
