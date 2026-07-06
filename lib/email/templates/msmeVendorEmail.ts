@@ -12,13 +12,17 @@ interface Props {
 
 const ACCENT = '#0d9488'
 
+// Subject format follows the widely-recognised corporate MSME-exercise style
+// (e.g. "Reminder 7 - MSME confirmations of Jones Lang ..."): first email has
+// no reminder prefix; follow-ups are numbered sequentially.
 export function msmeVendorEmailSubject(p: Props): string {
   if (p.attemptNo === 1)
-    return `Action required: Share your MSME details with ${p.orgName}`
+    return `MSME confirmations of ${p.orgName}`
   const total = p.totalEmails ?? 5
+  const n = p.attemptNo - 1   // attempt 2 = Reminder 1, etc.
   if (p.attemptNo === total)
-    return `Final reminder: MSME compliance details required — ${p.orgName}`
-  return `Reminder ${p.attemptNo}: MSME certificate details still pending — ${p.orgName}`
+    return `Final Reminder ${n} - MSME confirmations of ${p.orgName}`
+  return `Reminder ${n} - MSME confirmations of ${p.orgName}`
 }
 
 // Plain-text alternative part. HTML-only email is a classic spam-filter
