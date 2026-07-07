@@ -74,6 +74,15 @@ export function MsmeVendorForm({ token }: { token: string }) {
   const [isMobile, setIsMobile] = useState(false)
   useEffect(() => { setIsMobile(/Mobi|Android/i.test(navigator.userAgent)) }, [])
 
+  // Pre-select the MSME / not-MSME path from the email's one-click buttons
+  // (?a=msme or ?a=not_msme). The vendor still confirms + consents on the form —
+  // this just skips the first question. Reduces friction without bypassing DPDP.
+  useEffect(() => {
+    const a = new URLSearchParams(window.location.search).get('a')
+    if (a === 'msme')      setIsMsme(true)
+    else if (a === 'not_msme') setIsMsme(false)
+  }, [])
+
   useEffect(() => {
     fetch(`/api/msme/submit/${token}`)
       .then(async r => {
