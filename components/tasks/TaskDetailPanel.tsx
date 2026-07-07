@@ -1314,6 +1314,12 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                               {sub.due_date}
                             </span>
                           )}
+                          {(sub as any).created_at && (
+                            <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}
+                              title={`Created ${new Date((sub as any).created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}`}>
+                              Added {new Date((sub as any).created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                            </span>
+                          )}
                         </div>
                         {/* Nil confirmation — shown when user tries to complete with no attachment */}
                         {nilSubtaskId === sub.id && (
