@@ -33,10 +33,10 @@ export function msmeVendorEmailText(p: Props): string {
   const isFinal    = p.attemptNo === total
 
   const intro = isFinal
-    ? `FINAL REMINDER: We've sent ${total - 1} earlier email${total - 2 > 0 ? 's' : ''} but haven't received your MSME details yet.`
+    ? `A quick final note — we've reached out a few times but haven't heard back yet.`
     : isReminder
-    ? `REMINDER: We're following up on our earlier request for your MSME registration details.`
-    : `${p.orgName} is collecting MSME registration details from all vendors, as required under the MSMED Act, 2006.`
+    ? `Just a gentle follow-up on our earlier note.`
+    : `As a valued vendor of ${p.orgName}, we need a quick confirmation.`
 
   return [
     `Dear Sir/Madam,`,
@@ -44,15 +44,21 @@ export function msmeVendorEmailText(p: Props): string {
     ``,
     intro,
     ``,
-    `Please fill in the short form (takes less than 2 minutes):`,
-    p.formUrl,
+    `Is your business registered as an MSME (Udyam)? Please let us know:`,
+    ``,
+    `  YES — we're MSME registered:  ${p.formUrl}?a=msme`,
+    `  NO  — we're not an MSME:      ${p.formUrl}?a=not_msme`,
+    ``,
+    `Why it helps you: registered MSMEs are entitled to protected payment`,
+    `timelines under Section 43B(h) of the Income-tax Act — your buyers must`,
+    `clear your dues on time or face interest and tax consequences.`,
+    ``,
+    `Takes about 90 seconds. No login or account needed.`,
     ``,
     `If you are MSME-registered, keep handy: your Udyam Registration Number`,
     `(UDYAM-XX-00-0000000), MSME category (Micro/Small/Medium), nature of`,
     `business, outstanding receivable amount as on 31st March (if any), and`,
     `your Udyam Registration Certificate (PDF or JPG).`,
-    ``,
-    `Not an MSME? You can simply declare that on the form - no certificate needed.`,
     ``,
     `Note: if we do not receive any reply within 15 days, we shall presume your`,
     `organisation is not registered under the MSMED Act, 2006.`,
@@ -76,21 +82,19 @@ export function msmeVendorEmailHtml(p: Props): string {
   const isReminder = p.attemptNo > 1
   const isFinal    = p.attemptNo === total
 
+  // One-click answer buttons — the form pre-selects the path from the ?a= param.
+  const yesUrl = `${p.formUrl}?a=msme`
+  const noUrl  = `${p.formUrl}?a=not_msme`
+
   const attentionLine = isFinal
-    ? `<p style="font-weight:700;color:#0f172a;font-size:14px;margin:0 0 16px;line-height:1.6">
-        ⚠️ We haven't heard back despite ${total - 1} earlier email${total - 2 > 0 ? 's' : ''}. This is our final request before we mark your status as unresponsive.
+    ? `<p style="color:#b45309;font-size:13px;margin:0 0 18px;line-height:1.6">
+        A quick final note — we've reached out a few times but haven't heard back yet. It only takes a moment to reply below.
        </p>`
     : isReminder
-    ? `<p style="font-weight:700;color:#0f172a;font-size:14px;margin:0 0 16px;line-height:1.6">
-        We noticed you haven't responded to our earlier email. Just a gentle nudge!
+    ? `<p style="color:#64748b;font-size:13px;margin:0 0 18px;line-height:1.6">
+        Just a gentle follow-up on our earlier note — a quick reply below is all we need.
        </p>`
     : ''
-
-  const bodyText = isFinal
-    ? `We've sent you ${total - 1} reminder${total - 2 > 0 ? 's' : ''} but haven't received your MSME details yet. Please take a moment to fill in the short form below — it takes less than 2 minutes.`
-    : isReminder
-    ? `We're following up on our earlier request for your MSME registration details. Please take a moment to fill in the short form below — it won't take more than 2 minutes.`
-    : `${p.orgName} is collecting MSME registration details from all vendors. This is a standard compliance step required under the MSMED Act, 2006. We just need to know whether your business is registered as an MSME or not — it takes less than 2 minutes.`
 
   const deadlineColour = isFinal ? '#dc2626' : '#b45309'
 
@@ -108,11 +112,45 @@ export function msmeVendorEmailHtml(p: Props): string {
     <!-- Body -->
     <tr><td style="padding:32px 36px">
 
-      <p style="color:#334155;font-size:14px;margin:0 0 20px;line-height:1.7">Dear Sir/Madam,<br/><strong>${p.vendorName}</strong></p>
+      <p style="color:#334155;font-size:14px;margin:0 0 18px;line-height:1.7">Dear Sir/Madam,<br/><strong>${p.vendorName}</strong></p>
 
       ${attentionLine}
 
-      <p style="color:#334155;font-size:14px;margin:0 0 24px;line-height:1.7">${bodyText}</p>
+      <p style="color:#334155;font-size:15px;margin:0 0 14px;line-height:1.7">
+        As a valued vendor of <strong>${p.orgName}</strong>, we just need a quick confirmation:
+        <strong>is your business registered as an MSME (Udyam)?</strong>
+      </p>
+
+      <!-- Benefit callout -->
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;margin:0 0 22px">
+        <tr><td style="padding:14px 18px">
+          <p style="color:#065f46;font-size:13px;line-height:1.7;margin:0">
+            💡 <strong>Why it helps you:</strong> registered MSMEs are entitled to protected payment timelines
+            under Section&nbsp;43B(h) of the Income-tax Act — your buyers are required to clear your dues on time,
+            or face interest and tax consequences. Confirming your status keeps your payments on record and on time.
+          </p>
+        </td></tr>
+      </table>
+
+      <!-- One-click answer buttons -->
+      <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:12px">
+        <tr><td align="center" style="background:${ACCENT};border-radius:8px">
+          <a href="${yesUrl}" style="display:block;padding:15px 0;font-size:15px;font-weight:700;color:#fff;text-decoration:none">
+            ✓ &nbsp;Yes — we're MSME registered
+          </a>
+        </td></tr>
+      </table>
+      <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:12px">
+        <tr><td align="center" style="border:1.5px solid #cbd5e1;border-radius:8px">
+          <a href="${noUrl}" style="display:block;padding:13px 0;font-size:15px;font-weight:600;color:#475569;text-decoration:none">
+            No — we're not an MSME
+          </a>
+        </td></tr>
+      </table>
+
+      <p style="color:#94a3b8;font-size:12px;line-height:1.6;margin:0 0 24px;text-align:center">
+        Takes about 90 seconds &nbsp;·&nbsp; No login or account needed &nbsp;·&nbsp; Link valid for 30 days
+      </p>
 
       <!-- Checklist -->
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:20px">
@@ -141,20 +179,6 @@ export function msmeVendorEmailHtml(p: Props): string {
           <li>If you are not the right recipient, please forward this email to the authorised person in your organisation.</li>
         </ol>
       </div>
-
-      <!-- CTA Button -->
-      <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:20px">
-        <tr><td align="center" style="background:${ACCENT};border-radius:8px">
-          <a href="${p.formUrl}"
-            style="display:block;padding:14px 0;font-size:15px;font-weight:700;color:#fff;text-decoration:none;letter-spacing:0.01em">
-            Submit MSME Details →
-          </a>
-        </td></tr>
-      </table>
-
-      <p style="color:#94a3b8;font-size:12px;line-height:1.6;margin:0 0 20px">
-        This link is valid for 30 days. Already submitted? You can ignore this email.
-      </p>
 
       <!-- Data & Privacy Notice -->
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;margin-bottom:20px">

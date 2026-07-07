@@ -103,8 +103,24 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // getUser() validates the JWT AND triggers a token refresh if needed
-  const { data: { user }, error } = await supabase.auth.getUser()
+  // Fast path: verify the JWT locally (asymmetric signing keys + JWKS cache —
+  // no network round-trip to Supabase Auth). getClaims() also auto-refreshes
+  // an expired session via getSession(), writing new cookies through setAll.
+  // Any failure falls back to the full network getUser(), preserving the old
+  // behaviour exactly for edge cases.
+  let user: { id: string } | null = null
+  let error: unknown = null
+  try {
+    const { data: claimsData, error: claimsErr } = await supabase.auth.getClaims()
+    if (claimsData?.claims?.sub && !claimsErr) {
+      user = { id: claimsData.claims.sub }
+    }
+  } catch { /* fall through to getUser */ }
+  if (!user) {
+    const res = await supabase.auth.getUser()
+    user  = res.data.user
+    error = res.error
+  }
 
   // Detect MSME subdomain (msme.upfloat.co or msme.localhost for dev)
   const host         = request.headers.get('host') ?? ''
