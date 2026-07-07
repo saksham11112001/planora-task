@@ -676,38 +676,67 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
   async function uploadFile(e: React.ChangeEvent<HTMLInputElement>) {
     if (!task || !e.target.files?.[0]) return
     const file = e.target.files[0]
+    const taskId = task.id
     setUploading(true)
+
+    // Fallback: stream the file through our API. Works even when the R2 bucket
+    // has no CORS policy, but is bound by the serverless request-body limit
+    // (~4.5 MB), so we only use it for smaller files.
+    const uploadViaServer = async (): Promise<boolean> => {
+      const form = new FormData()
+      form.append('file', file)
+      const r = await fetch(`/api/tasks/${taskId}/attachments`, { method: 'POST', body: form })
+      const d = await r.json().catch(() => ({}))
+      if (r.ok) { setAttachments(p => [d.data, ...p]); toast.success('File uploaded'); return true }
+      toast.error((d as any).error ?? 'Upload failed')
+      return false
+    }
+
     try {
-      // Try presigned direct-to-R2 upload first (zero Vercel bandwidth for file bytes)
-      const presignRes = await fetch('/api/storage/presign-upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ task_id: task.id, filename: file.name, content_type: file.type || 'application/octet-stream', size: file.size }),
-      })
-      if (presignRes.ok) {
-        const { upload_url, key } = await presignRes.json()
-        const putRes = await fetch(upload_url, {
-          method: 'PUT',
-          headers: { 'Content-Type': file.type || 'application/octet-stream' },
-          body: file,
-        })
-        if (!putRes.ok) throw new Error('Direct upload to storage failed')
-        const r = await fetch(`/api/tasks/${task.id}/attachments`, {
+      // Preferred path: presigned direct-to-R2 (zero Vercel bandwidth). This can
+      // fail at the browser->R2 PUT if the bucket's CORS policy doesn't allow
+      // this origin — in that case we transparently fall back to the server.
+      let putSucceeded = false
+      let recorded     = false
+      try {
+        const presignRes = await fetch('/api/storage/presign-upload', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ storage_key: key, file_name: file.name, file_size: file.size, mime_type: file.type }),
+          body: JSON.stringify({ task_id: taskId, filename: file.name, content_type: file.type || 'application/octet-stream', size: file.size }),
         })
-        const d = await r.json()
-        if (r.ok) { setAttachments(p => [d.data, ...p]); toast.success('File uploaded') }
-        else toast.error(d.error ?? 'Upload failed')
-      } else {
-        // Fallback: send file through Vercel (R2 not configured or CORS not set up)
-        const form = new FormData()
-        form.append('file', file)
-        const r = await fetch(`/api/tasks/${task.id}/attachments`, { method: 'POST', body: form })
-        const d = await r.json()
-        if (r.ok) { setAttachments(p => [d.data, ...p]); toast.success('File uploaded') }
-        else toast.error(d.error ?? 'Upload failed')
+        if (presignRes.ok) {
+          const { upload_url, key } = await presignRes.json()
+          const putRes = await fetch(upload_url, {
+            method: 'PUT',
+            headers: { 'Content-Type': file.type || 'application/octet-stream' },
+            body: file,
+          })
+          if (putRes.ok) {
+            putSucceeded = true
+            const r = await fetch(`/api/tasks/${taskId}/attachments`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ storage_key: key, file_name: file.name, file_size: file.size, mime_type: file.type }),
+            })
+            const d = await r.json().catch(() => ({}))
+            if (r.ok) { setAttachments(p => [d.data, ...p]); toast.success('File uploaded'); recorded = true }
+            else toast.error((d as any).error ?? 'Upload failed')
+          }
+        }
+      } catch (err) {
+        // Direct upload failed (most commonly: R2 bucket CORS not allowing this
+        // origin). Swallow and fall back to the server path below.
+        console.warn('[upload] direct R2 upload failed, falling back through server:', err)
+      }
+
+      // Fall back only when the file never reached storage (avoid duplicating a
+      // file that uploaded but whose DB record failed).
+      if (!recorded && !putSucceeded) {
+        if (file.size > 4 * 1024 * 1024) {
+          toast.error('Upload failed — file is too large for the fallback route. Storage (R2 CORS) needs configuring for large files.')
+        } else {
+          await uploadViaServer()
+        }
       }
     } catch {
       toast.error('Upload failed — please try again')
