@@ -1006,13 +1006,18 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
               const displayStatus = isRecurringTemplate ? 'todo' : task.status
               const sc     = STATUS_CONFIG[displayStatus] ?? STATUS_CONFIG.todo
               const ov     = isOverdue(task.due_date, displayStatus)
+              // Unassigned open tasks need attention — amber highlight so the admin
+              // can spot and assign them (same pattern as My Tasks / CA Compliance).
+              const isUnassigned = !task.assignee_id && !['completed', 'cancelled'].includes(displayStatus)
+              const rowBg     = isUnassigned ? 'rgba(245,158,11,0.10)' : bg
+              const rowAccent = isUnassigned ? '#f59e0b' : accent
               return (
                 <div key={task.id}
                   onClick={() => openTask(task.id)}
                   style={{ display: 'grid', gridTemplateColumns: '1fr 70px 80px 100px 90px 80px',
                     alignItems: 'center', padding: '0 24px', minHeight: 38, cursor: 'pointer',
-                    borderBottom: '1px solid var(--border-light)', borderLeft: `3px solid ${accent}`,
-                    background: bg, transition: 'filter 0.1s' }}
+                    borderBottom: '1px solid var(--border-light)', borderLeft: `3px solid ${rowAccent}`,
+                    background: rowBg, transition: 'filter 0.1s' }}
                   onMouseEnter={e => (e.currentTarget as HTMLElement).style.filter = 'brightness(0.97)'}
                   onMouseLeave={e => (e.currentTarget as HTMLElement).style.filter = 'none'}>
 
@@ -1054,10 +1059,17 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
                   </span>
 
                   {/* Assignee */}
-                  <span style={{ fontSize: 11, color: task.assignee ? 'var(--text-secondary)' : 'var(--text-muted)',
-                    fontStyle: task.assignee ? 'normal' : 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {task.assignee?.name ?? '—'}
-                  </span>
+                  {isUnassigned ? (
+                    <span style={{ fontSize: 10, fontWeight: 700, color: '#b45309', background: 'rgba(245,158,11,0.18)',
+                      padding: '2px 7px', borderRadius: 99, whiteSpace: 'nowrap', justifySelf: 'start' }}>
+                      Unassigned
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: 11, color: 'var(--text-secondary)',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {task.assignee?.name ?? '—'}
+                    </span>
+                  )}
 
                   {/* Due date */}
                   <span style={{ fontSize: 11, fontWeight: ov ? 700 : 400, color: ov ? '#dc2626' : 'var(--text-secondary)' }}>
