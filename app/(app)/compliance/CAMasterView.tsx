@@ -1672,6 +1672,17 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
   const [showAddModal, setShowAddModal] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [pendingChanges, setPendingChanges] = useState<Record<string, Partial<CAMasterTask>>>({})
+
+  // Unsaved edits live only in pendingChanges until the row's Save is clicked —
+  // closing/reloading the tab silently discarded them (the likely cause of
+  // "my due-date change disappeared" reports). Warn before leaving.
+  useEffect(() => {
+    const dirty = Object.keys(pendingChanges).length > 0
+    if (!dirty) return
+    const warn = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [pendingChanges])
   const [savingAll, setSavingAll] = useState(false)
   // Tracks server-confirmed task values (before any pending edits)
   const originalValuesRef = useRef<Record<string, CAMasterTask>>({})

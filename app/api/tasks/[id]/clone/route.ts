@@ -29,6 +29,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     .eq('id', id).eq('org_id', mb.org_id).maybeSingle()
   if (!orig) return NextResponse.json({ error: 'Task not found' }, { status: 404 })
 
+  // Strip internal CA-spawn markers from the copy: _assignment_id ties a task
+  // to a ca_client_assignments row — a clone carrying it collides with the
+  // spawner's dedup and gets collapsed/hidden by the same-assignment dedupe in
+  // task lists. The clone is a standalone task, not a spawned instance.
+  const cleanCustomFields = (() => {
+    const cf = { ...((orig.custom_fields as Record<string, unknown>) ?? {}) }
+    delete cf._assignment_id
+    delete cf._triggered
+    return Object.keys(cf).length ? cf : null
+  })()
+
   // Create the parent copy
   const { data: newTask, error: parentErr } = await admin.from('tasks').insert({
     org_id:            mb.org_id,
@@ -43,7 +54,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     project_id:        orig.project_id ?? null,
     due_date:          orig.due_date ?? null,
     estimated_hours:   orig.estimated_hours ?? null,
-    custom_fields:     orig.custom_fields ?? null,
+    custom_fields:     cleanCustomFields,
     is_billable:       orig.is_billable ?? false,
     billable_amount:   orig.billable_amount ?? null,
     created_by:        user.id,
