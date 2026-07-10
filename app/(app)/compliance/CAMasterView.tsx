@@ -1672,6 +1672,17 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
   const [showAddModal, setShowAddModal] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [pendingChanges, setPendingChanges] = useState<Record<string, Partial<CAMasterTask>>>({})
+
+  // Unsaved edits live only in pendingChanges until the row's Save is clicked —
+  // closing/reloading the tab silently discarded them (the likely cause of
+  // "my due-date change disappeared" reports). Warn before leaving.
+  useEffect(() => {
+    const dirty = Object.keys(pendingChanges).length > 0
+    if (!dirty) return
+    const warn = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [pendingChanges])
   const [savingAll, setSavingAll] = useState(false)
   // Tracks server-confirmed task values (before any pending edits)
   const originalValuesRef = useRef<Record<string, CAMasterTask>>({})
@@ -1692,6 +1703,7 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
       title?: string
       priority?: string
       attachment_headers?: { old: string[]; new: string[] }
+      due_dates?: { old: string; new: string }[]
     }
   } | null>(null)
   const [propagating, setPropagating] = useState(false)
@@ -1938,8 +1950,16 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
 
       // Check if any propagation-relevant fields changed
       if (original) {
-        const propFields: { title?: string; priority?: string; attachment_headers?: { old: string[]; new: string[] } } = {}
+        const propFields: { title?: string; priority?: string; attachment_headers?: { old: string[]; new: string[] }; due_dates?: { old: string; new: string }[] } = {}
         if (patch.name && patch.name !== original.name) propFields.title = patch.name as string
+        // Due-date changes: offer to move incomplete spawned tasks to the new date
+        if (patch.dates) {
+          const oldDates = (original.dates ?? {}) as Record<string, string>
+          const pairs = Object.entries(patch.dates as Record<string, string>)
+            .filter(([m, v]) => !!v && !!oldDates[m] && oldDates[m] !== v)
+            .map(([m, v]) => ({ old: oldDates[m], new: v }))
+          if (pairs.length) propFields.due_dates = pairs
+        }
         if (patch.priority && patch.priority !== original.priority) propFields.priority = patch.priority as string
         if (patch.attachment_headers) {
           const oldH = original.attachment_headers ?? []
@@ -2823,6 +2843,18 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
                   <span style={{ fontWeight:600, color:'var(--text-primary)', textTransform:'capitalize' }}>{propagateModal.fields.priority}</span>
                 </div>
               )}
+              {propagateModal.fields.due_dates?.map((p, i) => (
+                <div key={i} style={{ display:'flex', alignItems:'center', gap:8, fontSize:12,
+                  padding:'7px 12px', borderRadius:8, background:'var(--surface-subtle)',
+                  border:'1px solid var(--border)' }}>
+                  <span style={{ color:'var(--text-muted)', width:110 }}>Due date</span>
+                  <span style={{ fontWeight:600, color:'var(--text-primary)' }}>
+                    {new Date(p.old + 'T00:00:00').toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })}
+                    {' → '}
+                    {new Date(p.new + 'T00:00:00').toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })}
+                  </span>
+                </div>
+              ))}
               {propagateModal.fields.attachment_headers && (
                 <div style={{ display:'flex', alignItems:'center', gap:8, fontSize:12,
                   padding:'7px 12px', borderRadius:8, background:'var(--surface-subtle)',

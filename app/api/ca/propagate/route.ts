@@ -45,6 +45,9 @@ export async function POST(req: NextRequest) {
       approver_id?: string | null
       client_id?: string | null
       attachment_headers?: { old: string[]; new: string[] } // retained in type for backwards-compat; no longer spawns subtasks
+      // Master due-date changes: move incomplete spawned tasks from the old
+      // date to the new one. Each pair is one changed month.
+      due_dates?: { old: string; new: string }[]
     }
   }
 
@@ -100,6 +103,47 @@ export async function POST(req: NextRequest) {
         .not('status', 'eq', 'completed')
         .contains('custom_fields', { _compliance_subtask: true })
       if (subtaskErr) console.error('[ca/propagate] subtask cascade error:', subtaskErr.message)
+    }
+  }
+
+  // ── Due-date propagation ────────────────────────────────────────────────
+  // For each changed month, move incomplete spawned tasks from the old date to
+  // the new one — and, critically, update the matching ca_task_instances rows.
+  // The daily spawner dedupes on (assignment_id, due_date); if the instance
+  // keeps the old date, the cron would spawn a DUPLICATE task for the new date.
+  const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+  if (Array.isArray(fields.due_dates)) {
+    for (const pair of fields.due_dates) {
+      if (!pair || !DATE_RE.test(pair.old ?? '') || !DATE_RE.test(pair.new ?? '') || pair.old === pair.new) continue
+
+      // Tasks among the matched set that carry the old due date
+      const { data: dateTasks } = await admin.from('tasks')
+        .select('id')
+        .in('id', taskIds)
+        .eq('due_date', pair.old)
+      const dateTaskIds = (dateTasks ?? []).map(t => t.id)
+      if (!dateTaskIds.length) continue
+
+      const { error: dateErr } = await admin.from('tasks')
+        .update({ due_date: pair.new })
+        .in('id', dateTaskIds)
+      if (dateErr) { console.error('[ca/propagate] due_date update error:', dateErr.message); continue }
+
+      // Keep the spawn-dedup record in sync so the cron doesn't re-spawn
+      const { error: instErr } = await admin.from('ca_task_instances')
+        .update({ due_date: pair.new })
+        .in('task_id', dateTaskIds)
+        .eq('org_id', mb.org_id)
+      if (instErr) console.error('[ca/propagate] instance due_date sync error:', instErr.message)
+
+      // Cascade to incomplete compliance subtasks that shared the parent's date
+      await admin.from('tasks')
+        .update({ due_date: pair.new })
+        .in('parent_task_id', dateTaskIds)
+        .eq('due_date', pair.old)
+        .not('status', 'eq', 'completed')
+
+      updated += dateTaskIds.length
     }
   }
 

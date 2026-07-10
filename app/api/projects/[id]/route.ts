@@ -35,8 +35,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   // Fire project status change notification if status changed
   try {
     if (body.status && body.status !== existingProject.status) {
+      // Scope to THIS org: an unscoped maybeSingle() errors for multi-org users
+      // (>1 rows) and silently dropped the actor/org names from notifications.
       const { data: mb2 } = await admin.from('org_members')
-        .select('users(name), organisations(name)').eq('user_id', user.id).maybeSingle()
+        .select('users(name), organisations(name)')
+        .eq('user_id', user.id).eq('org_id', mb.org_id).maybeSingle()
       await inngest.send({
         name: 'project/status-updated',
         data: {

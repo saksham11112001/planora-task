@@ -30,7 +30,10 @@ export const onApprovalRequested = inngest.createFunction(
 
     // Check org notification mode (use org_id from manager's membership)
     if (managerUserId) {
-      const { data: mgMb } = await admin.from('org_members').select('org_id').eq('user_id', managerUserId).eq('is_active', true).maybeSingle()
+      // limit(1): multi-org managers have >1 membership rows — maybeSingle()
+      // errors on that and silently dropped them out of digest mode.
+      const { data: mgRows } = await admin.from('org_members').select('org_id').eq('user_id', managerUserId).eq('is_active', true).order('created_at', { ascending: true }).limit(1)
+      const mgMb = mgRows?.[0] ?? null
       if (mgMb?.org_id && await getOrgNotifMode(mgMb.org_id) === 'digest') {
         await queueNotification({
           orgId: mgMb.org_id, userId: managerUserId, userEmail: d.manager_email,

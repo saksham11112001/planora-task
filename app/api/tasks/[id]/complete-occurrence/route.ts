@@ -1,7 +1,9 @@
 import { NextResponse }        from 'next/server'
+import type { NextRequest }    from 'next/server'
 import { createClient }        from '@/lib/supabase/server'
 import { getAuthUser } from '@/lib/supabase/authUser'
 import { createAdminClient }   from '@/lib/supabase/admin'
+import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
 import { nextOccurrence }      from '@/lib/utils/recurringSchedule'
 
 // POST /api/tasks/[id]/complete-occurrence
@@ -12,7 +14,7 @@ import { nextOccurrence }      from '@/lib/utils/recurringSchedule'
 // approval is required). Called from TaskDetailPanel when the user clicks
 // "Complete this occurrence" on a past calendar slot showing a template.
 export async function POST(
-  req: Request,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
@@ -20,10 +22,10 @@ export async function POST(
   const user = await getAuthUser(supabase)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data: mb } = await supabase
-    .from('org_members').select('org_id, role')
-    .eq('user_id', user.id).eq('is_active', true)
-    .maybeSingle()
+  // Shared resolver: respects the active-org cookie and never errors for
+  // multi-org users (a raw maybeSingle() errors on >1 membership rows and
+  // falsely 403'd them here).
+  const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'Not a member' }, { status: 403 })
 
   const body = await req.json()
