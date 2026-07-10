@@ -1,5 +1,6 @@
 'use client'
-import { useState, useMemo, useRef, useEffect } from 'react'
+import { useState, useMemo, useRef, useEffect, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { Search, Filter, BarChart2, Download, Calendar } from 'lucide-react'
 import { MultiPillSelect } from '@/components/filters/MultiPillSelect'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LineChart, Line, Legend, PieChart, Pie } from 'recharts'
@@ -113,6 +114,29 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
     )
   )
   const today = todayStr()
+
+  // ── Real-time refresh ──────────────────────────────────────────────────
+  // Monitor is server-fetched; without this, changes made by teammates never
+  // appear until a manual reload. router.refresh() re-runs the server fetcher
+  // silently (inside a transition, so the page never flashes), and the effect
+  // below re-syncs local state whenever fresh server data arrives.
+  const router = useRouter()
+  const [, startRefresh] = useTransition()
+  useEffect(() => {
+    setTasks(initialTasks.filter(t =>
+      t.status !== 'completed' || !t.completed_at || t.completed_at.slice(0, 10) >= from90
+    ))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialTasks])
+  useEffect(() => {
+    const refresh = () => { if (!document.hidden) startRefresh(() => router.refresh()) }
+    const iv = setInterval(refresh, 30_000)              // poll every 30s while visible
+    const onVis = () => { if (!document.hidden) refresh() }  // instant on tab return
+    document.addEventListener('visibilitychange', onVis)
+    window.addEventListener('focus', onVis)
+    return () => { clearInterval(iv); document.removeEventListener('visibilitychange', onVis); window.removeEventListener('focus', onVis) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // ── Current-month boundaries + label ────────────────────────────────────
   const _now       = new Date()
