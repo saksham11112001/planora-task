@@ -1,13 +1,13 @@
 import { createClient }      from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse }      from 'next/server'
+import { isSuperAdminEmail } from '@/lib/utils/superAdmin'
 
-const ADMIN_EMAIL = 'saksham.gpt2001@gmail.com'
 
 export async function GET() {
   const sb = await createClient()
   const { data: { user } } = await sb.auth.getUser()
-  if (!user || user.email !== ADMIN_EMAIL) {
+  if (!user || !isSuperAdminEmail(user.email)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 

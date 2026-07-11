@@ -1,3 +1,4 @@
+import { isSuperAdminEmail } from '@/lib/utils/superAdmin'
 import { createClient }      from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { CouponsView }       from '@/app/(app)/settings/coupons/CouponsView'
@@ -10,8 +11,7 @@ export default async function SuperAdminCouponsPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const superEmail = process.env.SUPER_ADMIN_EMAIL
-  const isSuper    = !!user && !!superEmail && user.email?.toLowerCase() === superEmail.toLowerCase()
+  const isSuper    = !!user && isSuperAdminEmail(user.email)
 
   if (!isSuper) {
     return (

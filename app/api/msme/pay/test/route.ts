@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient }              from '@/lib/supabase/server'
 import { getAuthUser }               from '@/lib/supabase/authUser'
+import { isSuperAdminEmail }          from '@/lib/utils/superAdmin'
 import crypto                        from 'crypto'
 
 const RZP_KEY_ID     = process.env.RAZORPAY_KEY_ID
@@ -22,9 +23,7 @@ const ALLOWED_PAISE  = new Set([5000, 10000])   // ₹50, ₹100
 async function superAdminOnly(): Promise<{ email: string } | null> {
   const supabase = await createClient()
   const user = await getAuthUser(supabase)
-  const superEmail = process.env.SUPER_ADMIN_EMAIL
-  if (!user?.email || !superEmail) return null
-  if (user.email.toLowerCase() !== superEmail.toLowerCase()) return null
+  if (!user?.email || !isSuperAdminEmail(user.email)) return null
   return { email: user.email }
 }
 
