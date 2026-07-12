@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getAuthUser } from '@/lib/supabase/authUser'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
 
 // Helper: only owner/admin/manager can read credentials; viewer cannot
 function canRead(role: string) { return ['owner', 'admin', 'manager'].includes(role) }
@@ -12,11 +13,11 @@ export async function GET(req: NextRequest) {
   const user = await getAuthUser(supabase)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const admin = createAdminClient()
-  const { data: mb } = await admin.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).order('created_at').limit(1).maybeSingle()
+  const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'No membership' }, { status: 403 })
   if (!canRead(mb.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
+  const admin = createAdminClient()
   const clientId = req.nextUrl.searchParams.get('client_id')
   if (!clientId) return NextResponse.json({ error: 'client_id required' }, { status: 400 })
 
@@ -30,10 +31,10 @@ export async function POST(req: NextRequest) {
   const user = await getAuthUser(supabase)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const admin = createAdminClient()
-  const { data: mb } = await admin.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).order('created_at').limit(1).maybeSingle()
+  const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')
   if (!mb || !canWrite(mb.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
+  const admin = createAdminClient()
   const body = await req.json()
   // Encode password before storing
   const password_enc = Buffer.from(body.password ?? '').toString('base64')
