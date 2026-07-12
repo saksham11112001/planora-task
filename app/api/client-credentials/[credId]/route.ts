@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getAuthUser } from '@/lib/supabase/authUser'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ credId: string }> }) {
   const { credId } = await params
@@ -9,10 +10,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ cr
   const user = await getAuthUser(supabase)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const admin = createAdminClient()
-  const { data: mb } = await admin.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).order('created_at').limit(1).maybeSingle()
+  const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')
   if (!mb || !['owner', 'admin', 'manager'].includes(mb.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
+  const admin = createAdminClient()
   const body = await req.json()
   const updates: Record<string, any> = { portal_name: body.portal_name, username: body.username, notes: body.notes, last_updated: new Date().toISOString() }
   if (body.password) updates.password_enc = Buffer.from(body.password).toString('base64')
@@ -28,10 +29,10 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ c
   const user = await getAuthUser(supabase)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const admin = createAdminClient()
-  const { data: mb } = await admin.from('org_members').select('org_id, role').eq('user_id', user.id).eq('is_active', true).order('created_at').limit(1).maybeSingle()
+  const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')
   if (!mb || !['owner', 'admin', 'manager'].includes(mb.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
+  const admin = createAdminClient()
   const { error } = await admin.from('client_credentials').delete().eq('id', credId).eq('org_id', mb.org_id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return new NextResponse(null, { status: 204 })
