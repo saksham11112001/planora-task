@@ -75,7 +75,20 @@ export async function GET(request: NextRequest) {
       user = existingUser
     } else {
       console.error('[auth/callback] exchangeCodeForSession failed:', error?.message)
-      return NextResponse.redirect(new URL('/login?error=auth_failed&hint=try_again', request.url))
+      // Self-heal: a stale host-only sb-* cookie from a previous release can
+      // shadow the fresh domain-scoped PKCE verifier, making EVERY exchange
+      // fail in that browser until cookies are cleared. Clear all Supabase
+      // auth cookies (both host-only and domain-scoped variants) so the
+      // user's next attempt starts from a clean slate.
+      const res = NextResponse.redirect(new URL('/login?error=auth_failed&hint=try_again', request.url))
+      for (const c of request.cookies.getAll()) {
+        if (!c.name.startsWith('sb-')) continue
+        res.cookies.set(c.name, '', { path: '/', maxAge: 0 })
+        if (process.env.NODE_ENV === 'production') {
+          res.headers.append('Set-Cookie', `${c.name}=; Path=/; Max-Age=0; Domain=.upfloat.co`)
+        }
+      }
+      return res
     }
   }
 
