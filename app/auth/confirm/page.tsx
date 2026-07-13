@@ -57,15 +57,20 @@ function AuthConfirmInner() {
       const tokenType    = hashParams.get('type')
 
       if (!accessToken || !refreshToken) {
+        // No tokens in the hash — the SDK's detectSessionInUrl may still be
+        // persisting the session asynchronously. Poll briefly before
+        // declaring failure; a single early check produces false errors.
         const supabase = createClient()
-        await new Promise(r => setTimeout(r, 800))
-        const { data: { session } } = await supabase.auth.getSession()
-        if (session?.user) {
-          await provision(session.user)
-          navigateToNext(next, router)
-        } else {
-          setState('error')
+        for (let attempt = 0; attempt < 4; attempt++) {
+          await new Promise(r => setTimeout(r, 700))
+          const { data: { session } } = await supabase.auth.getSession()
+          if (session?.user) {
+            await provision(session.user)
+            navigateToNext(next, router)
+            return
+          }
         }
+        setState('error')
         return
       }
 

@@ -20,6 +20,18 @@ export async function GET(request: NextRequest) {
   const isMsmeDomain = host.startsWith('msme.')
   const next = safeRedirect(url.searchParams.get('next'), isMsmeDomain ? '/msme' : '/dashboard')
 
+  // Provider/OTP errors arrive as query params (?error=access_denied,
+  // ?error_code=otp_expired). Surface a specific message on the login page
+  // instead of bouncing through /auth/confirm to a generic failure.
+  const errParam = url.searchParams.get('error')
+  const errCode  = url.searchParams.get('error_code')
+  if (!code && (errParam || errCode)) {
+    const mapped =
+      errCode === 'otp_expired'      ? 'otp_expired' :
+      errParam === 'access_denied'   ? 'cancelled'   : 'auth_failed'
+    return NextResponse.redirect(new URL(`/login?error=${mapped}`, request.url))
+  }
+
   // IMPLICIT FLOW: token is in the URL hash (#access_token=...).
   // Hashes are never sent to the server, so if there's no ?code,
   // redirect to a client-side page that can read window.location.hash.
