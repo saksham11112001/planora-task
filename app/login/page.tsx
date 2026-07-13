@@ -65,11 +65,31 @@ export default function LoginPage() {
     if (params.get('mode') === 'signup') {
       setMode('email_signup')
     }
-    if (params.get('error') === 'auth_failed') {
-      setError("Sign-in failed. Please try again — if the problem persists, try a different method.")
+    const errParam = params.get('error')
+    if (errParam) {
+      const messages: Record<string, string> = {
+        auth_failed: 'Sign-in failed. Please try again — if the problem persists, try a different method.',
+        otp_expired: 'That sign-in link has expired or was already used. Request a fresh one, or sign in with your password.',
+        cancelled:   'Sign-in was cancelled. Pick a method below to try again.',
+      }
+      setError(messages[errParam] ?? messages.auth_failed)
       setMode('email_password')
     }
-  }, [])
+
+    // Already signed in? Skip the form entirely. This also rescues the
+    // replayed-link case where the callback redirected here with ?error=
+    // even though the first click already established a session.
+    const supabase = createClient()
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) router.replace(getPostLoginPath())
+    })
+
+    // bfcache restore (user pressed Back mid-OAuth) revives the page with
+    // loading=true and every button disabled — clear the stuck spinner.
+    const onPageShow = (e: PageTransitionEvent) => { if (e.persisted) setLoading(false) }
+    window.addEventListener('pageshow', onPageShow)
+    return () => window.removeEventListener('pageshow', onPageShow)
+  }, [router])
 
   function resetForm(newMode: Mode) {
     setMode(newMode)
@@ -181,6 +201,16 @@ export default function LoginPage() {
     if (err) {
       setLoading(false)
       setError(err.message)
+      return
+    }
+
+    // Supabase returns a phantom user with no identities when the email is
+    // already registered (to prevent enumeration). Without this check the
+    // user is told to wait for a confirmation email that will never arrive.
+    if (data.user && !data.session && (data.user.identities?.length ?? 0) === 0) {
+      setLoading(false)
+      setError('An account with this email already exists. Sign in below — or use "Forgot password?" if you don\'t remember it.')
+      setMode('email_password')
       return
     }
 
