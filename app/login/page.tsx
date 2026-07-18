@@ -79,10 +79,18 @@ export default function LoginPage() {
     // Already signed in? Skip the form entirely. This also rescues the
     // replayed-link case where the callback redirected here with ?error=
     // even though the first click already established a session.
+    // MUST be getUser() (server-validated), NOT getSession(): a session that
+    // is valid locally but dead server-side would redirect to /dashboard,
+    // whose layout bounces back here → infinite loop that freezes the tab.
     const supabase = createClient()
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) router.replace(getPostLoginPath())
-    })
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session?.user) return              // anonymous visitor — no network call
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) { router.replace(getPostLoginPath()); return }
+      // Dead local session (user deleted / token revoked): clear it so the
+      // form works and no other page loops on the phantom session.
+      await supabase.auth.signOut().catch(() => {})
+    }).catch(() => {})
 
     // bfcache restore (user pressed Back mid-OAuth) revives the page with
     // loading=true and every button disabled — clear the stuck spinner.
