@@ -7,10 +7,13 @@
  * Every super-admin surface (coupons, complaints, msme-stats, payment test)
  * must gate through this — never hardcode an email in a route again.
  */
+export function superAdminEmails(): string[] {
+  const raw = process.env.SUPER_ADMIN_EMAIL
+  if (!raw) return []
+  return raw.split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
+}
+
 export function isSuperAdminEmail(email: string | null | undefined): boolean {
   if (!email) return false
-  const raw = process.env.SUPER_ADMIN_EMAIL
-  if (!raw) return false
-  const allowed = raw.split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
-  return allowed.includes(email.trim().toLowerCase())
+  return superAdminEmails().includes(email.trim().toLowerCase())
 }
