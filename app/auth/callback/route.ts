@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { createAdminClient }  from '@/lib/supabase/admin'
+import { notifySuperAdminsOfSignup } from '@/lib/email/signupAlert'
 import { cookies }            from 'next/headers'
 import { NextResponse }       from 'next/server'
 import type { NextRequest }   from 'next/server'
@@ -131,12 +132,25 @@ async function provisionUser(user: any) {
       user.email?.split('@')[0]?.replace(/[._]/g, ' ')?.replace(/\b\w/g, (l: string) => l.toUpperCase()) ??
       'User'
     )
+    // Existence check before the upsert — provisioning runs on EVERY login,
+    // and super admins should only be alerted for genuinely new signups.
+    const { data: existing } = await admin.from('users')
+      .select('id').eq('id', user.id).maybeSingle()
+
     await admin.from('users').upsert({
       id:         user.id,
       email:      (user.email ?? '').slice(0, 255),
       name:       String(rawName).slice(0, 100),
       avatar_url: user.user_metadata?.avatar_url ?? null,
     }, { onConflict: 'id' })
+
+    if (!existing) {
+      const provider = user.app_metadata?.provider ?? 'oauth'
+      await notifySuperAdminsOfSignup(
+        { email: user.email, name: String(rawName) },
+        provider === 'email' ? 'email link' : `${provider} oauth`,
+      )
+    }
   } catch (err) {
     console.error('[auth/callback] provisionUser failed:', err)
   }

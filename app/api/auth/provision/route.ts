@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse }      from 'next/server'
 import type { NextRequest }  from 'next/server'
 import { dbError }           from '@/lib/api-error'
+import { notifySuperAdminsOfSignup } from '@/lib/email/signupAlert'
 
 // Called client-side after implicit OAuth flow establishes a session.
 // Creates/updates the public.users row and handles invite metadata.
@@ -26,12 +27,25 @@ export async function POST(request: NextRequest) {
       user.email?.split('@')[0]?.replace(/[._]/g, ' ')?.replace(/\b\w/g, (l: string) => l.toUpperCase()) ??
       'User'
     )
+    // Existence check before the upsert — this endpoint runs on EVERY login,
+    // and super admins should only be alerted for genuinely new signups.
+    const { data: existing } = await admin.from('users')
+      .select('id').eq('id', user.id).maybeSingle()
+
     await admin.from('users').upsert({
       id:         user.id,
       email:      (user.email ?? '').slice(0, 255),
       name:       String(rawName).slice(0, 100),
       avatar_url: user.user_metadata?.avatar_url ?? null,
     }, { onConflict: 'id' })
+
+    if (!existing) {
+      const provider = user.app_metadata?.provider ?? 'email'
+      await notifySuperAdminsOfSignup(
+        { email: user.email, name: String(rawName) },
+        provider === 'email' ? 'email + password / magic link' : `${provider} oauth`,
+      )
+    }
 
     // 2. Handle invite metadata if present
     const VALID_ROLES = new Set(['member', 'manager', 'admin', 'owner'])
