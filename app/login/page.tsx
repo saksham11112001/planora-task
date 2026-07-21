@@ -89,7 +89,9 @@ export default function LoginPage() {
       if (user) { router.replace(getPostLoginPath()); return }
       // Dead local session (user deleted / token revoked): clear it so the
       // form works and no other page loops on the phantom session.
-      await supabase.auth.signOut().catch(() => {})
+      // scope 'local' — clears THIS browser only. Default (global) would
+      // revoke the user's sessions on every device on a transient failure.
+      await supabase.auth.signOut({ scope: 'local' }).catch(() => {})
     }).catch(() => {})
 
     // bfcache restore (user pressed Back mid-OAuth) revives the page with

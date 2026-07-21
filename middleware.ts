@@ -57,6 +57,34 @@ export async function middleware(request: NextRequest) {
     return res
   }
 
+  // ── Self-heal duplicate Supabase auth cookies ───────────────────────────
+  // A host-only sb-* cookie from an old release can coexist with the
+  // domain-scoped (.upfloat.co) one the current release sets. The browser
+  // sends BOTH; Next's cookie map keeps the last while the browser client
+  // reads the first — so the server and the browser can operate on two
+  // DIFFERENT sessions. Symptoms: login/dashboard redirect loops ("page
+  // isn't responding") and users randomly asked to sign in again.
+  // Detection must use the raw Cookie header (the parsed map dedupes).
+  if (!pathname.startsWith('/_next/') && !pathname.includes('.')) {
+    const rawCookie = request.headers.get('cookie') ?? ''
+    const sbNames = rawCookie.split(';')
+      .map(p => p.split('=')[0].trim())
+      .filter(n => n.startsWith('sb-'))
+    if (sbNames.length !== new Set(sbNames).size) {
+      // Clear BOTH variants of every Supabase cookie, then replay the
+      // request. The user signs in once more and gets a single clean set.
+      const res = NextResponse.redirect(request.nextUrl.clone())
+      for (const n of new Set(sbNames)) {
+        res.cookies.set(n, '', { path: '/', maxAge: 0 })
+        if (process.env.NODE_ENV === 'production') {
+          // append() bypasses the response cookie map (also keyed by name)
+          res.headers.append('Set-Cookie', `${n}=; Path=/; Max-Age=0; Domain=.upfloat.co`)
+        }
+      }
+      return res
+    }
+  }
+
   // Static assets, auth and public paths — always let through
   if (
     pathname.startsWith('/auth/') ||
