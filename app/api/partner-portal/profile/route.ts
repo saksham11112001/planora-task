@@ -6,6 +6,7 @@ import { createClient }             from '@/lib/supabase/server'
 import { getAuthUser } from '@/lib/supabase/authUser'
 import { createAdminClient }        from '@/lib/supabase/admin'
 import { generateCode }             from '@/lib/utils/codeGen'
+import { attributeSignup }          from '@/lib/partner/attribution'
 
 export async function GET(req: NextRequest) {
   const supabase = await createClient()
@@ -81,24 +82,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Registration failed — please try again' }, { status: 500 })
   }
 
-  // If this partner was referred by another partner, mark that invite as signed_up
+  // Credit the inviting partner for this partner-program signup — exactly one,
+  // to prevent double commission. Prefer the partner whose code was used
+  // (referred_by); fall back to the most-recent inviter of this email.
+  let preferPartnerId: string | null = null
   if (referredByCode) {
     const { data: referrerPartner } = await admin
       .from('standalone_partners')
       .select('id')
       .eq('referral_code', referredByCode)
       .maybeSingle()
-
-    if (referrerPartner) {
-      await admin
-        .from('partner_portal_invites')
-        .update({ signed_up: true, signed_up_at: new Date().toISOString() })
-        .eq('partner_id', referrerPartner.id)
-        .eq('email', email.trim().toLowerCase())
-        .eq('invite_type', 'partner')
-        .eq('signed_up', false)
-    }
+    preferPartnerId = referrerPartner?.id ?? null
   }
+  await attributeSignup(admin, email.trim().toLowerCase(), 'partner', preferPartnerId)
 
   return NextResponse.json({ id: newPartner.id, referral_code: newPartner.referral_code, exists: false })
 }

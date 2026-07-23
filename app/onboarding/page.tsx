@@ -265,7 +265,11 @@ export default function OnboardingPage() {
       const postOnboard = sessionStorage.getItem('upfloat_post_onboard') ?? ''
       if (postOnboard) sessionStorage.removeItem('upfloat_post_onboard')
       const urlNext = new URLSearchParams(window.location.search).get('next') ?? ''
-      const dest = postOnboard || urlNext || '/dashboard'
+      // Server-confirmed MSME referral is the reliable fallback: the referral
+      // came in on a different origin, so postOnboard/urlNext are often empty
+      // here. Without this the referred user lands in the task manager instead
+      // of MSME. An explicit next still wins when it survived.
+      const dest = postOnboard || urlNext || (data.msme_referral ? '/msme' : '') || '/dashboard'
       router.push(dest); router.refresh()
     } catch { setError('Network error — please try again') } finally { setSaving(false) }
   }

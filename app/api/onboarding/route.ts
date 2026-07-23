@@ -2,6 +2,7 @@ import { NextResponse }  from 'next/server'
 import type { NextRequest } from 'next/server'
 import { dbError } from '@/lib/api-error'
 import { generateCode, normaliseCode } from '@/lib/utils/codeGen'
+import { attributeSignup } from '@/lib/partner/attribution'
 
 export async function POST(request: NextRequest) {
   try {
@@ -238,31 +239,30 @@ export async function POST(request: NextRequest) {
           ])
         }
       }
-
-      // ── Also check standalone partner referral code ──────────────────────────
-      if (rawReferralCode) {
-        const inputCode = normaliseCode(rawReferralCode)
-        const { data: standalonePartner } = await admin
-          .from('standalone_partners')
-          .select('id')
-          .eq('referral_code', inputCode)
-          .maybeSingle()
-
-        if (standalonePartner) {
-          // Mark any open MSME invite for this user's email as signed_up
-          const userEmail = user.email?.toLowerCase()
-          if (userEmail) {
-            await admin
-              .from('partner_portal_invites')
-              .update({ signed_up: true, signed_up_at: new Date().toISOString() })
-              .eq('partner_id', standalonePartner.id)
-              .eq('email', userEmail)
-              .eq('invite_type', 'msme')
-              .eq('signed_up', false)
-          }
-        }
-      }
     }
+
+    // ── Partner-portal MSME referral: attribute by EMAIL, not referral code ────
+    // The referral code lives in sessionStorage on upfloat.co, but an OAuth
+    // signup usually finishes onboarding on the msme.upfloat.co subdomain —
+    // a different origin — so the code is gone by the time we get here. The
+    // invited EMAIL always survives, so we match on that instead. This both
+    // marks the invite as signed_up (fixes the partner dashboard stuck on
+    // "Invited") and tells us to send this user to /msme rather than the task
+    // manager. Exactly ONE partner is credited (see attributeSignup) so two
+    // partners inviting the same email can never double-pay commission — the
+    // partner whose code the user actually used wins, else the last inviter.
+    let preferMsmePartnerId: string | null = null
+    if (rawReferralCode) {
+      const { data: codePartner } = await admin
+        .from('standalone_partners')
+        .select('id')
+        .eq('referral_code', normaliseCode(rawReferralCode))
+        .maybeSingle()
+      preferMsmePartnerId = (codePartner as any)?.id ?? null
+    }
+    const msmeReferral = user.email
+      ? await attributeSignup(admin, user.email, 'msme', preferMsmePartnerId)
+      : false
 
     // Add owner member
     await admin.from('org_members').insert({ org_id: org.id, user_id: user.id, role: 'owner', is_active: true })
@@ -289,7 +289,7 @@ export async function POST(request: NextRequest) {
       console.error('[onboarding] Failed to fire user/welcome event:', e)
     }
 
-    return NextResponse.json({ success: true, org_id: org.id }, { status: 201 })
+    return NextResponse.json({ success: true, org_id: org.id, msme_referral: msmeReferral }, { status: 201 })
   } catch (err: any) {
     return NextResponse.json(dbError(err, 'onboarding'), { status: 500 })
   }
