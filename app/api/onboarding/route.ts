@@ -2,6 +2,7 @@ import { NextResponse }  from 'next/server'
 import type { NextRequest } from 'next/server'
 import { dbError } from '@/lib/api-error'
 import { generateCode, normaliseCode } from '@/lib/utils/codeGen'
+import { attributeSignup } from '@/lib/partner/attribution'
 
 export async function POST(request: NextRequest) {
   try {
@@ -247,25 +248,21 @@ export async function POST(request: NextRequest) {
     // invited EMAIL always survives, so we match on that instead. This both
     // marks the invite as signed_up (fixes the partner dashboard stuck on
     // "Invited") and tells us to send this user to /msme rather than the task
-    // manager. Multiple partners may have invited the same email — mark them all.
-    let msmeReferral = false
-    const inviteEmail = user.email?.toLowerCase()
-    if (inviteEmail) {
-      const { data: openMsmeInvites } = await admin
-        .from('partner_portal_invites')
+    // manager. Exactly ONE partner is credited (see attributeSignup) so two
+    // partners inviting the same email can never double-pay commission — the
+    // partner whose code the user actually used wins, else the last inviter.
+    let preferMsmePartnerId: string | null = null
+    if (rawReferralCode) {
+      const { data: codePartner } = await admin
+        .from('standalone_partners')
         .select('id')
-        .eq('email', inviteEmail)
-        .eq('invite_type', 'msme')
-        .eq('signed_up', false)
-
-      if (openMsmeInvites && openMsmeInvites.length > 0) {
-        msmeReferral = true
-        await admin
-          .from('partner_portal_invites')
-          .update({ signed_up: true, signed_up_at: new Date().toISOString() })
-          .in('id', openMsmeInvites.map((r: any) => r.id))
-      }
+        .eq('referral_code', normaliseCode(rawReferralCode))
+        .maybeSingle()
+      preferMsmePartnerId = (codePartner as any)?.id ?? null
     }
+    const msmeReferral = user.email
+      ? await attributeSignup(admin, user.email, 'msme', preferMsmePartnerId)
+      : false
 
     // Add owner member
     await admin.from('org_members').insert({ org_id: org.id, user_id: user.id, role: 'owner', is_active: true })

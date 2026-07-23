@@ -2,6 +2,7 @@ import { redirect }          from 'next/navigation'
 import { createClient }      from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { generateCode }      from '@/lib/utils/codeGen'
+import { attributeSignup }   from '@/lib/partner/attribution'
 import { PartnerDashboard }  from './PartnerDashboard'
 
 export const metadata = { title: 'Partner Dashboard' }
@@ -76,6 +77,11 @@ export default async function PartnerDashboardPage() {
 
     if (created) {
       partner = created
+      // This user became a partner without going through /partners/join (e.g. an
+      // existing upFloat user landing here directly), so referred_by was never
+      // captured. Still credit whoever invited them to the partner program, by
+      // email — exactly one partner, matching the join-form path.
+      await attributeSignup(admin, user.email.toLowerCase(), 'partner')
     } else {
       // Fallback: if insert failed (e.g. email unique conflict from a race), try fetching again
       const { data: retry } = await admin

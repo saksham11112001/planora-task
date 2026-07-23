@@ -120,7 +120,7 @@ function useInView<T extends HTMLElement>(threshold = 0.3) {
 /* ============================================================
    NAV
 ============================================================ */
-function Nav() {
+function Nav({ loginUrl, signupUrl }: { loginUrl: string; signupUrl: string }) {
   const scrolled = useScrolled()
   return (
     <nav
@@ -181,13 +181,13 @@ function Nav() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <Link
-            href="/login?redirect=/msme"
+            href={loginUrl}
             style={{ color: C.text, fontWeight: 600, fontSize: 14, textDecoration: 'none' }}
           >
             Login
           </Link>
           <Link
-            href="/login?redirect=/msme&mode=signup"
+            href={signupUrl}
             style={{
               background: `linear-gradient(135deg, ${C.teal}, ${C.emerald})`,
               color: '#fff',
@@ -1613,15 +1613,15 @@ function MsmeLandingInner() {
     }
   }, [ref])
 
-  const loginUrl = ref
-    ? `/login?redirect=/msme&mode=signup&ref=${encodeURIComponent(ref)}`
-    : '/login?redirect=/msme&mode=signup'
+  const refParam = ref ? `&ref=${encodeURIComponent(ref)}` : ''
+  const loginUrl  = `/login?redirect=/msme&mode=signup${refParam}`   // signup CTA
+  const signInUrl = `/login?redirect=/msme${refParam}`               // "Login" link
   return (
     <>
       <ScrollProgressBar accent="#0d9488" />
       {/* Sticky CTA uses loginUrl so partner ?ref= attribution is preserved */}
       <StickyCTA href={loginUrl} label="Start free — no credit card" accent="#0d9488" />
-      <Nav />
+      <Nav loginUrl={signInUrl} signupUrl={loginUrl} />
       <Hero loginUrl={loginUrl} />
       <div style={{ padding: '10px 0' }}>
         <Marquee accent="#0d9488" items={[
