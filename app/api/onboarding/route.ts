@@ -264,6 +264,21 @@ export async function POST(request: NextRequest) {
       ? await attributeSignup(admin, user.email, 'msme', preferMsmePartnerId)
       : false
 
+    // ── Product-scoped mailers ────────────────────────────────────────────────
+    // Record that this person signed up through MSME so they never receive
+    // upFloat task-manager usage email (task assigned, digests, approvals…).
+    // Promotional email still reaches them — that's how we cross-sell the app.
+    // Guarded twice: only on the user's FIRST org, and only when their product
+    // is still the default 'app', so an existing app user is never downgraded.
+    const hint = typeof body.signup_product === 'string' ? body.signup_product : 'app'
+    const resolvedProduct = msmeReferral ? 'msme' : (hint === 'msme' ? 'msme' : 'app')
+    if (resolvedProduct === 'msme' && isFirstOrg) {
+      await admin.from('users')
+        .update({ signup_product: 'msme' })
+        .eq('id', user.id)
+        .eq('signup_product', 'app')
+    }
+
     // Add owner member
     await admin.from('org_members').insert({ org_id: org.id, user_id: user.id, role: 'owner', is_active: true })
 

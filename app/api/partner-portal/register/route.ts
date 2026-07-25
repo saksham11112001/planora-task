@@ -45,6 +45,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Could not create your account — please try again' }, { status: 500 })
   }
 
+  // Tag brand-new accounts as partner-only so they never receive upFloat
+  // task-manager usage email. Only on creation — an existing upFloat user who
+  // also becomes a partner keeps their 'app' product and all their app email.
+  if (created?.user?.id) {
+    await admin.from('users').upsert({
+      id:             created.user.id,
+      email:          cleanEmail,
+      name:           name.trim().slice(0, 100),
+      signup_product: 'partner',
+    }, { onConflict: 'id' })
+  }
+
   const { profile, error: profileErr } = await ensurePartnerProfile(admin, {
     name,
     email:      cleanEmail,
