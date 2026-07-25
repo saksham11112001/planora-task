@@ -17,7 +17,7 @@ function PartnerLoginInner() {
 
   useEffect(() => {
     if (params.get('registered') === '1') {
-      setInfo('Account created! Please check your email to confirm your address, then sign in.')
+      setInfo('Account created! Sign in with the email and password you just chose.')
     }
     if (params.get('already') === '1') {
       setInfo('An account with this email already exists. Please sign in to connect to the partner program.')

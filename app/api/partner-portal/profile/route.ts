@@ -1,12 +1,13 @@
 // Create or fetch a standalone partner profile.
-// POST: called from the join page — creates the partner record before sending magic link.
+// POST: creates the partner record for an already-authenticated user.
+//       (New partner signups go through /api/partner-portal/register, which
+//       also creates the auth account — this route creates the profile only.)
 // GET: returns the current user's partner profile.
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient }             from '@/lib/supabase/server'
 import { getAuthUser } from '@/lib/supabase/authUser'
 import { createAdminClient }        from '@/lib/supabase/admin'
-import { generateCode }             from '@/lib/utils/codeGen'
-import { attributeSignup }          from '@/lib/partner/attribution'
+import { ensurePartnerProfile }     from '@/lib/partner/profile'
 
 export async function GET(req: NextRequest) {
   const supabase = await createClient()
@@ -33,70 +34,18 @@ export async function POST(req: NextRequest) {
 
   const admin = createAdminClient()
 
-  // Check if a partner with this email already exists
-  const { data: existing } = await admin
-    .from('standalone_partners')
-    .select('id, referral_code, status')
-    .eq('email', email.trim().toLowerCase())
-    .maybeSingle()
+  // Shared with /api/partner-portal/register so both paths create profiles
+  // (and credit the inviting partner) identically.
+  const { profile, error } = await ensurePartnerProfile(admin, {
+    name,
+    email,
+    phone:      phone ?? null,
+    referredBy: referred_by ?? null,
+  })
 
-  if (existing) {
-    // Partner already registered — return success (magic link will be sent by client)
-    return NextResponse.json({ id: existing.id, referral_code: existing.referral_code, exists: true })
-  }
+  if (!profile) return NextResponse.json({ error: error ?? 'Registration failed' }, { status: 500 })
 
-  // Check if referred_by is a valid referral code
-  let referredByCode: string | null = null
-  if (referred_by?.trim()) {
-    const { data: referrer } = await admin
-      .from('standalone_partners')
-      .select('id')
-      .eq('referral_code', referred_by.trim().toUpperCase())
-      .maybeSingle()
-    if (referrer) referredByCode = referred_by.trim().toUpperCase()
-  }
-
-  // Generate unique referral code — retry up to 5 times to handle collision
-  let refCode = generateCode(8)
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const { data: clash } = await admin.from('standalone_partners').select('id').eq('referral_code', refCode).maybeSingle()
-    if (!clash) break
-    refCode = generateCode(8)
-  }
-
-  const { data: newPartner, error } = await admin
-    .from('standalone_partners')
-    .insert({
-      name:          name.trim(),
-      email:         email.trim().toLowerCase(),
-      phone:         phone ?? null,
-      referral_code: refCode,
-      referred_by:   referredByCode,
-      status:        'active',
-    })
-    .select('id, referral_code')
-    .single()
-
-  if (error) {
-    console.error('[partner-portal/profile] insert failed:', error.message)
-    return NextResponse.json({ error: 'Registration failed — please try again' }, { status: 500 })
-  }
-
-  // Credit the inviting partner for this partner-program signup — exactly one,
-  // to prevent double commission. Prefer the partner whose code was used
-  // (referred_by); fall back to the most-recent inviter of this email.
-  let preferPartnerId: string | null = null
-  if (referredByCode) {
-    const { data: referrerPartner } = await admin
-      .from('standalone_partners')
-      .select('id')
-      .eq('referral_code', referredByCode)
-      .maybeSingle()
-    preferPartnerId = referrerPartner?.id ?? null
-  }
-  await attributeSignup(admin, email.trim().toLowerCase(), 'partner', preferPartnerId)
-
-  return NextResponse.json({ id: newPartner.id, referral_code: newPartner.referral_code, exists: false })
+  return NextResponse.json({ id: profile.id, referral_code: profile.referral_code, exists: profile.exists })
 }
 
 // Called from auth callback after magic link login to link user_id to partner record

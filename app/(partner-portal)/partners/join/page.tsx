@@ -25,20 +25,6 @@ export default function PartnerJoinPage() {
     })
   }, [])
 
-  // Called in all paths to ensure the partner profile row exists
-  async function ensurePartnerProfile(nameVal: string, emailVal: string, phoneVal: string, refCodeVal: string) {
-    await fetch('/api/partner-portal/profile', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name:        nameVal,
-        email:       emailVal,
-        phone:       phoneVal || null,
-        referred_by: refCodeVal || null,
-      }),
-    })
-  }
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!name.trim())    { setError('Name is required'); return }
@@ -48,47 +34,35 @@ export default function PartnerJoinPage() {
     if (password !== confirmPwd) { setError('Passwords do not match'); return }
     setLoading(true); setError('')
     try {
-      // Create Supabase account with email + password
-      const supabase = createClient()
-      const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
-        email:    email.trim().toLowerCase(),
-        password,
-        options: { emailRedirectTo: `${window.location.origin}/auth/callback?next=/partners/dashboard` },
-      })
-      if (signUpErr) {
-        // If the user already has an account, create their partner profile then send them to login.
-        // Without this, existing Supabase users could never become partners because signUp()
-        // fails before the profile API is ever called, causing an infinite join→login→dashboard loop.
-        if (signUpErr.message.toLowerCase().includes('already registered') ||
-            signUpErr.message.toLowerCase().includes('already been registered') ||
-            signUpErr.status === 422) {
-          await ensurePartnerProfile(name.trim(), email.trim().toLowerCase(), phone.trim(), refCode.trim())
-          router.push('/partners/login?already=1')
-          return
-        }
-        setError(signUpErr.message); return
-      }
-
-      // Register partner profile (idempotent — safe to call even if record already exists)
-      const res = await fetch('/api/partner-portal/profile', {
+      // Register server-side: the account is created with email_confirm=true so
+      // NO verification email is sent. This avoids Supabase's built-in SMTP rate
+      // limit ("email rate limit exceeded"), which previously aborted signup
+      // entirely and left people unable to log in afterwards.
+      const res  = await fetch('/api/partner-portal/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name:        name.trim(),
           email:       email.trim().toLowerCase(),
           phone:       phone.trim() || null,
+          password,
           referred_by: refCode.trim() || null,
         }),
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error ?? 'Registration failed'); return }
 
-      // If session is already active (email confirm disabled), go straight to dashboard
-      if (signUpData.session) {
-        router.push('/partners/dashboard')
-      } else {
-        router.push('/partners/login?registered=1')
-      }
+      // Email already had an account — their existing password still applies,
+      // so we never touch it. Send them to sign in.
+      if (data.account_existed) { router.push('/partners/login?already=1'); return }
+
+      // Fresh account — sign in immediately, no email round-trip.
+      const { error: signInErr } = await createClient().auth.signInWithPassword({
+        email:    email.trim().toLowerCase(),
+        password,
+      })
+      if (signInErr) { router.push('/partners/login?registered=1'); return }
+      router.push('/partners/dashboard')
     } catch { setError('Something went wrong — please try again') }
     finally { setLoading(false) }
   }
