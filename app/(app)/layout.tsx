@@ -1,21 +1,27 @@
 import { redirect }  from 'next/navigation'
 import { AppShell }  from './AppShell'
-import { getSessionUser, getUserProfile } from '@/lib/supabase/cached'
+import { getSessionUser, getSessionUserId, getUserProfile } from '@/lib/supabase/cached'
 import { getActiveOrgMembership, getUserOrgs } from '@/lib/supabase/activeOrg'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   try {
     // Use React-cached helpers so the layout and child page components share
     // a single set of DB calls per request — no double-fetching.
-    const user = await getSessionUser()
-    if (!user) redirect('/login')
+    //
+    // PERF: resolve the user id LOCALLY first (JWT claims — no network), so
+    // the three DB queries AND the network getUser() all run in parallel.
+    // Previously getUser() was a serial gate in front of the queries, putting
+    // a full Supabase-Auth round-trip on the critical path of every page.
+    const userId = await getSessionUserId()
+    if (!userId) redirect('/login')
 
-    // Membership + profile + all orgs can run in parallel
-    const [membership, profile, allOrgs] = await Promise.all([
-      getActiveOrgMembership(user.id),
-      getUserProfile(user.id),
-      getUserOrgs(user.id),
+    const [user, membership, profile, allOrgs] = await Promise.all([
+      getSessionUser(),                 // full user object (created_at etc.)
+      getActiveOrgMembership(userId),
+      getUserProfile(userId),
+      getUserOrgs(userId),
     ])
+    if (!user) redirect('/login')
 
     // NOTE: a previous "repair" block here blanket-reactivated ALL of a user's
     // inactive memberships (patching an old provision/join-invite bug that has

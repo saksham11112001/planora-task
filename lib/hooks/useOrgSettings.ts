@@ -76,13 +76,28 @@ function notifyAll(s: OrgSettings, orgId?: string) {
 
 async function fetchSettings(): Promise<OrgSettings> {
   try {
-    const [customRes, fieldsRes, featuresRes, permissionsRes, localeRes] = await Promise.all([
-      fetch('/api/settings/custom-fields').then(r => r.json()).catch(() => ({ data: [] })),
-      fetch('/api/settings/fields').then(r => r.json()).catch(() => ({ data: null })),
-      fetch('/api/settings/features').then(r => r.json()).catch(() => ({ data: {} })),
-      fetch('/api/settings/permissions').then(r => r.json()).catch(() => ({ data: null })),
-      fetch('/api/settings/locale').then(r => r.json()).catch(() => ({ data: null })),
-    ])
+    // Fast path: ONE request instead of five. Each of the old five paid its
+    // own middleware pass + auth + org lookup, mostly reading the same row —
+    // a visible chunk of first-page-load time. Same payload shapes.
+    let customRes: any, fieldsRes: any, featuresRes: any, permissionsRes: any, localeRes: any
+    const boot = await fetch('/api/settings/bootstrap')
+      .then(r => (r.ok ? r.json() : null)).catch(() => null)
+    if (boot?.data) {
+      customRes      = { data: boot.data.custom_fields }
+      fieldsRes      = { data: boot.data.task_fields }
+      featuresRes    = { data: boot.data.features }
+      permissionsRes = { data: boot.data.permissions }
+      localeRes      = { data: boot.data.locale }
+    } else {
+      // Fallback: the original five-request path (kept for resilience)
+      ;[customRes, fieldsRes, featuresRes, permissionsRes, localeRes] = await Promise.all([
+        fetch('/api/settings/custom-fields').then(r => r.json()).catch(() => ({ data: [] })),
+        fetch('/api/settings/fields').then(r => r.json()).catch(() => ({ data: null })),
+        fetch('/api/settings/features').then(r => r.json()).catch(() => ({ data: {} })),
+        fetch('/api/settings/permissions').then(r => r.json()).catch(() => ({ data: null })),
+        fetch('/api/settings/locale').then(r => r.json()).catch(() => ({ data: null })),
+      ])
+    }
     const raw = featuresRes.data ?? {}
     const nav: NavFeatures = {
       one_time_tasks:     raw.one_time_tasks     !== undefined ? raw.one_time_tasks     : true,

@@ -2,7 +2,8 @@ import { inngest }              from '../client'
 import { createAdminClient }    from '@/lib/supabase/admin'
 import { markQueueSent }        from '@/lib/email/queue'
 import { digestEmailHtml }      from '@/lib/email/templates/digestEmail'
-import { resend, FROM }         from '@/lib/email/resend'
+import { FROM }                 from '@/lib/email/resend'
+import { sendAppUsageEmail }    from '@/lib/email/audience'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://upfloat.co'
 
@@ -74,7 +75,10 @@ async function runDigest(slot: 'morning' | 'evening') {
         // The Brevo wrapper RETURNS errors rather than throwing — check the
         // result explicitly. Marking items sent on a failed send silently
         // destroys the user's digest (it never retries).
-        const { error: sendErr } = await resend.emails.send({
+        // Product-gated: the digest is upFloat task-manager usage email, so it
+        // is skipped for MSME-only / partner-only users (reported as success,
+        // which correctly clears their queue instead of retrying forever).
+        const { error: sendErr } = await sendAppUsageEmail({
           from:    FROM,
           to:      userEmail,
           subject: `📬 upFloat digest (${slotLabel} IST) — ${items.length} update${items.length === 1 ? '' : 's'}`,

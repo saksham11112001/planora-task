@@ -45,7 +45,10 @@ export async function middleware(request: NextRequest) {
     else if (pathname.startsWith('/api/org/join'))           bucket = 'join'
 
     const cfg    = RATE_LIMITS[bucket]
-    const result = await checkRateLimit(ip, bucket, cfg.max, cfg.windowMs)
+    // General 'api' bucket enforces in-memory (no Redis round-trip) — that
+    // round-trip was a flat latency tax on every data fetch of every page.
+    // Sensitive buckets keep distributed (Upstash) enforcement.
+    const result = await checkRateLimit(ip, bucket, cfg.max, cfg.windowMs, { local: bucket === 'api' })
 
     if (!result.allowed) return buildRateLimitResponse(result)
 

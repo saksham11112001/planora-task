@@ -234,9 +234,20 @@ export default function OnboardingPage() {
     if (!form.org_name.trim()) { setError('Organisation name is required'); return }
     setSaving(true); setError('')
     try {
+      // Which product is this signup for? Tells the server to scope this user's
+      // mailers, so an MSME signup never gets upFloat task-manager usage email.
+      // Read (not cleared) here — the destination is consumed after the call.
+      const pendingDest = sessionStorage.getItem('upfloat_post_onboard') ?? ''
+      const nextParam   = new URLSearchParams(window.location.search).get('next') ?? ''
+      const isMsmeSignup =
+        pendingDest.startsWith('/msme') ||
+        nextParam.startsWith('/msme') ||
+        window.location.hostname.startsWith('msme.')
+
       const res = await fetch('/api/onboarding', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          signup_product:    isMsmeSignup ? 'msme' : 'app',
           name:              form.name.trim(),
           org_name:          form.org_name,
           industry:          form.industry,

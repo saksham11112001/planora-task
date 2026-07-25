@@ -1,4 +1,8 @@
-import { resend, FROM }           from './resend'
+import { resend, FROM }          from './resend'
+// sendAppUsageEmail = product-gated send: skips recipients who signed up
+// through MSME / the Partner Program. Used for every upFloat task-manager
+// email below. The few sends that keep plain `resend` are marked inline.
+import { sendAppUsageEmail }     from './audience'
 import { generateActionToken }   from './actionToken'
 import { welcomeEmailHtml, welcomeEmailSubject, day2EmailHtml, day2EmailSubject } from './templates/welcomeEmail'
 import { trialExpiringSoonHtml, trialExpiringSoonSubject, trialExpiredHtml, trialExpiredSubject } from './templates/trialEmail'
@@ -44,7 +48,7 @@ export async function sendTaskAssignedEmail(p: {
     aUrl   = actionUrl(p.taskId, p.assigneeUserId, act)
     aLabel = p.approvalRequired ? 'Submit for Approval' : 'Mark Complete'
   }
-  return resend.emails.send({
+  return sendAppUsageEmail({
     from: FROM, to: p.to,
     subject: `New task assigned: ${p.taskTitle}`,
     html: taskAssignedHtml({ ...p, taskUrl: url, actionUrl: aUrl, actionLabel: aLabel }),
@@ -59,7 +63,7 @@ export async function sendDueSoonEmail(p: {
   hoursLeft: number; projectName?: string | null; projectId?: string | null
 }) {
   const url = taskUrl(p.taskId, p.projectId)
-  return resend.emails.send({
+  return sendAppUsageEmail({
     from: FROM, to: p.to,
     subject: `⏰ Due soon: ${p.taskTitle}`,
     html: taskDueSoonHtml({ ...p, taskUrl: url }),
@@ -76,7 +80,7 @@ export async function sendApprovalRequestedEmail(p: {
   const url        = taskUrl(p.taskId, p.projectId)
   const approveUrl = p.managerUserId ? actionUrl(p.taskId, p.managerUserId, 'approve') : null
   const rejectUrl  = p.managerUserId ? actionUrl(p.taskId, p.managerUserId, 'reject')  : null
-  return resend.emails.send({
+  return sendAppUsageEmail({
     from: FROM, to: p.to,
     subject: `🔔 Approval needed: ${p.taskTitle}`,
     html: approvalRequestedHtml({ ...p, taskUrl: url, approveUrl, rejectUrl }),
@@ -91,7 +95,7 @@ export async function sendApprovalResultEmail(p: {
 }) {
   const url = taskUrl(p.taskId, p.projectId)
   const verb = p.decision === 'approved' ? 'Approved' : 'Rejected'
-  return resend.emails.send({
+  return sendAppUsageEmail({
     from: FROM, to: p.to,
     subject: `${p.decision === 'approved' ? '✅' : '❌'} Task ${verb}: ${p.taskTitle}`,
     html: approvalResultHtml({ ...p, taskUrl: url }),
@@ -104,7 +108,7 @@ export async function sendApprovalDigestEmail(p: {
   to: string; approverName: string; orgName: string
   tasks: { taskId: string; taskTitle: string; assigneeName: string; dueDate?: string | null; projectId?: string | null }[]
 }) {
-  return resend.emails.send({
+  return sendAppUsageEmail({
     from: FROM, to: p.to,
     subject: `🔔 ${p.tasks.length} task${p.tasks.length !== 1 ? 's' : ''} waiting for your approval — ${p.orgName}`,
     html: approvalDigestHtml(p),
@@ -118,7 +122,7 @@ export async function sendTaskCommentedEmail(p: {
   orgName: string; projectId?: string | null
 }) {
   const url = taskUrl(p.taskId, p.projectId)
-  return resend.emails.send({
+  return sendAppUsageEmail({
     from: FROM, to: p.to,
     subject: `💬 New comment on: ${p.taskTitle}`,
     html: taskCommentedHtml({ ...p, taskUrl: url }),
@@ -132,7 +136,7 @@ export async function sendProjectUpdatedEmail(p: {
   updatedBy: string; orgName: string
 }) {
   const url = `${APP_URL}/projects/${p.projectId}`
-  return resend.emails.send({
+  return sendAppUsageEmail({
     from: FROM, to: p.to,
     subject: `📁 Project updated: ${p.projectName} is now ${p.newStatus.replace('_',' ')}`,
     html: projectUpdatedHtml({ ...p, projectUrl: url, memberName: p.recipientName }),
@@ -144,7 +148,7 @@ export async function sendMemberInvitedEmail(p: {
   to: string; recipientName: string; memberName: string
   memberEmail: string; role: string; invitedBy: string; orgName: string
 }) {
-  return resend.emails.send({
+  return sendAppUsageEmail({
     from: FROM, to: p.to,
     subject: `👋 ${p.memberName} joined ${p.orgName} on upFloat`,
     html: memberInvitedHtml({ ...p, appUrl: APP_URL }),
@@ -157,6 +161,9 @@ export async function sendClientDocReminderEmail(p: {
   taskTitle: string; dueDate: string; collectionDeadline: string
   daysLeft: number; portalUrl: string; missingDocs: string[]
 }) {
+  // NOT product-gated: recipients are the firm's CLIENTS, not upFloat users.
+  // A client's address could coincidentally match an MSME signup, and blocking
+  // their document reminders would break the CA's workflow.
   return resend.emails.send({
     from: FROM, to: p.to,
     subject: clientDocReminderSubject(p),
@@ -166,6 +173,7 @@ export async function sendClientDocReminderEmail(p: {
 
 // ── Client document reminder — batched (one email, multiple tasks) ───────────
 export async function sendBatchedClientDocReminderEmail(p: BatchProps & { to: string }) {
+  // NOT product-gated — external clients (see above).
   return resend.emails.send({
     from: FROM, to: p.to,
     subject: clientDocReminderBatchSubject(p),
@@ -180,7 +188,7 @@ export async function sendClientUploadNotifyEmail(p: {
   fileName: string; taskId: string; projectId?: string | null
 }) {
   const url = taskUrl(p.taskId, p.projectId)
-  return resend.emails.send({
+  return sendAppUsageEmail({
     from: FROM, to: p.to,
     subject: clientUploadNotifySubject({ ...p, taskUrl: url }),
     html:    clientUploadNotifyHtml({ ...p, taskUrl: url }),
@@ -195,7 +203,7 @@ export async function sendEscalationEmail(p: {
   projectName?: string | null; projectId?: string | null
 }) {
   const url = taskUrl(p.taskId, p.projectId)
-  return resend.emails.send({
+  return sendAppUsageEmail({
     from: FROM, to: p.to,
     subject: `🚨 Escalation: "${p.taskTitle}" is ${p.daysOverdue} day${p.daysOverdue===1?'':'s'} overdue`,
     html: escalationAlertHtml({ ...p, taskUrl: url }),
@@ -205,7 +213,7 @@ export async function sendEscalationEmail(p: {
 export async function sendWelcomeEmail(p: {
   to: string; userName: string; orgName: string; trialDays?: number
 }) {
-  return resend.emails.send({
+  return sendAppUsageEmail({
     from: FROM, to: p.to,
     subject: welcomeEmailSubject({ userName: p.userName }),
     html:    welcomeEmailHtml({ ...p, appUrl: APP_URL }),
@@ -216,7 +224,7 @@ export async function sendWelcomeEmail(p: {
 export async function sendDay2Email(p: {
   to: string; userName: string; orgName: string
 }) {
-  return resend.emails.send({
+  return sendAppUsageEmail({
     from: FROM, to: p.to,
     subject: day2EmailSubject(),
     html:    day2EmailHtml({ ...p, appUrl: APP_URL }),
@@ -228,7 +236,7 @@ export async function sendTrialExpiringSoonEmail(p: {
   to: string; userName: string; orgName: string
   trialEndsAt: string; daysLeft: number
 }) {
-  return resend.emails.send({
+  return sendAppUsageEmail({
     from: FROM, to: p.to,
     subject: trialExpiringSoonSubject({ daysLeft: p.daysLeft }),
     html:    trialExpiringSoonHtml({ ...p, appUrl: APP_URL }),
@@ -239,7 +247,7 @@ export async function sendTrialExpiringSoonEmail(p: {
 export async function sendTrialExpiredEmail(p: {
   to: string; userName: string; orgName: string
 }) {
-  return resend.emails.send({
+  return sendAppUsageEmail({
     from: FROM, to: p.to,
     subject: trialExpiredSubject(),
     html:    trialExpiredHtml({ ...p, appUrl: APP_URL }),
@@ -251,7 +259,7 @@ export async function sendReEngagementEmail(p: {
   to: string; userName: string; orgName: string; daysSince: number
   overdueCount: number; pendingCount: number
 }) {
-  return resend.emails.send({
+  return sendAppUsageEmail({
     from: FROM, to: p.to,
     subject: reEngagementSubject({ userName: p.userName, overdueCount: p.overdueCount }),
     html:    reEngagementHtml({ ...p, appUrl: APP_URL }),
@@ -263,7 +271,7 @@ export async function sendOnboardingNudgeEmail(p: {
   to: string; userName: string; orgName: string
   hasClient: boolean; hasTask: boolean; hasTeam: boolean; hasCa: boolean
 }) {
-  return resend.emails.send({
+  return sendAppUsageEmail({
     from: FROM, to: p.to,
     subject: onboardingNudgeSubject({ userName: p.userName }),
     html:    onboardingNudgeHtml({ ...p, appUrl: APP_URL }),
@@ -283,6 +291,8 @@ export async function sendMsmeVendorEmail(p: {
   // Strip characters that could break or spoof the From header.
   const safeOrgName = p.orgName.replace(/[<>"\r\n;,]/g, '').trim().slice(0, 60) || 'MSME Compliance'
   const msmeFrom    = `${safeOrgName} <${msmeDomain}>`
+  // NOT product-gated: this is MSME's own product email, sent to the customer's
+  // VENDORS (who are not upFloat users at all).
   return resend.emails.send({
     from: msmeFrom, to: p.to,
     ...(p.cc ? { cc: [p.cc] } : {}),
@@ -294,6 +304,8 @@ export async function sendMsmeVendorEmail(p: {
 
 // ── Payment tax invoice ───────────────────────────────────────────────────
 export async function sendInvoiceEmail(p: InvoiceProps) {
+  // NOT product-gated: a tax invoice is a financial/legal record and must
+  // always reach the customer, whichever product they bought.
   return resend.emails.send({
     from:    FROM,
     to:      p.customerEmail,
@@ -308,7 +320,7 @@ export async function sendUpgradePushEmail(p: {
   to: string; userName: string; orgName: string
   currentPlan: 'free' | 'starter' | 'pro'; limitHit: 'tasks' | 'members' | 'clients' | 'storage' | 'ai'
 }) {
-  return resend.emails.send({
+  return sendAppUsageEmail({
     from: FROM, to: p.to,
     subject: upgradePushSubject({ orgName: p.orgName, limitHit: p.limitHit }),
     html:    upgradePushHtml({ ...p, appUrl: APP_URL }),
