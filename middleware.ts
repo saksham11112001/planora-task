@@ -70,7 +70,13 @@ export async function middleware(request: NextRequest) {
     const sbNames = rawCookie.split(';')
       .map(p => p.split('=')[0].trim())
       .filter(n => n.startsWith('sb-'))
-    if (sbNames.length !== new Set(sbNames).size) {
+    // LOOP GUARD: only ever attempt the heal once per browser. If a duplicate
+    // survives our clear (e.g. it was set on a Path we don't target, and
+    // browsers differ here — Chrome and Edge don't behave identically), a
+    // second redirect would loop forever and freeze the tab. The marker cookie
+    // means the worst case is "heal didn't work", never an infinite loop.
+    const healed = request.cookies.get('sb-heal')?.value === '1'
+    if (!healed && sbNames.length !== new Set(sbNames).size) {
       // Clear BOTH variants of every Supabase cookie, then replay the
       // request. The user signs in once more and gets a single clean set.
       const res = NextResponse.redirect(request.nextUrl.clone())
@@ -81,6 +87,7 @@ export async function middleware(request: NextRequest) {
           res.headers.append('Set-Cookie', `${n}=; Path=/; Max-Age=0; Domain=.upfloat.co`)
         }
       }
+      res.cookies.set('sb-heal', '1', { path: '/', maxAge: 300, httpOnly: true, sameSite: 'lax' })
       return res
     }
   }
