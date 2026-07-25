@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -52,7 +52,15 @@ export default function LoginPage() {
     return '/dashboard'
   }
 
+  // Runs exactly once. Guarded by a ref rather than dependencies: if `router`
+  // identity ever changed, a dependency-driven re-run would call router.replace
+  // again on every render — an effect loop that freezes the tab on its own.
+  const didInit = useRef(false)
+
   useEffect(() => {
+    if (didInit.current) return
+    didInit.current = true
+
     const params = new URLSearchParams(window.location.search)
     // Persist referral code from ?ref= so onboarding can pick it up after auth
     const ref = params.get('ref')
@@ -76,21 +84,38 @@ export default function LoginPage() {
       setMode('email_password')
     }
 
-    // Already signed in? Skip the form entirely. This also rescues the
-    // replayed-link case where the callback redirected here with ?error=
-    // even though the first click already established a session.
-    // MUST be getUser() (server-validated), NOT getSession(): a session that
-    // is valid locally but dead server-side would redirect to /dashboard,
-    // whose layout bounces back here → infinite loop that freezes the tab.
+    // Already signed in? Skip the form entirely (this also rescues the
+    // replayed-link case where the callback sent us here with ?error= even
+    // though the first click already established a session).
+    //
+    // The redirect MUST be decided by the SERVER, not by the browser's own
+    // session. The browser client validates its own copy of the token, but
+    // middleware and server layouts read the cookie the browser SENDS — and a
+    // stale/duplicate sb-* cookie makes those views disagree (differently in
+    // Chrome vs Edge). Redirecting on the browser's view produced an endless
+    // /login -> /dashboard -> /login bounce that froze the tab.
     const supabase = createClient()
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session?.user) return              // anonymous visitor — no network call
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) { router.replace(getPostLoginPath()); return }
-      // Dead local session (user deleted / token revoked): clear it so the
-      // form works and no other page loops on the phantom session.
-      // scope 'local' — clears THIS browser only. Default (global) would
-      // revoke the user's sessions on every device on a transient failure.
+
+      const serverSaysAuthed = await fetch('/api/session-check', { cache: 'no-store' })
+        .then(r => r.json()).then(j => !!j.authenticated).catch(() => false)
+
+      if (serverSaysAuthed) {
+        // BOUNCE GUARD: auto-redirect at most once per tab. If we somehow land
+        // back here anyway, show the form instead of bouncing again — a frozen
+        // tab is far worse than an extra click.
+        if (sessionStorage.getItem('upfloat_auto_redirect') === '1') return
+        sessionStorage.setItem('upfloat_auto_redirect', '1')
+        router.replace(getPostLoginPath())
+        return
+      }
+
+      // Browser thinks it's signed in but the server disagrees — the exact
+      // state that caused the freeze. Clear the local session so the form
+      // works and the next sign-in starts clean. scope 'local' keeps this to
+      // THIS browser (never revoke the user's other devices).
+      sessionStorage.removeItem('upfloat_auto_redirect')
       await supabase.auth.signOut({ scope: 'local' }).catch(() => {})
     }).catch(() => {})
 
