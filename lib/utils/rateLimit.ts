@@ -108,8 +108,15 @@ export async function checkRateLimit(
   namespace:  string,
   maxRequests: number,
   windowMs:    number,
+  opts?: { local?: boolean },
 ): Promise<RateLimitResult> {
-  if (!UPSTASH_ENABLED) {
+  // opts.local — enforce in-memory only, even when Upstash is configured.
+  // Used for the high-traffic general 'api' bucket: paying a Redis round-trip
+  // on EVERY routine API call adds latency to every page's data fetches, while
+  // the bucket's generous limit is coarse DoS protection where per-instance
+  // enforcement is adequate. Abuse-sensitive buckets (auth, upload, import,
+  // report, referral, join) stay distributed — a bypass there has real cost.
+  if (opts?.local || !UPSTASH_ENABLED) {
     return checkInMemory(identifier, namespace, maxRequests, windowMs)
   }
   try {
