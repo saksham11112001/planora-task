@@ -307,7 +307,7 @@ export const clientDocReminders = inngest.createFunction(
 
         // Look up the assignee's user_id (needed for the queue row)
         const { data: userRow } = await admin
-          .from('users').select('id').eq('email', email).maybeSingle()
+          .from('users').select('id').eq('email', email).limit(1).maybeSingle()
         if (!userRow?.id) return
 
         const orgMode = await getOrgNotifMode(orgId)

@@ -40,7 +40,7 @@ export const onTaskCommented = inngest.createFunction(
     let notified = 0
     for (const recipient of recipients) {
       const { data: prefs } = await admin.from('notification_preferences')
-        .select('via_email').eq('user_id', recipient.id).eq('event_type', 'task_commented').maybeSingle()
+        .select('via_email').eq('user_id', recipient.id).eq('event_type', 'task_commented').limit(1).maybeSingle()
       if (prefs?.via_email === false) continue
 
       const { mode, orgId } = await getOrgNotifModeForUser(recipient.id)

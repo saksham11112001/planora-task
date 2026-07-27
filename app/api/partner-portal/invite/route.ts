@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
     .from('standalone_partners')
     .select('id, name, referral_code')
     .eq('user_id', user.id)
-    .maybeSingle()
+    .limit(1).maybeSingle()
 
   if (!partner) return NextResponse.json({ error: 'Partner profile not found' }, { status: 404 })
 
@@ -120,7 +120,7 @@ export async function POST(req: NextRequest) {
         .eq('partner_id', partner.id)
         .eq('email', normalEmail)
         .eq('invite_type', invite_type)
-        .maybeSingle()
+        .limit(1).maybeSingle()
 
       if (existingInvite) {
         await admin.from('partner_portal_invites')

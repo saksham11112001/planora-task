@@ -481,7 +481,7 @@ export async function POST(request: NextRequest) {
           .from('users')
           .select('id')
           .eq('email', e)
-          .maybeSingle()
+          .limit(1).maybeSingle()
 
         if (appUser?.id) { emailCache[key] = appUser.id; return appUser.id }
 

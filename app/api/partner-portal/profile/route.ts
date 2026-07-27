@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
     .from('standalone_partners')
     .select('*')
     .eq('user_id', user.id)
-    .maybeSingle()
+    .limit(1).maybeSingle()
 
   if (!partner) return NextResponse.json({ error: 'No partner profile found' }, { status: 404 })
   return NextResponse.json(partner)
