@@ -67,7 +67,7 @@ export function NewProjectForm({ clients: initialClients, members, orgTemplates 
       const res = await fetch(`/api/tasks?project_id=${tmpl.id}&limit=500`)
       if (res.ok) {
         const json = await res.json()
-        const allTasks: any[] = json.data ?? json ?? []
+        const allTasks: any[] = Array.isArray(json.data) ? json.data : Array.isArray(json) ? json : []
         const parents = allTasks.filter((t: any) => !t.parent_task_id)
         const children = allTasks.filter((t: any) => !!t.parent_task_id)
         const tasks: TemplateTask[] = parents.map((p: any) => ({

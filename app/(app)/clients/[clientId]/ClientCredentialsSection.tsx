@@ -35,7 +35,11 @@ export function ClientCredentialsSection({ clientId, canManage }: Props) {
       const res = await fetch(`/api/client-credentials?client_id=${clientId}`)
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Failed to load credentials')
-      setCreds(data.credentials ?? data ?? [])
+      // API returns { data: [...] } — the old `data.credentials ?? data`
+      // fallback set state to the whole response OBJECT, crashing creds.map at
+      // render ("s.map is not a function"). Only ever store a real array.
+      const list = Array.isArray(data) ? data : (data.data ?? data.credentials)
+      setCreds(Array.isArray(list) ? list : [])
     } catch (e: any) {
       setError(e.message)
     } finally {
