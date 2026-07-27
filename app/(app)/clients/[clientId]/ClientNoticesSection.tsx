@@ -44,7 +44,11 @@ export function ClientNoticesSection({ clientId, canManage }: Props) {
       const res = await fetch(`/api/notices?client_id=${clientId}`)
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Failed to load notices')
-      setNotices(data.notices ?? data ?? [])
+      // API returns { data: [...] } — the old `data.notices ?? data` fallback
+      // set state to the whole response OBJECT, crashing notices.map at render
+      // (Sentry: "s.map is not a function"). Only ever store a real array.
+      const list = Array.isArray(data) ? data : (data.data ?? data.notices)
+      setNotices(Array.isArray(list) ? list : [])
     } catch (e: any) {
       setError(e.message)
     } finally {

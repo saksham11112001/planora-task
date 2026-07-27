@@ -124,7 +124,9 @@ export function CATasksView({ userRole, currentUserId, members, clients }: Props
       // all org tasks and discarding non-CA rows on the client.
       const res = await fetch('/api/tasks?top_level=true&ca_compliance=true')
       const json = await res.json().catch(() => ({}))
-      const all: any[] = json.data ?? json ?? []
+      // Never fall back to the raw response object — an { error } payload here
+      // previously became the array state and crashed .filter/.map at render.
+      const all: any[] = Array.isArray(json.data) ? json.data : Array.isArray(json) ? json : []
       const caTasks = all // already filtered server-side
 
       // Enrich with client data
