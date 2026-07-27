@@ -9,7 +9,7 @@
  *   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
  */
 import { createAdminClient } from './admin'
-import { ACTIVE_ORG_COOKIE } from './activeOrg'
+import { parseActiveOrgIds } from './activeOrg'
 import { isGhostAdmin, ghostMembership } from './ghostAdmin'
 import type { NextRequest }   from 'next/server'
 
@@ -20,11 +20,14 @@ export async function getApiOrgMembership(
   select:    string = 'org_id, role',
 ) {
   // Read ALL cookies with this name — a domain migration in a previous release can leave
-  // both a host-only cookie and a domain-scoped cookie with the same name. Browsers send
-  // the more-specific (host-only) one first, so .get() returns the stale value.
+  // both a host-only cookie and a domain-scoped cookie with the same name.
+  // MUST parse the RAW Cookie header: request.cookies is a Map keyed by name,
+  // so duplicates silently collapse to one value (and which one survives is
+  // browser-dependent). The old getAll() call here therefore never saw more
+  // than one candidate — when the stale duplicate won, this resolver landed on
+  // the wrong org, disagreeing with pages and breaking client-scoped loads.
   // We try every value until we find one the user actually has an active membership for.
-  const allOrgIds = request.cookies.getAll(ACTIVE_ORG_COOKIE)
-    .map(c => c.value).filter(Boolean)
+  const allOrgIds = parseActiveOrgIds(request.headers.get('cookie'))
   const activeOrgId = allOrgIds[0] ?? null
   const admin = createAdminClient() as any
 
