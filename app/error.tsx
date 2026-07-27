@@ -12,8 +12,14 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
     try {
       const { createClient } = await import('@/lib/supabase/client')
       const sb = createClient()
-      await sb.auth.signOut()
+      // scope 'local': clear THIS browser only — the global default would
+      // revoke the user's sessions on every device.
+      await sb.auth.signOut({ scope: 'local' })
     } finally {
+      // Clear both variants of the org cookie (host-only + domain-scoped) —
+      // duplicate-cookie corruption has been the top "couldn't load" cause.
+      document.cookie = 'upfloat_active_org=; Path=/; Max-Age=0'
+      document.cookie = 'upfloat_active_org=; Path=/; Max-Age=0; Domain=.upfloat.co'
       window.location.href = '/login'
     }
   }

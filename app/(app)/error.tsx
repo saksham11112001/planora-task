@@ -1,15 +1,27 @@
 'use client'
 import { useEffect } from 'react'
+import * as Sentry from '@sentry/nextjs'
 
 export default function AppError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
-  useEffect(() => { console.error('[App Error]', error) }, [error])
+  useEffect(() => {
+    console.error('[App Error]', error)
+    // Without this, workspace crashes were never reported — we debugged blind.
+    try { Sentry.captureException(error) } catch { /* ignore */ }
+  }, [error])
 
   async function signOut() {
     try {
       const { createClient } = await import('@/lib/supabase/client')
       const sb = createClient()
-      await sb.auth.signOut()
+      // scope 'local': clear THIS browser only — the global default would
+      // revoke the user's sessions on every device.
+      await sb.auth.signOut({ scope: 'local' })
     } finally {
+      // Corrupted duplicate cookies (host-only + domain-scoped) have been the
+      // top cause of unrecoverable "couldn't load" loops. Clear both variants
+      // of the org cookie so signing back in starts from a clean slate.
+      document.cookie = 'upfloat_active_org=; Path=/; Max-Age=0'
+      document.cookie = 'upfloat_active_org=; Path=/; Max-Age=0; Domain=.upfloat.co'
       window.location.href = '/login'
     }
   }

@@ -16,7 +16,7 @@ export const onApprovalRequested = inngest.createFunction(
 
     // Get manager prefs (find manager user_id from email)
     const { data: managerUser } = await admin.from('users')
-      .select('id').eq('email', d.manager_email).maybeSingle()
+      .select('id').eq('email', d.manager_email).limit(1).maybeSingle()
 
     const managerUserId = managerUser?.id
     let sendWA = false
@@ -24,7 +24,7 @@ export const onApprovalRequested = inngest.createFunction(
     if (managerUserId) {
       const { data: prefs } = await admin.from('notification_preferences')
         .select('via_email, via_whatsapp')
-        .eq('user_id', managerUserId).eq('event_type', 'task_approved').maybeSingle()
+        .eq('user_id', managerUserId).eq('event_type', 'task_approved').limit(1).maybeSingle()
       sendWA = prefs?.via_whatsapp ?? false
     }
 
@@ -80,7 +80,7 @@ export const onApprovalCompleted = inngest.createFunction(
 
     const { data: prefs } = await admin.from('notification_preferences')
       .select('via_email, via_whatsapp')
-      .eq('user_id', d.assignee_id).eq('event_type', 'task_approved').maybeSingle()
+      .eq('user_id', d.assignee_id).eq('event_type', 'task_approved').limit(1).maybeSingle()
 
     const sendEmail    = prefs?.via_email    ?? true
     const sendWhatsApp = prefs?.via_whatsapp ?? false

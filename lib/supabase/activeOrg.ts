@@ -10,21 +10,62 @@
  * changes beyond swapping the import.
  */
 import { cache }             from 'react'
-import { cookies }           from 'next/headers'
+import { cookies, headers }  from 'next/headers'
 import { createClient }      from './server'
 import { createAdminClient } from './admin'
 import { isGhostAdmin, ghostMembership } from './ghostAdmin'
 
 export const ACTIVE_ORG_COOKIE = 'upfloat_active_org'
 
+/**
+ * Extract EVERY value of the active-org cookie from a raw Cookie header.
+ *
+ * Why raw parsing: Next's parsed cookie APIs (cookies().getAll(name),
+ * request.cookies.getAll(name)) are backed by a Map KEYED BY NAME, so when a
+ * browser sends duplicate cookies with the same name — a host-only
+ * upfloat_active_org from before the domain migration PLUS the current
+ * domain-scoped one — they silently collapse to a single value. Which one
+ * survives depends on header order, which differs between browsers.
+ *
+ * When the stale duplicate won, org resolution landed on an org the user
+ * isn't in (→ fallback to their oldest membership): pages "couldn't load",
+ * client mapping writes went to a different org than reads, and signing out
+ * didn't help because sign-out clears only sb-* auth cookies. Parsing the raw
+ * header restores the "try every candidate until one has a real membership"
+ * behaviour both resolvers were designed around.
+ */
+export function parseActiveOrgIds(rawCookieHeader: string | null | undefined): string[] {
+  if (!rawCookieHeader) return []
+  const prefix = `${ACTIVE_ORG_COOKIE}=`
+  const values: string[] = []
+  for (const part of rawCookieHeader.split(';')) {
+    const p = part.trim()
+    if (!p.startsWith(prefix)) continue
+    let v = p.slice(prefix.length)
+    try { v = decodeURIComponent(v) } catch { /* keep raw */ }
+    if (v) values.push(v)
+  }
+  return [...new Set(values)]
+}
+
 /** Read the active org id from the request cookie. Returns null if not set. */
 export async function getActiveOrgId(): Promise<string | null> {
-  const jar = await cookies()
-  return jar.get(ACTIVE_ORG_COOKIE)?.value ?? null
+  // Same duplicate-aware parsing as getAllActiveOrgIds so every reader of
+  // this cookie sees the SAME candidate order regardless of browser quirks.
+  const all = await getAllActiveOrgIds()
+  return all[0] ?? null
 }
 
 /** Read ALL active org cookie values (handles duplicate cookies from domain migration). */
 async function getAllActiveOrgIds(): Promise<string[]> {
+  // Raw Cookie header first — the parsed jar dedupes by name and silently
+  // drops duplicates (see parseActiveOrgIds). Fall back to the jar if the
+  // header is unavailable for any reason.
+  try {
+    const h = await headers()
+    const fromRaw = parseActiveOrgIds(h.get('cookie'))
+    if (fromRaw.length > 0) return fromRaw
+  } catch { /* fall through */ }
   const jar = await cookies()
   return jar.getAll(ACTIVE_ORG_COOKIE).map(c => c.value).filter(Boolean)
 }

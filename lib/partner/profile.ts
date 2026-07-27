@@ -22,7 +22,7 @@ export async function ensurePartnerProfile(
     .from('standalone_partners')
     .select('id, referral_code, user_id')
     .eq('email', email)
-    .maybeSingle()
+    .limit(1).maybeSingle()
 
   if (existing) {
     if (input.userId && !existing.user_id) {
@@ -73,7 +73,7 @@ export async function ensurePartnerProfile(
       .from('standalone_partners')
       .select('id, referral_code')
       .eq('email', email)
-      .maybeSingle()
+      .limit(1).maybeSingle()
     if (raced) return { profile: { id: raced.id, referral_code: raced.referral_code, exists: true } }
 
     console.error('[partner/profile] insert failed:', error?.message)

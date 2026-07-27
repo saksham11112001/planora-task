@@ -25,7 +25,7 @@ export const onProjectUpdated = inngest.createFunction(
       if (!user?.email || user.id === d.updated_by_id) continue // skip the updater
 
       const { data: prefs } = await admin.from('notification_preferences')
-        .select('via_email').eq('user_id', user.id).eq('event_type', 'project_updated').maybeSingle()
+        .select('via_email').eq('user_id', user.id).eq('event_type', 'project_updated').limit(1).maybeSingle()
 
       if (prefs?.via_email === false) continue
 

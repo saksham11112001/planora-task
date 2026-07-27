@@ -128,6 +128,7 @@ export async function POST(
         .select('user_id')
         .eq('org_id', mb.org_id)
         .eq('role', 'owner')
+        .limit(1)               // maybeSingle() errors if an org has 2+ owners
         .maybeSingle()
       if (ownerMember?.user_id) {
         const { data: { user: ownerUser } } = await admin.auth.admin.getUserById(ownerMember.user_id)

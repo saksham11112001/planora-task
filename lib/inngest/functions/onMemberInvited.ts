@@ -27,7 +27,7 @@ export const onMemberInvited = inngest.createFunction(
       if (!user?.email || user.id === d.new_member_id) continue
 
       const { data: prefs } = await admin.from('notification_preferences')
-        .select('via_email').eq('user_id', user.id).eq('event_type', 'member_invited').maybeSingle()
+        .select('via_email').eq('user_id', user.id).eq('event_type', 'member_invited').limit(1).maybeSingle()
 
       if (prefs?.via_email === false) continue
 

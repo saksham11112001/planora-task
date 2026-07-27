@@ -43,7 +43,7 @@ export async function getSignupProduct(email: string): Promise<SignupProduct> {
       .from('users')
       .select('signup_product')
       .eq('email', key)
-      .maybeSingle()
+      .limit(1).maybeSingle()
     const value = (data as any)?.signup_product
     if (value === 'msme' || value === 'partner') product = value
   } catch (err) {

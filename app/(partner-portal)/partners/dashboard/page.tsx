@@ -19,7 +19,7 @@ export default async function PartnerDashboardPage() {
     .from('standalone_partners')
     .select('id, name, email, referral_code, status, created_at')
     .eq('user_id', user.id)
-    .maybeSingle()
+    .limit(1).maybeSingle()
 
   // If not found by user_id, try by email (first magic-link login after join)
   // and link the user_id automatically
@@ -29,7 +29,7 @@ export default async function PartnerDashboardPage() {
       .select('id, name, email, referral_code, status, created_at')
       .eq('email', user.email.toLowerCase())
       .is('user_id', null)
-      .maybeSingle()
+      .limit(1).maybeSingle()
 
     if (byEmail) {
       await admin
@@ -57,7 +57,7 @@ export default async function PartnerDashboardPage() {
     // Generate a unique referral code — retry up to 5 times to handle collision
     let refCode = generateCode(8)
     for (let attempt = 0; attempt < 5; attempt++) {
-      const { data: clash } = await admin.from('standalone_partners').select('id').eq('referral_code', refCode).maybeSingle()
+      const { data: clash } = await admin.from('standalone_partners').select('id').eq('referral_code', refCode).limit(1).maybeSingle()
       if (!clash) break
       refCode = generateCode(8)
     }
@@ -88,7 +88,7 @@ export default async function PartnerDashboardPage() {
         .from('standalone_partners')
         .select('id, name, email, referral_code, status, created_at')
         .eq('email', user.email.toLowerCase())
-        .maybeSingle()
+        .limit(1).maybeSingle()
       if (retry) {
         // Link user_id if missing
         if (!(retry as any).user_id) {

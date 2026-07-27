@@ -15,7 +15,7 @@ async function getPartnerOrError(admin: ReturnType<typeof createAdminClient>, us
     .from('standalone_partners')
     .select('id')
     .eq('user_id', userId)
-    .maybeSingle()
+    .limit(1).maybeSingle()
   return partner
 }
 

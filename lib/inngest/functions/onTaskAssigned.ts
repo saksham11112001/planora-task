@@ -17,7 +17,7 @@ export const onTaskAssigned = inngest.createFunction(
       .select('via_email, via_whatsapp')
       .eq('user_id', d.assignee_id)
       .eq('event_type', 'task_assigned')
-      .maybeSingle()
+      .limit(1).maybeSingle()
 
     const sendEmail    = prefs?.via_email    ?? true
     const sendWhatsApp = prefs?.via_whatsapp ?? false

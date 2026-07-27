@@ -35,6 +35,11 @@ export const getSessionUserId = cache(async (): Promise<string | null> => {
   return user?.id ?? null
 })
 
+/**
+ * @deprecated Use getActiveOrgMembership (lib/supabase/activeOrg.ts) — it
+ * respects the active-org cookie and handles multi-org users. Kept only so
+ * old call sites keep compiling; currently has NO live callers.
+ */
 export const getOrgMembership = cache(async (userId: string) => {
   const supabase = await createClient()
   const { data } = await supabase
@@ -42,6 +47,10 @@ export const getOrgMembership = cache(async (userId: string) => {
     .select('org_id, role, can_view_all_tasks, can_view_monitor, organisations(id, name, slug, plan_tier, logo_color, status, trial_ends_at, trial_started_at, trial_extension_days, referral_code, join_code, subscription_id)')
     .eq('user_id', userId)
     .eq('is_active', true)
+    // Without this, maybeSingle() ERRORS for users in 2+ orgs (returns null →
+    // caller redirects to onboarding). The original multi-org crash family.
+    .order('created_at', { ascending: true })
+    .limit(1)
     .maybeSingle()
   return data
 })
