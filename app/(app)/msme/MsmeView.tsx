@@ -718,7 +718,7 @@ export function MsmeView({ userRole, orgName }: Props) {
     setExporting(true)
     try {
       // Fetch email logs first
-      let logs: Array<{ vendor_id: string; attempt_no: number; sent_at: string; opened_at: string | null }> = []
+      let logs: Array<{ vendor_id: string; attempt_no: number; sent_at: string }> = []
       try {
         const logsRes = await fetch('/api/msme/email-logs')
         if (logsRes.ok) {
@@ -738,7 +738,7 @@ export function MsmeView({ userRole, orgName }: Props) {
       const header = [
         'Vendor Name', 'Vendor Email', 'GSTIN', 'Current Status',
         'Udyam Number', 'Category', 'Nature of Business', 'Outstanding Amount (₹)',
-        'Emails Sent', 'Email Dates (all)', 'Opened On (all)',
+        'Emails Sent', 'Email Dates (all)',
         'Submitted On', 'Declaration By', 'Date Added',
       ]
 
@@ -751,9 +751,6 @@ export function MsmeView({ userRole, orgName }: Props) {
         const emailDates   = vendorLogs.length
           ? vendorLogs.map(l => new Date(l.sent_at).toLocaleDateString('en-IN')).join(' | ')
           : '—'
-        const openedDates  = vendorLogs.length
-          ? vendorLogs.map(l => l.opened_at ? new Date(l.opened_at).toLocaleDateString('en-IN') : 'Not opened').join(' | ')
-          : '—'
 
         mergedRows.push([
           v.vendor_name, v.vendor_email, v.gstin ?? '', status,
@@ -762,7 +759,6 @@ export function MsmeView({ userRole, orgName }: Props) {
           v.outstanding_amount !== null && v.outstanding_amount !== undefined ? v.outstanding_amount : '',
           emailsSent || '—',
           emailDates,
-          openedDates,
           v.submitted_at ? new Date(v.submitted_at).toLocaleDateString('en-IN') : '',
           v.declarant_name ?? '',
           new Date(v.created_at).toLocaleDateString('en-IN'),
@@ -1956,7 +1952,7 @@ const MSME_FAQ = [
   },
   {
     q: 'How do I export the audit log?',
-    a: 'Click "Export Audit Log" in the toolbar. This downloads a single Excel sheet with all vendors and a full email trail — vendor name, email, GSTIN, status, Udyam details, each email\'s sent date/time, open status, and submission date. Use this for compliance documentation.',
+    a: 'Click "Export Audit Log" in the toolbar. This downloads a single Excel sheet with all vendors and a full email trail — vendor name, email, GSTIN, status, Udyam details, each email\'s sent date, and submission date. Use this for compliance documentation.',
   },
   {
     q: 'How do I send an email to a specific vendor manually?',
