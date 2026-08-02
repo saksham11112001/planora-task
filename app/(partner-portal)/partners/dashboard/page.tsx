@@ -3,6 +3,7 @@ import { createClient }      from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { generateCode }      from '@/lib/utils/codeGen'
 import { attributeSignup }   from '@/lib/partner/attribution'
+import { computeMsmeEarnings } from '@/lib/partner/commission'
 import { PartnerDashboard }  from './PartnerDashboard'
 
 export const metadata = { title: 'Partner Dashboard' }
@@ -114,70 +115,9 @@ export default async function PartnerDashboardPage() {
     .eq('partner_id', partner.id)
     .order('created_at', { ascending: false })
 
-  // Enrich signed-up MSME invites with pack purchase data
-  const signedUpMsmeEmails = (invites ?? [])
-    .filter(i => i.invite_type === 'msme' && i.signed_up)
-    .map(i => i.email.toLowerCase())
-
-  let packByEmail: Record<string, { packTier: string; amountPaise: number; paidAt: string }> = {}
-
-  if (signedUpMsmeEmails.length > 0) {
-    const { data: usersData } = await admin
-      .from('users')
-      .select('id, email')
-      .in('email', signedUpMsmeEmails)
-
-    if (usersData && usersData.length > 0) {
-      const userIds = usersData.map((u: { id: string; email: string }) => u.id)
-
-      const { data: members } = await admin
-        .from('org_members')
-        .select('user_id, org_id')
-        .in('user_id', userIds)
-
-      if (members && members.length > 0) {
-        const allOrgIds = [...new Set(members.map((m: { org_id: string }) => m.org_id))]
-
-        const { data: payments } = await admin
-          .from('msme_pack_payments')
-          .select('org_id, pack_tier, amount_paise, paid_at')
-          .in('org_id', allOrgIds)
-          .eq('status', 'paid')
-          .order('paid_at', { ascending: false })
-
-        const emailToUserId: Record<string, string> = {}
-        usersData.forEach((u: { id: string; email: string }) => {
-          emailToUserId[u.email.toLowerCase()] = u.id
-        })
-
-        // Map userId → ALL org_ids (one user can be in multiple orgs)
-        const userToOrgIds: Record<string, string[]> = {}
-        members.forEach((m: { user_id: string; org_id: string }) => {
-          if (!userToOrgIds[m.user_id]) userToOrgIds[m.user_id] = []
-          userToOrgIds[m.user_id].push(m.org_id)
-        })
-
-        // Latest paid pack per org_id
-        const latestByOrg: Record<string, { packTier: string; amountPaise: number; paidAt: string }> = {}
-        ;(payments ?? []).forEach((p: { org_id: string; pack_tier: string; amount_paise: number; paid_at: string }) => {
-          if (!latestByOrg[p.org_id]) {
-            latestByOrg[p.org_id] = { packTier: p.pack_tier, amountPaise: p.amount_paise, paidAt: p.paid_at }
-          }
-        })
-
-        // For display: show the first paid pack found across any of the user's orgs
-        signedUpMsmeEmails.forEach(email => {
-          const userId = emailToUserId[email]
-          if (!userId) return
-          const orgIds = userToOrgIds[userId] ?? []
-          for (const orgId of orgIds) {
-            const payment = latestByOrg[orgId]
-            if (payment) { packByEmail[email] = payment; break }
-          }
-        })
-      }
-    }
-  }
+  // Pack purchases + tier-based earnings via the SHARED calculator — the same
+  // code the withdrawal route uses, so displayed and withdrawable amounts match.
+  const { packByEmail } = await computeMsmeEarnings(admin, partner.id)
 
   const msmeInvites    = (invites ?? []).filter(i => i.invite_type === 'msme')
   const partnerInvites = (invites ?? []).filter(i => i.invite_type === 'partner')
