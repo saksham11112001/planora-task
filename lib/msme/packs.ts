@@ -2,7 +2,8 @@ export interface MsmePack {
   tier:                 string
   label:                string
   vendor_limit:         number
-  price_paise:          number   // annual price incl. 18% GST (charged by Razorpay)
+  price_paise:          number   // annual BASE price EXCLUDING GST. Checkout adds 18%.
+                                 // Must stay ex-GST: the pay route multiplies by 1.18.
   price_label:          string   // annual display price (excl. GST) shown to user
   per_vendor:           string
   recommended?:         boolean
@@ -14,10 +15,10 @@ export const FREE_VENDOR_LIMIT = 5
 // Razorpay is charged: display price + 18% GST (calculated at checkout).
 export const MSME_PACKS: MsmePack[] = [
   { tier: 'free',         label: 'Free',         vendor_limit: 5,   price_paise: 0,        price_label: '₹0',       per_vendor: 'Free' },
-  { tier: 'pack_25',      label: 'Starter',      vendor_limit: 25,  price_paise: 353682,   price_label: '₹2,999',   per_vendor: '₹120/vendor' },
-  { tier: 'pack_100',     label: 'Growth',       vendor_limit: 100, price_paise: 943882,   price_label: '₹7,999',   per_vendor: '₹80/vendor' },
-  { tier: 'pack_250',     label: 'Professional', vendor_limit: 250, price_paise: 2005882,  price_label: '₹16,999',  per_vendor: '₹68/vendor', recommended: true },
-  { tier: 'pack_500',     label: 'Business',     vendor_limit: 500, price_paise: 3539882,  price_label: '₹29,999',  per_vendor: '₹60/vendor' },
+  { tier: 'pack_25',      label: 'Starter',      vendor_limit: 25,  price_paise: 299900,   price_label: '₹2,999',   per_vendor: '₹120/vendor' },
+  { tier: 'pack_100',     label: 'Growth',       vendor_limit: 100, price_paise: 799900,   price_label: '₹7,999',   per_vendor: '₹80/vendor' },
+  { tier: 'pack_250',     label: 'Professional', vendor_limit: 250, price_paise: 1699900,  price_label: '₹16,999',  per_vendor: '₹68/vendor', recommended: true },
+  { tier: 'pack_500',     label: 'Business',     vendor_limit: 500, price_paise: 2999900,  price_label: '₹29,999',  per_vendor: '₹60/vendor' },
   { tier: 'pack_enterprise', label: 'Enterprise', vendor_limit: 9999, price_paise: 0,      price_label: 'Custom',   per_vendor: '—' },
 ]
 
@@ -34,7 +35,7 @@ export interface MsmeAddonPack {
 }
 
 export const MSME_ADDON_PACKS: MsmeAddonPack[] = [
-  { slots: 25,  price_paise: 353682,  price_label: '₹2,999',  label: '+25 vendors' },
-  { slots: 100, price_paise: 943882,  price_label: '₹7,999',  label: '+100 vendors' },
-  { slots: 250, price_paise: 2005882, price_label: '₹16,999', label: '+250 vendors' },
+  { slots: 25,  price_paise: 299900,  price_label: '₹2,999',  label: '+25 vendors' },
+  { slots: 100, price_paise: 799900,  price_label: '₹7,999',  label: '+100 vendors' },
+  { slots: 250, price_paise: 1699900, price_label: '₹16,999', label: '+250 vendors' },
 ]
