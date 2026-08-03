@@ -2,6 +2,7 @@
 import { useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import PartnerTour from './PartnerTour'
+import { PARTNER_TIERS, tierForSignups, msmeCommissionPaise } from '@/lib/partner/tiers'
 
 const TEAL   = '#0d9488'
 const PURPLE = '#7c3aed'
@@ -11,7 +12,9 @@ const BORDER = '#e2e8f0'
 const BG     = '#f8fafc'
 const WHITE  = '#ffffff'
 
-const MSME_COMMISSION = 200
+// Tier-based MSME commission (Bronze 5% / Silver 10% / Gold 20% of pack
+// price) — rates and thresholds come from the shared lib/partner/tiers.ts,
+// the same module the server-side withdrawal balance uses.
 
 type Tab = 'about' | 'kpis' | 'invites' | 'withdrawals'
 
@@ -75,11 +78,12 @@ function fmtShort(iso: string) {
   return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
 }
 
-function getTier(signedUp: number): { label: string; color: string; bg: string; next: string | null } {
-  if (signedUp >= 10) return { label: 'Gold Partner',   color: '#b45309', bg: '#fef3c7', next: null }
-  if (signedUp >= 5)  return { label: 'Silver Partner', color: '#475569', bg: '#f1f5f9', next: `${10 - signedUp} more to Gold` }
-  if (signedUp >= 1)  return { label: 'Bronze Partner', color: '#92400e', bg: '#fef9c3', next: `${5 - signedUp} more to Silver` }
-  return { label: 'Starter', color: MUTED, bg: BG, next: '1 sign-up to Bronze' }
+function getTier(signedUp: number): { label: string; color: string; bg: string; next: string | null; ratePct: number } {
+  const t = tierForSignups(signedUp)
+  if (t.key === 'gold')   return { label: 'Gold Partner',   color: '#b45309', bg: '#fef3c7', next: null, ratePct: t.ratePct }
+  if (t.key === 'silver') return { label: 'Silver Partner', color: '#475569', bg: '#f1f5f9', next: `${10 - signedUp} more to Gold (20% commission)`, ratePct: t.ratePct }
+  if (t.key === 'bronze') return { label: 'Bronze Partner', color: '#92400e', bg: '#fef9c3', next: `${5 - signedUp} more to Silver (10% commission)`, ratePct: t.ratePct }
+  return { label: 'Starter', color: MUTED, bg: BG, next: '1 sign-up to Bronze', ratePct: t.ratePct }
 }
 
 function packTierLabel(tier: string): string {
@@ -249,11 +253,14 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
   const totalSignedUp   = msmeSignedUp + partnerSignedUp
   const totalSent       = allInvites.length
   const msmePaidCount   = allInvites.filter(i => i.invite_type === 'msme' && i.signed_up && packByEmail[i.email.toLowerCase()]).length
-  const commissionEst   = msmePaidCount * MSME_COMMISSION
+  const tier            = getTier(totalSignedUp)
+  // Tier rate × each referred user's purchased pack — same formula as the
+  // server's withdrawal balance (shared lib/partner/tiers.ts).
+  const commissionEst   = Object.values(packByEmail).reduce(
+    (sum, p) => sum + msmeCommissionPaise(p.amountPaise, tier.ratePct), 0) / 100
   const paidDeducted    = initWithdrawals.filter(w => w.status !== 'rejected').reduce((s, w) => s + w.amount_paise, 0)
   const displayEarned   = earnedPaise !== null ? earnedPaise / 100 : commissionEst
   const displayAvail    = availPaise  !== null ? availPaise  / 100 : Math.max(0, commissionEst - paidDeducted / 100)
-  const tier            = getTier(totalSignedUp)
 
   return (
     <div style={{ height: '100vh', background: BG, colorScheme: 'light', fontFamily: "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif", color: DARK, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -375,7 +382,7 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
                 {[
                   { icon: '🤝', title: 'Help Your Customers', body: 'When your clients are MSME compliant, they unlock faster payments, government schemes, and bank loans.' },
                   { icon: '💡', title: 'We Are Here to Help', body: 'Invite a business, we handle onboarding, compliance setup, and all filings. You focus on growing your network.' },
-                  { icon: '💰', title: 'Earn Real Commission', body: `₹${MSME_COMMISSION} for every MSME client who purchases a pack. No cap. Withdraw anytime above ₹500.` },
+                  { icon: '💰', title: 'Earn Real Commission', body: 'Earn 5–20% of every pack your referred MSME clients purchase — Bronze 5%, Silver 10%, Gold 20%. No cap. Withdraw anytime above ₹500.' },
                 ].map(c => (
                   <div key={c.title} style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 20 }}>
                     <div style={{ fontSize: 28, marginBottom: 10 }}>{c.icon}</div>
@@ -392,7 +399,7 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
                   {[
                     ['Invite clients or partners', `Share your referral link or send an email from the Invites tab. Your code ${partner.referral_code} is embedded automatically.`],
                     ['They sign up via your link', 'Anyone who uses your link is tagged to your account permanently — even if they sign up later.'],
-                    ['They purchase a pack — you earn', `₹${MSME_COMMISSION} when your referred MSME user buys any paid pack. Partner referrals earn no commission. Tiers unlock at 1, 5, and 10 sign-ups.`],
+                    ['They purchase a pack — you earn', 'Your tier\'s rate of the pack price: Bronze 5%, Silver 10%, Gold 20%. Tiers unlock at 1, 5, and 10 sign-ups — level up and your WHOLE balance is re-rated at the higher percentage. Partner referrals earn no commission.'],
                     ['Request payout anytime', 'Min ₹500. Submit your bank details in the Withdrawals tab. Processed within 3–5 business days.'],
                   ].map(([title, desc], i) => (
                     <div key={i} style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
@@ -458,19 +465,16 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 0 }}>
-                  {[
-                    { label: 'Starter', min: 0, color: MUTED },
-                    { label: 'Bronze', min: 1, color: '#92400e' },
-                    { label: 'Silver', min: 5, color: '#475569' },
-                    { label: 'Gold',   min: 10, color: '#b45309' },
-                  ].map((t, i, arr) => {
-                    const reached  = totalSignedUp >= t.min
-                    const isActive = totalSignedUp >= t.min && (i === arr.length - 1 || totalSignedUp < arr[i + 1].min)
+                  {PARTNER_TIERS.map((pt, i, arr) => {
+                    const colors: Record<string, string> = { starter: MUTED, bronze: '#92400e', silver: '#475569', gold: '#b45309' }
+                    const color    = colors[pt.key]
+                    const reached  = totalSignedUp >= pt.minSignups
+                    const isActive = reached && (i === arr.length - 1 || totalSignedUp < arr[i + 1].minSignups)
                     return (
-                      <div key={t.label} style={{ flex: 1, textAlign: 'center' }}>
-                        <div style={{ height: 6, background: reached ? t.color : BORDER, borderRadius: i === 0 ? '4px 0 0 4px' : i === arr.length - 1 ? '0 4px 4px 0' : 0 }} />
-                        <div style={{ marginTop: 6, fontSize: 11, fontWeight: isActive ? 700 : 500, color: isActive ? t.color : MUTED }}>{t.label}</div>
-                        <div style={{ fontSize: 10, color: MUTED }}>{t.min === 0 ? 'Start' : `${t.min}+`}</div>
+                      <div key={pt.key} style={{ flex: 1, textAlign: 'center' }}>
+                        <div style={{ height: 6, background: reached ? color : BORDER, borderRadius: i === 0 ? '4px 0 0 4px' : i === arr.length - 1 ? '0 4px 4px 0' : 0 }} />
+                        <div style={{ marginTop: 6, fontSize: 11, fontWeight: isActive ? 700 : 500, color: isActive ? color : MUTED }}>{pt.label}</div>
+                        <div style={{ fontSize: 10, color: MUTED }}>{pt.minSignups === 0 ? 'Start' : `${pt.minSignups}+`} · {pt.ratePct}%</div>
                       </div>
                     )
                   })}
@@ -481,7 +485,7 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
                   </div>
                 )}
                 <div style={{ marginTop: 10, padding: '10px 14px', background: BG, borderRadius: 8, fontSize: 12, color: MUTED, lineHeight: 1.6 }}>
-                  Commission: <strong style={{ color: DARK }}>₹{MSME_COMMISSION.toLocaleString('en-IN')} per MSME user who purchases a pack</strong> · Partner referrals earn no commission · Paid on request (min ₹500).
+                  Your commission: <strong style={{ color: DARK }}>{tier.ratePct}% of each pack your referred MSME users purchase</strong> · Partner referrals earn no commission · Paid on request (min ₹500).
                 </div>
               </div>
 
@@ -630,7 +634,7 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
                               <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
                                 {inv.invite_type === 'msme' && inv.signed_up ? (
                                   pack
-                                    ? <span style={{ fontSize: 13, fontWeight: 700, color: TEAL }}>₹{MSME_COMMISSION.toLocaleString('en-IN')}</span>
+                                    ? <span style={{ fontSize: 13, fontWeight: 700, color: TEAL }}>₹{(msmeCommissionPaise(pack.amountPaise, tier.ratePct) / 100).toLocaleString('en-IN')} <span style={{ fontSize: 10, fontWeight: 500, color: MUTED }}>({tier.ratePct}%)</span></span>
                                     : <span style={{ fontSize: 12, color: '#94a3b8' }}>Pending purchase</span>
                                 ) : inv.invite_type === 'partner' && inv.signed_up
                                   ? <span style={{ fontSize: 12, color: '#94a3b8' }}>No commission</span>

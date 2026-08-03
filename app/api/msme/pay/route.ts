@@ -95,7 +95,10 @@ export async function POST(req: NextRequest) {
         org_id:           orgId,
         pack_tier:        `addon_${addon_slots}`,
         vendor_limit:     addon_slots,
-        amount_paise:     addonPack.price_paise,
+        // Store what Razorpay actually charges (GST + any coupon), matching the
+        // pack flow. Storing the ex-GST base here made addon invoices and
+        // partner commission disagree with the real payment.
+        amount_paise:     chargeablePaise,
         gateway:          'razorpay',
         gateway_order_id: order.id,
         status:           'pending',

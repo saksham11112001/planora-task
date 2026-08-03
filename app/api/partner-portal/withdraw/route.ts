@@ -5,10 +5,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient }             from '@/lib/supabase/server'
 import { getAuthUser } from '@/lib/supabase/authUser'
 import { createAdminClient }        from '@/lib/supabase/admin'
+import { computeMsmeEarnings }      from '@/lib/partner/commission'
 
-const MSME_COMMISSION_PAISE    = 20000   // ₹200 per MSME paid pack
-const PARTNER_COMMISSION_PAISE = 0       // ₹0 — no commission for referring a partner
-const MIN_WITHDRAWAL_PAISE     = 50000   // ₹500 minimum
+// Commission is tier-based (Bronze 5% / Silver 10% / Gold 20% of each pack an
+// invited MSME user buys) — computed by the SHARED computeMsmeEarnings so the
+// dashboard display and this withdrawable balance can never diverge.
+// Partner-program referrals earn no commission (unchanged).
+const MIN_WITHDRAWAL_PAISE = 50000   // ₹500 minimum
 
 async function getPartnerOrError(admin: ReturnType<typeof createAdminClient>, userId: string) {
   const { data: partner } = await admin
@@ -20,65 +23,7 @@ async function getPartnerOrError(admin: ReturnType<typeof createAdminClient>, us
 }
 
 async function computeBalance(admin: ReturnType<typeof createAdminClient>, partnerId: string) {
-  // Earned = number of invited MSME emails where the user's org has made a paid pack purchase × ₹200
-  // Each invited email counts as AT MOST ONE commission, even if that user belongs to multiple orgs.
-  const { data: msmeInvites } = await admin
-    .from('partner_portal_invites')
-    .select('email')
-    .eq('partner_id', partnerId)
-    .eq('invite_type', 'msme')
-    .eq('signed_up', true)
-
-  let paidMsmeCount = 0
-  if (msmeInvites && msmeInvites.length > 0) {
-    const emails = msmeInvites.map((i: { email: string }) => i.email.toLowerCase())
-
-    const { data: users } = await admin
-      .from('users')
-      .select('id, email')
-      .in('email', emails)
-
-    if (users && users.length > 0) {
-      // Map email → userId for later per-email check
-      const emailToUserId: Record<string, string> = {}
-      users.forEach((u: { id: string; email: string }) => { emailToUserId[u.email.toLowerCase()] = u.id })
-
-      const userIds = users.map((u: { id: string }) => u.id)
-
-      const { data: members } = await admin
-        .from('org_members')
-        .select('user_id, org_id')
-        .in('user_id', userIds)
-
-      if (members && members.length > 0) {
-        // Map userId → list of org_ids (one user can be in multiple orgs)
-        const userToOrgIds: Record<string, string[]> = {}
-        members.forEach((m: { user_id: string; org_id: string }) => {
-          if (!userToOrgIds[m.user_id]) userToOrgIds[m.user_id] = []
-          userToOrgIds[m.user_id].push(m.org_id)
-        })
-
-        // Fetch all paid org_ids in one query
-        const allOrgIds = [...new Set(members.map((m: { org_id: string }) => m.org_id))]
-        const { data: paidPacks } = await admin
-          .from('msme_pack_payments')
-          .select('org_id')
-          .in('org_id', allOrgIds)
-          .eq('status', 'paid')
-        const paidOrgSet = new Set((paidPacks ?? []).map((p: { org_id: string }) => p.org_id))
-
-        // Count each invited email exactly once if ANY of their orgs has a paid pack
-        for (const email of emails) {
-          const userId = emailToUserId[email]
-          if (!userId) continue
-          const orgIds = userToOrgIds[userId] ?? []
-          if (orgIds.some(orgId => paidOrgSet.has(orgId))) paidMsmeCount++
-        }
-      }
-    }
-  }
-
-  const earnedPaise = paidMsmeCount * MSME_COMMISSION_PAISE
+  const { earnedPaise } = await computeMsmeEarnings(admin, partnerId)
 
   // Deduct paid + pending withdrawals
   const { data: withdrawals } = await admin
