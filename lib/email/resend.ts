@@ -20,6 +20,11 @@ type SendPayload = {
   subject: string
   html?: string
   text?: string
+  /** Real human address replies should go to. A valid Reply-To is a strong
+   *  legitimacy signal for spam filters — and lets recipients actually reply. */
+  replyTo?: string
+  /** Extra headers merged over the defaults (e.g. List-Unsubscribe on invites). */
+  headers?: Record<string, string>
 }
 
 function parseAddress(addr: string): { email: string; name?: string } {
@@ -51,11 +56,13 @@ async function brevoSend(payload: SendPayload): Promise<{ data: null; error: str
     headers: {
       'X-Mailer':   'upFloat',
       'Precedence': 'normal',
+      ...(payload.headers ?? {}),
     },
   }
-  if (payload.html)  body.htmlContent = payload.html
-  if (payload.text)  body.textContent = payload.text
-  if (payload.cc)    body.cc = toList(payload.cc)
+  if (payload.html)    body.htmlContent = payload.html
+  if (payload.text)    body.textContent = payload.text
+  if (payload.cc)      body.cc = toList(payload.cc)
+  if (payload.replyTo) body.replyTo = parseAddress(payload.replyTo)
 
   const res = await fetch('https://api.brevo.com/v3/smtp/email', {
     method:  'POST',
