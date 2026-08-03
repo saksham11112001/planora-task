@@ -12,17 +12,19 @@ const BORDER = '#e2e8f0'
 const BG     = '#f8fafc'
 const WHITE  = '#ffffff'
 
-// Tier-based MSME commission (Bronze 5% / Silver 10% / Gold 20% of pack
+// Tier-based MSME referral incentive (Bronze 5% / Silver 10% / Gold 20% of pack
 // price) — rates and thresholds come from the shared lib/partner/tiers.ts,
 // the same module the server-side withdrawal balance uses.
 
-type Tab = 'about' | 'kpis' | 'invites' | 'withdrawals'
+// 'about' is the combined home page: what the programme is (left) and the
+// invite form (right), side by side — so a first-time partner reads how it
+// works and can act on it without moving between tabs.
+type Tab = 'about' | 'kpis' | 'withdrawals'
 
 const NAV_ITEMS: { id: Tab; icon: string; label: string }[] = [
-  { id: 'about',       icon: '🏠', label: 'About' },
+  { id: 'about',       icon: '🏠', label: 'Start Here' },
   { id: 'kpis',        icon: '📊', label: 'My KPIs' },
-  { id: 'invites',     icon: '📨', label: 'Invites' },
-  { id: 'withdrawals', icon: '💰', label: 'Withdrawals' },
+  { id: 'withdrawals', icon: '💰', label: 'Get Paid' },
 ]
 
 interface Partner {
@@ -81,8 +83,8 @@ function fmtShort(iso: string) {
 function getTier(signedUp: number): { label: string; color: string; bg: string; next: string | null; ratePct: number } {
   const t = tierForSignups(signedUp)
   if (t.key === 'gold')   return { label: 'Gold Partner',   color: '#b45309', bg: '#fef3c7', next: null, ratePct: t.ratePct }
-  if (t.key === 'silver') return { label: 'Silver Partner', color: '#475569', bg: '#f1f5f9', next: `${10 - signedUp} more to Gold (20% commission)`, ratePct: t.ratePct }
-  if (t.key === 'bronze') return { label: 'Bronze Partner', color: '#92400e', bg: '#fef9c3', next: `${5 - signedUp} more to Silver (10% commission)`, ratePct: t.ratePct }
+  if (t.key === 'silver') return { label: 'Silver Partner', color: '#475569', bg: '#f1f5f9', next: `${10 - signedUp} more sign-ups for Gold (20%)`, ratePct: t.ratePct }
+  if (t.key === 'bronze') return { label: 'Bronze Partner', color: '#92400e', bg: '#fef9c3', next: `${5 - signedUp} more sign-ups for Silver (10%)`, ratePct: t.ratePct }
   return { label: 'Starter', color: MUTED, bg: BG, next: '1 sign-up to Bronze', ratePct: t.ratePct }
 }
 
@@ -359,220 +361,189 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
         <main style={{ flex: 1, overflowY: 'auto', padding: '32px 32px 80px', overscrollBehavior: 'contain' }}>
 
           {/* ── About ─────────────────────────────────────────────────── */}
+          {/* ── Start Here: what this is + send invites, side by side ─── */}
           {activeTab === 'about' && (
             <div>
-              {/* Hero */}
-              <div style={{ background: `linear-gradient(135deg, ${DARK} 0%, #1e293b 60%, #134e4a 100%)`, borderRadius: 16, padding: '36px 32px', marginBottom: 28, position: 'relative', overflow: 'hidden' }}>
+              {/* Hero — plain language, states the deal immediately */}
+              <div style={{ background: `linear-gradient(135deg, ${DARK} 0%, #1e293b 60%, #134e4a 100%)`, borderRadius: 16, padding: '32px 32px', marginBottom: 22, position: 'relative', overflow: 'hidden' }}>
                 <div style={{ position: 'absolute', top: -40, right: -40, width: 200, height: 200, borderRadius: '50%', border: '2px solid rgba(13,148,136,0.2)', pointerEvents: 'none' }} />
-                <div style={{ position: 'absolute', top: -10, right: -10, width: 120, height: 120, borderRadius: '50%', border: '2px solid rgba(13,148,136,0.15)', pointerEvents: 'none' }} />
                 <div style={{ position: 'relative' }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: TEAL, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>Partners Program · upFloat</div>
-                  <h1 style={{ fontSize: 26, fontWeight: 800, color: WHITE, margin: '0 0 10px', lineHeight: 1.25 }}>
-                    Hey {partner.name.split(' ')[0]}! Welcome back 👋
+                  <h1 style={{ fontSize: 27, fontWeight: 800, color: WHITE, margin: '0 0 12px', lineHeight: 1.25 }}>
+                    Hi {partner.name.split(' ')[0]} — here is the whole idea in one line.
                   </h1>
-                  <p style={{ margin: 0, fontSize: 15, color: '#cbd5e1', lineHeight: 1.7, maxWidth: 520 }}>
-                    You are here to help businesses stay compliant — and we reward you for every client you bring in.
-                    This is a real partnership, not just commissions.
+                  <p style={{ margin: '0 0 18px', fontSize: 16, color: '#e2e8f0', lineHeight: 1.7, maxWidth: 640 }}>
+                    You introduce a business to <strong style={{ color: WHITE }}>MSME Tracker</strong>. They use it to collect
+                    MSME declarations from their vendors. When they take a paid plan, <strong style={{ color: WHITE }}>you get a
+                    referral incentive of {tier.ratePct}% of what they pay</strong>.
+                  </p>
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    <span style={{ background: 'rgba(13,148,136,0.18)', border: '1px solid rgba(13,148,136,0.45)', color: '#5eead4', borderRadius: 20, padding: '6px 14px', fontSize: 13, fontWeight: 600 }}>
+                      Your tier: {tier.label} · {tier.ratePct}%
+                    </span>
+                    <span style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.18)', color: '#cbd5e1', borderRadius: 20, padding: '6px 14px', fontSize: 13, fontWeight: 600 }}>
+                      Your code: {partner.referral_code}
+                    </span>
+                    <span style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.18)', color: '#cbd5e1', borderRadius: 20, padding: '6px 14px', fontSize: 13, fontWeight: 600 }}>
+                      Paid out from ₹500
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Two halves: understand it (left) · do it (right) */}
+              <div className="partner-split" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, alignItems: 'start', marginBottom: 22 }}>
+
+                {/* LEFT — what it is and how it works */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 22, borderLeft: `4px solid ${TEAL}` }}>
+                    <div style={{ fontWeight: 800, fontSize: 16, color: DARK, marginBottom: 10 }}>What is MSME Tracker?</div>
+                    <p style={{ margin: '0 0 12px', fontSize: 14, color: '#334155', lineHeight: 1.7 }}>
+                      A business uploads its list of vendors. Each vendor is asked for their MSME (Udyam) details.
+                      Vendors who do not reply get reminders. The business ends up with an audit log showing who
+                      declared what, and when.
+                    </p>
+                    <p style={{ margin: 0, fontSize: 14, color: '#334155', lineHeight: 1.7 }}>
+                      They need this because of <strong>Section 43B(h)</strong>: payments to MSME vendors must be made
+                      within 45 days, or the expense is disallowed. To follow the rule they first have to know which
+                      vendors are MSMEs.
+                    </p>
+                  </div>
+
+                  <div style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 22 }}>
+                    <div style={{ fontWeight: 800, fontSize: 16, color: DARK, marginBottom: 14 }}>What you need to do</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
+                      {[
+                        ['Send an invite', 'Use the box on the right, or share your link. Your code is added for you.'],
+                        ['They sign up', 'Anyone who joins through your link stays linked to you — even if they sign up weeks later.'],
+                        ['They buy a plan', `You receive ${tier.ratePct}% of what they pay. Introduce more businesses and the rate rises: 5% → 10% → 20%.`],
+                        ['You get paid', 'Ask for a payout once you are above ₹500. It reaches your bank in 3–5 working days.'],
+                      ].map(([title, desc], i) => (
+                        <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                          <div style={{ width: 24, height: 24, borderRadius: '50%', background: TEAL, color: WHITE, fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>{i + 1}</div>
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: 13.5, color: DARK, marginBottom: 2 }}>{title}</div>
+                            <div style={{ fontSize: 13, color: MUTED, lineHeight: 1.6 }}>{desc}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Referral incentive rates */}
+                  <div style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 22 }}>
+                    <div style={{ fontWeight: 800, fontSize: 16, color: DARK, marginBottom: 4 }}>Your referral incentive</div>
+                    <p style={{ margin: '0 0 14px', fontSize: 13, color: MUTED, lineHeight: 1.6 }}>
+                      Based on how many people have signed up through you. Reach a new level and the higher rate
+                      applies to everything you have referred.
+                    </p>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      {PARTNER_TIERS.filter(t => t.key !== 'starter').map(pt => {
+                        const colors: Record<string, string> = { bronze: '#92400e', silver: '#475569', gold: '#b45309' }
+                        const active = tier.ratePct === pt.ratePct
+                        return (
+                          <div key={pt.key} style={{ flex: 1, textAlign: 'center', padding: '12px 6px', borderRadius: 10, border: `1.5px solid ${active ? colors[pt.key] : BORDER}`, background: active ? `${colors[pt.key]}12` : BG }}>
+                            <div style={{ fontSize: 19, fontWeight: 800, color: colors[pt.key] }}>{pt.ratePct}%</div>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: DARK, marginTop: 2 }}>{pt.label}</div>
+                            <div style={{ fontSize: 11, color: MUTED }}>{pt.minSignups}+ sign-ups</div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                    <p style={{ margin: '12px 0 0', fontSize: 12, color: MUTED, lineHeight: 1.6 }}>
+                      Inviting someone to the Partner Program does not carry an incentive — only businesses who take a paid plan do.
+                    </p>
+                  </div>
+                </div>
+
+                {/* RIGHT — act on it now */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div data-tour="partner-invite-form" style={{ background: WHITE, border: `2px solid ${TEAL}`, borderRadius: 12, padding: 24, boxShadow: '0 4px 16px rgba(13,148,136,0.10)' }}>
+                  <div style={{ fontWeight: 800, fontSize: 17, color: DARK, marginBottom: 4 }}>Start here — send your first invite</div>
+                  <p style={{ fontSize: 13, color: MUTED, margin: '0 0 16px', lineHeight: 1.6 }}>
+                    Pick who you are inviting, type their email, and press send. We write the email for you.
+                  </p>
+
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                    {(['msme', 'partner'] as const).map(t => (
+                      <button key={t} onClick={() => setInvType(t)} style={{
+                        padding: '7px 18px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                        border: `1.5px solid ${invType === t ? (t === 'msme' ? TEAL : PURPLE) : BORDER}`,
+                        background: invType === t ? (t === 'msme' ? `${TEAL}15` : `${PURPLE}12`) : WHITE,
+                        color: invType === t ? (t === 'msme' ? TEAL : PURPLE) : MUTED,
+                        colorScheme: 'light',
+                      }}>
+                        {t === 'msme' ? 'MSME Tracker' : 'Partner Program'}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {emails.map((em, idx) => (
+                      <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <input
+                          type="email"
+                          value={em}
+                          onChange={e => { const next = [...emails]; next[idx] = e.target.value; setEmails(next) }}
+                          onKeyDown={e => { if (e.key === 'Enter') sendInvite() }}
+                          placeholder={invType === 'msme' ? 'business@example.com' : 'friend@example.com'}
+                          style={{ ...inputStyle, flex: 1, width: 'auto' }}
+                        />
+                        {emails.length > 1 && (
+                          <button onClick={() => setEmails(emails.filter((_, i) => i !== idx))} style={{ width: 34, height: 34, borderRadius: 8, border: `1px solid ${BORDER}`, background: WHITE, color: '#94a3b8', fontSize: 18, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', colorScheme: 'light' }}>×</button>
+                        )}
+                      </div>
+                    ))}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <button onClick={() => setEmails([...emails, ''])} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 600, border: `1.5px dashed ${BORDER}`, background: WHITE, color: MUTED, cursor: 'pointer', colorScheme: 'light' }}>
+                        <span style={{ fontSize: 18, lineHeight: 1, marginTop: -1 }}>+</span> Add another email
+                      </button>
+                      <div style={{ flex: 1 }} />
+                      <button onClick={sendInvite} disabled={busy || !emails.some(e => e.trim())} style={{
+                        padding: '10px 24px', borderRadius: 8, fontSize: 14, fontWeight: 600,
+                        background: busy || !emails.some(e => e.trim()) ? '#e2e8f0' : (invType === 'msme' ? TEAL : PURPLE),
+                        color: busy || !emails.some(e => e.trim()) ? '#94a3b8' : WHITE,
+                        border: 'none', cursor: busy || !emails.some(e => e.trim()) ? 'not-allowed' : 'pointer', flexShrink: 0, colorScheme: 'light',
+                      }}>
+                        {busy ? 'Sending…' : emails.filter(e => e.trim()).length > 1 ? `Send ${emails.filter(e => e.trim()).length} Invites` : 'Send Invite'}
+                      </button>
+                    </div>
+                  </div>
+                  <p style={{ fontSize: 11, color: '#94a3b8', margin: '8px 0 0' }}>
+                    {invType === 'msme'
+                      ? 'They get a short email explaining what MSME Tracker does. Your referral code is added automatically.'
+                      : 'They get an email explaining the Partner Program and how referral incentives work.'}
                   </p>
                 </div>
-              </div>
 
-              {/* Value cards */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 28 }}>
-                {[
-                  { icon: '🤝', title: 'Help Your Customers', body: 'When your clients are MSME compliant, they unlock faster payments, government schemes, and bank loans.' },
-                  { icon: '💡', title: 'We Are Here to Help', body: 'Invite a business, we handle onboarding, compliance setup, and all filings. You focus on growing your network.' },
-                  { icon: '💰', title: 'Earn Real Commission', body: 'Earn 5–20% of every pack your referred MSME clients purchase — Bronze 5%, Silver 10%, Gold 20%. No cap. Withdraw anytime above ₹500.' },
-                ].map(c => (
-                  <div key={c.title} style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 20 }}>
-                    <div style={{ fontSize: 28, marginBottom: 10 }}>{c.icon}</div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: DARK, marginBottom: 6 }}>{c.title}</div>
-                    <div style={{ fontSize: 13, color: MUTED, lineHeight: 1.6 }}>{c.body}</div>
-                  </div>
-                ))}
-              </div>
-
-              {/* How commissions work */}
-              <div style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 24, marginBottom: 24 }}>
-                <div style={{ fontWeight: 700, fontSize: 16, color: DARK, marginBottom: 16 }}>How commissions work</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  {[
-                    ['Invite clients or partners', `Share your referral link or send an email from the Invites tab. Your code ${partner.referral_code} is embedded automatically.`],
-                    ['They sign up via your link', 'Anyone who uses your link is tagged to your account permanently — even if they sign up later.'],
-                    ['They purchase a pack — you earn', 'Your tier\'s rate of the pack price: Bronze 5%, Silver 10%, Gold 20%. Tiers unlock at 1, 5, and 10 sign-ups — level up and your WHOLE balance is re-rated at the higher percentage. Partner referrals earn no commission.'],
-                    ['Request payout anytime', 'Min ₹500. Submit your bank details in the Withdrawals tab. Processed within 3–5 business days.'],
-                  ].map(([title, desc], i) => (
-                    <div key={i} style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-                      <div style={{ width: 26, height: 26, borderRadius: '50%', background: TEAL, color: WHITE, fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>{i + 1}</div>
-                      <div>
-                        <div style={{ fontWeight: 600, fontSize: 13, color: DARK, marginBottom: 2 }}>{title}</div>
-                        <div style={{ fontSize: 12, color: MUTED, lineHeight: 1.6 }}>{desc}</div>
+                  {/* Referral links */}
+                  <div data-tour="partner-referral" style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 20, borderLeft: `4px solid #2563eb` }}>
+                    <div style={{ fontWeight: 800, fontSize: 15, color: DARK, marginBottom: 4 }}>Or share your link</div>
+                    <p style={{ fontSize: 13, color: MUTED, margin: '0 0 16px', lineHeight: 1.6 }}>
+                      Paste these into WhatsApp or email. Your code <strong style={{ fontFamily: 'monospace', color: TEAL }}>{partner.referral_code}</strong> is already inside both.
+                    </p>
+                    <div style={{ marginBottom: 14 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>For a business (MSME Tracker)</div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <div style={{ flex: 1, padding: '9px 12px', background: BG, border: `1px solid ${BORDER}`, borderRadius: 8, fontSize: 12, color: MUTED, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{msmeReferralUrl}</div>
+                        <button onClick={copyMsme} style={{ padding: '9px 16px', background: copiedMsme ? '#dcfce7' : TEAL, color: copiedMsme ? '#166534' : WHITE, border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', flexShrink: 0, colorScheme: 'light' }}>
+                          {copiedMsme ? 'Copied' : 'Copy'}
+                        </button>
                       </div>
                     </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Referral links */}
-              <div data-tour="partner-referral" style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 20, borderLeft: `4px solid #2563eb` }}>
-                <div style={{ fontWeight: 700, fontSize: 14, color: DARK, marginBottom: 4 }}>Your Referral Links</div>
-                <p style={{ fontSize: 13, color: MUTED, margin: '0 0 18px', lineHeight: 1.6 }}>
-                  Share these directly — code <strong style={{ fontFamily: 'monospace', color: TEAL }}>{partner.referral_code}</strong> is embedded in both.
-                </p>
-                <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>MSME Tracker</div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <div style={{ flex: 1, padding: '9px 12px', background: BG, border: `1px solid ${BORDER}`, borderRadius: 8, fontSize: 12, color: MUTED, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{msmeReferralUrl}</div>
-                    <button onClick={copyMsme} style={{ padding: '9px 16px', background: copiedMsme ? '#dcfce7' : TEAL, color: copiedMsme ? '#166534' : WHITE, border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', flexShrink: 0, colorScheme: 'light' }}>
-                      {copiedMsme ? 'Copied' : 'Copy'}
-                    </button>
-                  </div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Partner Program</div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <div style={{ flex: 1, padding: '9px 12px', background: BG, border: `1px solid ${BORDER}`, borderRadius: 8, fontSize: 12, color: MUTED, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{partnerReferralUrl}</div>
-                    <button onClick={copyPartner} style={{ padding: '9px 16px', background: copiedPartner ? '#dcfce7' : PURPLE, color: copiedPartner ? '#166534' : WHITE, border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', flexShrink: 0, colorScheme: 'light' }}>
-                      {copiedPartner ? 'Copied' : 'Copy'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ── KPIs ──────────────────────────────────────────────────── */}
-          {activeTab === 'kpis' && (
-            <div>
-              <PageHeader title="My KPIs" subtitle="Your performance at a glance" />
-
-              {/* KPI grid */}
-              <div data-tour="partner-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 28 }}>
-                <KpiCard label="Commission Earned" value={`₹${commissionEst.toLocaleString('en-IN')}`} sub="estimated · pending review" accent={TEAL} top />
-                <KpiCard label="Total Sign-ups"    value={String(totalSignedUp)} sub="referred users joined"  accent="#16a34a" />
-                <KpiCard label="Total Invites Sent" value={String(totalSent)}   sub="emails dispatched"      accent="#2563eb" />
-                <KpiCard label="MSME Invites"      value={String(allInvites.filter(i => i.invite_type === 'msme').length)}    sub="MSME Tracker"    accent={TEAL} />
-                <KpiCard label="Partner Invites"   value={String(allInvites.filter(i => i.invite_type === 'partner').length)} sub="Partner Program"  accent={PURPLE} />
-              </div>
-
-              {/* Tier progress */}
-              <div data-tour="partner-tier" style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 12, padding: '20px 24px', marginBottom: 24, borderLeft: `4px solid #b45309` }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: DARK }}>Partner Tier Progress</span>
-                  <div style={{ background: tier.bg, border: `1.5px solid ${tier.color}40`, borderRadius: 20, padding: '4px 14px', display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: tier.color }} />
-                    <span style={{ fontSize: 13, fontWeight: 700, color: tier.color }}>{tier.label}</span>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: 0 }}>
-                  {PARTNER_TIERS.map((pt, i, arr) => {
-                    const colors: Record<string, string> = { starter: MUTED, bronze: '#92400e', silver: '#475569', gold: '#b45309' }
-                    const color    = colors[pt.key]
-                    const reached  = totalSignedUp >= pt.minSignups
-                    const isActive = reached && (i === arr.length - 1 || totalSignedUp < arr[i + 1].minSignups)
-                    return (
-                      <div key={pt.key} style={{ flex: 1, textAlign: 'center' }}>
-                        <div style={{ height: 6, background: reached ? color : BORDER, borderRadius: i === 0 ? '4px 0 0 4px' : i === arr.length - 1 ? '0 4px 4px 0' : 0 }} />
-                        <div style={{ marginTop: 6, fontSize: 11, fontWeight: isActive ? 700 : 500, color: isActive ? color : MUTED }}>{pt.label}</div>
-                        <div style={{ fontSize: 10, color: MUTED }}>{pt.minSignups === 0 ? 'Start' : `${pt.minSignups}+`} · {pt.ratePct}%</div>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>For another partner</div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <div style={{ flex: 1, padding: '9px 12px', background: BG, border: `1px solid ${BORDER}`, borderRadius: 8, fontSize: 12, color: MUTED, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{partnerReferralUrl}</div>
+                        <button onClick={copyPartner} style={{ padding: '9px 16px', background: copiedPartner ? '#dcfce7' : PURPLE, color: copiedPartner ? '#166534' : WHITE, border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', flexShrink: 0, colorScheme: 'light' }}>
+                          {copiedPartner ? 'Copied' : 'Copy'}
+                        </button>
                       </div>
-                    )
-                  })}
-                </div>
-                {tier.next && (
-                  <div style={{ marginTop: 14, padding: '10px 14px', background: BG, borderRadius: 8, fontSize: 12, color: MUTED }}>
-                    👉 {tier.next} to unlock the next tier
-                  </div>
-                )}
-                <div style={{ marginTop: 10, padding: '10px 14px', background: BG, borderRadius: 8, fontSize: 12, color: MUTED, lineHeight: 1.6 }}>
-                  Your commission: <strong style={{ color: DARK }}>{tier.ratePct}% of each pack your referred MSME users purchase</strong> · Partner referrals earn no commission · Paid on request (min ₹500).
-                </div>
-              </div>
-
-              {/* Summary breakdown */}
-              <div style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 20 }}>
-                <div style={{ fontWeight: 700, fontSize: 14, color: DARK, marginBottom: 14 }}>Breakdown</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {[
-                    { label: 'MSME users signed up',            value: msmeSignedUp,    color: TEAL },
-                    { label: 'Partners signed up',              value: partnerSignedUp, color: PURPLE },
-                    { label: 'MSME users who purchased a pack', value: msmePaidCount,   color: '#16a34a' },
-                    { label: 'Estimated commission',            value: `₹${commissionEst.toLocaleString('en-IN')}`, color: TEAL, isText: true },
-                  ].map(row => (
-                    <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: BG, borderRadius: 8 }}>
-                      <span style={{ fontSize: 13, color: DARK }}>{row.label}</span>
-                      <span style={{ fontSize: 15, fontWeight: 700, color: row.color }}>{row.isText ? row.value : row.value}</span>
                     </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ── Invites ───────────────────────────────────────────────── */}
-          {activeTab === 'invites' && (
-            <div>
-              <PageHeader title="Send Invites" subtitle="Invite businesses to MSME Tracker or people to join the Partner Program" />
-
-              {/* Send invite form */}
-              <div data-tour="partner-invite-form" style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 24, marginBottom: 24, borderLeft: `4px solid ${PURPLE}` }}>
-                <div style={{ fontWeight: 700, fontSize: 15, color: DARK, marginBottom: 4 }}>Send an invite</div>
-                <p style={{ fontSize: 13, color: MUTED, margin: '0 0 16px', lineHeight: 1.6 }}>
-                  Choose what to invite them to, then enter their email.
-                </p>
-
-                <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-                  {(['msme', 'partner'] as const).map(t => (
-                    <button key={t} onClick={() => setInvType(t)} style={{
-                      padding: '7px 18px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                      border: `1.5px solid ${invType === t ? (t === 'msme' ? TEAL : PURPLE) : BORDER}`,
-                      background: invType === t ? (t === 'msme' ? `${TEAL}15` : `${PURPLE}12`) : WHITE,
-                      color: invType === t ? (t === 'msme' ? TEAL : PURPLE) : MUTED,
-                      colorScheme: 'light',
-                    }}>
-                      {t === 'msme' ? 'MSME Tracker' : 'Partner Program'}
-                    </button>
-                  ))}
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {emails.map((em, idx) => (
-                    <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      <input
-                        type="email"
-                        value={em}
-                        onChange={e => { const next = [...emails]; next[idx] = e.target.value; setEmails(next) }}
-                        onKeyDown={e => { if (e.key === 'Enter') sendInvite() }}
-                        placeholder={invType === 'msme' ? 'business@example.com' : 'friend@example.com'}
-                        style={{ ...inputStyle, flex: 1, width: 'auto' }}
-                      />
-                      {emails.length > 1 && (
-                        <button onClick={() => setEmails(emails.filter((_, i) => i !== idx))} style={{ width: 34, height: 34, borderRadius: 8, border: `1px solid ${BORDER}`, background: WHITE, color: '#94a3b8', fontSize: 18, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', colorScheme: 'light' }}>×</button>
-                      )}
-                    </div>
-                  ))}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <button onClick={() => setEmails([...emails, ''])} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 600, border: `1.5px dashed ${BORDER}`, background: WHITE, color: MUTED, cursor: 'pointer', colorScheme: 'light' }}>
-                      <span style={{ fontSize: 18, lineHeight: 1, marginTop: -1 }}>+</span> Add another email
-                    </button>
-                    <div style={{ flex: 1 }} />
-                    <button onClick={sendInvite} disabled={busy || !emails.some(e => e.trim())} style={{
-                      padding: '10px 24px', borderRadius: 8, fontSize: 14, fontWeight: 600,
-                      background: busy || !emails.some(e => e.trim()) ? '#e2e8f0' : (invType === 'msme' ? TEAL : PURPLE),
-                      color: busy || !emails.some(e => e.trim()) ? '#94a3b8' : WHITE,
-                      border: 'none', cursor: busy || !emails.some(e => e.trim()) ? 'not-allowed' : 'pointer', flexShrink: 0, colorScheme: 'light',
-                    }}>
-                      {busy ? 'Sending…' : emails.filter(e => e.trim()).length > 1 ? `Send ${emails.filter(e => e.trim()).length} Invites` : 'Send Invite'}
-                    </button>
                   </div>
                 </div>
-                <p style={{ fontSize: 11, color: '#94a3b8', margin: '8px 0 0' }}>
-                  {invType === 'msme'
-                    ? 'They get an email to try MSME Tracker — your referral code is embedded automatically.'
-                    : 'They get an email to join the Partner Program and start earning commissions.'}
-                </p>
               </div>
 
+              {/* Everyone you have invited — full width below */}
               {/* Referred users table */}
               <div data-tour="partner-invited-table" style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 12, overflow: 'hidden' }}>
                 <div style={{ padding: '14px 20px', borderBottom: `1px solid ${BORDER}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: `${TEAL}06`, borderLeft: `4px solid ${TEAL}` }}>
@@ -593,7 +564,7 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                       <thead>
                         <tr>
-                          {['Email', 'Invited to', 'Times sent', 'Sign-up', 'Pack purchased', 'Commission', 'Last sent'].map(h => (
+                          {['Email', 'Invited to', 'Times sent', 'Sign-up', 'Pack purchased', 'Your incentive', 'Last sent'].map(h => (
                             <th key={h} style={{ padding: '9px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: TEAL, textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap', borderBottom: `1.5px solid rgba(13,148,136,0.25)`, background: 'rgba(13,148,136,0.05)' }}>{h}</th>
                           ))}
                         </tr>
@@ -637,7 +608,7 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
                                     ? <span style={{ fontSize: 13, fontWeight: 700, color: TEAL }}>₹{(msmeCommissionPaise(pack.amountPaise, tier.ratePct) / 100).toLocaleString('en-IN')} <span style={{ fontSize: 10, fontWeight: 500, color: MUTED }}>({tier.ratePct}%)</span></span>
                                     : <span style={{ fontSize: 12, color: '#94a3b8' }}>Pending purchase</span>
                                 ) : inv.invite_type === 'partner' && inv.signed_up
-                                  ? <span style={{ fontSize: 12, color: '#94a3b8' }}>No commission</span>
+                                  ? <span style={{ fontSize: 12, color: '#94a3b8' }}>No incentive</span>
                                   : <span style={{ fontSize: 12, color: '#cbd5e1' }}>—</span>}
                               </td>
                               <td style={{ padding: '10px 14px', color: MUTED, fontSize: 12, whiteSpace: 'nowrap' }}>{fmtShort(inv.last_sent_at)}</td>
@@ -652,7 +623,74 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
             </div>
           )}
 
-          {/* ── Withdrawals ───────────────────────────────────────────── */}
+          {activeTab === 'kpis' && (
+            <div>
+              <PageHeader title="My KPIs" subtitle="Your performance at a glance" />
+
+              {/* KPI grid */}
+              <div data-tour="partner-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 28 }}>
+                <KpiCard label="Incentive Earned" value={`₹${commissionEst.toLocaleString('en-IN')}`} sub="estimated · pending review" accent={TEAL} top />
+                <KpiCard label="Total Sign-ups"    value={String(totalSignedUp)} sub="referred users joined"  accent="#16a34a" />
+                <KpiCard label="Total Invites Sent" value={String(totalSent)}   sub="emails dispatched"      accent="#2563eb" />
+                <KpiCard label="MSME Invites"      value={String(allInvites.filter(i => i.invite_type === 'msme').length)}    sub="MSME Tracker"    accent={TEAL} />
+                <KpiCard label="Partner Invites"   value={String(allInvites.filter(i => i.invite_type === 'partner').length)} sub="Partner Program"  accent={PURPLE} />
+              </div>
+
+              {/* Tier progress */}
+              <div data-tour="partner-tier" style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 12, padding: '20px 24px', marginBottom: 24, borderLeft: `4px solid #b45309` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: DARK }}>Partner Tier Progress</span>
+                  <div style={{ background: tier.bg, border: `1.5px solid ${tier.color}40`, borderRadius: 20, padding: '4px 14px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: tier.color }} />
+                    <span style={{ fontSize: 13, fontWeight: 700, color: tier.color }}>{tier.label}</span>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 0 }}>
+                  {PARTNER_TIERS.map((pt, i, arr) => {
+                    const colors: Record<string, string> = { starter: MUTED, bronze: '#92400e', silver: '#475569', gold: '#b45309' }
+                    const color    = colors[pt.key]
+                    const reached  = totalSignedUp >= pt.minSignups
+                    const isActive = reached && (i === arr.length - 1 || totalSignedUp < arr[i + 1].minSignups)
+                    return (
+                      <div key={pt.key} style={{ flex: 1, textAlign: 'center' }}>
+                        <div style={{ height: 6, background: reached ? color : BORDER, borderRadius: i === 0 ? '4px 0 0 4px' : i === arr.length - 1 ? '0 4px 4px 0' : 0 }} />
+                        <div style={{ marginTop: 6, fontSize: 11, fontWeight: isActive ? 700 : 500, color: isActive ? color : MUTED }}>{pt.label}</div>
+                        <div style={{ fontSize: 10, color: MUTED }}>{pt.minSignups === 0 ? 'Start' : `${pt.minSignups}+`} · {pt.ratePct}%</div>
+                      </div>
+                    )
+                  })}
+                </div>
+                {tier.next && (
+                  <div style={{ marginTop: 14, padding: '10px 14px', background: BG, borderRadius: 8, fontSize: 12, color: MUTED }}>
+                    👉 {tier.next} to unlock the next tier
+                  </div>
+                )}
+                <div style={{ marginTop: 10, padding: '10px 14px', background: BG, borderRadius: 8, fontSize: 12, color: MUTED, lineHeight: 1.6 }}>
+                  Your referral incentive: <strong style={{ color: DARK }}>{tier.ratePct}% of each pack your referred MSME users buy</strong> · Partner Program invites carry no incentive · Paid on request (min ₹500).
+                </div>
+              </div>
+
+              {/* Summary breakdown */}
+              <div style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 20 }}>
+                <div style={{ fontWeight: 700, fontSize: 14, color: DARK, marginBottom: 14 }}>Breakdown</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {[
+                    { label: 'MSME users signed up',            value: msmeSignedUp,    color: TEAL },
+                    { label: 'Partners signed up',              value: partnerSignedUp, color: PURPLE },
+                    { label: 'MSME users who purchased a pack', value: msmePaidCount,   color: '#16a34a' },
+                    { label: 'Estimated incentive',              value: `₹${commissionEst.toLocaleString('en-IN')}`, color: TEAL, isText: true },
+                  ].map(row => (
+                    <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: BG, borderRadius: 8 }}>
+                      <span style={{ fontSize: 13, color: DARK }}>{row.label}</span>
+                      <span style={{ fontSize: 15, fontWeight: 700, color: row.color }}>{row.isText ? row.value : row.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Invites ───────────────────────────────────────────────── */}
           {activeTab === 'withdrawals' && (
             <div>
               <PageHeader title="Withdraw Earnings" subtitle="Request a payout to your bank account" />
@@ -662,7 +700,7 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
                 <div style={{ background: BG, border: `1px solid ${BORDER}`, borderRadius: 10, padding: '16px 18px' }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Total Earned</div>
                   <div style={{ fontSize: 26, fontWeight: 800, color: TEAL }}>₹{displayEarned.toLocaleString('en-IN')}</div>
-                  <div style={{ fontSize: 11, color: MUTED }}>estimated commissions</div>
+                  <div style={{ fontSize: 11, color: MUTED }}>estimated referral incentives</div>
                 </div>
                 <div style={{ background: BG, border: `1px solid ${BORDER}`, borderRadius: 10, padding: '16px 18px' }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Available</div>
@@ -784,6 +822,11 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
         }
         @media (min-width: 641px) {
           .partner-mobile-tabs { display: none !important; }
+        }
+        /* Start Here is a 50/50 split on desktop; stack it on narrow screens
+           so the invite box lands directly under the explanation. */
+        @media (max-width: 1100px) {
+          .partner-split { grid-template-columns: 1fr !important; }
         }
       `}</style>
     </div>

@@ -6,7 +6,7 @@ const DARK   = '#0f172a'
 const MUTED  = '#64748b'
 const PAD    = 10
 
-type Tab = 'about' | 'kpis' | 'invites' | 'withdrawals'
+type Tab = 'about' | 'kpis' | 'withdrawals'
 
 interface Step {
   selector:    string
@@ -64,14 +64,14 @@ const STEPS: Step[] = [
     description: 'Type one or more email addresses, choose whether to invite them to MSME Tracker or the Partner Program, and hit Send. They receive a branded email with your referral link.',
     hint:        'You can send to multiple emails at once.',
     prefer:      'bottom',
-    tab:         'invites',
+    tab:         'about',
   },
   {
     selector:    '[data-tour="partner-invited-table"]',
     title:       'Referred Users Table',
     description: 'Full transparency — see every invite you sent, whether they signed up, if they purchased a pack, and exactly how much commission you earned per referral.',
     prefer:      'top',
-    tab:         'invites',
+    tab:         'about',
   },
   {
     selector:    '[data-tour="partner-balance"]',
