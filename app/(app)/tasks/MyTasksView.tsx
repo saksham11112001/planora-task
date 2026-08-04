@@ -56,8 +56,13 @@ const BOARD_COLS = [
 // task sits in the list for a whole quarter with nothing to actually do. Those
 // get parked in their own section instead of padding out To do.
 //
-// A task is "long lead" when its trigger fired more than this many days before
-// the due date (i.e. ca_master_tasks.days_before_due > 60).
+// A task is "long lead" when its trigger fired this many days or more before
+// the due date (i.e. ca_master_tasks.days_before_due >= 60).
+//
+// NOTE: every master task is seeded with days_before_due = 7 (see
+// app/api/ca/master/route.ts). Nothing qualifies until a master task is given a
+// longer lead in CA Compliance › Master Tasks — this column stays empty by
+// design until then.
 const CA_LONG_LEAD_DAYS = 60
 // ...but parking stops once the due date is this close. Without this a task
 // with a 90-day lead would stay hidden right up to its deadline — the opposite
@@ -68,7 +73,7 @@ const CA_SURFACE_WITHIN_DAYS = 30
 function isAnnualParked(t: Task, today: string): boolean {
   if ((t as any).custom_fields?._ca_compliance !== true) return false
   const lead = (t as any)._lead_days
-  if (typeof lead !== 'number' || lead <= CA_LONG_LEAD_DAYS) return false
+  if (typeof lead !== 'number' || lead < CA_LONG_LEAD_DAYS) return false
   // Anything already in play stays in the normal flow.
   if (['completed','cancelled','in_review'].includes(t.status)) return false
   if (t.approval_status === 'pending') return false
@@ -222,11 +227,14 @@ export function MyTasksView({
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
   const [groupPages,      setGroupPages]      = useState<Record<string, number>>({})
   const [showAssignedByMe, setShowAssignedByMe] = useState(false)
-  const [activeSection, setActiveSection]       = useState<'mine'|'approval'|'assigned'|'annual'>('mine')
+  const [activeSection, setActiveSection]       = useState<'mine'|'approval'|'assigned'>('mine')
   const [focusMode,     setFocusMode]     = useState(false)
   // Which annual compliance groups are expanded — held here rather than inside
   // the section so it survives the parent re-rendering.
   const [expandedAnnual, setExpandedAnnual] = useState<Set<string>>(new Set())
+  // List view shows the same grouped rows, collapsed by default — the point is
+  // to keep them out of the way, not to move the clutter one section down.
+  const [annualListOpen, setAnnualListOpen] = useState(false)
   const [sortBy, setSortBy] = useState<'due_date'|'created_at'|'updated_at'>('due_date')
   const [sortDir, setSortDir] = useState<'asc'|'desc'>('asc')
   const [sortOpen, setSortOpen] = useState(false)
@@ -273,14 +281,6 @@ export function MyTasksView({
     () => filteredTasks.filter(t => !isAnnualParked(t, today)),
     [filteredTasks, today]
   )
-  // Tab badges count the whole list, not the filtered one — same convention the
-  // My Tasks badge has always used. Keeps the Annual tab from vanishing the
-  // moment a filter excludes everything in it.
-  const annualAllCount = useMemo(
-    () => tasks.filter(t => isAnnualParked(t, today)).length,
-    [tasks, today]
-  )
-
   // Focus mode: collapse the list to what is actually actionable right now —
   // overdue, due today, and anything waiting on approval. Opt-in, off by
   // default, so nobody's view changes unless they ask for it.
@@ -807,27 +807,9 @@ export function MyTasksView({
               background: activeSection==='mine' ? 'rgba(13,148,136,0.12)' : 'var(--surface-subtle)',
               border:'1px solid var(--border)', color: activeSection==='mine' ? 'var(--brand)' : 'var(--text-secondary)',
               fontWeight:700 }}>
-              {tasks.length - annualAllCount}
+              {tasks.length}
             </span>
           </button>
-
-          {/* Annual compliances — long-lead CA work, parked out of the main list */}
-          {annualAllCount > 0 && (
-            <button onClick={() => { setActiveSection('annual'); setShowAssignedByMe(false) }}
-              title="Compliance tasks that were raised more than 60 days before their due date"
-              style={{ display:'flex', alignItems:'center', gap:7, padding:'11px 14px', border:'none',
-                background:'transparent', cursor:'pointer', fontSize:13, fontWeight:600,
-                borderBottom:`2px solid ${activeSection==='annual'?'#d97706':'transparent'}`,
-                color: activeSection==='annual' ? '#d97706' : 'var(--text-muted)',
-                marginBottom:-1, transition:'color 0.15s' }}>
-              Annual compliances
-              <span style={{ fontSize:11, padding:'1px 7px', borderRadius:99, fontWeight:700,
-                background: activeSection==='annual' ? '#d97706' : 'rgba(217,119,6,0.12)',
-                color: activeSection==='annual' ? '#fff' : '#d97706' }}>
-                {annualAllCount}
-              </span>
-            </button>
-          )}
 
           {/* Needs Approval */}
           {canManage && (
@@ -999,127 +981,96 @@ export function MyTasksView({
   )
 
   // ── Annual compliances (long-lead CA work) ───────────────────────────────
-  const AnnualSection = () => annualTasks.length === 0 ? (
-    <div style={{ flex:1, overflowY:'auto', background:'var(--surface-subtle)',
-      display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
-      gap:14, padding:40, textAlign:'center' }}>
-      <div style={{ width:64, height:64, borderRadius:'50%',
-        background:'rgba(217,119,6,0.08)', border:'1px solid rgba(217,119,6,0.2)',
-        display:'flex', alignItems:'center', justifyContent:'center', fontSize:28 }}>🗓</div>
-      <div style={{ fontSize:18, fontWeight:700, color:'var(--text-primary)' }}>Nothing parked here</div>
-      <div style={{ fontSize:13, color:'var(--text-muted)', maxWidth:320, lineHeight:1.6 }}>
-        Compliance tasks raised more than {CA_LONG_LEAD_DAYS} days ahead of their due date wait here until
-        the deadline is closer. If you expected to see some, check whether a filter is hiding them.
-      </div>
-    </div>
-  ) : (
-    <div style={{ flex:1, overflowY:'auto', background:'var(--surface-subtle)' }}>
-      <div style={{ padding:20, display:'flex', flexDirection:'column', gap:10, maxWidth:900, margin:'0 auto' }}>
-        {/* Explain why these are here, so the section doesn't read as "hidden work" */}
-        <div style={{ background:'rgba(217,119,6,0.07)', border:'1px solid rgba(217,119,6,0.22)',
-          borderRadius:14, padding:'18px 22px', display:'flex', alignItems:'center', gap:16 }}>
-          <div style={{ width:48, height:48, borderRadius:12, background:'rgba(217,119,6,0.12)',
-            display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, flexShrink:0 }}>🗓</div>
-          <div>
-            <div style={{ fontSize:18, fontWeight:800, color:'#d97706' }}>
-              {annualTasks.length} long-lead compliance task{annualTasks.length!==1?'s':''}
-            </div>
-            <div style={{ fontSize:12, color:'var(--text-muted)', marginTop:4, lineHeight:1.6 }}>
-              These were raised more than {CA_LONG_LEAD_DAYS} days before they are due, so there is nothing to do
-              yet. They move back into My Tasks on their own once the due date is within {CA_SURFACE_WITHIN_DAYS} days —
-              and anything overdue or awaiting approval never lands here.
-            </div>
-          </div>
-        </div>
-
-        {annualGroups.map(grp => {
-          const isOpen   = expandedAnnual.has(grp.title)
-          const earliest = grp.tasks[0]?.due_date ?? null
-          const latest   = grp.tasks[grp.tasks.length - 1]?.due_date ?? null
-          return (
-            <div key={grp.title} style={{ background:'var(--surface)', border:'1px solid var(--border)',
-              borderRadius:12, borderLeft:'4px solid #d97706', overflow:'hidden' }}>
-              {/* Group row — one line per task title, regardless of client count */}
-              <button
-                onClick={() => setExpandedAnnual(prev => {
-                  const s = new Set(prev)
-                  s.has(grp.title) ? s.delete(grp.title) : s.add(grp.title)
-                  return s
-                })}
-                style={{ width:'100%', display:'flex', alignItems:'center', gap:12, padding:'14px 18px',
-                  background:'transparent', border:'none', cursor:'pointer', textAlign:'left',
-                  fontFamily:'inherit' }}>
-                <span style={{ fontSize:11, color:'#d97706', flexShrink:0, display:'inline-block',
-                  transition:'transform 0.15s', transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)' }}>▾</span>
-                <span style={{ flexShrink:0, fontSize:9, fontWeight:700, background:'rgba(234,179,8,0.15)',
-                  color:'#b45309', padding:'1px 4px', borderRadius:3 }}>CA</span>
-                <span style={{ flex:1, minWidth:0, fontSize:14, fontWeight:700, color:'var(--text-primary)',
-                  overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
-                  {grp.title}
-                </span>
+  // One row per task title however many clients it covers, with an expander —
+  // "GSTR 9" across 50 clients reads as one line, not fifty.
+  // Rendered in two places: the 5th Kanban column (compact) and a collapsed
+  // block at the foot of the List view (wide), so neither view loses the work.
+  const AnnualGroups = ({ compact }: { compact: boolean }) => (
+    <>
+      {annualGroups.map(grp => {
+        const isOpen   = expandedAnnual.has(grp.title)
+        const earliest = grp.tasks[0]?.due_date ?? null
+        const latest   = grp.tasks[grp.tasks.length - 1]?.due_date ?? null
+        return (
+          <div key={grp.title} style={{ background:'var(--surface)', border:'1px solid var(--border)',
+            borderRadius: compact ? 8 : 12, borderLeft:'3px solid #d97706', overflow:'hidden' }}>
+            {/* Group row — one line per task title, regardless of client count */}
+            <button
+              title={grp.title}
+              onClick={() => setExpandedAnnual(prev => {
+                const s = new Set(prev)
+                s.has(grp.title) ? s.delete(grp.title) : s.add(grp.title)
+                return s
+              })}
+              style={{ width:'100%', display:'flex', alignItems:'center',
+                gap: compact ? 6 : 12, padding: compact ? '9px 10px' : '14px 18px',
+                background:'transparent', border:'none', cursor:'pointer', textAlign:'left',
+                fontFamily:'inherit' }}>
+              <span style={{ fontSize:11, color:'#d97706', flexShrink:0, display:'inline-block',
+                transition:'transform 0.15s', transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)' }}>▾</span>
+              <span style={{ flexShrink:0, fontSize:9, fontWeight:700, background:'rgba(234,179,8,0.15)',
+                color:'#b45309', padding:'1px 4px', borderRadius:3 }}>CA</span>
+              <span style={{ flex:1, minWidth:0, fontSize: compact ? 13 : 14, fontWeight:700,
+                color:'var(--text-primary)', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
+                {grp.title}
+              </span>
+              {!compact && (
                 <span style={{ flexShrink:0, fontSize:12, color:'var(--text-muted)' }}>
                   {earliest ? fmtDate(earliest) : '—'}
                   {latest && latest !== earliest ? ` – ${fmtDate(latest)}` : ''}
                 </span>
-                <span style={{ flexShrink:0, fontSize:11, fontWeight:700, padding:'2px 9px', borderRadius:99,
-                  background:'rgba(217,119,6,0.12)', color:'#d97706' }}>
-                  {grp.tasks.length} client{grp.tasks.length!==1?'s':''}
-                </span>
-              </button>
+              )}
+              <span style={{ flexShrink:0, fontSize: compact ? 10 : 11, fontWeight:700,
+                padding: compact ? '1px 7px' : '2px 9px', borderRadius:99,
+                background:'rgba(217,119,6,0.12)', color:'#d97706' }}>
+                {grp.tasks.length}{compact ? '' : ` client${grp.tasks.length!==1?'s':''}`}
+              </span>
+            </button>
 
-              {isOpen && (
-                <div style={{ borderTop:'1px solid var(--border-light)' }}>
-                  {grp.tasks.map(task => {
-                    const client = (task as any).client as {id:string;name:string;color:string}|null
-                    return (
-                      <div key={task.id}
-                        onClick={() => setSelTask(selTask?.id === task.id ? null : task)}
-                        style={{ display:'grid', gridTemplateColumns:'22px 1fr 150px 90px 16px',
-                          alignItems:'center', gap:10, padding:'8px 18px', minHeight:38,
-                          borderBottom:'1px solid var(--border-light)', cursor:'pointer',
-                          background:'var(--surface)' }}>
-                        <CircleBtn task={task}/>
-                        <div style={{ display:'flex', alignItems:'center', gap:5, minWidth:0 }}>
-                          {client && <span style={{ width:7, height:7, borderRadius:2, background:client.color, flexShrink:0 }}/>}
-                          <span style={{ fontSize:13, color:'var(--text-primary)', overflow:'hidden',
-                            whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
-                            {client?.name ?? 'No client'}
-                          </span>
-                        </div>
-                        <div style={{ fontSize:12, color:'var(--text-muted)' }}>
-                          Due {task.due_date ? fmtDate(task.due_date) : '—'}
-                        </div>
+            {/* Expanded — the individual client tasks behind the single row */}
+            {isOpen && (
+              <div style={{ borderTop:'1px solid var(--border-light)' }}>
+                {grp.tasks.map(task => {
+                  const client = (task as any).client as {id:string;name:string;color:string}|null
+                  return (
+                    <div key={task.id}
+                      onClick={() => setSelTask(selTask?.id === task.id ? null : task)}
+                      style={ compact
+                        ? { display:'flex', alignItems:'center', gap:7, padding:'6px 10px',
+                            borderBottom:'1px solid var(--border-light)', cursor:'pointer',
+                            background:'var(--surface)' }
+                        : { display:'grid', gridTemplateColumns:'22px 1fr 150px 90px 16px',
+                            alignItems:'center', gap:10, padding:'8px 18px', minHeight:38,
+                            borderBottom:'1px solid var(--border-light)', cursor:'pointer',
+                            background:'var(--surface)' } }>
+                      <CircleBtn task={task}/>
+                      <div style={{ display:'flex', alignItems:'center', gap:5, minWidth:0,
+                        ...(compact ? { flex:1 } : {}) }}>
+                        {client && <span style={{ width:7, height:7, borderRadius:2, background:client.color, flexShrink:0 }}/>}
+                        <span style={{ fontSize: compact ? 12 : 13, color:'var(--text-primary)', overflow:'hidden',
+                          whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
+                          {client?.name ?? 'No client'}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: compact ? 10 : 12, color:'var(--text-muted)', flexShrink:0 }}>
+                        {compact ? '' : 'Due '}{task.due_date ? fmtDate(task.due_date) : '—'}
+                      </div>
+                      {!compact && (
                         <div style={{ fontSize:11, color:'var(--text-muted)' }}>
                           {typeof (task as any)._lead_days === 'number' ? `${(task as any)._lead_days}d lead` : ''}
                         </div>
-                        <div title={task.priority}
-                          style={{ width:8, height:8, borderRadius:'50%', flexShrink:0,
-                            background: PRIORITY_CONFIG[task.priority]?.color ?? '#94a3b8' }}/>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-
-  // ── Annual section early return ────────────────────────────────────────
-  if (activeSection === 'annual') return (
-    <>
-      <style>{`
-        .mytasks-row:hover .delete-task-btn { opacity: 1 !important; }
-        @media (max-width: 640px) { .hide-mobile { display: none !important; } }
-      `}</style>
-      <PageHeader/>
-      <AnnualSection/>
-      <TaskDetailPanel task={selTask} members={members} clients={clients}
-        currentUserId={currentUserId} userRole={userRole}
-        onClose={() => { setSelTask(null) }}
-        onUpdated={handleTaskUpdated}/>
+                      )}
+                      <div title={task.priority}
+                        style={{ width:8, height:8, borderRadius:'50%', flexShrink:0,
+                          background: PRIORITY_CONFIG[task.priority]?.color ?? '#94a3b8' }}/>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )
+      })}
     </>
   )
 
@@ -1817,6 +1768,32 @@ export function MyTasksView({
             )
           })}
 
+          {/* ── Annual compliances — same grouped rows as the board column, so
+                 List users still reach the parked work ── */}
+          {annualTasks.length > 0 && !showAssignedByMe && (
+            <div style={{ borderBottom:'1px solid var(--border-light)' }}>
+              <button onClick={() => setAnnualListOpen(v => !v)}
+                style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 18px 5px',
+                  width:'100%', background:'none', border:'none', cursor:'pointer',
+                  fontFamily:'inherit', fontSize:10, fontWeight:700, textTransform:'uppercase',
+                  letterSpacing:'0.06em', color:'#d97706', textAlign:'left' }}>
+                {annualListOpen ? '▾' : '▸'} 🗓 Annual compliances
+                <span style={{ opacity:0.5, fontWeight:400, textTransform:'none' }}>
+                  ({annualTasks.length})
+                </span>
+                <span style={{ fontSize:10, color:'#d97706', opacity:0.6, fontWeight:400,
+                  textTransform:'none', marginLeft:4 }}>
+                  raised {CA_LONG_LEAD_DAYS}+ days early
+                </span>
+              </button>
+              {annualListOpen && (
+                <div style={{ padding:'0 18px 10px', display:'flex', flexDirection:'column', gap:8 }}>
+                  <AnnualGroups compact={false}/>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ── CA tasks triggering in next 3 days (owner/admin only) ── */}
           {upcomingCATriggers.length > 0 && !showAssignedByMe && (
             <CATriggerSection triggers={upcomingCATriggers} />
@@ -2357,6 +2334,34 @@ export function MyTasksView({
           )
           })
         })()}
+
+        {/* ── 5th column: Annual compliances ──────────────────────────────
+            Deliberately rendered outside BOARD_COLS.map and with no drop
+            handler: 'annual' is not a task status, so letting a card be
+            dragged here would PATCH an invalid status. The four real columns
+            keep their existing behaviour untouched. */}
+        {annualTasks.length > 0 && (
+          <div style={{ width:272, flexShrink:0, borderRadius:10, overflow:'hidden',
+            maxHeight:'100%', display:'flex', flexDirection:'column',
+            background:'var(--border-light)', border:'1px solid rgba(217,119,6,0.35)' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:7, padding:'11px 13px',
+              borderBottom:'1px solid var(--border)', flexShrink:0 }}>
+              <div style={{ width:9, height:9, borderRadius:'50%', background:'#d97706', flexShrink:0 }}/>
+              <span style={{ fontSize:13, fontWeight:600, color:'var(--text-primary)', flex:1 }}>
+                Annual compliances
+              </span>
+              <span style={{ fontSize:12, color:'var(--text-muted)' }}>{annualTasks.length}</span>
+            </div>
+            <div style={{ padding:'6px 10px 8px', fontSize:10, color:'var(--text-muted)',
+              lineHeight:1.5, borderBottom:'1px solid var(--border-light)' }}>
+              Raised {CA_LONG_LEAD_DAYS}+ days early — nothing to do yet. Returns to To do
+              within {CA_SURFACE_WITHIN_DAYS} days of the due date.
+            </div>
+            <div style={{ padding:8, display:'flex', flexDirection:'column', gap:7, overflowY:'auto', flex:1 }}>
+              <AnnualGroups compact/>
+            </div>
+          </div>
+        )}
       </div>
       <TaskDetailPanel task={selTask} members={members} clients={clients}
         currentUserId={currentUserId} userRole={userRole}
