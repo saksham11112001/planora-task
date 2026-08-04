@@ -256,6 +256,8 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
   const totalSent       = allInvites.length
   const msmePaidCount   = allInvites.filter(i => i.invite_type === 'msme' && i.signed_up && packByEmail[i.email.toLowerCase()]).length
   const tier            = getTier(totalSignedUp)
+  // Sign-ups needed for the next tier up — null once Gold is reached.
+  const nextTierAt      = PARTNER_TIERS.find(t => t.minSignups > totalSignedUp)?.minSignups ?? null
   // Tier rate × each referred user's purchased pack — same formula as the
   // server's withdrawal balance (shared lib/partner/tiers.ts).
   const commissionEst   = Object.values(packByEmail).reduce(
@@ -371,11 +373,19 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
                   <h1 style={{ fontSize: 27, fontWeight: 800, color: WHITE, margin: '0 0 12px', lineHeight: 1.25 }}>
                     Hi {partner.name.split(' ')[0]} — here is the whole idea in one line.
                   </h1>
-                  <p style={{ margin: '0 0 18px', fontSize: 16, color: '#e2e8f0', lineHeight: 1.7, maxWidth: 640 }}>
-                    You introduce a business to <strong style={{ color: WHITE }}>MSME Tracker</strong>. They use it to collect
-                    MSME declarations from their vendors. When they take a paid plan, <strong style={{ color: WHITE }}>you get a
-                    referral incentive of {tier.ratePct}% of what they pay</strong>.
-                  </p>
+                  {invType === 'msme' ? (
+                    <p style={{ margin: '0 0 18px', fontSize: 16, color: '#e2e8f0', lineHeight: 1.7, maxWidth: 640 }}>
+                      You introduce a business to <strong style={{ color: WHITE }}>MSME Tracker</strong>. They use it to collect
+                      MSME declarations from their vendors. When they take a paid plan, <strong style={{ color: WHITE }}>you get a
+                      referral incentive of {tier.ratePct}% of what they pay</strong>.
+                    </p>
+                  ) : (
+                    <p style={{ margin: '0 0 18px', fontSize: 16, color: '#e2e8f0', lineHeight: 1.7, maxWidth: 640 }}>
+                      You invite someone to join the <strong style={{ color: WHITE }}>Partner Program</strong>. They introduce
+                      businesses to MSME Tracker themselves. Their sign-up <strong style={{ color: WHITE }}>counts towards your
+                      tier</strong> — and a higher tier raises your rate on every business you have already referred.
+                    </p>
+                  )}
                   <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                     <span style={{ background: 'rgba(13,148,136,0.18)', border: '1px solid rgba(13,148,136,0.45)', color: '#5eead4', borderRadius: 20, padding: '6px 14px', fontSize: 13, fontWeight: 600 }}>
                       Your tier: {tier.label} · {tier.ratePct}%
@@ -384,7 +394,11 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
                       Your code: {partner.referral_code}
                     </span>
                     <span style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.18)', color: '#cbd5e1', borderRadius: 20, padding: '6px 14px', fontSize: 13, fontWeight: 600 }}>
-                      Paid out from ₹500
+                      {invType === 'msme'
+                        ? 'Paid out from ₹500'
+                        : nextTierAt !== null
+                          ? `${totalSignedUp} of ${nextTierAt} sign-ups to the next tier`
+                          : 'Top tier reached'}
                     </span>
                   </div>
                 </div>
@@ -393,33 +407,60 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
               {/* Two halves: understand it (left) · do it (right) */}
               <div className="partner-split" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, alignItems: 'start', marginBottom: 22 }}>
 
-                {/* LEFT — what it is and how it works */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  <div style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 22, borderLeft: `4px solid ${TEAL}` }}>
-                    <div style={{ fontWeight: 800, fontSize: 16, color: DARK, marginBottom: 10 }}>What is MSME Tracker?</div>
-                    <p style={{ margin: '0 0 12px', fontSize: 14, color: '#334155', lineHeight: 1.7 }}>
-                      A business uploads its list of vendors. Each vendor is asked for their MSME (Udyam) details.
-                      Vendors who do not reply get reminders. The business ends up with an audit log showing who
-                      declared what, and when.
-                    </p>
-                    <p style={{ margin: 0, fontSize: 14, color: '#334155', lineHeight: 1.7 }}>
-                      They need this because of <strong>Section 43B(h)</strong>: payments to MSME vendors must be made
-                      within 45 days, or the expense is disallowed. To follow the rule they first have to know which
-                      vendors are MSMEs.
-                    </p>
-                  </div>
+                {/* LEFT — what it is and how it works. Follows the invite-type
+                    switcher on the right, so the guide always describes the thing
+                    the partner is currently inviting someone to. */}
+                <div className="partner-explain" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  {invType === 'msme' ? (
+                    <div style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 22, borderLeft: `4px solid ${TEAL}` }}>
+                      <div style={{ fontWeight: 800, fontSize: 16, color: DARK, marginBottom: 10 }}>What is MSME Tracker?</div>
+                      <p style={{ margin: '0 0 12px', fontSize: 14, color: '#334155', lineHeight: 1.7 }}>
+                        A business uploads its list of vendors. Each vendor is asked for their MSME (Udyam) details.
+                        Vendors who do not reply get reminders. The business ends up with an audit log showing who
+                        declared what, and when.
+                      </p>
+                      <p style={{ margin: 0, fontSize: 14, color: '#334155', lineHeight: 1.7 }}>
+                        They need this because of <strong>Section 43B(h)</strong>: payments to MSME vendors must be made
+                        within 45 days, or the expense is disallowed. To follow the rule they first have to know which
+                        vendors are MSMEs.
+                      </p>
+                    </div>
+                  ) : (
+                    <div style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 22, borderLeft: `4px solid ${PURPLE}` }}>
+                      <div style={{ fontWeight: 800, fontSize: 16, color: DARK, marginBottom: 10 }}>What is the Partner Program?</div>
+                      <p style={{ margin: '0 0 12px', fontSize: 14, color: '#334155', lineHeight: 1.7 }}>
+                        It is the programme you are in right now. Someone you invite gets their own partner portal,
+                        their own referral code, and can introduce businesses to MSME Tracker just as you do.
+                      </p>
+                      <p style={{ margin: 0, fontSize: 14, color: '#334155', lineHeight: 1.7 }}>
+                        Inviting a partner does not pay you directly. What it does is move you up a tier — and the
+                        higher rate then applies to <strong>every</strong> business you have referred, including the
+                        ones from before.
+                      </p>
+                    </div>
+                  )}
 
                   <div style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 22 }}>
                     <div style={{ fontWeight: 800, fontSize: 16, color: DARK, marginBottom: 14 }}>What you need to do</div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
-                      {[
-                        ['Send an invite', 'Use the box on the right, or share your link. Your code is added for you.'],
-                        ['They sign up', 'Anyone who joins through your link stays linked to you — even if they sign up weeks later.'],
-                        ['They buy a plan', `You receive ${tier.ratePct}% of what they pay. Introduce more businesses and the rate rises: 5% → 10% → 20%.`],
-                        ['You get paid', 'Ask for a payout once you are above ₹500. It reaches your bank in 3–5 working days.'],
-                      ].map(([title, desc], i) => (
+                      {(invType === 'msme'
+                        ? [
+                            ['Send an invite', 'Use the box on the right, or share your link. Your code is added for you.'],
+                            ['They sign up', 'Anyone who joins through your link stays linked to you — even if they sign up weeks later.'],
+                            ['They buy a plan', `You receive ${tier.ratePct}% of what they pay. Introduce more businesses and the rate rises: 5% → 10% → 20%.`],
+                            ['You get paid', 'Ask for a payout once you are above ₹500. It reaches your bank in 3–5 working days.'],
+                          ]
+                        : [
+                            ['Send an invite', 'Use the box on the right, or share your partner link. Your code is added for you.'],
+                            ['They join as a partner', 'They get their own portal and referral code, and start introducing businesses themselves.'],
+                            ['Your tier moves up', nextTierAt !== null
+                              ? `You are at ${totalSignedUp} sign-up${totalSignedUp === 1 ? '' : 's'}. At ${nextTierAt} you reach the next tier.`
+                              : 'You are already at the top tier, so further sign-ups do not change your rate.'],
+                            ['Your rate rises on everything', 'The new rate applies to every business you have referred, not just the ones after it.'],
+                          ]
+                      ).map(([title, desc], i) => (
                         <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                          <div style={{ width: 24, height: 24, borderRadius: '50%', background: TEAL, color: WHITE, fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>{i + 1}</div>
+                          <div style={{ width: 24, height: 24, borderRadius: '50%', background: invType === 'msme' ? TEAL : PURPLE, color: WHITE, fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>{i + 1}</div>
                           <div>
                             <div style={{ fontWeight: 700, fontSize: 13.5, color: DARK, marginBottom: 2 }}>{title}</div>
                             <div style={{ fontSize: 13, color: MUTED, lineHeight: 1.6 }}>{desc}</div>
@@ -450,17 +491,20 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
                       })}
                     </div>
                     <p style={{ margin: '12px 0 0', fontSize: 12, color: MUTED, lineHeight: 1.6 }}>
-                      Inviting someone to the Partner Program does not carry an incentive — only businesses who take a paid plan do.
+                      {invType === 'msme'
+                        ? 'Inviting someone to the Partner Program does not carry an incentive — only businesses who take a paid plan do.'
+                        : 'Partner sign-ups are not paid on their own, but they do count towards the sign-up totals above — which is how they raise your rate.'}
                     </p>
                   </div>
                 </div>
 
                 {/* RIGHT — act on it now */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <div data-tour="partner-invite-form" style={{ background: WHITE, border: `2px solid ${TEAL}`, borderRadius: 12, padding: 24, boxShadow: '0 4px 16px rgba(13,148,136,0.10)' }}>
+                <div className="partner-act" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div data-tour="partner-invite-form" style={{ background: WHITE, border: `2px solid ${invType === 'msme' ? TEAL : PURPLE}`, borderRadius: 12, padding: 24, boxShadow: `0 4px 16px ${invType === 'msme' ? 'rgba(13,148,136,0.10)' : 'rgba(124,58,237,0.10)'}` }}>
                   <div style={{ fontWeight: 800, fontSize: 17, color: DARK, marginBottom: 4 }}>Start here — send your first invite</div>
                   <p style={{ fontSize: 13, color: MUTED, margin: '0 0 16px', lineHeight: 1.6 }}>
                     Pick who you are inviting, type their email, and press send. We write the email for you.
+                    The guide alongside changes to match your choice.
                   </p>
 
                   <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
@@ -823,10 +867,15 @@ export function PartnerDashboard({ partner, msmeInvites: initMsme, partnerInvite
         @media (min-width: 641px) {
           .partner-mobile-tabs { display: none !important; }
         }
-        /* Start Here is a 50/50 split on desktop; stack it on narrow screens
-           so the invite box lands directly under the explanation. */
+        /* Start Here is a 50/50 split on desktop; stack it on narrow screens.
+           Stacked, the invite box goes FIRST — it holds the MSME / Partner
+           switcher, and that switcher rewrites the explanation below it. With
+           the old order the switcher sat under the text it controls, so the
+           change happened off-screen. */
         @media (max-width: 1100px) {
           .partner-split { grid-template-columns: 1fr !important; }
+          .partner-act     { order: 1; }
+          .partner-explain { order: 2; }
         }
       `}</style>
     </div>
