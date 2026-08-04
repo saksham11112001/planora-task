@@ -71,7 +71,13 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'Schedule must be an array of 1–4 day intervals (for 2–5 emails)' }, { status: 400 })
     }
     if (schedule.some(d => !Number.isInteger(d) || d < 1 || d > 365)) {
-      return NextResponse.json({ error: 'Each interval must be a whole number of days between 1 and 365' }, { status: 400 })
+      return NextResponse.json({ error: 'Each value must be a whole number of days between 1 and 365' }, { status: 400 })
+    }
+    // Values are day offsets from the first email, so they must increase —
+    // "day 14 then day 7" has no meaning. The reminder cron degrades a bad
+    // stored schedule gracefully, but reject it here so it never gets stored.
+    if (schedule.some((d, i) => i > 0 && d <= schedule[i - 1])) {
+      return NextResponse.json({ error: 'Each reminder day must be later than the previous one (days are counted from the first email)' }, { status: 400 })
     }
     const { error } = await admin
       .from('org_feature_settings')

@@ -291,11 +291,18 @@ export async function sendMsmeVendorEmail(p: {
   // Strip characters that could break or spoof the From header.
   const safeOrgName = p.orgName.replace(/[<>"\r\n;,]/g, '').trim().slice(0, 60) || 'MSME Compliance'
   const msmeFrom    = `${safeOrgName} <${msmeDomain}>`
+  // Replies must reach a human at the requesting firm. The From address is
+  // noreply@ on our domain, and a vendor's most common response to a request
+  // like this is simply pressing Reply — without a Reply-To those answers
+  // vanished and the vendor believed they had responded. A real Reply-To is
+  // also a legitimacy signal for spam filters.
+  const replyTo = p.contactEmail || p.cc
   // NOT product-gated: this is MSME's own product email, sent to the customer's
   // VENDORS (who are not upFloat users at all).
   return resend.emails.send({
     from: msmeFrom, to: p.to,
     ...(p.cc ? { cc: [p.cc] } : {}),
+    ...(replyTo ? { replyTo } : {}),
     subject: msmeVendorEmailSubject(p),
     html:    msmeVendorEmailHtml(p),
     text:    msmeVendorEmailText(p),

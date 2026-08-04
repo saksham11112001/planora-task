@@ -64,7 +64,8 @@
       "Read(//tmp/**)",
       "Bash(sed -i 's/if \\(typeof lead !== .number. || lead <= CA_LONG_LEAD_DAYS\\) return false/if \\(typeof lead !== \"number\" || lead < CA_LONG_LEAD_DAYS\\) return false/' parked.test.mjs)",
       "Bash(sed -i \"s/\\\\['CA, 61d lead \\(just over threshold\\)        -> PARKED',        ca\\({ _lead_days: 61 }\\),                      true\\\\]/['CA, 61d lead                              -> PARKED',        ca\\({ _lead_days: 61 }\\),                      true]/\" parked.test.mjs)",
-      "Bash(sed -i \"s/\\\\['CA, 60d lead \\(at threshold\\)               -> visible',       ca\\({ _lead_days: 60 }\\),                      false\\\\]/['CA, 60d lead \\(at threshold, inclusive\\)    -> PARKED',        ca\\({ _lead_days: 60 }\\),                      true],\\\\n  ['CA, 59d lead \\(below threshold\\)           -> visible',       ca\\({ _lead_days: 59 }\\),                      false]/\" parked.test.mjs)"
+      "Bash(sed -i \"s/\\\\['CA, 60d lead \\(at threshold\\)               -> visible',       ca\\({ _lead_days: 60 }\\),                      false\\\\]/['CA, 60d lead \\(at threshold, inclusive\\)    -> PARKED',        ca\\({ _lead_days: 60 }\\),                      true],\\\\n  ['CA, 59d lead \\(below threshold\\)           -> visible',       ca\\({ _lead_days: 59 }\\),                      false]/\" parked.test.mjs)",
+      "Bash(node cadence.test.mjs)"
     ]
   }
 }
