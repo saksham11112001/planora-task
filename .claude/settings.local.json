@@ -50,7 +50,14 @@
       "Bash(xargs grep -l \"digest\\\\|queue\\\\|notification\")",
       "Bash(New-Item -ItemType Directory -Force \"C:\\\\Users\\\\saksh\\\\Desktop\\\\planora-task\\\\app\\\\api\\\\recurring\\\\recalculate\")",
       "Bash(Out-Null)",
-      "Bash(Write-Output \"ok\")"
+      "Bash(Write-Output \"ok\")",
+      "Bash(npm ci *)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(cd \"C:/Users/saksh/Desktop/planora-task/.claude/worktrees/task-manager-ca-compliance-analysis-e1fab2\" && ls -a .claude/ 2>/dev/null; echo \"--- env ---\"; ls -a | grep -i \"env\" ; echo \"--- parent env ---\"; ls -a ../../.. 2>/dev/null | grep -i env)",
+      "Bash(NEXT_PUBLIC_SUPABASE_URL=\"https://placeholder.supabase.co\" NEXT_PUBLIC_SUPABASE_ANON_KEY=\"placeholder\" SUPABASE_SERVICE_ROLE_KEY=\"placeholder\" npm run build)",
+      "Bash(node parked.test.mjs)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
     ]
   }
 }

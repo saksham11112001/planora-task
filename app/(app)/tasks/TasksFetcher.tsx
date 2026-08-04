@@ -118,9 +118,36 @@ export async function TasksFetcher() {
     (tasks ?? []).map((t: any) => t.parent_task_id).filter((id: any) => id && !seenIds.has(id))
   )] as string[]
 
+  // A CA task's trigger date is due_date − master.days_before_due, and
+  // days_before_due lives on ca_master_tasks — not on the spawned task. Resolve
+  // it through the assignment id stamped into custom_fields so MyTasksView can
+  // tell long-lead compliance work (spawned months early) from ordinary work.
+  // Scoped to the assignments this user actually has tasks for, so orgs with
+  // thousands of assignments don't pay for a full-table read on every load.
+  const caAssignmentIds = [...new Set(
+    taskList
+      .filter((t: any) => t.custom_fields?._ca_compliance === true && t.custom_fields?._assignment_id)
+      .map((t: any) => t.custom_fields._assignment_id as string)
+  )] as string[]
+
+  const [{ data: parentRows }, { data: leadRows }] = await Promise.all([
+    parentIds.length > 0
+      ? supabase.from('tasks').select(PARENT_COLS).in('id', parentIds).eq('org_id', mb.org_id)
+      : Promise.resolve({ data: [] as any[] }),
+    caAssignmentIds.length > 0
+      ? supabase.from('ca_client_assignments')
+          .select('id, master_task:ca_master_tasks(days_before_due)')
+          .eq('org_id', mb.org_id).in('id', caAssignmentIds)
+      : Promise.resolve({ data: [] as any[] }),
+  ])
+
+  const leadDaysByAssignment: Record<string, number> = {}
+  ;(leadRows ?? []).forEach((r: any) => {
+    const d = (r.master_task as any)?.days_before_due
+    if (typeof d === 'number') leadDaysByAssignment[r.id] = d
+  })
+
   if (parentIds.length > 0) {
-    const { data: parentRows } = await supabase.from('tasks')
-      .select(PARENT_COLS).in('id', parentIds).eq('org_id', mb.org_id)
     ;(parentRows ?? []).forEach((p: any) => {
       if (seenIds.has(p.id)) return
       seenIds.add(p.id)
@@ -141,7 +168,7 @@ export async function TasksFetcher() {
   // so tasks from different assignments sharing the same title/client/date are NOT
   // incorrectly treated as duplicates.
   const seenCAKeys = new Set<string>()
-  const displayTaskList = taskList.filter((t: any) => {
+  const dedupedTaskList = taskList.filter((t: any) => {
     // Show subtasks that are directly assigned to the current user.
     // Only drop subtasks that arrived as context (shouldn't happen, but guard anyway).
     if (t.parent_task_id && t.custom_fields?._context_task === true) return false
@@ -155,6 +182,15 @@ export async function TasksFetcher() {
     }
     return true
   })
+
+  // _lead_days: how many days before the due date this task was spawned.
+  // Read-only, derived here and never written back — MyTasksView uses it to
+  // park long-lead compliance work in its own section.
+  const displayTaskList = dedupedTaskList.map((t: any) =>
+    t.custom_fields?._ca_compliance === true
+      ? { ...t, _lead_days: leadDaysByAssignment[t.custom_fields?._assignment_id] ?? null }
+      : t
+  )
 
   type UpcomingCATrigger = {
     id: string; title: string; triggerDate: string; dueDate: string
