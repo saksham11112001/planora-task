@@ -23,6 +23,12 @@ export const msmeReminders = inngest.createFunction(
         .select('id, vendor_name, vendor_email, org_id, email_count, last_emailed_at, organisations(name)')
         .eq('status', 'emailed')
         .eq('is_deleted', false)
+        // Never auto-remind a vendor who unsubscribed or whose address bounced.
+        // The manual send paths already refuse these; the cron ignoring the flag
+        // meant opted-out vendors kept getting reminders — and every send to a
+        // dead address chips away at sender reputation, pushing ALL vendor
+        // emails towards spam.
+        .eq('email_bounced', false)
         .gte('email_count', 1)
         .lte('email_count', 4)  // max 5 emails (email_count 1–4 still have follow-ups pending)
         .not('last_emailed_at', 'is', null)
@@ -78,8 +84,17 @@ export const msmeReminders = inngest.createFunction(
 
       if (vendor.email_count >= maxEmails) continue
 
-      const daysToWait = intervalDays[vendor.email_count - 1]
-      if (daysToWait == null) continue
+      // Schedule values are DAY OFFSETS from the first email (day 7, 14, 21,
+      // 30 by default). The wait after the previous send is therefore the
+      // DIFFERENCE between consecutive offsets. Treating each value as a gap
+      // (the old reading) compounded them: [7,14,21,30] actually sent on days
+      // 7, 21, 42 and 72 — the "final reminder" landing two months after the
+      // 15-day reply window the email itself quotes. Clamped to ≥1 day so a
+      // non-increasing custom schedule can never machine-gun a vendor.
+      const offset     = intervalDays[vendor.email_count - 1]
+      if (offset == null) continue
+      const prevOffset = vendor.email_count >= 2 ? (intervalDays[vendor.email_count - 2] ?? 0) : 0
+      const daysToWait = Math.max(1, offset - prevOffset)
 
       const lastEmailed = new Date(vendor.last_emailed_at!)
       const sendAfter   = new Date(lastEmailed.getTime() + daysToWait * 86400_000)

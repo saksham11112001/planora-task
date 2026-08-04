@@ -1549,7 +1549,7 @@ export function MsmeView({ userRole, orgName }: Props) {
                   Reminder email {i + 2}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                  <span style={{ fontSize: 12, color: '#64748b' }}>After</span>
+                  <span style={{ fontSize: 12, color: '#64748b' }}>Day</span>
                   <input
                     type="number"
                     min={1}
@@ -1561,7 +1561,6 @@ export function MsmeView({ userRole, orgName }: Props) {
                     }}
                     style={{ width: 60, padding: '4px 8px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, background: '#f8fafc', color: '#0f172a', textAlign: 'center' }}
                   />
-                  <span style={{ fontSize: 12, color: '#64748b' }}>days</span>
                   {draftIntervals.length > 1 && (
                     <button
                       onClick={() => setDraftIntervals(prev => prev.filter((_, idx) => idx !== i))}
@@ -1576,12 +1575,16 @@ export function MsmeView({ userRole, orgName }: Props) {
             {/* Add email button */}
             {draftIntervals.length < 4 && (
               <button
-                onClick={() => setDraftIntervals(prev => [...prev, 7])}
+                onClick={() => setDraftIntervals(prev => [...prev, Math.min(365, (prev[prev.length - 1] ?? 0) + 7)])}
                 style={{ width: '100%', padding: '8px', border: '1px dashed #e2e8f0', borderRadius: 8, background: 'none', color: '#64748b', fontSize: 13, cursor: 'pointer', marginTop: 4 }}
               >
                 + Add another reminder email
               </button>
             )}
+            <p style={{ margin: '8px 0 0', fontSize: 11, color: '#64748b' }}>
+              Days are counted from the first email (Day 0). The default sends reminders on
+              day 7, 14, 21 and 30.
+            </p>
           </div>
 
           {/* CC email */}
@@ -1920,7 +1923,7 @@ const MSME_FAQ = [
   },
   {
     q: 'How do I change the email frequency or number of reminders?',
-    a: 'Settings → Email Settings → Email Schedule. You can set the number of follow-up emails (1–4 reminders, so 2–5 total emails) and the gap in days between each one. For example: Email 1 on day 0, Email 2 after 7 days, Email 3 after 14 days. Changes apply to new email sequences only — vendors already in progress continue on the old schedule.',
+    a: 'Settings → Email Settings → Email Schedule. You can set the number of follow-up emails (1–4 reminders, so 2–5 total emails) and the day each one goes out, counted from the first email. For example: Email 1 on day 0, Email 2 on day 7, Email 3 on day 14. Changes apply to new email sequences only — vendors already in progress continue on the old schedule.',
   },
   {
     q: 'What is an email slot and how does it get consumed?',

@@ -1708,7 +1708,11 @@ export function LandingClient(props: Props) {
             <Link href="/professionals" style={navLink}>Professionals</Link>
             <Link href="/msme-landing" style={navLink}>MSME Tracker</Link>
           </div>
-          <span style={{ fontSize: 13, color: '#64748b' }}>© 2026 upFloat</span>
+          <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', alignItems: 'center' }}>
+            <a href="mailto:info@upfloat.co" style={navLink}>info@upfloat.co</a>
+            <a href="tel:+918506064704" style={navLink}>+91 85060 64704</a>
+            <span style={{ fontSize: 13, color: '#64748b' }}>© 2026 upFloat</span>
+          </div>
         </div>
       </footer>
     </div>
