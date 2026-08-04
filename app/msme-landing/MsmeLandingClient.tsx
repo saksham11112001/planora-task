@@ -1362,6 +1362,23 @@ function Footer() {
             links={['Features', 'How it works', 'Security']}
           />
           <FooterCol heading="Company" links={['About upFloat', 'Contact', 'Privacy', 'Terms']} />
+          <div>
+            <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 14 }}>Contact us</div>
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+              <li style={{ marginBottom: 10 }}>
+                <a href="mailto:info@upfloat.co"
+                  style={{ fontSize: 14, color: 'rgba(255,255,255,0.62)', textDecoration: 'none' }}>
+                  info@upfloat.co
+                </a>
+              </li>
+              <li style={{ marginBottom: 10 }}>
+                <a href="tel:+918506064704"
+                  style={{ fontSize: 14, color: 'rgba(255,255,255,0.62)', textDecoration: 'none' }}>
+                  +91 85060 64704
+                </a>
+              </li>
+            </ul>
+          </div>
         </div>
       </div>
       <div
