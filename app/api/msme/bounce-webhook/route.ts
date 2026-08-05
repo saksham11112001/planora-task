@@ -5,9 +5,10 @@
 //
 // Bounces mark the vendor as bounced. Email count is NOT decremented —
 // the slot is already consumed and this is the user's mistake for entering a bad address.
-// Opens stamp msme_email_log.opened_at, which feeds the "Opened On" column of
-// the audit export — without it there is no way to tell "landed in spam" apart
-// from "opened and ignored" when vendors go quiet.
+// Opens stamp msme_email_log.opened_at (served by /api/msme/email-logs).
+// Deliberately NOT shown in the audit-log export — it's diagnostic data for
+// telling "landed in spam" apart from "opened and ignored" when vendors go
+// quiet, not a compliance record.
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient }        from '@/lib/supabase/admin'
 
