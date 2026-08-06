@@ -106,8 +106,10 @@ function selectStyle(active: boolean) {
 }
 
 export function MonitorView({ tasks: initialTasks, members, clients, currentUserId, userRole, from90 }: Props) {
-  // Pre-filter server data: drop completed tasks older than 90 days (done client-side
-  // so the DB query has no OR condition that could silently exclude active tasks).
+  // Drop completed tasks older than 90 days. The fetcher now applies the same
+  // cutoff in the database, so this is a redundant safety net rather than the
+  // primary filter — kept because it is free and guards against a row slipping
+  // through on odd data.
   const [tasks, setTasks] = useState<MonTask[]>(
     initialTasks.filter(t =>
       t.status !== 'completed' || !t.completed_at || t.completed_at.slice(0, 10) >= from90
