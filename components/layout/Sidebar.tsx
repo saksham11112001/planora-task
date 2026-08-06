@@ -818,6 +818,7 @@ function LogoutIconButton() {
       onClick={logout}
       disabled={signingOut}
       title={signingOut ? 'Signing out…' : 'Sign out'}
+      aria-label={signingOut ? 'Signing out' : 'Sign out'}
       style={{
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         width: 28, height: 28, borderRadius: 6,

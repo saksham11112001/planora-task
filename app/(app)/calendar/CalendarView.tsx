@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, RefreshCw, FolderOpen, CheckSquare, Clock, A
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
 import { nextOccurrence } from '@/lib/utils/recurringSchedule'
 import { MultiPillSelect } from '@/components/filters/MultiPillSelect'
+import { usePersistedState, viewPrefKey } from '@/lib/hooks/usePersistedState'
 import type { Task } from '@/types'
 
 interface CalTask {
@@ -151,7 +152,12 @@ export function CalendarView({ tasks: initialTasks, clients = [], members = [], 
   const [year,     setYear]     = useState(now.getFullYear())
   const [month,    setMonth]    = useState(now.getMonth())
   const [filter,   setFilter]   = useState<Filter>('all')
-  const [viewMode, setViewMode] = useState<ViewMode>('timeline')
+  // Remembered per user — month vs timeline is a strong personal preference and
+  // previously reset to timeline on every visit.
+  const [viewMode, setViewMode] = usePersistedState<ViewMode>(
+    viewPrefKey('calendar_mode', currentUserId), 'timeline',
+    v => v === 'month' || v === 'timeline',
+  )
   const [selected, setSelected] = useState<string|null>(null)
   const [hovered,       setHovered]       = useState<string|null>(null)
   const [clientFilter,  setClientFilter]  = useState<string[]>([])

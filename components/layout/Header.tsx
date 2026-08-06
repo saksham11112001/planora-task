@@ -197,6 +197,8 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void } = {}) {
       {/* Create */}
       <div className="relative" ref={createRef}>
         <button onClick={() => { setCreateOpen(!createOpen); setProfileOpen(false); setBellOpen(false) }}
+          aria-expanded={createOpen}
+          aria-haspopup="menu"
           style={{
             display: 'flex', alignItems: 'center', gap: 6,
             padding: '6px 14px', borderRadius: 8,
@@ -235,6 +237,7 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void } = {}) {
       {/* Report issue */}
       <button onClick={() => { setReportOpen(true); setCreateOpen(false); setBellOpen(false); setProfileOpen(false) }}
         title="Report an issue"
+        aria-label="Report an issue"
         style={{ width:34, height:34, borderRadius:8, border:'none',
           background:'transparent', cursor:'pointer', display:'flex', alignItems:'center',
           justifyContent:'center', color:'var(--text-muted)', transition:'all 0.15s', flexShrink:0 }}
@@ -246,6 +249,9 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void } = {}) {
       {/* Bell */}
       <div className="relative" ref={bellRef}>
         <button onClick={openBell}
+          aria-label={unread > 0 ? `Activity — ${unread} unread` : 'Activity'}
+          aria-expanded={bellOpen}
+          title="Activity"
           style={{ position:'relative', width:34, height:34, borderRadius:8, border:'none',
             background:'transparent', cursor:'pointer', display:'flex', alignItems:'center',
             justifyContent:'center', color:'var(--text-muted)', transition:'all 0.15s' }}
@@ -313,6 +319,9 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void } = {}) {
       {/* Profile */}
       <div className="relative" ref={profileRef}>
         <button onClick={() => { setProfileOpen(!profileOpen); setCreateOpen(false); setBellOpen(false) }}
+          aria-label="Account menu"
+          aria-expanded={profileOpen}
+          title="Account"
           style={{ width:32, height:32, borderRadius:'50%', border:'2px solid var(--border)',
             display:'flex', alignItems:'center', justifyContent:'center',
             color:'#fff', fontSize:12, fontWeight:600, cursor:'pointer',
