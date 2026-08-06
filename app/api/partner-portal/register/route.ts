@@ -14,6 +14,7 @@
 import { NextRequest, NextResponse }  from 'next/server'
 import { createAdminClient }          from '@/lib/supabase/admin'
 import { ensurePartnerProfile }       from '@/lib/partner/profile'
+import { notifySuperAdminsOfSignup }  from '@/lib/email/signupAlert'
 
 export async function POST(req: NextRequest) {
   const { name, email, phone, password, referred_by } = await req.json()
@@ -55,6 +56,17 @@ export async function POST(req: NextRequest) {
       name:           name.trim().slice(0, 100),
       signup_product: 'partner',
     }, { onConflict: 'id' })
+
+    // Partner accounts are created here via the admin API, so they never pass
+    // through /auth/callback or /api/auth/provision — the two places that alert
+    // super admins. Without this, partner signups were completely silent.
+    // Guarded by `created`, so an existing account joining the programme (the
+    // alreadyRegistered path) is not reported as a new signup.
+    await notifySuperAdminsOfSignup(
+      { email: cleanEmail, name: name.trim() },
+      'email + password',
+      'partner',
+    )
   }
 
   const { profile, error: profileErr } = await ensurePartnerProfile(admin, {

@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse }      from 'next/server'
 import type { NextRequest }  from 'next/server'
 import { dbError }           from '@/lib/api-error'
-import { notifySuperAdminsOfSignup } from '@/lib/email/signupAlert'
+import { notifySuperAdminsOfSignup, resolveSignupSurface } from '@/lib/email/signupAlert'
 
 // Called client-side after implicit OAuth flow establishes a session.
 // Creates/updates the public.users row and handles invite metadata.
@@ -41,9 +41,18 @@ export async function POST(request: NextRequest) {
 
     if (!existing) {
       const provider = user.app_metadata?.provider ?? 'email'
+      // This route is fetched same-origin from the signup page, so the Host
+      // header is the subdomain the person actually signed up on. The referer
+      // supplies the path (e.g. /partners/...) that Host alone cannot show.
+      // Both are hints only — a missing or odd value just falls back to 'app'.
+      let refPath: string | null = null
+      try { refPath = new URL(request.headers.get('referer') ?? '').pathname } catch { /* no/invalid referer */ }
+      const surface = resolveSignupSurface(request.headers.get('host'), refPath)
+
       await notifySuperAdminsOfSignup(
         { email: user.email, name: String(rawName) },
         provider === 'email' ? 'email + password / magic link' : `${provider} oauth`,
+        surface,
       )
     }
 

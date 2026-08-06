@@ -1,6 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { createAdminClient }  from '@/lib/supabase/admin'
-import { notifySuperAdminsOfSignup } from '@/lib/email/signupAlert'
+import { notifySuperAdminsOfSignup, resolveSignupSurface, type SignupSurface } from '@/lib/email/signupAlert'
 import { cookies }            from 'next/headers'
 import { NextResponse }       from 'next/server'
 import type { NextRequest }   from 'next/server'
@@ -98,14 +98,19 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL('/auth/reset-password', request.url))
   }
 
-  await provisionUser(user)
+  // Which product surface this signup came through — the msme.* subdomain, a
+  // /partners destination, or the main app. Informational only: it labels the
+  // super-admin alert and never gates anything.
+  const surface = resolveSignupSurface(host, next)
+
+  await provisionUser(user, surface)
 
   const invitedOrgId = user.user_metadata?.invited_to_org as string | undefined
   const rawRole      = user.user_metadata?.invited_role as string | undefined
   const invitedRole  = VALID_ROLES.has(rawRole ?? '') ? (rawRole as string) : 'member'
 
   if (invitedOrgId) {
-    await provisionInvitedMember(user, invitedOrgId, invitedRole)
+    await provisionInvitedMember(user, invitedOrgId, invitedRole, surface)
     return NextResponse.redirect(new URL(isMsmeDomain ? '/msme' : '/dashboard', request.url))
   }
 
@@ -119,7 +124,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.redirect(new URL(next, request.url))
 }
 
-async function provisionUser(user: any) {
+async function provisionUser(user: any, surface: SignupSurface = 'app') {
   const admin = createAdminClient()
   try {
     const rawName = (
@@ -149,6 +154,7 @@ async function provisionUser(user: any) {
       await notifySuperAdminsOfSignup(
         { email: user.email, name: String(rawName) },
         provider === 'email' ? 'email link' : `${provider} oauth`,
+        surface,
       )
     }
   } catch (err) {
@@ -156,10 +162,10 @@ async function provisionUser(user: any) {
   }
 }
 
-async function provisionInvitedMember(user: any, orgId: string, role: string) {
+async function provisionInvitedMember(user: any, orgId: string, role: string, surface: SignupSurface = 'app') {
   const admin = createAdminClient()
 
-  await provisionUser(user)
+  await provisionUser(user, surface)
 
   // Use upsert to avoid check-then-insert race condition
   await admin.from('org_members').upsert(
