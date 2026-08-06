@@ -129,7 +129,24 @@ function prevOccurrence(freq: string, dateStr: string): string {
   return toLocalDateStr(dt)
 }
 
-export function CalendarView({ tasks, clients = [], members = [], canViewAll, currentUserId, userRole, upcomingCATriggers = [] }: Props) {
+export function CalendarView({ tasks: initialTasks, clients = [], members = [], canViewAll, currentUserId, userRole, upcomingCATriggers = [] }: Props) {
+  // Local mirror of the tasks prop. The grid renders straight from this, so an
+  // edit made in the detail panel (completing a task) repaints immediately —
+  // previously only `panelTask` was updated and the grid kept the stale status
+  // until a server refresh re-delivered the prop.
+  const [tasks, setTasks] = useState<CalTask[]>(initialTasks)
+  // Re-sync when the server sends fresh data. The prop identity only changes on
+  // a server re-render (the parent is an async server component), so this never
+  // clobbers an optimistic update mid-interaction.
+  useEffect(() => { setTasks(initialTasks) }, [initialTasks])
+
+  /** Apply a panel edit to the grid straight away, keyed by task id. */
+  function applyTaskUpdate(taskId: string | undefined, fields?: Record<string, unknown>) {
+    if (!fields || !taskId) return
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...(fields as Partial<CalTask>) } : t))
+    setPanelTask(prev => prev ? { ...prev, ...(fields as Partial<Task>) } : prev)
+  }
+
   const now = new Date()
   const [year,     setYear]     = useState(now.getFullYear())
   const [month,    setMonth]    = useState(now.getMonth())
@@ -577,9 +594,7 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
       </div>
 
       <TaskDetailPanel task={panelTask} members={members} clients={clients} currentUserId={currentUserId} userRole={userRole}
-        onClose={() => setPanelTask(null)} onUpdated={(fields) => {
-          if (fields && panelTask) setPanelTask(prev => prev ? { ...prev, ...(fields as Partial<Task>) } : prev)
-        }} />
+        onClose={() => setPanelTask(null)} onUpdated={(fields) => applyTaskUpdate(panelTask?.id, fields)} />
     </>)
   }
 
@@ -894,8 +909,6 @@ export function CalendarView({ tasks, clients = [], members = [], canViewAll, cu
     </div>{/* end height wrapper */}
 
     <TaskDetailPanel task={panelTask} members={members} clients={clients} currentUserId={currentUserId} userRole={userRole}
-      onClose={() => setPanelTask(null)} onUpdated={(fields) => {
-        if (fields && panelTask) setPanelTask(prev => prev ? { ...prev, ...(fields as Partial<Task>) } : prev)
-      }} />
+      onClose={() => setPanelTask(null)} onUpdated={(fields) => applyTaskUpdate(panelTask?.id, fields)} />
   </>)
 }
