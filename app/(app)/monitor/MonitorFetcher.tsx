@@ -36,6 +36,10 @@ export async function MonitorFetcher() {
   //   completed_at >= 90 days ago (recently finished work)
   const recentOrOpen = `status.neq.completed,completed_at.is.null,completed_at.gte.${from90}`
 
+  // Kept beside the queries so the view can tell whether either cap was hit.
+  const DATED_CAP   = 4000
+  const UNDATED_CAP = 2000
+
   const makeBase = () => supabase.from('tasks')
     .select(TASK_COLS)
     .eq('org_id', mb.org_id)
@@ -56,11 +60,12 @@ export async function MonitorFetcher() {
     // Caps are a backstop against a runaway payload, not the working limit —
     // with the 90-day filter above, a realistic org lands far below these.
     // Both are ordered so that if a cap IS hit the truncation is deterministic
-    // (soonest due first / newest first) rather than arbitrary.
+    // (soonest due first / newest first) rather than arbitrary, and the view
+    // shows a notice rather than silently reporting partial stats.
     makeBase().not('due_date', 'is', null)
-      .order('due_date', { ascending: true }).limit(4000),
+      .order('due_date', { ascending: true }).limit(DATED_CAP),
     makeBase().is('due_date', null)
-      .order('created_at', { ascending: false }).limit(2000),
+      .order('created_at', { ascending: false }).limit(UNDATED_CAP),
     supabase.from('org_members')
       .select('user_id, users(id, name)').eq('org_id', mb.org_id).eq('is_active', true),
     supabase.from('clients').select('id, name, color, status').eq('org_id', mb.org_id).order('name'),
@@ -100,6 +105,11 @@ export async function MonitorFetcher() {
     project: (t.projects as any) ?? null,
   }))
 
+  // Either query hitting its cap means the stats bar below is computed over a
+  // partial set. Surface it rather than showing a quietly wrong count.
+  const truncated =
+    (datedTasks?.length ?? 0) >= DATED_CAP || (undatedTasks?.length ?? 0) >= UNDATED_CAP
+
   return <MonitorView
     tasks={taskList as any}
     members={memberList}
@@ -107,5 +117,6 @@ export async function MonitorFetcher() {
     currentUserId={user.id}
     userRole={mb.role}
     from90={from90}
+    truncated={truncated}
   />
 }
