@@ -8,7 +8,7 @@ import {
   RefreshCw, Users, BarChart2, Settings, Plus,
   ChevronDown, ChevronRight, Clock, Zap, X, Upload,
   Calendar, Shield, LogOut, FileCheck, ArrowRight, Eye, Receipt, Copy, Check, Activity, BookOpen, ShieldAlert,
-  ChevronsUpDown, FileQuestion, CalendarDays, Building2, Handshake, ExternalLink, Mail, Phone,
+  ChevronsUpDown, FileQuestion, CalendarDays, Building2, Handshake, ExternalLink,
 } from 'lucide-react'
 import { cn }            from '@/lib/utils/cn'
 import { createClient }  from '@/lib/supabase/client'
@@ -473,31 +473,6 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
 
       {/* ── Trial banner ── */}
       <TrialBanner/>
-
-      {/* ── Contact card — every logged-in page needs a way to reach us ── */}
-      <div style={{ padding: '8px 8px 0', flexShrink: 0 }}>
-        <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-          borderRadius: 10, padding: '8px 11px' }}>
-          <p style={{ margin: '0 0 5px', fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.4)',
-            textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-            Questions? Contact us
-          </p>
-          <a href="mailto:info@upfloat.co"
-            style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '3px 0',
-              fontSize: 11.5, color: 'rgba(255,255,255,0.65)', textDecoration: 'none', transition: 'color 0.12s' }}
-            onMouseEnter={e => ((e.currentTarget as HTMLElement).style.color = '#2dd4bf')}
-            onMouseLeave={e => ((e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.65)')}>
-            <Mail style={{ width: 12, height: 12, flexShrink: 0 }}/> info@upfloat.co
-          </a>
-          <a href="tel:+918506064704"
-            style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '3px 0',
-              fontSize: 11.5, color: 'rgba(255,255,255,0.65)', textDecoration: 'none', transition: 'color 0.12s' }}
-            onMouseEnter={e => ((e.currentTarget as HTMLElement).style.color = '#2dd4bf')}
-            onMouseLeave={e => ((e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.65)')}>
-            <Phone style={{ width: 12, height: 12, flexShrink: 0 }}/> +91 85060 64704
-          </a>
-        </div>
-      </div>
 
       {/* ── Bottom fixed section — single line ── */}
       <div style={{ padding: '8px', borderTop: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>

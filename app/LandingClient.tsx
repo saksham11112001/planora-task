@@ -13,6 +13,8 @@ import {
   Play,
   Check,
   Shield,
+  Mail,
+  Phone,
 } from 'lucide-react'
 import { ScrollProgressBar, StickyCTA, Floating3DShapes, Marquee } from '@/components/landing/Wow'
 
@@ -1678,6 +1680,60 @@ export function LandingClient(props: Props) {
             >
               View MSME Tracker
             </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* ============ CONTACT ============ */}
+      <section id="contact" style={{ padding: '0 clamp(16px, 5vw, 48px) clamp(48px, 8vw, 80px)' }}>
+        <div
+          style={{
+            maxWidth: 1080,
+            margin: '0 auto',
+            borderRadius: 20,
+            padding: 'clamp(28px, 5vw, 44px) clamp(24px, 4vw, 44px)',
+            border: '1px solid rgba(255,255,255,0.10)',
+            background: 'rgba(255,255,255,0.03)',
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 24,
+          }}
+        >
+          <div style={{ minWidth: 260 }}>
+            <h2 style={{ fontSize: 'clamp(1.3rem, 2.5vw, 1.7rem)', fontWeight: 800, color: '#f8fafc', margin: '0 0 8px', letterSpacing: -0.3 }}>
+              Questions? Talk to a human.
+            </h2>
+            <p style={{ fontSize: 15, color: '#94a3b8', margin: 0, lineHeight: 1.6, maxWidth: 420 }}>
+              Not sure whether upFloat fits your practice? Email or call us — we
+              answer every message ourselves.
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <a
+              href="mailto:info@upfloat.co"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 10,
+                fontSize: 15, fontWeight: 600, color: '#fff', textDecoration: 'none',
+                padding: '12px 22px', borderRadius: 12,
+                background: 'rgba(13,148,136,0.16)', border: '1px solid rgba(13,148,136,0.4)',
+              }}
+            >
+              <Mail size={16} /> info@upfloat.co
+            </a>
+            <a
+              href="tel:+918506064704"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 10,
+                fontSize: 15, fontWeight: 600, color: '#fff', textDecoration: 'none',
+                padding: '12px 22px', borderRadius: 12,
+                background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)',
+              }}
+            >
+              <Phone size={16} /> +91 85060 64704
+            </a>
           </div>
         </div>
       </section>

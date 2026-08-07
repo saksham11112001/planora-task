@@ -7,6 +7,7 @@ import { COMPLIANCE_TASKS }   from '@/lib/data/complianceTasks'
 import { CA_DEFAULT_TASKS }   from '@/lib/data/caDefaultTasks'
 import { effectivePlan, canUseFeature } from '@/lib/utils/planGate'
 import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
+import { inviteUserToOrg }     from '@/lib/auth/inviteUser'
 
 export const maxDuration = 60 // seconds — Vercel Hobby plan cap
 export const dynamic = 'force-dynamic'
@@ -566,10 +567,15 @@ export async function POST(request: NextRequest) {
     // Auto-invite an email address as a 'member' when it cannot be resolved to an existing user.
     // Used by resolveEmail so that assignees listed in the import are created on the fly.
     async function autoInviteMember(email: string): Promise<string | null> {
-      const { data: invData, error: invErr } = await admin.auth.admin.inviteUserByEmail(email, {
-        data: { invited_to_org: orgId, invited_role: 'member' },
-        redirectTo: `${APP_URL}/auth/callback`,
+      // Was inviteUserByEmail(), which sends via Supabase's rate-limited SMTP —
+      // an import referencing more than a couple of new assignees exhausted the
+      // hourly budget and every subsequent invite failed silently. inviteUserToOrg
+      // mints the link without sending and delivers it over Brevo instead.
+      const invited = await inviteUserToOrg(admin, {
+        email, orgId, role: 'member', appUrl: APP_URL,
       })
+      const invData = invited.userId ? { user: { id: invited.userId } } : null
+      const invErr  = invited.error ? { message: invited.error } : null
       if (invErr) {
         // User already exists in auth but not in this org — look them up and add them
         if (invErr.message?.toLowerCase().includes('already') || invErr.message?.toLowerCase().includes('registered')) {
@@ -785,10 +791,13 @@ export async function POST(request: NextRequest) {
             roleCache[uid] = role
             results.members.created++
           } else {
-            const { data: invData, error: invErr } = await admin.auth.admin.inviteUserByEmail(email, {
-              data: { invited_to_org: orgId, invited_role: role, full_name: name || null },
-              redirectTo: `${APP_URL}/auth/callback`,
+            // See autoInviteMember above — moved off Supabase's rate-limited
+            // SMTP so importing a whole team no longer fails part-way through.
+            const invitedMember = await inviteUserToOrg(admin, {
+              email, orgId, role, appUrl: APP_URL, name: name || null,
             })
+            const invData = invitedMember.userId ? { user: { id: invitedMember.userId } } : null
+            const invErr  = invitedMember.error ? { message: invitedMember.error } : null
             if (invErr) {
               if (invErr.message?.toLowerCase().includes('already') || invErr.message?.toLowerCase().includes('registered')) {
                 const authId = await resolveAuthUser(email)
