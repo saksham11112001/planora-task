@@ -17,6 +17,8 @@ type SendPayload = {
   from: string
   to: string | string[]
   cc?: string | string[]
+  /** Blind copy — recipients here are not visible to `to`/`cc`. */
+  bcc?: string | string[]
   subject: string
   html?: string
   text?: string
@@ -62,6 +64,11 @@ async function brevoSend(payload: SendPayload): Promise<{ data: null; error: str
   if (payload.html)    body.htmlContent = payload.html
   if (payload.text)    body.textContent = payload.text
   if (payload.cc)      body.cc = toList(payload.cc)
+  // Brevo rejects an empty cc/bcc array, so only attach when non-empty.
+  if (payload.bcc) {
+    const bccList = toList(payload.bcc)
+    if (bccList.length > 0) body.bcc = bccList
+  }
   if (payload.replyTo) body.replyTo = parseAddress(payload.replyTo)
 
   const res = await fetch('https://api.brevo.com/v3/smtp/email', {

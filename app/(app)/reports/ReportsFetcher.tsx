@@ -4,6 +4,7 @@ import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { ReportsCharts }  from './ReportsCharts'
 import { ReportsExport }  from './ReportsExport'
 import { fmtHours }       from '@/lib/utils/format'
+import { TruncationNotice } from '@/components/ui/TruncationNotice'
 
 export async function ReportsFetcher() {
   const user = await getSessionUser()
@@ -19,9 +20,13 @@ export async function ReportsFetcher() {
 
   // Single unified task query — all columns needed by any tab, capped at 3000 rows.
   // Previously had 3 separate task queries (10k + 20k + 2k rows) — now one fetch, post-filtered in JS.
+  // Kept in sync with the .limit() below — the view compares the two to decide
+  // whether to warn that the KPIs are computed over a partial dataset.
+  const TASK_ROW_CAP = 5000
   const [
     { data: allTasksRaw },
     { count: overdueCount },
+    { count: totalInScope },
     { data: timeLogs },
     { data: projects },
     { data: members },
@@ -33,12 +38,19 @@ export async function ReportsFetcher() {
       // Fetch: tasks created in last 90 days (for chart metrics)
       // OR any active task regardless of age (so overdue tasks created >90 days ago still appear in WIP)
       .or(`created_at.gte.${from90},and(status.neq.completed,status.neq.cancelled)`)
-      .limit(5000),
+      .limit(TASK_ROW_CAP),
     supabase.from('tasks')
       .select('*', { count: 'exact', head: true })
       .eq('org_id', orgId).neq('is_archived', true).is('parent_task_id', null)
       .not('status', 'in', '("completed","cancelled")')
       .not('due_date', 'is', null).lt('due_date', today),
+    // Same filters as the task query above, as a HEAD count: no rows are
+    // transferred, so it costs almost nothing but lets the UI state the exact
+    // shortfall instead of silently reporting KPIs over a truncated set.
+    supabase.from('tasks')
+      .select('*', { count: 'exact', head: true })
+      .eq('org_id', orgId).neq('is_archived', true).is('parent_task_id', null)
+      .or(`created_at.gte.${from90},and(status.neq.completed,status.neq.cancelled)`),
     supabase.from('time_logs')
       .select('hours, is_billable, project_id, logged_date, user_id')
       .eq('org_id', orgId).gte('logged_date', from30.split('T')[0]),
@@ -330,6 +342,22 @@ export async function ReportsFetcher() {
           </div>
           <ReportsExport/>
         </div>
+
+        {/* Sits directly above the KPI tiles: if the row cap was hit, every
+            figure below is computed over a partial dataset and must say so.
+            Gated so the wrapper's margin does not add dead space in the
+            normal case, where the notice itself renders nothing. */}
+        {(totalInScope ?? 0) > allTasks.length && (
+          <div style={{ marginBottom: 16, borderRadius: 10, overflow: 'hidden' }}>
+            <TruncationNotice
+              shown={allTasks.length}
+              cap={TASK_ROW_CAP}
+              total={totalInScope}
+              noun="tasks"
+              hint="Figures below cover only the tasks shown."
+            />
+          </div>
+        )}
 
         <div className="stat-grid-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 22 }}>
           {kpis.map(k => (

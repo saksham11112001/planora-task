@@ -21,6 +21,7 @@ import { reEngagementHtml, reEngagementSubject } from './templates/reEngagementE
 import { onboardingNudgeHtml, onboardingNudgeSubject } from './templates/onboardingNudgeEmail'
 import { upgradePushHtml, upgradePushSubject } from './templates/upgradePushEmail'
 import { msmeVendorEmailHtml, msmeVendorEmailText, msmeVendorEmailSubject } from './templates/msmeVendorEmail'
+import { superAdminEmails }      from '@/lib/utils/superAdmin'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://upfloat.co'
 
@@ -311,12 +312,20 @@ export async function sendMsmeVendorEmail(p: {
 
 // ── Payment tax invoice ───────────────────────────────────────────────────
 export async function sendInvoiceEmail(p: InvoiceProps) {
+  // Super admins get a blind copy of every invoice — BCC, not CC, so the
+  // customer never sees internal addresses. Deduped against the visible
+  // recipients so nobody is mailed twice, and skipped entirely when
+  // SUPER_ADMIN_EMAIL is unset (superAdminEmails() returns []).
+  const visible = new Set([p.customerEmail.toLowerCase(), 'accounts@sgng.in'])
+  const bcc = superAdminEmails().filter(e => !visible.has(e))
+
   // NOT product-gated: a tax invoice is a financial/legal record and must
   // always reach the customer, whichever product they bought.
   return resend.emails.send({
     from:    FROM,
     to:      p.customerEmail,
     cc:      'accounts@sgng.in',
+    ...(bcc.length > 0 ? { bcc } : {}),
     subject: paymentInvoiceSubject(p),
     html:    paymentInvoiceHtml(p),
   })

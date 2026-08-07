@@ -5,6 +5,7 @@ import { Search, Filter, BarChart2, Download, Calendar } from 'lucide-react'
 import { MultiPillSelect } from '@/components/filters/MultiPillSelect'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LineChart, Line, Legend, PieChart, Pie } from 'recharts'
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
+import { TruncationNotice } from '@/components/ui/TruncationNotice'
 import { isOverdue, fmtDate, localDayStr } from '@/lib/utils/format'
 import type { Task } from '@/types'
 
@@ -46,6 +47,8 @@ interface Props {
   currentUserId: string
   userRole: string
   from90: string
+  /** Set when either server query hit its row cap — the stats below are partial. */
+  truncated?: boolean
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
@@ -105,9 +108,11 @@ function selectStyle(active: boolean) {
   } as React.CSSProperties
 }
 
-export function MonitorView({ tasks: initialTasks, members, clients, currentUserId, userRole, from90 }: Props) {
-  // Pre-filter server data: drop completed tasks older than 90 days (done client-side
-  // so the DB query has no OR condition that could silently exclude active tasks).
+export function MonitorView({ tasks: initialTasks, members, clients, currentUserId, userRole, from90, truncated = false }: Props) {
+  // Drop completed tasks older than 90 days. The fetcher now applies the same
+  // cutoff in the database, so this is a redundant safety net rather than the
+  // primary filter — kept because it is free and guards against a row slipping
+  // through on odd data.
   const [tasks, setTasks] = useState<MonTask[]>(
     initialTasks.filter(t =>
       t.status !== 'completed' || !t.completed_at || t.completed_at.slice(0, 10) >= from90
@@ -551,6 +556,18 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
             <Download style={{ width: 13, height: 13 }}/> Export Excel
           </button>
         </div>
+
+        {/* Warn before the stats, so a partial count is never read as complete */}
+        {truncated && (
+          <div style={{ borderRadius: 8, overflow: 'hidden', marginBottom: 4 }}>
+            <TruncationNotice
+              shown={tasks.length}
+              cap={0}
+              noun="tasks"
+              hint="Filter by client, assignee or date to see the rest."
+            />
+          </div>
+        )}
 
         {/* ── Stats bar ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>

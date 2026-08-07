@@ -21,11 +21,31 @@ export async function MonitorFetcher() {
   // For other roles run the permission check in parallel with the data fetches.
   const isOwnerOrAdmin = ['owner', 'admin'].includes(mb.role)
 
+  // The 90-day cutoff is applied HERE, in the database. It used to run only on
+  // the client, which meant every completed task the org had ever created was
+  // still fetched, serialised into the RSC payload and shipped to the browser
+  // before being thrown away — with two queries capped at 10,000 rows each,
+  // that is up to 20,000 wide rows (description + custom_fields + four joins)
+  // per page load, and again on every 30-second auto-refresh. That is what made
+  // Monitor slow to open and prone to freezing.
+  //
+  // The OR is written so it can never exclude an ACTIVE task — the original
+  // reason the filter was moved client-side. It keeps a row when ANY holds:
+  //   status is not 'completed'   (every open task, whatever its dates)
+  //   completed_at is null        (belt and braces for odd data)
+  //   completed_at >= 90 days ago (recently finished work)
+  const recentOrOpen = `status.neq.completed,completed_at.is.null,completed_at.gte.${from90}`
+
+  // Kept beside the queries so the view can tell whether either cap was hit.
+  const DATED_CAP   = 4000
+  const UNDATED_CAP = 2000
+
   const makeBase = () => supabase.from('tasks')
     .select(TASK_COLS)
     .eq('org_id', mb.org_id)
     .neq('is_archived', true)
     .is('parent_task_id', null)
+    .or(recentOrOpen)
 
   const [
     hasRoleAccess,
@@ -37,9 +57,15 @@ export async function MonitorFetcher() {
     isOwnerOrAdmin
       ? Promise.resolve(true)
       : canDo(supabase, mb.org_id, user.id, mb.role, 'monitor.view'),
+    // Caps are a backstop against a runaway payload, not the working limit —
+    // with the 90-day filter above, a realistic org lands far below these.
+    // Both are ordered so that if a cap IS hit the truncation is deterministic
+    // (soonest due first / newest first) rather than arbitrary, and the view
+    // shows a notice rather than silently reporting partial stats.
     makeBase().not('due_date', 'is', null)
-      .order('due_date', { ascending: true }).limit(10000),
-    makeBase().is('due_date', null).limit(10000),
+      .order('due_date', { ascending: true }).limit(DATED_CAP),
+    makeBase().is('due_date', null)
+      .order('created_at', { ascending: false }).limit(UNDATED_CAP),
     supabase.from('org_members')
       .select('user_id, users(id, name)').eq('org_id', mb.org_id).eq('is_active', true),
     supabase.from('clients').select('id, name, color, status').eq('org_id', mb.org_id).order('name'),
@@ -79,6 +105,11 @@ export async function MonitorFetcher() {
     project: (t.projects as any) ?? null,
   }))
 
+  // Either query hitting its cap means the stats bar below is computed over a
+  // partial set. Surface it rather than showing a quietly wrong count.
+  const truncated =
+    (datedTasks?.length ?? 0) >= DATED_CAP || (undatedTasks?.length ?? 0) >= UNDATED_CAP
+
   return <MonitorView
     tasks={taskList as any}
     members={memberList}
@@ -86,5 +117,6 @@ export async function MonitorFetcher() {
     currentUserId={user.id}
     userRole={mb.role}
     from90={from90}
+    truncated={truncated}
   />
 }

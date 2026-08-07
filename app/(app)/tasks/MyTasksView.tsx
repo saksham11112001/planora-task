@@ -12,6 +12,7 @@ import { PRIORITY_CONFIG } from '@/types'
 import type { Task, TaskStatus } from '@/types'
 import { toast, useFilterStore } from '@/store/appStore'
 import { UniversalFilterBar } from '@/components/filters/UniversalFilterBar'
+import { usePersistedState, viewPrefKey } from '@/lib/hooks/usePersistedState'
 
 interface UpcomingCATrigger {
   id: string; title: string; triggerDate: string; dueDate: string
@@ -183,7 +184,12 @@ export function MyTasksView({
   const [tasks,           setTasks]           = useState<Task[]>(initialTasks)
   const [pendingTasks,    setPendingTasks]    = useState<Task[]>(pendingApprovalTasks)
   const [assignedByMeList, setAssignedByMeList] = useState<Task[]>(assignedByMeTasks)
-  const [tab,          setTab]          = useState<'List'|'Board'>('Board')
+  // Remembered across navigations — these reset to their default on every page
+  // visit before, which meant re-picking your view all day.
+  const [tab, setTab] = usePersistedState<'List'|'Board'>(
+    viewPrefKey('tasks_tab', currentUserId), 'Board',
+    v => v === 'List' || v === 'Board',
+  )
   const [selTask,    setSelTask]    = useState<Task | null>(null)
   const panelHasUpdates = useRef(false)
   const panelTaskIdRef  = useRef<string | null>(null)
@@ -228,15 +234,24 @@ export function MyTasksView({
   const [groupPages,      setGroupPages]      = useState<Record<string, number>>({})
   const [showAssignedByMe, setShowAssignedByMe] = useState(false)
   const [activeSection, setActiveSection]       = useState<'mine'|'approval'|'assigned'>('mine')
-  const [focusMode,     setFocusMode]     = useState(false)
+  const [focusMode, setFocusMode] = usePersistedState<boolean>(
+    viewPrefKey('tasks_focus', currentUserId), false,
+    v => typeof v === 'boolean',
+  )
   // Which annual compliance groups are expanded — held here rather than inside
   // the section so it survives the parent re-rendering.
   const [expandedAnnual, setExpandedAnnual] = useState<Set<string>>(new Set())
   // List view shows the same grouped rows, collapsed by default — the point is
   // to keep them out of the way, not to move the clutter one section down.
   const [annualListOpen, setAnnualListOpen] = useState(false)
-  const [sortBy, setSortBy] = useState<'due_date'|'created_at'|'updated_at'>('due_date')
-  const [sortDir, setSortDir] = useState<'asc'|'desc'>('asc')
+  const [sortBy, setSortBy] = usePersistedState<'due_date'|'created_at'|'updated_at'>(
+    viewPrefKey('tasks_sort_by', currentUserId), 'due_date',
+    v => v === 'due_date' || v === 'created_at' || v === 'updated_at',
+  )
+  const [sortDir, setSortDir] = usePersistedState<'asc'|'desc'>(
+    viewPrefKey('tasks_sort_dir', currentUserId), 'asc',
+    v => v === 'asc' || v === 'desc',
+  )
   const [sortOpen, setSortOpen] = useState(false)
   const [statusMenuOpen, setStatusMenuOpen] = useState(false)
   // Inline editing: maps taskId → field name being edited

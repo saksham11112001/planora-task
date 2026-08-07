@@ -67,7 +67,13 @@
       "Bash(sed -i \"s/\\\\['CA, 60d lead \\(at threshold\\)               -> visible',       ca\\({ _lead_days: 60 }\\),                      false\\\\]/['CA, 60d lead \\(at threshold, inclusive\\)    -> PARKED',        ca\\({ _lead_days: 60 }\\),                      true],\\\\n  ['CA, 59d lead \\(below threshold\\)           -> visible',       ca\\({ _lead_days: 59 }\\),                      false]/\" parked.test.mjs)",
       "Bash(node cadence.test.mjs)",
       "Bash(git fetch *)",
-      "Bash(node surface.test.mjs)"
+      "Bash(node surface.test.mjs)",
+      "Bash(node persist.test.mjs)",
+      "Bash(node --experimental-strip-types --test tests/recurringSchedule.test.ts)",
+      "Bash(node --experimental-strip-types --test tests/permissionGate.test.ts)",
+      "Bash(node --experimental-strip-types --test tests/money.test.ts)",
+      "Bash(echo \"EXIT:$? \\(1 = no stale figures remain\\)\")",
+      "Bash(npm test *)"
     ]
   }
 }
