@@ -71,7 +71,9 @@
       "Bash(node persist.test.mjs)",
       "Bash(node --experimental-strip-types --test tests/recurringSchedule.test.ts)",
       "Bash(node --experimental-strip-types --test tests/permissionGate.test.ts)",
-      "Bash(node --experimental-strip-types --test tests/money.test.ts)"
+      "Bash(node --experimental-strip-types --test tests/money.test.ts)",
+      "Bash(echo \"EXIT:$? \\(1 = no stale figures remain\\)\")",
+      "Bash(npm test *)"
     ]
   }
 }
