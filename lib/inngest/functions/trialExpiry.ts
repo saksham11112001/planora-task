@@ -4,6 +4,38 @@ import { sendTrialExpiringSoonEmail, sendTrialExpiredEmail } from '@/lib/email/s
 
 const OWNER_SELECT = 'org_id, user_id, users!org_members_user_id_fkey(email, name)'
 
+/**
+ * Orgs that have bought an MSME pack are MSME customers. A "your upFloat trial
+ * is ending" email is about a product they never signed up for.
+ *
+ * This is defence in depth, not the primary guard: sendAppUsageEmail already
+ * filters on users.signup_product. But that flag is set per USER at signup and
+ * was historically inferred from client-side state, so it can be wrong for
+ * anyone who signed up before it was made reliable. This check keys off a hard
+ * fact — money changed hands for MSME — and so cannot be wrong in the same way.
+ *
+ * The downgrade itself is NOT skipped; only the email. Billing state must stay
+ * accurate regardless of which product the customer came from.
+ */
+async function orgsWithPaidMsmePack(
+  admin: ReturnType<typeof createAdminClient>,
+  orgIds: string[],
+): Promise<Set<string>> {
+  if (orgIds.length === 0) return new Set()
+  const { data, error } = await admin
+    .from('msme_pack_payments')
+    .select('org_id')
+    .in('org_id', orgIds)
+    .eq('status', 'paid')
+  if (error) {
+    // Fail OPEN: on a lookup failure keep the existing behaviour (send) rather
+    // than silently suppressing mail for every org in the run.
+    console.error('[trial-expiry] MSME pack lookup failed, not suppressing:', error.message)
+    return new Set()
+  }
+  return new Set((data ?? []).map(r => r.org_id as string))
+}
+
 async function fetchOrgOwner(admin: ReturnType<typeof createAdminClient>, orgId: string) {
   const { data } = await admin
     .from('org_members')
@@ -40,8 +72,14 @@ export const trialExpiry = inngest.createFunction(
       .gte('trial_ends_at', warnStart)
       .lt('trial_ends_at', warnEnd)
 
+    const msmeSoon = await orgsWithPaidMsmePack(admin, (expiringSoon ?? []).map(o => o.id))
+
     let warned = 0
     for (const org of expiringSoon ?? []) {
+      if (msmeSoon.has(org.id)) {
+        console.log(`[trial-expiry] skipped warning for MSME-pack org ${org.id}`)
+        continue
+      }
       const owner = await fetchOrgOwner(admin, org.id)
       if (!owner) continue
       try {
@@ -78,9 +116,16 @@ export const trialExpiry = inngest.createFunction(
       .update({ status: 'active', plan_tier: 'free' })
       .in('id', ids)
 
-    // Send trial-expired email to each org owner
+    // Send trial-expired email to each org owner. The downgrade above already
+    // ran for every org — only the email is suppressed for MSME customers.
+    const msmeExpired = await orgsWithPaidMsmePack(admin, ids)
+
     let notified = 0
     for (const org of expired) {
+      if (msmeExpired.has(org.id)) {
+        console.log(`[trial-expiry] skipped expiry email for MSME-pack org ${org.id}`)
+        continue
+      }
       const owner = await fetchOrgOwner(admin, org.id)
       if (!owner) continue
       try {

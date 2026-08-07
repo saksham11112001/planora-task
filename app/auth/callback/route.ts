@@ -93,9 +93,14 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Password-reset flow: user is now authenticated; send them to set their new password.
+  // Password-reset flow: user is now authenticated; send them to set their new
+  // password. `next` is carried through so a partner resetting their password
+  // returns to the partner portal instead of being dropped into the main app
+  // dashboard (which, having no org, would push them into org onboarding).
   if (isRecovery) {
-    return NextResponse.redirect(new URL('/auth/reset-password', request.url))
+    const resetUrl = new URL('/auth/reset-password', request.url)
+    if (next && next !== '/dashboard') resetUrl.searchParams.set('next', next)
+    return NextResponse.redirect(resetUrl)
   }
 
   // Which product surface this signup came through — the msme.* subdomain, a
@@ -147,6 +152,17 @@ async function provisionUser(user: any, surface: SignupSurface = 'app') {
       email:      (user.email ?? '').slice(0, 255),
       name:       String(rawName).slice(0, 100),
       avatar_url: user.user_metadata?.avatar_url ?? null,
+      // Stamp the product at ACCOUNT CREATION, from the Host header — the only
+      // authoritative signal. Onboarding also sets this, but it infers the
+      // product from sessionStorage / ?next= / hostname on the client; lose any
+      // of those (new tab, a redirect that drops the query string, landing on
+      // the apex domain) and the user was silently classified 'app' forever and
+      // received task-manager email for a product they never signed up for.
+      //
+      // Only ever written for a BRAND-NEW account and only when we positively
+      // know it is not the main app. An existing user is never reclassified —
+      // that direction would silence email they legitimately expect.
+      ...(!existing && surface !== 'app' ? { signup_product: surface } : {}),
     }, { onConflict: 'id' })
 
     if (!existing) {

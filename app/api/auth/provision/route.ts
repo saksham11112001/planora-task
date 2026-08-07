@@ -32,22 +32,28 @@ export async function POST(request: NextRequest) {
     const { data: existing } = await admin.from('users')
       .select('id').eq('id', user.id).maybeSingle()
 
+    // This route is fetched same-origin from the signup page, so the Host
+    // header is the subdomain the person actually signed up on. The referer
+    // supplies the path (e.g. /partners/...) that Host alone cannot show.
+    // Both are hints only — a missing or odd value just falls back to 'app'.
+    let refPath: string | null = null
+    try { refPath = new URL(request.headers.get('referer') ?? '').pathname } catch { /* no/invalid referer */ }
+    const surface = resolveSignupSurface(request.headers.get('host'), refPath)
+
     await admin.from('users').upsert({
       id:         user.id,
       email:      (user.email ?? '').slice(0, 255),
       name:       String(rawName).slice(0, 100),
       avatar_url: user.user_metadata?.avatar_url ?? null,
+      // See the matching comment in app/auth/callback/route.ts: the product is
+      // stamped at account creation from the Host header, because onboarding's
+      // client-side inference silently mislabels users as 'app' whenever any of
+      // its three signals is lost. New accounts only, and never back to 'app'.
+      ...(!existing && surface !== 'app' ? { signup_product: surface } : {}),
     }, { onConflict: 'id' })
 
     if (!existing) {
       const provider = user.app_metadata?.provider ?? 'email'
-      // This route is fetched same-origin from the signup page, so the Host
-      // header is the subdomain the person actually signed up on. The referer
-      // supplies the path (e.g. /partners/...) that Host alone cannot show.
-      // Both are hints only — a missing or odd value just falls back to 'app'.
-      let refPath: string | null = null
-      try { refPath = new URL(request.headers.get('referer') ?? '').pathname } catch { /* no/invalid referer */ }
-      const surface = resolveSignupSurface(request.headers.get('host'), refPath)
 
       await notifySuperAdminsOfSignup(
         { email: user.email, name: String(rawName) },
