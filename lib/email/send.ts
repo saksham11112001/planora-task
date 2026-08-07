@@ -14,6 +14,7 @@ import { approvalDigestHtml } from './templates/approvalDigest'
 import { taskCommentedHtml }  from './templates/taskCommented'
 import { projectUpdatedHtml }  from './templates/projectUpdated'
 import { memberInvitedHtml }   from './templates/memberInvited'
+import { teamInviteHtml, teamInviteText, teamInviteSubject } from './templates/teamInvite'
 import { escalationAlertHtml } from './templates/escalationAlert'
 import { clientDocReminderHtml, clientDocReminderSubject, clientDocReminderBatchHtml, clientDocReminderBatchSubject, type BatchProps } from './templates/clientDocReminder'
 import { clientUploadNotifyHtml, clientUploadNotifySubject } from './templates/clientUploadNotify'
@@ -145,6 +146,32 @@ export async function sendProjectUpdatedEmail(p: {
 }
 
 // ── Member invited / joined ───────────────────────────────────────────────
+/**
+ * "You've been invited to join <org>" — sent to the INVITEE.
+ *
+ * Goes out over Brevo rather than Supabase's built-in SMTP, which is rate
+ * limited to a handful of messages per hour. When that budget was exhausted
+ * inviteUserByEmail() failed outright ("email rate limit exceeded"): no auth
+ * user, no membership row, and no email — invites just silently stopped
+ * working for the rest of the hour.
+ *
+ * NOT product-gated: this is an account/access email, in the same class as a
+ * magic link. The recipient is being granted access to a workspace and must
+ * always receive it, whatever product they originally signed up through.
+ */
+export async function sendTeamInviteEmail(p: {
+  to: string; orgName: string; inviterName?: string | null
+  role: string; actionUrl: string
+}) {
+  return resend.emails.send({
+    from:    FROM,
+    to:      p.to,
+    subject: teamInviteSubject(p),
+    html:    teamInviteHtml(p),
+    text:    teamInviteText(p),
+  })
+}
+
 export async function sendMemberInvitedEmail(p: {
   to: string; recipientName: string; memberName: string
   memberEmail: string; role: string; invitedBy: string; orgName: string

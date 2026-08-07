@@ -8,6 +8,7 @@ import { effectivePlan, isAtMemberLimit, memberLimit } from '@/lib/utils/planGat
 import { dbError } from '@/lib/api-error'
 import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
 import { isGhostAdmin }      from '@/lib/supabase/ghostAdmin'
+import { inviteUserToOrg }   from '@/lib/auth/inviteUser'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://upfloat.co'
 
@@ -78,17 +79,46 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, message: 'Member added to your workspace' })
   }
 
-  // New user — send Supabase invite email.
-  // Invite email: redirectTo /auth/confirm which shows a "set password" screen for new users.
-  // If PKCE returns ?code= instead of a hash token, /auth/confirm now forwards to /auth/callback.
-  const { error: inviteErr } = await admin.auth.admin.inviteUserByEmail(email.trim(), {
-    data: { invited_to_org: mb.org_id, invited_role: role },
-    redirectTo: `${APP_URL}/auth/confirm`,
+  // ── New user — generate the invite link, then send it ourselves ────────────
+  //
+  // This used to call admin.auth.admin.inviteUserByEmail(), which sends through
+  // Supabase's built-in SMTP. That is rate limited to a handful of messages per
+  // hour; once the budget was gone the call failed with "email rate limit
+  // exceeded" and NOTHING happened — no auth user, no membership, no email —
+  // so invites silently stopped working for the rest of the hour. That is the
+  // Sentry AuthApiError on POST /api/team, and the reports of invites never
+  // arriving for some addresses.
+  //
+  // generateLink() only MINTS the link, it does not send anything, so it is not
+  // subject to the email rate limit. We then deliver it over Brevo, which is
+  // the transport every other product email already uses.
+  // Look up the inviter's and org's names so the email says who added them.
+  const [{ data: inviter }, { data: org }] = await Promise.all([
+    admin.from('users').select('name').eq('id', user.id).maybeSingle(),
+    admin.from('organisations').select('name').eq('id', mb.org_id).maybeSingle(),
+  ])
+
+  const invite = await inviteUserToOrg(admin, {
+    email:       email.trim(),
+    orgId:       mb.org_id,
+    role,
+    appUrl:      APP_URL,
+    inviterName: inviter?.name ?? null,
+    orgName:     org?.name ?? null,
   })
 
-  if (inviteErr) {
-    console.error('[/api/team POST] inviteUserByEmail failed:', inviteErr.message)
-    return NextResponse.json(dbError(inviteErr, 'team'), { status: 500 })
+  if (invite.error) {
+    console.error('[/api/team POST] invite failed:', invite.error)
+    return NextResponse.json({ error: invite.error }, { status: 500 })
+  }
+
+  if (!invite.emailed) {
+    // The account exists but they have no way in yet. Say so plainly rather
+    // than reporting success — the admin needs to know to retry.
+    return NextResponse.json(
+      { error: 'The account was created but the invitation email could not be sent. Please try inviting again.' },
+      { status: 502 },
+    )
   }
 
   return NextResponse.json({ success: true, message: 'Invitation sent!' })
