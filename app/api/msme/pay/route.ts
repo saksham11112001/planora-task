@@ -339,7 +339,15 @@ export async function PUT(req: NextRequest) {
       org_id:             mb.org_id,
       pack_tier,
       vendor_limit:       pack.vendor_limit,
-      amount_paise:       pack.price_paise,
+      // What Razorpay ACTUALLY charged — read back from the pending row this
+      // order created (base + 18% GST, less any coupon). Writing
+      // pack.price_paise here instead overwrote that with the ex-GST list
+      // price, so the stored figure disagreed with the money collected AND
+      // with the webhook, which writes the real payment amount — whichever of
+      // the two landed last won. Partner commission is derived from this
+      // column, so the discrepancy was payable. Matches the add-on path above,
+      // which was already fixed for exactly this reason.
+      amount_paise:       packPayment.amount_paise ?? Math.round(pack.price_paise * 1.18),
       gateway:            'razorpay',
       gateway_order_id:   razorpay_order_id,
       gateway_payment_id: razorpay_payment_id,

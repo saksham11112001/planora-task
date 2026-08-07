@@ -137,7 +137,11 @@ export async function POST(req: NextRequest) {
       org_id:             orgId,
       pack_tier,
       vendor_limit:       pack.vendor_limit,
-      amount_paise:       paymentAmount ?? pack.price_paise,
+      // Razorpay's payment.amount is what was actually collected. The fallback
+      // is GST-inclusive to match: pack.price_paise is the ex-GST list price,
+      // and storing that would understate the payment (and any partner
+      // commission derived from it) by 18%.
+      amount_paise:       paymentAmount ?? Math.round(pack.price_paise * 1.18),
       gateway:            'razorpay',
       gateway_order_id:   orderId,
       gateway_payment_id: paymentId,
