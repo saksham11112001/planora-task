@@ -68,7 +68,10 @@
       "Bash(node cadence.test.mjs)",
       "Bash(git fetch *)",
       "Bash(node surface.test.mjs)",
-      "Bash(node persist.test.mjs)"
+      "Bash(node persist.test.mjs)",
+      "Bash(node --experimental-strip-types --test tests/recurringSchedule.test.ts)",
+      "Bash(node --experimental-strip-types --test tests/permissionGate.test.ts)",
+      "Bash(node --experimental-strip-types --test tests/money.test.ts)"
     ]
   }
 }
