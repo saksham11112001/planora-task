@@ -1316,6 +1316,65 @@ function CtaSection({ loginUrl }: { loginUrl: string }) {
 }
 
 /* ============================================================
+   CONTACT
+============================================================ */
+function ContactSection() {
+  return (
+    <section id="contact" style={{ background: C.surface, padding: '0 24px 64px' }}>
+      <div
+        style={{
+          maxWidth: 1080,
+          margin: '0 auto',
+          borderRadius: 18,
+          padding: 'clamp(26px, 5vw, 40px)',
+          border: `1px solid ${C.border}`,
+          background: C.bgLight,
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 22,
+        }}
+      >
+        <div style={{ minWidth: 260 }}>
+          <h2 style={{ fontSize: 'clamp(1.25rem, 2.4vw, 1.6rem)', fontWeight: 800, color: C.text, margin: '0 0 8px' }}>
+            Questions? Talk to a human.
+          </h2>
+          <p style={{ fontSize: 15, color: C.muted, margin: 0, lineHeight: 1.6, maxWidth: 430 }}>
+            Not sure how many vendor slots you need, or whether this fits your
+            43B(h) process? Email or call — we answer every message ourselves.
+          </p>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <a
+            href="mailto:info@upfloat.co"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 9,
+              fontSize: 15, fontWeight: 700, color: '#fff', textDecoration: 'none',
+              padding: '12px 22px', borderRadius: 11, background: C.teal,
+            }}
+          >
+            ✉&nbsp; info@upfloat.co
+          </a>
+          <a
+            href="tel:+918506064704"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 9,
+              fontSize: 15, fontWeight: 700, color: C.text, textDecoration: 'none',
+              padding: '12px 22px', borderRadius: 11,
+              background: C.surface, border: `1px solid ${C.border}`,
+            }}
+          >
+            ☏&nbsp; +91 85060 64704
+          </a>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+/* ============================================================
    FOOTER
 ============================================================ */
 function Footer() {
@@ -1400,6 +1459,9 @@ function Footer() {
 }
 
 function FooterCol({ heading, links }: { heading: string; links: string[] }) {
+  // "Contact" pointed at href="#" and did nothing — send it to the contact
+  // section that now exists on the page.
+  const hrefFor = (label: string) => (label === 'Contact' ? '#contact' : '#')
   return (
     <div>
       <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 14 }}>{heading}</div>
@@ -1407,7 +1469,7 @@ function FooterCol({ heading, links }: { heading: string; links: string[] }) {
         {links.map((l) => (
           <li key={l} style={{ marginBottom: 10 }}>
             <a
-              href="#"
+              href={hrefFor(l)}
               style={{
                 fontSize: 14,
                 color: 'rgba(255,255,255,0.62)',
@@ -1651,6 +1713,7 @@ function MsmeLandingInner() {
       <Reveal><UnlockTeaser /></Reveal>
       <Reveal><Testimonials /></Reveal>
       <Reveal><CtaSection loginUrl={loginUrl} /></Reveal>
+      <Reveal><ContactSection /></Reveal>
       <Footer />
       <FloatingBadge />
     </>

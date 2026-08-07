@@ -73,7 +73,9 @@
       "Bash(node --experimental-strip-types --test tests/permissionGate.test.ts)",
       "Bash(node --experimental-strip-types --test tests/money.test.ts)",
       "Bash(echo \"EXIT:$? \\(1 = no stale figures remain\\)\")",
-      "Bash(npm test *)"
+      "Bash(npm test *)",
+      "Bash(grep -n \"<Footer\\\\|function Footer\\\\|{/\\\\* FOOTER\" app/msme-landing/MsmeLandingClient.tsx)",
+      "Bash(echo \"EXIT:$? \\(no output above = identical to pre-card state\\)\")"
     ]
   }
 }

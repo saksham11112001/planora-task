@@ -3,7 +3,8 @@ import { useState, useRef, useEffect, useTransition } from 'react'
 import { useRouter }     from 'next/navigation'
 import { Search, Plus, Bell, ChevronDown, CheckSquare, FolderOpen,
          Users2, LogOut, Settings, Clock, RefreshCw, Zap, X,
-         CheckCheck, AlertCircle, Menu, User, MessageSquarePlus, Paperclip, Send } from 'lucide-react'
+         CheckCheck, AlertCircle, Menu, User, MessageSquarePlus, Paperclip, Send,
+         Mail, Phone } from 'lucide-react'
 import Link              from 'next/link'
 import { ThemeToggle }   from '@/components/theme/ThemeToggle'
 import { createClient }  from '@/lib/supabase/client'
@@ -424,6 +425,26 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void } = {}) {
                   ))}
                 </div>
               )}
+            </div>
+
+            {/* Direct contact — some problems are faster to explain to a human
+                than to type into a form, so the details sit right here rather
+                than tucked away in the sidebar. */}
+            <div style={{ borderTop:'1px solid var(--border)', paddingTop:14,
+              display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+              <span style={{ fontSize:12, color:'var(--text-muted)' }}>Or reach us directly:</span>
+              <a href="mailto:info@upfloat.co"
+                style={{ display:'inline-flex', alignItems:'center', gap:5, fontSize:12, fontWeight:600,
+                  color:'var(--brand)', textDecoration:'none', padding:'4px 10px', borderRadius:99,
+                  background:'var(--brand-light)', border:'1px solid var(--brand-border)' }}>
+                <Mail style={{ width:12, height:12 }}/> info@upfloat.co
+              </a>
+              <a href="tel:+918506064704"
+                style={{ display:'inline-flex', alignItems:'center', gap:5, fontSize:12, fontWeight:600,
+                  color:'var(--brand)', textDecoration:'none', padding:'4px 10px', borderRadius:99,
+                  background:'var(--brand-light)', border:'1px solid var(--brand-border)' }}>
+                <Phone style={{ width:12, height:12 }}/> +91 85060 64704
+              </a>
             </div>
 
             {/* Actions */}
