@@ -32,8 +32,15 @@ function ResetPasswordInner() {
     const { error: err } = await supabase.auth.updateUser({ password })
     setSaving(false)
     if (err) { setError(err.message); return }
-    // Subdomain-aware redirect so MSME users land back in /msme
-    router.replace(window.location.hostname.startsWith('msme.') ? '/msme' : '/dashboard')
+    // Return the user to the product they came from. `next` is set by the
+    // partner portal so a partner is not dropped into the main app dashboard —
+    // with no org membership that would push them into org onboarding and turn
+    // a partner into an app user. Only same-origin relative paths are accepted.
+    const raw = new URLSearchParams(window.location.search).get('next')
+    const safeNext = raw && raw.startsWith('/') && !raw.startsWith('//') ? raw : null
+    router.replace(
+      safeNext ?? (window.location.hostname.startsWith('msme.') ? '/msme' : '/dashboard')
+    )
   }
 
   if (state === 'loading') {

@@ -40,6 +40,26 @@ function PartnerLoginInner() {
     finally { setLoading(false) }
   }
 
+  // Password reset. `next` sends the partner back to the partner dashboard
+  // after choosing a new password — without it the shared reset page lands
+  // everyone on /dashboard, and a partner with no org would be pushed into
+  // main-app org onboarding.
+  async function handleForgotPassword() {
+    if (!email.trim()) { setError('Enter your email address first, then click "Forgot password?"'); return }
+    setLoading(true); setError(''); setInfo('')
+    try {
+      const { error: err } = await createClient().auth.resetPasswordForEmail(
+        email.trim().toLowerCase(),
+        { redirectTo: `${window.location.origin}/auth/callback?recovery=1&next=/partners/dashboard` },
+      )
+      if (err) { setError(err.message); return }
+      // Deliberately the same message whether or not the address exists, so
+      // this cannot be used to discover which emails are registered.
+      setInfo(`If an account exists for ${email.trim().toLowerCase()}, a password reset link is on its way. Check your inbox and spam folder.`)
+    } catch { setError('Something went wrong — please try again') }
+    finally { setLoading(false) }
+  }
+
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 16px', background: '#f8fafc', colorScheme: 'light' }}>
       <div style={{ width: '100%', maxWidth: 420 }}>
@@ -69,7 +89,22 @@ function PartnerLoginInner() {
               />
             </div>
             <div style={{ marginBottom: 20 }}>
-              <label style={lblStyle}>Password</label>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+                <label style={lblStyle}>Password</label>
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  disabled={loading}
+                  style={{
+                    background: 'none', border: 'none', padding: 0,
+                    fontSize: 12, fontWeight: 600, color: ACCENT,
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    fontFamily: 'inherit', marginBottom: 6,
+                  }}
+                >
+                  Forgot password?
+                </button>
+              </div>
               <input
                 type="password"
                 value={password}
