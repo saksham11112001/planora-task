@@ -24,6 +24,14 @@ interface Props {
 
 export function InboxView({ tasks, members, clients, currentUserId, userRole, canCreate, canViewAllTasks }: Props) {
   const canManage    = ['owner','admin','manager'].includes(userRole ?? '')
+
+  /** Mirrors the API: creator or assignee may correct their own task's details. */
+  const creatorOf   = (t: any) => (t?.created_by ?? t?.creator?.id) ?? null
+  const canEditTask = (t: any) =>
+    canManage || (!!currentUserId && (creatorOf(t) === currentUserId || t?.assignee_id === currentUserId))
+  /** Own entries can be binned (soft delete → Trash); spawner-created compliance rows cannot. */
+  const canDelete   = (t: any) =>
+    canManage || (!!currentUserId && creatorOf(t) === currentUserId && !t?.custom_fields?._assignment_id)
   const router       = useRouter()
   const searchParams = useSearchParams()
   const autoOpen     = searchParams.get('new') === '1'
@@ -207,31 +215,27 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
     if (!confirm('Delete this task?')) return
     setLocalTasks(prev => prev.filter(t => t.id!==taskId))
     const res = await fetch(`/api/tasks/${taskId}`, { method:'DELETE' })
-    if (!res.ok) { toast.error('Could not delete'); startT(() => router.refresh()) }
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}))
+      toast.error(d.error ?? 'Could not delete')
+      startT(() => router.refresh())
+    }
     else toast.success('Moved to Trash')
   }
 
   async function cloneTask(task: Task) {
-    const res = await fetch('/api/tasks', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title:             `${task.title} (copy)`,
-        status:            'todo',
-        priority:          task.priority,
-        assignee_id:       task.assignee_id ?? null,
-        client_id:         (task as any).client_id ?? null,
-        project_id:        (task as any).project_id ?? null,
-        approver_id:       (task as any).approver_id ?? null,
-        approval_required: (task as any).approval_required ?? false,
-        due_date:          task.due_date ?? null,
-        custom_fields:     (task as any).custom_fields ?? null,
-      }),
-    })
-    const d = await res.json()
+    // Use the same server-side clone endpoint as My tasks and the project board.
+    // Re-posting the fields by hand copied custom_fields verbatim (carrying
+    // spawner-internal markers that make the copy invisible in task lists),
+    // dropped subtasks, and 400'd on a task flagged approval_required with no
+    // approver. One code path, one set of rules.
+    const res = await fetch(`/api/tasks/${task.id}/clone`, { method: 'POST' })
+    const d = await res.json().catch(() => ({}))
     if (!res.ok) { toast.error(d.error ?? 'Clone failed'); return }
     const newTask = d.data ?? d
     if (newTask?.id) setLocalTasks(prev => [{ ...newTask, assignee: (task as any).assignee, client: (task as any).client } as Task, ...prev])
-    toast.success('Task cloned')
+    const n = d.subtasks_cloned ?? 0
+    toast.success(n > 0 ? `Task cloned with ${n} subtask${n === 1 ? '' : 's'}` : 'Task cloned')
   }
 
   async function bulkComplete() {
@@ -658,8 +662,8 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                             )}
                           </div>
                           {/* Assignee column — inline editable */}
-                          <div className="hide-mobile" style={{ display:'flex', alignItems:'center', overflow:'hidden', cursor: canManage ? 'pointer' : 'default' }}
-                            onClick={e => { e.stopPropagation(); if (canManage) setInlineEdit({taskId:task.id,field:'assignee_id'}) }}>
+                          <div className="hide-mobile" style={{ display:'flex', alignItems:'center', overflow:'hidden', cursor: canEditTask(task) ? 'pointer' : 'default' }}
+                            onClick={e => { e.stopPropagation(); if (canEditTask(task)) setInlineEdit({taskId:task.id,field:'assignee_id'}) }}>
                             {inlineEdit?.taskId===task.id && inlineEdit.field==='assignee_id' ? (
                               <select autoFocus defaultValue={(task as any).assignee_id ?? ''}
                                 onChange={e => patchTaskField(task.id,'assignee_id',e.target.value||null)}
@@ -673,14 +677,14 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                               </select>
                             ) : (() => {
                               const assignee = (task as any).assignee as { id:string; name:string } | null
-                              if (!assignee) return <span style={{ fontSize:11, color:'var(--text-muted)', cursor: canManage ? 'pointer' : 'default' }} title={canManage ? 'Click to assign' : undefined}>—</span>
+                              if (!assignee) return <span style={{ fontSize:11, color:'var(--text-muted)', cursor: canEditTask(task) ? 'pointer' : 'default' }} title={canEditTask(task) ? 'Click to assign' : undefined}>—</span>
                               return (
-                                <span title={canManage ? 'Click to reassign' : undefined}
+                                <span title={canEditTask(task) ? 'Click to reassign' : undefined}
                                   style={{ display:'inline-flex', alignItems:'center', padding:'2px 8px', borderRadius:99,
                                   background:'var(--surface-subtle)', border:'1px solid var(--border)',
                                   fontSize:11, fontWeight:500, color:'var(--text-secondary)',
                                   maxWidth:82, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis',
-                                  cursor: canManage ? 'pointer' : 'default' }}>
+                                  cursor: canEditTask(task) ? 'pointer' : 'default' }}>
                                   {assignee.name.split(' ')[0]}
                                 </span>
                               )
@@ -696,8 +700,8 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                             ) : <span style={{ fontSize:11, color:'var(--text-muted)' }}>—</span>}
                           </div>
                           {/* Due date — inline editable */}
-                          <div className="hide-mobile" style={{ textAlign:'center', fontSize:12, color:ov?'#f87171':task.due_date===today?'var(--brand)':'var(--text-muted)', fontWeight:ov||task.due_date===today?600:400, cursor: canManage ? 'pointer' : 'default' }}
-                            onClick={e => { e.stopPropagation(); if (canManage) setInlineEdit({taskId:task.id,field:'due_date'}) }}>
+                          <div className="hide-mobile" style={{ textAlign:'center', fontSize:12, color:ov?'#f87171':task.due_date===today?'var(--brand)':'var(--text-muted)', fontWeight:ov||task.due_date===today?600:400, cursor: canEditTask(task) ? 'pointer' : 'default' }}
+                            onClick={e => { e.stopPropagation(); if (canEditTask(task)) setInlineEdit({taskId:task.id,field:'due_date'}) }}>
                             {inlineEdit?.taskId===task.id && inlineEdit.field==='due_date' ? (
                               <input autoFocus type="date" defaultValue={task.due_date ?? ''}
                                 onChange={e => patchTaskField(task.id,'due_date',e.target.value||null)}
@@ -706,7 +710,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                                 style={{ fontSize:11, padding:'1px 4px', borderRadius:5, border:'1px solid var(--brand)',
                                   background:'var(--surface)', outline:'none', colorScheme:'light dark', fontFamily:'inherit' }}/>
                             ) : (
-                              <span title={canManage ? 'Click to change due date' : undefined}>
+                              <span title={canEditTask(task) ? 'Click to change due date' : undefined}>
                                 {task.due_date ? fmtDate(task.due_date) : '—'}
                               </span>
                             )}
@@ -737,7 +741,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                               onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background='transparent'; (e.currentTarget as HTMLElement).style.color='var(--text-muted)' }}>
                               <Copy style={{ width:11, height:11 }}/>
                             </button>
-                            {canManage && (
+                            {canDelete(task) && (
                               <button onClick={e => { e.stopPropagation(); deleteTask(task.id) }}
                                 style={{ display:'flex', alignItems:'center', justifyContent:'center', width:24, height:24, borderRadius:6, border:'none', background:'transparent', cursor:'pointer', color:'var(--text-muted)', flexShrink:0 }}
                                 onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background='#fef2f2'; (e.currentTarget as HTMLElement).style.color='#dc2626' }}
@@ -745,7 +749,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                                 <Trash2 style={{ width:12, height:12 }}/>
                               </button>
                             )}
-                            {!canManage && <div/>}
+                            {!canDelete(task) && <div/>}
                           </div>
                         </div>
                         {expandedTasks.has(task.id) && (

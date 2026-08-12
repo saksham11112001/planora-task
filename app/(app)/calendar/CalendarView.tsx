@@ -5,6 +5,7 @@ import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
 import { nextOccurrence } from '@/lib/utils/recurringSchedule'
 import { MultiPillSelect } from '@/components/filters/MultiPillSelect'
 import { usePersistedState, viewPrefKey } from '@/lib/hooks/usePersistedState'
+import { useAutoRefresh } from '@/lib/hooks/useAutoRefresh'
 import type { Task } from '@/types'
 
 interface CalTask {
@@ -141,6 +142,14 @@ export function CalendarView({ tasks: initialTasks, clients = [], members = [], 
   // clobbers an optimistic update mid-interaction.
   useEffect(() => { setTasks(initialTasks) }, [initialTasks])
 
+  // Poll for fresh server data every 30s, and immediately when the tab regains
+  // focus. Without this the calendar only changed on a full browser reload —
+  // which reset the month, the filters and the scroll position, so a shared
+  // team calendar quietly drifted out of date over the course of a day.
+  // A refresh re-renders this component rather than remounting it, so
+  // everything below survives untouched.
+  useAutoRefresh()
+
   /** Apply a panel edit to the grid straight away, keyed by task id. */
   function applyTaskUpdate(taskId: string | undefined, fields?: Record<string, unknown>) {
     if (!fields || !taskId) return
@@ -151,7 +160,15 @@ export function CalendarView({ tasks: initialTasks, clients = [], members = [], 
   const now = new Date()
   const [year,     setYear]     = useState(now.getFullYear())
   const [month,    setMonth]    = useState(now.getMonth())
-  const [filter,   setFilter]   = useState<Filter>('all')
+  // Type / client / member filters persist per user, like the month-vs-timeline
+  // preference below — they define which slice of the calendar someone works
+  // from, and rebuilding that after every reload was the main complaint.
+  // Year and month deliberately do NOT persist: the calendar should open on the
+  // current month, not wherever the user was browsing last week.
+  const [filter,   setFilter]   = usePersistedState<Filter>(
+    viewPrefKey('calendar_filter', currentUserId), 'all',
+    v => v === 'all' || v === 'compliance' || v === 'project' || v === 'one-time' || v === 'recurring',
+  )
   // Remembered per user — month vs timeline is a strong personal preference and
   // previously reset to timeline on every visit.
   const [viewMode, setViewMode] = usePersistedState<ViewMode>(
@@ -160,8 +177,11 @@ export function CalendarView({ tasks: initialTasks, clients = [], members = [], 
   )
   const [selected, setSelected] = useState<string|null>(null)
   const [hovered,       setHovered]       = useState<string|null>(null)
-  const [clientFilter,  setClientFilter]  = useState<string[]>([])
-  const [memberFilter,  setMemberFilter]  = useState<string[]>([])
+  const isStrArr = (v: unknown) => Array.isArray(v) && v.every(x => typeof x === 'string')
+  const [clientFilter,  setClientFilter]  = usePersistedState<string[]>(
+    viewPrefKey('calendar_clients', currentUserId), [], isStrArr)
+  const [memberFilter,  setMemberFilter]  = usePersistedState<string[]>(
+    viewPrefKey('calendar_members', currentUserId), [], isStrArr)
   const [panelTask, setPanelTask] = useState<Task | null>(null)
   const timelineScrollRef = useRef<HTMLDivElement>(null)
 
@@ -345,6 +365,18 @@ export function CalendarView({ tasks: initialTasks, clients = [], members = [], 
               <MultiPillSelect values={memberFilter} onChange={setMemberFilter} placeholder="All members"
                 options={members.map(m => ({ value: m.id, label: m.name }))}/>
             </div>
+          )}
+          {/* Filters persist between visits, so there must be one obvious way
+              back to the full calendar rather than deselecting pill by pill. */}
+          {(clientFilter.length > 0 || memberFilter.length > 0 || filter !== 'all') && (
+            <button
+              onClick={() => { setClientFilter([]); setMemberFilter([]); setFilter('all') }}
+              title="Show the whole calendar again"
+              style={{ fontSize:12, padding:'4px 10px', borderRadius:20, cursor:'pointer',
+                fontFamily:'inherit', border:'1px solid var(--border)',
+                background:'transparent', color:'var(--text-secondary)' }}>
+              Clear filters
+            </button>
           )}
         </div>
       )}

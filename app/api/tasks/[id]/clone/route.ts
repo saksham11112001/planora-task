@@ -33,10 +33,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // to a ca_client_assignments row — a clone carrying it collides with the
   // spawner's dedup and gets collapsed/hidden by the same-assignment dedupe in
   // task lists. The clone is a standalone task, not a spawned instance.
+  //
+  // _triggered must SURVIVE on a compliance clone. Task lists treat a task
+  // carrying _ca_compliance as a not-yet-due placeholder unless _triggered is
+  // set (TasksFetcher: `if (cf._ca_compliance) return cf._triggered === true`),
+  // so a clone that dropped the flag was written to the database and then
+  // filtered out of every list — the copy appeared for a moment, then vanished
+  // on the next load and looked like a save that had failed. A clone is a real,
+  // live task by definition: re-assert the flag rather than inheriting it.
   const cleanCustomFields = (() => {
     const cf = { ...((orig.custom_fields as Record<string, unknown>) ?? {}) }
     delete cf._assignment_id
-    delete cf._triggered
+    if (cf._ca_compliance === true) cf._triggered = true
+    else delete cf._triggered
     return Object.keys(cf).length ? cf : null
   })()
 

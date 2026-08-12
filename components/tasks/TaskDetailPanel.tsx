@@ -37,8 +37,16 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     : canManage
   const approverInfo = (task as any)?.approver as unknown as { id: string; name: string } | null
   const isAssignee = task?.assignee_id === currentUserId
-  // canEdit: only managers or the main task assignee can edit the parent task
-  const canEdit = canManage || isAssignee
+  // The person who raised the task can correct it too — matching the API, which
+  // treats creator, assignee and manager alike under tasks.edit_own. Previously
+  // a member who assigned their task to someone else got a read-only panel and
+  // had to raise a fresh task to fix a typo.
+  // Not every view selects created_by (Monitor ships only the creator join), so
+  // accept either shape rather than silently falling back to read-only there.
+  const creatorId = ((task as any)?.created_by ?? ((task as any)?.creator as { id?: string } | null)?.id) ?? null
+  const isCreator = !!currentUserId && creatorId === currentUserId
+  // canEdit: managers, the main task assignee, or whoever created the task
+  const canEdit = canManage || isAssignee || isCreator
   // isContextTask: this parent task was surfaced because the current user is assigned
   // to one of its subtasks, not to the task itself — show read-only with a banner.
   const isContextTask = !!(task as any)?.custom_fields?._context_task
@@ -1585,7 +1593,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                   </FieldCard>
 
                   {/* Approver */}
-                  {canManage && (
+                  {canEdit && (
                     <FieldCard label="Approver">
                       <ShieldCheck className="h-3 w-3 flex-shrink-0" style={{ color: approverId ? '#7c3aed' : 'var(--text-muted)' }} />
                       <select value={approverId} onChange={e => {
@@ -1594,7 +1602,9 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
                       }}
                         className="text-sm bg-transparent outline-none w-full"
                         style={{ color: 'var(--text-primary)', cursor: 'pointer' }}>
-                        <option value="">Any manager</option>
+                        {/* Non-managers may add an approver but not lift a requirement
+                            already in force — the API rejects it, so don't offer it. */}
+                        {(canManage || !task.approval_required) && <option value="">Any manager</option>}
                         {members.map(m => <option key={m.id} value={m.id}>{m.name}{m.id === currentUserId ? ' (me)' : ''}</option>)}
                       </select>
                     </FieldCard>

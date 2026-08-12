@@ -181,6 +181,16 @@ export function MyTasksView({
   const today      = todayStr()
   const canManage  = ['owner','admin','manager'].includes(userRole ?? '')
 
+  /** Mirrors the API: creator or assignee may correct their own task's details. */
+  const creatorOf   = (t: any) => (t?.created_by ?? t?.creator?.id) ?? null
+  const canEditTask = (t: any) =>
+    canManage || (!!currentUserId && (creatorOf(t) === currentUserId || t?.assignee_id === currentUserId))
+
+  /** Whoever raised a task may bin their own mistake, matching DELETE /api/tasks/[id].
+   *  Excludes spawner-created compliance rows — those are ledger entries, not user entries. */
+  const canDelete = (t: any) =>
+    canManage || (!!currentUserId && creatorOf(t) === currentUserId && !t?.custom_fields?._assignment_id)
+
   const [tasks,           setTasks]           = useState<Task[]>(initialTasks)
   const [pendingTasks,    setPendingTasks]    = useState<Task[]>(pendingApprovalTasks)
   const [assignedByMeList, setAssignedByMeList] = useState<Task[]>(assignedByMeTasks)
@@ -666,7 +676,8 @@ export function MyTasksView({
     setAssignedByMeList(prev => prev.filter(t => t.id !== taskId))
     const res = await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' })
     if (!res.ok) {
-      toast.error('Could not delete task')
+      const d = await res.json().catch(() => ({}))
+      toast.error(d.error ?? 'Could not delete task')
       refresh()
     } else {
       toast.success('Moved to Trash')
@@ -701,7 +712,8 @@ export function MyTasksView({
       const rollback = (t: Task) => t.id === taskId ? prev : t
       setTasks(p => p.map(rollback))
       setAssignedByMeList(p => p.map(rollback))
-      toast.error('Could not update task')
+      const d = await res.json().catch(() => ({}))
+      toast.error(d.error ?? 'Could not update task')
     }
   }
 
@@ -1515,9 +1527,9 @@ export function MyTasksView({
                           </span>}
                         </div>
                       </div>
-                      {/* Client column — inline editable for managers */}
+                      {/* Client column — inline editable by managers, and by whoever owns the task */}
                       <div className="hide-mobile" style={{ display:'flex', alignItems:'center', gap:4, overflow:'hidden', paddingRight:4 }}
-                        onClick={e => { e.stopPropagation(); if (canManage) setInlineEdit({taskId:task.id,field:'client_id'}) }}>
+                        onClick={e => { e.stopPropagation(); if (canEditTask(task)) setInlineEdit({taskId:task.id,field:'client_id'}) }}>
                         {inlineEdit?.taskId===task.id && inlineEdit.field==='client_id' ? (
                           <select autoFocus defaultValue={task.client_id ?? ''}
                             onChange={e => patchTaskField(task.id,'client_id',e.target.value||null)}
@@ -1532,18 +1544,18 @@ export function MyTasksView({
                         ) : client ? (
                           <>
                             <span style={{ width:7, height:7, borderRadius:2, background:client.color, flexShrink:0, display:'inline-block' }}/>
-                            <span title={client.name + (canManage ? ' — click to change' : '')}
+                            <span title={client.name + (canEditTask(task) ? ' — click to change' : '')}
                               style={{ fontSize:12, color:'var(--text-muted)', overflow:'hidden', whiteSpace:'nowrap',
-                                textOverflow:'ellipsis', cursor: canManage?'pointer':'default' }}>{client.name}</span>
+                                textOverflow:'ellipsis', cursor: canEditTask(task)?'pointer':'default' }}>{client.name}</span>
                           </>
-                        ) : <span style={{ fontSize:12, color:'var(--text-muted)', cursor: canManage?'pointer':'default' }}>—</span>}
+                        ) : <span style={{ fontSize:12, color:'var(--text-muted)', cursor: canEditTask(task)?'pointer':'default' }}>—</span>}
                       </div>
                       {/* Due date — inline editable for managers */}
                       <div className="hide-mobile" style={{ textAlign:'center', fontSize:12,
                         color: task.due_date===today?'var(--brand)':ov?'#dc2626':'var(--text-muted)',
                         fontWeight: (task.due_date===today||ov)?600:400,
-                        cursor: canManage ? 'pointer' : 'default' }}
-                        onClick={e => { e.stopPropagation(); if (canManage) setInlineEdit({taskId:task.id,field:'due_date'}) }}>
+                        cursor: canEditTask(task) ? 'pointer' : 'default' }}
+                        onClick={e => { e.stopPropagation(); if (canEditTask(task)) setInlineEdit({taskId:task.id,field:'due_date'}) }}>
                         {inlineEdit?.taskId===task.id && inlineEdit.field==='due_date' ? (
                           <input autoFocus type="date" defaultValue={task.due_date ?? ''}
                             onChange={e => patchTaskField(task.id,'due_date',e.target.value||null)}
@@ -1552,14 +1564,14 @@ export function MyTasksView({
                             style={{ fontSize:11, padding:'1px 4px', borderRadius:5, border:'1px solid var(--brand)',
                               background:'var(--surface)', outline:'none', colorScheme:'light dark', fontFamily:'inherit' }}/>
                         ) : (
-                          <span title={canManage ? 'Click to change due date' : undefined}>
+                          <span title={canEditTask(task) ? 'Click to change due date' : undefined}>
                             {task.due_date ? fmtDate(task.due_date) : '—'}
                           </span>
                         )}
                       </div>
-                      {/* Assignee column — inline editable for managers */}
+                      {/* Assignee column — inline editable by managers, and by whoever owns the task */}
                       <div className="hide-mobile" style={{ display:'flex', alignItems:'center', gap:5, overflow:'hidden' }}
-                        onClick={e => { e.stopPropagation(); if (canManage) setInlineEdit({taskId:task.id,field:'assignee_id'}) }}>
+                        onClick={e => { e.stopPropagation(); if (canEditTask(task)) setInlineEdit({taskId:task.id,field:'assignee_id'}) }}>
                         {inlineEdit?.taskId===task.id && inlineEdit.field==='assignee_id' ? (
                           <select autoFocus defaultValue={task.assignee_id ?? ''}
                             onChange={e => patchTaskField(task.id,'assignee_id',e.target.value||null)}
@@ -1575,15 +1587,15 @@ export function MyTasksView({
                           (() => {
                             const assignee = task.assignee as {id:string;name:string}|null
                             return assignee ? (
-                              <span title={canManage ? 'Click to reassign' : undefined}
+                              <span title={canEditTask(task) ? 'Click to reassign' : undefined}
                                 style={{ display:'inline-flex', alignItems:'center', padding:'2px 7px', borderRadius:99,
                                 background:'var(--surface-subtle)', border:'1px solid var(--border)',
                                 fontSize:11, fontWeight:500, color:'var(--text-secondary)',
                                 maxWidth:84, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis',
-                                cursor: canManage ? 'pointer' : 'default' }}>
+                                cursor: canEditTask(task) ? 'pointer' : 'default' }}>
                                 {assignee.name.split(' ')[0]}
                               </span>
-                            ) : <span style={{ fontSize:12, color:'var(--text-muted)', cursor: canManage?'pointer':'default' }}>—</span>
+                            ) : <span style={{ fontSize:12, color:'var(--text-muted)', cursor: canEditTask(task)?'pointer':'default' }}>—</span>
                           })()
                         ) : (
                           creator ? (
@@ -1612,7 +1624,7 @@ export function MyTasksView({
                             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background='transparent'; (e.currentTarget as HTMLElement).style.color='var(--text-muted)' }}>
                             <Copy style={{ width:11, height:11 }}/>
                           </button>
-                          {canManage && (
+                          {canDelete(task) && (
                             <button onClick={() => deleteTask(task.id)} title="Delete task"
                               className="delete-task-btn"
                               style={{ opacity:0, transition:'opacity 0.15s', display:'flex', alignItems:'center',
@@ -1904,7 +1916,7 @@ export function MyTasksView({
                           onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background='transparent'; (e.currentTarget as HTMLElement).style.color='var(--text-muted)' }}>
                           <Copy style={{ width:11, height:11 }}/>
                         </button>
-                        {canManage && (
+                        {canDelete(task) && (
                           <button onClick={() => deleteTask(task.id)} title="Delete task"
                             className="delete-task-btn"
                             style={{ opacity:0, transition:'opacity 0.15s', display:'flex', alignItems:'center',
@@ -2211,7 +2223,7 @@ export function MyTasksView({
                       </span>
                     )}
                     {task.is_recurring && <RefreshCw style={{width:8,height:8,color:'var(--brand)'}}/>}
-                    {canManage && !isContextTask && (
+                    {canDelete(task) && !isContextTask && (
                       <button onClick={e => { e.stopPropagation(); deleteTask(task.id) }}
                         title="Delete" style={{ background:'none', border:'none', cursor:'pointer',
                           color:'var(--text-muted)', padding:2, display:'flex', alignItems:'center',

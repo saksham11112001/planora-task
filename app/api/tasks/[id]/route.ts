@@ -39,13 +39,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const { data: task } = await admin
     .from('tasks')
-    .select('id, assignee_id, approver_id, org_id, approval_required, approval_status, status, parent_task_id, is_recurring, custom_fields')
+    .select('id, assignee_id, approver_id, org_id, approval_required, approval_status, status, parent_task_id, is_recurring, custom_fields, created_by')
     .eq('id', id).eq('org_id', mb.org_id).maybeSingle()
   if (!task) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const isManager     = ['owner','admin','manager'].includes(mb.role)
   const isOwnerOrAdmin = ['owner','admin'].includes(mb.role)
   const isAssignee = task.assignee_id === user.id
+  // The person who raised the task owns its details. Without this a member who
+  // created a task and assigned it to a colleague could not fix their own typo,
+  // wrong client or wrong due date — the only remedy was raising a second task,
+  // which is what filled boards with near-duplicate and blank entries.
+  const isCreator  = !!task.created_by && task.created_by === user.id
   const isApprover = task.approver_id
     ? task.approver_id === user.id
     : isManager
@@ -60,7 +65,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     isParentAssignee = parentTask?.assignee_id === user.id
   }
 
-  if (!isManager && !isAssignee && !isParentAssignee)
+  if (!isManager && !isAssignee && !isParentAssignee && !isCreator)
     return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
 
   const body = await req.json()
@@ -88,16 +93,38 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const denied = await assertCan(admin, mb.org_id, user.id, mb.role, 'tasks.complete')
     if (denied) return NextResponse.json({ error: denied.error }, { status: denied.status })
   }
-  // Re-assign task to someone else
-  if ('assignee_id' in body && body.assignee_id !== task.assignee_id) {
+  // Re-assign task to someone else.
+  // The creator is exempt: POST /api/tasks accepts assignee_id behind nothing
+  // but tasks.create, so anyone who can raise a task can already choose who it
+  // goes to. Refusing the same change one second later taught users to delete
+  // and re-raise instead of correcting. Handing someone ELSE's task to a third
+  // party is still a genuine escalation and stays behind tasks.assign.
+  if ('assignee_id' in body && body.assignee_id !== task.assignee_id && !isCreator) {
     const denied = await assertCan(admin, mb.org_id, user.id, mb.role, 'tasks.assign')
     if (denied) return NextResponse.json({ error: denied.error }, { status: denied.status })
   }
-  // General edit permission: assignees (or parent-task assignees) check edit_own, others check edit
+  // General edit permission: people with a stake in this task (assignee, parent-task
+  // assignee, or the person who raised it) check edit_own; everyone else checks edit.
+  const isOwnTask = isAssignee || isParentAssignee || isCreator
   {
-    const perm = (isAssignee || isParentAssignee) ? 'tasks.edit_own' : 'tasks.edit'
+    const perm = isOwnTask ? 'tasks.edit_own' : 'tasks.edit'
     const denied = await assertCan(admin, mb.org_id, user.id, mb.role, perm)
     if (denied) return NextResponse.json({ error: denied.error }, { status: denied.status })
+  }
+
+  // A non-manager may ADD an approver to their own task, never remove one that
+  // is already in force. The approval gate further down reads the PRE-update
+  // row, so without this a two-step PATCH — clear the flag, then complete —
+  // walks straight past it.
+  if (!isManager && task.approval_required) {
+    const clearsFlag     = 'approval_required' in body && !body.approval_required
+    const clearsApprover = 'approver_id' in body && !body.approver_id
+    if (clearsFlag || clearsApprover) {
+      return NextResponse.json({
+        error: 'Only a manager can remove the approval requirement from a task',
+        code:  'APPROVAL_LOCK',
+      }, { status: 403 })
+    }
   }
 
   // ── APPROVAL GATE ──────────────────────────────────────────────
@@ -179,8 +206,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     body.approved_at     = new Date().toISOString()
   }
 
-  // Members can only update status/completed_at of tasks assigned to them
-  // Managers can update all fields on any task in their org
+  // Managers can update all fields on any task in their org.
+  //
+  // Non-managers get two tiers:
+  //   own task  — the full set of DESCRIPTIVE fields, so a clerical mistake is
+  //               a correction rather than a reason to raise a second task.
+  //               Reaching here already means tasks.edit_own passed, so an org
+  //               that wants the old behaviour can switch that permission off in
+  //               Settings → Permissions and this list collapses to nothing.
+  //   other's   — status only, unchanged.
+  //
+  // Deliberately NOT in the own-task list: approval_status / approved_by /
+  // approved_at (self-approval), is_recurring / frequency / next_occurrence_date
+  // (schedule changes fan out to every future occurrence), and sort_order.
   const ALLOWED = isManager ? [
     'title','description','status','priority','due_date','start_date',
     'completed_at','assignee_id','approver_id','client_id','approval_status',
@@ -188,9 +226,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     'estimated_hours','sort_order','custom_fields',
     'frequency','next_occurrence_date','is_recurring',
     'is_billable','billable_amount',
+  ] : isOwnTask ? [
+    'title','description','status','priority','due_date',
+    'completed_at','client_id','assignee_id','approver_id',
+    'approval_required','estimated_hours','custom_fields',
+    'is_billable','billable_amount',
   ] : [
-    // Members: only status + completed_at (to submit/complete their own tasks)
-    // + billable fields so assignees can mark their own tasks billable
+    // Someone else's task: status + completed_at only (to submit/complete work
+    // delegated via a subtask), plus billable fields.
     'status','completed_at','custom_fields','is_billable','billable_amount',
   ]
   const updates: Record<string, unknown> = {}
@@ -331,8 +374,26 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const mb = await getApiOrgMembership(supabase, user.id, req, 'org_id, role')
   if (!mb) return NextResponse.json({ error: 'No org' }, { status: 403 })
   const admin = createAdminClient()
+
+  const { data: target } = await admin
+    .from('tasks')
+    .select('id, created_by, custom_fields')
+    .eq('id', id).eq('org_id', mb.org_id).maybeSingle()
+  if (!target) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
   const deleteDenied = await assertCan(admin, mb.org_id, user.id, mb.role, 'tasks.delete')
-  if (deleteDenied) return NextResponse.json({ error: deleteDenied.error }, { status: deleteDenied.status })
+  if (deleteDenied) {
+    // Fallback: whoever raised a task may bin their own mistake. Without this a
+    // member's blank or wrong entry was permanent and had to be worked around,
+    // which is what buried real work in near-duplicates. This is a SOFT delete
+    // (30-day Trash), and it deliberately does not extend to compliance tasks
+    // the spawner created — those are ledger rows, not user entries.
+    const isOwnEntry     = !!target.created_by && target.created_by === user.id
+    const isSpawnedCA    = !!(target.custom_fields as any)?._assignment_id
+    if (!isOwnEntry || isSpawnedCA) {
+      return NextResponse.json({ error: deleteDenied.error }, { status: deleteDenied.status })
+    }
+  }
   // Soft delete — move to trash with deleted_at timestamp
   // Tasks are permanently purged after 30 days via cron
   const deletedAt = new Date().toISOString()

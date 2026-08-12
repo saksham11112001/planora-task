@@ -1,7 +1,8 @@
 'use client'
-import { useState, useMemo, useRef, useEffect, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { Search, Filter, BarChart2, Download, Calendar } from 'lucide-react'
+import { useAutoRefresh } from '@/lib/hooks/useAutoRefresh'
+import { usePersistedState, viewPrefKey } from '@/lib/hooks/usePersistedState'
 import { MultiPillSelect } from '@/components/filters/MultiPillSelect'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LineChart, Line, Legend, PieChart, Pie } from 'recharts'
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
@@ -122,26 +123,17 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
 
   // ── Real-time refresh ──────────────────────────────────────────────────
   // Monitor is server-fetched; without this, changes made by teammates never
-  // appear until a manual reload. router.refresh() re-runs the server fetcher
-  // silently (inside a transition, so the page never flashes), and the effect
-  // below re-syncs local state whenever fresh server data arrives.
-  const router = useRouter()
-  const [, startRefresh] = useTransition()
+  // appear until a manual reload. The hook re-runs the server fetcher silently
+  // every 30s (and the moment the tab regains focus); the effect below re-syncs
+  // local state whenever fresh server data arrives. Filters live in this
+  // component and survive, because a refresh re-renders rather than remounts.
+  useAutoRefresh()
   useEffect(() => {
     setTasks(initialTasks.filter(t =>
       t.status !== 'completed' || !t.completed_at || t.completed_at.slice(0, 10) >= from90
     ))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialTasks])
-  useEffect(() => {
-    const refresh = () => { if (!document.hidden) startRefresh(() => router.refresh()) }
-    const iv = setInterval(refresh, 30_000)              // poll every 30s while visible
-    const onVis = () => { if (!document.hidden) refresh() }  // instant on tab return
-    document.addEventListener('visibilitychange', onVis)
-    window.addEventListener('focus', onVis)
-    return () => { clearInterval(iv); document.removeEventListener('visibilitychange', onVis); window.removeEventListener('focus', onVis) }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   // ── Current-month boundaries + label ────────────────────────────────────
   const _now       = new Date()
@@ -151,27 +143,36 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
   const monthLabel = _now.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
 
   // ── Filter state ──
+  // Persisted per user: a filtered Monitor is a saved workspace ("my overdue
+  // GST clients"), and losing it to a reload or a sidebar click meant rebuilding
+  // the same five selections several times a day. Free-text search stays
+  // transient — a search term restored from last week reads as an empty board.
+  const pk = (name: string) => viewPrefKey(`monitor_${name}`, currentUserId)
+  const isStrArr = (v: unknown) => Array.isArray(v) && v.every(x => typeof x === 'string')
+  const isStr    = (v: unknown) => typeof v === 'string'
+  const isBool   = (v: unknown) => typeof v === 'boolean'
+
   const [search,         setSearch]         = useState('')
-  const [filterStatus,   setFilterStatus]   = useState<string[]>([])
-  const [filterPrio,     setFilterPrio]     = useState<string[]>([])
-  const [filterClient,   setFilterClient]   = useState<string[]>([])
-  const [filterMember,   setFilterMember]   = useState<string[]>([])
-  const [filterType,     setFilterType]     = useState<string[]>([])
+  const [filterStatus,   setFilterStatus]   = usePersistedState<string[]>(pk('status'), [], isStrArr)
+  const [filterPrio,     setFilterPrio]     = usePersistedState<string[]>(pk('prio'),   [], isStrArr)
+  const [filterClient,   setFilterClient]   = usePersistedState<string[]>(pk('client'), [], isStrArr)
+  const [filterMember,   setFilterMember]   = usePersistedState<string[]>(pk('member'), [], isStrArr)
+  const [filterType,     setFilterType]     = usePersistedState<string[]>(pk('type'),   [], isStrArr)
   // ── Date filter state ──
   const [dateOpen,          setDateOpen]          = useState(false)
   const [alignDateRight,    setAlignDateRight]     = useState(false)
-  const [duePreset,         setDuePreset]          = useState('')
-  const [dueDateFrom,       setDueDateFrom]        = useState('')
-  const [dueDateTo,         setDueDateTo]          = useState('')
-  const [createdPreset,     setCreatedPreset]      = useState('')
-  const [createdFrom,       setCreatedFrom]        = useState('')
-  const [createdTo,         setCreatedTo]          = useState('')
-  const [updatedPreset,     setUpdatedPreset]      = useState('')
-  const [updatedFrom,       setUpdatedFrom]        = useState('')
-  const [updatedTo,         setUpdatedTo]          = useState('')
-  const [showCustomDue,     setShowCustomDue]      = useState(false)
-  const [showCustomCreated, setShowCustomCreated]  = useState(false)
-  const [showCustomUpdated, setShowCustomUpdated]  = useState(false)
+  const [duePreset,         setDuePreset]          = usePersistedState<string>(pk('due_preset'),     '', isStr)
+  const [dueDateFrom,       setDueDateFrom]        = usePersistedState<string>(pk('due_from'),       '', isStr)
+  const [dueDateTo,         setDueDateTo]          = usePersistedState<string>(pk('due_to'),         '', isStr)
+  const [createdPreset,     setCreatedPreset]      = usePersistedState<string>(pk('created_preset'), '', isStr)
+  const [createdFrom,       setCreatedFrom]        = usePersistedState<string>(pk('created_from'),   '', isStr)
+  const [createdTo,         setCreatedTo]          = usePersistedState<string>(pk('created_to'),     '', isStr)
+  const [updatedPreset,     setUpdatedPreset]      = usePersistedState<string>(pk('updated_preset'), '', isStr)
+  const [updatedFrom,       setUpdatedFrom]        = usePersistedState<string>(pk('updated_from'),   '', isStr)
+  const [updatedTo,         setUpdatedTo]          = usePersistedState<string>(pk('updated_to'),     '', isStr)
+  const [showCustomDue,     setShowCustomDue]      = usePersistedState<boolean>(pk('custom_due'),     false, isBool)
+  const [showCustomCreated, setShowCustomCreated]  = usePersistedState<boolean>(pk('custom_created'), false, isBool)
+  const [showCustomUpdated, setShowCustomUpdated]  = usePersistedState<boolean>(pk('custom_updated'), false, isBool)
   const dateRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -193,6 +194,20 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
     : updatedFrom    ? 'Modified: custom'
     : 'Date'
 
+  // Filters now survive reloads, so there has to be one obvious way back to the
+  // full board — otherwise someone returns to a near-empty Monitor tomorrow and
+  // reads it as broken data rather than a filter they set yesterday.
+  const activeFilterCount =
+    (search ? 1 : 0) + filterStatus.length + filterPrio.length +
+    filterClient.length + filterMember.length + filterType.length +
+    (hasDateFilter ? 1 : 0)
+
+  function clearAllFilters() {
+    setSearch('')
+    setFilterStatus([]); setFilterPrio([]); setFilterClient([]); setFilterMember([]); setFilterType([])
+    clearDateFilters()
+  }
+
   function clearDateFilters() {
     setDuePreset(''); setDueDateFrom(''); setDueDateTo(''); setShowCustomDue(false)
     setCreatedPreset(''); setCreatedFrom(''); setCreatedTo(''); setShowCustomCreated(false)
@@ -202,7 +217,10 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
   // ── UI state ──
   const [showChart,       setShowChart]       = useState(false)
   const [panelTask,       setPanelTask]       = useState<Task | null>(null)
-  const [groupBy,         setGroupBy]         = useState<'status' | 'assignee' | 'client' | 'type' | 'none'>('status')
+  const [groupBy,         setGroupBy]         = usePersistedState<'status' | 'assignee' | 'client' | 'type' | 'none'>(
+    pk('group_by'), 'status',
+    v => v === 'status' || v === 'assignee' || v === 'client' || v === 'type' || v === 'none',
+  )
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
 
   function toggleGroup(k: string) {
@@ -823,6 +841,17 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
             { value: 'project',   label: 'Project tasks' },
             { value: 'quick',     label: 'Quick tasks'   },
           ]}/>
+
+        {/* Clear all — only while something is actually filtering the board */}
+        {activeFilterCount > 0 && (
+          <button onClick={clearAllFilters}
+            title="Show all tasks again"
+            style={{ fontSize: 12, padding: '4px 10px', borderRadius: 20, cursor: 'pointer',
+              fontFamily: 'inherit', border: '1px solid var(--border)',
+              background: 'transparent', color: 'var(--text-secondary)' }}>
+            Clear filters ({activeFilterCount})
+          </button>
+        )}
 
         {/* Date filter — single button with dropdown panel */}
         <div ref={dateRef} style={{ position: 'relative' }}>
