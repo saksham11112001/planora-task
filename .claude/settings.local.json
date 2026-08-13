@@ -85,7 +85,9 @@
       "PowerShell(@\\(\"C:\\\\Program Files\\\\nodejs\",\"C:\\\\Program Files \\(x86\\)\\\\nodejs\",\"$env:LOCALAPPDATA\\\\Programs\\\\nodejs\",\"$env:LOCALAPPDATA\\\\node\",\"$env:USERPROFILE\\\\scoop\\\\apps\\\\nodejs\",\"C:\\\\nvm4w\\\\nodejs\",\"$env:APPDATA\\\\fnm\"\\) | ForEach-Object { if \\(Test-Path $_\\) { \"DIR: $_\" } }; Get-ChildItem C:\\\\ -Filter \"node.exe\" -Depth 3 -ErrorAction SilentlyContinue | Select-Object -First 5 -ExpandProperty FullName)",
       "Bash(grep -n \"fetch\\('/api\\\\|fetch\\(\\\\`/api\" \"app/\\(app\\)/compliance/CATasksView.tsx\")",
       "Bash(gh auth *)",
-      "Bash(git checkout *)"
+      "Bash(git checkout *)",
+      "Bash(git ls-remote *)",
+      "Bash(echo \"exit:$?\")"
     ]
   }
 }
