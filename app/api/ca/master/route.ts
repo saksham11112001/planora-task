@@ -34,9 +34,16 @@ export async function GET(req: NextRequest) {
   const { data, error } = await q
 
   if (error) return NextResponse.json(dbError(error, 'ca/master'), { status: 500 })
-  // Master tasks rarely change — cache aggressively
+  // Master tasks change rarely, but WHEN they change it is a statutory due date
+  // and everyone must see it at once. The old `max-age=300,
+  // stale-while-revalidate=3600` meant a browser could keep serving the previous
+  // dates for up to 65 minutes after an admin corrected them — and because a
+  // reload does not bypass the HTTP cache for JS-issued fetches, the assignee
+  // had no way to force the new date onto their screen. Rarely-changing is an
+  // argument for cheap revalidation, not for serving a known-stale filing
+  // deadline.
   return NextResponse.json({ data: data ?? [] }, {
-    headers: { 'Cache-Control': 'private, max-age=300, stale-while-revalidate=3600' },
+    headers: { 'Cache-Control': 'private, no-store' },
   })
 }
 

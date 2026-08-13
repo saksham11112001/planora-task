@@ -40,8 +40,11 @@ export async function GET(req: NextRequest) {
   const { data, error } = await query
 
   if (error) return NextResponse.json(dbError(error, 'ca/assignments'), { status: 500 })
+  // Carries the joined master_task.dates, so caching this cached the due dates
+  // too — the compliance board kept showing pre-correction deadlines. Same
+  // reasoning as /api/tasks and /api/ca/master: no browser copy of live state.
   return NextResponse.json({ data: data ?? [] }, {
-    headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=300' },
+    headers: { 'Cache-Control': 'private, no-store' },
   })
 }
 

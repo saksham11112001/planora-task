@@ -82,7 +82,10 @@
       "Bash(python -)",
       "PowerShell(npx tsc --noEmit --skipLibCheck 2>&1)",
       "PowerShell($c = Get-Command node -ErrorAction SilentlyContinue; if \\($c\\) { $c.Source } else { \"node not on PATH\" }; foreach \\($p in @\\(\"$env:ProgramFiles\\\\nodejs\\\\node.exe\", \"${env:ProgramFiles\\(x86\\)}\\\\nodejs\\\\node.exe\", \"$env:LOCALAPPDATA\\\\nvs\\\\default\\\\node.exe\", \"$env:APPDATA\\\\nvm\\\\node.exe\"\\)\\) { if \\(Test-Path $p\\) { \"FOUND: $p\" } }; Get-ChildItem \"$env:APPDATA\\\\nvm\" -Filter node.exe -Recurse -ErrorAction SilentlyContinue | Select-Object -First 3 -ExpandProperty FullName)",
-      "PowerShell(@\\(\"C:\\\\Program Files\\\\nodejs\",\"C:\\\\Program Files \\(x86\\)\\\\nodejs\",\"$env:LOCALAPPDATA\\\\Programs\\\\nodejs\",\"$env:LOCALAPPDATA\\\\node\",\"$env:USERPROFILE\\\\scoop\\\\apps\\\\nodejs\",\"C:\\\\nvm4w\\\\nodejs\",\"$env:APPDATA\\\\fnm\"\\) | ForEach-Object { if \\(Test-Path $_\\) { \"DIR: $_\" } }; Get-ChildItem C:\\\\ -Filter \"node.exe\" -Depth 3 -ErrorAction SilentlyContinue | Select-Object -First 5 -ExpandProperty FullName)"
+      "PowerShell(@\\(\"C:\\\\Program Files\\\\nodejs\",\"C:\\\\Program Files \\(x86\\)\\\\nodejs\",\"$env:LOCALAPPDATA\\\\Programs\\\\nodejs\",\"$env:LOCALAPPDATA\\\\node\",\"$env:USERPROFILE\\\\scoop\\\\apps\\\\nodejs\",\"C:\\\\nvm4w\\\\nodejs\",\"$env:APPDATA\\\\fnm\"\\) | ForEach-Object { if \\(Test-Path $_\\) { \"DIR: $_\" } }; Get-ChildItem C:\\\\ -Filter \"node.exe\" -Depth 3 -ErrorAction SilentlyContinue | Select-Object -First 5 -ExpandProperty FullName)",
+      "Bash(grep -n \"fetch\\('/api\\\\|fetch\\(\\\\`/api\" \"app/\\(app\\)/compliance/CATasksView.tsx\")",
+      "Bash(gh auth *)",
+      "Bash(git checkout *)"
     ]
   }
 }
