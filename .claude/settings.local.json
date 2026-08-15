@@ -87,7 +87,8 @@
       "Bash(gh auth *)",
       "Bash(git checkout *)",
       "Bash(git ls-remote *)",
-      "Bash(echo \"exit:$?\")"
+      "Bash(echo \"exit:$?\")",
+      "Bash(timeout 90 git push origin fix/stale-task-status-and-compliance-dates)"
     ]
   }
 }
