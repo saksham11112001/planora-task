@@ -1,0 +1,72 @@
+-- ============================================================================
+-- Index tasks.parent_task_id — fixes "canceling statement due to statement
+-- timeout" on PATCH /api/tasks/[id].
+--
+-- WHY THIS WAS MISSING
+--   add_disk_io_indexes.sql indexed parent_recurring_id (the recurring-spawn
+--   idempotency column) but not parent_task_id (the subtask parent column).
+--   They are different columns and only the first got covered. Postgres does
+--   NOT create an index for a foreign key automatically, so nothing else
+--   filled the gap.
+--
+-- WHAT WAS SCANNING
+--   Three statements filter on parent_task_id, two of them on the hot
+--   task-update path:
+--
+--   1. app/api/tasks/[id]/route.ts PATCH — "block completing a parent task
+--      that still has incomplete subtasks":
+--        WHERE parent_task_id = $1 AND org_id = $2
+--   2. app/api/tasks/[id]/route.ts PATCH — "auto-complete the parent once
+--      every sibling is done":
+--        WHERE parent_task_id = $1 AND org_id = $2
+--   3. app/api/tasks/[id]/route.ts DELETE — archive a task's subtasks:
+--        UPDATE ... WHERE parent_task_id = $1 AND org_id = $2
+--
+--   With no index on parent_task_id the planner's best option was an org_id
+--   index (e.g. idx_tasks_org_created_at), which means reading EVERY task row
+--   belonging to that organisation and discarding all but the handful that are
+--   actually children of this task. That cost grows with the size of the org,
+--   not with the number of subtasks — so it degrades quietly as a firm's
+--   compliance history accumulates, and eventually a routine "mark complete"
+--   exceeds the statement timeout.
+--
+-- WHY (parent_task_id, status)
+--   Both PATCH statements read `id, status` for the matched children and only
+--   ever ask "is any of them not completed?". Carrying status in the index lets
+--   that question be answered from the index alone.
+--
+-- WHY PARTIAL
+--   Most tasks are top-level, so parent_task_id is NULL for the large majority
+--   of rows. Excluding them keeps the index small and cheap to maintain. It
+--   does mean this index cannot serve `parent_task_id IS NULL` lookups (the
+--   `top_level=true` filter on GET /api/tasks) — those are already served by
+--   the org_id composite indexes in add_composite_indexes.sql, which is why
+--   that query was never the one timing out.
+--
+-- CONCURRENTLY: does not take a write lock, so it is safe on the live table.
+-- It cannot run inside a transaction block — run this file on its own in the
+-- Supabase SQL editor, not wrapped in BEGIN/COMMIT.
+-- ============================================================================
+
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_tasks_parent_task_status
+  ON tasks(parent_task_id, status)
+  WHERE parent_task_id IS NOT NULL;
+
+-- VERIFY — the index should be listed, and both plans below should use it
+-- rather than an org_id index or a sequential scan.
+--
+--   SELECT indexname FROM pg_indexes
+--   WHERE tablename = 'tasks' AND indexname = 'idx_tasks_parent_task_status';
+--
+--   EXPLAIN ANALYZE
+--   SELECT id, status FROM tasks
+--   WHERE parent_task_id = '<any-parent-task-uuid>' AND org_id = '<its-org-uuid>';
+--
+-- If CONCURRENTLY fails part-way it leaves an INVALID index behind. Check with:
+--
+--   SELECT c.relname, i.indisvalid FROM pg_class c
+--   JOIN pg_index i ON i.indexrelid = c.oid
+--   WHERE c.relname = 'idx_tasks_parent_task_status';
+--
+-- and if indisvalid is false, DROP INDEX CONCURRENTLY idx_tasks_parent_task_status;
+-- then re-run this file.
