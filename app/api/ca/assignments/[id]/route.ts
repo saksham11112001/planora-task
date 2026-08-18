@@ -16,7 +16,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!['owner','admin','manager'].includes(mb.role)) return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
 
   const body = await req.json()
-  const ALLOWED = ['client_id', 'master_task_id', 'assignee_id', 'approver_id', 'is_active', 'notes', 'custom_due_date', 'frequency_override']
+  // start_date / end_date were missing, so this route silently dropped them and
+  // still answered 200 — the same "saved successfully, changed nothing" shape
+  // the Step 2 form had. Step 2 itself updates via delete-then-re-add rather
+  // than PATCH, but any other caller of this route deserves a working update.
+  const ALLOWED = ['client_id', 'master_task_id', 'assignee_id', 'approver_id', 'is_active', 'notes', 'custom_due_date', 'frequency_override', 'start_date', 'end_date']
   const updates: Record<string, unknown> = {}
   for (const k of ALLOWED) { if (k in body) updates[k] = body[k] }
   if (!Object.keys(updates).length) return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })

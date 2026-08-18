@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
   const { data: assignments, error: asgErr } = await admin
     .from('ca_client_assignments')
     .select(`
-      id, org_id, client_id, assignee_id, approver_id, created_at, start_date,
+      id, org_id, client_id, assignee_id, approver_id, created_at, start_date, end_date,
       master_task:ca_master_tasks(id, name, priority, dates, days_before_due, attachment_headers, attachment_count)
     `)
     .eq('org_id', mb.org_id)
@@ -106,6 +106,11 @@ export async function POST(request: NextRequest) {
     // past-due tasks for newly onboarded clients (same guard as the daily cron).
     // Admins who need to backfill past months must set start_date on the assignment first.
     const startDateStr: string = (asgn as any).start_date ?? today
+    // Upper bound for a client being wound down. NULL = open-ended (every
+    // assignment today), so this is inert until a date is actually set.
+    // Applied here as well as in the daily cron, otherwise a manual "Spawn
+    // tasks" would re-create exactly the work the end date exists to prevent.
+    const endDateStr: string | null = (asgn as any).end_date ?? null
 
     for (const [monthKey, dueDateStr] of Object.entries(dates)) {
       if (!dueDateStr) continue
@@ -115,6 +120,12 @@ export async function POST(request: NextRequest) {
       // Skip dates before the client's start date
       if (dueDateStr < startDateStr) {
         detail.push({ ...logBase, action: 'skipped', reason: `before start_date (${startDateStr})` })
+        continue
+      }
+
+      // Skip dates after the client's end date
+      if (endDateStr && dueDateStr > endDateStr) {
+        detail.push({ ...logBase, action: 'skipped', reason: `after end_date (${endDateStr})` })
         continue
       }
 

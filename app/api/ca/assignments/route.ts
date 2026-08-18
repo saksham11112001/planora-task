@@ -57,18 +57,22 @@ export async function POST(req: NextRequest) {
   if (!['owner','admin','manager'].includes(mb.role)) return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
 
   const body = await req.json()
-  const { assignments } = body  // array of { master_task_id, client_id, assignee_id, approver_id }
+  // array of { master_task_id, client_id, assignee_id, approver_id, start_date, end_date }
+  const { assignments } = body
   if (!Array.isArray(assignments) || assignments.length === 0)
     return NextResponse.json({ error: 'assignments array required' }, { status: 400 })
 
   const admin = createAdminClient()
-  const rows = assignments.map((a: { master_task_id: string; client_id: string; assignee_id?: string; approver_id?: string; start_date?: string }) => ({
+  const rows = assignments.map((a: { master_task_id: string; client_id: string; assignee_id?: string; approver_id?: string; start_date?: string; end_date?: string }) => ({
     org_id: mb.org_id,
     master_task_id: a.master_task_id,
     client_id: a.client_id,
     assignee_id: a.assignee_id ?? null,
     approver_id: a.approver_id ?? null,
     start_date: a.start_date ?? null,
+    // Was omitted here, so the end date the Step 2 form collected was discarded
+    // by the server even on the occasions the client did send it.
+    end_date:   a.end_date   ?? null,
     created_by: user.id,
     is_active: true,
   }))
