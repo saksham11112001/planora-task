@@ -1050,7 +1050,7 @@ export function MsmeView({ userRole, orgName }: Props) {
           ) : filtered.length === 0 ? (
             <EmptyState search={search} onAdd={canManage ? () => setShowAdd(true) : undefined} onImport={canManage ? () => setShowImport(true) : undefined} />
           ) : (
-            <div>
+            <div data-tour="msme-table">
             {/* Bulk action bar */}
             {checkedIds.size > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', background: `${ACCENT}12`, border: `1.5px solid ${ACCENT}40`, borderRadius: 10, marginBottom: 10, flexWrap: 'wrap' }}>
@@ -1688,7 +1688,17 @@ export function MsmeView({ userRole, orgName }: Props) {
 
       {/* ── Walkthrough + spotlight tour ── */}
       <MsmeWalkthrough onUpgrade={() => setShowUpgrade(true)} onStartTour={() => setShowTour(true)} />
-      {showTour && <MsmeTour onDone={() => setShowTour(false)} />}
+      {showTour && (
+        <MsmeTour
+          onDone={() => setShowTour(false)}
+          /* Live counts so the tour can tell when a step's task is genuinely
+             done, rather than assuming it because the user clicked something. */
+          progress={{
+            vendorCount:  vendors.length,
+            emailedCount: vendors.filter(v => (v.email_count ?? 0) > 0).length,
+          }}
+        />
+      )}
 
       {/* ── Import modal ── */}
       {showImport && (
