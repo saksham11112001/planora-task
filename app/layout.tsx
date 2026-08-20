@@ -34,18 +34,21 @@ export const metadata: Metadata = {
     siteName:    'upFloat',
     title:       'upFloat — Task & Practice Management for CA Firms',
     description: 'All-in-one task manager and practice management software for Indian CA firms, CPAs, and MSMEs. Track compliance, manage teams, automate recurring tasks.',
-    images: [{ url: '/og-image.svg', width: 1200, height: 630, alt: 'upFloat — Practice Management for CA Firms' }],
+    // og:image / twitter:image are supplied by app/opengraph-image.tsx, which
+    // renders a real PNG. They used to point at /og-image.svg — no major social
+    // platform renders SVG share cards, so every shared link previewed blank.
   },
   twitter: {
     card:        'summary_large_image',
     title:       'upFloat — Task & Practice Management for CA Firms',
     description: 'All-in-one task manager and practice management software for Indian CA firms, CPAs, and MSMEs.',
-    images:      ['/og-image.svg'],
     creator:     '@upfloatco',
   },
   icons: {
-    icon:  [{ url: '/favicon.svg', type: 'image/svg+xml' }],
-    apple: [{ url: '/favicon.svg' }],
+    icon:  [{ url: '/favicon.svg', type: 'image/svg+xml' }, { url: '/favicon.ico', sizes: '32x32' }],
+    // iOS ignores SVG for the home-screen icon, so point Apple at the .ico
+    // rather than a file it will silently skip.
+    apple: [{ url: '/favicon.ico' }],
   },
   manifest: '/manifest',
   appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: 'upFloat' },
