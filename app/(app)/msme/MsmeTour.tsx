@@ -6,51 +6,84 @@ const DARK    = '#0f172a'
 const MUTED   = '#64748b'
 const PAD     = 10   // padding around the spotlight ring
 
+/** Live counts read from MsmeView, used to tell whether a step's task is done. */
+export interface TourProgress {
+  vendorCount:  number
+  emailedCount: number
+}
+
 interface Step {
   selector:    string
   title:       string
   description: string
   hint?:       string
   prefer:      'top' | 'bottom' | 'left' | 'right'
+  /**
+   * The one thing to DO on this step, phrased as an instruction. Its presence
+   * is what makes a step a task: gated steps hold "Next" back until the task is
+   * done, and offer "Skip this step" instead. Steps without it are context and
+   * advance freely, as before.
+   */
+  action?:     string
+  /**
+   * Outcome test against live dashboard state. When this passes the step counts
+   * as done even if the user got there by another route — pasting a vendor in
+   * via import still satisfies "add your first vendor". Steps with an `action`
+   * but no `done` are satisfied by clicking the highlighted control.
+   */
+  done?:       (p: TourProgress) => boolean
 }
 
 const STEPS: Step[] = [
   {
     selector:    '[data-tour="msme-header"]',
-    title:       'Your MSME dashboard',
-    description: 'This is your central hub for tracking Section 43B(h) vendor compliance. Everything you need is here.',
+    title:       'What this page is for',
+    description: 'Section 43B(h) means you can only deduct payments to MSME vendors if you paid them on time — and to know who is an MSME, you have to ask them. This page does the asking and keeps the replies as evidence.',
     prefer:      'bottom',
   },
   {
     selector:    '[data-tour="msme-getting-started"]',
-    title:       'Three steps to compliance',
-    description: 'Add vendors → shoot them a verification email → track their MSME status as they respond. That\'s the full workflow.',
-    prefer:      'bottom',
-  },
-  {
-    selector:    '[data-tour="msme-import-btn"]',
-    title:       'Bulk import from Excel',
-    description: 'Have a spreadsheet of vendor names and emails? Upload it here. The system auto-deduplicates and maps column names automatically.',
-    hint:        'Supports .xlsx and .csv',
+    title:       'The whole job is three steps',
+    description: 'Add your vendors, email them a declaration form, and watch the replies land here. The rest of this tour walks you through it on your real data — about two minutes.',
     prefer:      'bottom',
   },
   {
     selector:    '[data-tour="msme-add-btn"]',
-    title:       'Add a vendor manually',
-    description: 'Add a single vendor by name and email. Once added, shoot them an email to collect their MSME certificate in one click.',
+    title:       'Add your first vendor',
+    description: 'Start with one vendor you actually buy from. You need their name and the email address that will receive the declaration form.',
+    action:      'Click "+ Add vendor", fill in a name and email, and save.',
+    hint:        'Only name and email are required — GSTIN is optional.',
+    done:        p => p.vendorCount > 0,
+    prefer:      'bottom',
+  },
+  {
+    selector:    '[data-tour="msme-import-btn"]',
+    title:       'Or bring the whole list in at once',
+    description: 'If your vendors are already in a spreadsheet, import it instead of typing them in. Column names are matched automatically and duplicate emails are skipped.',
+    hint:        'Optional — skip this if you would rather add them one by one.',
+    prefer:      'bottom',
+  },
+  {
+    selector:    '[data-tour="msme-table"]',
+    title:       'Now email them the form',
+    description: 'Nothing reaches your vendor until you send it. Tick the vendor you just added, then use the "✉ Email selected" button that appears above the list.',
+    action:      'Send the declaration email to at least one vendor.',
+    hint:        'The first email uses one vendor slot. Replies come back to this table on their own.',
+    done:        p => p.emailedCount > 0,
+    prefer:      'top',
+  },
+  {
+    selector:    '[data-tour="msme-schedule-btn"]',
+    title:       'Chasing happens without you',
+    description: 'Vendors who do not reply are reminded automatically on day 7, 14, 21 and 30. Open this to change the timing or the reply-to address.',
+    hint:        'You never have to follow up by hand.',
     prefer:      'bottom',
   },
   {
     selector:    '[data-tour="msme-upgrade-btn"]',
-    title:       'Vendor pack',
-    description: 'Free tier covers 5 vendors. Vendors imported beyond your limit appear blurred in the table — upgrade once to unlock them all.',
-    hint:        'One-time payment, no subscription',
-    prefer:      'bottom',
-  },
-  {
-    selector:    '[data-tour="msme-schedule-btn"]',
-    title:       'Automated follow-up schedule',
-    description: 'Configure how many reminder emails to send and how many days apart. The system sends them automatically — you never have to chase manually.',
+    title:       'When you need more than 5',
+    description: 'The free tier covers 5 vendors. A slot is used when a vendor is first emailed — not when you add them — so you can load your full list now and decide later.',
+    hint:        'One-time payment, no subscription.',
     prefer:      'bottom',
   },
 ]
@@ -58,13 +91,17 @@ const STEPS: Step[] = [
 interface Rect { x: number; y: number; w: number; h: number }
 
 interface Props {
-  onDone: () => void
+  onDone:    () => void
+  progress?: TourProgress
 }
 
-export default function MsmeTour({ onDone }: Props) {
+export default function MsmeTour({ onDone, progress }: Props) {
   const [step,    setStep]    = useState(0)
   const [rect,    setRect]    = useState<Rect | null>(null)
   const [vp,      setVp]      = useState({ w: 1280, h: 800 })
+  // Whether the CURRENT step's task has been carried out. Reset on every step
+  // change; only meaningful for steps that declare an `action`.
+  const [didStep, setDidStep] = useState(false)
   const rafRef = useRef<number | null>(null)
 
   const measure = useCallback((stepIdx: number) => {
@@ -97,6 +134,30 @@ export default function MsmeTour({ onDone }: Props) {
     }
   }, [step, measure])
 
+  const s = STEPS[step]
+  /** A step is a task when it says what to do. Everything else is context. */
+  const isTask  = !!s.action
+  /** Satisfied either by the outcome check against live data, or — for tasks
+   *  with no measurable outcome — by the user clicking the highlighted control. */
+  const taskDone = !isTask || (s.done ? s.done(progress ?? { vendorCount: 0, emailedCount: 0 }) : didStep)
+
+  // Clear the click flag whenever the step changes, so a click on step 3 can
+  // never count as having done step 5.
+  useEffect(() => { setDidStep(false) }, [step])
+
+  // Count a click on the spotlighted control as having done the task. Capture
+  // phase, because the control's own handler may unmount it (opening a modal)
+  // before a bubbling listener would ever run.
+  useEffect(() => {
+    if (!isTask) return
+    function onClick(e: MouseEvent) {
+      const el = document.querySelector(s.selector)
+      if (el && e.target instanceof Node && el.contains(e.target)) setDidStep(true)
+    }
+    document.addEventListener('click', onClick, true)
+    return () => document.removeEventListener('click', onClick, true)
+  }, [isTask, s.selector])
+
   function next() {
     // Skip steps whose element doesn't exist in DOM
     let next = step + 1
@@ -109,6 +170,17 @@ export default function MsmeTour({ onDone }: Props) {
     setStep(next)
   }
 
+  /**
+   * Clicking the dark area used to advance the tour. On a task step that is the
+   * opposite of what we want — a stray click would carry the user past the very
+   * thing they were asked to do, which is how people ended up at the end of the
+   * tour without having added a vendor. Context steps keep the old behaviour.
+   */
+  function backdropAdvance() {
+    if (isTask && !taskDone) return
+    next()
+  }
+
   function prev() {
     let prev = step - 1
     while (prev >= 0) {
@@ -119,8 +191,6 @@ export default function MsmeTour({ onDone }: Props) {
     if (prev < 0) return
     setStep(prev)
   }
-
-  const s = STEPS[step]
 
   // Spotlight geometry
   const spotX = rect ? rect.x - PAD : 0
@@ -209,13 +279,13 @@ export default function MsmeTour({ onDone }: Props) {
       {rect ? (
         <>
           {/* Top */}
-          <div style={{ position: 'fixed', inset: 0, bottom: `calc(100% - ${spotY}px)`, background: 'rgba(0,0,0,0.72)', zIndex: 10000 }} onClick={next} />
+          <div style={{ position: 'fixed', inset: 0, bottom: `calc(100% - ${spotY}px)`, background: 'rgba(0,0,0,0.72)', zIndex: 10000 }} onClick={backdropAdvance} />
           {/* Bottom */}
-          <div style={{ position: 'fixed', top: spotY + spotH, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.72)', zIndex: 10000 }} onClick={next} />
+          <div style={{ position: 'fixed', top: spotY + spotH, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.72)', zIndex: 10000 }} onClick={backdropAdvance} />
           {/* Left */}
-          <div style={{ position: 'fixed', top: spotY, left: 0, width: spotX, height: spotH, background: 'rgba(0,0,0,0.72)', zIndex: 10000 }} onClick={next} />
+          <div style={{ position: 'fixed', top: spotY, left: 0, width: spotX, height: spotH, background: 'rgba(0,0,0,0.72)', zIndex: 10000 }} onClick={backdropAdvance} />
           {/* Right */}
-          <div style={{ position: 'fixed', top: spotY, left: spotX + spotW, right: 0, height: spotH, background: 'rgba(0,0,0,0.72)', zIndex: 10000 }} onClick={next} />
+          <div style={{ position: 'fixed', top: spotY, left: spotX + spotW, right: 0, height: spotH, background: 'rgba(0,0,0,0.72)', zIndex: 10000 }} onClick={backdropAdvance} />
           {/* Spotlight ring */}
           <div
             style={{
@@ -232,7 +302,7 @@ export default function MsmeTour({ onDone }: Props) {
         </>
       ) : (
         // No element — full dark backdrop
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.72)', zIndex: 10000 }} onClick={next} />
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.72)', zIndex: 10000 }} onClick={backdropAdvance} />
       )}
 
       {/* ── Tooltip ───────────────────────────────────────────────────────────── */}
@@ -259,6 +329,23 @@ export default function MsmeTour({ onDone }: Props) {
           <h3 style={{ margin: '0 0 6px', fontSize: 15, fontWeight: 800, color: DARK }}>{s.title}</h3>
           <p style={{ margin: 0, fontSize: 13, color: MUTED, lineHeight: 1.6 }}>{s.description}</p>
 
+          {/* The instruction, and whether it has been carried out. This is the
+              part that was missing: the tour described the screen but never
+              said what to do, so people finished it none the wiser. */}
+          {s.action && (
+            <div style={{
+              display: 'flex', alignItems: 'flex-start', gap: 8,
+              margin: '12px 0 0', padding: '10px 12px', borderRadius: 8,
+              background: taskDone ? 'rgba(22,163,74,0.08)' : 'rgba(13,148,136,0.08)',
+              border: `1px solid ${taskDone ? 'rgba(22,163,74,0.35)' : 'rgba(13,148,136,0.35)'}`,
+            }}>
+              <span style={{ fontSize: 13, lineHeight: 1.4 }}>{taskDone ? '✅' : '👉'}</span>
+              <span style={{ fontSize: 12.5, fontWeight: 600, lineHeight: 1.5, color: taskDone ? '#15803d' : DARK }}>
+                {taskDone ? 'Done — you can carry on.' : s.action}
+              </span>
+            </div>
+          )}
+
           {s.hint && (
             <p style={{ margin: '8px 0 0', fontSize: 11, color: ACCENT, fontWeight: 600 }}>
               💡 {s.hint}
@@ -280,9 +367,27 @@ export default function MsmeTour({ onDone }: Props) {
                 ← Back
               </button>
             )}
+            {/* An unfinished task offers a way out rather than a dead end —
+                nobody should be trapped in a tour. It is a quiet text link, so
+                doing the task stays the obvious path. */}
+            {isTask && !taskDone && (
+              <button
+                onClick={next}
+                style={{ background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', fontSize: 12, fontWeight: 600, color: MUTED, cursor: 'pointer', textDecoration: 'underline' }}
+              >
+                Skip this step
+              </button>
+            )}
             <button
               onClick={isLast ? onDone : next}
-              style={{ background: ACCENT, border: 'none', borderRadius: 7, padding: '7px 18px', fontSize: 12, fontWeight: 700, color: '#fff', cursor: 'pointer' }}
+              disabled={isTask && !taskDone}
+              title={isTask && !taskDone ? s.action : undefined}
+              style={{
+                background: isTask && !taskDone ? '#cbd5e1' : ACCENT,
+                border: 'none', borderRadius: 7, padding: '7px 18px',
+                fontSize: 12, fontWeight: 700, color: '#fff',
+                cursor: isTask && !taskDone ? 'not-allowed' : 'pointer',
+              }}
             >
               {isLast ? 'Done ✓' : 'Next →'}
             </button>

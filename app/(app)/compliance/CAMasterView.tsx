@@ -38,6 +38,20 @@ interface Props {
   financialYear?: string
 }
 
+/** One "apply this master-task change to already-spawned tasks?" prompt.
+ *  A save can produce several of these, so they are queued rather than shown
+ *  one-at-a-time-and-forgotten. `old_name` is what /api/ca/propagate matches
+ *  spawned task titles against, so it must be the name BEFORE the edit. */
+interface PropagatePrompt {
+  old_name: string
+  fields: {
+    title?:              string
+    priority?:           string
+    attachment_headers?: { old: string[]; new: string[] }
+    due_dates?:          { old: string; new: string }[]
+  }
+}
+
 /* ─── Constants ───────────────────────────────────────────────── */
 
 const FY_OPTIONS = ['2025-26', '2026-27', '2027-28'] as const
@@ -1697,16 +1711,22 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
   const importFileRef = useRef<HTMLInputElement>(null)
 
   // Propagation modal state
-  const [propagateModal, setPropagateModal] = useState<{
-    old_name: string
-    fields: {
-      title?: string
-      priority?: string
-      attachment_headers?: { old: string[]; new: string[] }
-      due_dates?: { old: string; new: string }[]
-    }
-  } | null>(null)
+  const [propagateModal, setPropagateModal] = useState<PropagatePrompt | null>(null)
+  // Remaining rows still to be offered after the one on screen. "Save all" can
+  // change several master tasks at once; previously only the first was ever
+  // shown, so every other row's edits silently failed to reach spawned tasks.
+  const [propagateRest, setPropagateRest] = useState<PropagatePrompt[]>([])
   const [propagating, setPropagating] = useState(false)
+
+  /** Show the next queued propagation prompt, or close the modal when done.
+   *  Called only from click handlers, so reading the queue from this render's
+   *  closure is current — and keeps the two setState calls independent rather
+   *  than nesting one inside the other's updater. */
+  function advancePropagateQueue() {
+    const [next, ...rest] = propagateRest
+    setPropagateModal(next ?? null)
+    setPropagateRest(rest)
+  }
 
   // Attachment templates
   const [attTemplates,       setAttTemplates]       = useState<AttachTemplate[]>(() => loadAttTemplates())
@@ -1950,7 +1970,7 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
 
       // Check if any propagation-relevant fields changed
       if (original) {
-        const propFields: { title?: string; priority?: string; attachment_headers?: { old: string[]; new: string[] }; due_dates?: { old: string; new: string }[] } = {}
+        const propFields: PropagatePrompt['fields'] = {}
         if (patch.name && patch.name !== original.name) propFields.title = patch.name as string
         // Due-date changes: offer to move incomplete spawned tasks to the new date
         if (patch.dates) {
@@ -1969,7 +1989,10 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
           }
         }
         if (Object.keys(propFields).length > 0) {
+          // Single-row save: this is the only prompt, so clear any queue left
+          // behind by an earlier "Save all" the user walked away from.
           setPropagateModal({ old_name: original.name, fields: propFields })
+          setPropagateRest([])
         }
       }
     } catch (err) {
@@ -1987,7 +2010,9 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
     const prevTasks = tasks
 
     // Compute effective patch for every pending id (mirrors handleSaveRow logic)
-    type PropEntry = { old_name: string; fields: NonNullable<typeof propagateModal>['fields'] }
+    // Tagged with the row id so the queue can be narrowed to rows the server
+    // actually saved before anything is offered for propagation.
+    type PropEntry = { id: string; entry: PropagatePrompt }
     const rows: Array<{ id: string; [key: string]: unknown }> = []
     const propagationQueue: PropEntry[] = []
 
@@ -2011,8 +2036,20 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
 
       // Collect propagation-relevant changes
       if (original) {
-        const propFields: NonNullable<typeof propagateModal>['fields'] = {}
+        const propFields: PropagatePrompt['fields'] = {}
         if (patch.name && patch.name !== original.name) propFields.title = patch.name as string
+        // Due-date changes — mirrors handleSaveRow. Their absence here was the
+        // reason a date corrected through "Save all" updated the master calendar
+        // but never moved the tasks already sitting in assignees' lists: the
+        // propagation prompt was only ever built for name, priority and
+        // attachments, so the new deadline had no path to spawned work.
+        if (patch.dates) {
+          const oldDates = (original.dates ?? {}) as Record<string, string>
+          const pairs = Object.entries(patch.dates as Record<string, string>)
+            .filter(([m, v]) => !!v && !!oldDates[m] && oldDates[m] !== v)
+            .map(([m, v]) => ({ old: oldDates[m], new: v }))
+          if (pairs.length) propFields.due_dates = pairs
+        }
         if (patch.priority && patch.priority !== original.priority) propFields.priority = patch.priority as string
         if (patch.attachment_headers) {
           const oldH = original.attachment_headers ?? []
@@ -2022,7 +2059,7 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
           }
         }
         if (Object.keys(propFields).length > 0) {
-          propagationQueue.push({ old_name: original.name, fields: propFields })
+          propagationQueue.push({ id, entry: { old_name: original.name, fields: propFields } })
         }
       }
     }
@@ -2062,9 +2099,18 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
       if (json.saved > 0) toast.success(`${json.saved} task${json.saved !== 1 ? 's' : ''} saved`)
       if (json.failed > 0) toast.error(`${json.failed} task${json.failed !== 1 ? 's' : ''} failed to save`)
 
-      // Show first propagation modal (if any saved row triggered it)
-      if (propagationQueue.length > 0) {
-        setPropagateModal(propagationQueue[0])
+      // Offer propagation for EVERY saved row that changed something spawned
+      // tasks care about — one prompt at a time, the rest queued behind it.
+      // Previously only propagationQueue[0] was shown, so in a multi-row save
+      // every prompt after the first was dropped on the floor. Rows the server
+      // rejected are excluded: propagating a change that did not save would put
+      // the spawned tasks ahead of the master calendar.
+      const savedPropagations = propagationQueue
+        .filter(p => savedSet.has(p.id))
+        .map(p => p.entry)
+      if (savedPropagations.length > 0) {
+        setPropagateModal(savedPropagations[0])
+        setPropagateRest(savedPropagations.slice(1))
       }
     } catch (err) {
       setTasks(prevTasks)
@@ -2110,8 +2156,10 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? 'Propagation failed')
       toast.success(`Updated ${json.updated} pending task${json.updated !== 1 ? 's' : ''}`)
-      setPropagateModal(null)
+      advancePropagateQueue()
     } catch (err) {
+      // Keep this prompt on screen so the failure is visible and retryable —
+      // advancing would hide which master task did not propagate.
       toast.error(err instanceof Error ? err.message : 'Propagation failed')
     } finally {
       setPropagating(false)
@@ -2816,13 +2864,21 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
       {propagateModal && (
         <div style={{ position:'fixed', inset:0, zIndex:1000, background:'rgba(0,0,0,0.35)',
           display:'flex', alignItems:'center', justifyContent:'center' }}
-          onClick={() => !propagating && setPropagateModal(null)}>
+          onClick={() => !propagating && advancePropagateQueue()}>
           <div onClick={e => e.stopPropagation()} style={{ background:'var(--surface)', borderRadius:14,
             padding:28, minWidth:380, maxWidth:460, boxShadow:'0 8px 40px rgba(0,0,0,0.18)',
             border:'1px solid var(--border)' }}>
             <div style={{ fontSize:16, fontWeight:700, color:'var(--text-primary)', marginBottom:6 }}>
               Apply changes to pending tasks?
             </div>
+            {/* Make the queue visible — a "Save all" over several master tasks
+                asks once per task, and without this the extra prompts look like
+                the dialog failing to close. */}
+            {propagateRest.length > 0 && (
+              <div style={{ fontSize:12, fontWeight:600, color:'var(--brand)', marginBottom:8 }}>
+                {propagateRest.length} more task{propagateRest.length !== 1 ? 's' : ''} to review after this one
+              </div>
+            )}
             <p style={{ fontSize:13, color:'var(--text-muted)', margin:'0 0 16px' }}>
               Update all incomplete tasks spawned from <strong>"{propagateModal.old_name}"</strong> across all clients:
             </p>
@@ -2865,7 +2921,7 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
               )}
             </div>
             <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
-              <button onClick={() => setPropagateModal(null)} disabled={propagating}
+              <button onClick={advancePropagateQueue} disabled={propagating}
                 style={{ padding:'8px 18px', borderRadius:8, border:'1px solid var(--border)',
                   background:'var(--surface)', color:'var(--text-secondary)', fontSize:13,
                   cursor:propagating ? 'not-allowed' : 'pointer', fontFamily:'inherit' }}>

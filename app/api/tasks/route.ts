@@ -56,8 +56,17 @@ export async function GET(request: NextRequest) {
 
   const { data, error } = await q
   if (error) return NextResponse.json(dbError(error, 'tasks'), { status: 500 })
+  // NEVER cache this. Client components fetch it with the default cache mode, so
+  // `max-age=60, stale-while-revalidate=300` let the BROWSER answer from its own
+  // store for a minute and then keep serving the stale copy for five more while
+  // it revalidated behind the scenes. A teammate completing a task stayed
+  // invisible to everyone else for up to six minutes, and reloading did not help
+  // — a page reload does not bypass the HTTP cache for fetches JavaScript makes
+  // after load, so "I refreshed and it still says To do" was the expected result,
+  // not a fluke. Task status is the one thing this product must never be wrong
+  // about; the saved round-trip is not worth it.
   return NextResponse.json({ data }, {
-    headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=300' },
+    headers: { 'Cache-Control': 'private, no-store' },
   })
 }
 

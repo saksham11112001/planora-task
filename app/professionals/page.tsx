@@ -3,6 +3,17 @@ import { redirect }                   from 'next/navigation'
 import Link                           from 'next/link'
 import { headers }                    from 'next/headers'
 import { getCountry, isValidCountry } from '@/lib/locale/countries'
+import type { Metadata }              from 'next'
+
+// This is a public, indexable marketing page and was inheriting the root
+// title/description verbatim — duplicate titles across pages are the single
+// most common on-page SEO fault, and search results showed the home-page copy
+// for it. The root layout's template appends " | upFloat".
+export const metadata: Metadata = {
+  title:       'For accounting professionals',
+  description: 'upFloat gives CA, CPA and accounting practices one place for statutory compliance calendars, recurring work, approvals, team workload and client document collection.',
+  alternates:  { canonical: 'https://upfloat.co/professionals' },
+}
 
 export default async function ProfessionalsPage() {
   try {

@@ -37,7 +37,7 @@ export const caComplianceSpawn = inngest.createFunction(
       const { data, error } = await admin
         .from('ca_client_assignments')
         .select(`
-          id, org_id, client_id, assignee_id, approver_id, created_at, start_date,
+          id, org_id, client_id, assignee_id, approver_id, created_at, start_date, end_date,
           master_task:ca_master_tasks(
             id, name, priority, dates, days_before_due
           )
@@ -83,11 +83,22 @@ export const caComplianceSpawn = inngest.createFunction(
       const startDateStr: string = (asgn as any).start_date
         ?? (asgn.created_at as string ?? '').split('T')[0]
 
+      // Upper bound, set in Step 2 when a firm is winding a client down. NULL
+      // means open-ended, which is every existing assignment, so this changes
+      // nothing until someone actually sets a date. Inclusive, mirroring
+      // start_date: end_date = 2026-07-31 keeps the obligation due that day and
+      // stops everything after it — which is the whole point, since the next
+      // financial year's dates would otherwise start spawning as usual.
+      const endDateStr: string | null = (asgn as any).end_date ?? null
+
       for (const [monthKey, dueDateStr] of Object.entries(dates)) {
         if (!dueDateStr) continue
 
         // Skip dates before the client's configured start date
         if (dueDateStr < startDateStr) continue
+
+        // Skip dates after the client's configured end date
+        if (endDateStr && dueDateStr > endDateStr) continue
 
         // Compute trigger date (timezone-safe: no UTC round-trip)
         const triggerStr = shiftDays(dueDateStr, -daysBeforeDue)

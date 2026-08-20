@@ -526,7 +526,7 @@ export function CAClientSetupView({ userRole, financialYear = '2026-27' }: Props
     setSaving(true)
     try {
       /* Determine which tasks to add and which assignments to remove */
-      const toAdd: { master_task_id: string; client_id: string; assignee_id: string | null; approver_id: string | null; start_date: string | null }[] = []
+      const toAdd: { master_task_id: string; client_id: string; assignee_id: string | null; approver_id: string | null; start_date: string | null; end_date: string | null }[] = []
       const toRemove: string[] = []
 
       /* Existing assignment ids keyed by master_task_id */
@@ -549,13 +549,21 @@ export function CAClientSetupView({ userRole, financialYear = '2026-27' }: Props
               assignee_id: sel.assignee_id || null,
               approver_id: sel.approver_id || null,
               start_date:  sel.start_date  || null,
+              end_date:    sel.end_date    || null,
             })
           } else {
             /* Update if changed — delete + re-add */
             const assigneeChanged = (sel.assignee_id || null) !== existing.assignee_id
             const approverChanged = (sel.approver_id || null) !== existing.approver_id
             const startDateChanged = (sel.start_date || null) !== ((existing as any).start_date ?? null)
-            const changed = assigneeChanged || approverChanged || startDateChanged
+            /* End date was absent from BOTH this comparison and the payload
+               below. Editing only the end date therefore produced no request at
+               all, while the handler still reported "Assignments saved" — the
+               exact "saves but doesn't save" report from firms winding a client
+               down. It has to be here, or the change is dropped before it ever
+               reaches the server. */
+            const endDateChanged = (sel.end_date || null) !== ((existing as any).end_date ?? null)
+            const changed = assigneeChanged || approverChanged || startDateChanged || endDateChanged
             if (changed) {
               toRemove.push(existing.id)
               toAdd.push({
@@ -564,8 +572,9 @@ export function CAClientSetupView({ userRole, financialYear = '2026-27' }: Props
                 assignee_id: sel.assignee_id || null,
                 approver_id: sel.approver_id || null,
                 start_date:  sel.start_date  || null,
+                end_date:    sel.end_date    || null,
               })
-              /* Only propagate assignee/approver changes, not start_date */
+              /* Only propagate assignee/approver changes, not the date bounds */
               if (assigneeChanged || approverChanged) {
                 propagatableChanges.push({
                   masterTaskName: task.name,
@@ -601,7 +610,15 @@ export function CAClientSetupView({ userRole, financialYear = '2026-27' }: Props
         if (!res.ok) throw new Error('Failed to save assignments')
       }
 
-      toast.success('Assignments saved')
+      /* Say what actually happened. This reported success unconditionally, so
+         when a field was silently dropped before the payload was built the user
+         got a green "saved" for a request that was never sent. Distinguishing
+         the two makes the next dropped field visible instead of invisible. */
+      if (toAdd.length === 0 && toRemove.length === 0) {
+        toast.info('No changes to save')
+      } else {
+        toast.success('Assignments saved')
+      }
 
       /* Reload to get fresh data + update assignment counts */
       await loadAssignments(selectedClient.id)
