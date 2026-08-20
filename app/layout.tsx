@@ -13,7 +13,13 @@ import { SentryInit }            from '@/components/analytics/SentryInit'
 
 export const metadata: Metadata = {
   title:       { default: 'upFloat — Task & Practice Management for CA Firms', template: '%s | upFloat' },
-  description: 'upFloat is the all-in-one task manager and practice management software built for Indian CA firms, CPAs, and MSMEs. Track compliance, manage teams, automate recurring tasks, and collaborate with clients — all in one place.',
+  // Positioning is deliberately market-plural: the compliance engine already
+  // ships statutory catalogues for India, the US, the UK, Canada, Australia
+  // and the EU, and the app picks currency, timezone and fiscal year from the
+  // org's country. Describing it as Indian-only under-sold what is already
+  // built. India stays named first — it is the launch market and where the
+  // existing search ranking sits — but no longer as the only one.
+  description: 'upFloat is all-in-one practice management for accounting firms — CAs in India, CPAs in the US, and ACCA/CPA practices across the UK, Canada, Australia and the EU. Statutory compliance calendars, recurring work, approvals, team workload and client document collection in one place.',
   keywords: [
     'task manager for CA firms', 'CA practice management software', 'MSME tracker', 'compliance task management',
     'project management India', 'CA office management', 'chartered accountant software', 'CPA practice management',
@@ -32,16 +38,16 @@ export const metadata: Metadata = {
     type:        'website',
     url:         'https://upfloat.co',
     siteName:    'upFloat',
-    title:       'upFloat — Task & Practice Management for CA Firms',
-    description: 'All-in-one task manager and practice management software for Indian CA firms, CPAs, and MSMEs. Track compliance, manage teams, automate recurring tasks.',
+    title:       'upFloat — Practice Management for CA & CPA Firms',
+    description: 'All-in-one practice management for accounting firms — CAs, CPAs and ACCA practices across India, the US, the UK, Canada, Australia and the EU. Compliance calendars, recurring work, approvals and client portals.',
     // og:image / twitter:image are supplied by app/opengraph-image.tsx, which
     // renders a real PNG. They used to point at /og-image.svg — no major social
     // platform renders SVG share cards, so every shared link previewed blank.
   },
   twitter: {
     card:        'summary_large_image',
-    title:       'upFloat — Task & Practice Management for CA Firms',
-    description: 'All-in-one task manager and practice management software for Indian CA firms, CPAs, and MSMEs.',
+    title:       'upFloat — Practice Management for CA & CPA Firms',
+    description: 'All-in-one practice management for accounting firms — CAs, CPAs and ACCA practices across India, the US, the UK, Canada, Australia and the EU.',
     creator:     '@upfloatco',
   },
   icons: {

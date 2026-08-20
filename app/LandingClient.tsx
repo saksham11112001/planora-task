@@ -1239,7 +1239,7 @@ export function LandingClient(props: Props) {
             </h1>
 
             <p style={{ fontSize: 'clamp(1rem, 2vw, 1.18rem)', color: '#94a3b8', margin: '24px 0 32px', lineHeight: 1.6, maxWidth: 520 }}>
-              Streamline compliance, automate recurring filings, and collaborate with your team and clients — purpose-built for modern Indian practices.
+              Streamline compliance, automate recurring filings, and collaborate with your team and clients — built for CA and CPA practices in India, the US, the UK, Canada, Australia and the EU.
             </p>
 
             <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
