@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json()
   // array of { master_task_id, client_id, assignee_id, approver_id, start_date, end_date }
-  const { assignments } = body
+  const { assignments, skip_existing } = body
   if (!Array.isArray(assignments) || assignments.length === 0)
     return NextResponse.json({ error: 'assignments array required' }, { status: 400 })
 
@@ -76,6 +76,46 @@ export async function POST(req: NextRequest) {
     created_by: user.id,
     is_active: true,
   }))
+
+  // ── Additive mode, used by "assign to several clients at once" ────────────
+  // The default path below OVERWRITES a matching row, which is right when one
+  // client's whole task list is being saved from Step 2 — the form holds the
+  // full intended state for that client.
+  //
+  // It is wrong for a bulk assign. "Give these 40 clients the ITR task" says
+  // nothing about the clients who already have it, and overwriting would blank
+  // the assignee and approver already set on them. ON CONFLICT DO NOTHING keeps
+  // those rows exactly as they are and inserts only what is genuinely new.
+  if (skip_existing) {
+    const { data: inserted, error: insErr } = await admin.from('ca_client_assignments')
+      .upsert(rows, { onConflict: 'master_task_id,client_id', ignoreDuplicates: true })
+      .select('id, client_id, master_task_id')
+    if (insErr) return NextResponse.json(dbError(insErr, 'ca/assignments'), { status: 500 })
+
+    // A previously removed assignment is a conflict too, so DO NOTHING would
+    // leave it switched off and the task would silently not apply. Reactivate
+    // any inactive row in the exact set the caller asked for — that set is the
+    // clients × tasks they just chose, so this can never touch anything else.
+    const clientIds = [...new Set(rows.map(r => r.client_id))]
+    const taskIds   = [...new Set(rows.map(r => r.master_task_id))]
+    const { data: revived, error: revErr } = await admin.from('ca_client_assignments')
+      .update({ is_active: true })
+      .eq('org_id', mb.org_id)
+      .in('client_id', clientIds)
+      .in('master_task_id', taskIds)
+      .eq('is_active', false)
+      .select('id')
+    if (revErr) console.error('[ca/assignments] reactivate failed:', revErr.message)
+
+    const created  = inserted?.length ?? 0
+    const restored = revived?.length ?? 0
+    return NextResponse.json({
+      data:    inserted ?? [],
+      created,
+      restored,
+      skipped: rows.length - created - restored,
+    }, { status: 201 })
+  }
 
   const { data, error } = await admin.from('ca_client_assignments')
     .upsert(rows, { onConflict: 'master_task_id,client_id', ignoreDuplicates: false })
