@@ -48,6 +48,15 @@ const PRESET_COLORS = [
   '#8b5cf6','#ec4899','#14b8a6','#f97316','#64748b',
 ]
 
+/* Inputs and selects in the bulk-assign modal. CSS vars rather than literals so
+   the modal follows dark mode like the rest of the module. */
+const bulkFieldStyle: React.CSSProperties = {
+  width: '100%', padding: '6px 8px', borderRadius: 7,
+  border: '1px solid var(--border)', background: 'var(--surface-subtle)',
+  color: 'var(--text-primary)', fontSize: 12, fontFamily: 'inherit',
+  outline: 'none', colorScheme: 'light dark',
+}
+
 interface AddClientModalProps {
   onClose: () => void
   onCreated: (client: Client) => void
@@ -358,6 +367,92 @@ export function CAClientSetupView({ userRole, financialYear = '2026-27' }: Props
 
   /* Assignment count per client */
   const [assignmentCounts, setAssignmentCounts] = useState<Record<string, number>>({})
+
+  /* ── Bulk assign: one task (or several) across many clients at once ──────
+     The panel on the right answers "what does THIS client file?". This answers
+     the other direction — "who files ITR?" — which is how firms actually roll
+     a new obligation out at the start of a year. */
+  const [checkedClients, setCheckedClients] = useState<Set<string>>(new Set())
+  const [showBulkAssign, setShowBulkAssign] = useState(false)
+  const [bulkTaskIds,    setBulkTaskIds]    = useState<Set<string>>(new Set())
+  const [bulkTaskSearch, setBulkTaskSearch] = useState('')
+  const [bulkAssigning,  setBulkAssigning]  = useState(false)
+  /* Defaults applied to every row created by the bulk assign. Left blank they
+     stay unset, which is the safe reading of "just give them the task". */
+  const [bulkAsgAssignee,  setBulkAsgAssignee]  = useState('')
+  const [bulkAsgApprover,  setBulkAsgApprover]  = useState('')
+  const [bulkAsgStartDate, setBulkAsgStartDate] = useState('')
+  const [bulkAsgEndDate,   setBulkAsgEndDate]   = useState('')
+
+  function toggleClientChecked(clientId: string) {
+    setCheckedClients(prev => {
+      const next = new Set(prev)
+      if (next.has(clientId)) next.delete(clientId); else next.add(clientId)
+      return next
+    })
+  }
+
+  /** Recompute every client's badge from the server. Called after a bulk assign
+   *  so the counts reflect what actually landed rather than what we hoped for. */
+  const refreshAssignmentCounts = useCallback(async () => {
+    try {
+      const res = await fetch('/api/ca/assignments')
+      if (!res.ok) return
+      const json = await res.json()
+      const rows: { client_id: string }[] = Array.isArray(json) ? json : (json.data ?? [])
+      const counts: Record<string, number> = {}
+      rows.forEach(r => { counts[r.client_id] = (counts[r.client_id] ?? 0) + 1 })
+      setAssignmentCounts(counts)
+    } catch { /* badges are cosmetic — never block the save on them */ }
+  }, [])
+
+  async function handleBulkAssign() {
+    if (checkedClients.size === 0 || bulkTaskIds.size === 0) return
+    setBulkAssigning(true)
+    try {
+      const rows = [...checkedClients].flatMap(clientId =>
+        [...bulkTaskIds].map(master_task_id => ({
+          master_task_id,
+          client_id:   clientId,
+          assignee_id: bulkAsgAssignee  || null,
+          approver_id: bulkAsgApprover  || null,
+          start_date:  bulkAsgStartDate || null,
+          end_date:    bulkAsgEndDate   || null,
+        })),
+      )
+      const res = await fetch('/api/ca/assignments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        /* Additive: clients who already have the task keep the assignee and
+           approver they were given. Without this the upsert would blank them. */
+        body: JSON.stringify({ assignments: rows, skip_existing: true }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error ?? 'Bulk assign failed')
+
+      const created  = json.created  ?? 0
+      const restored = json.restored ?? 0
+      const skipped  = json.skipped  ?? 0
+      const parts = [`${created + restored} assignment${created + restored === 1 ? '' : 's'} created`]
+      if (skipped > 0) parts.push(`${skipped} already had it`)
+      toast.success(parts.join(' · '))
+
+      await refreshAssignmentCounts()
+      /* If the open client was part of the batch, reload its panel so the new
+         rows are ticked rather than sitting there looking unchanged. */
+      if (selectedClient && checkedClients.has(selectedClient.id)) {
+        await loadAssignments(selectedClient.id)
+      }
+      setShowBulkAssign(false)
+      setBulkTaskIds(new Set())
+      setCheckedClients(new Set())
+      setBulkAsgAssignee(''); setBulkAsgApprover(''); setBulkAsgStartDate(''); setBulkAsgEndDate('')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Bulk assign failed')
+    } finally {
+      setBulkAssigning(false)
+    }
+  }
 
   /* Per-client service date range */
   const [clientDates, setClientDates] = useState<Record<string, { start_date: string; end_date: string }>>({})
@@ -704,7 +799,62 @@ export function CAClientSetupView({ userRole, financialYear = '2026-27' }: Props
               </button>
             )}
           </div>
+
+          {/* Bulk selection controls. "Select all" follows the search box, so
+              searching "Pvt Ltd" and ticking all is the fast path to assigning
+              one obligation across a whole segment. */}
+          {canEdit && filteredClients.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+              <button
+                onClick={() => {
+                  const visibleIds = filteredClients.map(c => c.id)
+                  const allChecked = visibleIds.every(id => checkedClients.has(id))
+                  setCheckedClients(prev => {
+                    const next = new Set(prev)
+                    // Only ever touches the clients currently visible, so a
+                    // selection made under one search survives the next one.
+                    visibleIds.forEach(id => { allChecked ? next.delete(id) : next.add(id) })
+                    return next
+                  })
+                }}
+                style={{ background: 'none', border: 'none', padding: 0, fontSize: 11, fontWeight: 600, color: 'var(--brand)', cursor: 'pointer' }}
+              >
+                {filteredClients.every(c => checkedClients.has(c.id)) ? 'Clear all' : 'Select all'}
+                {clientSearch ? ' shown' : ''}
+              </button>
+              {checkedClients.size > 0 && (
+                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                  {checkedClients.size} selected
+                </span>
+              )}
+            </div>
+          )}
         </div>
+
+        {/* Bulk assign bar — only once something is actually selected */}
+        {canEdit && checkedClients.size > 0 && (
+          <div style={{
+            padding: '10px 12px', borderBottom: '1px solid var(--border)',
+            background: 'rgba(13,148,136,0.08)', flexShrink: 0,
+            display: 'flex', flexDirection: 'column', gap: 6,
+          }}>
+            <button
+              onClick={() => setShowBulkAssign(true)}
+              style={{
+                width: '100%', padding: '7px 10px', borderRadius: 7, border: 'none',
+                background: 'var(--brand)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+              }}
+            >
+              Assign tasks to {checkedClients.size} client{checkedClients.size === 1 ? '' : 's'}
+            </button>
+            <button
+              onClick={() => setCheckedClients(new Set())}
+              style={{ background: 'none', border: 'none', padding: 0, fontSize: 11, color: 'var(--text-muted)', cursor: 'pointer' }}
+            >
+              Clear selection
+            </button>
+          </div>
+        )}
 
         {/* Client rows */}
         <div style={{ flex: 1, overflowY: 'auto' }}>
@@ -716,37 +866,56 @@ export function CAClientSetupView({ userRole, financialYear = '2026-27' }: Props
           {filteredClients.map(client => {
             const isSelected = selectedClient?.id === client.id
             const count = assignmentCounts[client.id] ?? 0
+            /* Row is a div, not a button, so the tick box can sit beside the
+               name without nesting one control inside another. The name area
+               is still its own button and still opens the client. */
             return (
-              <button
+              <div
                 key={client.id}
-                onClick={() => handleSelectClient(client)}
                 style={{
-                  width: '100%', display: 'flex', alignItems: 'center', gap: 10,
-                  padding: '10px 14px', border: 'none', textAlign: 'left',
+                  width: '100%', display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '0 14px 0 8px',
                   background: isSelected ? 'var(--surface-alt)' : 'transparent',
                   borderLeft: isSelected ? '3px solid var(--brand)' : '3px solid transparent',
-                  cursor: 'pointer',
                 }}
               >
-                <div style={{
-                  width: 10, height: 10, borderRadius: '50%',
-                  background: client.color, flexShrink: 0,
-                }} />
-                <span style={{
-                  flex: 1, fontSize: 13, fontWeight: isSelected ? 600 : 400,
-                  color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                }}>
-                  {client.name}
-                </span>
-                {count > 0 && (
-                  <span style={{
-                    fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 99,
-                    background: 'var(--brand)', color: '#fff', flexShrink: 0,
-                  }}>
-                    {count}
-                  </span>
+                {canEdit && (
+                  <input
+                    type="checkbox"
+                    checked={checkedClients.has(client.id)}
+                    onChange={() => toggleClientChecked(client.id)}
+                    aria-label={`Select ${client.name} for bulk assignment`}
+                    style={{ width: 14, height: 14, accentColor: 'var(--brand)', cursor: 'pointer', flexShrink: 0 }}
+                  />
                 )}
-              </button>
+                <button
+                  onClick={() => handleSelectClient(client)}
+                  style={{
+                    flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '10px 0', border: 'none', textAlign: 'left',
+                    background: 'transparent', cursor: 'pointer',
+                  }}
+                >
+                  <div style={{
+                    width: 10, height: 10, borderRadius: '50%',
+                    background: client.color, flexShrink: 0,
+                  }} />
+                  <span style={{
+                    flex: 1, fontSize: 13, fontWeight: isSelected ? 600 : 400,
+                    color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>
+                    {client.name}
+                  </span>
+                  {count > 0 && (
+                    <span style={{
+                      fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 99,
+                      background: 'var(--brand)', color: '#fff', flexShrink: 0,
+                    }}>
+                      {count}
+                    </span>
+                  )}
+                </button>
+              </div>
             )
           })}
         </div>
@@ -896,6 +1065,141 @@ export function CAClientSetupView({ userRole, financialYear = '2026-27' }: Props
           onClose={() => setShowAddModal(false)}
           onCreated={handleClientCreated}
         />
+      )}
+
+      {/* ── Bulk assign modal: pick the tasks, apply to every ticked client ── */}
+      {showBulkAssign && (
+        <div
+          onMouseDown={() => !bulkAssigning && setShowBulkAssign(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.35)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+          }}
+        >
+          <div
+            onMouseDown={e => e.stopPropagation()}
+            style={{
+              background: 'var(--surface)', borderRadius: 14, border: '1px solid var(--border)',
+              boxShadow: '0 8px 40px rgba(0,0,0,0.18)', width: 520, maxWidth: '100%',
+              maxHeight: '85vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
+            }}
+          >
+            <div style={{ padding: '20px 22px 12px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>
+                Assign tasks to {checkedClients.size} client{checkedClients.size === 1 ? '' : 's'}
+              </div>
+              <p style={{ margin: '6px 0 0', fontSize: 12.5, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                Pick the compliance tasks every selected client should file. Clients who
+                already have a task keep their existing assignee and dates — nothing is
+                overwritten.
+              </p>
+            </div>
+
+            {/* Task picker */}
+            <div style={{ padding: '12px 22px 0', flexShrink: 0 }}>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                background: 'var(--surface-subtle)', border: '1px solid var(--border)',
+                borderRadius: 8, padding: '6px 10px',
+              }}>
+                <Search style={{ width: 13, height: 13, color: 'var(--text-muted)', flexShrink: 0 }} />
+                <input
+                  value={bulkTaskSearch}
+                  onChange={e => setBulkTaskSearch(e.target.value)}
+                  placeholder="Search tasks — e.g. ITR, GSTR, TDS…"
+                  style={{ flex: 1, border: 'none', background: 'none', outline: 'none', fontSize: 12, color: 'var(--text-primary)' }}
+                />
+              </div>
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', padding: '10px 22px' }}>
+              {(() => {
+                const q = bulkTaskSearch.trim().toLowerCase()
+                const shown = masterTasks.filter(t =>
+                  !q || t.name.toLowerCase().includes(q) || (t.group_name ?? '').toLowerCase().includes(q))
+                if (shown.length === 0) {
+                  return <div style={{ padding: 16, textAlign: 'center', fontSize: 12.5, color: 'var(--text-muted)' }}>No matching tasks</div>
+                }
+                return shown.map(t => (
+                  <label
+                    key={t.id}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 9, padding: '7px 4px',
+                      cursor: 'pointer', borderBottom: '1px solid var(--border)',
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={bulkTaskIds.has(t.id)}
+                      onChange={() => setBulkTaskIds(prev => {
+                        const next = new Set(prev)
+                        if (next.has(t.id)) next.delete(t.id); else next.add(t.id)
+                        return next
+                      })}
+                      style={{ width: 14, height: 14, accentColor: 'var(--brand)', cursor: 'pointer', flexShrink: 0 }}
+                    />
+                    <span style={{ flex: 1, fontSize: 12.5, color: 'var(--text-primary)' }}>{t.name}</span>
+                    <span style={{ fontSize: 10.5, color: 'var(--text-muted)', flexShrink: 0 }}>{t.group_name}</span>
+                  </label>
+                ))
+              })()}
+            </div>
+
+            {/* Optional defaults */}
+            <div style={{ padding: '12px 22px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Apply to new assignments (optional)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <select value={bulkAsgAssignee} onChange={e => setBulkAsgAssignee(e.target.value)} style={bulkFieldStyle}>
+                  <option value="">Assignee — unassigned</option>
+                  {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+                <select value={bulkAsgApprover} onChange={e => setBulkAsgApprover(e.target.value)} style={bulkFieldStyle}>
+                  <option value="">Approver — any manager</option>
+                  {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <span style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>Start date</span>
+                  <input type="date" value={bulkAsgStartDate} onChange={e => setBulkAsgStartDate(e.target.value)} style={bulkFieldStyle} />
+                </label>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <span style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>End date</span>
+                  <input type="date" value={bulkAsgEndDate} onChange={e => setBulkAsgEndDate(e.target.value)} style={bulkFieldStyle} />
+                </label>
+              </div>
+            </div>
+
+            <div style={{ padding: '12px 22px 18px', display: 'flex', gap: 10, justifyContent: 'flex-end', flexShrink: 0 }}>
+              <button
+                onClick={() => setShowBulkAssign(false)}
+                disabled={bulkAssigning}
+                style={{
+                  padding: '8px 18px', borderRadius: 8, border: '1px solid var(--border)',
+                  background: 'var(--surface)', color: 'var(--text-secondary)', fontSize: 13,
+                  cursor: bulkAssigning ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBulkAssign}
+                disabled={bulkAssigning || bulkTaskIds.size === 0}
+                style={{
+                  padding: '8px 20px', borderRadius: 8, border: 'none',
+                  background: bulkTaskIds.size === 0 ? '#cbd5e1' : 'var(--brand)',
+                  color: '#fff', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+                  cursor: bulkAssigning || bulkTaskIds.size === 0 ? 'not-allowed' : 'pointer',
+                  opacity: bulkAssigning ? 0.7 : 1,
+                }}
+              >
+                {bulkAssigning
+                  ? 'Assigning…'
+                  : `Assign ${bulkTaskIds.size || ''} task${bulkTaskIds.size === 1 ? '' : 's'}`.replace('  ', ' ')}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Propagation modal */}
