@@ -83,7 +83,7 @@ const STEPS: Step[] = [
     selector:    '[data-tour="msme-upgrade-btn"]',
     title:       'When you need more than 5',
     description: 'The free tier covers 5 vendors. A slot is used when a vendor is first emailed — not when you add them — so you can load your full list now and decide later.',
-    hint:        'One-time payment, no subscription.',
+    hint:        'Packs run for 12 months from the day you buy.',
     prefer:      'bottom',
   },
 ]

@@ -6,7 +6,7 @@ import { createClient }             from '@/lib/supabase/server'
 import { getAuthUser } from '@/lib/supabase/authUser'
 import { createAdminClient }        from '@/lib/supabase/admin'
 import { getApiOrgMembership }      from '@/lib/supabase/apiActiveOrg'
-import { MSME_PACKS, getPackByTier, MSME_ADDON_PACKS } from '@/lib/msme/packs'
+import { MSME_PACKS, getPackByTier, MSME_ADDON_PACKS, packExpiryFrom } from '@/lib/msme/packs'
 import { sendInvoiceEmail }         from '@/lib/email/send'
 import crypto                       from 'crypto'
 
@@ -41,18 +41,26 @@ export async function POST(req: NextRequest) {
   const admin   = createAdminClient()
 
   // Resolve coupon discount from DB (validates server-side)
-  let discountPct = 0
+  let discountPct   = 0
+  let couponMonths  = 12   // term granted by a 100% coupon; 12 unless the coupon says otherwise
   if (coupon_code) {
     const { data: couponRow } = await admin
       .from('coupons')
-      .select('id, discount_type, discount_percent, max_uses, uses_count, expires_at, is_active, one_time_use')
+      .select('id, discount_type, discount_percent, max_uses, uses_count, expires_at, is_active, one_time_use, plan_tier, duration_months')
       .eq('code', coupon_code.trim().toUpperCase())
       .eq('is_active', true)
       .maybeSingle()
+    // plan_tier scopes a coupon to ONE pack. It was selected but never checked,
+    // so a 100%-off code minted for the cheapest pack would have taken ₹29,999
+    // off the Business pack just as happily. Any coupon carrying a plan_tier
+    // now applies only to that exact tier — and never to an add-on order, which
+    // has no pack_tier to match.
+    const tierOk = !couponRow?.plan_tier || couponRow.plan_tier === pack_tier
     if (
       couponRow &&
       couponRow.discount_type === 'percent' &&
       couponRow.discount_percent &&
+      tierOk &&
       !(couponRow.expires_at && new Date(couponRow.expires_at) < new Date()) &&
       !(couponRow.max_uses != null && (couponRow.uses_count ?? 0) >= couponRow.max_uses)
     ) {
@@ -62,7 +70,10 @@ export async function POST(req: NextRequest) {
         const { data: ex } = await admin.from('coupon_redemptions').select('id').eq('coupon_id', couponRow.id).eq('org_id', orgId).maybeSingle()
         alreadyUsed = !!ex
       }
-      if (!alreadyUsed) discountPct = couponRow.discount_percent
+      if (!alreadyUsed) {
+        discountPct  = couponRow.discount_percent
+        couponMonths = couponRow.duration_months ?? 12
+      }
     }
   }
 
@@ -137,7 +148,8 @@ export async function POST(req: NextRequest) {
     const paidAt = new Date().toISOString()
     await admin.from('org_feature_settings').upsert(
       { org_id: orgId, feature_key: 'msme_pack', is_enabled: true,
-        config: { tier: pack_tier, vendor_limit: vendorLimit, paid_at: paidAt } },
+        // Coupon grants run for the coupon's own duration_months (12 for BNI).
+        config: { tier: pack_tier, vendor_limit: vendorLimit, paid_at: paidAt, expires_at: packExpiryFrom(paidAt, couponMonths) } },
       { onConflict: 'org_id,feature_key' }
     )
     await admin.from('msme_pack_payments').insert({
@@ -329,7 +341,8 @@ export async function PUT(req: NextRequest) {
       org_id:      mb.org_id,
       feature_key: 'msme_pack',
       is_enabled:  true,
-      config:      { tier: pack_tier, vendor_limit: pack.vendor_limit, paid_at: paidAt },
+      // Packs are annual — stamp the term so entitlement is never open-ended.
+      config:      { tier: pack_tier, vendor_limit: pack.vendor_limit, paid_at: paidAt, expires_at: packExpiryFrom(paidAt) },
     },
     { onConflict: 'org_id,feature_key' }
   )

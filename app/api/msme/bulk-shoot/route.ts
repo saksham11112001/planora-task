@@ -8,6 +8,7 @@ import { createAdminClient }        from '@/lib/supabase/admin'
 import { getApiOrgMembership }      from '@/lib/supabase/apiActiveOrg'
 import { sendMsmeVendorEmail }      from '@/lib/email/send'
 import { DEFAULT_EMAIL_SCHEDULE }   from '@/lib/msme/emailSchedule'
+import { resolvePackEntitlement }   from '@/lib/msme/packs'
 import crypto                       from 'crypto'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://upfloat.co'
@@ -54,7 +55,12 @@ export async function POST(req: NextRequest) {
 
   const intervalDays: number[] = (scheduleRow?.config?.days as number[] | undefined) ?? DEFAULT_EMAIL_SCHEDULE
   const maxEmails               = intervalDays.length + 1
-  const vendorLimit: number     = ((packRow?.config as any)?.vendor_limit ?? 5) + ((addonRow?.config as any)?.extra_slots ?? 0)
+  // Annual term: an expired pack drops back to the free allowance, so the
+  // slot gate has to ask the shared resolver rather than read the raw limit.
+  const vendorLimit: number     = resolvePackEntitlement(
+    packRow?.config as any,
+    (addonRow?.config as any)?.extra_slots ?? 0,
+  ).vendorLimit
   const slotsUsed               = emailedEver ?? 0
   const slotsRemaining          = Math.max(0, vendorLimit - slotsUsed)
   const cc                      = (ccRow?.config as { email?: string } | null)?.email || undefined

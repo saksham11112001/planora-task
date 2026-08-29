@@ -4,6 +4,7 @@ import { getAuthUser } from '@/lib/supabase/authUser'
 import { createAdminClient }        from '@/lib/supabase/admin'
 import { getApiOrgMembership }      from '@/lib/supabase/apiActiveOrg'
 import { DEFAULT_EMAIL_SCHEDULE }   from '@/lib/msme/emailSchedule'
+import { resolvePackEntitlement }   from '@/lib/msme/packs'
 
 export async function GET(req: NextRequest) {
   const supabase = await createClient()
@@ -33,7 +34,11 @@ export async function GET(req: NextRequest) {
     .eq('feature_key', 'msme_pack')
     .maybeSingle()
 
-  const pack = (packRow?.config as { tier: string; vendor_limit: number } | null) ?? { tier: 'free', vendor_limit: 5 }
+  // Reported through the shared resolver so settings shows the tier the org can
+  // actually use today. Reading config.tier raw would keep announcing
+  // "Professional" after the annual term lapsed.
+  const ent  = resolvePackEntitlement(packRow?.config as any)
+  const pack = { tier: ent.tier, vendor_limit: ent.vendorLimit, expires_at: ent.expiresAt, expired: ent.isExpired }
 
   const [{ data: ccRow }, { data: contactRow }] = await Promise.all([
     admin.from('org_feature_settings').select('config').eq('org_id', mb.org_id).eq('feature_key', 'msme_cc_email').maybeSingle(),
