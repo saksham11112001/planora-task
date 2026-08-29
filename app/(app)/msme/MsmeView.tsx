@@ -141,6 +141,11 @@ export function MsmeView({ userRole, orgName }: Props) {
   // ── Coupon code ────────────────────────────────────────────────────────────
   const [couponCode,      setCouponCode]      = useState('')
   const [couponDiscount,  setCouponDiscount]  = useState(0)
+  /* Pack this coupon is restricted to, or null when it applies to any pack.
+     Without it the price preview struck out EVERY plan — BNI is a Starter-only
+     code, so all five cards showed ₹0 and the buyer would have been charged
+     full price on anything but Starter. */
+  const [couponTier,      setCouponTier]      = useState<string | null>(null)
   const [couponError,     setCouponError]     = useState('')
   const [couponBusy,      setCouponBusy]      = useState(false)
 
@@ -269,8 +274,10 @@ export function MsmeView({ userRole, orgName }: Props) {
     try {
       const res = await fetch(`/api/msme/coupon?code=${encodeURIComponent(couponCode.trim())}`)
       const data = await res.json()
-      if (!res.ok) { setCouponError(data.error ?? 'Invalid coupon'); setCouponDiscount(0); return }
+      if (!res.ok) { setCouponError(data.error ?? 'Invalid coupon'); setCouponDiscount(0); setCouponTier(null); return }
       setCouponDiscount(data.discount_percent)
+      // The endpoint has always returned plan_tier; nothing was reading it.
+      setCouponTier(data.plan_tier ?? null)
     } catch { setCouponError('Network error — please try again') }
     finally { setCouponBusy(false) }
   }
@@ -284,7 +291,12 @@ export function MsmeView({ userRole, orgName }: Props) {
       res = await fetch('/api/msme/pay', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ addon_slots: slots, ...(couponCode && couponDiscount > 0 ? { coupon_code: couponCode } : {}) }),
+        // A pack-scoped coupon never applies to an add-on — the server refuses
+        // it, so sending it would only produce a price the user did not expect.
+        body: JSON.stringify({
+          addon_slots: slots,
+          ...(couponCode && couponDiscount > 0 && !couponTier ? { coupon_code: couponCode } : {}),
+        }),
       })
       data = await res.json()
     } catch { showToast('Network error — please try again', 'error'); setAddonBusy(null); return }
@@ -373,7 +385,12 @@ export function MsmeView({ userRole, orgName }: Props) {
     const res  = await fetch('/api/msme/pay', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ pack_tier: tier, ...(couponCode && couponDiscount > 0 ? { coupon_code: couponCode } : {}) }),
+      // Only send the code for the pack it is actually scoped to, so the price
+      // charged always matches the price shown on the card that was clicked.
+      body:    JSON.stringify({
+        pack_tier: tier,
+        ...(couponCode && couponDiscount > 0 && (!couponTier || couponTier === tier) ? { coupon_code: couponCode } : {}),
+      }),
     })
     const data = await res.json()
     setUpgradeBusy(null)
@@ -1410,8 +1427,12 @@ export function MsmeView({ userRole, orgName }: Props) {
               const isEnterprise  = pack.tier === 'pack_enterprise'
               const isRecommended = pack.recommended && !isCurrent
               const lockedAfter   = Math.max(0, totalEver - pack.vendor_limit)
-              const discountedPaise = couponDiscount > 0 ? Math.round(pack.price_paise * (1 - couponDiscount / 100)) : pack.price_paise
-              const discountedLabel = couponDiscount > 0 ? `₹${Math.round(discountedPaise / 100).toLocaleString('en-IN')}` : null
+              /* A coupon scoped to one pack discounts that pack alone. Showing
+                 ₹0 on a plan the server will charge in full is the worst kind
+                 of wrong — the customer clicks Purchase expecting free. */
+              const couponApplies   = couponDiscount > 0 && (!couponTier || couponTier === pack.tier)
+              const discountedPaise = couponApplies ? Math.round(pack.price_paise * (1 - couponDiscount / 100)) : pack.price_paise
+              const discountedLabel = couponApplies ? `₹${Math.round(discountedPaise / 100).toLocaleString('en-IN')}` : null
 
               // Gold luxurious style for current paid plan
               const isGold = isCurrent && packTier !== 'free'
@@ -1513,7 +1534,17 @@ export function MsmeView({ userRole, orgName }: Props) {
                 {couponBusy ? '…' : 'Apply'}
               </button>
             </div>
-            {couponDiscount > 0 && <p style={{ fontSize: 12, color: '#16a34a', margin: '6px 0 0' }}>✓ {couponDiscount}% discount applied!</p>}
+            {couponDiscount > 0 && (
+              <p style={{ fontSize: 12, color: '#16a34a', margin: '6px 0 0' }}>
+                ✓ {couponDiscount}% off
+                {/* Name the plan when the code is scoped to one, so it is clear
+                    before paying which card the discount belongs to. */}
+                {couponTier
+                  ? ` the ${MSME_PACKS.find(p => p.tier === couponTier)?.label ?? couponTier} plan`
+                  : ' — applies to any plan'}
+                {couponDiscount >= 100 ? ' · free for 12 months' : ''}
+              </p>
+            )}
             {couponError && <p style={{ fontSize: 12, color: '#dc2626', margin: '6px 0 0' }}>{couponError}</p>}
           </div>
 
