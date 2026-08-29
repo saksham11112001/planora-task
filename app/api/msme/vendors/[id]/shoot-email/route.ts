@@ -5,6 +5,7 @@ import { createAdminClient }        from '@/lib/supabase/admin'
 import { getApiOrgMembership }      from '@/lib/supabase/apiActiveOrg'
 import { sendMsmeVendorEmail }      from '@/lib/email/send'
 import { DEFAULT_EMAIL_SCHEDULE }   from '@/lib/msme/emailSchedule'
+import { resolvePackEntitlement }   from '@/lib/msme/packs'
 import crypto                       from 'crypto'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://upfloat.co'
@@ -58,7 +59,12 @@ export async function POST(
       admin.from('org_feature_settings').select('config').eq('org_id', mb.org_id).eq('feature_key', 'msme_pack').maybeSingle(),
       admin.from('org_feature_settings').select('config').eq('org_id', mb.org_id).eq('feature_key', 'msme_addon_slots').maybeSingle(),
     ])
-    const vendorLimit: number = ((packRow?.config as any)?.vendor_limit ?? 5) + ((addonRow?.config as any)?.extra_slots ?? 0)
+    // Annual term: an expired pack drops back to the free allowance, so the
+    // slot gate has to ask the shared resolver rather than read the raw limit.
+    const vendorLimit: number = resolvePackEntitlement(
+      packRow?.config as any,
+      (addonRow?.config as any)?.extra_slots ?? 0,
+    ).vendorLimit
 
     // Count vendors that have already consumed an email slot (incl. soft-deleted)
     const { count: emailedEver } = await admin

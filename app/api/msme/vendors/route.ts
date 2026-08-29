@@ -3,7 +3,7 @@ import { createClient }             from '@/lib/supabase/server'
 import { getAuthUser } from '@/lib/supabase/authUser'
 import { createAdminClient }        from '@/lib/supabase/admin'
 import { getApiOrgMembership }      from '@/lib/supabase/apiActiveOrg'
-import { FREE_VENDOR_LIMIT }        from '@/lib/msme/packs'
+import { resolvePackEntitlement }   from '@/lib/msme/packs'
 
 export async function GET(req: NextRequest) {
   const supabase = await createClient()
@@ -49,11 +49,20 @@ export async function GET(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  const packLimit: number   = (packRow?.config?.vendor_limit as number | undefined) ?? FREE_VENDOR_LIMIT
-  const addonSlots: number  = (addonRow?.config as any)?.extra_slots ?? 0
-  const vendorLimit: number = packLimit + addonSlots
+  // Packs run for a year. resolvePackEntitlement is the single place that
+  // decides what the term means, so the list, the send gates and settings can
+  // never disagree about whether an org still has its slots.
+  const addonSlots: number = (addonRow?.config as any)?.extra_slots ?? 0
+  const ent = resolvePackEntitlement(packRow?.config as any, addonSlots)
   const total = vendors?.length ?? 0
-  return NextResponse.json({ vendors: vendors ?? [], total, totalEver: totalEver ?? 0, vendorLimit })
+  return NextResponse.json({
+    vendors: vendors ?? [], total, totalEver: totalEver ?? 0,
+    vendorLimit: ent.vendorLimit,
+    // Surfaced so the dashboard can show renewal state rather than silently
+    // showing fewer slots than the customer thinks they bought.
+    packExpiresAt: ent.expiresAt,
+    packExpired:   ent.isExpired,
+  })
 }
 
 export async function POST(req: NextRequest) {

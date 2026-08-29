@@ -89,7 +89,11 @@
       "Bash(git ls-remote *)",
       "Bash(echo \"exit:$?\")",
       "Bash(timeout 90 git push origin fix/stale-task-status-and-compliance-dates)",
-      "Bash(grep -n \"showAddModal &&\\\\|propagateModal &&\\\\|^    </div>\\\\|^  \\)$\" \"app/\\(app\\)/compliance/CAClientSetupView.tsx\")"
+      "Bash(grep -n \"showAddModal &&\\\\|propagateModal &&\\\\|^    </div>\\\\|^  \\)$\" \"app/\\(app\\)/compliance/CAClientSetupView.tsx\")",
+      "Bash(sed -i \"s|import { MSME_PACKS, getPackByTier, MSME_ADDON_PACKS } from '@/lib/msme/packs'|import { MSME_PACKS, getPackByTier, MSME_ADDON_PACKS, packExpiryFrom } from '@/lib/msme/packs'|\" app/api/msme/pay/route.ts)",
+      "Bash(sed -i \"s|import { getPackByTier }             from '@/lib/msme/packs'|import { getPackByTier, packExpiryFrom } from '@/lib/msme/packs'|\" app/api/msme/pay/webhook/route.ts)",
+      "Bash(sed -i \"s|import { FREE_VENDOR_LIMIT }        from '@/lib/msme/packs'|import { FREE_VENDOR_LIMIT, resolvePackEntitlement } from '@/lib/msme/packs'|\" app/api/msme/vendors/route.ts)",
+      "Bash(cd \"C:/Users/Saksham Gupta/Desktop/planora-task\" && sed -i \"s|import { DEFAULT_EMAIL_SCHEDULE }   from '@/lib/msme/emailSchedule'|import { DEFAULT_EMAIL_SCHEDULE }   from '@/lib/msme/emailSchedule'\\\\nimport { resolvePackEntitlement }   from '@/lib/msme/packs'|\" app/api/msme/bulk-shoot/route.ts \"app/api/msme/vendors/[id]/shoot-email/route.ts\" && grep -n \"resolvePackEntitlement\" app/api/msme/bulk-shoot/route.ts \"app/api/msme/vendors/[id]/shoot-email/route.ts\")"
     ]
   }
 }

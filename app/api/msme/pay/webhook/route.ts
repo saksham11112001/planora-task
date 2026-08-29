@@ -11,7 +11,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient }         from '@/lib/supabase/admin'
-import { getPackByTier }             from '@/lib/msme/packs'
+import { getPackByTier, packExpiryFrom } from '@/lib/msme/packs'
 import crypto                        from 'crypto'
 
 const WEBHOOK_SECRET = process.env.RAZORPAY_WEBHOOK_SECRET
@@ -126,7 +126,8 @@ export async function POST(req: NextRequest) {
       org_id:      orgId,
       feature_key: 'msme_pack',
       is_enabled:  true,
-      config:      { tier: pack_tier, vendor_limit: pack.vendor_limit, paid_at: paidAt },
+      // Packs are annual — stamp the term so entitlement is never open-ended.
+      config:      { tier: pack_tier, vendor_limit: pack.vendor_limit, paid_at: paidAt, expires_at: packExpiryFrom(paidAt) },
     },
     { onConflict: 'org_id,feature_key' }
   )
