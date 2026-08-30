@@ -110,6 +110,10 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/msme/unsubscribed') ||  // unsubscribe confirmation page — public
     pathname.startsWith('/msme/privacy') ||       // DPDP privacy notice — public
     pathname.startsWith('/task-action') ||         // email action result page — public
+    // Booking redirect behind the printed QR codes. EXACT match, never
+    // startsWith: '/call' is a prefix of '/calendar', and a startsWith test
+    // here would quietly make the authenticated calendar page world-readable.
+    pathname === '/call' ||
     pathname.startsWith('/_next/') ||
     pathname.includes('.')
   ) {
