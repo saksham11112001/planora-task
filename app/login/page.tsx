@@ -8,6 +8,28 @@ import Link from 'next/link'
 // doesn't need its own entry in the Supabase redirect URL allow-list.
 const APP_ORIGIN = process.env.NEXT_PUBLIC_APP_URL ?? 'https://upfloat.co'
 
+/**
+ * Turn a Supabase auth error into something a person can act on.
+ *
+ * supabase-js surfaces the raw response body as `message`. When Auth answers a
+ * non-2xx with an empty body — an SMTP failure while sending the confirmation
+ * email, the Auth service being briefly unavailable, a gateway timeout — that
+ * body is the two characters "{}", and the user was shown a pair of braces
+ * with no idea what to do next. The real error is logged for us; the user gets
+ * a sentence and a way forward.
+ */
+function authErrorMessage(err: unknown, context: string, fallback: string): string {
+  const e      = err as { message?: string; status?: number; code?: string } | null
+  const raw    = (e?.message ?? '').trim()
+  const opaque = raw === '' || raw === '{}' || raw === '[object Object]' || raw === 'null'
+
+  // Always log the whole thing — this is the only record of WHY it failed.
+  console.error(`[auth] ${context} failed`, { message: e?.message, status: e?.status, code: e?.code, err })
+
+  if (!opaque) return raw
+  return e?.status ? `${fallback} (error ${e.status})` : fallback
+}
+
 type Mode = 'choose' | 'magic' | 'magic_sent' | 'email_password' | 'email_signup' | 'signup_confirm' | 'reset_password' | 'reset_sent'
 
 function MicrosoftIcon() {
@@ -207,7 +229,9 @@ export default function LoginPage() {
     })
     if (err || !data.user) {
       setLoading(false)
-      setError(err?.message ?? 'Sign-in failed. Check your credentials.')
+      // Same opaque-body risk as sign-up: an empty error body would have shown
+      // the user "{}" here too.
+      setError(authErrorMessage(err, 'signInWithPassword', 'Sign-in failed. Check your credentials, or use “Email me a sign-in link” below.'))
       return
     }
 
@@ -235,7 +259,11 @@ export default function LoginPage() {
 
     if (err) {
       setLoading(false)
-      setError(err.message)
+      setError(authErrorMessage(
+        err,
+        'signUp',
+        'We could not create your account just now. Please use “Email me a sign-in link” below instead — it signs you in without a password — or try again in a few minutes.',
+      ))
       return
     }
 
