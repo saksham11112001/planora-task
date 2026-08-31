@@ -27,6 +27,17 @@ function authErrorMessage(err: unknown, context: string, fallback: string): stri
   console.error(`[auth] ${context} failed`, { message: e?.message, status: e?.status, code: e?.code, err })
 
   if (!opaque) return raw
+
+  // A gateway timeout or an unavailable upstream is not something the user can
+  // route around: every alternative on this page (magic link, password reset)
+  // goes through the same Auth service and the same mail sender, so pointing
+  // them at one would just fail the same way a second time. Say plainly that it
+  // is our side and that waiting is the action.
+  const stalled = e?.status === 504 || e?.status === 503 || e?.status === 502 || e?.status === 408
+  if (stalled) {
+    return `Our sign-in service is taking too long to respond right now — this is a problem on our side, not with your details. Please wait a minute and try again. (error ${e?.status})`
+  }
+
   return e?.status ? `${fallback} (error ${e.status})` : fallback
 }
 
@@ -262,7 +273,10 @@ export default function LoginPage() {
       setError(authErrorMessage(
         err,
         'signUp',
-        'We could not create your account just now. Please use “Email me a sign-in link” below instead — it signs you in without a password — or try again in a few minutes.',
+        // Deliberately does not name another method: the sign-up screen has no
+        // magic-link button on it, and that method would go through the same
+        // Auth service anyway.
+        'We could not create your account just now. Please try again in a few minutes.',
       ))
       return
     }
