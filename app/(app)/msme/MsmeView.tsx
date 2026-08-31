@@ -1728,6 +1728,9 @@ export function MsmeView({ userRole, orgName }: Props) {
             vendorCount:  vendors.length,
             emailedCount: vendors.filter(v => (v.email_count ?? 0) > 0).length,
           }}
+          /* Any open dialog hides the tour, so its backdrop can never sit on
+             top of the form the current step is asking the user to fill in. */
+          paused={showAdd || showImport || showUpgrade || showSettings || showGstModal || showContactModal || showCerts || showBounced}
         />
       )}
 

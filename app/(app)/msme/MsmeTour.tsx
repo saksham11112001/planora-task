@@ -93,9 +93,19 @@ interface Rect { x: number; y: number; w: number; h: number }
 interface Props {
   onDone:    () => void
   progress?: TourProgress
+  /**
+   * True while a dashboard dialog is open. The tour's backdrop sits at
+   * z-index 10000, above every modal in the app, so leaving it up meant the
+   * Add-vendor form opened BEHIND it: the field could not be typed in, the
+   * spotlight stayed on the button that had already been pressed, and the only
+   * control still reachable was "Skip this step" — the tour blocking the very
+   * task it was asking for. While a dialog is open the tour gets out of the
+   * way entirely and returns when the dialog closes.
+   */
+  paused?:   boolean
 }
 
-export default function MsmeTour({ onDone, progress }: Props) {
+export default function MsmeTour({ onDone, progress, paused = false }: Props) {
   const [step,    setStep]    = useState(0)
   const [rect,    setRect]    = useState<Rect | null>(null)
   const [vp,      setVp]      = useState({ w: 1280, h: 800 })
@@ -120,6 +130,10 @@ export default function MsmeTour({ onDone, progress }: Props) {
   }, [])
 
   useEffect(() => {
+    // Re-measure when a dialog closes as well as when the step changes: adding
+    // a vendor grows the table and moves everything below it, so the ring would
+    // otherwise come back around whatever now sits at the old coordinates.
+    if (paused) return
     setVp({ w: window.innerWidth, h: window.innerHeight })
     measure(step)
 
@@ -132,7 +146,7 @@ export default function MsmeTour({ onDone, progress }: Props) {
       window.removeEventListener('resize', onResize)
       if (rafRef.current) cancelAnimationFrame(rafRef.current)
     }
-  }, [step, measure])
+  }, [step, measure, paused])
 
   const s = STEPS[step]
   /** A step is a task when it says what to do. Everything else is context. */
@@ -266,6 +280,12 @@ export default function MsmeTour({ onDone, progress }: Props) {
       zIndex: 10001,
     }
   }
+
+  // Step aside while a dialog is open. Placed after every hook so hook order is
+  // identical on both branches; the component keeps its step, its click
+  // listener and its progress, and simply renders nothing until the dialog is
+  // dismissed — at which point the task will usually already be satisfied.
+  if (paused) return null
 
   const isFirst = step === 0
   const isLast  = step === STEPS.length - 1
