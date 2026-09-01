@@ -365,9 +365,59 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
     URL.revokeObjectURL(url)
   }
 
+  // ── Optional subtasks ────────────────────────────────────────────────────
+  // MonitorFetcher deliberately queries `parent_task_id IS NULL` — pulling every
+  // subtask in the org into the server payload would multiply the page weight
+  // for something most sessions never look at. This is the opt-in: one extra
+  // request, made the first time it is switched on, held in its own state.
+  //
+  // Its own state matters. The auto-refresh re-syncs `tasks` from the server
+  // prop every 30 seconds, so anything merged into `tasks` would silently
+  // vanish on the next tick.
+  //
+  // NOT persisted between visits, unlike the filters. The whole point is that
+  // the page always opens light; a remembered "on" would defeat that.
+  const [showSubtasks,    setShowSubtasks]    = useState(false)
+  const [subtasks,        setSubtasks]        = useState<MonTask[]>([])
+  const [subtasksLoading, setSubtasksLoading] = useState(false)
+  const [subtasksLoaded,  setSubtasksLoaded]  = useState(false)
+  const [subtaskError,    setSubtaskError]    = useState('')
+
+  useEffect(() => {
+    if (!showSubtasks || subtasksLoaded || subtasksLoading) return
+    let cancelled = false
+    setSubtasksLoading(true); setSubtaskError('')
+    fetch('/api/tasks?subtasks_only=true')
+      .then(r => r.ok ? r.json() : Promise.reject(new Error(String(r.status))))
+      .then((json: { data?: any[] }) => {
+        if (cancelled) return
+        const memberById: Record<string, { id: string; name: string }> = {}
+        members.forEach(m => { memberById[m.id] = m })
+        const clientById: Record<string, { id: string; name: string; color: string }> = {}
+        clients.forEach(c => { clientById[c.id] = c })
+        setSubtasks((json.data ?? []).map((t: any) => ({
+          ...t,
+          description: null,
+          assignee: t.assignee_id ? (memberById[t.assignee_id] ?? null) : null,
+          client:    t.client_id   ? (clientById[t.client_id]   ?? null) : null,
+          project:   null, approver: null, creator: null,
+        })) as MonTask[])
+        setSubtasksLoaded(true)
+      })
+      .catch(() => { if (!cancelled) setSubtaskError('Could not load subtasks — try again') })
+      .finally(() => { if (!cancelled) setSubtasksLoading(false) })
+    return () => { cancelled = true }
+  }, [showSubtasks, subtasksLoaded, subtasksLoading, members, clients])
+
   // ── Filtering ──
   const visible = useMemo(() => {
-    return tasks.filter(t => {
+    // Subtasks join the browsable LIST only. They are deliberately kept out of
+    // the stat tiles, trend chart and ageing figures below, which all read
+    // `tasks` directly: folding subtasks into those would change what every
+    // headline number means and break comparison with any figure quoted before
+    // today.
+    const source = showSubtasks ? [...tasks, ...subtasks] : tasks
+    return source.filter(t => {
       if (search) {
         const q = search.toLowerCase()
         const hit = t.title.toLowerCase().includes(q) ||
@@ -403,7 +453,7 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
       if (updatedTo   && updatedDate > updatedTo)   return false
       return true
     })
-  }, [tasks, search, filterStatus, filterPrio, filterClient, filterMember, filterType.join(','),
+  }, [tasks, subtasks, showSubtasks, search, filterStatus, filterPrio, filterClient, filterMember, filterType.join(','),
       dueDateFrom, dueDateTo, createdFrom, createdTo, updatedFrom, updatedTo])
 
   // ── Current-month task slice ──────────────────────────────────────────────
@@ -423,7 +473,12 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
     createdPreset || createdFrom || updatedPreset || updatedFrom)
 
   const stats = useMemo(() => {
-    const m = hasFilters ? visible : monthTasks
+    // Subtasks are stripped back out here. `visible` carries them when the
+    // toggle is on, and with any filter active these tiles read from `visible`
+    // — so without this line switching subtasks on would quietly inflate every
+    // headline number and make today's figures incomparable with any quoted
+    // before. Subtasks are for reading the list, not for restating the KPIs.
+    const m = (hasFilters ? visible : monthTasks).filter(t => !t.parent_task_id)
     return {
       total:      m.length,
       todo:       m.filter(t => t.status === 'todo').length,
@@ -842,6 +897,33 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
             { value: 'quick',     label: 'Quick tasks'   },
           ]}/>
 
+        {/* Include subtasks — off on every page load by design. Switching it on
+            fires one extra request; the count reassures that it loaded. */}
+        <label
+          title="Subtasks are normally hidden here. Turn this on to see work assigned to people through subtasks of someone else's task. Loads on demand — the stat tiles above stay on top-level tasks only."
+          style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12,
+            color: 'var(--text-secondary)', cursor: subtasksLoading ? 'wait' : 'pointer',
+            padding: '4px 10px', borderRadius: 20,
+            border: `1px solid ${showSubtasks ? 'var(--brand)' : 'var(--border)'}`,
+            background: showSubtasks ? 'rgba(13,148,136,0.08)' : 'var(--surface-subtle)' }}
+        >
+          <input
+            type="checkbox"
+            checked={showSubtasks}
+            onChange={e => setShowSubtasks(e.target.checked)}
+            disabled={subtasksLoading}
+            style={{ width: 13, height: 13, accentColor: 'var(--brand)', cursor: 'inherit' }}
+          />
+          {subtasksLoading
+            ? 'Loading subtasks…'
+            : showSubtasks
+              ? `Subtasks shown${subtasksLoaded ? ` (${subtasks.length})` : ''}`
+              : 'Include subtasks'}
+        </label>
+        {subtaskError && (
+          <span style={{ fontSize: 11, color: '#dc2626' }}>{subtaskError}</span>
+        )}
+
         {/* Clear all — only while something is actually filtering the board */}
         {activeFilterCount > 0 && (
           <button onClick={clearAllFilters}
@@ -1093,6 +1175,17 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
 
                   {/* Title */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, padding: '7px 0' }}>
+                    {/* Only rendered while the subtask toggle is on, so the
+                        normal view is untouched. Without it a subtask row is
+                        indistinguishable from a task and the list looks like it
+                        has grown duplicates. */}
+                    {task.parent_task_id && (
+                      <span title="A subtask of another task" style={{ flexShrink: 0, fontSize: 9, fontWeight: 700,
+                        background: 'rgba(8,145,178,0.12)', color: '#0891b2',
+                        padding: '1px 5px', borderRadius: 3, whiteSpace: 'nowrap' }}>
+                        ↳ Subtask
+                      </span>
+                    )}
                     <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)',
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</span>
                     {task.client && (
