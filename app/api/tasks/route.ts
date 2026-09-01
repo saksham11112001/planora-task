@@ -39,6 +39,10 @@ export async function GET(request: NextRequest) {
     q = q.eq('status', 'in_review').eq('approval_status', 'pending').eq('approver_id', user.id)
   if (sp.get('parent_id'))    q = q.eq('parent_task_id', sp.get('parent_id')!)
   if (sp.get('top_level') === 'true') q = q.is('parent_task_id', null)
+  // Inverse of top_level — every subtask in the org, whoever owns it. Used by
+  // Monitor's opt-in "include subtasks" view, which is deliberately a separate
+  // on-demand request so the default page load stays small.
+  if (sp.get('subtasks_only') === 'true') q = q.not('parent_task_id', 'is', null)
   if (sp.get('exclude_recurring') === 'true') q = q.or('is_recurring.is.null,is_recurring.eq.false')
   if (sp.get('parent_recurring_id')) q = q.eq('parent_recurring_id', sp.get('parent_recurring_id')!)
   // Filter to CA compliance tasks only (custom_fields @> '{"_ca_compliance":true}')
