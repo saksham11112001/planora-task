@@ -1001,11 +1001,13 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
               <div style={{ padding:'9px 16px', background:'rgba(8,145,178,0.08)',
                 borderBottom:'1px solid rgba(8,145,178,0.2)',
                 display:'flex', alignItems:'flex-start', gap:8 }}>
-                <span style={{ fontSize:15, flexShrink:0, lineHeight:1 }}>📋</span>
+                <span style={{ fontSize:15, flexShrink:0, lineHeight:1 }}>★</span>
                 <div>
-                  <p style={{ margin:0, fontSize:12, fontWeight:600, color:'#0369a1' }}>Context task</p>
+                  {/* Matches the "★ Subtask only" badge on the list and board so
+                      the same idea is not called two different things. */}
+                  <p style={{ margin:0, fontSize:12, fontWeight:600, color:'#0369a1' }}>Subtask only</p>
                   <p style={{ margin:'2px 0 0', fontSize:11, color:'#0891b2', lineHeight:1.4 }}>
-                    You are assigned a subtask here. You can view all details and manage your subtask below — but only the main assignee can edit this task.
+                    Your part of this task is a subtask, listed below. Tick that off — completing or editing the task itself is the main assignee&apos;s job.
                   </p>
                 </div>
               </div>

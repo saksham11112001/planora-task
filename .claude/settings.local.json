@@ -94,7 +94,10 @@
       "Bash(sed -i \"s|import { getPackByTier }             from '@/lib/msme/packs'|import { getPackByTier, packExpiryFrom } from '@/lib/msme/packs'|\" app/api/msme/pay/webhook/route.ts)",
       "Bash(sed -i \"s|import { FREE_VENDOR_LIMIT }        from '@/lib/msme/packs'|import { FREE_VENDOR_LIMIT, resolvePackEntitlement } from '@/lib/msme/packs'|\" app/api/msme/vendors/route.ts)",
       "Bash(cd \"C:/Users/Saksham Gupta/Desktop/planora-task\" && sed -i \"s|import { DEFAULT_EMAIL_SCHEDULE }   from '@/lib/msme/emailSchedule'|import { DEFAULT_EMAIL_SCHEDULE }   from '@/lib/msme/emailSchedule'\\\\nimport { resolvePackEntitlement }   from '@/lib/msme/packs'|\" app/api/msme/bulk-shoot/route.ts \"app/api/msme/vendors/[id]/shoot-email/route.ts\" && grep -n \"resolvePackEntitlement\" app/api/msme/bulk-shoot/route.ts \"app/api/msme/vendors/[id]/shoot-email/route.ts\")",
-      "Bash(grep -o \"process\\\\.env\\\\.[A-Z_]*\\\\|process\\\\.env\\\\[\\\\`[^\\\\`]*\\\\`\\\\]\")"
+      "Bash(grep -o \"process\\\\.env\\\\.[A-Z_]*\\\\|process\\\\.env\\\\[\\\\`[^\\\\`]*\\\\`\\\\]\")",
+      "Bash(timeout 60 git fetch origin --quiet)",
+      "Bash(awk 'NR>=1384 && NR<=1700 && /isContextTask/ {print NR\": \"$0}' \"app/\\(app\\)/tasks/MyTasksView.tsx\")",
+      "Bash(timeout 90 git push -u origin feat/subtask-only-badge)"
     ]
   }
 }

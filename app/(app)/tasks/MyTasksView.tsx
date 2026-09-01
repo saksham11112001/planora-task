@@ -1480,8 +1480,12 @@ export function MyTasksView({
                           {task.project_id && !task.is_recurring && <FolderOpen style={{ flexShrink:0, width:11, height:11, color:'#7c3aed', marginRight:2 }}/>}
                           {isCompliance && <span style={{ flexShrink:0, fontSize:9, fontWeight:700, background:'rgba(234,179,8,0.15)', color:'#b45309', padding:'1px 4px', borderRadius:3 }}>CA</span>}
                           {isContextTask && (
-                            <span title="You have a subtask here — this task is shown for context" style={{ flexShrink:0, fontSize:9, fontWeight:700, background:'rgba(8,145,178,0.12)', color:'#0891b2', padding:'1px 5px', borderRadius:3, whiteSpace:'nowrap' }}>
-                              📋 context
+                            /* "context" was jargon — it described why the row was
+                               fetched rather than what the reader has to do. The
+                               only thing that matters to them is that their piece
+                               of work is the subtask, not this task. */
+                            <span title="Your part here is a subtask, not this whole task. Only the main assignee can complete or edit the task itself." style={{ flexShrink:0, fontSize:9, fontWeight:700, background:'rgba(8,145,178,0.12)', color:'#0891b2', padding:'1px 5px', borderRadius:3, whiteSpace:'nowrap' }}>
+                              ★ Subtask only
                             </span>
                           )}
                           <span className="task-title" style={{ overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis', flex:1 }}>{task.title}</span>
@@ -2156,12 +2160,26 @@ export function MyTasksView({
                         {isDone && <svg viewBox="0 0 10 10" fill="none" style={{width:7,height:7}}><path d="M1.5 5L4 7.5L8.5 2.5" stroke="white" strokeWidth="1.5" strokeLinecap="round"/></svg>}
                       </div>
                   }
-                  <span style={{ fontSize:13, fontWeight:600, lineHeight:1.4, flex:1, minWidth:0,
-                    color: isDone?'var(--text-muted)':isPending?'#7c3aed':ov?'#dc2626':'var(--text-primary)',
-                    textDecoration: isDone?'line-through':'none',
-                    overflow:'hidden', display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical' }}>
-                    {task.title}
-                  </span>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    {/* Board is the default tab and carried no label at all —
+                        only a faint cyan tint, which reads as decoration. A
+                        subtask assignee could sit on this card wondering why
+                        they cannot tick it off. */}
+                    {isContextTask && (
+                      <span title="Your part here is a subtask, not this whole task. Only the main assignee can complete or edit the task itself."
+                        style={{ display:'inline-block', marginBottom:3, fontSize:9, fontWeight:700,
+                          background:'rgba(8,145,178,0.12)', color:'#0891b2',
+                          padding:'1px 5px', borderRadius:3, whiteSpace:'nowrap' }}>
+                        ★ Subtask only
+                      </span>
+                    )}
+                    <span style={{ fontSize:13, fontWeight:600, lineHeight:1.4,
+                      color: isDone?'var(--text-muted)':isPending?'#7c3aed':ov?'#dc2626':'var(--text-primary)',
+                      textDecoration: isDone?'line-through':'none',
+                      overflow:'hidden', display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical' }}>
+                      {task.title}
+                    </span>
+                  </div>
                 </div>
                 {/* Chips row: context badge + client + assignee */}
                 <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:6, flexWrap:'wrap', opacity: 0.85 }}>
