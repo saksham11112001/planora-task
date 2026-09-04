@@ -45,11 +45,14 @@ export async function POST(req: NextRequest) {
     max_uses?:         number | null
     expires_at?:       string | null
     is_active?:        boolean
+    one_time_use?:     boolean
+    msme_only?:        boolean
   }
   const {
     code, description, discount_type,
     discount_percent, plan_tier, duration_months,
     max_uses, expires_at, is_active = true,
+    one_time_use = true, msme_only = false,
   } = body
 
   if (!code?.trim()) return NextResponse.json({ error: 'Code is required' }, { status: 400 })
@@ -64,11 +67,26 @@ export async function POST(req: NextRequest) {
     description:      description?.trim() || null,
     discount_type:    discount_type ?? 'free_plan',
     discount_percent: discount_type === 'percent' ? discount_percent : null,
-    plan_tier:        discount_type === 'free_plan' ? plan_tier : null,
+    // plan_tier is kept for PERCENT coupons too, not just free_plan.
+    //
+    // The MSME payment route only ever resolves percent coupons, and it treats
+    // a null plan_tier as "valid on every pack". Forcing null here meant a code
+    // created on this page as "100% off Growth" would take ₹29,999 off the
+    // Business pack just as happily — the coupon could not be scoped at all
+    // through the admin UI, only by writing SQL by hand.
+    //
+    // Null stays meaningful: leave the tier blank for a discount that should
+    // apply to anything.
+    plan_tier:        plan_tier || null,
     duration_months:  duration_months ?? 1,
     max_uses:         max_uses ?? null,
     expires_at:       expires_at ?? null,
     is_active,
+    // Defaults chosen for the common case — a code issued to one buyer.
+    // one_time_use blocks the same org redeeming twice; max_uses (set by the
+    // caller) is what stops a forwarded code being used by a different org.
+    one_time_use,
+    msme_only,
   }).select().single()
 
   if (error) {

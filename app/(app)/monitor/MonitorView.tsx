@@ -98,6 +98,11 @@ const PAST_PRESETS = [
   { value: '90d',   label: 'Last 90d', from: () => subDays(90),  to: () => todayStr()  },
 ]
 
+/** Ceiling on the opt-in subtask fetch. Every row returned is a row rendered —
+ *  the list is not virtualised — so this bounds layout cost as much as payload.
+ *  Hitting it is surfaced in the toggle label rather than silently truncating. */
+const SUBTASK_FETCH_LIMIT = 1000
+
 // Shared dropdown style helper
 function selectStyle(active: boolean) {
   return {
@@ -383,14 +388,30 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
   const [subtasksLoaded,  setSubtasksLoaded]  = useState(false)
   const [subtaskError,    setSubtaskError]    = useState('')
 
+  // Guarded by a ref, NOT by state in the dependency array.
+  //
+  // The first version listed subtasksLoading in its deps while also setting it:
+  // ticking the box set loading=true, the dep change re-ran the effect, the
+  // cleanup of the first run marked its own fetch cancelled, and the response
+  // was then discarded — including the call that would have cleared the loading
+  // flag. The checkbox sat on "Loading subtasks…" for ever. A ref cannot
+  // retrigger the effect, so the fetch runs exactly once.
+  const subtaskFetchStarted = useRef(false)
+  const mountedRef          = useRef(true)
+  useEffect(() => () => { mountedRef.current = false }, [])
+
   useEffect(() => {
-    if (!showSubtasks || subtasksLoaded || subtasksLoading) return
-    let cancelled = false
+    if (!showSubtasks || subtaskFetchStarted.current) return
+    subtaskFetchStarted.current = true
     setSubtasksLoading(true); setSubtaskError('')
-    fetch('/api/tasks?subtasks_only=true')
+
+    // Bounded on purpose. The list is not virtualised, so every row returned is
+    // a row rendered — an unbounded fetch could load fine and then lock the
+    // browser laying it out, which looks identical to the page hanging.
+    fetch(`/api/tasks?subtasks_only=true&limit=${SUBTASK_FETCH_LIMIT}`)
       .then(r => r.ok ? r.json() : Promise.reject(new Error(String(r.status))))
       .then((json: { data?: any[] }) => {
-        if (cancelled) return
+        if (!mountedRef.current) return
         const memberById: Record<string, { id: string; name: string }> = {}
         members.forEach(m => { memberById[m.id] = m })
         const clientById: Record<string, { id: string; name: string; color: string }> = {}
@@ -404,10 +425,17 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
         })) as MonTask[])
         setSubtasksLoaded(true)
       })
-      .catch(() => { if (!cancelled) setSubtaskError('Could not load subtasks — try again') })
-      .finally(() => { if (!cancelled) setSubtasksLoading(false) })
-    return () => { cancelled = true }
-  }, [showSubtasks, subtasksLoaded, subtasksLoading, members, clients])
+      .catch(() => {
+        if (!mountedRef.current) return
+        setSubtaskError('Could not load subtasks — untick and try again')
+        // Allow a retry: without this the ref would block every later attempt.
+        subtaskFetchStarted.current = false
+      })
+      .finally(() => { if (mountedRef.current) setSubtasksLoading(false) })
+  // members/clients are read from the closure; re-running on their identity is
+  // what made this loop in the first place.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showSubtasks])
 
   // ── Filtering ──
   const visible = useMemo(() => {
@@ -917,7 +945,7 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
           {subtasksLoading
             ? 'Loading subtasks…'
             : showSubtasks
-              ? `Subtasks shown${subtasksLoaded ? ` (${subtasks.length})` : ''}`
+              ? `Subtasks shown${subtasksLoaded ? ` (${subtasks.length}${subtasks.length >= SUBTASK_FETCH_LIMIT ? '+, newest first' : ''})` : ''}`
               : 'Include subtasks'}
         </label>
         {subtaskError && (
