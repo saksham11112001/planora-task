@@ -165,6 +165,11 @@ export function CouponsView({ initialCoupons }: Props) {
       body.plan_tier = form.plan_tier
     } else if (form.discount_type === 'percent') {
       body.discount_percent = Number(form.discount_percent)
+      // Empty means "any plan"; the API stores null for that.
+      body.plan_tier = form.plan_tier || null
+      // A percent coupon aimed at one MSME pack is the direct-payment case:
+      // it belongs to the MSME module and to a single buyer.
+      if (form.plan_tier.startsWith('pack_')) body.msme_only = true
     }
 
     const res = await fetch('/api/admin/coupons', {
@@ -441,7 +446,15 @@ export function CouponsView({ initialCoupons }: Props) {
                     return (
                       <button
                         key={t}
-                        onClick={() => setF('discount_type', t)}
+                        onClick={() => {
+                          setF('discount_type', t)
+                          // plan_tier defaults to 'pro'. Without this reset,
+                          // switching to a percent coupon would silently scope
+                          // it to Pro — previously percent coupons were always
+                          // unrestricted, so that would be a regression.
+                          // free_plan must have a tier, so it keeps the default.
+                          setF('plan_tier', t === 'percent' ? '' : 'pro')
+                        }}
                         style={{ padding: '10px 8px', borderRadius: 8, border: `2px solid ${form.discount_type === t ? tm.color : 'var(--border)'}`, background: form.discount_type === t ? tm.bg : 'var(--surface)', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}
                       >
                         <TypeIcon style={{ width: 16, height: 16, color: tm.color }} />
@@ -453,15 +466,25 @@ export function CouponsView({ initialCoupons }: Props) {
               </div>
 
               {/* Conditional fields */}
-              {form.discount_type === 'free_plan' && (
+              {/* Shown for percent coupons too. MSME only ever honours percent
+                  coupons, so without a tier here a 100%-off code could not be
+                  restricted to the pack it was issued for — it would discount
+                  every pack, including the most expensive one. */}
+              {(form.discount_type === 'free_plan' || form.discount_type === 'percent') && (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>Plan tier *</label>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>
+                      {form.discount_type === 'percent' ? 'Restrict to plan' : 'Plan tier *'}
+                    </label>
                     <select
                       value={form.plan_tier}
                       onChange={e => setF('plan_tier', e.target.value)}
                       style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1.5px solid var(--border)', background: 'var(--surface)', fontSize: 13, color: 'var(--text-primary)', outline: 'none' }}
                     >
+                      {/* free_plan REQUIRES a tier; percent may be unrestricted. */}
+                      {form.discount_type === 'percent' && (
+                        <option value="">Any plan — no restriction</option>
+                      )}
                       <optgroup label="upFloat Plans">
                         <option value="starter">Starter</option>
                         <option value="pro">Pro</option>
