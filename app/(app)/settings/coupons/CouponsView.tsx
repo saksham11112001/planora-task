@@ -36,6 +36,24 @@ const PLAN_COLORS: Record<string, { bg: string; color: string }> = {
   starter:  { bg: '#f0fdfa', color: '#0d9488' },
   pro:      { bg: '#f5f3ff', color: '#7c3aed' },
   business: { bg: '#ecfeff', color: '#0891b2' },
+  // MSME pack tiers were missing, and the PLAN column only renders a badge
+  // when this lookup hits — so a coupon correctly scoped to a pack displayed
+  // as "—", i.e. identical to one scoped to nothing. The one column you would
+  // check before handing a code to a buyer was hiding the answer.
+  pack_25:         { bg: '#fffbeb', color: '#b45309' },
+  pack_100:        { bg: '#fffbeb', color: '#b45309' },
+  pack_250:        { bg: '#fffbeb', color: '#b45309' },
+  pack_500:        { bg: '#fffbeb', color: '#b45309' },
+  pack_enterprise: { bg: '#fffbeb', color: '#b45309' },
+}
+
+/** Pack keys are not readable in a table cell. */
+const PLAN_LABELS: Record<string, string> = {
+  pack_25:         'MSME 25v',
+  pack_100:        'MSME 100v',
+  pack_250:        'MSME 250v',
+  pack_500:        'MSME 500v',
+  pack_enterprise: 'MSME Ent.',
 }
 
 type DiscountType = 'free_plan' | 'percent' | 'fixed_inr'
@@ -341,11 +359,16 @@ export function CouponsView({ initialCoupons }: Props) {
 
               {/* Plan tier */}
               <div>
-                {pc && c.plan_tier ? (
-                  <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 6, background: pc.bg, color: pc.color, textTransform: 'capitalize' }}>
-                    {c.plan_tier}
+                {/* Falls back to a neutral badge rather than "—" for any tier
+                    without a colour, so an unrecognised value can never again
+                    be displayed as "no restriction". */}
+                {c.plan_tier ? (
+                  <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 6,
+                    background: pc?.bg ?? '#f1f5f9', color: pc?.color ?? '#64748b',
+                    textTransform: PLAN_LABELS[c.plan_tier] ? 'none' : 'capitalize' }}>
+                    {PLAN_LABELS[c.plan_tier] ?? c.plan_tier}
                   </span>
-                ) : <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>—</span>}
+                ) : <span style={{ fontSize: 12, color: 'var(--text-muted)' }} title="Applies to any plan">Any</span>}
               </div>
 
               {/* Uses */}
