@@ -47,14 +47,24 @@ export async function GET(req: NextRequest) {
     if (existing) return NextResponse.json({ error: 'Your organisation has already used this coupon' }, { status: 409 })
   }
 
-  // Only percent coupons are supported in the MSME payment flow
-  if (coupon.discount_type !== 'percent' || !coupon.discount_percent) {
-    return NextResponse.json({ error: 'This coupon is not valid for MSME packs' }, { status: 422 })
+  // A 'free_plan' coupon means "this plan, free, for duration_months" — which
+  // is exactly the sponsored / paid-me-directly case, and the option an admin
+  // naturally reaches for when creating one. It used to be rejected outright
+  // here, so a correctly-created coupon read as invalid with no hint that the
+  // fix was to rebuild it as a 100% percent coupon. Treat it as 100% off the
+  // plan it names; the schema already guarantees free_plan carries a plan_tier.
+  const isFreePlan = coupon.discount_type === 'free_plan'
+  const percent    = isFreePlan ? 100 : coupon.discount_percent
+
+  if (!percent) {
+    return NextResponse.json({
+      error: 'This coupon type cannot be used for MSME packs. Use a "Free plan" or percentage coupon.',
+    }, { status: 422 })
   }
 
   return NextResponse.json({
     code:             coupon.code,
-    discount_percent: coupon.discount_percent,
+    discount_percent: percent,
     plan_tier:        coupon.plan_tier ?? null,
     valid:            true,
   })

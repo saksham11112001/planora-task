@@ -56,10 +56,16 @@ export async function POST(req: NextRequest) {
     // now applies only to that exact tier — and never to an add-on order, which
     // has no pack_tier to match.
     const tierOk = !couponRow?.plan_tier || couponRow.plan_tier === pack_tier
+    // 'free_plan' is 100% off the plan it names, for duration_months. Matches
+    // /api/msme/coupon, which validates the code before this route charges for
+    // it — the two must agree or a coupon accepted at the pricing modal would
+    // be ignored at checkout and the buyer charged full price.
+    const isFreePlan   = couponRow?.discount_type === 'free_plan'
+    const effectivePct = isFreePlan ? 100 : couponRow?.discount_percent
     if (
       couponRow &&
-      couponRow.discount_type === 'percent' &&
-      couponRow.discount_percent &&
+      (isFreePlan || couponRow.discount_type === 'percent') &&
+      effectivePct &&
       tierOk &&
       !(couponRow.expires_at && new Date(couponRow.expires_at) < new Date()) &&
       !(couponRow.max_uses != null && (couponRow.uses_count ?? 0) >= couponRow.max_uses)
@@ -71,7 +77,7 @@ export async function POST(req: NextRequest) {
         alreadyUsed = !!ex
       }
       if (!alreadyUsed) {
-        discountPct  = couponRow.discount_percent
+        discountPct  = effectivePct
         couponMonths = couponRow.duration_months ?? 12
       }
     }
