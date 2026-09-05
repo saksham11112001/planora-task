@@ -145,13 +145,21 @@ async function provisionUser(user: any, surface: SignupSurface = 'app') {
     // Existence check before the upsert — provisioning runs on EVERY login,
     // and super admins should only be alerted for genuinely new signups.
     const { data: existing } = await admin.from('users')
-      .select('id').eq('id', user.id).maybeSingle()
+      .select('id, name, avatar_url').eq('id', user.id).maybeSingle()
+
+    // Same rule as /api/auth/provision, and for the same reason: this runs on
+    // every magic-link and PKCE login, so writing name/avatar from the identity
+    // provider each time silently undid any rename done in Team settings. Only
+    // fill them when the row has nothing; email stays provider-authoritative.
+    const providerAvatar = (user.user_metadata?.avatar_url as string | undefined) ?? null
+    const keepName   = !!existing && !!existing.name && !!String(existing.name).trim()
+    const keepAvatar = !!existing && !!existing.avatar_url
 
     await admin.from('users').upsert({
       id:         user.id,
       email:      (user.email ?? '').slice(0, 255),
-      name:       String(rawName).slice(0, 100),
-      avatar_url: user.user_metadata?.avatar_url ?? null,
+      ...(keepName   ? {} : { name: String(rawName).slice(0, 100) }),
+      ...(keepAvatar ? {} : { avatar_url: providerAvatar }),
       // Stamp the product at ACCOUNT CREATION, from the Host header — the only
       // authoritative signal. Onboarding also sets this, but it infers the
       // product from sessionStorage / ?next= / hostname on the client; lose any

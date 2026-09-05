@@ -99,7 +99,8 @@
       "Bash(awk 'NR>=1384 && NR<=1700 && /isContextTask/ {print NR\": \"$0}' \"app/\\(app\\)/tasks/MyTasksView.tsx\")",
       "Bash(timeout 90 git push -u origin feat/subtask-only-badge)",
       "Bash(awk 'NR>=450 && NR<=470' \"app/\\(app\\)/monitor/MonitorView.tsx\")",
-      "Bash(timeout 90 git push origin feat/subtask-only-badge)"
+      "Bash(timeout 90 git push origin feat/subtask-only-badge)",
+      "Bash(timeout 90 git push -u origin fix/name-reset-and-monitor-subtask-click)"
     ]
   }
 }
