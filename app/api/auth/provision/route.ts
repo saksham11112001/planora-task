@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     // Existence check before the upsert — this endpoint runs on EVERY login,
     // and super admins should only be alerted for genuinely new signups.
     const { data: existing } = await admin.from('users')
-      .select('id').eq('id', user.id).maybeSingle()
+      .select('id, name, avatar_url').eq('id', user.id).maybeSingle()
 
     // This route is fetched same-origin from the signup page, so the Host
     // header is the subdomain the person actually signed up on. The referer
@@ -40,17 +40,44 @@ export async function POST(request: NextRequest) {
     try { refPath = new URL(request.headers.get('referer') ?? '').pathname } catch { /* no/invalid referer */ }
     const surface = resolveSignupSurface(request.headers.get('host'), refPath)
 
-    await admin.from('users').upsert({
-      id:         user.id,
-      email:      (user.email ?? '').slice(0, 255),
-      name:       String(rawName).slice(0, 100),
-      avatar_url: user.user_metadata?.avatar_url ?? null,
-      // See the matching comment in app/auth/callback/route.ts: the product is
-      // stamped at account creation from the Host header, because onboarding's
-      // client-side inference silently mislabels users as 'app' whenever any of
-      // its three signals is lost. New accounts only, and never back to 'app'.
-      ...(!existing && surface !== 'app' ? { signup_product: surface } : {}),
-    }, { onConflict: 'id' })
+    // This endpoint runs on EVERY login, so what it writes to an existing row
+    // has to be limited to things the identity provider genuinely owns.
+    //
+    // It used to upsert name and avatar_url unconditionally. rawName is derived
+    // from Google's full_name (or the email prefix), so every sign-in silently
+    // reset the person's name back to whatever their provider says — a rename
+    // done in Team settings survived only until that user next logged in, which
+    // is why names appeared to "come back" a day or two later. The avatar went
+    // the same way, and a member who had cleared theirs got it back.
+    //
+    // email stays authoritative from auth: that IS the provider's to own, and
+    // it must track a changed sign-in address.
+    const providerAvatar = (user.user_metadata?.avatar_url as string | undefined) ?? null
+
+    if (!existing) {
+      await admin.from('users').upsert({
+        id:         user.id,
+        email:      (user.email ?? '').slice(0, 255),
+        name:       String(rawName).slice(0, 100),
+        avatar_url: providerAvatar,
+        // See the matching comment in app/auth/callback/route.ts: the product is
+        // stamped at account creation from the Host header, because onboarding's
+        // client-side inference silently mislabels users as 'app' whenever any of
+        // its three signals is lost. New accounts only, and never back to 'app'.
+        ...(surface !== 'app' ? { signup_product: surface } : {}),
+      }, { onConflict: 'id' })
+    } else {
+      // Fill blanks, never overwrite. A name or avatar already on the row was
+      // put there deliberately — by the person, or by an admin renaming them.
+      const patch: Record<string, unknown> = { email: (user.email ?? '').slice(0, 255) }
+      if (!existing.name || !String(existing.name).trim()) {
+        patch.name = String(rawName).slice(0, 100)
+      }
+      if (!existing.avatar_url && providerAvatar) {
+        patch.avatar_url = providerAvatar
+      }
+      await admin.from('users').update(patch).eq('id', user.id)
+    }
 
     if (!existing) {
       const provider = user.app_metadata?.provider ?? 'email'

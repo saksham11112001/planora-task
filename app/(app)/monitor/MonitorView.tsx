@@ -232,9 +232,37 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
     setCollapsedGroups(prev => { const s = new Set(prev); s.has(k) ? s.delete(k) : s.add(k); return s })
   }
 
-  function openTask(id: string) {
-    const t = tasks.find(t => t.id === id)
-    if (t) setPanelTask(t as unknown as Task)
+  /**
+   * Subtasks are held in their own state (see the toggle above), so a lookup
+   * against `tasks` alone found nothing and the click did nothing at all — the
+   * rows were visible but dead.
+   *
+   * A subtask row opens its PARENT. On its own a subtask carries almost no
+   * context — no client, no project, and a title that only makes sense next to
+   * the task it belongs to — so the parent is what someone tracking progress
+   * actually wants to read.
+   */
+  async function openTask(id: string) {
+    const row = tasks.find(t => t.id === id) ?? subtasks.find(t => t.id === id)
+    if (!row) return
+
+    if (!row.parent_task_id) { setPanelTask(row as unknown as Task); return }
+
+    const loadedParent = tasks.find(t => t.id === row.parent_task_id)
+    if (loadedParent) { setPanelTask(loadedParent as unknown as Task); return }
+
+    // Parent is outside Monitor's window — it only loads open work plus the
+    // last 90 days of completions, so an old parent legitimately will not be
+    // in memory. Fetch that one task rather than leaving the click dead.
+    try {
+      const res  = await fetch(`/api/tasks/${row.parent_task_id}`)
+      const json = await res.json().catch(() => ({}))
+      if (res.ok && json.data) { setPanelTask(json.data as Task); return }
+    } catch { /* fall through */ }
+
+    // Last resort: show the subtask itself. Less useful than the parent, but
+    // far better than a row that ignores being clicked.
+    setPanelTask(row as unknown as Task)
   }
 
   // ── Export ──
@@ -1208,7 +1236,7 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
                         indistinguishable from a task and the list looks like it
                         has grown duplicates. */}
                     {task.parent_task_id && (
-                      <span title="A subtask of another task" style={{ flexShrink: 0, fontSize: 9, fontWeight: 700,
+                      <span title="A subtask of another task — click the row to open the task it belongs to" style={{ flexShrink: 0, fontSize: 9, fontWeight: 700,
                         background: 'rgba(8,145,178,0.12)', color: '#0891b2',
                         padding: '1px 5px', borderRadius: 3, whiteSpace: 'nowrap' }}>
                         ↳ Subtask
