@@ -69,7 +69,12 @@ export async function POST(request: NextRequest) {
     const { data: existing } = await admin.from('org_members')
       .select('id, is_active').eq('org_id', mb.org_id).eq('user_id', existingUser.id).maybeSingle()
     if (existing?.is_active)
-      return NextResponse.json({ error: 'User is already a member' }, { status: 409 })
+      // Re-inviting is what admins try when someone cannot sign in, so say why
+      // it will not help. An invite creates access; it does not touch a
+      // password, and this person already has access.
+      return NextResponse.json({
+        error: 'This person is already an active member. Re-inviting will not fix a sign-in problem — an invite grants access, it does not reset a password. Ask them to use "Forgot password?" on the login page, or to sign in with the emailed link instead of a password.',
+      }, { status: 409 })
 
     if (existing) {
       await admin.from('org_members').update({ is_active: true, role }).eq('id', existing.id)
@@ -176,8 +181,16 @@ export async function PATCH(request: NextRequest) {
     let removeQuery = admin.from('org_members').update({ is_active: false }).eq('org_id', mb.org_id)
     if (member_id) removeQuery = removeQuery.eq('id', member_id)
     else           removeQuery = removeQuery.eq('user_id', user_id)
-    const { error: removeErr } = await removeQuery
+    // Confirm a row was actually deactivated. This used to report "Member
+    // removed" whatever happened, so an id that matched nothing looked like a
+    // success — and the membership stayed active. The admin then could not
+    // re-invite the person either, because the invite path correctly refuses
+    // someone who is still an active member. That dead end is what this check
+    // prevents: a removal that did not happen now says so.
+    const { data: removedRows, error: removeErr } = await removeQuery.select('id')
     if (removeErr) return NextResponse.json(dbError(removeErr, 'team'), { status: 500 })
+    if (!removedRows || removedRows.length === 0)
+      return NextResponse.json({ error: 'Member not found in this organisation' }, { status: 404 })
     return NextResponse.json({ success: true, message: 'Member removed' })
   }
 
