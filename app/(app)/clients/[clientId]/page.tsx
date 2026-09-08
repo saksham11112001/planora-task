@@ -13,7 +13,6 @@ import ClientOnboardingChecklist from './ClientOnboardingChecklist'
 import { createAdminClient }    from '@/lib/supabase/admin'
 import type { Metadata }        from 'next'
 export const metadata: Metadata = { title: 'Client' }
-export const revalidate = 30
 
 export default async function ClientDetailPage({ params }: { params: Promise<{ clientId: string }> }) {
   const { clientId } = await params

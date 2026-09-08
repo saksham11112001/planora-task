@@ -6,7 +6,6 @@ import { redirect }     from 'next/navigation'
 import { TaskSettingsForm } from './TaskSettingsForm'
 import type { Metadata }   from 'next'
 export const metadata: Metadata = { title: 'Task settings' }
-export const revalidate = 20
 
 export default async function TaskSettingsPage() {
   const user = await getSessionUser()

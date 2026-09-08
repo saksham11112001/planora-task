@@ -229,9 +229,16 @@ export async function PATCH(request: NextRequest) {
             .filter(([, v]) => typeof v === 'boolean')
             .map(([k, v]) => [k, v as boolean])
         )
-    const { error: permErr } = await admin.from('org_members')
+    // targetId is matched against org_members.id. A caller passing user_id
+    // instead would match nothing, and an unchecked update reports success
+    // having changed nothing — the "I saved it and it did not stick" shape.
+    // Confirm a row was actually written before claiming it was.
+    const { data: updatedRows, error: permErr } = await admin.from('org_members')
       .update({ permissions: sanitized }).eq('org_id', mb.org_id).eq('id', targetId)
+      .select('id')
     if (permErr) return NextResponse.json(dbError(permErr, 'team'), { status: 500 })
+    if (!updatedRows || updatedRows.length === 0)
+      return NextResponse.json({ error: 'Member not found in this organisation' }, { status: 404 })
     return NextResponse.json({ success: true })
   }
 

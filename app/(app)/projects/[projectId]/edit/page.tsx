@@ -6,7 +6,10 @@ import { ProjectEditForm } from './ProjectEditForm'
 import type { Metadata }   from 'next'
 export const metadata: Metadata = { title: 'Edit Project' }
 
-export const revalidate = 20
+// NEVER cache: this page renders one organisation's data, and the route is
+// identical for every org — an ISR entry keyed on the path alone can be served
+// to a different tenant.
+export const dynamic = 'force-dynamic'
 
 export default async function ProjectEditPage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params

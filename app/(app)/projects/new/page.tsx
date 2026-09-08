@@ -7,7 +7,10 @@ import { NewProjectForm } from './NewProjectForm'
 import type { Metadata }  from 'next'
 export const metadata: Metadata = { title: 'New project' }
 
-export const revalidate = 20
+// NEVER cache: this page renders one organisation's data, and the route is
+// identical for every org — an ISR entry keyed on the path alone can be served
+// to a different tenant.
+export const dynamic = 'force-dynamic'
 
 export default async function NewProjectPage() {
   const user = await getSessionUser()

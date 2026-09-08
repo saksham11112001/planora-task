@@ -6,7 +6,6 @@ import { BillingView }  from './BillingView'
 import type { Metadata } from 'next'
 export const metadata: Metadata = { title: 'Billing' }
 
-export const revalidate = 20
 
 export default async function BillingPage() {
   const user = await getSessionUser()
