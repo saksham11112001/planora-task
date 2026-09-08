@@ -11,14 +11,28 @@
 // quiet, not a compliance record.
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient }        from '@/lib/supabase/admin'
+import crypto                       from 'crypto'
 
 const BOUNCE_EVENTS = new Set(['hard_bounce', 'soft_bounce', 'spam', 'invalid_email'])
 const OPEN_EVENTS   = new Set(['opened', 'unique_opened', 'proxy_open'])
 
 export async function POST(req: NextRequest) {
-  // Basic secret check — add BREVO_WEBHOOK_SECRET to your Vercel env vars
+  // Fail CLOSED. The check used to be skipped entirely when
+  // BREVO_WEBHOOK_SECRET was unset, which left an unauthenticated endpoint that
+  // marks vendors email_bounced = true. Anyone who found it could permanently
+  // suppress a firm's entire vendor outreach — the reminder cron and both send
+  // routes all refuse to email a bounced vendor — and nothing in the product
+  // would explain why the emails had stopped.
+  const configured = process.env.BREVO_WEBHOOK_SECRET
+  if (!configured) {
+    console.error('[msme/bounce-webhook] BREVO_WEBHOOK_SECRET is not set — rejecting')
+    return NextResponse.json({ error: 'Webhook not configured' }, { status: 503 })
+  }
   const secret = req.nextUrl.searchParams.get('secret')
-  if (process.env.BREVO_WEBHOOK_SECRET && secret !== process.env.BREVO_WEBHOOK_SECRET) {
+  const provided = Buffer.from(secret ?? '')
+  const expected = Buffer.from(configured)
+  const ok = provided.length === expected.length && crypto.timingSafeEqual(provided, expected)
+  if (!ok) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
