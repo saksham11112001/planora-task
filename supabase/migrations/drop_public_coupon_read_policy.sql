@@ -1,0 +1,43 @@
+-- ============================================================================
+-- Remove the RLS policy that let ANY signed-in user read every active coupon.
+--
+-- create_coupons.sql shipped:
+--
+--   CREATE POLICY "auth_read_active_coupons" ON coupons
+--   FOR SELECT TO authenticated USING (is_active = true);
+--
+-- so any authenticated user — including a viewer in a free org, or anyone who
+-- signed up for the MSME tracker — could query the coupons table straight from
+-- the browser Supabase client and read every live code, its plan_tier and its
+-- remaining uses. That includes 100%-off codes issued to individual buyers who
+-- had paid directly, and the BNI code. Reading them is enough to spend them:
+-- the redemption flow only asks for the code.
+--
+-- Nothing needs the policy. Every reader in the codebase goes through the
+-- service role, which bypasses RLS entirely and is unaffected by this drop:
+--
+--   app/api/msme/coupon        validate a code before checkout
+--   app/api/msme/pay           resolve the discount server-side
+--   app/api/msme/pay/webhook   record redemption
+--   app/api/coupon             upFloat plan coupons
+--   app/api/settings/billing   + /verify
+--   app/api/admin/coupons      + /[id]   (super-admin only)
+--   app/coupons/saksham/page   super-admin page, createAdminClient
+--
+-- After this, an ordinary user has NO read path to the coupons table. Codes are
+-- validated by the server, which is the only thing that ever needed to see them.
+--
+-- Idempotent, and does not touch the service_role policy that the app relies on.
+-- ============================================================================
+
+DROP POLICY IF EXISTS "auth_read_active_coupons" ON coupons;
+
+-- VERIFY — expect only the two service_role policies to remain.
+--
+--   SELECT policyname, roles, cmd
+--   FROM   pg_policies
+--   WHERE  tablename = 'coupons'
+--   ORDER  BY policyname;
+--
+-- And confirm the app still works: applying a valid code in the MSME pricing
+-- dialog must still succeed, because that path never used this policy.

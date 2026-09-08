@@ -50,6 +50,9 @@ interface Props {
   clients?:       { id: string; name: string; color: string }[]
   currentUserId?: string
   userRole?:      string
+  /** Resolved server-side from the reports.view_all permission, so a Member who
+   *  has been granted it sees the whole team without changing their role. */
+  canViewAllReports?: boolean
   dailyData:       { date: string; created: number; completed: number }[]
   memberData:      { name: string; completed: number }[]
   priorityData:    { name: string; value: number; color: string }[]
@@ -340,7 +343,7 @@ function buildComplianceData(
 }
 // ────────────────────────────────────────────────────────────────────────────
 
-export function ReportsCharts({ dailyData, memberData, priorityData, projectData, timeByProject, employeeStats, currentUserId, userRole, clients = [], complianceRawTasks = [], complianceMemberList = [], wipData = [], trajectoryData = [], statusBreakdown = [], actionItems }: Props) {
+export function ReportsCharts({ dailyData, memberData, priorityData, projectData, timeByProject, employeeStats, currentUserId, userRole, canViewAllReports, clients = [], complianceRawTasks = [], complianceMemberList = [], wipData = [], trajectoryData = [], statusBreakdown = [], actionItems }: Props) {
   const [activeTab,    setActiveTab]    = useState<'overview' | 'actions' | 'team' | 'compliance' | 'wip'>('overview')
   const [clientFilter, setClientFilter] = useState('')
   const [timeline,     setTimeline]     = useState<'30' | '60' | '90' | '365'>('90')
@@ -352,7 +355,11 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
   const [compDateFrom, setCompDateFrom] = useState(today90From)
   const [compDateTo,   setCompDateTo]   = useState(todayStr)
 
-  const canViewAll = !userRole || ['owner','admin','manager'].includes(userRole)
+  // Decided on the server by canDo('reports.view_all'), which honours per-user
+  // permission overrides. The old role-list test here ignored the permission
+  // entirely, so a Member granted reports.view_all still saw only themselves.
+  // The role fallback covers callers that predate the prop.
+  const canViewAll = canViewAllReports ?? (!userRole || ['owner','admin','manager'].includes(userRole))
 
   // Universal filter store — used to pre-filter compliance raw tasks
   const {

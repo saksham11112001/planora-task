@@ -5,6 +5,7 @@ import { ReportsCharts }  from './ReportsCharts'
 import { ReportsExport }  from './ReportsExport'
 import { fmtHours }       from '@/lib/utils/format'
 import { TruncationNotice } from '@/components/ui/TruncationNotice'
+import { canDo }          from '@/lib/utils/permissionGate'
 
 export async function ReportsFetcher() {
   const user = await getSessionUser()
@@ -289,6 +290,20 @@ export async function ReportsFetcher() {
     memberMap[uid] = name
   })
 
+  // Whose figures may this person see?
+  //
+  // ReportsCharts used to decide this itself with a hardcoded
+  // ['owner','admin','manager'].includes(role) test, which meant the
+  // reports.view_all permission — settable per role in Settings → Permissions
+  // and per person in Team → Permissions — had no effect on this page at all.
+  // Granting it to a member changed nothing; they still saw only themselves.
+  //
+  // canDo applies the documented order: owner/admin always, then the per-user
+  // override on org_members.permissions, then the org's role grid, then the
+  // built-in default. So a Member with the permission granted now sees the
+  // whole team, and a Member without it still sees only their own row.
+  const canViewAllReports = await canDo(supabase, orgId, user.id, mb.role, 'reports.view_all')
+
   const actionItems = {
     overdue: tasks
       .filter(t => t.due_date && t.due_date < today && t.status !== 'completed' && t.status !== 'cancelled')
@@ -375,10 +390,15 @@ export async function ReportsFetcher() {
           priorityData={priorityData}
           projectData={projectData}
           timeByProject={timeByProject}
-          employeeStats={employeeStats}
+          /* Filtered HERE, not in the browser. Every member's figures used to
+             be serialised into the page for everyone and merely hidden by the
+             client — readable by anyone who opened devtools. Someone without
+             reports.view_all is now simply not sent their colleagues' rows. */
+          employeeStats={canViewAllReports ? employeeStats : employeeStats.filter(e => e.uid === user.id)}
           currentUserId={user.id}
           clients={clients ?? []}
           userRole={mb.role}
+          canViewAllReports={canViewAllReports}
           complianceRawTasks={complianceRawTasks}
           complianceMemberList={complianceMemberList}
           wipData={wipData}
