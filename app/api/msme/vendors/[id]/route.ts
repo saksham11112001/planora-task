@@ -84,13 +84,37 @@ export async function DELETE(
   }
 
   const admin = createAdminClient()
-  // Soft-delete: slot remains permanently consumed to prevent gaming the free tier
-  const { error } = await admin
+
+  // Resolve the address first, then soft-delete EVERY row in this org holding
+  // it — not just the id that was clicked.
+  //
+  // The email is the vendor's identity here: it is what the slot accounting
+  // counts, what the re-add path looks for, and what the unique index
+  // constrains. But that index is partial (`WHERE is_deleted = false`), so
+  // nothing has ever prevented an org accumulating more than one row for the
+  // same address. When that happened, deleting the row on screen left a
+  // sibling active, and re-adding the vendor was refused with "a vendor with
+  // this email already exists" — the address looked permanently burnt.
+  //
+  // Slots are unaffected: they are counted from email_count > 0 across all
+  // rows including deleted ones, so nothing is freed by this that should not be.
+  const { data: target } = await admin
     .from('msme_vendors')
-    .update({ is_deleted: true })
+    .select('vendor_email')
     .eq('id', id)
     .eq('org_id', mb.org_id)
+    .maybeSingle()
+
+  if (!target) return NextResponse.json({ error: 'Vendor not found' }, { status: 404 })
+
+  const { data: removed, error } = await admin
+    .from('msme_vendors')
+    .update({ is_deleted: true })
+    .eq('org_id', mb.org_id)
+    .eq('vendor_email', target.vendor_email)
+    .eq('is_deleted', false)
+    .select('id')
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ ok: true })
+  return NextResponse.json({ ok: true, removed: removed?.length ?? 0 })
 }
