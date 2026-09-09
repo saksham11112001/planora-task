@@ -104,7 +104,10 @@
       "Bash(timeout 90 git push -u origin HEAD)",
       "Bash(timeout 90 git push origin HEAD)",
       "Bash(grep -n \"const { name, org_name, industry, team_size, phone\\\\|const resolvedName\\\\|notifySuperAdminsOfOnboarding\" app/api/onboarding/route.ts)",
-      "Bash(timeout 90 git push -u origin feat/signup-alert-phone)"
+      "Bash(timeout 90 git push -u origin feat/signup-alert-phone)",
+      "Bash(sed -i \"s|import { engagementEmails }            from '@/lib/inngest/functions/engagementEmails'|import { engagementEmails }            from '@/lib/inngest/functions/engagementEmails'\\\\nimport { weeklyUsageReport }           from '@/lib/inngest/functions/weeklyUsageReport'|\" app/api/inngest/route.ts)",
+      "Bash(sed -i \"s|^    engagementEmails,$|    engagementEmails,\\\\n    weeklyUsageReport,|\" app/api/inngest/route.ts)",
+      "Bash(timeout 90 git push -u origin feat/usage-tracking-weekly-report)"
     ]
   }
 }
