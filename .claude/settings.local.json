@@ -102,7 +102,9 @@
       "Bash(timeout 90 git push origin feat/subtask-only-badge)",
       "Bash(timeout 90 git push -u origin fix/name-reset-and-monitor-subtask-click)",
       "Bash(timeout 90 git push -u origin HEAD)",
-      "Bash(timeout 90 git push origin HEAD)"
+      "Bash(timeout 90 git push origin HEAD)",
+      "Bash(grep -n \"const { name, org_name, industry, team_size, phone\\\\|const resolvedName\\\\|notifySuperAdminsOfOnboarding\" app/api/onboarding/route.ts)",
+      "Bash(timeout 90 git push -u origin feat/signup-alert-phone)"
     ]
   }
 }

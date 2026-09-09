@@ -3,6 +3,7 @@ import type { NextRequest } from 'next/server'
 import { dbError } from '@/lib/api-error'
 import { generateCode, normaliseCode } from '@/lib/utils/codeGen'
 import { attributeSignup } from '@/lib/partner/attribution'
+import { notifySuperAdminsOfOnboarding } from '@/lib/email/signupAlert'
 
 export async function POST(request: NextRequest) {
   try {
@@ -303,6 +304,16 @@ export async function POST(request: NextRequest) {
       // Non-fatal — don't fail org creation if Inngest is unavailable
       console.error('[onboarding] Failed to fire user/welcome event:', e)
     }
+
+    // Tell super admins, WITH the phone number. The signup alert fired earlier,
+    // the moment the login was created, and could only report an email address
+    // — the phone is asked for here. Placed after the org row exists so a failed
+    // creation never produces an alert for an org that does not exist.
+    // notifySuperAdminsOfOnboarding swallows its own errors.
+    await notifySuperAdminsOfOnboarding(
+      { email: user.email, name: resolvedName, phone: phone?.trim() || null },
+      { name: org_name.trim(), industry: industry || null, teamSize: team_size || null, country: country || null },
+    )
 
     return NextResponse.json({ success: true, org_id: org.id, msme_referral: msmeReferral }, { status: 201 })
   } catch (err: any) {
