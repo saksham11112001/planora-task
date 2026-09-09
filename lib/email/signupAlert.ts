@@ -35,19 +35,33 @@ export function resolveSignupSurface(host?: string | null, path?: string | null)
   return 'app'
 }
 
+/** Name, email and phone all come from user-controlled input — escape before
+ *  putting any of them in an HTML body. */
+const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+const nowIST = () =>
+  new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' })
+
 export async function notifySuperAdminsOfSignup(
-  user: { email?: string | null; name?: string | null },
+  user: { email?: string | null; name?: string | null; phone?: string | null },
   source: string,           // HOW they authenticated — e.g. 'google oauth', 'email link'
   surface: SignupSurface = 'app',   // WHERE they signed up — app / msme / partner
 ) {
   const to = superAdminEmails()
   if (!to.length) return
 
-  // Name/email come from user-controlled metadata — escape for the HTML body
-  const esc   = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   const email = esc(user.email ?? 'unknown')
   const name  = esc(user.name ?? (user.email ?? 'unknown').split('@')[0])
-  const when  = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' })
+  // Partner registration collects a phone up front, so it is known here. The
+  // app and MSME flows do not: this alert fires the moment the account is
+  // created, and the phone is only asked for at onboarding, which happens
+  // afterwards. Rather than print an empty row and leave the reader wondering
+  // whether the person refused to give one, say when it is coming — the
+  // "completed setup" alert below carries it.
+  const phone = user.phone?.trim()
+    ? esc(user.phone.trim())
+    : 'not yet — collected at setup'
+  const when  = nowIST()
 
   const where = SURFACE_LABEL[surface] ?? SURFACE_LABEL.app
 
@@ -58,7 +72,7 @@ export async function notifySuperAdminsOfSignup(
       // Surface goes in the subject too — super admins scan the inbox and need
       // to see which product a signup came from without opening the mail.
       subject: `New ${where} signup: ${email}`,
-      text:    `New user signed up.\n\nName: ${name}\nEmail: ${email}\nSigned up on: ${where}\nMethod: ${source}\nTime: ${when} IST`,
+      text:    `New user signed up.\n\nName: ${name}\nEmail: ${email}\nPhone: ${phone}\nSigned up on: ${where}\nMethod: ${source}\nTime: ${when} IST`,
       html: `
         <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:480px;margin:0 auto;padding:28px 24px;background:#fff">
           <span style="font-size:20px;font-weight:800;color:#0f172a;letter-spacing:-0.5px">upFloat</span>
@@ -66,6 +80,7 @@ export async function notifySuperAdminsOfSignup(
           <table style="font-size:14px;color:#334155;border-collapse:collapse">
             <tr><td style="padding:4px 16px 4px 0;color:#94a3b8">Name</td><td style="padding:4px 0;font-weight:600">${name}</td></tr>
             <tr><td style="padding:4px 16px 4px 0;color:#94a3b8">Email</td><td style="padding:4px 0;font-weight:600">${email}</td></tr>
+            <tr><td style="padding:4px 16px 4px 0;color:#94a3b8">Phone</td><td style="padding:4px 0;font-weight:600">${phone}</td></tr>
             <tr><td style="padding:4px 16px 4px 0;color:#94a3b8">Signed up on</td><td style="padding:4px 0;font-weight:600;color:#0d9488">${where}</td></tr>
             <tr><td style="padding:4px 16px 4px 0;color:#94a3b8">Method</td><td style="padding:4px 0">${source}</td></tr>
             <tr><td style="padding:4px 16px 4px 0;color:#94a3b8">Time</td><td style="padding:4px 0">${when} IST</td></tr>
@@ -75,5 +90,61 @@ export async function notifySuperAdminsOfSignup(
     if (error) console.error('[signupAlert] send failed:', error)
   } catch (err) {
     console.error('[signupAlert] unexpected error:', err)
+  }
+}
+
+/**
+ * Fires when a user finishes onboarding and their organisation is created.
+ *
+ * This is the alert that actually carries a phone number for app and MSME
+ * signups. The signup alert above runs the instant the account exists, which is
+ * before onboarding has asked for anything — so it can only ever report the
+ * email address. Onboarding is where the phone is collected, validated as
+ * E.164 and checked for the one-trial-per-phone rule, so by the time this runs
+ * the number is both present and known-good.
+ *
+ * It is also the more meaningful business signal of the two: a signup is
+ * someone who created a login, whereas this is someone who named their firm and
+ * gave a contactable number.
+ *
+ * Never throws: a failed alert must not break org creation.
+ */
+export async function notifySuperAdminsOfOnboarding(
+  user: { email?: string | null; name?: string | null; phone?: string | null },
+  org:  { name?: string | null; industry?: string | null; teamSize?: string | null; country?: string | null },
+) {
+  const to = superAdminEmails()
+  if (!to.length) return
+
+  const email   = esc(user.email ?? 'unknown')
+  const name    = esc(user.name ?? (user.email ?? 'unknown').split('@')[0])
+  const phone   = user.phone?.trim() ? esc(user.phone.trim()) : 'not provided'
+  const orgName = esc(org.name ?? 'Unnamed organisation')
+  const extras  = [org.industry, org.teamSize, org.country].filter(Boolean).map(v => esc(String(v))).join(' · ')
+  const when    = nowIST()
+
+  try {
+    const { error } = await resend.emails.send({
+      from:    FROM,
+      to,
+      subject: `Setup complete: ${orgName} — ${phone}`,
+      text:    `A user completed onboarding.\n\nName: ${name}\nEmail: ${email}\nPhone: ${phone}\nOrganisation: ${orgName}\n${extras ? `Details: ${extras}\n` : ''}Time: ${when} IST`,
+      html: `
+        <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:480px;margin:0 auto;padding:28px 24px;background:#fff">
+          <span style="font-size:20px;font-weight:800;color:#0f172a;letter-spacing:-0.5px">upFloat</span>
+          <h2 style="font-size:17px;font-weight:700;color:#0f172a;margin:18px 0 14px">✅ Setup complete</h2>
+          <table style="font-size:14px;color:#334155;border-collapse:collapse">
+            <tr><td style="padding:4px 16px 4px 0;color:#94a3b8">Name</td><td style="padding:4px 0;font-weight:600">${name}</td></tr>
+            <tr><td style="padding:4px 16px 4px 0;color:#94a3b8">Email</td><td style="padding:4px 0;font-weight:600">${email}</td></tr>
+            <tr><td style="padding:4px 16px 4px 0;color:#94a3b8">Phone</td><td style="padding:4px 0;font-weight:600;color:#0d9488">${phone}</td></tr>
+            <tr><td style="padding:4px 16px 4px 0;color:#94a3b8">Organisation</td><td style="padding:4px 0;font-weight:600">${orgName}</td></tr>
+            ${extras ? `<tr><td style="padding:4px 16px 4px 0;color:#94a3b8">Details</td><td style="padding:4px 0">${extras}</td></tr>` : ''}
+            <tr><td style="padding:4px 16px 4px 0;color:#94a3b8">Time</td><td style="padding:4px 0">${when} IST</td></tr>
+          </table>
+        </div>`,
+    })
+    if (error) console.error('[signupAlert] onboarding send failed:', error)
+  } catch (err) {
+    console.error('[signupAlert] onboarding unexpected error:', err)
   }
 }

@@ -63,7 +63,9 @@ export async function POST(req: NextRequest) {
     // Guarded by `created`, so an existing account joining the programme (the
     // alreadyRegistered path) is not reported as a new signup.
     await notifySuperAdminsOfSignup(
-      { email: cleanEmail, name: name.trim() },
+      // Partner registration asks for a phone on the form, so unlike the app
+      // and MSME flows this alert can carry it straight away.
+      { email: cleanEmail, name: name.trim(), phone: phone ?? null },
       'email + password',
       'partner',
     )

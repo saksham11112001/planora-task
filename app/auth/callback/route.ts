@@ -176,7 +176,13 @@ async function provisionUser(user: any, surface: SignupSurface = 'app') {
     if (!existing) {
       const provider = user.app_metadata?.provider ?? 'oauth'
       await notifySuperAdminsOfSignup(
-        { email: user.email, name: String(rawName) },
+        {
+          email: user.email,
+          name:  String(rawName),
+          // See the note in /api/auth/provision — the phone is collected at
+          // onboarding, which has not run yet at this point.
+          phone: user.phone ?? (user.user_metadata?.phone as string | undefined) ?? null,
+        },
         provider === 'email' ? 'email link' : `${provider} oauth`,
         surface,
       )

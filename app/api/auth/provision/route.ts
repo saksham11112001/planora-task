@@ -83,7 +83,15 @@ export async function POST(request: NextRequest) {
       const provider = user.app_metadata?.provider ?? 'email'
 
       await notifySuperAdminsOfSignup(
-        { email: user.email, name: String(rawName) },
+        {
+          email: user.email,
+          name:  String(rawName),
+          // Almost always absent here — the app and MSME flows ask for a phone
+          // at onboarding, which runs after this. Passed anyway for the rare
+          // provider that supplies one, and notifySuperAdminsOfOnboarding sends
+          // the number once it is actually collected.
+          phone: user.phone ?? (user.user_metadata?.phone as string | undefined) ?? null,
+        },
         provider === 'email' ? 'email + password / magic link' : `${provider} oauth`,
         surface,
       )
