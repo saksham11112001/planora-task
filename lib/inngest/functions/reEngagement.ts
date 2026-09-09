@@ -18,16 +18,25 @@ export const reEngagement = inngest.createFunction(
     const now    = new Date()
     const today  = todayStr()
 
-    // 7-day inactivity window: last_sign_in between 7d and 8d ago
+    // 7-day inactivity window: last seen between 7 and 8 days ago
     const from8d = new Date(now.getTime() - 8 * 86400000).toISOString()
     const from7d = new Date(now.getTime() - 7 * 86400000).toISOString()
 
-    // Supabase auth.users — use admin rpc to get last_sign_in_at
+    // Reads users.last_seen_at, written by /api/heartbeat.
+    //
+    // This used to filter on users.last_sign_in_at — a column no migration
+    // creates and no code writes. The query matched nothing every single day,
+    // so this email had never reached a single user despite the function
+    // running on schedule and reporting success.
+    //
+    // last_seen_at is also the better signal: sessions here are long-lived, so
+    // a sign-in timestamp would say nothing about whether someone has opened
+    // the product in the last week.
     const { data: inactiveUsers } = await admin
       .from('users')
-      .select('id, email, name, last_sign_in_at')
-      .gte('last_sign_in_at', from8d)
-      .lt('last_sign_in_at', from7d)
+      .select('id, email, name, last_seen_at')
+      .gte('last_seen_at', from8d)
+      .lt('last_seen_at', from7d)
       .limit(500)
 
     if (!inactiveUsers?.length) return { sent: 0 }

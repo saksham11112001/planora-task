@@ -18,6 +18,7 @@ import { onboardingNudge }             from '@/lib/inngest/functions/onboardingN
 import { upgradePush }                 from '@/lib/inngest/functions/upgradePush'
 import { msmeReminders }               from '@/lib/inngest/functions/msmeReminders'
 import { engagementEmails }            from '@/lib/inngest/functions/engagementEmails'
+import { weeklyUsageReport }           from '@/lib/inngest/functions/weeklyUsageReport'
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
@@ -42,5 +43,6 @@ export const { GET, POST, PUT } = serve({
     upgradePush,
     msmeReminders,
     engagementEmails,
+    weeklyUsageReport,
   ],
 })

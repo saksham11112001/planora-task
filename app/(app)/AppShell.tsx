@@ -39,6 +39,23 @@ export function AppShell({ user, org, role, workspaceId, allOrgs, children }: Pr
 
   useEffect(() => { setMobileOpen(false) }, [pathname])
 
+  // Record that this person is using the app. Nothing else in the product does
+  // — activity_log only captures writes, so someone who signs in every day just
+  // to read their tasks was indistinguishable from someone who had left. Both
+  // the weekly super-admin report and the re-engagement email need that
+  // difference.
+  //
+  // Once per browser session, and the route throttles again server-side to once
+  // an hour, so navigating around the app costs nothing. Deliberately silent:
+  // a failed usage ping must never surface to someone doing real work.
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem('upfloat_hb') === '1') return
+      sessionStorage.setItem('upfloat_hb', '1')
+    } catch { /* private mode — just send it */ }
+    fetch('/api/heartbeat', { method: 'POST', keepalive: true }).catch(() => {})
+  }, [])
+
   // Lock body scroll on iOS when sidebar is open
   useEffect(() => {
     if (mobileOpen) {
