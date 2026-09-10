@@ -30,11 +30,22 @@ export function normalizeFrequency(freq: string): string {
 }
 
 // ── Annual fixed-date variants ────────────────────────────────────────────────
-const ANNUAL_FIXED: Record<string, [number, number]> = {
-  annual_31jul: [6, 31],   // [month 0-indexed, day]
-  annual_30sep: [8, 30],
-  annual_31dec: [11, 31],
-  annual_31mar: [2, 31],
+// The four statutory presets (31 Jul, 30 Sep, 31 Dec, 31 Mar) and the picker's
+// "Custom date…" values (annual_1jan, annual_15aug, …) share one shape, so a
+// single parser covers every annual value the app can produce. Only the four
+// presets used to be recognised; every other annual date fell through to the
+// default arm of the switch below and repeated WEEKLY.
+const MONTH_SHORT = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec']
+
+/** annual_<day><mon> → [month 0-indexed, day], or null when not an annual value. */
+function parseAnnualFixed(freq: string): [number, number] | null {
+  const m = freq.match(/^annual_(\d{1,2})([a-z]{3})$/)
+  if (!m) return null
+  const month = MONTH_SHORT.indexOf(m[2])
+  if (month === -1) return null
+  const day = parseInt(m[1], 10)
+  if (day < 1 || day > 31) return null
+  return [month, day]
 }
 
 // ── Quarter-end months (0-indexed) ───────────────────────────────────────────
@@ -93,7 +104,6 @@ export function inferGranularFrequency(frequency: string, nextDate: string): str
   }
 
   if (frequency === 'annual') {
-    const MONTH_SHORT = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec']
     return `annual_${d}${MONTH_SHORT[m - 1]}`
   }
 
@@ -108,15 +118,16 @@ export function inferGranularFrequency(frequency: string, nextDate: string): str
  *   weekly_mon … weekly_sun
  *   monthly_1, monthly_7, …, monthly_last
  *   quarterly_13, quarterly_15, quarterly_25, quarterly_last
- *   annual_31jul, annual_30sep, annual_31dec, annual_31mar
+ *   annual_31jul, annual_30sep, annual_31dec, annual_31mar, annual_<day><mon>
  *   annual, quarterly, monthly, weekly, bi_weekly, daily
  */
 export function nextOccurrence(freq: string, from: string): string {
   const ref = localDate(from)
 
   // ── Annual with a fixed calendar date ────────────────────────────────────
-  if (freq in ANNUAL_FIXED) {
-    const [mo, day] = ANNUAL_FIXED[freq]
+  const annualFixed = parseAnnualFixed(freq)
+  if (annualFixed) {
+    const [mo, day] = annualFixed
     for (let yr = ref.getFullYear(); yr <= ref.getFullYear() + 1; yr++) {
       const lastOfMonth = new Date(yr, mo + 1, 0).getDate()
       const c = new Date(yr, mo, Math.min(day, lastOfMonth))

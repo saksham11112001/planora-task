@@ -139,6 +139,40 @@ describe('nextOccurrence — annual fixed dates', () => {
   })
 })
 
+describe('nextOccurrence — annual custom dates (picker "Custom date…")', () => {
+  // Regression: only the four statutory presets were recognised, so every
+  // custom annual date fell through to the default arm and repeated WEEKLY.
+  // A "Yearly Jan" task due 2027-01-01 was drawn on the calendar every
+  // Thursday, including 2026-09-10.
+  test('any day/month pair recurs once a year, not once a week', () => {
+    assert.equal(nextOccurrence('annual_1jan',  '2026-01-01'), '2027-01-01')
+    assert.equal(nextOccurrence('annual_1jan',  '2026-09-03'), '2027-01-01')
+    assert.equal(nextOccurrence('annual_15aug', '2026-01-15'), '2026-08-15')
+    assert.equal(nextOccurrence('annual_15aug', '2026-08-15'), '2027-08-15')
+    assert.equal(nextOccurrence('annual_7nov',  '2026-12-01'), '2027-11-07')
+  })
+
+  test('a year of daily reference dates yields only the anniversary', () => {
+    // The calendar expands a template by stepping forward from the previous
+    // occurrence; anything other than the anniversary is a phantom row.
+    const seen = new Set<string>()
+    let cursor = '2026-01-01'
+    for (let n = 0; n < 5; n++) { cursor = nextOccurrence('annual_1jan', cursor); seen.add(cursor) }
+    assert.deepEqual([...seen], ['2027-01-01', '2028-01-01', '2029-01-01', '2030-01-01', '2031-01-01'])
+  })
+
+  test('clamps a day the target month does not have', () => {
+    assert.equal(nextOccurrence('annual_31feb', '2026-01-01'), '2026-02-28')
+    assert.equal(nextOccurrence('annual_31feb', '2028-01-01'), '2028-02-29') // leap
+    assert.equal(nextOccurrence('annual_31apr', '2026-01-01'), '2026-04-30')
+  })
+
+  test('an unparseable annual-looking value still falls back safely', () => {
+    // Not a real month — must not be mistaken for a fixed annual date.
+    assert.equal(nextOccurrence('annual_1xyz', '2026-08-04'), '2026-08-11')
+  })
+})
+
 describe('nextOccurrence — monthly', () => {
   test('fixed day of month', () => {
     assert.equal(nextOccurrence('monthly_15', '2026-08-01'), '2026-08-15')
@@ -251,6 +285,7 @@ describe('nextOccurrence — invariants across every frequency', () => {
     'every_3_days', 'weekly_mon', 'weekly_fri', 'weekly_days:mon,wed,fri',
     'monthly_1', 'monthly_15', 'monthly_31', 'monthly_last', 'monthly_days:1,15,25',
     'quarterly_13', 'quarterly_last', 'annual_31jul', 'annual_30sep', 'annual_31dec', 'annual_31mar',
+    'annual_1jan', 'annual_15aug', 'annual_31feb', 'annual_29feb',
   ]
 
   test('always returns a strictly future, well-formed date', () => {
