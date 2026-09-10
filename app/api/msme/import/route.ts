@@ -98,7 +98,11 @@ export async function POST(req: NextRequest) {
   let revivedCount = 0
   for (const r of toRevive) {
     const { error } = await admin.from('msme_vendors')
-      .update({ vendor_name: r.name, gstin: r.gstin, is_deleted: false, status: 'pending', email_count: 0, last_emailed_at: null })
+      // email_count / last_emailed_at intentionally untouched — see the note in
+      // the manual add path. They are the slot ledger; resetting them on
+      // reactivation would hand a consumed slot back and let a pack be reused
+      // indefinitely by deleting and re-importing the same addresses.
+      .update({ vendor_name: r.name, gstin: r.gstin, is_deleted: false, status: 'pending' })
       .eq('id', r.id).eq('org_id', mb.org_id)
     if (!error) revivedCount++
   }

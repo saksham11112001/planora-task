@@ -127,8 +127,18 @@ export async function POST(req: NextRequest) {
         gstin:          gstin?.trim() || null,
         is_deleted:     false,
         status:         'pending',
-        email_count:    0,
-        last_emailed_at: null,
+        // email_count and last_emailed_at are deliberately NOT reset.
+        //
+        // They are the slot ledger, not display state: every gate counts rows
+        // where email_count > 0, across deleted rows too, so that a slot stays
+        // consumed once an email has gone out. Zeroing it here handed the slot
+        // back and made the whole permanence scheme defeatable in three clicks
+        // — email 25 vendors, delete them, re-add the same 25, and the counter
+        // reads zero again while the declarations already collected stay in the
+        // table. Repeat, and a 25-vendor pack tracks any number of vendors.
+        //
+        // Re-adding reuses the existing slot, which is what the anti-gaming
+        // migration intended; it was never meant to release it.
       })
       .eq('id', deleted.id)
       .select()
