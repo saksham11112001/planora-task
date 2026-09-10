@@ -48,16 +48,29 @@ export async function POST(req: NextRequest) {
     }, { status: 422 })
   }
 
-  // Get existing emails (all rows incl. soft-deleted) to avoid duplicates
+  // Existing emails, split by state. Treating soft-deleted rows as "already
+  // exists" meant a vendor who had ever been removed could never be brought
+  // back by import — the row was skipped every time with a reason that read
+  // like a duplicate. Manual add already reactivates those; import now matches.
   const { data: existingVendors } = await admin
     .from('msme_vendors')
-    .select('vendor_email')
+    .select('id, vendor_email, is_deleted')
     .eq('org_id', mb.org_id)
 
-  const existingEmails = new Set((existingVendors ?? []).map(v => v.vendor_email.toLowerCase()))
+  const existingEmails = new Set(
+    (existingVendors ?? []).filter(v => !v.is_deleted).map(v => v.vendor_email.toLowerCase()),
+  )
+  // email → id of a removed row that can simply be switched back on.
+  const revivable = new Map<string, string>()
+  for (const v of existingVendors ?? []) {
+    const e = v.vendor_email.toLowerCase()
+    if (v.is_deleted && !existingEmails.has(e) && !revivable.has(e)) revivable.set(e, v.id)
+  }
 
   const skipped: Array<{ row: number; name: string; reason: string }> = []
   const toInsert: Array<{ org_id: string; vendor_name: string; vendor_email: string; gstin: string | null; is_paid: boolean; payment_status: string; created_by: string }> = []
+  // Rows matching a previously removed vendor — reactivated rather than inserted.
+  const toRevive: Array<{ id: string; name: string; gstin: string | null }> = []
 
   for (let i = 0; i < rows.length; i++) {
     const row   = rows[i]
@@ -70,7 +83,28 @@ export async function POST(req: NextRequest) {
     if (existingEmails.has(email))     { skipped.push({ row: i + 1, name, reason: 'Email already exists' }); continue }
 
     existingEmails.add(email) // prevent intra-batch duplicates
+
+    // Previously removed — switch the existing row back on instead of inserting
+    // a second one for the same address. Reuses its slot, exactly as the manual
+    // add path does.
+    const reviveId = revivable.get(email)
+    if (reviveId) { toRevive.push({ id: reviveId, name, gstin }); continue }
+
     toInsert.push({ org_id: mb.org_id, vendor_name: name, vendor_email: email, gstin, is_paid: true, payment_status: 'free', created_by: user.id })
+  }
+
+  // Reactivations run before the insert so a failure here cannot leave the
+  // batch half-applied with duplicates already created.
+  let revivedCount = 0
+  for (const r of toRevive) {
+    const { error } = await admin.from('msme_vendors')
+      // email_count / last_emailed_at intentionally untouched — see the note in
+      // the manual add path. They are the slot ledger; resetting them on
+      // reactivation would hand a consumed slot back and let a pack be reused
+      // indefinitely by deleting and re-importing the same addresses.
+      .update({ vendor_name: r.name, gstin: r.gstin, is_deleted: false, status: 'pending' })
+      .eq('id', r.id).eq('org_id', mb.org_id)
+    if (!error) revivedCount++
   }
 
   let insertedCount = 0
@@ -85,7 +119,10 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({
     ok: true,
-    inserted: insertedCount,
+    // Reactivated rows count as imported from the user's point of view — the
+    // vendor is back in their list either way.
+    inserted: insertedCount + revivedCount,
+    restored: revivedCount,
     skipped,
     paid_slots: 0,
   })

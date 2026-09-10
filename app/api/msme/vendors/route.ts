@@ -90,16 +90,35 @@ export async function POST(req: NextRequest) {
   const admin       = createAdminClient()
   const emailNorm   = vendor_email.trim().toLowerCase()
 
-  // Check if a soft-deleted vendor with the same email exists — reactivate it (no new slot).
-  const { data: deleted } = await admin
+  // Fetch EVERY row for this email in one query — active and soft-deleted.
+  //
+  // This used to be two .maybeSingle() lookups whose errors were discarded.
+  // maybeSingle() ERRORS when more than one row matches, and an org can hold
+  // several soft-deleted rows for the same address (the unique index is
+  // partial: `WHERE is_deleted = false`, so it constrains active rows only).
+  // When that happened both lookups returned null, the reactivate branch was
+  // skipped, and the request fell through to an insert — which is how an email
+  // ends up looking permanently taken after a delete.
+  const { data: sameEmail, error: lookupErr } = await admin
     .from('msme_vendors')
-    .select('id')
+    .select('id, is_deleted, created_at')
     .eq('org_id', mb.org_id)
     .eq('vendor_email', emailNorm)
-    .eq('is_deleted', true)
-    .maybeSingle()
+    .order('created_at', { ascending: false })
 
-  if (deleted) {
+  // Never guess on a failed lookup: inserting here could breach the unique
+  // index or silently duplicate a vendor.
+  if (lookupErr) return NextResponse.json({ error: lookupErr.message }, { status: 500 })
+
+  const activeRow  = (sameEmail ?? []).find(v => !v.is_deleted)
+  const deletedRow = (sameEmail ?? []).find(v =>  v.is_deleted)
+
+  if (activeRow) {
+    return NextResponse.json({ error: 'A vendor with this email already exists' }, { status: 409 })
+  }
+
+  if (deletedRow) {
+    const deleted = deletedRow
     // Reactivate the existing slot — no new slot consumed
     const { data: vendor, error } = await admin
       .from('msme_vendors')
@@ -108,26 +127,24 @@ export async function POST(req: NextRequest) {
         gstin:          gstin?.trim() || null,
         is_deleted:     false,
         status:         'pending',
-        email_count:    0,
-        last_emailed_at: null,
+        // email_count and last_emailed_at are deliberately NOT reset.
+        //
+        // They are the slot ledger, not display state: every gate counts rows
+        // where email_count > 0, across deleted rows too, so that a slot stays
+        // consumed once an email has gone out. Zeroing it here handed the slot
+        // back and made the whole permanence scheme defeatable in three clicks
+        // — email 25 vendors, delete them, re-add the same 25, and the counter
+        // reads zero again while the declarations already collected stay in the
+        // table. Repeat, and a 25-vendor pack tracks any number of vendors.
+        //
+        // Re-adding reuses the existing slot, which is what the anti-gaming
+        // migration intended; it was never meant to release it.
       })
       .eq('id', deleted.id)
       .select()
       .maybeSingle()
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ vendor }, { status: 201 })
-  }
-
-  // Check active vendors don't already have this email
-  const { data: existing } = await admin
-    .from('msme_vendors')
-    .select('id')
-    .eq('org_id', mb.org_id)
-    .eq('vendor_email', emailNorm)
-    .eq('is_deleted', false)
-    .maybeSingle()
-  if (existing) {
-    return NextResponse.json({ error: 'A vendor with this email already exists' }, { status: 409 })
   }
 
   const { data: vendor, error } = await admin

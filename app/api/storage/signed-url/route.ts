@@ -48,8 +48,24 @@ export async function GET(req: NextRequest) {
     // Supabase Storage fallback — determine bucket from key prefix
     const admin = createAdminClient()
     const bucket = key.startsWith('issue-reports/') ? 'issue-reports' : 'attachments'
-    const { data } = admin.storage.from(bucket).getPublicUrl(key)
-    url = data.publicUrl
+    // SIGNED, not public.
+    //
+    // This used to return getPublicUrl(), which is wrong whichever way the
+    // bucket is configured. If the bucket is public the link never expires and
+    // needs no authentication — and worse, the org check above becomes
+    // decorative, because anyone who can construct a key reaches the object
+    // directly without passing through this route at all. Client documents,
+    // compliance attachments and MSME certificates all live in that bucket.
+    // If the bucket is private, getPublicUrl() returns a URL that simply does
+    // not work, so the fallback was broken rather than leaky.
+    //
+    // createSignedUrl honours the same expiry the R2 path uses.
+    const { data, error } = await admin.storage.from(bucket)
+      .createSignedUrl(key, expires, download ? { download: true } : undefined)
+    if (error || !data?.signedUrl) {
+      return NextResponse.json({ error: 'Could not generate a download link' }, { status: 500 })
+    }
+    url = data.signedUrl
   }
 
   // Short cache — URL is already time-limited, no benefit caching at CDN
