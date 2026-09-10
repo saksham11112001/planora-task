@@ -110,7 +110,8 @@
       "Bash(timeout 90 git push -u origin feat/usage-tracking-weekly-report)",
       "Bash(sed -n '/const skipped: Array/,/const toInsert/p' app/api/msme/import/route.ts)",
       "Bash(sed -n '/ok: true,/,/^}/p' app/api/msme/import/route.ts)",
-      "Bash(timeout 90 git push -u origin fix/msme-vendor-email-reuse)"
+      "Bash(timeout 90 git push -u origin fix/msme-vendor-email-reuse)",
+      "Bash(timeout 90 git push -u origin fix/annual-recurrence-and-row-cap)"
     ]
   }
 }

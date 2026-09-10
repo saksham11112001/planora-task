@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import type { NextRequest } from 'next/server'
 import { dbError } from '@/lib/api-error'
 import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
+import { fetchAllRows } from '@/lib/supabase/fetchAll'
 
 export const maxDuration = 30
 
@@ -22,22 +23,33 @@ export async function GET(req: NextRequest) {
   // All other callers (e.g. CAClientSetupView) omit this param and get only active ones.
   const includeInactive = req.nextUrl.searchParams.get('include_inactive') === 'true'
 
-  let query = admin
-    .from('ca_client_assignments')
-    .select(`
-      *,
-      master_task:ca_master_tasks(id, code, name, group_name, task_type, dates, days_before_due, attachment_count, attachment_headers, priority, financial_year),
-      client:clients(id, name, color),
-      assignee:users!ca_client_assignments_assignee_id_fkey(id, name),
-      approver:users!ca_client_assignments_approver_id_fkey(id, name)
-    `)
-    .eq('org_id', mb.org_id)
-    .order('created_at', { ascending: false })
+  // Built fresh per page — a PostgREST builder is single-use.
+  const buildQuery = () => {
+    let query = admin
+      .from('ca_client_assignments')
+      .select(`
+        *,
+        master_task:ca_master_tasks(id, code, name, group_name, task_type, dates, days_before_due, attachment_count, attachment_headers, priority, financial_year),
+        client:clients(id, name, color),
+        assignee:users!ca_client_assignments_assignee_id_fkey(id, name),
+        approver:users!ca_client_assignments_approver_id_fkey(id, name)
+      `)
+      .eq('org_id', mb.org_id)
 
-  if (!includeInactive) query = query.eq('is_active', true)
+    if (!includeInactive) query = query.eq('is_active', true)
+    if (clientId) query = query.eq('client_id', clientId)
 
-  if (clientId) query = query.eq('client_id', clientId)
-  const { data, error } = await query
+    // created_at is not unique, so it cannot page on its own — id breaks the ties.
+    return query.order('created_at', { ascending: false }).order('id', { ascending: true })
+  }
+
+  // A firm with a few hundred clients has more assignments than PostgREST's
+  // max-rows, and it truncates without saying so. Client Setup and the Kanban
+  // board both read this list, so a short answer means clients silently appear
+  // to have no compliance tasks assigned at all.
+  const { data, error } = await fetchAllRows<Record<string, unknown>>(
+    (from, to) => buildQuery().range(from, to),
+  )
 
   if (error) return NextResponse.json(dbError(error, 'ca/assignments'), { status: 500 })
   // Carries the joined master_task.dates, so caching this cached the due dates

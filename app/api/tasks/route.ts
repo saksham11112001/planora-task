@@ -8,6 +8,7 @@ import { assertCan }         from '@/lib/utils/permissionGate'
 import { dbError }           from '@/lib/api-error'
 import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
 import { isValidGranularFrequency } from '@/lib/utils/recurringSchedule'
+import { fetchAllRows }  from '@/lib/supabase/fetchAll'
 
 const VALID_PRIORITIES    = ['low', 'medium', 'high', 'urgent']
 const VALID_TASK_STATUSES = ['todo', 'in_progress', 'in_review', 'completed', 'cancelled']
@@ -21,44 +22,61 @@ export async function GET(request: NextRequest) {
   const admin = createAdminClient()
 
   const sp  = request.nextUrl.searchParams
-  let q = admin.from('tasks')
-    .select('id, title, status, priority, due_date, assignee_id, approver_id, approval_status, approval_required, approved_by, approved_at, completed_at, project_id, client_id, is_recurring, frequency, next_occurrence_date, parent_task_id, parent_recurring_id, custom_fields, created_at, updated_at, is_billable, billable_amount, created_by')
-    .eq('org_id', mb.org_id).neq('is_archived', true)
+  // Built fresh per page — a PostgREST builder is single-use, and paging below
+  // issues one request per page.
+  const buildQuery = () => {
+    let q = admin.from('tasks')
+      .select('id, title, status, priority, due_date, assignee_id, approver_id, approval_status, approval_required, approved_by, approved_at, completed_at, project_id, client_id, is_recurring, frequency, next_occurrence_date, parent_task_id, parent_recurring_id, custom_fields, created_at, updated_at, is_billable, billable_amount, created_by')
+      .eq('org_id', mb.org_id).neq('is_archived', true)
 
-  // Non-manager/admin/owner users only see tasks they are involved in
-  if (!['owner', 'admin', 'manager'].includes(mb.role)) {
-    q = q.or(`assignee_id.eq.${user.id},approver_id.eq.${user.id},created_by.eq.${user.id}`)
+    // Non-manager/admin/owner users only see tasks they are involved in
+    if (!['owner', 'admin', 'manager'].includes(mb.role)) {
+      q = q.or(`assignee_id.eq.${user.id},approver_id.eq.${user.id},created_by.eq.${user.id}`)
+    }
+    if (sp.get('project_id'))   q = q.eq('project_id', sp.get('project_id')!)
+    if (sp.get('assignee_id'))  q = q.eq('assignee_id', sp.get('assignee_id')!)
+    if (sp.get('client_id'))    q = q.eq('client_id', sp.get('client_id')!)
+    if (sp.get('status'))       q = q.eq('status', sp.get('status')!)
+    if (sp.get('mine') === 'true') q = q.eq('assignee_id', user.id)
+    // pending_approvals=true: tasks where the current user is approver and decision is pending
+    if (sp.get('pending_approvals') === 'true')
+      q = q.eq('status', 'in_review').eq('approval_status', 'pending').eq('approver_id', user.id)
+    if (sp.get('parent_id'))    q = q.eq('parent_task_id', sp.get('parent_id')!)
+    if (sp.get('top_level') === 'true') q = q.is('parent_task_id', null)
+    // Inverse of top_level — every subtask in the org, whoever owns it. Used by
+    // Monitor's opt-in "include subtasks" view, which is deliberately a separate
+    // on-demand request so the default page load stays small.
+    if (sp.get('subtasks_only') === 'true') q = q.not('parent_task_id', 'is', null)
+    if (sp.get('exclude_recurring') === 'true') q = q.or('is_recurring.is.null,is_recurring.eq.false')
+    if (sp.get('parent_recurring_id')) q = q.eq('parent_recurring_id', sp.get('parent_recurring_id')!)
+    // Filter to CA compliance tasks only (custom_fields @> '{"_ca_compliance":true}')
+    if (sp.get('ca_compliance') === 'true') q = (q as any).contains('custom_fields', { _ca_compliance: true })
+    // Find all tasks that are blocking a given task id (reverse lookup via JSONB @> contains)
+    if (sp.get('blocks_task_id')) {
+      const btid = sp.get('blocks_task_id')!
+      q = (q as any).contains('custom_fields', { _blocked_by: [btid] })
+    }
+    // Order by due date, then by id. Paging needs a TOTAL order and due_date is
+    // full of ties — without the tiebreak Postgres may repeat a row on one page
+    // and drop another.
+    return q.order('due_date', { ascending: true, nullsFirst: false }).order('id', { ascending: true })
   }
-  if (sp.get('project_id'))   q = q.eq('project_id', sp.get('project_id')!)
-  if (sp.get('assignee_id'))  q = q.eq('assignee_id', sp.get('assignee_id')!)
-  if (sp.get('client_id'))    q = q.eq('client_id', sp.get('client_id')!)
-  if (sp.get('status'))       q = q.eq('status', sp.get('status')!)
-  if (sp.get('mine') === 'true') q = q.eq('assignee_id', user.id)
-  // pending_approvals=true: tasks where the current user is approver and decision is pending
-  if (sp.get('pending_approvals') === 'true')
-    q = q.eq('status', 'in_review').eq('approval_status', 'pending').eq('approver_id', user.id)
-  if (sp.get('parent_id'))    q = q.eq('parent_task_id', sp.get('parent_id')!)
-  if (sp.get('top_level') === 'true') q = q.is('parent_task_id', null)
-  // Inverse of top_level — every subtask in the org, whoever owns it. Used by
-  // Monitor's opt-in "include subtasks" view, which is deliberately a separate
-  // on-demand request so the default page load stays small.
-  if (sp.get('subtasks_only') === 'true') q = q.not('parent_task_id', 'is', null)
-  if (sp.get('exclude_recurring') === 'true') q = q.or('is_recurring.is.null,is_recurring.eq.false')
-  if (sp.get('parent_recurring_id')) q = q.eq('parent_recurring_id', sp.get('parent_recurring_id')!)
-  // Filter to CA compliance tasks only (custom_fields @> '{"_ca_compliance":true}')
-  if (sp.get('ca_compliance') === 'true') q = (q as any).contains('custom_fields', { _ca_compliance: true })
-  // Find all tasks that are blocking a given task id (reverse lookup via JSONB @> contains)
-  if (sp.get('blocks_task_id')) {
-    const btid = sp.get('blocks_task_id')!
-    q = (q as any).contains('custom_fields', { _blocked_by: [btid] })
-  }
+
   const parsedLimit  = parseInt(sp.get('limit')  ?? '0', 10)
   const parsedOffset = parseInt(sp.get('offset') ?? '0', 10)
   const _limit  = (!isNaN(parsedLimit) && parsedLimit > 0) ? Math.min(parsedLimit, 5000) : 5000
   const _offset = Math.max(isNaN(parsedOffset) ? 0 : parsedOffset, 0)
-  q = q.order('due_date', { ascending: true, nullsFirst: false }).range(_offset, _offset + _limit - 1)
 
-  const { data, error } = await q
+  // One request can never return more than PostgREST's max-rows (1000 on
+  // Supabase's defaults), and it truncates silently — no error, no flag, just a
+  // short array. This endpoint advertises up to 5000, so anything past the first
+  // page has to be fetched a page at a time. The CA Tasks board reads this
+  // endpoint, which is why a firm past the cap saw compliance tasks for only its
+  // earliest-dated clients: everything after the cut-off never left the server.
+  const { data, error } = await fetchAllRows<Record<string, unknown>>(
+    (from, to) => buildQuery().range(_offset + from, _offset + to),
+    { maxRows: _limit },
+  )
   if (error) return NextResponse.json(dbError(error, 'tasks'), { status: 500 })
   // NEVER cache this. Client components fetch it with the default cache mode, so
   // `max-age=60, stale-while-revalidate=300` let the BROWSER answer from its own

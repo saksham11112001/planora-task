@@ -6,6 +6,7 @@ import { dbError } from '@/lib/api-error'
 import type { NextRequest }    from 'next/server'
 import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
 import { shiftDays }           from '@/lib/utils/recurringSchedule'
+import { fetchAllRows, chunk } from '@/lib/supabase/fetchAll'
 
 /**
  * POST /api/ca/trigger
@@ -31,32 +32,47 @@ export async function POST(request: NextRequest) {
   // ── 0. Clean up any legacy compliance subtasks (attachment headers that were
   //       incorrectly created as subtask rows). Attachment headers are now shown
   //       only as a UI checklist — not as subtasks.
-  const { data: legacyRows } = await admin
-    .from('tasks')
-    .select('id')
-    .eq('org_id', mb.org_id)
-    .not('parent_task_id', 'is', null)
-    .contains('custom_fields', { _compliance_subtask: true })
+  const { data: legacyRows } = await fetchAllRows<{ id: string }>(
+    (from, to) => admin
+      .from('tasks')
+      .select('id')
+      .eq('org_id', mb.org_id)
+      .not('parent_task_id', 'is', null)
+      .contains('custom_fields', { _compliance_subtask: true })
+      .order('id', { ascending: true })
+      .range(from, to),
+  )
 
   if (legacyRows && legacyRows.length > 0) {
     const legacyIds = legacyRows.map(r => r.id)
-    const { error: cleanErr } = await admin.from('tasks').delete().in('id', legacyIds)
-    if (cleanErr) console.error('[ca/trigger] legacy subtask cleanup failed:', cleanErr.message)
-    else console.log(`[ca/trigger] cleaned up ${legacyIds.length} legacy compliance subtask(s)`)
+    // Chunked: a few thousand ids in one `.in()` overruns the URL length limit
+    // in front of Postgres and comes back 414, which reads as a plain failure.
+    for (const ids of chunk(legacyIds)) {
+      const { error: cleanErr } = await admin.from('tasks').delete().in('id', ids)
+      if (cleanErr) console.error('[ca/trigger] legacy subtask cleanup failed:', cleanErr.message)
+    }
+    console.log(`[ca/trigger] cleaned up ${legacyIds.length} legacy compliance subtask(s)`)
   }
 
   // ── 1. Fetch all active assignments for this org ──────────────────
-  const { data: assignments, error: asgErr } = await admin
-    .from('ca_client_assignments')
-    .select(`
-      id, org_id, client_id, assignee_id, approver_id, created_at, start_date, end_date,
-      master_task:ca_master_tasks(id, name, priority, dates, days_before_due, attachment_headers, attachment_count)
-    `)
-    .eq('org_id', mb.org_id)
-    .eq('is_active', true)
+  // Paged: PostgREST caps a single response at max-rows and truncates in
+  // silence, so a firm past the cap had assignments that this route never even
+  // looked at — their clients' compliance tasks were never created.
+  const { data: assignments, error: asgErr } = await fetchAllRows<any>(
+    (from, to) => admin
+      .from('ca_client_assignments')
+      .select(`
+        id, org_id, client_id, assignee_id, approver_id, created_at, start_date, end_date,
+        master_task:ca_master_tasks(id, name, priority, dates, days_before_due, attachment_headers, attachment_count)
+      `)
+      .eq('org_id', mb.org_id)
+      .eq('is_active', true)
+      .order('id', { ascending: true })
+      .range(from, to),
+  )
 
   if (asgErr) {
-    console.error('[ca/trigger] fetch assignments:', asgErr.message)
+    console.error('[ca/trigger] fetch assignments:', (asgErr as any)?.message)
     return NextResponse.json(dbError(asgErr, 'ca/trigger'), { status: 500 })
   }
   if (!assignments || assignments.length === 0) {
@@ -64,10 +80,16 @@ export async function POST(request: NextRequest) {
   }
 
   // ── 2. Fetch already-spawned instances for this org ───────────────
-  const { data: instances } = await admin
-    .from('ca_task_instances')
-    .select('assignment_id, due_date')
-    .eq('org_id', mb.org_id)
+  // Paged for the same reason — a truncated dedup set makes this route re-attempt
+  // work it already did, which the unique constraint then rejects.
+  const { data: instances } = await fetchAllRows<any>(
+    (from, to) => admin
+      .from('ca_task_instances')
+      .select('assignment_id, due_date')
+      .eq('org_id', mb.org_id)
+      .order('id', { ascending: true })
+      .range(from, to),
+  )
 
   const existingKeys = new Set(
     (instances ?? []).map((r: any) => `${r.assignment_id}__${r.due_date}`)
@@ -75,12 +97,16 @@ export async function POST(request: NextRequest) {
 
   // Also check actual tasks table — guards against ca_task_instances being out of sync
   // (e.g. if a previous spawn wrote the task but the instance insert failed).
-  const { data: existingCATasks } = await admin
-    .from('tasks')
-    .select('title, client_id, due_date')
-    .eq('org_id', mb.org_id)
-    .contains('custom_fields', { _ca_compliance: true })
-    .neq('is_archived', true)
+  const { data: existingCATasks } = await fetchAllRows<any>(
+    (from, to) => admin
+      .from('tasks')
+      .select('id, title, client_id, due_date')
+      .eq('org_id', mb.org_id)
+      .contains('custom_fields', { _ca_compliance: true })
+      .neq('is_archived', true)
+      .order('id', { ascending: true })
+      .range(from, to),
+  )
 
   const existingTaskKeys = new Set(
     (existingCATasks ?? []).map((t: any) => `${t.title}__${t.client_id ?? ''}__${t.due_date ?? ''}`)
