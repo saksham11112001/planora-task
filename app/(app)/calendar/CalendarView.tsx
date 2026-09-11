@@ -592,6 +592,29 @@ export function CalendarView({ tasks: initialTasks, clients = [], members = [], 
                                 {t.client.name.length > 12 ? t.client.name.slice(0, 12)+'…' : t.client.name}
                               </span>
                             )}
+                            {/* Who is doing it. The calendar is read to answer
+                                "who is loaded on Friday", and without a name
+                                every card had to be opened to find out.
+                                First name only — the cards are 190px wide and
+                                the row already carries project, CA and client.
+                                Unassigned is shown rather than hidden: on a
+                                workload view a gap is the thing worth spotting. */}
+                            {t.assignee?.name ? (
+                              <span title={t.assignee.name}
+                                style={{ fontSize:9, padding:'1px 5px', borderRadius:4,
+                                  background:'var(--surface-subtle)', color:'var(--text-secondary)',
+                                  fontWeight:500, maxWidth:72, overflow:'hidden',
+                                  whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
+                                {t.assignee.name.split(' ')[0]}
+                              </span>
+                            ) : (
+                              <span title="No assignee"
+                                style={{ fontSize:9, padding:'1px 5px', borderRadius:4,
+                                  background:'rgba(148,163,184,0.12)', color:'var(--text-muted)',
+                                  fontWeight:500, fontStyle:'italic' }}>
+                                Unassigned
+                              </span>
+                            )}
                             <span style={{ marginLeft:'auto', fontSize:9, padding:'1px 5px', borderRadius:4,
                               background: isDone ? 'rgba(22,163,74,0.15)' : 'var(--surface-subtle)',
                               color: STATUS_DOT[displayStatus] ?? '#94a3b8', fontWeight:500 }}>
@@ -619,7 +642,23 @@ export function CalendarView({ tasks: initialTasks, clients = [], members = [], 
                           WebkitLineClamp:2, WebkitBoxOrient:'vertical' as const }}>
                           {ct.title}
                         </p>
-                        <span style={{ fontSize:9, color:'#a16207' }}>Due {ct.dueDate}</span>
+                        <div style={{ display:'flex', alignItems:'center', gap:5, flexWrap:'wrap' }}>
+                          <span style={{ fontSize:9, color:'#a16207' }}>Due {ct.dueDate}</span>
+                          {/* These carry only an assignee id, so the name is
+                              resolved from the member list the view already has.
+                              Shown for the same reason as the real cards: this is
+                              work that is about to land on someone. */}
+                          {(() => {
+                            const who = ct.assigneeId ? members.find(m => m.id === ct.assigneeId) : null
+                            if (!who) return null
+                            return (
+                              <span title={who.name} style={{ fontSize:9, color:'#a16207', opacity:0.85,
+                                maxWidth:72, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>
+                                · {who.name.split(' ')[0]}
+                              </span>
+                            )
+                          })()}
+                        </div>
                       </div>
                     ))}
                   </div>
