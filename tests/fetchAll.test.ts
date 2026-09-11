@@ -83,6 +83,42 @@ describe('fetchAllRows', () => {
   })
 })
 
+describe('fetchAllRows — the ceiling that took production down', () => {
+  // The default used to be 200_000, i.e. up to 200 sequential round trips for
+  // any caller that forgot to pass one — and every caller did forget. On
+  // /api/ca/assignments, where each page is a four-way join and three views hit
+  // it on load, the fan-out saturated the API tier until every request queued
+  // past Vercel's 60s limit. /api/health timed out and the site was down.
+  test('an unbounded caller cannot issue more than five round trips', async () => {
+    let calls = 0
+    // A table that always has another full page — the worst case.
+    const { data, truncated } = await fetchAllRows<number>((from, to) => {
+      calls++
+      return Promise.resolve({ data: Array.from({ length: to - from + 1 }, (_, i) => from + i), error: null })
+    })
+    assert.equal(calls, 5, 'default ceiling is five pages, not two hundred')
+    assert.equal(data.length, 5 * PAGE_SIZE)
+    assert.equal(truncated, true, 'stopping at our own ceiling must be reported')
+  })
+
+  test('a caller that asks for more gets it, but only by saying so', async () => {
+    let calls = 0
+    const { truncated } = await fetchAllRows<number>((from, to) => {
+      calls++
+      return Promise.resolve({ data: Array.from({ length: to - from + 1 }, (_, i) => from + i), error: null })
+    }, { maxRows: 2 * PAGE_SIZE })
+    assert.equal(calls, 2)
+    assert.equal(truncated, true)
+  })
+
+  test('a complete read is never flagged as truncated', async () => {
+    const { data, truncated } = await fetchAllRows<number>((from, to) =>
+      Promise.resolve({ data: from === 0 ? Array.from({ length: 10 }, (_, i) => i) : [], error: null }))
+    assert.equal(data.length, 10)
+    assert.equal(truncated, false, 'a short page means the data ran out, not the budget')
+  })
+})
+
 describe('chunk', () => {
   test('leaves a list that already fits as one chunk', () => {
     assert.deepEqual(chunk([1, 2, 3], 200), [[1, 2, 3]])

@@ -49,6 +49,7 @@ export const caComplianceSpawn = inngest.createFunction(
             id, org_id, client_id, assignee_id, approver_id, created_at, start_date, end_date,
             master_task:ca_master_tasks(
               id, name, priority, dates, days_before_due
+              { maxRows: 20_000 },
             )
           `)
           .eq('is_active', true)
@@ -79,6 +80,7 @@ export const caComplianceSpawn = inngest.createFunction(
             .in('assignment_id', ids)
             .order('id', { ascending: true })
             .range(from, to),
+          { maxRows: 20_000 },
         )
         if (error) {
           // A partial dedup set would cause duplicate spawn attempts, so stop.
