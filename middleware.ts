@@ -20,6 +20,27 @@ const RATE_LIMITS = {
   join:     { max: 10,  windowMs: 300_000 },
 } as const
 
+/**
+ * Middleware runs on EVERY request and Vercel kills it after a fixed budget, so
+ * nothing in here may wait on the network without a bound. An unbounded await
+ * does not degrade one feature — it returns 504 for the whole site, which is
+ * exactly what MIDDLEWARE_INVOCATION_TIMEOUT means.
+ *
+ * Note a try/catch is not enough on its own: it rescues a dependency that
+ * ERRORS, and does nothing for one that is merely slow. Slow is the case that
+ * takes the site down.
+ */
+const AUTH_TIMEOUT_MS = 3_000
+const RATE_LIMIT_TIMEOUT_MS = 2_000
+
+function withTimeout<T>(p: PromiseLike<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    Promise.resolve(p),
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)),
+  ])
+}
+
 function getClientIp(req: NextRequest): string {
   return (
     req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
@@ -48,7 +69,22 @@ export async function middleware(request: NextRequest) {
     // General 'api' bucket enforces in-memory (no Redis round-trip) — that
     // round-trip was a flat latency tax on every data fetch of every page.
     // Sensitive buckets keep distributed (Upstash) enforcement.
-    const result = await checkRateLimit(ip, bucket, cfg.max, cfg.windowMs, { local: bucket === 'api' })
+    // Bounded for the same reason as the auth calls below. The sensitive
+    // buckets go to Upstash over the network, and rateLimit's own try/catch
+    // only covers Redis ERRORING — a Redis that is simply slow would hang here
+    // and 504 the request. On timeout we let the request through: rate limiting
+    // is abuse mitigation, and briefly losing it is far better than refusing
+    // every sign-in attempt on the site.
+    let result
+    try {
+      result = await withTimeout(
+        checkRateLimit(ip, bucket, cfg.max, cfg.windowMs, { local: bucket === 'api' }),
+        RATE_LIMIT_TIMEOUT_MS, 'rateLimit',
+      )
+    } catch {
+      console.error('[middleware] rate-limit check timed out — allowing request')
+      return NextResponse.next({ request })
+    }
 
     if (!result.allowed) return buildRateLimitResponse(result)
 
@@ -152,16 +188,41 @@ export async function middleware(request: NextRequest) {
   // behaviour exactly for edge cases.
   let user: { id: string } | null = null
   let error: unknown = null
+  // Whether we genuinely learned this request is signed out, or merely failed
+  // to find out. The two must not be treated the same — see the bail-out below.
+  let authKnown = true
   try {
-    const { data: claimsData, error: claimsErr } = await supabase.auth.getClaims()
+    const { data: claimsData, error: claimsErr } = await withTimeout(
+      supabase.auth.getClaims(), AUTH_TIMEOUT_MS, 'getClaims',
+    )
     if (claimsData?.claims?.sub && !claimsErr) {
       user = { id: claimsData.claims.sub }
     }
   } catch { /* fall through to getUser */ }
   if (!user) {
-    const res = await supabase.auth.getUser()
-    user  = res.data.user
-    error = res.error
+    try {
+      const res = await withTimeout(supabase.auth.getUser(), AUTH_TIMEOUT_MS, 'getUser')
+      user  = res.data.user
+      error = res.error
+    } catch {
+      // Supabase Auth did not answer in time. We do NOT know whether this
+      // person is signed in.
+      authKnown = false
+    }
+  }
+
+  // Auth is unreachable. Let the request through untouched rather than guessing.
+  //
+  // Middleware here is a redirect convenience, not the security boundary:
+  // app/(app)/layout.tsx resolves the session itself and redirects to /login
+  // when there is none, and every API route re-authenticates. So passing the
+  // request on costs nothing in safety, while the alternatives are both bad —
+  // treating it as signed out bounces signed-in users to /login mid-session,
+  // and waiting is what produced MIDDLEWARE_INVOCATION_TIMEOUT and 504'd the
+  // entire site when Supabase Auth slowed down.
+  if (!authKnown) {
+    console.error('[middleware] auth lookup timed out — passing request through')
+    return response
   }
 
   // Detect MSME subdomain (msme.upfloat.co or msme.localhost for dev)

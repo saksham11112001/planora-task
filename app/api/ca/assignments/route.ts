@@ -47,15 +47,21 @@ export async function GET(req: NextRequest) {
   // max-rows, and it truncates without saying so. Client Setup and the Kanban
   // board both read this list, so a short answer means clients silently appear
   // to have no compliance tasks assigned at all.
-  const { data, error } = await fetchAllRows<Record<string, unknown>>(
+  // Explicit budget. Each page here is a four-way joined read and three CA
+  // views call this endpoint on load, so an unbounded fan-out on this route in
+  // particular is what took the site down. Three pages covers every realistic
+  // firm — clients × master tasks — and caps the worst case at three round
+  // trips instead of two hundred.
+  const { data, error, truncated } = await fetchAllRows<Record<string, unknown>>(
     (from, to) => buildQuery().range(from, to),
+    { maxRows: 3000 },
   )
 
   if (error) return NextResponse.json(dbError(error, 'ca/assignments'), { status: 500 })
   // Carries the joined master_task.dates, so caching this cached the due dates
   // too — the compliance board kept showing pre-correction deadlines. Same
   // reasoning as /api/tasks and /api/ca/master: no browser copy of live state.
-  return NextResponse.json({ data: data ?? [] }, {
+  return NextResponse.json({ data: data ?? [], truncated }, {
     headers: { 'Cache-Control': 'private, no-store' },
   })
 }

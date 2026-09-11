@@ -18,8 +18,22 @@
 /** Supabase's default `max-rows`. Requesting more than this in one round trip is pointless. */
 export const PAGE_SIZE = 1000
 
-/** Hard ceiling so a runaway table can never spin forever. */
-const MAX_ROWS = 200_000
+/**
+ * Default ceiling — five pages.
+ *
+ * This was 200_000, i.e. up to TWO HUNDRED sequential round trips for a single
+ * caller that did not pass its own cap, and none of the original call sites
+ * did. Each page of /api/ca/assignments is a four-way joined read, and that
+ * endpoint is hit by three CA views on load. The fan-out saturated the Supabase
+ * API tier until every request queued past Vercel's 60-second limit — including
+ * /api/health, which does nothing but a HEAD count. The site was down until the
+ * deploy was rolled back.
+ *
+ * A default has to be safe when someone forgets it, so it is now sized for a
+ * request path. Background jobs that genuinely need more pass maxRows
+ * explicitly and say why.
+ */
+const MAX_ROWS = 5_000
 
 type PageResult<T> = { data: T[] | null; error: unknown }
 
@@ -34,10 +48,15 @@ type PageResult<T> = { data: T[] | null; error: unknown }
 export async function fetchAllRows<T>(
   build: (from: number, to: number) => PromiseLike<PageResult<T>>,
   opts: { pageSize?: number; maxRows?: number } = {},
-): Promise<{ data: T[]; error: unknown }> {
+): Promise<{ data: T[]; error: unknown; truncated: boolean }> {
   const pageSize = Math.max(1, opts.pageSize ?? PAGE_SIZE)
   const maxRows  = opts.maxRows ?? MAX_ROWS
   const out: T[] = []
+  // True when the ceiling stopped us rather than the data running out. Silent
+  // truncation is the fault this helper exists to fix, so hitting our OWN limit
+  // has to be reported the same way — otherwise we have simply moved the lie
+  // from 1000 rows to maxRows.
+  let truncated = false
 
   for (let from = 0; from < maxRows; from += pageSize) {
     // Never ask for more than the caller's remaining budget — a caller that
@@ -46,13 +65,18 @@ export async function fetchAllRows<T>(
     const { data, error } = await build(from, from + size - 1)
     // Return what we have alongside the error — callers decide whether a partial
     // read is usable. None of them should treat it as complete.
-    if (error) return { data: out, error }
+    if (error) return { data: out, error, truncated }
     const rows = data ?? []
     out.push(...rows)
-    if (rows.length < size) break
+    if (rows.length < size) return { data: out, error: null, truncated: false }
+    // A full last page means there was very likely more to come.
+    if (from + size >= maxRows) truncated = true
   }
 
-  return { data: out, error: null }
+  if (truncated) {
+    console.warn(`[fetchAllRows] stopped at the ${maxRows}-row ceiling — result is incomplete`)
+  }
+  return { data: out, error: null, truncated }
 }
 
 /**

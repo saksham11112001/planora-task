@@ -41,6 +41,7 @@ export async function POST(request: NextRequest) {
       .contains('custom_fields', { _compliance_subtask: true })
       .order('id', { ascending: true })
       .range(from, to),
+    { maxRows: 20_000 },
   )
 
   if (legacyRows && legacyRows.length > 0) {
@@ -69,6 +70,7 @@ export async function POST(request: NextRequest) {
       .eq('is_active', true)
       .order('id', { ascending: true })
       .range(from, to),
+    { maxRows: 20_000 },
   )
 
   if (asgErr) {
@@ -89,6 +91,7 @@ export async function POST(request: NextRequest) {
       .eq('org_id', mb.org_id)
       .order('id', { ascending: true })
       .range(from, to),
+    { maxRows: 20_000 },
   )
 
   const existingKeys = new Set(
@@ -106,6 +109,7 @@ export async function POST(request: NextRequest) {
       .neq('is_archived', true)
       .order('id', { ascending: true })
       .range(from, to),
+    { maxRows: 20_000 },
   )
 
   const existingTaskKeys = new Set(
