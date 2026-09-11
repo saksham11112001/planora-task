@@ -94,7 +94,10 @@
       "PowerShell(cd \"C:\\\\Users\\\\Saksham Gupta\\\\Desktop\\\\planora-task\"; $env:NEXT_TELEMETRY_DISABLED=\"1\"; npm run build 2>&1 | Select-Object -Last 12; \"EXITCODE=$LASTEXITCODE\")",
       "Bash(timeout 90 git push -u origin fix/bound-pagination-fanout)",
       "PowerShell(cd \"C:\\\\Users\\\\Saksham Gupta\\\\Desktop\\\\planora-task\"; npm test 2>&1 | Select-String -Pattern \"^. tests |^. pass |^. fail \" ; $env:NEXT_TELEMETRY_DISABLED=\"1\"; npm run build 2>&1 | Select-Object -Last 4; \"BUILD_EXIT=$LASTEXITCODE\")",
-      "Bash(timeout 90 git push -u origin HEAD)"
+      "Bash(timeout 90 git push -u origin HEAD)",
+      "PowerShell(npx tsc --noEmit --skipLibCheck)",
+      "PowerShell(npm test 2>&1)",
+      "PowerShell(npm run build 2>&1)"
     ]
   }
 }
