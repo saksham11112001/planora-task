@@ -19,6 +19,7 @@ import { upgradePush }                 from '@/lib/inngest/functions/upgradePush
 import { msmeReminders }               from '@/lib/inngest/functions/msmeReminders'
 import { engagementEmails }            from '@/lib/inngest/functions/engagementEmails'
 import { weeklyUsageReport }           from '@/lib/inngest/functions/weeklyUsageReport'
+import { onFunctionFailed }            from '@/lib/inngest/functions/onFunctionFailed'
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
@@ -44,5 +45,6 @@ export const { GET, POST, PUT } = serve({
     msmeReminders,
     engagementEmails,
     weeklyUsageReport,
+    onFunctionFailed,
   ],
 })
