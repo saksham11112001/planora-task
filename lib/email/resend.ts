@@ -11,7 +11,38 @@
  *   DISABLE_EMAILS — set to "true" to suppress all sends (useful in dev)
  */
 
+import * as Sentry from '@sentry/nextjs'
+
 export const FROM = process.env.FROM_EMAIL ?? 'upFloat <noreply@upfloat.co>'
+
+/** Ceiling on a single send. Generous for a transactional API, and finite. */
+const SEND_TIMEOUT_MS = 15_000
+
+/**
+ * Report a delivery failure somewhere a human will actually see it.
+ *
+ * console.error alone reaches only the platform log, which is short-lived and
+ * nobody tails. That is precisely how a single wrong digit in the SMTP port
+ * silently stopped every outgoing email for days: signups, invites, digests,
+ * reminders. Nothing alerted, because nothing was watching.
+ *
+ * Scoped to this one function on purpose. There are ~124 console.error sites in
+ * the codebase and routing them all to Sentry would exhaust a free-tier quota
+ * in noise. Email is the choke point every message passes through, and its
+ * failures are invisible from inside the product.
+ *
+ * A no-op when Sentry is unconfigured, and never throws — a broken error
+ * reporter must not break the thing it reports on.
+ */
+function reportSendFailure(reason: string, subject: string, level: 'error' | 'warning' = 'error') {
+  try {
+    Sentry.captureMessage(`[email] ${reason}`, {
+      level,
+      tags:  { subsystem: 'email', provider: 'brevo' },
+      extra: { subject },
+    })
+  } catch { /* reporting must never take the send path down */ }
+}
 
 type SendPayload = {
   from: string
@@ -45,6 +76,7 @@ async function brevoSend(payload: SendPayload): Promise<{ data: null; error: str
   const apiKey = process.env.BREVO_API_KEY
   if (!apiKey) {
     console.error('[email] BREVO_API_KEY is not set — email not sent:', payload.subject)
+    reportSendFailure('BREVO_API_KEY is not set — no email can be sent at all', payload.subject)
     return { data: null, error: 'BREVO_API_KEY not configured' }
   }
 
@@ -71,19 +103,48 @@ async function brevoSend(payload: SendPayload): Promise<{ data: null; error: str
   }
   if (payload.replyTo) body.replyTo = parseAddress(payload.replyTo)
 
-  const res = await fetch('https://api.brevo.com/v3/smtp/email', {
-    method:  'POST',
-    headers: {
-      'api-key':      apiKey,
-      'Content-Type': 'application/json',
-      'Accept':       'application/json',
-    },
-    body: JSON.stringify(body),
-  })
+  // Bounded, like every other outbound call. Without this a slow Brevo blocks
+  // its caller indefinitely, and the callers are loops: the digest job sends
+  // sequentially, so ONE hung request stalls the whole run. Its own time budget
+  // is checked between sends and cannot interrupt a send already in flight, so
+  // this is what actually enforces it.
+  let res: Response
+  try {
+    res = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method:  'POST',
+      headers: {
+        'api-key':      apiKey,
+        'Content-Type': 'application/json',
+        'Accept':       'application/json',
+      },
+      body:   JSON.stringify(body),
+      signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
+    })
+  } catch (err) {
+    // Returned, not thrown — every caller checks `error` and none of them are
+    // wrapped in try/catch for this. Throwing here would abort whole batches.
+    const msg = (err as Error)?.name === 'TimeoutError'
+      ? `Brevo did not respond within ${SEND_TIMEOUT_MS / 1000}s`
+      : `Brevo request failed: ${(err as Error)?.message ?? String(err)}`
+    console.error('[email]', msg, '—', payload.subject)
+    reportSendFailure(msg, payload.subject)
+    return { data: null, error: msg }
+  }
 
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText)
-    console.error(`[email] Brevo send failed (${res.status}):`, text)
+    // 402 is Brevo's "daily sending limit reached". On the free plan that is 300
+    // a day, and it arrives as an ordinary rejection that only reaches a log —
+    // which is how a fortnight of undelivered mail can go unnoticed.
+    const quotaHit = res.status === 402
+    const hint = quotaHit ? ' — DAILY SENDING QUOTA EXHAUSTED' : ''
+    console.error(`[email] Brevo send failed (${res.status})${hint}:`, text)
+    reportSendFailure(
+      quotaHit
+        ? 'Brevo daily sending quota exhausted — every further email today will be dropped'
+        : `Brevo rejected the send (${res.status}): ${text}`,
+      payload.subject,
+    )
     return { data: null, error: text }
   }
 

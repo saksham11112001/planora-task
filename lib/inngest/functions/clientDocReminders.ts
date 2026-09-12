@@ -32,7 +32,10 @@ export const clientDocReminders = inngest.createFunction(
     concurrency: { limit: 1 },
   },
   [
-    { cron: '30 1 * * *' },
+    // 7:40 AM IST. Staggered off 7:00, where this collided with the recurring
+    // and CA compliance spawns — three full-table walks at once on one
+    // shared-CPU database.
+    { cron: '10 2 * * *' },
     { event: 'client/document-uploaded' },
   ],
   async ({ event, step }) => {

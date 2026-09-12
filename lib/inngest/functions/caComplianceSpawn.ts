@@ -23,8 +23,13 @@ export const caComplianceSpawn = inngest.createFunction(
     name:        'Daily: spawn CA compliance tasks for clients',
     concurrency: { limit: 1 },
   },
-  // Fires daily at 7:00 AM IST AND can be triggered manually from /api/ca/trigger
-  [{ cron: '30 1 * * *' }, { event: 'ca/compliance-spawn-manual' }],
+  // Fires daily at 7:20 AM IST AND can be triggered manually from /api/ca/trigger.
+  //
+  // Staggered, not simultaneous. This and two other heavy jobs all ran at 7:00,
+  // so three full-table walks hit one shared-CPU database at the same instant
+  // every morning. Still well before the 8:00 reminder pass, which needs the
+  // tasks this spawns to already exist.
+  [{ cron: '50 1 * * *' }, { event: 'ca/compliance-spawn-manual' }],
 
   async ({ step }) => {
     const admin = createAdminClient()
