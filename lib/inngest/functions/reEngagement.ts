@@ -12,7 +12,8 @@ import { todayStr }          from '@/lib/utils/format'
  */
 export const reEngagement = inngest.createFunction(
   { id: 're-engagement', name: 'Re-engagement — 7-day inactive users', concurrency: { limit: 1 } },
-  { cron: 'TZ=Asia/Kolkata 0 10 * * *' },
+  // 11:30 IST — moved off 10:00, where it ran alongside the MSME reminder pass.
+  { cron: 'TZ=Asia/Kolkata 30 11 * * *' },
   async () => {
     const admin  = createAdminClient()
     const now    = new Date()

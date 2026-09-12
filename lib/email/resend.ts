@@ -13,6 +13,9 @@
 
 export const FROM = process.env.FROM_EMAIL ?? 'upFloat <noreply@upfloat.co>'
 
+/** Ceiling on a single send. Generous for a transactional API, and finite. */
+const SEND_TIMEOUT_MS = 15_000
+
 type SendPayload = {
   from: string
   to: string | string[]
@@ -71,19 +74,40 @@ async function brevoSend(payload: SendPayload): Promise<{ data: null; error: str
   }
   if (payload.replyTo) body.replyTo = parseAddress(payload.replyTo)
 
-  const res = await fetch('https://api.brevo.com/v3/smtp/email', {
-    method:  'POST',
-    headers: {
-      'api-key':      apiKey,
-      'Content-Type': 'application/json',
-      'Accept':       'application/json',
-    },
-    body: JSON.stringify(body),
-  })
+  // Bounded, like every other outbound call. Without this a slow Brevo blocks
+  // its caller indefinitely, and the callers are loops: the digest job sends
+  // sequentially, so ONE hung request stalls the whole run. Its own time budget
+  // is checked between sends and cannot interrupt a send already in flight, so
+  // this is what actually enforces it.
+  let res: Response
+  try {
+    res = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method:  'POST',
+      headers: {
+        'api-key':      apiKey,
+        'Content-Type': 'application/json',
+        'Accept':       'application/json',
+      },
+      body:   JSON.stringify(body),
+      signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
+    })
+  } catch (err) {
+    // Returned, not thrown — every caller checks `error` and none of them are
+    // wrapped in try/catch for this. Throwing here would abort whole batches.
+    const msg = (err as Error)?.name === 'TimeoutError'
+      ? `Brevo did not respond within ${SEND_TIMEOUT_MS / 1000}s`
+      : `Brevo request failed: ${(err as Error)?.message ?? String(err)}`
+    console.error('[email]', msg, '—', payload.subject)
+    return { data: null, error: msg }
+  }
 
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText)
-    console.error(`[email] Brevo send failed (${res.status}):`, text)
+    // 402 is Brevo's "daily sending limit reached". On the free plan that is 300
+    // a day, and it arrives as an ordinary rejection that only reaches a log —
+    // which is how a fortnight of undelivered mail can go unnoticed.
+    const hint = res.status === 402 ? ' — DAILY SENDING QUOTA EXHAUSTED' : ''
+    console.error(`[email] Brevo send failed (${res.status})${hint}:`, text)
     return { data: null, error: text }
   }
 

@@ -36,7 +36,9 @@ interface QuietUser {
 
 export const weeklyUsageReport = inngest.createFunction(
   { id: 'weekly-usage-report', name: 'Weekly usage report for super admins', concurrency: { limit: 1 } },
-  { cron: 'TZ=Asia/Kolkata 0 9 * * 1' },
+  // Monday 12:00 IST — moved off 09:00, which it shared with the trial-expiry
+  // pass. An internal report is the one job here with no reason to be early.
+  { cron: 'TZ=Asia/Kolkata 0 12 * * 1' },
   async ({ step }) => {
     const to = superAdminEmails()
     if (!to.length) return { skipped: 'no super admins configured' }
