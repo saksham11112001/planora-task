@@ -1390,7 +1390,7 @@ export function MyTasksView({
                   const isRecurring  = task.is_recurring === true
                   const isProject    = !!task.project_id && !isRecurring && !isCompliance
                   const isSpawnedUnassigned = canManage && !(task as any).assignee_id
-                  const typeAccent   = isSpawnedUnassigned ? '#f59e0b' : isCompliance ? '#d97706' : isRecurring ? '#0d9488' : isProject ? '#7c3aed' : '#0891b2'
+                  const typeAccent   = isSpawnedUnassigned ? '#f59e0b' : isCompliance ? '#d97706' : isRecurring ? '#0d9488' : isProject ? '#7c3aed' : '#2563eb'
                   const typeBg = checked.has(task.id) ? 'var(--brand-light)'
                     : isSpawnedUnassigned ? 'rgba(245,158,11,0.10)'
                     : isPending    ? 'var(--pending-surface, #faf5ff)'
@@ -2108,7 +2108,7 @@ export function MyTasksView({
             const _isComp   = (task as any).custom_fields?._ca_compliance === true
             const _isRec    = task.is_recurring === true
             const _isPrj    = !!task.project_id && !_isRec && !_isComp
-            const _accent   = isContextTask ? '#0891b2' : _isComp ? '#d97706' : _isRec ? '#0d9488' : _isPrj ? '#7c3aed' : '#0891b2'
+            const _accent   = isContextTask ? '#0891b2' : _isComp ? '#d97706' : _isRec ? '#0d9488' : _isPrj ? '#7c3aed' : '#2563eb'
             const _cardBg   = isContextTask ? 'rgba(8,145,178,0.05)' : _isComp ? 'rgba(234,179,8,0.07)' : _isRec ? 'rgba(13,148,136,0.06)' : _isPrj ? 'rgba(124,58,237,0.06)' : 'var(--surface)'
             const isSelected = dragTaskId===task.id || selTask?.id===task.id
             return (
