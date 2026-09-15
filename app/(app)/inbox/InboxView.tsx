@@ -430,7 +430,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                       const _isComp = (task as any).custom_fields?._ca_compliance === true
                       const _isRec  = (task as any).is_recurring === true
                       const _isPrj  = !!(task as any).project_id && !_isRec && !_isComp
-                      const _accent = _isComp ? '#d97706' : _isRec ? '#0d9488' : _isPrj ? '#7c3aed' : '#0891b2'
+                      const _accent = _isComp ? '#d97706' : _isRec ? '#0d9488' : _isPrj ? '#7c3aed' : '#2563eb'
                       const _cardBg = _isComp ? 'rgba(234,179,8,0.07)' : _isRec ? 'rgba(13,148,136,0.06)' : _isPrj ? 'rgba(124,58,237,0.06)' : 'var(--surface)'
                       return (
                         <div key={task.id} draggable
@@ -597,7 +597,7 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
                     const isCompliance = (task as any).custom_fields?._ca_compliance === true
                     const isRecurring  = (task as any).is_recurring === true
                     const isProject    = !!(task as any).project_id && !isRecurring && !isCompliance
-                    const typeAccent   = isCompliance ? '#d97706' : isRecurring ? '#0d9488' : isProject ? '#7c3aed' : '#0891b2'
+                    const typeAccent   = isCompliance ? '#d97706' : isRecurring ? '#0d9488' : isProject ? '#7c3aed' : '#2563eb'
                     const typeBg = checked.has(task.id) ? '#f0fdfa'
                       : isCompliance ? 'rgba(234,179,8,0.09)'
                       : isRecurring  ? 'rgba(13,148,136,0.07)'

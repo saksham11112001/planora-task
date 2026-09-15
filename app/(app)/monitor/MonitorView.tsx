@@ -66,13 +66,13 @@ function typeAccent(t: MonTask): string {
   if (t.custom_fields?._ca_compliance) return '#d97706'
   if (t.is_recurring)                  return '#0d9488'
   if (t.project_id)                    return '#7c3aed'
-  return '#0891b2'
+  return '#2563eb'   // blue — one-time (was cyan, too close to recurring teal)
 }
 function typeBg(t: MonTask): string {
   if (t.custom_fields?._ca_compliance) return 'rgba(234,179,8,0.06)'
   if (t.is_recurring)                  return 'rgba(13,148,136,0.05)'
   if (t.project_id)                    return 'rgba(124,58,237,0.05)'
-  return 'rgba(8,145,178,0.05)'
+  return 'rgba(37,99,235,0.05)'
 }
 function typeLabel(t: MonTask): string {
   if (t.custom_fields?._ca_compliance) return 'CA'
@@ -625,7 +625,7 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
         { key: 'ca',        label: 'CA Compliance', color: '#d97706', tasks: visible.filter(t => t.custom_fields?._ca_compliance) },
         { key: 'recurring', label: 'Repeat tasks',  color: '#0d9488', tasks: visible.filter(t => t.is_recurring && !t.custom_fields?._ca_compliance) },
         { key: 'project',   label: 'Project tasks', color: '#7c3aed', tasks: visible.filter(t => !!t.project_id && !t.is_recurring && !t.custom_fields?._ca_compliance) },
-        { key: 'quick',     label: 'Quick tasks',   color: '#0891b2', tasks: visible.filter(t => !t.project_id && !t.is_recurring && !t.custom_fields?._ca_compliance) },
+        { key: 'quick',     label: 'Quick tasks',   color: '#2563eb', tasks: visible.filter(t => !t.project_id && !t.is_recurring && !t.custom_fields?._ca_compliance) },
       ].filter(g => g.tasks.length > 0)
     }
     return [{ key: 'all', label: 'All tasks', color: 'var(--brand)', tasks: visible }]
@@ -772,14 +772,14 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
                     { name: 'CA',      value: stats.ca,        fill: '#d97706' },
                     { name: 'Repeat',  value: stats.recurring, fill: '#0d9488' },
                     { name: 'Project', value: (hasFilters ? visible : monthTasks).filter(t => !!t.project_id && !t.is_recurring && !t.custom_fields?._ca_compliance).length, fill: '#7c3aed' },
-                    { name: 'Quick',   value: (hasFilters ? visible : monthTasks).filter(t => !t.project_id && !t.is_recurring && !t.custom_fields?._ca_compliance).length,  fill: '#0891b2' },
+                    { name: 'Quick',   value: (hasFilters ? visible : monthTasks).filter(t => !t.project_id && !t.is_recurring && !t.custom_fields?._ca_compliance).length,  fill: '#2563eb' },
                     { name: 'Overdue', value: stats.overdue,   fill: '#dc2626' },
                   ]} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                     <XAxis dataKey="name" tick={{ fontSize: 9 }}/>
                     <YAxis tick={{ fontSize: 9 }} allowDecimals={false}/>
                     <Tooltip contentStyle={{ fontSize: 11, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-primary)', borderRadius: 6 }}/>
                     <Bar dataKey="value" radius={[3, 3, 0, 0]}>
-                      {[{ fill: '#d97706' }, { fill: '#0d9488' }, { fill: '#7c3aed' }, { fill: '#0891b2' }, { fill: '#dc2626' }]
+                      {[{ fill: '#d97706' }, { fill: '#0d9488' }, { fill: '#7c3aed' }, { fill: '#2563eb' }, { fill: '#dc2626' }]
                         .map((e, i) => <Cell key={i} fill={e.fill}/>)}
                     </Bar>
                   </BarChart>

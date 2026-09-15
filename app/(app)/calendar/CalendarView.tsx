@@ -62,19 +62,19 @@ function taskTypeBorder(t: CalTask): string {
   if (t.custom_fields?._ca_compliance) return '#d97706'   // amber — compliance
   if (isRecurringRelated(t))           return '#0d9488'   // teal  — recurring / spawned instance
   if (t.project_id)                    return '#7c3aed'   // purple — project
-  return '#0891b2'                                        // cyan  — one-time
+  return '#2563eb'                                        // blue  — one-time (was cyan, too close to recurring teal)
 }
 function taskTypeBg(t: CalTask): string {
   if (t.custom_fields?._ca_compliance) return 'rgba(234,179,8,0.10)'
   if (isRecurringRelated(t))           return 'rgba(13,148,136,0.08)'
   if (t.project_id)                    return 'rgba(124,58,237,0.08)'
-  return 'rgba(8,145,178,0.07)'
+  return 'rgba(37,99,235,0.07)'
 }
 function taskTypeDot(t: CalTask): string {
   if (t.custom_fields?._ca_compliance) return '#d97706'
   if (isRecurringRelated(t))           return '#0d9488'
   if (t.project_id)                    return t.projects?.color ?? '#7c3aed'
-  return '#0891b2'
+  return '#2563eb'
 }
 
 /* ── Format a local Date as YYYY-MM-DD without UTC conversion ── */
@@ -337,7 +337,7 @@ export function CalendarView({ tasks: initialTasks, clients = [], members = [], 
     { v:'all'        as Filter, label:'All',         icon:CheckSquare, color:'#0d9488', bg:'rgba(13,148,136,0.12)' },
     { v:'compliance' as Filter, label:'Compliance',  icon:AlertTriangle, color:'#d97706', bg:'rgba(234,179,8,0.12)' },
     { v:'project'    as Filter, label:'Projects',    icon:FolderOpen,  color:'#7c3aed', bg:'rgba(124,58,237,0.12)' },
-    { v:'one-time'   as Filter, label:'Quick',       icon:CheckSquare, color:'#0891b2', bg:'rgba(8,145,178,0.12)' },
+    { v:'one-time'   as Filter, label:'Quick',       icon:CheckSquare, color:'#2563eb', bg:'rgba(37,99,235,0.12)' },
     { v:'recurring'  as Filter, label:'Recurring',   icon:RefreshCw,   color:'#ea580c', bg:'rgba(234,88,12,0.12)' },
   ]
 
@@ -709,7 +709,7 @@ export function CalendarView({ tasks: initialTasks, clients = [], members = [], 
             <span style={{ width:8,height:8,borderRadius:2,background:'rgba(124,58,237,0.25)',border:'1px solid rgba(124,58,237,0.3)',display:'inline-block' }}/>Project
           </span>
           <span style={{ display:'flex', alignItems:'center', gap:3 }}>
-            <span style={{ width:8,height:8,borderRadius:2,background:'rgba(8,145,178,0.25)',border:'1px solid rgba(8,145,178,0.3)',display:'inline-block' }}/>Quick
+            <span style={{ width:8,height:8,borderRadius:2,background:'rgba(37,99,235,0.25)',border:'1px solid rgba(37,99,235,0.3)',display:'inline-block' }}/>Quick
           </span>
           <span style={{ display:'flex', alignItems:'center', gap:3 }}>
             <span style={{ width:8,height:8,borderRadius:2,background:'rgba(234,179,8,0.25)',border:'1px solid rgba(234,179,8,0.3)',display:'inline-block' }}/>Compliance
