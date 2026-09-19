@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient }       from '@supabase/ssr'
 import { checkRateLimit, buildRateLimitResponse } from '@/lib/utils/rateLimit'
+import { authCookieDomain } from '@/lib/supabase/cookieDomain'
 
 // ── Rate-limit config ────────────────────────────────────────────────────────
 const RATE_LIMITS = {
@@ -172,7 +173,7 @@ export async function middleware(request: NextRequest) {
         setAll(toSet: { name: string; value: string; options?: Record<string, unknown> }[]) {
           toSet.forEach(({ name, value }) => request.cookies.set(name, value))
           response = NextResponse.next({ request })
-          const sharedDomain = process.env.NODE_ENV === 'production' ? { domain: '.upfloat.co' } : {}
+          const sharedDomain = authCookieDomain()
           toSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, { ...(options as any), ...sharedDomain })
           )

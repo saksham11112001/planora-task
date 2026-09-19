@@ -11,6 +11,7 @@
  */
 import { createServerClient } from '@supabase/ssr'
 import { NextRequest, NextResponse } from 'next/server'
+import { authCookieDomain } from './cookieDomain'
 
 export function createApiClient(request: NextRequest) {
   let response = NextResponse.next({ request })
@@ -24,7 +25,9 @@ export function createApiClient(request: NextRequest) {
         setAll: (cs: { name: string; value: string; options?: Record<string, unknown> }[]) => {
           cs.forEach(({ name, value }) => request.cookies.set(name, value))
           response = NextResponse.next({ request })
-          cs.forEach(({ name, value, options }) => response.cookies.set(name, value, options as any))
+          // Shared domain, as every other sb-* writer uses — see cookieDomain.ts.
+          cs.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, { ...(options as any), ...authCookieDomain() }))
         },
       },
     }

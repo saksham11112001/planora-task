@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { authCookieDomain } from './cookieDomain'
 
 /**
  * Creates a Supabase client for use in Server Components and API Routes.
@@ -17,9 +18,14 @@ export async function createClient() {
     {
       cookies: {
         getAll: () => cookieStore.getAll(),
+        // MUST carry the shared domain. Without it this writer minted HOST-ONLY
+        // sb-* cookies on every token refresh, while the browser client and
+        // middleware wrote domain-scoped ones — leaving two cookies with the
+        // same name. The middleware reads that as a corrupted session and
+        // clears it, which is what was signing people out day after day.
         setAll: (cs: { name: string; value: string; options?: Record<string, unknown> }[]) =>
           cs.forEach(({ name, value, options }) => {
-            try { cookieStore.set(name, value, options as any) } catch {}
+            try { cookieStore.set(name, value, { ...(options as any), ...authCookieDomain() }) } catch {}
           }),
       },
     }

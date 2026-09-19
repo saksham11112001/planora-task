@@ -34,6 +34,15 @@ interface QuietUser {
   lastSeen:  string | null
 }
 
+interface RosterUser extends QuietUser {
+  status: 'active' | 'quiet' | 'gone' | 'never'
+}
+
+// Caps keep the email a readable page rather than an unbounded dump — Gmail
+// clips messages past ~102KB, which would silently cut the tables off.
+const ACTIVE_LIST_CAP = 100
+const ROSTER_CAP      = 250
+
 export const weeklyUsageReport = inngest.createFunction(
   { id: 'weekly-usage-report', name: 'Weekly usage report for super admins', concurrency: { limit: 1 } },
   // Monday 12:00 IST — moved off 09:00, which it shared with the trial-expiry
@@ -79,38 +88,83 @@ export const weeklyUsageReport = inngest.createFunction(
       }
 
       let activeWeek = 0, quietWeek = 0, longGone = 0, neverSeen = 0
-      const quiet: QuietUser[] = []
+      const quiet:  QuietUser[] = []
+      const active: QuietUser[] = []
+      // Everyone, with the status they fell into — so the report answers "who
+      // are my users" and not only "how many". Built from the same pass.
+      const roster: RosterUser[] = []
 
       for (const u of byUser.values()) {
+        // Someone in several orgs shows all of them rather than an arbitrary first.
+        const orgLabel = [...new Set(u.orgs)].join(', ')
         const seen = u.lastSeen ? new Date(u.lastSeen).getTime() : NaN
-        if (!u.lastSeen || Number.isNaN(seen)) { neverSeen++; continue }
-        if (seen >= d7)  { activeWeek++; continue }
-        if (seen >= d14) {
-          quietWeek++
-          quiet.push({ name: u.name, email: u.email, orgName: u.orgs[0], lastSeen: u.lastSeen })
-          continue
-        }
-        longGone++
+        const row = { name: u.name, email: u.email, orgName: orgLabel, lastSeen: u.lastSeen }
+
+        let status: RosterUser['status']
+        if (!u.lastSeen || Number.isNaN(seen)) { neverSeen++; status = 'never' }
+        else if (seen >= d7)  { activeWeek++; status = 'active'; active.push(row) }
+        else if (seen >= d14) { quietWeek++;  status = 'quiet';  quiet.push(row) }
+        else { longGone++; status = 'gone' }
+
+        roster.push({ ...row, status })
       }
 
       // Longest-quiet first — those are closest to being lost for good.
       quiet.sort((a, b) => new Date(a.lastSeen ?? 0).getTime() - new Date(b.lastSeen ?? 0).getTime())
-      return { total: byUser.size, activeWeek, quietWeek, longGone, neverSeen, quiet: quiet.slice(0, 50) }
+      // Most recently active first.
+      active.sort((a, b) => new Date(b.lastSeen ?? 0).getTime() - new Date(a.lastSeen ?? 0).getTime())
+      // Roster: most recent first, never-seen last (NaN sorts to the bottom).
+      roster.sort((a, b) => (new Date(b.lastSeen ?? 0).getTime() || 0) - (new Date(a.lastSeen ?? 0).getTime() || 0))
+
+      return {
+        total: byUser.size, activeWeek, quietWeek, longGone, neverSeen,
+        quiet:  quiet.slice(0, 50),
+        active: active.slice(0, ACTIVE_LIST_CAP),
+        roster: roster.slice(0, ROSTER_CAP),
+      }
     })
 
     await step.run('send', async () => {
-      const { total, activeWeek, quietWeek, longGone, neverSeen, quiet } = stats
+      const { total, activeWeek, quietWeek, longGone, neverSeen, quiet, active, roster } = stats
       const pct = total > 0 ? Math.round((activeWeek / total) * 100) : 0
       const fmt = (iso: string | null) =>
         iso ? new Date(iso).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short' }) : '—'
 
-      const rows = quiet.map(q => `
+      // One row renderer for every table — `accent` colours the Last seen cell.
+      const userRows = (list: QuietUser[], accent: string) => list.map(u => `
         <tr>
-          <td style="padding:6px 12px 6px 0;border-top:1px solid #f1f5f9">${esc(q.name)}</td>
-          <td style="padding:6px 12px 6px 0;border-top:1px solid #f1f5f9;color:#64748b">${esc(q.email)}</td>
-          <td style="padding:6px 12px 6px 0;border-top:1px solid #f1f5f9;color:#64748b">${esc(q.orgName)}</td>
-          <td style="padding:6px 0;border-top:1px solid #f1f5f9;color:#b45309;white-space:nowrap">${fmt(q.lastSeen)}</td>
+          <td style="padding:6px 12px 6px 0;border-top:1px solid #f1f5f9">${esc(u.name)}</td>
+          <td style="padding:6px 12px 6px 0;border-top:1px solid #f1f5f9;color:#64748b">${esc(u.email)}</td>
+          <td style="padding:6px 12px 6px 0;border-top:1px solid #f1f5f9;color:#64748b">${esc(u.orgName)}</td>
+          <td style="padding:6px 0;border-top:1px solid #f1f5f9;color:${accent};white-space:nowrap">${fmt(u.lastSeen)}</td>
         </tr>`).join('')
+
+      const rows = userRows(quiet, '#b45309')
+
+      const STATUS_LABEL: Record<RosterUser['status'], { text: string; colour: string }> = {
+        active: { text: 'Active',      colour: '#16a34a' },
+        quiet:  { text: 'Quiet 7–14d', colour: '#b45309' },
+        gone:   { text: 'Gone 14d+',   colour: '#dc2626' },
+        never:  { text: 'Never opened', colour: '#64748b' },
+      }
+
+      const rosterRows = roster.map(u => {
+        const s = STATUS_LABEL[u.status]
+        return `
+        <tr>
+          <td style="padding:6px 12px 6px 0;border-top:1px solid #f1f5f9">${esc(u.name)}</td>
+          <td style="padding:6px 12px 6px 0;border-top:1px solid #f1f5f9;color:#64748b">${esc(u.email)}</td>
+          <td style="padding:6px 12px 6px 0;border-top:1px solid #f1f5f9;color:#64748b">${esc(u.orgName)}</td>
+          <td style="padding:6px 12px 6px 0;border-top:1px solid #f1f5f9;white-space:nowrap"><span style="color:${s.colour};font-weight:600">${s.text}</span></td>
+          <td style="padding:6px 0;border-top:1px solid #f1f5f9;color:#64748b;white-space:nowrap">${fmt(u.lastSeen)}</td>
+        </tr>`
+      }).join('')
+
+      const headCell = (t: string, last = false) =>
+        `<th style="padding:0 ${last ? '0' : '12px'} 6px 0;font-weight:600">${t}</th>`
+      const tableHead = `<tr style="font-size:11px;color:#94a3b8;text-align:left">
+                  ${headCell('Name')}${headCell('Email')}${headCell('Organisation')}${headCell('Last seen', true)}
+                </tr>`
 
       const tile = (label: string, value: number, colour: string) => `
         <td style="padding:12px 14px;background:#f8fafc;border-radius:10px;text-align:center">
@@ -129,6 +183,13 @@ export const weeklyUsageReport = inngest.createFunction(
         quiet.length
           ? `Worth a call:\n${quiet.map(q => `  ${q.name} <${q.email}> — ${q.orgName} — last seen ${fmt(q.lastSeen)}`).join('\n')}`
           : `Nobody went quiet this week.`,
+        ``,
+        active.length
+          ? `Active this week (${active.length}${activeWeek > active.length ? ` of ${activeWeek}` : ''}):\n${active.map(a => `  ${a.name} <${a.email}> — ${a.orgName} — last seen ${fmt(a.lastSeen)}`).join('\n')}`
+          : `Nobody opened the app this week.`,
+        ``,
+        `All users (${roster.length}${total > roster.length ? ` of ${total}` : ''}):`,
+        ...roster.map(u => `  [${u.status}] ${u.name} <${u.email}> — ${u.orgName} — last seen ${fmt(u.lastSeen)}`),
       ].join('\n')
 
       const { error } = await resend.emails.send({
@@ -157,16 +218,31 @@ export const weeklyUsageReport = inngest.createFunction(
               <h3 style="font-size:14px;font-weight:700;color:#0f172a;margin:22px 0 8px">Worth a call — quiet for a week</h3>
               <p style="font-size:12px;color:#64748b;margin:0 0 10px">Active recently, but have not opened it in the last seven days. The warmest list to work through.</p>
               <table style="width:100%;font-size:13px;color:#334155;border-collapse:collapse">
-                <tr style="font-size:11px;color:#94a3b8;text-align:left">
-                  <th style="padding:0 12px 6px 0;font-weight:600">Name</th>
-                  <th style="padding:0 12px 6px 0;font-weight:600">Email</th>
-                  <th style="padding:0 12px 6px 0;font-weight:600">Organisation</th>
-                  <th style="padding:0 0 6px;font-weight:600">Last seen</th>
-                </tr>
+                ${tableHead}
                 ${rows}
               </table>
               ${quietWeek > quiet.length ? `<p style="font-size:12px;color:#94a3b8;margin:10px 0 0">Showing ${quiet.length} of ${quietWeek}.</p>` : ''}
             ` : `<p style="font-size:13px;color:#16a34a;margin:22px 0 0">Nobody went quiet this week.</p>`}
+
+            ${active.length ? `
+              <h3 style="font-size:14px;font-weight:700;color:#0f172a;margin:26px 0 8px">Active this week</h3>
+              <p style="font-size:12px;color:#64748b;margin:0 0 10px">Everyone who opened upFloat in the last seven days, most recent first.</p>
+              <table style="width:100%;font-size:13px;color:#334155;border-collapse:collapse">
+                ${tableHead}
+                ${userRows(active, '#16a34a')}
+              </table>
+              ${activeWeek > active.length ? `<p style="font-size:12px;color:#94a3b8;margin:10px 0 0">Showing ${active.length} of ${activeWeek}.</p>` : ''}
+            ` : ''}
+
+            <h3 style="font-size:14px;font-weight:700;color:#0f172a;margin:26px 0 8px">All users</h3>
+            <p style="font-size:12px;color:#64748b;margin:0 0 10px">Every person in an organisation, with where they stand.</p>
+            <table style="width:100%;font-size:13px;color:#334155;border-collapse:collapse">
+              <tr style="font-size:11px;color:#94a3b8;text-align:left">
+                ${headCell('Name')}${headCell('Email')}${headCell('Organisation')}${headCell('Status')}${headCell('Last seen', true)}
+              </tr>
+              ${rosterRows}
+            </table>
+            ${total > roster.length ? `<p style="font-size:12px;color:#94a3b8;margin:10px 0 0">Showing ${roster.length} of ${total}.</p>` : ''}
 
             ${neverSeen > 0 ? `<p style="font-size:12px;color:#94a3b8;margin:18px 0 0">${neverSeen} ${neverSeen === 1 ? 'person has' : 'people have'} never opened the app since usage tracking began. Expect this to fall as people return.</p>` : ''}
           </div>`,
