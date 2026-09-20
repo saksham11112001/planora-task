@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { createAdminClient }  from '@/lib/supabase/admin'
+import { authCookieDomain } from '@/lib/supabase/cookieDomain'
 import { notifySuperAdminsOfSignup, resolveSignupSurface, type SignupSurface } from '@/lib/email/signupAlert'
 import { cookies }            from 'next/headers'
 import { NextResponse }       from 'next/server'
@@ -51,7 +52,7 @@ export async function GET(request: NextRequest) {
       cookies: {
         getAll: () => cookieStore.getAll(),
         setAll: (cs: { name: string; value: string; options?: Record<string, unknown> }[]) => {
-          const sharedDomain = process.env.NODE_ENV === 'production' ? { domain: '.upfloat.co' } : {}
+          const sharedDomain = authCookieDomain()
           cs.forEach(({ name, value, options }) => {
             try { cookieStore.set(name, value, { ...(options as any), ...sharedDomain }) } catch {}
           })

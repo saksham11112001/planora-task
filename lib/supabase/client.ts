@@ -1,4 +1,5 @@
 import { createBrowserClient } from '@supabase/ssr'
+import { authCookieDomain } from './cookieDomain'
 
 export function createClient() {
   // NOTE: @supabase/ssr force-overrides flowType to 'pkce' (and
@@ -11,9 +12,8 @@ export function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       // Share auth cookies across subdomains (msme.upfloat.co etc.)
-      cookieOptions: {
-        domain: process.env.NODE_ENV === 'production' ? '.upfloat.co' : undefined,
-      },
+      // Same scope every other sb-* writer uses — see cookieDomain.ts.
+      cookieOptions: authCookieDomain(),
     }
   )
 }
