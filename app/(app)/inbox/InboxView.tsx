@@ -151,12 +151,23 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
       const fresh = d.data ?? []
       setSubtaskMap(p => ({ ...p, [parentId]: fresh }))
       if (fresh.length > 0 && fresh.every((s:any) => s.status === 'completed')) {
-        await fetch(`/api/tasks/${parentId}`, {
-          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'completed', completed_at: new Date().toISOString() }),
-        })
-        setLocalTasks(prev => prev.map(t => t.id===parentId ? { ...t, status:'completed' } : t))
-        toast.success('All subtasks done — task completed! 🎉')
+        // Only tell the user the parent closed if it actually did. Unchecked,
+        // a failed PATCH still announced completion and left the parent shown
+        // as done while it was still open on the server.
+        let ok = false
+        try {
+          const res = await fetch(`/api/tasks/${parentId}`, {
+            method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'completed', completed_at: new Date().toISOString() }),
+          })
+          ok = res.ok
+        } catch { ok = false }
+        if (ok) {
+          setLocalTasks(prev => prev.map(t => t.id===parentId ? { ...t, status:'completed' } : t))
+          toast.success('All subtasks done — task completed! 🎉')
+        } else {
+          toast.error('Subtasks are done, but the task could not be closed. Please try again.')
+        }
       }
     }
     startT(() => router.refresh())

@@ -193,23 +193,43 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
       }
     }
     // Optimistic update on subtask — compute updated list first so we can use it for auto-complete
+    // Captured before the optimistic write so a rejected save can be undone.
+    const prevStatus = (subtaskData[parentId] ?? []).find(s => s.id === subId)?.status ?? 'todo'
     const updatedSubs = (subtaskData[parentId] ?? []).map(s =>
       s.id === subId ? { ...s, status: newStatus } : s
     )
     setSubtaskData(p => ({ ...p, [parentId]: updatedSubs }))
 
-    await fetch(`/api/tasks/${subId}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: newStatus, completed_at: newStatus === 'completed' ? new Date().toISOString() : null }),
-    })
+    // Unchecked, a rejected save left the subtask shown in its new state and
+    // still let the parent be announced as completed below.
+    let subOk = false
+    try {
+      const res = await fetch(`/api/tasks/${subId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus, completed_at: newStatus === 'completed' ? new Date().toISOString() : null }),
+      })
+      subOk = res.ok
+    } catch { subOk = false }
+
+    if (!subOk) {
+      // Put the subtask back the way it was and say so.
+      setSubtaskData(p => ({ ...p, [parentId]: (p[parentId] ?? []).map(s => s.id === subId ? { ...s, status: prevStatus } : s) }))
+      toast.error('Could not save the subtask. Please try again.')
+      return
+    }
 
     // Auto-complete parent only when ALL subtasks are done (use optimistic state — no extra round-trip)
     if (updatedSubs.length > 0 && updatedSubs.every(s => s.status === 'completed')) {
-      await fetch(`/api/tasks/${parentId}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'completed', completed_at: new Date().toISOString() }),
-      })
-      toast.success('All subtasks done — task completed! 🎉')
+      let parentOk = false
+      try {
+        const res = await fetch(`/api/tasks/${parentId}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'completed', completed_at: new Date().toISOString() }),
+        })
+        parentOk = res.ok
+      } catch { parentOk = false }
+      if (parentOk) toast.success('All subtasks done — task completed! 🎉')
+      else toast.error('Subtasks are done, but the task could not be closed. Please try again.')
     }
     startT(() => router.refresh())
   }

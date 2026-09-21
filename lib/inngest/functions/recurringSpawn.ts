@@ -21,15 +21,41 @@ export const recurringSpawn = inngest.createFunction(
     const todayIST = new Date(Date.now() + 5.5 * 60 * 60 * 1000)
     const today = todayIST.toISOString().split('T')[0]
 
+    // One step is spent per template below, and Inngest starts refusing work
+    // around a thousand, so this stays a bounded slice rather than everything
+    // due. Templates are ordered oldest-first so a backlog drains in order
+    // instead of the same rows being served every morning.
+    const TEMPLATE_LIMIT = 500
+
     const templates = await step.run('fetch-due-recurring-templates', async () => {
-      const { data } = await admin.from('tasks')
+      // The error was previously not even destructured. A failed read handed
+      // back null, became [], and the run finished reporting
+      // "templates_checked: 0" — indistinguishable from "nothing was due".
+      // That is precisely how the CA spawner went ten days creating nothing
+      // while looking healthy. Throwing fails the run, which is what the
+      // job-failure alert watches.
+      const { data, error } = await admin.from('tasks')
         .select('id, title, priority, assignee_id, project_id, client_id, org_id, frequency, next_occurrence_date, approval_required, custom_fields')
         .eq('is_recurring', true)
         .lte('next_occurrence_date', today)
         .neq('is_archived', true)
-        .limit(500)
+        .order('next_occurrence_date', { ascending: true })
+        .limit(TEMPLATE_LIMIT)
+      if (error) {
+        console.error('[recurringSpawn] fetch due templates:', error.message)
+        throw new Error(`Could not read due recurring templates: ${error.message}`)
+      }
       return data ?? []
     })
+
+    // Hitting the cap means there was more due than we took. Silence here is
+    // the same lie in a different shape — the overflow would simply never be
+    // spawned, with nothing in the result to say so. It is reported below and
+    // drains on the next run, because the slice is ordered by due date.
+    const capped = templates.length >= TEMPLATE_LIMIT
+    if (capped) {
+      console.warn(`[recurringSpawn] hit the ${TEMPLATE_LIMIT}-template ceiling — the remainder spawns on the next run`)
+    }
 
     let spawned = 0
 
@@ -76,6 +102,6 @@ export const recurringSpawn = inngest.createFunction(
       })
     }
 
-    return { templates_checked: templates.length, tasks_spawned: spawned }
+    return { templates_checked: templates.length, tasks_spawned: spawned, capped }
   }
 )
