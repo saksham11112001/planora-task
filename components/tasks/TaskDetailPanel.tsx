@@ -756,7 +756,11 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
 
   async function deleteAttachment(attId: string, storagePath: string) {
     if (!task || !confirm('Delete this attachment?')) return
-    await fetch(`/api/tasks/${task.id}/attachments?attachment_id=${attId}`, { method: 'DELETE' })
+    // Checked: unverified, a refused delete still removed the row from view
+    // and said "Deleted", so a document that was still attached looked gone.
+    let ok = false
+    try { ok = (await fetch(`/api/tasks/${task.id}/attachments?attachment_id=${attId}`, { method: 'DELETE' })).ok } catch { ok = false }
+    if (!ok) { toast.error('Could not delete the attachment. Please try again.'); return }
     setAttachments(p => p.filter(a => a.id !== attId))
     toast.success('Deleted')
   }

@@ -2005,10 +2005,30 @@ export function MyTasksView({
               ? { ...t, status: 'completed', completed_at: new Date().toISOString() } : t))
             setSelTask(prev => prev?.id === task.id
               ? { ...prev, status: 'completed', completed_at: new Date().toISOString() } : prev)
-            await fetch(`/api/tasks/${task.id}`, {
-              method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ status: 'completed', completed_at: new Date().toISOString() }),
-            })
+            // Remember the real state so a rejected save can be undone.
+            const prevStatus      = task.status
+            const prevCompletedAt = (task as any).completed_at ?? null
+            // The response MUST be checked. As a bare await, a 401 from an
+            // expired session — or any other failure — still ran on to the
+            // success toast, leaving the task ticked and the person told it
+            // saved when nothing had been written.
+            let ok = false
+            try {
+              const res = await fetch(`/api/tasks/${task.id}`, {
+                method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'completed', completed_at: new Date().toISOString() }),
+              })
+              ok = res.ok
+            } catch { ok = false }
+            if (!ok) {
+              setTasks(prev => prev.map(t => t.id === task.id
+                ? { ...t, status: prevStatus, completed_at: prevCompletedAt } : t))
+              setSelTask(prev => prev?.id === task.id
+                ? { ...prev, status: prevStatus, completed_at: prevCompletedAt } : prev)
+              setCompleting(p => { const s = new Set(p); s.delete(task.id); return s })
+              toast.error('Could not save — the task is still open. Please try again.')
+              return
+            }
             setCompleting(p => { const s = new Set(p); s.delete(task.id); return s })
             toast.success('Task done! 🎉')
             refresh()

@@ -161,7 +161,13 @@ export function InlineOneTimeTask({ members, clients, currentUserId, onCreated, 
       if (files.length > 0 && d.data?.id) {
         const fd = new FormData()
         files.forEach(f => fd.append('files', f))
-        await fetch(`/api/tasks/${d.data.id}/attachments`, { method: 'POST', body: fd })
+        // Checked: an unreported failure here meant the task was created
+        // without the file the user had attached, and they were told it all
+        // worked. The task itself is already saved, so this warns rather than
+        // rolling back.
+        let upOk = false
+        try { upOk = (await fetch(`/api/tasks/${d.data.id}/attachments`, { method: 'POST', body: fd })).ok } catch { upOk = false }
+        if (!upOk) toast.error('Task created, but the attachment did not upload. Please add it again.')
       }
 
       toast.success('Task created')

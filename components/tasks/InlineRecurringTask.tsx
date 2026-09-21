@@ -290,7 +290,11 @@ export function InlineRecurringTask({ members, clients = [], currentUserId, defa
       if (files.length > 0 && d.data?.id) {
         const fd = new FormData()
         files.forEach(f => fd.append('files', f))
-        await fetch(`/api/tasks/${d.data.id}/attachments`, { method: 'POST', body: fd })
+        // Checked — see InlineOneTimeTask: a silent failure left the task
+        // saved without its attachment while reporting success.
+        let upOk = false
+        try { upOk = (await fetch(`/api/tasks/${d.data.id}/attachments`, { method: 'POST', body: fd })).ok } catch { upOk = false }
+        if (!upOk) toast.error('Task created, but the attachment did not upload. Please add it again.')
       }
 
       toast.success(isEdit ? 'Updated ✓' : 'Repeat task created ✓')
