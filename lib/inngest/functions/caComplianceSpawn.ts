@@ -54,14 +54,29 @@ export const caComplianceSpawn = inngest.createFunction(
             id, org_id, client_id, assignee_id, approver_id, created_at, start_date, end_date,
             master_task:ca_master_tasks(
               id, name, priority, dates, days_before_due
-              { maxRows: 20_000 },
             )
           `)
           .eq('is_active', true)
           .order('id', { ascending: true })
           .range(from, to),
+        // Belongs HERE, as fetchAllRows' second argument. It was once pasted
+        // inside the select string above, which made the query unparseable:
+        // PostgREST rejected every page, fetchAllRows returned an empty list
+        // with an error, and the code below happily "checked 0 assignments".
+        // Result: not one compliance task was created, for anyone, for as long
+        // as it went unnoticed.
+        { maxRows: 20_000 },
       )
-      if (error) console.error('[caComplianceSpawn] fetch assignments:', (error as any)?.message)
+      // Throw, never continue. An empty list here is indistinguishable from
+      // "no firm has any assignments", so carrying on spawns nothing and
+      // reports success. Throwing fails the Inngest run, which is what the
+      // job-failure alert watches — the difference between finding this in
+      // minutes and finding it when a client asks where their filings went.
+      if (error) {
+        const msg = (error as any)?.message ?? String(error)
+        console.error('[caComplianceSpawn] fetch assignments:', msg)
+        throw new Error(`Could not read CA client assignments: ${msg}`)
+      }
       return data
     })
 

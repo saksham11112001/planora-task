@@ -881,10 +881,26 @@ export function InboxView({ tasks, members, clients, currentUserId, userRole, ca
             <CompletionAttachModal taskId={completingTask.id} taskTitle={completingTask.title}
               onConfirm={async () => {
                 const task = completingTask; setCompletingTask(null)
+                // Remember the real state so a rejected save can be undone.
+                const prevStatus      = task.status
+                const prevCompletedAt = (task as any).completed_at ?? null
                 setCompleting(p => new Set(p).add(task.id))
                 setLocalTasks(prev => prev.map(t => t.id===task.id ? { ...t, status:'completed', completed_at:new Date().toISOString() } : t))
-                await fetch(`/api/tasks/${task.id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ status:'completed', completed_at:new Date().toISOString() }) })
+                // The response MUST be checked. This used to be a bare await:
+                // a 401 from an expired session, or any 4xx/5xx, still ran on
+                // to the success toast, so the row sat there ticked and the
+                // person was told it saved when nothing had been written.
+                let ok = false
+                try {
+                  const res = await fetch(`/api/tasks/${task.id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ status:'completed', completed_at:new Date().toISOString() }) })
+                  ok = res.ok
+                } catch { ok = false }
                 setCompleting(p => { const s=new Set(p); s.delete(task.id); return s })
+                if (!ok) {
+                  setLocalTasks(prev => prev.map(t => t.id===task.id ? { ...t, status: prevStatus, completed_at: prevCompletedAt } : t))
+                  toast.error('Could not save — the task is still open. Please try again.')
+                  return
+                }
                 toast.success('Task completed! ✓'); startT(() => router.refresh())
               }}
               onCancel={() => setCompletingTask(null)}/>
