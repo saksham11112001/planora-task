@@ -131,11 +131,23 @@ export async function POST(request: NextRequest) {
 
     if (Object.keys(dates).length === 0) { skipped++; continue }
 
-    // Use the assignment's start_date as the lower bound for backfill.
-    // If no start_date is set, default to today so we never accidentally spawn
-    // past-due tasks for newly onboarded clients (same guard as the daily cron).
-    // Admins who need to backfill past months must set start_date on the assignment first.
-    const startDateStr: string = (asgn as any).start_date ?? today
+    // Lower bound for backfill: the assignment's start_date, else the date the
+    // assignment was created.
+    //
+    // This used to fall back to TODAY, which quietly made the button useless
+    // for the job it exists to do. start_date is nullable and was never
+    // backfilled, so for most assignments the bound became "today" and every
+    // obligation already due was skipped as "before start_date" — including
+    // the ones a failed cron had missed, which is precisely when an admin
+    // reaches for "Spawn tasks". The daily cron has always used created_at
+    // here; the two paths simply disagreed.
+    //
+    // created_at keeps the protection that the `?? today` was reaching for: a
+    // client onboarded today still cannot pull in a year of past filings,
+    // because nothing predates their own assignment.
+    const startDateStr: string = (asgn as any).start_date
+      ?? ((asgn as any).created_at as string ?? '').split('T')[0]
+      ?? today
     // Upper bound for a client being wound down. NULL = open-ended (every
     // assignment today), so this is inert until a date is actually set.
     // Applied here as well as in the daily cron, otherwise a manual "Spawn
