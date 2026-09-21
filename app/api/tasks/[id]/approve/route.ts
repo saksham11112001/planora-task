@@ -168,9 +168,18 @@ export async function POST(
   if (task.approver_id && task.approver_id !== user.id && !isOwnerOrAdmin) {
     return NextResponse.json({ error: 'Only the designated approver can approve or reject this task' }, { status: 403 })
   }
-  // Block self-approval: whoever submitted cannot also approve/reject
-  const submittedBy = (task as any).custom_fields?._submitted_by
-  if (submittedBy && submittedBy === user.id && !isOwnerOrAdmin) {
+  // Block self-approval: whoever submitted cannot also approve/reject.
+  //
+  // UNLESS they are the task's DESIGNATED approver. Where a firm has put the
+  // same person down as assignee and approver — routine in a small practice —
+  // this rule made the task impossible to close: the only person entitled to
+  // approve it was the one person forbidden from doing so, and every such task
+  // had to be escalated to an owner or admin. The separation this protects
+  // still holds for everyone else, because the check above already restricts
+  // approval to the designated approver (or an owner/admin).
+  const submittedBy   = (task as any).custom_fields?._submitted_by
+  const isTaskApprover = !!task.approver_id && task.approver_id === user.id
+  if (submittedBy && submittedBy === user.id && !isOwnerOrAdmin && !isTaskApprover) {
     return NextResponse.json({ error: 'You submitted this task for approval — another approver must review it' }, { status: 403 })
   }
 
