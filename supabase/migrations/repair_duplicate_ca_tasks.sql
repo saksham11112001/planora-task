@@ -1,184 +1,154 @@
 -- ============================================================================
--- REPAIR: archive CA compliance tasks that the backfill re-created
+-- REPAIR: undo what the backfill created for periods already dealt with
 --
--- WHAT HAPPENED
---   "Spawn tasks" de-duplicates a due date two ways: against ca_task_instances
---   (assignment_id + due_date), and against the tasks table (title + client +
---   due date). The tasks-table check deliberately ignores ARCHIVED rows. So a
---   task that had been completed and then archived, and whose ca_task_instances
---   row was missing, matched neither check and was created a second time.
+-- THE SITUATION
+--   Clicking "Spawn tasks" walked each assignment back to the date it was
+--   created and made a task for every due date that had no ledger row — so
+--   periods your team finished months ago (e.g. Accounting (Monthly), due
+--   10 Apr) reappeared as fresh "To do" rows and are now showing overdue.
 --
--- WHAT THIS DOES
---   Sends the duplicate to Trash using EXACTLY the mechanism the app itself
---   uses for deletion (is_archived = true, deleted_at = now()). Nothing is
---   destroyed, nothing is removed from any table, and Section 5 undoes it.
---   The original — the one people already completed — is never touched.
+-- WHY MATCHING ON NAME + DATE IS NOT ENOUGH
+--   The obvious rule — "delete it if an identical completed task exists" —
+--   misses these. The new rows are built from the master task's CURRENT name
+--   and CURRENT date, so if either was edited since the original was created,
+--   the two no longer look identical even though they are the same obligation.
+--   That is why this script does NOT rely on finding a twin.
 --
--- WHY ARCHIVE RATHER THAN DELETE
---   * Reversible. A DELETE is not.
---   * It is what the product means by "deleted": the rows leave every list,
---     because every task query filters is_archived.
---   * ca_task_instances.task_id is ON DELETE SET NULL, so deleting would quietly
---     discard the (assignment, due_date) record and let the pair spawn AGAIN.
---     Archiving keeps that record, so this cannot recur for these dates.
+-- WHAT IT USES INSTEAD — three facts that are true regardless of renaming:
+--   1. The row was created by the backfill run (a timestamp you set).
+--   2. The spawner created it, not a person (custom_fields._assignment_id).
+--   3. Nobody has touched it: still 'To do', with no attachment, comment,
+--      time log or subtask.
+--   Anything a person has worked on is never a candidate, so no work can be
+--   lost — the worst case is a row returning to Trash, which is reversible.
 --
--- SAFETY (each is enforced in SQL, not assumed)
---   1. Only rows the spawner created  — custom_fields._assignment_id present.
---   2. Only untouched rows — status 'todo', and no attachment, comment, time
---      log or subtask. Anything a person has worked on is left alone.
---   3. Only rows created inside the backfill window (Section 1 parameter).
---   4. NEVER the last live copy. Ranking runs over live rows only and always
---      keeps rank 1, so every group provably retains exactly one live task.
---   5. Completed / in-progress tasks are never candidates.
+-- NOTHING IS DELETED
+--   Rows are archived exactly the way the app's own delete works
+--   (is_archived = true, deleted_at = now()), so they leave every list and sit
+--   in Trash. Section 5 puts them back.
+--   Archiving also matters technically: ca_task_instances.task_id is
+--   ON DELETE SET NULL, so a real DELETE would discard the ledger record and
+--   let the same period spawn AGAIN. Archiving keeps it.
 --
--- HOW TO RUN
---   Section 1 and 2 are READ-ONLY — run them and read the output first.
---   Only then run Section 3. Section 4 verifies. Section 5 is the undo.
+-- ORDER OF PLAY
+--   Sections 1-2 are READ-ONLY. Run them, read the output, decide the cutoff.
+--   Then Section 3. Section 4 verifies. Section 5 undoes.
 -- ============================================================================
 
 
 -- ============================================================================
--- SECTION 1 — the shared definition. Read-only. Run this with Section 2.
+-- SECTION 1 — set two values, then run. Read-only.
 -- ============================================================================
--- Adjust ONLY this timestamp: the moment the backfill ran (IST is UTC+5:30).
--- Anything created before it is treated as pre-existing and left alone.
--- Widen it only after reading Section 2's output.
+--  backfill_from : when "Spawn tasks" was clicked (IST is +05:30). Only rows
+--                  created at or after this are ever considered.
+--  keep_due_from : the FIRST due date you want to KEEP. Anything due earlier
+--                  is treated as a period already dealt with.
+--                  e.g. '2026-09-01' keeps September's genuinely-missed tasks
+--                  and clears April-August.
 
-DROP VIEW IF EXISTS _ca_dupe_candidates;
-CREATE TEMP VIEW _ca_dupe_candidates AS
+DROP VIEW IF EXISTS _ca_backfill_rows;
+CREATE TEMP VIEW _ca_backfill_rows AS
 WITH params AS (
-  SELECT TIMESTAMPTZ '2026-09-20 00:00:00+05:30' AS backfill_from
-),
--- Live, spawner-created, top-level CA compliance tasks.
-live_ca AS (
-  SELECT t.id, t.org_id, t.client_id, t.title, t.due_date, t.status,
-         t.created_at, t.custom_fields
-  FROM tasks t
-  WHERE t.custom_fields->>'_ca_compliance' = 'true'
-    AND t.parent_task_id IS NULL
-    AND COALESCE(t.is_archived, false) = false
-),
--- Rank within (org, client, title, due date). Because only LIVE rows are
--- ranked, rank 1 is always a live row that survives — this is what makes
--- "never remove the last copy" true by construction rather than by filter.
-ranked AS (
-  SELECT l.*,
-         ROW_NUMBER() OVER (
-           PARTITION BY l.org_id, COALESCE(l.client_id::text, '~none~'),
-                        lower(btrim(l.title)), l.due_date
-           ORDER BY l.created_at ASC, l.id ASC
-         ) AS rn,
-         COUNT(*) OVER (
-           PARTITION BY l.org_id, COALESCE(l.client_id::text, '~none~'),
-                        lower(btrim(l.title)), l.due_date
-         ) AS live_in_group,
-         FIRST_VALUE(l.id) OVER (
-           PARTITION BY l.org_id, COALESCE(l.client_id::text, '~none~'),
-                        lower(btrim(l.title)), l.due_date
-           ORDER BY l.created_at ASC, l.id ASC
-         ) AS keeps_id
-  FROM live_ca l
+  SELECT TIMESTAMPTZ '2026-09-21 00:00:00+05:30' AS backfill_from,
+         DATE        '2026-09-01'                AS keep_due_from
 )
-SELECT r.id            AS duplicate_id,
-       r.keeps_id      AS original_id,
-       r.org_id, r.client_id, r.title, r.due_date,
-       r.created_at    AS duplicate_created_at,
-       r.live_in_group
-FROM ranked r, params p
-WHERE r.rn > 1                                   -- never the survivor
-  AND r.live_in_group > 1                        -- a genuine duplicate
-  AND r.created_at >= p.backfill_from            -- created by the backfill
-  AND r.status = 'todo'                          -- untouched
-  AND r.custom_fields ? '_assignment_id'         -- spawner-created, not a person's
-  -- and genuinely untouched: nothing hangs off it
-  AND NOT EXISTS (SELECT 1 FROM task_attachments a WHERE a.task_id  = r.id)
-  AND NOT EXISTS (SELECT 1 FROM task_comments    c WHERE c.task_id  = r.id)
-  AND NOT EXISTS (SELECT 1 FROM time_logs        tl WHERE tl.task_id = r.id)
-  AND NOT EXISTS (SELECT 1 FROM tasks            s WHERE s.parent_task_id = r.id);
+SELECT t.id,
+       t.org_id,
+       t.client_id,
+       t.title,
+       t.due_date,
+       t.created_at,
+       (t.due_date < p.keep_due_from) AS is_old_period,
+       -- Informational only — never used to decide. Shows whether an older
+       -- task for the same client and due date already exists, in any state.
+       (SELECT o.status FROM tasks o
+         WHERE o.org_id = t.org_id
+           AND o.client_id IS NOT DISTINCT FROM t.client_id
+           AND o.due_date = t.due_date
+           AND o.id <> t.id
+           AND o.created_at < t.created_at
+           AND o.custom_fields->>'_ca_compliance' = 'true'
+         ORDER BY o.created_at ASC LIMIT 1) AS older_twin_status
+FROM tasks t, params p
+WHERE t.custom_fields->>'_ca_compliance' = 'true'
+  AND t.parent_task_id IS NULL
+  AND COALESCE(t.is_archived, false) = false
+  AND t.created_at >= p.backfill_from            -- created by the backfill
+  AND t.status = 'todo'                          -- untouched
+  AND t.custom_fields ? '_assignment_id'         -- spawner-created
+  AND NOT EXISTS (SELECT 1 FROM task_attachments a WHERE a.task_id  = t.id)
+  AND NOT EXISTS (SELECT 1 FROM task_comments    c WHERE c.task_id  = t.id)
+  AND NOT EXISTS (SELECT 1 FROM time_logs        tl WHERE tl.task_id = t.id)
+  AND NOT EXISTS (SELECT 1 FROM tasks            s WHERE s.parent_task_id = t.id);
 
 
 -- ============================================================================
--- SECTION 2 — INSPECT. Read-only. Read this before running Section 3.
+-- SECTION 2 — LOOK FIRST. Read-only. This is the important step.
 -- ============================================================================
 
--- 2a. Summary
-SELECT count(*) AS duplicates_to_archive,
-       count(DISTINCT org_id)    AS orgs_affected,
-       count(DISTINCT client_id) AS clients_affected,
-       min(due_date) AS earliest_due,
-       max(due_date) AS latest_due
-FROM _ca_dupe_candidates;
+-- 2a. Everything the backfill created, by due month.
+--     "will_archive" is what Section 3 acts on; "will_keep" stays.
+SELECT to_char(due_date,'YYYY-MM')                      AS due_month,
+       count(*)                                         AS tasks,
+       count(*) FILTER (WHERE is_old_period)            AS will_archive,
+       count(*) FILTER (WHERE NOT is_old_period)        AS will_keep,
+       count(*) FILTER (WHERE older_twin_status IS NOT NULL) AS has_older_twin
+FROM _ca_backfill_rows
+GROUP BY 1 ORDER BY 1;
 
--- 2b. Every row, with the task that will SURVIVE alongside it.
---     `original_status` should read completed/in_progress — that is the work
---     already done. If any row looks wrong, stop and send this output over.
-SELECT d.title,
-       c.name                AS client,
-       d.due_date,
-       d.duplicate_id,
-       d.duplicate_created_at,
-       o.status              AS original_status,
-       o.created_at          AS original_created_at,
-       d.live_in_group       AS live_copies_now
-FROM _ca_dupe_candidates d
-JOIN tasks   o ON o.id = d.original_id
-LEFT JOIN clients c ON c.id = d.client_id
-ORDER BY c.name NULLS FIRST, d.due_date, d.title;
+-- 2b. Grand total for the run.
+SELECT count(*) FILTER (WHERE is_old_period)     AS total_will_archive,
+       count(*) FILTER (WHERE NOT is_old_period) AS total_will_keep
+FROM _ca_backfill_rows;
 
--- 2c. SAFETY ASSERTION — must return zero rows.
---     Proves no group would be left without a live task.
-SELECT 'UNSAFE: would remove the last live copy' AS problem, d.*
-FROM _ca_dupe_candidates d
-WHERE d.duplicate_id = d.original_id;
+-- 2c. The actual rows to be archived — check a few against the app.
+--     older_twin_status 'completed' confirms the period was already handled.
+SELECT b.title, c.name AS client, b.due_date, b.older_twin_status, b.created_at
+FROM _ca_backfill_rows b
+LEFT JOIN clients c ON c.id = b.client_id
+WHERE b.is_old_period
+ORDER BY b.due_date, c.name, b.title
+LIMIT 100;
+
+-- 2d. SAFETY ASSERTION — must return zero rows.
+--     Proves nothing being archived has any work attached to it.
+SELECT 'UNSAFE: has work attached' AS problem, b.id, b.title
+FROM _ca_backfill_rows b
+WHERE b.is_old_period
+  AND (EXISTS (SELECT 1 FROM task_attachments a WHERE a.task_id = b.id)
+    OR EXISTS (SELECT 1 FROM task_comments    c WHERE c.task_id = b.id)
+    OR EXISTS (SELECT 1 FROM time_logs       tl WHERE tl.task_id = b.id));
 
 
 -- ============================================================================
--- SECTION 3 — THE REPAIR. Run only after Section 2 looks right.
--- Wrapped in a transaction: if the assertion fails, nothing is written.
+-- SECTION 3 — THE CLEANUP. Only after Section 2 looks right.
 -- ============================================================================
 
 BEGIN;
 
-  -- Re-point the dedup record at the task people actually use, so the record
-  -- outlives this repair and keeps the pair from spawning a third time.
-  UPDATE ca_task_instances i
-  SET    task_id = d.original_id
-  FROM   _ca_dupe_candidates d
-  WHERE  i.task_id = d.duplicate_id;
-
-  -- Send the duplicate to Trash — same two columns the app's own delete writes.
   UPDATE tasks t
   SET    is_archived = true,
          deleted_at  = now()
-  FROM   _ca_dupe_candidates d
-  WHERE  t.id = d.duplicate_id
-    AND  COALESCE(t.is_archived, false) = false;   -- idempotent: safe to re-run
+  FROM   _ca_backfill_rows b
+  WHERE  t.id = b.id
+    AND  b.is_old_period
+    AND  COALESCE(t.is_archived, false) = false;   -- idempotent
 
-  -- Final guard. Every affected group must still have exactly one live task.
-  -- If this raises, the whole transaction rolls back and nothing changed.
+  -- Guard: nothing completed, and nothing with work on it, may have been
+  -- caught. If this raises, the whole transaction rolls back.
   DO $$
   DECLARE bad int;
   BEGIN
     SELECT count(*) INTO bad
-    FROM (
-      SELECT t.org_id, COALESCE(t.client_id::text,'~none~') AS c,
-             lower(btrim(t.title)) AS ti, t.due_date, count(*) AS live
-      FROM tasks t
-      WHERE t.custom_fields->>'_ca_compliance' = 'true'
-        AND t.parent_task_id IS NULL
-        AND COALESCE(t.is_archived,false) = false
-        AND (t.org_id, COALESCE(t.client_id::text,'~none~'),
-             lower(btrim(t.title)), t.due_date) IN (
-              SELECT d.org_id, COALESCE(d.client_id::text,'~none~'),
-                     lower(btrim(d.title)), d.due_date
-              FROM _ca_dupe_candidates d)
-      GROUP BY 1,2,3,4
-    ) g
-    WHERE g.live <> 1;
-
+    FROM tasks t
+    WHERE t.is_archived = true
+      AND t.deleted_at > now() - interval '2 minutes'
+      AND (t.status <> 'todo'
+        OR EXISTS (SELECT 1 FROM task_attachments a WHERE a.task_id = t.id)
+        OR EXISTS (SELECT 1 FROM task_comments    c WHERE c.task_id = t.id)
+        OR EXISTS (SELECT 1 FROM time_logs       tl WHERE tl.task_id = t.id));
     IF bad > 0 THEN
-      RAISE EXCEPTION
-        'ABORTED: % affected group(s) would not have exactly one live task', bad;
+      RAISE EXCEPTION 'ABORTED: % archived row(s) were not untouched to-dos', bad;
     END IF;
   END $$;
 
@@ -189,27 +159,26 @@ COMMIT;
 -- SECTION 4 — VERIFY (after committing)
 -- ============================================================================
 
--- 4a. What moved to Trash in the last few minutes.
+-- 4a. How many went to Trash just now.
 SELECT count(*) AS archived_now
 FROM tasks
 WHERE is_archived = true
   AND deleted_at > now() - interval '15 minutes'
   AND custom_fields->>'_ca_compliance' = 'true';
 
--- 4b. Any remaining live CA duplicates anywhere (expect zero rows).
-SELECT org_id, client_id, title, due_date, count(*) AS live_copies
+-- 4b. What the team sees now: remaining overdue CA to-dos by month.
+--     The old periods should be gone; September should remain.
+SELECT to_char(due_date,'YYYY-MM') AS due_month, count(*) AS still_to_do
 FROM tasks
 WHERE custom_fields->>'_ca_compliance' = 'true'
-  AND parent_task_id IS NULL
   AND COALESCE(is_archived,false) = false
-GROUP BY 1,2,3,4
-HAVING count(*) > 1
-ORDER BY count(*) DESC;
+  AND status = 'todo'
+  AND due_date < CURRENT_DATE
+GROUP BY 1 ORDER BY 1;
 
 
 -- ============================================================================
--- SECTION 5 — UNDO (only if something looks wrong)
--- Restores everything this script archived in the last hour.
+-- SECTION 5 — UNDO (restores everything this archived in the last hour)
 -- ============================================================================
 -- BEGIN;
 --   UPDATE tasks
