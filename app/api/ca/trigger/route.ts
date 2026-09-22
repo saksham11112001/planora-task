@@ -100,13 +100,22 @@ export async function POST(request: NextRequest) {
 
   // Also check actual tasks table — guards against ca_task_instances being out of sync
   // (e.g. if a previous spawn wrote the task but the instance insert failed).
+  //
+  // ARCHIVED ROWS COUNT HERE. This deliberately has no is_archived filter:
+  // the question is "was this obligation ever created?", not "is it on the
+  // board right now". With `.neq('is_archived', true)` a task that had been
+  // completed and then archived was invisible to this check, so if its
+  // ca_task_instances row was also missing it was created a SECOND time —
+  // which is exactly what the backfill did to already-completed tasks.
+  // (That filter also dropped rows where is_archived IS NULL, since
+  // `is_archived <> true` is NULL for them, widening the same hole.)
+  // Restoring a wrongly-archived task is the Trash's job, not the spawner's.
   const { data: existingCATasks } = await fetchAllRows<any>(
     (from, to) => admin
       .from('tasks')
       .select('id, title, client_id, due_date')
       .eq('org_id', mb.org_id)
       .contains('custom_fields', { _ca_compliance: true })
-      .neq('is_archived', true)
       .order('id', { ascending: true })
       .range(from, to),
     { maxRows: 20_000 },
