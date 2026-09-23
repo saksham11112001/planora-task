@@ -1,3 +1,24 @@
+-- ############################################################################
+-- ##  DO NOT RUN. THE DETECTION RULE BELOW IS WRONG AND OVER-MATCHES.       ##
+-- ##                                                                        ##
+-- ##  It assumed /api/tasks/[id] is the only path that completes a task     ##
+-- ##  without writing an activity_log row. It is not. THREE ordinary,       ##
+-- ##  human completion paths also write no activity_log row and no          ##
+-- ##  approved_by:                                                          ##
+-- ##    - approve/route.ts:118  owner/admin ticking a task complete         ##
+-- ##    - approve/route.ts:129  completing a task with no approver          ##
+-- ##    - complete-occurrence   completing a recurring task                 ##
+-- ##                                                                        ##
+-- ##  Against real data this matched 62 rows across 5 people and 3 days —   ##
+-- ##  overwhelmingly genuine work. Running section 3 would have un-done it. ##
+-- ##                                                                        ##
+-- ##  The tasks table alone CANNOT distinguish an email-link completion     ##
+-- ##  from an in-app one: email-action and complete-occurrence write the    ##
+-- ##  identical column shape (status + completed_at, nothing else).         ##
+-- ##  Identifying the affected rows needs the server request log, which     ##
+-- ##  records the GETs to /api/tasks/email-action. Kept for that context.   ##
+-- ############################################################################
+
 -- ============================================================================
 -- REPAIR: tasks that marked themselves completed overnight
 --
