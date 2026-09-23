@@ -11,15 +11,48 @@ import { createAdminClient }  from '@/lib/supabase/admin'
 
 export const dynamic = 'force-dynamic'   // never cache a health check
 
+/**
+ * A try/catch rescues a dependency that ERRORS and does nothing for one that is
+ * merely slow — and slow is the case that times the probe out. Same reasoning
+ * as the bounds in middleware.ts.
+ */
+function withTimeout<T>(p: PromiseLike<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>
+  return Promise.race([
+    Promise.resolve(p),
+    new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`db timed out after ${ms}ms`)), ms)
+    }),
+  ]).finally(() => clearTimeout(timer)) as Promise<T>
+}
+
+// A probe that hangs is worse than one that fails: it holds the function open
+// until the platform kills it, so the monitor records a hard timeout instead of
+// a readable status. Bound it well under any uptime checker's own timeout.
+const DB_TIMEOUT_MS = 3_000
+
 export async function GET() {
   const startedAt = Date.now()
   try {
-    // Cheapest possible DB round-trip: HEAD count on a tiny always-present table.
+    // Reachability probe, not a census.
+    //
+    // This used to be `select('id', { count: 'exact', head: true })`, described
+    // as the cheapest possible round-trip. It was the most expensive one
+    // available: `count: 'exact'` makes Postgres run SELECT count(*) over the
+    // whole table, and `.limit(1)` does not bound that — it only caps returned
+    // rows, and head:true returns none anyway. At one probe every five minutes
+    // that is ~288 full scans of `organisations` a day, growing with the table:
+    // slow enough to occasionally exceed the monitor's request timeout (a false
+    // "down" that clears on the next probe), and a standing drain on the
+    // Supabase disk-IO budget.
+    //
+    // Reading a single row proves exactly what this endpoint claims to prove —
+    // the app can reach the database and get an answer — in constant time.
     const admin = createAdminClient()
-    const { error } = await admin
-      .from('organisations')
-      .select('id', { count: 'exact', head: true })
-      .limit(1)
+    const { error } = await withTimeout(
+      admin.from('organisations').select('id').limit(1),
+      DB_TIMEOUT_MS,
+    )
 
     if (error) {
       return NextResponse.json(
