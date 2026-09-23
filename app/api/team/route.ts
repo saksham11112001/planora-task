@@ -259,11 +259,51 @@ export async function PATCH(request: NextRequest) {
   if (!role || !['admin', 'manager', 'member', 'viewer'].includes(role))
     return NextResponse.json({ error: 'Invalid role' }, { status: 400 })
 
-  let query = admin.from('org_members').update({ role }).eq('org_id', mb.org_id)
-  if (member_id) query = query.eq('id', member_id)
-  else           query = query.eq('user_id', user_id)
+  // Every branch above this one guards its target: removal refuses owners,
+  // the permission toggles refuse owners and admins. This branch guarded
+  // nothing, and it is the branch that hands out authority.
+  //
+  // That gap is only reachable through configuration, but it is reachable.
+  // 'team.change_role' defaults to admin-only, yet it is a per-org toggle in
+  // org_settings.role_permissions, so an org can legitimately grant it to a
+  // manager. assertCan() was then the ONLY check, which left that manager
+  // able to write any row in the org — including:
+  //   • their own, set to 'admin', and admin bypasses every permission check
+  //     from that point on;
+  //   • the owner's, set to 'viewer', locking the founder out of their own
+  //     organisation.
+  //
+  // Resolve the target first so both can be refused.
+  const targetSelector = member_id
+    ? { column: 'id' as const,      value: member_id }
+    : { column: 'user_id' as const, value: user_id }
 
-  const { error } = await query
+  const { data: targetRow } = await admin.from('org_members')
+    .select('id, user_id, role')
+    .eq('org_id', mb.org_id)
+    .eq(targetSelector.column, targetSelector.value)
+    .maybeSingle()
+
+  if (!targetRow)
+    return NextResponse.json({ error: 'Member not found in this organisation' }, { status: 404 })
+
+  // An owner's role is changed by transferring ownership, not through here.
+  if (targetRow.role === 'owner')
+    return NextResponse.json({ error: 'Cannot change an owner\'s role' }, { status: 403 })
+
+  // Nobody grants themselves authority. Owners and admins already hold it, so
+  // this costs them nothing; for anyone else it closes the escalation.
+  if (targetRow.user_id === user.id && !['owner', 'admin'].includes(mb.role))
+    return NextResponse.json({ error: 'You cannot change your own role' }, { status: 403 })
+
+  // Only an owner may mint another admin. Otherwise a manager holding
+  // team.change_role could promote a colleague to admin and inherit that
+  // colleague's bypass by proxy.
+  if (role === 'admin' && !['owner', 'admin'].includes(mb.role))
+    return NextResponse.json({ error: 'Only owners and admins can grant the admin role' }, { status: 403 })
+
+  const { error } = await admin.from('org_members')
+    .update({ role }).eq('org_id', mb.org_id).eq('id', targetRow.id)
   if (error) return NextResponse.json(dbError(error, 'team'), { status: 500 })
   return NextResponse.json({ success: true })
 }

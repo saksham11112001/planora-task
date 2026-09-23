@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { dbError } from '@/lib/api-error'
 import { createClient } from '@/lib/supabase/server'
 import { getAuthUser } from '@/lib/supabase/authUser'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
+import { stripIdentityFields } from '@/lib/utils/safeUpdate'
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ noticeId: string }> }) {
   const { noticeId } = await params
@@ -16,8 +18,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ no
 
   const admin = createAdminClient()
   const body = await req.json()
-  const { data, error } = await admin.from('client_notices').update({ ...body, updated_at: new Date().toISOString() }).eq('id', noticeId).eq('org_id', mb.org_id).select().single()
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  // The .eq('org_id') below scopes WHICH row is written, not WHAT is written
+  // to it — an org_id in the body would land in the SET clause and move this
+  // notice into another organisation. Ownership comes from the session.
+  const { data, error } = await admin.from('client_notices')
+    .update({ ...stripIdentityFields(body), updated_at: new Date().toISOString() })
+    .eq('id', noticeId).eq('org_id', mb.org_id)
+    .select().maybeSingle()
+  if (error) return NextResponse.json(dbError(error, 'notices/[noticeId]'), { status: 500 })
   return NextResponse.json({ data })
 }
 

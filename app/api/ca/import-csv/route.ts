@@ -77,6 +77,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'No CSV file provided' }, { status: 400 })
   if (!file.name.toLowerCase().endsWith('.csv'))
     return NextResponse.json({ error: 'File must be a .csv' }, { status: 400 })
+  // Cap before reading. file.text() pulls the whole upload into memory, so
+  // without a bound an arbitrarily large file is a free out-of-memory button
+  // on the function. The sibling .xlsx importer already caps at 5 MB; this one
+  // was simply missed.
+  if (file.size > 5 * 1024 * 1024)
+    return NextResponse.json({ error: 'File must be under 5 MB' }, { status: 400 })
 
   const text = await file.text()
   const allRows = parseCSV(text).filter(r => r.some(v => v))  // drop blank lines

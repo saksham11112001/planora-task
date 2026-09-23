@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import type { NextRequest } from 'next/server'
 import { dbError } from '@/lib/api-error'
 import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
+import { stripIdentityFields } from '@/lib/utils/safeUpdate'
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -18,9 +19,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const body = await req.json()
   const admin = createAdminClient()
   const { data, error } = await admin.from('ca_master_tasks')
-    .update({ ...body, updated_at: new Date().toISOString() })
+    // org_id in the body would land in the SET clause and move this master
+    // task into another organisation; the .eq below only scopes the WHERE.
+    .update({ ...stripIdentityFields(body), updated_at: new Date().toISOString() })
     .eq('id', id).eq('org_id', mb.org_id)
-    .select().single()
+    .select().maybeSingle()
 
   if (error) return NextResponse.json(dbError(error, 'ca/master/[id]'), { status: 500 })
   return NextResponse.json({ data })
