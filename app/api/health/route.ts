@@ -55,8 +55,12 @@ export async function GET() {
     )
 
     if (error) {
+      // No `detail` in the body. This is the one route anybody on the internet
+      // can call without signing in, and a raw PostgREST message names tables,
+      // columns and constraints. A monitor only needs the status code.
+      console.error('[health] db error:', error.message)
       return NextResponse.json(
-        { status: 'degraded', db: 'error', detail: error.message, ms: Date.now() - startedAt },
+        { status: 'degraded', db: 'error', ms: Date.now() - startedAt },
         { status: 503, headers: { 'Cache-Control': 'no-store' } },
       )
     }
@@ -66,8 +70,9 @@ export async function GET() {
       { status: 200, headers: { 'Cache-Control': 'no-store' } },
     )
   } catch (err) {
+    console.error('[health] unreachable:', (err as Error)?.message)
     return NextResponse.json(
-      { status: 'degraded', db: 'unreachable', detail: (err as Error)?.message, ms: Date.now() - startedAt },
+      { status: 'degraded', db: 'unreachable', ms: Date.now() - startedAt },
       { status: 503, headers: { 'Cache-Control': 'no-store' } },
     )
   }
