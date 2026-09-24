@@ -5,7 +5,10 @@ import { MonitorView }  from './MonitorView'
 import { canDo }        from '@/lib/utils/permissionGate'
 import { redirect }     from 'next/navigation'
 
-const TASK_COLS = 'id, title, description, status, priority, due_date, completed_at, assignee_id, approver_id, client_id, project_id, parent_task_id, approval_status, approval_required, is_recurring, frequency, next_occurrence_date, estimated_hours, custom_fields, created_at, updated_at, is_billable, billable_amount, assignee:users!tasks_assignee_id_fkey(id, name), approver:users!tasks_approver_id_fkey(id, name), creator:users!tasks_created_by_fkey(id, name), projects(id, name, color)'
+// `description` is deliberately absent. Monitor never renders it — the only
+// reader is TaskDetailPanel, which now fetches the single task it opens. It was
+// the widest column here, shipped for every row on every 2-minute refresh.
+const TASK_COLS = 'id, title, status, priority, due_date, completed_at, assignee_id, approver_id, client_id, project_id, parent_task_id, approval_status, approval_required, is_recurring, frequency, next_occurrence_date, estimated_hours, custom_fields, created_at, updated_at, is_billable, billable_amount, assignee:users!tasks_assignee_id_fkey(id, name), approver:users!tasks_approver_id_fkey(id, name), creator:users!tasks_created_by_fkey(id, name), projects(id, name, color)'
 
 export async function MonitorFetcher() {
   const user = await getSessionUser()
@@ -88,7 +91,8 @@ export async function MonitorFetcher() {
 
   const taskList = (tasks ?? []).map((t: any) => ({
     ...t,
-    description: t.description ?? null,
+    // No `description` key at all: undefined tells the detail panel to fetch
+    // it. Setting it to null here would read as "this task has no description".
     due_date: t.due_date ?? null, completed_at: t.completed_at ?? null,
     assignee_id: t.assignee_id ?? null, client_id: t.client_id ?? null,
     project_id: t.project_id ?? null, parent_task_id: t.parent_task_id ?? null,

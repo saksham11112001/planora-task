@@ -141,12 +141,44 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
   /* sync from task + eagerly pre-fetch all tab data in parallel */
   useEffect(() => {
     if (!task) return
+    let cancelled = false
     setSubtasksLoaded(false); setAttLoaded(false)
     setSubtasks([]); setAttachments([]); setCaHeaders([])
     setChaserDraft(null); setChaserLoading(false)
     setComments([]); setCommentsLoaded(false)
     setTitle(task.title)
     setDescription(task.description ?? '')
+
+    // ── Detail-only fields ────────────────────────────────────────────────
+    // A list view that would otherwise carry a heavy column for EVERY row now
+    // omits it — Monitor drops `description`, Calendar drops the billing pair —
+    // because those are read here and nowhere else. Sending them for thousands
+    // of rows, on every auto-refresh, just to serve the one task somebody
+    // opens is the wrong trade.
+    //
+    // `undefined` is the signal that a field was not sent, and it is distinct
+    // from null or '' which genuinely mean "empty". Only the absent ones are
+    // filled in, so a view that does send them is completely unaffected.
+    const needsDetail =
+      task.description === undefined ||
+      (task as any).is_billable === undefined ||
+      (task as any).billable_amount === undefined
+    if (needsDetail) {
+      fetch(`/api/tasks/${task.id}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(d => {
+          const row = d?.data
+          // `cancelled` guards the panel having moved to another task (or
+          // closed) while this was in flight — a late response must not paint
+          // one task's description over another's.
+          if (!row || cancelled) return
+          if (task.description === undefined) setDescription(row.description ?? '')
+          if ((task as any).is_billable === undefined) setIsBillable(!!row.is_billable)
+          if ((task as any).billable_amount === undefined)
+            setBillableAmount(row.billable_amount != null ? String(row.billable_amount) : '')
+        })
+        .catch(() => {})
+    }
     setStatus(task.status)
     setPriority(task.priority)
     setAssigneeId(task.assignee_id ?? '')
@@ -215,6 +247,7 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
         })
         .catch(() => {})
     }
+    return () => { cancelled = true }
   }, [task?.id, (task as any)?.is_billable, (task as any)?.billable_amount, (task as any)?.next_occurrence_date, (task as any)?.frequency])
 
   /* auto-grow textarea */
