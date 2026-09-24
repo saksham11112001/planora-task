@@ -19,11 +19,21 @@
 --   disk. Dropping one is pure reduction, and it is reversible — the CREATE
 --   statement to put it back is in the comment beside each DROP.
 --
--- RUN THIS OUTSIDE A TRANSACTION
---   is used throughout so nothing takes a lock that blocks live
---   traffic. Postgres refuses inside a transaction block, so run
---   this as plain statements (the Supabase SQL editor does that by default) —
---   do NOT wrap it in BEGIN/COMMIT.
+-- LOCKING
+--   These are plain statements, deliberately not CONCURRENTLY. CONCURRENTLY
+--   avoids taking a lock, but Postgres refuses it inside a transaction block
+--   and the Supabase SQL editor wraps every run in one — so it cannot be used
+--   from the place this file is meant to be run.
+--
+--   Plain DDL is the right call at this size anyway. DROP INDEX is a catalog
+--   change and a file unlink: milliseconds. CREATE INDEX blocks writes to that
+--   one table while it builds, which on a few thousand rows is under a second.
+--   Section 0 prints the row counts so that is confirmed, not assumed.
+--
+--   If a table ever passes a few hundred thousand rows, run the section 4
+--   CREATEs with CONCURRENTLY through a direct psql connection instead
+--   (Project Settings -> Database -> Connection string). That path is not
+--   wrapped in a transaction.
 -- ============================================================================
 
 
