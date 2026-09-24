@@ -317,11 +317,28 @@ export function CalendarView({ tasks: initialTasks, clients = [], members = [], 
   })
 
   // Upcoming CA triggers indexed by their triggerDate (the day they will be spawned)
+  //
+  // The client and member filters are applied HERE, not at each render site.
+  // They were missing entirely: real tasks go through `filtered` above, but
+  // these projected compliance items were indexed straight from the prop, so
+  // narrowing the calendar to one colleague still left every other person's
+  // upcoming compliance work on the grid — which reads as the filter simply
+  // not working.
+  //
+  // Filtering at the source covers all four places byTriggerDate is read (the
+  // month grid, the timeline, and both halves of the selected-day panel), so
+  // no render site can drift out of step with the others later.
   const byTriggerDate: Record<string, UpcomingCATrigger[]> = {}
-  upcomingCATriggers.forEach(ct => {
-    if (!byTriggerDate[ct.triggerDate]) byTriggerDate[ct.triggerDate] = []
-    byTriggerDate[ct.triggerDate].push(ct)
-  })
+  upcomingCATriggers
+    .filter(ct => {
+      if (clientFilter.length > 0 && !clientFilter.includes(ct.clientId ?? ''))   return false
+      if (memberFilter.length > 0 && !memberFilter.includes(ct.assigneeId ?? '')) return false
+      return true
+    })
+    .forEach(ct => {
+      if (!byTriggerDate[ct.triggerDate]) byTriggerDate[ct.triggerDate] = []
+      byTriggerDate[ct.triggerDate].push(ct)
+    })
 
   const firstDay    = new Date(year, month, 1).getDay()
   const daysInMonth = new Date(year, month+1, 0).getDate()
