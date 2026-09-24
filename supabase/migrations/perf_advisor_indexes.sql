@@ -20,11 +20,26 @@
 --   statement to put it back is in the comment beside each DROP.
 --
 -- RUN THIS OUTSIDE A TRANSACTION
---   CONCURRENTLY is used throughout so nothing takes a lock that blocks live
---   traffic. Postgres refuses CONCURRENTLY inside a transaction block, so run
+--   is used throughout so nothing takes a lock that blocks live
+--   traffic. Postgres refuses inside a transaction block, so run
 --   this as plain statements (the Supabase SQL editor does that by default) —
 --   do NOT wrap it in BEGIN/COMMIT.
 -- ============================================================================
+
+
+-- ============================================================================
+-- SECTION 0 — confirm the tables are small enough that the lock is a non-event
+-- ============================================================================
+-- Anything here in the low thousands builds in well under a second. If `tasks`
+-- is in the hundreds of thousands, use the psql route described above for
+-- section 4 instead.
+
+SELECT relname AS table, n_live_tup AS approx_rows
+FROM pg_stat_user_tables
+WHERE schemaname = 'public'
+  AND relname IN ('tasks','task_attachments','ca_task_instances',
+                  'msme_vendors','msme_email_log','projects','org_members')
+ORDER BY n_live_tup DESC;
 
 
 -- ============================================================================
@@ -36,14 +51,14 @@
 -- survivor is the one actually serving queries.
 
 -- keeps: msme_email_log_vendor_id_idx
-DROP INDEX CONCURRENTLY IF EXISTS public.msme_email_log_vendor_idx;
+DROP INDEX IF EXISTS public.msme_email_log_vendor_idx;
 
 -- keeps: idx_task_attachments_task
-DROP INDEX CONCURRENTLY IF EXISTS public.idx_attachments_task;
+DROP INDEX IF EXISTS public.idx_attachments_task;
 
 -- keeps: idx_tasks_org_active_due  (the partial/active variant, which is the
 -- one every board and list query actually filters on)
-DROP INDEX CONCURRENTLY IF EXISTS public.idx_tasks_org_due;
+DROP INDEX IF EXISTS public.idx_tasks_org_due;
 
 
 -- ============================================================================
@@ -86,32 +101,32 @@ ORDER BY pg_relation_size(s.indexrelid) DESC;
 -- Skip any line that section 2 reported as backing a constraint.
 
 -- tasks: the busiest table in the app
-DROP INDEX CONCURRENTLY IF EXISTS public.idx_tasks_org_due;
-  -- restore: CREATE INDEX CONCURRENTLY idx_tasks_org_due ON tasks (org_id, due_date);
+DROP INDEX IF EXISTS public.idx_tasks_org_due;
+  -- restore: CREATE INDEX idx_tasks_org_due ON tasks (org_id, due_date);
 
 -- task_attachments
-DROP INDEX CONCURRENTLY IF EXISTS public.idx_attachments_task;
-  -- restore: CREATE INDEX CONCURRENTLY idx_attachments_task ON task_attachments (task_id);
+DROP INDEX IF EXISTS public.idx_attachments_task;
+  -- restore: CREATE INDEX idx_attachments_task ON task_attachments (task_id);
 
 -- msme_vendors / msme_email_log: written in bulk on every reminder run
-DROP INDEX CONCURRENTLY IF EXISTS public.idx_msme_vendors_is_deleted;
-  -- restore: CREATE INDEX CONCURRENTLY idx_msme_vendors_is_deleted ON msme_vendors (is_deleted);
-DROP INDEX CONCURRENTLY IF EXISTS public.msme_vendors_status_emailed_idx;
-  -- restore: CREATE INDEX CONCURRENTLY msme_vendors_status_emailed_idx ON msme_vendors (status, last_emailed_at);
+DROP INDEX IF EXISTS public.idx_msme_vendors_is_deleted;
+  -- restore: CREATE INDEX idx_msme_vendors_is_deleted ON msme_vendors (is_deleted);
+DROP INDEX IF EXISTS public.msme_vendors_status_emailed_idx;
+  -- restore: CREATE INDEX msme_vendors_status_emailed_idx ON msme_vendors (status, last_emailed_at);
 
 -- projects: three unused indexes on a small, rarely-read table
-DROP INDEX CONCURRENTLY IF EXISTS public.idx_projects_org;
-  -- restore: CREATE INDEX CONCURRENTLY idx_projects_org ON projects (org_id);
-DROP INDEX CONCURRENTLY IF EXISTS public.idx_projects_client;
-  -- restore: CREATE INDEX CONCURRENTLY idx_projects_client ON projects (client_id);
-DROP INDEX CONCURRENTLY IF EXISTS public.idx_projects_member_ids;
-  -- restore: CREATE INDEX CONCURRENTLY idx_projects_member_ids ON projects USING gin (member_ids);
-DROP INDEX CONCURRENTLY IF EXISTS public.idx_projects_name_trgm;
-  -- restore: CREATE INDEX CONCURRENTLY idx_projects_name_trgm ON projects USING gin (name gin_trgm_ops);
+DROP INDEX IF EXISTS public.idx_projects_org;
+  -- restore: CREATE INDEX idx_projects_org ON projects (org_id);
+DROP INDEX IF EXISTS public.idx_projects_client;
+  -- restore: CREATE INDEX idx_projects_client ON projects (client_id);
+DROP INDEX IF EXISTS public.idx_projects_member_ids;
+  -- restore: CREATE INDEX idx_projects_member_ids ON projects USING gin (member_ids);
+DROP INDEX IF EXISTS public.idx_projects_name_trgm;
+  -- restore: CREATE INDEX idx_projects_name_trgm ON projects USING gin (name gin_trgm_ops);
 
 -- org_members: read on every single request, but never through this index
-DROP INDEX CONCURRENTLY IF EXISTS public.idx_org_members_user_active;
-  -- restore: CREATE INDEX CONCURRENTLY idx_org_members_user_active ON org_members (user_id, is_active);
+DROP INDEX IF EXISTS public.idx_org_members_user_active;
+  -- restore: CREATE INDEX idx_org_members_user_active ON org_members (user_id, is_active);
 
 
 -- ============================================================================
@@ -121,12 +136,12 @@ DROP INDEX CONCURRENTLY IF EXISTS public.idx_org_members_user_active;
 -- makes Postgres find the referencing rows, and with no index that is a full
 -- scan of ca_task_instances — on every delete, and the Trash purge deletes in
 -- bulk. This is the single most expensive missing index here.
-CREATE INDEX CONCURRENTLY IF NOT EXISTS ca_task_instances_task_id_idx
+CREATE INDEX IF NOT EXISTS ca_task_instances_task_id_idx
   ON public.ca_task_instances (task_id);
 
 -- tasks.parent_recurring_id is walked by the daily recurring spawn and by the
 -- calendar's occurrence lookup, both of which run across the whole table.
-CREATE INDEX CONCURRENTLY IF NOT EXISTS tasks_parent_recurring_id_idx
+CREATE INDEX IF NOT EXISTS tasks_parent_recurring_id_idx
   ON public.tasks (parent_recurring_id)
   WHERE parent_recurring_id IS NOT NULL;
 
