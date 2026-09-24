@@ -4,7 +4,10 @@ import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { CalendarView } from './CalendarView'
 import { shiftDays, nextOccurrence } from '@/lib/utils/recurringSchedule'
 
-const TASK_SELECT = 'id, title, status, priority, due_date, next_occurrence_date, is_recurring, parent_task_id, parent_recurring_id, project_id, assignee_id, approver_id, approval_status, approval_required, client_id, frequency, custom_fields, is_billable, billable_amount, projects(id,name,color), assignee:users!tasks_assignee_id_fkey(id,name), approver:users!tasks_approver_id_fkey(id,name)'
+// is_billable / billable_amount are deliberately absent: the calendar itself
+// never reads them, only TaskDetailPanel does, and it now fetches the single
+// task it opens. Two queries here run to thousands of rows each.
+const TASK_SELECT = 'id, title, status, priority, due_date, next_occurrence_date, is_recurring, parent_task_id, parent_recurring_id, project_id, assignee_id, approver_id, approval_status, approval_required, client_id, frequency, custom_fields, projects(id,name,color), assignee:users!tasks_assignee_id_fkey(id,name), approver:users!tasks_approver_id_fkey(id,name)'
 
 export async function CalendarFetcher() {
   const user = await getSessionUser()

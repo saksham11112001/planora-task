@@ -446,7 +446,8 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
         clients.forEach(c => { clientById[c.id] = c })
         setSubtasks((json.data ?? []).map((t: any) => ({
           ...t,
-          description: null,
+          // Left undefined rather than null so the detail panel fetches the
+          // real description instead of showing a blank one.
           assignee: t.assignee_id ? (memberById[t.assignee_id] ?? null) : null,
           client:    t.client_id   ? (clientById[t.client_id]   ?? null) : null,
           project:   null, approver: null, creator: null,
