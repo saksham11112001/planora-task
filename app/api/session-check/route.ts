@@ -19,19 +19,27 @@ import { getAuthUser }   from '@/lib/supabase/authUser'
 // Never cache: a cached "authenticated: true" would redirect signed-out users.
 export const dynamic = 'force-dynamic'
 
+// `conclusive` says whether this answer is worth acting on destructively.
+//
+// The login page wants to fail closed — if we cannot tell, show the form.
+// AuthErrorBoundary wants the opposite: it evicts a signed-in person to
+// /login, and doing that because Auth was briefly unreachable is the bug it
+// was added to prevent. One boolean cannot serve both, so the answer carries
+// its own confidence and each caller decides.
 export async function GET() {
   try {
     const supabase = await createClient()
     const user = await getAuthUser(supabase)
     return NextResponse.json(
-      { authenticated: !!user },
+      { authenticated: !!user, conclusive: true },
       { headers: { 'Cache-Control': 'no-store, max-age=0' } },
     )
-  } catch {
-    // Fail closed: on error, report "not authenticated" so the login form is
-    // shown rather than risking a redirect into a bounce loop.
+  } catch (err) {
+    console.error('[session-check] auth lookup failed:', (err as Error)?.message)
+    // Still false, so the login page behaves exactly as before — but flagged
+    // inconclusive so nothing signs a working session out over it.
     return NextResponse.json(
-      { authenticated: false },
+      { authenticated: false, conclusive: false },
       { headers: { 'Cache-Control': 'no-store, max-age=0' } },
     )
   }
