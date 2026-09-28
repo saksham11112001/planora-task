@@ -151,15 +151,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   // Manager/owner/admin bypass: they can force-complete regardless of subtask state
   if (body.status === 'completed' && !task.parent_task_id && !isManager) {
     const { data: subtasks } = await admin
-      .from('tasks').select('id, status').eq('parent_task_id', id).eq('org_id', mb.org_id)
-    if (subtasks && subtasks.length > 0) {
-      const incomplete = subtasks.filter(s => s.status !== 'completed')
-      if (incomplete.length > 0) {
-        return NextResponse.json({
-          error: `Complete all subtasks first — ${incomplete.length} remaining`,
-          code: 'SUBTASKS_INCOMPLETE',
-        }, { status: 422 })
-      }
+      .from('tasks').select(SUBTASK_GATE_COLS).eq('parent_task_id', id).eq('org_id', mb.org_id)
+    // Shared with the approve route. This branch used to count compliance
+    // placeholders as real work, which the approve route already excluded —
+    // the two gates disagreed about what a subtask is.
+    const incomplete = blockingSubtasks(subtasks as any)
+    if (incomplete.length > 0) {
+      return NextResponse.json({
+        error: subtaskGateMessage(incomplete),
+        code: 'SUBTASKS_INCOMPLETE',
+      }, { status: 422 })
     }
   }
 

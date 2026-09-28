@@ -71,13 +71,13 @@ export async function POST(
     // _compliance_subtask rows are attachment-header placeholders — not real work items,
     // so they are always excluded from this gate.
     const { data: subtasks } = await admin
-      .from('tasks').select('id, status, parent_task_id, custom_fields').eq('parent_task_id', id).eq('org_id', mb.org_id)
-    const realSubtasks = (subtasks ?? []).filter((s: any) => s.custom_fields?._compliance_subtask !== true)
-    if (!isOwnerOrAdmin && realSubtasks.length > 0) {
-      const incomplete = realSubtasks.filter((s: any) => s.status !== 'completed')
+      .from('tasks').select(`${SUBTASK_GATE_COLS}, parent_task_id`)
+      .eq('parent_task_id', id).eq('org_id', mb.org_id)
+    if (!isOwnerOrAdmin) {
+      const incomplete = blockingSubtasks(subtasks as any)
       if (incomplete.length > 0) {
         return NextResponse.json({
-          error: `Complete all subtasks first — ${incomplete.length} remaining`,
+          error: subtaskGateMessage(incomplete),
           code: 'SUBTASKS_INCOMPLETE',
         }, { status: 422 })
       }
