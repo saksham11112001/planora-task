@@ -35,7 +35,7 @@ export const recurringSpawn = inngest.createFunction(
       // while looking healthy. Throwing fails the run, which is what the
       // job-failure alert watches.
       const { data, error } = await admin.from('tasks')
-        .select('id, title, priority, assignee_id, project_id, client_id, org_id, frequency, next_occurrence_date, approval_required, custom_fields')
+        .select('id, title, priority, assignee_id, approver_id, project_id, client_id, org_id, frequency, next_occurrence_date, approval_required, custom_fields')
         .eq('is_recurring', true)
         .lte('next_occurrence_date', today)
         .neq('is_archived', true)
@@ -82,6 +82,13 @@ export const recurringSpawn = inngest.createFunction(
             project_id:          tmpl.project_id,
             client_id:           tmpl.client_id,
             approval_required:   tmpl.approval_required,
+            // Carried from the template alongside approval_required. Copying
+            // one without the other produced an occurrence that REQUIRES
+            // approval with nobody designated to give it, which then falls
+            // back to "any manager" — so a template whose approver is a member
+            // (a team lead signing off their own reports' work) spawned tasks
+            // that same person was not allowed to approve.
+            approver_id:         tmpl.approver_id ?? null,
             is_recurring:        false,
             parent_recurring_id: tmpl.id,
             due_date:            spawnDate,
