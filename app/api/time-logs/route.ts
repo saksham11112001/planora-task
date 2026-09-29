@@ -4,7 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { effectivePlan, canUseFeature } from '@/lib/utils/planGate'
 import { NextResponse }      from 'next/server'
 import type { NextRequest }  from 'next/server'
-import { assertCan }         from '@/lib/utils/permissionGate'
+import { assertCan, canDo }         from '@/lib/utils/permissionGate'
 import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
 import { dbError } from '@/lib/api-error'
 
@@ -52,8 +52,17 @@ export async function GET(request: NextRequest) {
   if (!mb) return NextResponse.json({ data: [] })
 
   const sp = request.nextUrl.searchParams
-  const canSeeAll = ['owner','admin','manager'].includes(mb.role)
   const admin = createAdminClient()
+  // 'time.view_all' decides this, not a hardcoded role list. The list said
+  // owner/admin/manager, which is exactly what the permission defaults to — so
+  // nothing changes for any org today. What changes is that switching the
+  // permission off in Settings -> Permissions now has an effect; before, the
+  // toggle was there and did nothing, and an admin who used it to stop
+  // managers seeing the team's hours was quietly ignored.
+  //
+  // Owners and admins bypass every permission check inside canDo, so they keep
+  // full visibility regardless of how the org configures this.
+  const canSeeAll = await canDo(admin, mb.org_id, user.id, mb.role, 'time.view_all')
   let q = admin.from('time_logs').select('id, hours, is_billable, logged_date, description, project_id, task_id, user_id').eq('org_id', mb.org_id)
   if (!canSeeAll) q = q.eq('user_id', user.id)
   if (sp.get('project_id')) q = q.eq('project_id', sp.get('project_id')!)
