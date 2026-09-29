@@ -26,17 +26,24 @@ export default async function DashboardPage() {
   const from30   = new Date(Date.now() - 30 * 86400000).toISOString()
   const from7    = new Date(Date.now() - 7  * 86400000).toISOString()
 
+  // Six of the counts this page used to make were exact counts over the SAME
+  // rows — this user's tasks in this org — differing only by filter. Six
+  // round-trips, six passes, for numbers that one pass can produce.
+  //
+  // At 55 MB the whole table is in memory, so this was never disk-bound: it
+  // was CPU spent counting the same rows over and over on every dashboard
+  // load, by every user, all day. One scan now feeds all six.
+  //
+  // The cap is a backstop against an absurd row count, not a working limit —
+  // this is one person's own tasks, which is hundreds, not thousands. Above it
+  // the tallies would understate, so it is set far beyond anything real.
+  const MY_TASK_CAP = 20_000
+
   const results = await Promise.allSettled([
-    supabase.from('tasks').select('*', { count: 'exact', head: true })
-      .eq('org_id', orgId).eq('assignee_id', user.id).neq('is_archived', true)
-      .in('status', ['todo','in_review'])
-      .not('due_date', 'is', null).lt('due_date', today),
-    supabase.from('tasks').select('*', { count: 'exact', head: true })
-      .eq('org_id', orgId).eq('assignee_id', user.id).neq('is_archived', true)
-      .in('status', ['todo','in_review'])
-      .eq('due_date', today),
-    supabase.from('tasks').select('*', { count: 'exact', head: true })
-      .eq('org_id', orgId).eq('assignee_id', user.id).eq('approval_status', 'pending'),
+    supabase.from('tasks')
+      .select('status, due_date, approval_status, completed_at, created_at, is_archived')
+      .eq('org_id', orgId).eq('assignee_id', user.id)
+      .limit(MY_TASK_CAP),
     supabase.from('tasks')
       .select('id, title, status, due_date, project_id, projects(id, name, color)')
       .eq('org_id', orgId).eq('assignee_id', user.id).in('status', ['todo'])
@@ -45,32 +52,49 @@ export default async function DashboardPage() {
       .select('id, name, color, status, due_date, client_id, clients(id, name, color)')
       .eq('org_id', orgId).eq('status', 'active').neq('is_archived', true)
       .order('updated_at', { ascending: false }).limit(4),
-    supabase.from('tasks').select('*', { count: 'exact', head: true })
-      .eq('org_id', orgId).eq('assignee_id', user.id).eq('status', 'completed').gte('completed_at', from30),
-    supabase.from('tasks').select('*', { count: 'exact', head: true })
-      .eq('org_id', orgId).eq('assignee_id', user.id).gte('created_at', from30),
     supabase.from('clients').select('id, name, color').eq('org_id', orgId).eq('status', 'active')
       .order('created_at', { ascending: false }).limit(5),
     // Additional KPIs
     supabase.from('clients').select('*', { count: 'exact', head: true })
       .eq('org_id', orgId).eq('status', 'active'),
-    supabase.from('tasks').select('*', { count: 'exact', head: true })
-      .eq('org_id', orgId).eq('assignee_id', user.id).eq('status', 'completed').gte('completed_at', from7),
     supabase.from('org_members').select('*', { count: 'exact', head: true })
       .eq('org_id', orgId),
   ])
 
-  const overdueCount       = results[0].status === 'fulfilled' ? (results[0].value as any).count ?? 0 : 0
-  const todayCount         = results[1].status === 'fulfilled' ? (results[1].value as any).count ?? 0 : 0
-  const pendingCount       = results[2].status === 'fulfilled' ? (results[2].value as any).count ?? 0 : 0
-  const myTasks            = results[3].status === 'fulfilled' ? (results[3].value as any).data ?? [] : []
-  const activeProjects     = results[4].status === 'fulfilled' ? (results[4].value as any).data ?? [] : []
-  const completedThisMonth = results[5].status === 'fulfilled' ? (results[5].value as any).count ?? 0 : 0
-  const totalThisMonth     = results[6].status === 'fulfilled' ? (results[6].value as any).count ?? 0 : 0
-  const recentClients      = results[7].status === 'fulfilled' ? (results[7].value as any).data ?? [] : []
-  const clientsCount       = results[8].status === 'fulfilled' ? (results[8].value as any).count ?? 0 : 0
-  const weeklyCompleted    = results[9].status === 'fulfilled' ? (results[9].value as any).count ?? 0 : 0
-  const teamCount          = results[10].status === 'fulfilled' ? (results[10].value as any).count ?? 1 : 1
+  // ── The six tallies, derived from the single pass above ──────────────────
+  // Each condition mirrors the filter the query it replaced used, including
+  // one quirk worth naming: `.neq('is_archived', true)` in SQL also drops rows
+  // where the column is NULL, because NULL <> true is NULL. `is_archived ===
+  // false` reproduces that exactly. `!is_archived` would NOT — it would count
+  // NULL rows the old dashboard excluded, and silently change these numbers.
+  type MyTaskRow = {
+    status?: string | null; due_date?: string | null; approval_status?: string | null
+    completed_at?: string | null; created_at?: string | null; is_archived?: boolean | null
+  }
+  const myTaskRows: MyTaskRow[] =
+    results[0].status === 'fulfilled' ? ((results[0].value as any).data ?? []) : []
+
+  const openStatus = (t: MyTaskRow) =>
+    t.is_archived === false && (t.status === 'todo' || t.status === 'in_review')
+
+  const overdueCount       = myTaskRows.filter(t =>
+    openStatus(t) && !!t.due_date && t.due_date < today).length
+  const todayCount         = myTaskRows.filter(t =>
+    openStatus(t) && t.due_date === today).length
+  const pendingCount       = myTaskRows.filter(t =>
+    t.approval_status === 'pending').length
+  const completedThisMonth = myTaskRows.filter(t =>
+    t.status === 'completed' && !!t.completed_at && t.completed_at >= from30).length
+  const totalThisMonth     = myTaskRows.filter(t =>
+    !!t.created_at && t.created_at >= from30).length
+  const weeklyCompleted    = myTaskRows.filter(t =>
+    t.status === 'completed' && !!t.completed_at && t.completed_at >= from7).length
+
+  const myTasks            = results[1].status === 'fulfilled' ? (results[1].value as any).data ?? [] : []
+  const activeProjects     = results[2].status === 'fulfilled' ? (results[2].value as any).data ?? [] : []
+  const recentClients      = results[3].status === 'fulfilled' ? (results[3].value as any).data ?? [] : []
+  const clientsCount       = results[4].status === 'fulfilled' ? (results[4].value as any).count ?? 0 : 0
+  const teamCount          = results[5].status === 'fulfilled' ? (results[5].value as any).count ?? 1 : 1
 
   const completionRate = totalThisMonth
     ? Math.min(100, Math.round(((completedThisMonth ?? 0) / totalThisMonth) * 100))
