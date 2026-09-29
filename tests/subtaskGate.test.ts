@@ -1,8 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { blockingSubtasks, subtaskGateMessage } from '../lib/utils/subtaskGate.ts'
+import type { SubtaskRow } from '../lib/utils/subtaskGate.ts'
 
-const sub = (o: Partial<Parameters<typeof blockingSubtasks>[0][number]> = {}) => ({
+const sub = (o: Partial<SubtaskRow> = {}): SubtaskRow => ({
   id: Math.random().toString(36).slice(2),
   title: 'Sales Accounting',
   status: 'completed',
