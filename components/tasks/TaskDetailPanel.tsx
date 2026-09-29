@@ -461,16 +461,33 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     if (decision === 'reject')  setStatus('todo')
     if (decision === 'submit')  setStatus('in_review')
 
-    const res = await fetch(`/api/tasks/${task.id}/approve`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ decision }),
-    })
-    const d = await res.json()
+    let res: Response
+    try {
+      res = await fetch(`/api/tasks/${task.id}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decision }),
+      })
+    } catch {
+      // Network failure: nothing reached the server, so the optimistic status
+      // is definitely wrong.
+      setApproving(false)
+      setStatus(prevStatus)
+      toast.error('Could not reach the server — please try again')
+      return
+    }
+
+    // Guarded, like the submit handler above. A 500 with an empty body — which
+    // is what a route throwing before it can serialise anything returns — made
+    // this line throw, and everything after it never ran: the spinner never
+    // stopped, the optimistic status was never rolled back, and the panel sat
+    // showing an approval that had not happened. That is how one server error
+    // turned into a stuck screen rather than an error message.
+    const d = await res.json().catch(() => ({} as Record<string, unknown>))
     setApproving(false)
     if (!res.ok) {
       setStatus(prevStatus)   // rollback
-      toast.error(d.error ?? 'Action failed')
+      toast.error((d as any).error ?? 'Action failed')
       return
     }
     if (decision === 'approve') toast.success('Task approved! ✅')

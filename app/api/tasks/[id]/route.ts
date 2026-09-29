@@ -8,6 +8,7 @@ import { assertCan }          from '@/lib/utils/permissionGate'
 import { dbError }             from '@/lib/api-error'
 import { nextOccurrence, normalizeFrequency, isValidGranularFrequency, shiftDays } from '@/lib/utils/recurringSchedule'
 import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
+import { blockingSubtasks, subtaskGateMessage, SUBTASK_GATE_COLS } from '@/lib/utils/subtaskGate'
 
 const VALID_PRIORITIES    = ['low', 'medium', 'high', 'urgent']
 const VALID_TASK_STATUSES = ['todo', 'in_progress', 'in_review', 'completed', 'cancelled']

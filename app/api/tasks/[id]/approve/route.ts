@@ -4,6 +4,7 @@ import { getAuthUser } from '@/lib/supabase/authUser'
 import { createAdminClient }        from '@/lib/supabase/admin'
 import { inngest }                   from '@/lib/inngest/client'
 import { getApiOrgMembership }       from '@/lib/supabase/apiActiveOrg'
+import { blockingSubtasks, subtaskGateMessage, SUBTASK_GATE_COLS } from '@/lib/utils/subtaskGate'
 
 export async function POST(
   req: NextRequest,
