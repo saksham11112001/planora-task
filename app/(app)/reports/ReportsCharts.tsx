@@ -398,6 +398,42 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
     d => d.dateKey >= compDateFrom && d.dateKey <= compDateTo
   )
 
+  // Totals for the selected chart period, shown under Today's snapshot.
+  //
+  // The four rows are NOT the same kind of number, and treating them alike
+  // would make the table wrong:
+  //
+  //   Added / Completed are events that happened on a given day, so summing
+  //   them across the range is the answer.
+  //
+  //   Overdue / No Due Date are counts of work still open AS OF a day. The
+  //   same task is counted again every day it stays overdue, so summing those
+  //   would report a number many times larger than the real backlog. The
+  //   meaningful figure is the count on the LAST day of the range, which is
+  //   what the range closed at.
+  //
+  // The Date column reflects that: flow rows carry the range, stock rows carry
+  // the end date, so each number says what it is measuring.
+  const periodSummary = (() => {
+    const rows  = complianceDailyData
+    const last  = rows[rows.length - 1]
+    const total = (pick: (d: typeof rows[number]) => number) =>
+      rows.reduce((acc, d) => acc + (pick(d) || 0), 0)
+    return {
+      fromLabel:    rows[0]?.date ?? '',
+      toLabel:      last?.date ?? '',
+      days:         rows.length,
+      addedC:       total(d => d.addedC),
+      addedNC:      total(d => d.addedNC),
+      completedC:   total(d => d.completedC),
+      completedNC:  total(d => d.completedNC),
+      overdueC:     last?.overdueC     ?? 0,
+      overdueNC:    last?.overdueNC    ?? 0,
+      noDueDateC:   last?.noDueDateC   ?? 0,
+      noDueDateNC:  last?.noDueDateNC  ?? 0,
+    }
+  })()
+
   // Role-based member list: members/viewers see only themselves
   // Timeline filter: slice weeklyTrend to match selected days
   const timelineDays = parseInt(timeline)
@@ -1006,6 +1042,62 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
                   <p style={{ fontSize: 11, color: '#ea580c', opacity: 0.7, marginTop: 4 }}>{complianceSummary.overdueNC} overdue</p>
                 </div>
               </div>
+            </div>
+
+            {/* Selected period — same shape as Today's snapshot, for the range
+                chosen above the charts. */}
+            <div className="card-elevated p-5">
+              <h3 style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
+                Selected period — {periodSummary.fromLabel} to {periodSummary.toLabel}
+              </h3>
+              <p style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 14 }}>
+                {periodSummary.days} day{periodSummary.days === 1 ? '' : 's'} · Added and Completed are totals across the range;
+                Overdue and No Due Date are the position on the closing day.
+              </p>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <thead>
+                  <tr style={{ background: 'var(--surface-subtle)' }}>
+                    {['Date', 'Status', 'Compliance', 'Non-Compliance'].map(h => (
+                      <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600,
+                        color: 'var(--text-secondary)', borderBottom: '1px solid var(--border)',
+                        fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    { label: 'Overdue',      color: '#dc2626', bg: '#fef2f2', when: periodSummary.toLabel,
+                      c: periodSummary.overdueC,    nc: periodSummary.overdueNC },
+                    { label: 'No Due Date',  color: '#64748b', bg: '#f8fafc', when: periodSummary.toLabel,
+                      c: periodSummary.noDueDateC,  nc: periodSummary.noDueDateNC },
+                    { label: 'Added',        color: '#0891b2', bg: '#f0f9ff',
+                      when: `${periodSummary.fromLabel} – ${periodSummary.toLabel}`,
+                      c: periodSummary.addedC,      nc: periodSummary.addedNC },
+                    { label: 'Completed',    color: '#16a34a', bg: '#f0fdf4',
+                      when: `${periodSummary.fromLabel} – ${periodSummary.toLabel}`,
+                      c: periodSummary.completedC,  nc: periodSummary.completedNC },
+                  ].map((row, i) => (
+                    <tr key={i} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                      <td style={{ padding: '9px 12px', color: 'var(--text-secondary)' }}>{row.when}</td>
+                      <td style={{ padding: '9px 12px' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6,
+                          padding: '2px 10px', borderRadius: 99, fontSize: 11, fontWeight: 600,
+                          color: row.color, background: row.bg }}>
+                          {row.label}
+                        </span>
+                      </td>
+                      <td style={{ padding: '9px 12px', fontWeight: 700, color: row.c > 0 ? row.color : 'var(--text-muted)', fontSize: 14, textAlign: 'center' }}>
+                        {row.c}
+                      </td>
+                      <td style={{ padding: '9px 12px', fontWeight: 700, color: row.nc > 0 ? row.color : 'var(--text-muted)', fontSize: 14, textAlign: 'center' }}>
+                        {row.nc}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
         </div>
       )}
