@@ -5,6 +5,7 @@ import { createAdminClient }        from '@/lib/supabase/admin'
 import { inngest }                   from '@/lib/inngest/client'
 import { getApiOrgMembership }       from '@/lib/supabase/apiActiveOrg'
 import { blockingSubtasks, subtaskGateMessage, SUBTASK_GATE_COLS } from '@/lib/utils/subtaskGate'
+import { assertCan } from '@/lib/utils/permissionGate'
 
 export async function POST(
   req: NextRequest,
@@ -43,7 +44,6 @@ export async function POST(
   }
   const isAssignee    = task.assignee_id === user.id
   const isOwnerOrAdmin = ['owner', 'admin'].includes(mb.role)
-  const isManager      = ['owner', 'admin', 'manager'].includes(mb.role)
 
   // ── Who can do what ────────────────────────────────────────────────────────
   // submit: the assignee OR any owner/admin
@@ -162,9 +162,24 @@ export async function POST(
     return NextResponse.json({ ok: true, message: 'Submitted for approval' })
   }
 
-  // approve / reject: designated approver OR any manager/owner/admin
-  if (!task.approver_id && !isManager) {
-    return NextResponse.json({ error: 'No approver assigned to this task' }, { status: 403 })
+  // approve / reject: designated approver OR, when nobody is designated,
+  // whoever the org grants 'tasks.approve'.
+  //
+  // The permission governs the FALLBACK only. Being named approver on a task
+  // is an assignment, not a role, so it is not something a role permission
+  // should be able to take away — otherwise a task could be left with an
+  // approver who is forbidden from approving it, which is unclosable.
+  //
+  // This replaces a hardcoded owner/admin/manager list. 'tasks.approve'
+  // defaults to exactly that set, so no org's behaviour changes today; what
+  // changes is that the toggle in Settings -> Permissions now does something.
+  // It was previously offered and silently ignored, so an admin who revoked
+  // approval rights from managers did not actually revoke anything.
+  if (!task.approver_id) {
+    const approveDenied = await assertCan(admin, mb.org_id, user.id, mb.role, 'tasks.approve')
+    if (approveDenied) {
+      return NextResponse.json({ error: 'No approver assigned to this task' }, { status: 403 })
+    }
   }
   if (task.approver_id && task.approver_id !== user.id && !isOwnerOrAdmin) {
     return NextResponse.json({ error: 'Only the designated approver can approve or reject this task' }, { status: 403 })
