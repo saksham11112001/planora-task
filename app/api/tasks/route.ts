@@ -22,6 +22,40 @@ export async function GET(request: NextRequest) {
   const admin = createAdminClient()
 
   const sp  = request.nextUrl.searchParams
+
+  // ── How widely this request may see ──────────────────────────────────────
+  const isPrivileged = ['owner', 'admin', 'manager'].includes(mb.role)
+  let scopeToInvolved = !isPrivileged
+
+  // Exception: the subtasks of a task you can already see.
+  //
+  // Without this, someone assigned a parent task sees only the subtasks they
+  // personally own. The panel showed "4/4 complete" while the server counted
+  // eight and refused to let them submit, naming a subtask they had no way to
+  // see — an unfixable state from where they were standing, since the thing
+  // blocking them was invisible.
+  //
+  // Whoever is responsible for finishing a task has to be able to see
+  // everything standing in the way of finishing it. This widens visibility
+  // only to children of a task the caller already has access to, and only when
+  // they asked for that task's children — it is checked against the parent, in
+  // this org, every time, so it cannot be used to enumerate anything else.
+  const parentId = sp.get('parent_id')
+  if (scopeToInvolved && parentId) {
+    const { data: parent } = await admin
+      .from('tasks')
+      .select('id, assignee_id, approver_id, created_by')
+      .eq('id', parentId)
+      .eq('org_id', mb.org_id)
+      .maybeSingle()
+    const ownsParent = !!parent && (
+      parent.assignee_id === user.id ||
+      parent.approver_id === user.id ||
+      parent.created_by  === user.id
+    )
+    if (ownsParent) scopeToInvolved = false
+  }
+
   // Built fresh per page — a PostgREST builder is single-use, and paging below
   // issues one request per page.
   const buildQuery = () => {
@@ -29,8 +63,9 @@ export async function GET(request: NextRequest) {
       .select('id, title, status, priority, due_date, assignee_id, approver_id, approval_status, approval_required, approved_by, approved_at, completed_at, project_id, client_id, is_recurring, frequency, next_occurrence_date, parent_task_id, parent_recurring_id, custom_fields, created_at, updated_at, is_billable, billable_amount, created_by')
       .eq('org_id', mb.org_id).neq('is_archived', true)
 
-    // Non-manager/admin/owner users only see tasks they are involved in
-    if (!['owner', 'admin', 'manager'].includes(mb.role)) {
+    // Decided above: normally "only tasks you are involved in", relaxed for the
+    // subtasks of a parent you already have access to.
+    if (scopeToInvolved) {
       q = q.or(`assignee_id.eq.${user.id},approver_id.eq.${user.id},created_by.eq.${user.id}`)
     }
     if (sp.get('project_id'))   q = q.eq('project_id', sp.get('project_id')!)
