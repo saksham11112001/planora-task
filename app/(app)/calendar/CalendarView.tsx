@@ -180,8 +180,28 @@ export function CalendarView({ tasks: initialTasks, clients = [], members = [], 
   const isStrArr = (v: unknown) => Array.isArray(v) && v.every(x => typeof x === 'string')
   const [clientFilter,  setClientFilter]  = usePersistedState<string[]>(
     viewPrefKey('calendar_clients', currentUserId), [], isStrArr)
+  // Defaults to just you, not the whole firm.
+  //
+  // For an owner or admin the server returns every task in the org — nearly
+  // five thousand of them here — and the calendar laid out all of them before
+  // anyone had asked to see a colleague's work. The first thing you want from
+  // a calendar is your own week; other people's tasks are a deliberate act,
+  // and the Member picker is right there for it.
+  //
+  // Rendering a few hundred entries instead of five thousand is most of why
+  // this page felt heavy. It does not reduce what the SERVER fetches — that
+  // needs the fetch itself scoped, which changes the filter from instant to a
+  // page load and is a separate decision.
+  //
+  // The key carries a _v2 suffix on purpose. usePersistedState lets a stored
+  // value win over the default, so without a new key everyone who has ever
+  // opened this page would keep their saved "all members" and never see the
+  // change. The suffix retires the old preference once; "Clear filters"
+  // remains the one click back to the whole calendar.
   const [memberFilter,  setMemberFilter]  = usePersistedState<string[]>(
-    viewPrefKey('calendar_members', currentUserId), [], isStrArr)
+    viewPrefKey('calendar_members_v2', currentUserId),
+    currentUserId ? [currentUserId] : [],
+    isStrArr)
   const [panelTask, setPanelTask] = useState<Task | null>(null)
   const timelineScrollRef = useRef<HTMLDivElement>(null)
 
