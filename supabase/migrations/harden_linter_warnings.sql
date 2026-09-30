@@ -27,12 +27,38 @@
 --
 -- The app never calls it. Close it.
 
+-- REVOKE FROM PUBLIC FIRST — this is the part that actually does anything.
+--
+-- Postgres grants EXECUTE on every new function to the PUBLIC pseudo-role
+-- automatically. anon and authenticated inherit it from there, they are not
+-- granted it by name. So revoking from them alone removes nothing: run it and
+-- has_function_privilege('anon', ..., 'EXECUTE') still comes back true, which
+-- is exactly what happened the first time this file was run against
+-- production. A NULL proacl on the function is the tell that defaults apply.
+--
+-- service_role is granted back explicitly so server-side callers keep working
+-- once PUBLIC no longer covers them.
+REVOKE EXECUTE ON FUNCTION public.compact_stage_orders(uuid, integer) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.compact_stage_orders(uuid, integer) FROM anon, authenticated;
+GRANT  EXECUTE ON FUNCTION public.compact_stage_orders(uuid, integer) TO service_role;
 
--- handle_new_user is a TRIGGER function. Triggers fire as the table owner, so
--- the calling role never needs EXECUTE — granting it only exposes the function
--- at /rest/v1/rpc/handle_new_user, where it was never meant to be reachable.
-REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM anon, authenticated;
+-- handle_new_user is DELIBERATELY NOT REVOKED HERE.
+--
+-- It is the trigger that creates the user row on signup. Revoking EXECUTE from
+-- PUBLIC risks breaking registration, and whether Postgres checks that
+-- privilege when a trigger fires is not something to find out on a live
+-- database holding paying customers.
+--
+-- The exposure is small either way: it reads NEW, and over RPC there is no NEW,
+-- so a direct call errors out before it can do anything. The search_path fix in
+-- section 2 closes the escalation route that did matter.
+--
+-- To close it anyway, run the two lines below and IMMEDIATELY create a test
+-- account. If signup breaks, undo with:
+--   GRANT EXECUTE ON FUNCTION public.handle_new_user() TO PUBLIC;
+--
+--   REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM PUBLIC, anon, authenticated;
+--   GRANT  EXECUTE ON FUNCTION public.handle_new_user() TO service_role, supabase_auth_admin;
 
 
 -- ============================================================================
