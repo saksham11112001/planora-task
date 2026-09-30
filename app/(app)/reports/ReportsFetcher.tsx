@@ -253,6 +253,9 @@ export async function ReportsFetcher() {
     due_date: string | null; created_at: string; completed_at: string | null
     custom_fields: Record<string, any> | null
     assignee_id: string | null; client_id: string | null
+    // Carried so the compliance charts can tell a recurring TEMPLATE from a
+    // real task. The select already returned both; the cast just hid them.
+    is_recurring: boolean | null; parent_recurring_id: string | null
   }[]
   const complianceMemberList = (members ?? []).map((m: any) => ({
     id:   (m.users as any)?.id   ?? m.user_id,
