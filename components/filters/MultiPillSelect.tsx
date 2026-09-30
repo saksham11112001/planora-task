@@ -45,6 +45,32 @@ export function MultiPillSelect({ values, onChange, placeholder, options }: Prop
     onChange(values.includes(v) ? values.filter(x => x !== v) : [...values, v])
   }
 
+  // ── Select all ────────────────────────────────────────────────────────────
+  // Sets every option rather than clearing the filter. The two look identical
+  // on a full list and are not: the reason to want this is "everyone except
+  // two", which needs all-selected-then-uncheck. Clearing would leave nothing
+  // to uncheck.
+  //
+  // Only counts options that exist now, so a list that grows (more members
+  // joining, say) does not leave a stale "all" ticked.
+  const allSelected  = options.length > 0 && options.every(o => values.includes(o.value))
+  const someSelected = values.length > 0 && !allSelected
+
+  function toggleAll() {
+    // Deselecting everything goes back to [], which every caller reads as
+    // "no filter" — the same state the × button produces. Leaving an empty
+    // array of explicit selections would filter everything out instead.
+    onChange(allSelected ? [] : options.map(o => o.value))
+  }
+
+  // A checkbox cannot express "some" through props; it has to be set on the
+  // node. Without it, a partial selection shows an unticked box, which reads
+  // as "nothing selected" while the pill says otherwise.
+  const allRef = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (allRef.current) allRef.current.indeterminate = someSelected
+  }, [someSelected, open])
+
   function handleOpen() {
     if (!open && ref.current) {
       const r = ref.current.getBoundingClientRect()
@@ -84,6 +110,30 @@ export function MultiPillSelect({ values, onChange, placeholder, options }: Prop
           borderRadius: 10, boxShadow: '0 8px 28px rgba(0,0,0,0.14)',
           minWidth: 168, maxHeight: 240, overflowY: 'auto', padding: '4px 0',
         }}>
+          {/* Worth the row only when there is more than one thing to select. */}
+          {options.length > 1 && (
+            <>
+              <label
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '7px 12px', cursor: 'pointer',
+                  background: allSelected ? 'rgba(13,148,136,0.06)' : 'transparent',
+                }}
+                onMouseEnter={e => { if (!allSelected) (e.currentTarget as HTMLElement).style.background = 'var(--surface-subtle)' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = allSelected ? 'rgba(13,148,136,0.06)' : 'transparent' }}>
+                <input ref={allRef} type="checkbox" checked={allSelected} onChange={toggleAll}
+                  style={{ accentColor: 'var(--brand)', width: 13, height: 13, flexShrink: 0, cursor: 'pointer' }}/>
+                <span style={{ fontSize: 12, fontWeight: 600, color: allSelected ? 'var(--brand)' : 'var(--text-secondary)' }}>
+                  {allSelected ? 'Deselect all' : 'Select all'}
+                </span>
+                <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-muted)' }}>
+                  {options.length}
+                </span>
+              </label>
+              <div style={{ height: 1, background: 'var(--border)', margin: '2px 0' }}/>
+            </>
+          )}
+
           {options.map(o => {
             const checked = values.includes(o.value)
             return (
