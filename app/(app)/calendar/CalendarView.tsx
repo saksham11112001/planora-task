@@ -180,8 +180,35 @@ export function CalendarView({ tasks: initialTasks, clients = [], members = [], 
   const isStrArr = (v: unknown) => Array.isArray(v) && v.every(x => typeof x === 'string')
   const [clientFilter,  setClientFilter]  = usePersistedState<string[]>(
     viewPrefKey('calendar_clients', currentUserId), [], isStrArr)
+  // Defaults to just you, not the whole firm.
+  //
+  // For an owner or admin the server returns every task in the org — nearly
+  // five thousand of them here — and the calendar laid out all of them before
+  // anyone had asked to see a colleague's work. The first thing you want from
+  // a calendar is your own week; other people's tasks are a deliberate act,
+  // and the Member picker is right there for it.
+  //
+  // Rendering a few hundred entries instead of five thousand is most of why
+  // this page felt heavy. It does not reduce what the SERVER fetches — that
+  // needs the fetch itself scoped, which changes the filter from instant to a
+  // page load and is a separate decision.
+  //
+  // The key carries a _v2 suffix on purpose. usePersistedState lets a stored
+  // value win over the default, so without a new key everyone who has ever
+  // opened this page would keep their saved "all members" and never see the
+  // change. The suffix retires the old preference once; "Clear filters"
+  // remains the one click back to the whole calendar.
   const [memberFilter,  setMemberFilter]  = usePersistedState<string[]>(
-    viewPrefKey('calendar_members', currentUserId), [], isStrArr)
+    viewPrefKey('calendar_members_v2', currentUserId),
+    // Only default to yourself if you are actually one of the members the
+    // picker lists. The ghost admin has a synthetic membership and no
+    // org_members row, so they are absent from `members`: defaulting to their
+    // id would match no task, show an empty calendar, and display a filter
+    // pill for someone not in the list — on the account most likely to be
+    // looking. They fall through to the whole calendar, which is what a
+    // cross-org admin view is for.
+    currentUserId && members.some(m => m.id === currentUserId) ? [currentUserId] : [],
+    isStrArr)
   const [panelTask, setPanelTask] = useState<Task | null>(null)
   const timelineScrollRef = useRef<HTMLDivElement>(null)
 
@@ -240,7 +267,14 @@ export function CalendarView({ tasks: initialTasks, clients = [], members = [], 
     return true
   }).filter(t => {
     if (clientFilter.length > 0 && !clientFilter.includes((t as any).client?.id ?? '')) return false
-    if (memberFilter.length > 0 && !memberFilter.includes(t.assignee_id ?? ''))         return false
+    // Unassigned work is never hidden by the member filter. `assignee_id ?? ''`
+    // used to be harmless because the filter defaulted to empty and this line
+    // never ran; now that it defaults to the current user, an unassigned task
+    // would match nobody and disappear. For a CA firm that is a statutory
+    // deadline nobody has picked up vanishing from the one screen meant to
+    // surface it — the spawner does write assignee_id null when an assignment
+    // has no assignee. Work with no owner is everyone's, so it always shows.
+    if (memberFilter.length > 0 && t.assignee_id && !memberFilter.includes(t.assignee_id)) return false
     return true
   })
 
@@ -332,7 +366,9 @@ export function CalendarView({ tasks: initialTasks, clients = [], members = [], 
   upcomingCATriggers
     .filter(ct => {
       if (clientFilter.length > 0 && !clientFilter.includes(ct.clientId ?? ''))   return false
-      if (memberFilter.length > 0 && !memberFilter.includes(ct.assigneeId ?? '')) return false
+      // Same rule as the task filter above: an unassigned compliance trigger is
+      // an upcoming obligation with nobody on it, and must stay visible.
+      if (memberFilter.length > 0 && ct.assigneeId && !memberFilter.includes(ct.assigneeId)) return false
       return true
     })
     .forEach(ct => {
