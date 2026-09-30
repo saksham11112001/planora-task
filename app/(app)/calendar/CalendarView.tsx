@@ -200,7 +200,14 @@ export function CalendarView({ tasks: initialTasks, clients = [], members = [], 
   // remains the one click back to the whole calendar.
   const [memberFilter,  setMemberFilter]  = usePersistedState<string[]>(
     viewPrefKey('calendar_members_v2', currentUserId),
-    currentUserId ? [currentUserId] : [],
+    // Only default to yourself if you are actually one of the members the
+    // picker lists. The ghost admin has a synthetic membership and no
+    // org_members row, so they are absent from `members`: defaulting to their
+    // id would match no task, show an empty calendar, and display a filter
+    // pill for someone not in the list — on the account most likely to be
+    // looking. They fall through to the whole calendar, which is what a
+    // cross-org admin view is for.
+    currentUserId && members.some(m => m.id === currentUserId) ? [currentUserId] : [],
     isStrArr)
   const [panelTask, setPanelTask] = useState<Task | null>(null)
   const timelineScrollRef = useRef<HTMLDivElement>(null)
@@ -260,7 +267,14 @@ export function CalendarView({ tasks: initialTasks, clients = [], members = [], 
     return true
   }).filter(t => {
     if (clientFilter.length > 0 && !clientFilter.includes((t as any).client?.id ?? '')) return false
-    if (memberFilter.length > 0 && !memberFilter.includes(t.assignee_id ?? ''))         return false
+    // Unassigned work is never hidden by the member filter. `assignee_id ?? ''`
+    // used to be harmless because the filter defaulted to empty and this line
+    // never ran; now that it defaults to the current user, an unassigned task
+    // would match nobody and disappear. For a CA firm that is a statutory
+    // deadline nobody has picked up vanishing from the one screen meant to
+    // surface it — the spawner does write assignee_id null when an assignment
+    // has no assignee. Work with no owner is everyone's, so it always shows.
+    if (memberFilter.length > 0 && t.assignee_id && !memberFilter.includes(t.assignee_id)) return false
     return true
   })
 
@@ -352,7 +366,9 @@ export function CalendarView({ tasks: initialTasks, clients = [], members = [], 
   upcomingCATriggers
     .filter(ct => {
       if (clientFilter.length > 0 && !clientFilter.includes(ct.clientId ?? ''))   return false
-      if (memberFilter.length > 0 && !memberFilter.includes(ct.assigneeId ?? '')) return false
+      // Same rule as the task filter above: an unassigned compliance trigger is
+      // an upcoming obligation with nobody on it, and must stay visible.
+      if (memberFilter.length > 0 && ct.assigneeId && !memberFilter.includes(ct.assigneeId)) return false
       return true
     })
     .forEach(ct => {
