@@ -4,7 +4,12 @@ import { getActiveOrgMembership } from '@/lib/supabase/activeOrg'
 import { MyTasksView } from './MyTasksView'
 import { shiftDays } from '@/lib/utils/recurringSchedule'
 
-const TASK_COLS = 'id, title, description, status, priority, due_date, assignee_id, approver_id, client_id, project_id, parent_task_id, approval_status, approval_required, estimated_hours, is_recurring, custom_fields, created_at, updated_at, is_billable, billable_amount, created_by, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), approver:users!tasks_approver_id_fkey(id, name), creator:users!tasks_created_by_fkey(id, name), projects(id, name, color)'
+// `description` is deliberately absent. My Tasks never renders it — the only
+// reader is TaskDetailPanel, which fetches the single task it opens (it treats
+// an absent description as "not loaded", distinct from null meaning "empty").
+// It was the widest column here, carried on up to 3,500 rows across the three
+// task reads below, on every load of the app's most-used page.
+const TASK_COLS = 'id, title, status, priority, due_date, assignee_id, approver_id, client_id, project_id, parent_task_id, approval_status, approval_required, estimated_hours, is_recurring, custom_fields, created_at, updated_at, is_billable, billable_amount, created_by, assignee:users!tasks_assignee_id_fkey(id, name, avatar_url), approver:users!tasks_approver_id_fkey(id, name), creator:users!tasks_created_by_fkey(id, name), projects(id, name, color)'
 const PARENT_COLS = 'id, title, status, priority'
 
 export async function TasksFetcher() {
