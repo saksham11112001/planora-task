@@ -38,6 +38,23 @@ interface ComplianceRawTask {
   due_date: string | null; created_at: string; completed_at: string | null
   custom_fields: Record<string, any> | null
   assignee_id: string | null; client_id: string | null
+  is_recurring?: boolean | null; parent_recurring_id?: string | null
+}
+
+/**
+ * A recurring TEMPLATE, as distinct from one of its occurrences.
+ *
+ * A template carries no due_date by design — it has next_occurrence_date
+ * instead — so every one of them landed in the "No Due Date" bucket and
+ * inflated it with rows that are not outstanding work at all, just the rule
+ * that generates it. The occurrences it spawns DO have due dates and are
+ * counted normally.
+ *
+ * Same test the WIP and trajectory sections of this page already use, so the
+ * whole Reports tab now agrees on what a template is.
+ */
+function isRecurringTemplate(t: ComplianceRawTask): boolean {
+  return t.is_recurring === true && !t.parent_recurring_id
 }
 
 interface ActionItems {
@@ -316,11 +333,11 @@ function buildComplianceData(
       dateKey:    ds,
       addedC:     caT.filter(t => t.created_at?.startsWith(ds)).length,
       completedC: caT.filter(t => t.completed_at?.startsWith(ds)).length,
-      noDueDateC: caT.filter(t => !t.due_date && t.created_at <= ds+'T23:59:59' && !['completed','cancelled'].includes(t.status)).length,
+      noDueDateC: caT.filter(t => !t.due_date && !isRecurringTemplate(t) && t.created_at <= ds+'T23:59:59' && !['completed','cancelled'].includes(t.status)).length,
       overdueC:   caT.filter(t => t.due_date && t.due_date < ds && !['completed','cancelled'].includes(t.status)).length,
       addedNC:    ncT.filter(t => t.created_at?.startsWith(ds)).length,
       completedNC:ncT.filter(t => t.completed_at?.startsWith(ds)).length,
-      noDueDateNC:ncT.filter(t => !t.due_date && t.created_at <= ds+'T23:59:59' && !['completed','cancelled'].includes(t.status)).length,
+      noDueDateNC:ncT.filter(t => !t.due_date && !isRecurringTemplate(t) && t.created_at <= ds+'T23:59:59' && !['completed','cancelled'].includes(t.status)).length,
       overdueNC:  ncT.filter(t => t.due_date && t.due_date < ds && !['completed','cancelled'].includes(t.status)).length,
     }
   })
@@ -330,8 +347,8 @@ function buildComplianceData(
     date:             todayD.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
     overdueC:         caT.filter(t => t.due_date && t.due_date < today && !['completed','cancelled'].includes(t.status)).length,
     overdueNC:        ncT.filter(t => t.due_date && t.due_date < today && !['completed','cancelled'].includes(t.status)).length,
-    noDueDateC:       caT.filter(t => !t.due_date && !['completed','cancelled'].includes(t.status)).length,
-    noDueDateNC:      ncT.filter(t => !t.due_date && !['completed','cancelled'].includes(t.status)).length,
+    noDueDateC:       caT.filter(t => !t.due_date && !isRecurringTemplate(t) && !['completed','cancelled'].includes(t.status)).length,
+    noDueDateNC:      ncT.filter(t => !t.due_date && !isRecurringTemplate(t) && !['completed','cancelled'].includes(t.status)).length,
     addedTodayC:      caT.filter(t => t.created_at?.startsWith(today)).length,
     addedTodayNC:     ncT.filter(t => t.created_at?.startsWith(today)).length,
     completedTodayC:  caT.filter(t => t.completed_at?.startsWith(today)).length,
