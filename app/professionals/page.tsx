@@ -3,6 +3,8 @@ import { redirect }                   from 'next/navigation'
 import Link                           from 'next/link'
 import { headers }                    from 'next/headers'
 import { getCountry, isValidCountry } from '@/lib/locale/countries'
+import { JsonLd }                     from '@/components/seo/JsonLd'
+import { organizationSchema, softwareApplicationSchema } from '@/lib/seo/structuredData'
 import type { Metadata }              from 'next'
 
 // This is a public, indexable marketing page and was inheriting the root
@@ -109,6 +111,13 @@ export default async function ProfessionalsPage() {
   ] as const
 
   return (
+    <>
+    <JsonLd data={[
+      organizationSchema(),
+      softwareApplicationSchema({
+        currency: currName, starter: starterP, pro: proP, business: businessP,
+      }),
+    ]}/>
     <div style={{
       minHeight: '100vh',
       background: '#ffffff',
@@ -726,5 +735,6 @@ export default async function ProfessionalsPage() {
         </div>
       </section>
     </div>
+    </>
   )
 }
