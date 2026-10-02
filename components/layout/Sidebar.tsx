@@ -9,6 +9,7 @@ import {
   ChevronDown, ChevronRight, Clock, Zap, X, Upload,
   Calendar, Shield, LogOut, FileCheck, ArrowRight, Eye, Receipt, Copy, Check, Activity, BookOpen, ShieldAlert,
   ChevronsUpDown, FileQuestion, CalendarDays, Building2, Handshake, ExternalLink,
+  CalendarCheck,
 } from 'lucide-react'
 import { cn }            from '@/lib/utils/cn'
 import { createClient }  from '@/lib/supabase/client'
@@ -432,6 +433,8 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
         {nav.team && <SI href="/team"    active={isActive('/team')}    icon={<Users    className="h-4 w-4"/>} label="Team"/>}
 
         {nav.time_tracking && isPaid && <SI href="/time" active={isActive('/time')} icon={<Clock className="h-4 w-4"/>} label="Time tracking"/>}
+        {/* Off by default — an admin enables it in Settings -> Features. */}
+        {nav.attendance && <SI href="/attendance" active={isActive('/attendance')} icon={<CalendarCheck className="h-4 w-4"/>} label="Attendance"/>}
         {nav.reports && isPaid && <SI href="/reports" active={isActive('/reports')} icon={<BarChart2 className="h-4 w-4"/>} label="Reports"/>}
         {canManage && <SI href="/invoices" active={isActive('/invoices')} icon={<Receipt className="h-4 w-4"/>} label="Invoices"/>}
         <SI href="/monitor" active={isActive('/monitor')} icon={<Eye className="h-4 w-4"/>} label="Monitor"/>
