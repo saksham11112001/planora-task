@@ -50,6 +50,15 @@ const DEFAULT_PERMISSIONS: RolePermissions = {
   'compliance.assign':         { admin: true,  manager: true,  member: false, viewer: false },
   'compliance.manage_tasks':   { admin: true,  manager: false, member: false, viewer: false },
   'monitor.view':              { admin: true,  manager: true,  member: false, viewer: false },
+  // CRM. A member always sees and edits the leads they OWN without any of
+  // these; the keys govern the whole pipeline and creating client records.
+  'leads.view_all':            { admin: true,  manager: true,  member: false, viewer: false },
+  'leads.create':              { admin: true,  manager: true,  member: true,  viewer: false },
+  'leads.edit':                { admin: true,  manager: true,  member: false, viewer: false },
+  'leads.delete':              { admin: true,  manager: false, member: false, viewer: false },
+  'leads.convert':             { admin: true,  manager: true,  member: false, viewer: false },
+  'proposals.view':            { admin: true,  manager: true,  member: true,  viewer: false },
+  'proposals.manage':          { admin: true,  manager: true,  member: false, viewer: false },
 }
 
 /**
