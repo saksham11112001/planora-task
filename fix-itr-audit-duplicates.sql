@@ -145,24 +145,40 @@ full join (select * from tasks_for_target where due_date = '2026-11-21') n
        on n.assignment_id = o.assignment_id;
 
 
--- B1. Archive the duplicate's subtasks, then the duplicate itself.
---     Archived, never deleted — these are live statutory records.
+-- B1. Park the duplicate OUT OF THE WAY, then archive it.
+--
+--     This is the step v3 got wrong. `tasks` carries a unique index
+--       tasks_ca_assignment_due_unique  on (custom_fields->>'_assignment_id', due_date)
+--     which is NOT in the repo's migrations — it was added directly in
+--     Supabase. Archiving does not free the key, because the row still
+--     exists, so moving the 31 Oct task onto 21 Nov in B3 collided with the
+--     duplicate that was still sitting there and the whole run rolled back.
+--
+--     Setting due_date to NULL releases the key: in a Postgres unique index
+--     NULLs never conflict with each other. The row is kept, archived, and
+--     the date it used to hold is written into custom_fields so nothing is
+--     lost and this is fully reversible.
+update tasks
+set is_archived   = true,
+    due_date      = null,
+    custom_fields = coalesce(custom_fields, '{}'::jsonb)
+                    || jsonb_build_object('_archived_duplicate_due', due_date::text,
+                                          '_archived_on',           now()::date::text),
+    updated_at    = now()
+where id in (select archive_id from _itr_fix where archive_id is not null);
+
+-- Its subtasks go with it.
 update tasks set is_archived = true, updated_at = now()
 where parent_task_id in (select archive_id from _itr_fix where archive_id is not null);
 
-update tasks set is_archived = true, updated_at = now()
-where id in (select archive_id from _itr_fix where archive_id is not null);
 
-
--- B2. Remove the duplicate's spawn record.
---     MUST come before B3: ca_task_instances carries
---     UNIQUE (assignment_id, due_date), so moving the surviving instance onto
---     21 Nov while the duplicate's 21 Nov instance still exists would collide.
+-- B2. Remove the duplicate's spawn record, so the surviving one can take
+--     21 Nov in B4 without hitting UNIQUE (assignment_id, due_date) there too.
 delete from ca_task_instances
 where task_id in (select archive_id from _itr_fix where archive_id is not null);
 
 
--- B3. Move the task staff have actually been working on, and its open subtasks.
+-- B3. Now the date is free, move the task staff have actually been working on.
 update tasks set due_date = '2026-11-21', updated_at = now()
 where id in (select keep_id from _itr_fix where keep_id is not null);
 
@@ -186,6 +202,7 @@ declare
   out_of_sync    int;
   still_dupes    int;
   orphaned       int;
+  badpark        int;
   moved          int;
 begin
   select count(*) into leftover_oct
@@ -248,6 +265,16 @@ begin
   );
   if orphaned > 0 then
     raise exception 'ROLLED BACK: % client(s) would be left with no open ITR task', orphaned;
+  end if;
+
+  -- Every parked duplicate must actually be archived and off the date, or
+  -- the unique index would bite again on tonight's cron run.
+  select count(*) into badpark
+  from tasks t
+  join _itr_fix f on f.archive_id = t.id
+  where coalesce(t.is_archived, false) = false or t.due_date is not null;
+  if badpark > 0 then
+    raise exception 'ROLLED BACK: % duplicate(s) were not parked correctly', badpark;
   end if;
 
   raise notice 'OK — % task(s) moved to 2026-11-21, duplicates archived, spawn records in sync.', moved;
