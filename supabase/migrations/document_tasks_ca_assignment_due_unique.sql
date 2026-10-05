@@ -1,0 +1,31 @@
+-- ============================================================================
+-- Document an index that already exists in production but was never in this
+-- repository.
+--
+-- tasks_ca_assignment_due_unique enforces: one CA compliance task per
+-- (assignment, due date). It is a good constraint — it is the reason the
+-- "ITR (with Audit)" incident could not quietly corrupt into something worse.
+--
+-- It was created directly in the Supabase dashboard, so nothing in the
+-- codebase mentioned it. That cost real time on 5 Oct 2026: a cleanup script
+-- that moved a task onto a date another row still held failed with
+--
+--   ERROR 23505: duplicate key value violates unique constraint
+--   "tasks_ca_assignment_due_unique"
+--
+-- and there was no way to anticipate it from reading the code. Anything that
+-- changes a CA task's due_date has to know this exists.
+--
+-- IF NOT EXISTS matches on the index NAME, so running this against production
+-- where the index already exists is a no-op. On a fresh database it creates
+-- the index, which is the point: a new environment should not silently lack a
+-- constraint production depends on.
+--
+-- NOTE: if this ever needs to be created for real on a live database, run it
+-- as CREATE UNIQUE INDEX CONCURRENTLY from a direct connection instead — the
+-- Supabase SQL editor wraps statements in a transaction, and CONCURRENTLY
+-- cannot run inside one.
+-- ============================================================================
+
+create unique index if not exists tasks_ca_assignment_due_unique
+  on tasks ((custom_fields ->> '_assignment_id'), due_date);
