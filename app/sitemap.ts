@@ -6,6 +6,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: base,                         lastModified: new Date(), changeFrequency: 'weekly',  priority: 1.0 },
     { url: `${base}/professionals`,      lastModified: new Date(), changeFrequency: 'monthly', priority: 0.8 },
     { url: `${base}/msme-landing`,       lastModified: new Date(), changeFrequency: 'monthly', priority: 0.8 },
+    // app/(msme)/msme/page.tsx — a real public page that was missing here, so
+    // nothing pointed a crawler at it.
+    { url: `${base}/msme`,               lastModified: new Date(), changeFrequency: 'monthly', priority: 0.8 },
     { url: `${base}/partners`,           lastModified: new Date(), changeFrequency: 'monthly', priority: 0.7 },
     { url: `${base}/login`,              lastModified: new Date(), changeFrequency: 'yearly',  priority: 0.5 },
     { url: `${base}/privacy`,            lastModified: new Date(), changeFrequency: 'yearly',  priority: 0.3 },

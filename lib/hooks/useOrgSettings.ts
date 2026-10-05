@@ -22,6 +22,8 @@ export interface NavFeatures {
   team:               boolean
   permissions:        boolean
   ca_compliance_mode: boolean
+  attendance:         boolean
+  crm:                boolean
 }
 interface OrgSettings {
   customFields:     CustomFieldDef[]
@@ -60,7 +62,12 @@ const DEFAULT_NAV: NavFeatures = {
   import_data:        true,
   team:               true,
   permissions:        false,
+  // New module: off until an admin turns it on in Settings -> Features, so
+  // no existing firm gets an unexplained HR page in their sidebar.
   ca_compliance_mode: false,
+  attendance:         false,
+  // New module: off until an admin enables it in Settings -> Features.
+  crm:                false,
 }
 
 // Global state shared across all hook instances
@@ -111,6 +118,8 @@ async function fetchSettings(): Promise<OrgSettings> {
       team:               raw.team               !== undefined ? raw.team               : true,
       permissions:        raw.permissions        !== undefined ? raw.permissions        : false,
       ca_compliance_mode: raw.ca_compliance_mode !== undefined ? raw.ca_compliance_mode : false,
+      attendance:         raw.attendance         !== undefined ? raw.attendance         : false,
+      crm:                raw.crm                !== undefined ? raw.crm                : false,
     }
     // permissionsRes.data is now { role_permissions, user_permissions } or null (legacy shape)
     const permData = permissionsRes.data

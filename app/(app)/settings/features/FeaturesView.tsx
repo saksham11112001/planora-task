@@ -1,7 +1,8 @@
 'use client'
 import { useState } from 'react'
 import { ArrowLeft, FileCheck, BarChart2, Clock, ListTodo, RefreshCw,
-         FolderOpen, Users2, Calendar, Upload, Users, Shield } from 'lucide-react'
+         FolderOpen, Users2, Calendar, Upload, Users, Shield,
+         CalendarCheck, Target } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from '@/store/appStore'
 import { refreshOrgSettings } from '@/lib/hooks/useOrgSettings'
@@ -114,6 +115,26 @@ export const ALL_FEATURES = [
     title:    'Role permissions',
     desc:     'Show the Permissions shortcut in the sidebar for managers.',
     badge:    null,
+    section:  'tools',
+    default:  false,
+  },
+  {
+    key:      'attendance',
+    icon:     CalendarCheck,
+    color:    '#0891b2',
+    title:    'Attendance & leave',
+    desc:     'Daily check-in and check-out for your team, with optional location, plus leave requests, approvals and yearly balances.',
+    badge:    'New',
+    section:  'tools',
+    default:  false,
+  },
+  {
+    key:      'crm',
+    icon:     Target,
+    color:    '#7c3aed',
+    title:    'Leads & proposals',
+    desc:     'Track enquiries through a pipeline, log calls and emails against them, send quotations, and convert a won lead into a client in one click.',
+    badge:    'New',
     section:  'tools',
     default:  false,
   },

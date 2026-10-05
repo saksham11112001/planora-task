@@ -9,6 +9,9 @@ import {
   ChevronDown, ChevronRight, Clock, Zap, X, Upload,
   Calendar, Shield, LogOut, FileCheck, ArrowRight, Eye, Receipt, Copy, Check, Activity, BookOpen, ShieldAlert,
   ChevronsUpDown, FileQuestion, CalendarDays, Building2, Handshake, ExternalLink,
+  CalendarCheck,
+  FileWarning,
+  Target,
 } from 'lucide-react'
 import { cn }            from '@/lib/utils/cn'
 import { createClient }  from '@/lib/supabase/client'
@@ -420,9 +423,14 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
           </div>
         )}
         {nav.clients && <SI href="/clients"    active={isActive('/clients', true)} icon={<Users2    className="h-4 w-4"/>} label="Clients"/>}
+        {/* Sits immediately above Clients: a lead becomes a client. */}
+        {nav.crm && <SI href="/leads" active={isActive('/leads')} icon={<Target className="h-4 w-4"/>} label="Leads"/>}
         {nav.clients && <SI href="/clients/health" active={isActive('/clients/health')} icon={<Activity className="h-4 w-4"/>} label="Client Health"/>}
         {nav.ca_compliance_mode && <SI href="/compliance" active={isActive('/compliance')} icon={<FileCheck className="h-4 w-4"/>} label="CA Compliance"/>}
         {nav.ca_compliance_mode && <SI href="/clients/dsc-expiry" active={isActive('/clients/dsc-expiry')} icon={<ShieldAlert className="h-4 w-4"/>} label="DSC Expiry"/>}
+        {/* Scoped to CA compliance mode, like DSC Expiry — statutory notices
+            only mean something to a firm running the compliance module. */}
+        {nav.ca_compliance_mode && <SI href="/notices" active={isActive('/notices')} icon={<FileWarning className="h-4 w-4"/>} label="Notices"/>}
         {nav.ca_compliance_mode && <SI href="/compliance/pending-docs" active={isActive('/compliance/pending-docs')} icon={<FileQuestion className="h-4 w-4"/>} label="Pending Docs"/>}
         {nav.ca_compliance_mode && <SI href="/compliance/annual-calendar" active={isActive('/compliance/annual-calendar')} icon={<CalendarDays className="h-4 w-4"/>} label="Annual Calendar"/>}
         <Div/>
@@ -432,6 +440,8 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
         {nav.team && <SI href="/team"    active={isActive('/team')}    icon={<Users    className="h-4 w-4"/>} label="Team"/>}
 
         {nav.time_tracking && isPaid && <SI href="/time" active={isActive('/time')} icon={<Clock className="h-4 w-4"/>} label="Time tracking"/>}
+        {/* Off by default — an admin enables it in Settings -> Features. */}
+        {nav.attendance && <SI href="/attendance" active={isActive('/attendance')} icon={<CalendarCheck className="h-4 w-4"/>} label="Attendance"/>}
         {nav.reports && isPaid && <SI href="/reports" active={isActive('/reports')} icon={<BarChart2 className="h-4 w-4"/>} label="Reports"/>}
         {canManage && <SI href="/invoices" active={isActive('/invoices')} icon={<Receipt className="h-4 w-4"/>} label="Invoices"/>}
         <SI href="/monitor" active={isActive('/monitor')} icon={<Eye className="h-4 w-4"/>} label="Monitor"/>
