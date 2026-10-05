@@ -132,7 +132,14 @@ tasks_for_target as (
 select
   coalesce(o.assignment_id, n.assignment_id) as assignment_id,
   o.id as keep_id,
-  n.id as archive_id
+  -- A 21 Nov task is only a DUPLICATE when its assignment also still has a
+  -- 31 Oct task. Where there is no 31 Oct counterpart, the 21 Nov task is the
+  -- only one that client has, and archiving it would leave them with nothing.
+  --
+  -- This is not hypothetical: the nightly cron kept running between the
+  -- diagnostic and this fix, and 21 Nov grew from 40 to 42 while 31 Oct sat
+  -- at 40. Those 2 extra rows have no partner and must be left alone.
+  case when o.id is not null then n.id end as archive_id
 from      (select * from tasks_for_target where due_date = '2026-10-31') o
 full join (select * from tasks_for_target where due_date = '2026-11-21') n
        on n.assignment_id = o.assignment_id;
@@ -178,6 +185,7 @@ declare
   leftover_oct   int;
   out_of_sync    int;
   still_dupes    int;
+  orphaned       int;
   moved          int;
 begin
   select count(*) into leftover_oct
@@ -222,6 +230,24 @@ begin
   end if;
   if still_dupes > 0 then
     raise exception 'ROLLED BACK: % client(s) still hold two open tasks', still_dupes;
+  end if;
+
+  -- Nobody may be left with nothing. This is the check that would have caught
+  -- the FULL JOIN fault above, where an unpaired 21 Nov task was archived and
+  -- its client lost their only ITR task.
+  select count(*) into orphaned
+  from _itr_fix f
+  where not exists (
+    select 1 from tasks t
+    where (t.custom_fields ->> '_assignment_id')::uuid = f.assignment_id
+      and t.title = 'ITR (with Audit)'
+      and t.parent_task_id is null
+      and t.custom_fields @> '{"_ca_compliance": true}'
+      and coalesce(t.is_archived, false) = false
+      and t.status <> 'completed'
+  );
+  if orphaned > 0 then
+    raise exception 'ROLLED BACK: % client(s) would be left with no open ITR task', orphaned;
   end if;
 
   raise notice 'OK — % task(s) moved to 2026-11-21, duplicates archived, spawn records in sync.', moved;
