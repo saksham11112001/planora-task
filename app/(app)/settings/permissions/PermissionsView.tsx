@@ -114,6 +114,21 @@ const FEATURE_GROUPS = [
       { key: 'leave.manage_balances', label: 'Set leave entitlements',      desc: 'Set how many days of each leave type a member gets per year' },
     ],
   },
+  {
+    group: 'Leads & proposals',
+    color: '#7c3aed',
+    features: [
+      // A member always sees and edits the leads they own, with none of
+      // these granted. These keys are about the whole pipeline.
+      { key: 'leads.view_all',   label: 'View the whole pipeline', desc: "See every lead, not just the ones you own" },
+      { key: 'leads.create',     label: 'Add leads',               desc: 'Create a new enquiry in the pipeline' },
+      { key: 'leads.edit',       label: "Edit anyone's lead",      desc: "Change a lead you do not own" },
+      { key: 'leads.delete',     label: 'Delete leads',            desc: 'Permanently remove a lead and its history' },
+      { key: 'leads.convert',    label: 'Convert lead to client',  desc: 'Turn a won lead into a client record' },
+      { key: 'proposals.view',   label: 'View proposals',          desc: 'See quotations sent to leads and clients' },
+      { key: 'proposals.manage', label: 'Create & send proposals', desc: 'Write, edit, send and decide quotations' },
+    ],
+  },
 ]
 
 const ROLES: { key: Role; label: string; color: string; icon: any }[] = [
@@ -166,6 +181,13 @@ const DEFAULT_PERMISSIONS: RolePermissions = {
   'leave.view_all':           { admin: true,  manager: true,  member: false, viewer: false },
   'leave.approve':            { admin: true,  manager: true,  member: false, viewer: false },
   'leave.manage_balances':    { admin: true,  manager: false, member: false, viewer: false },
+  'leads.view_all':           { admin: true,  manager: true,  member: false, viewer: false },
+  'leads.create':             { admin: true,  manager: true,  member: true,  viewer: false },
+  'leads.edit':               { admin: true,  manager: true,  member: false, viewer: false },
+  'leads.delete':             { admin: true,  manager: false, member: false, viewer: false },
+  'leads.convert':            { admin: true,  manager: true,  member: false, viewer: false },
+  'proposals.view':           { admin: true,  manager: true,  member: true,  viewer: false },
+  'proposals.manage':         { admin: true,  manager: true,  member: false, viewer: false },
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
