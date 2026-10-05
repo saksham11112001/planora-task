@@ -1960,8 +1960,17 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(patch),
       })
-      const json = (await res.json()) as { data?: CAMasterTask; error?: string }
+      const json = (await res.json()) as {
+        data?: CAMasterTask; error?: string
+        dateMigration?: { tasksMoved: number; instancesMoved: number; warnings: string[] } | null
+      }
       if (!res.ok) throw new Error(json.error ?? 'Update failed')
+
+      // The server moves already-spawned client tasks when a due date changes.
+      // Say so, and surface any warning rather than letting it die in a log.
+      const mig = json.dateMigration
+      if (mig?.tasksMoved) toast.success(`${mig.tasksMoved} client task${mig.tasksMoved !== 1 ? 's' : ''} moved to the new date`)
+      mig?.warnings?.forEach(w => toast.error(w))
       setPendingChanges(p => { const n = { ...p }; delete n[id]; return n })
       setTasks(ts => ts.map(t => t.id === id ? { ...t, is_user_saved: true } : t))
       // Update our baseline so next save compares against fresh values
@@ -1972,14 +1981,11 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
       if (original) {
         const propFields: PropagatePrompt['fields'] = {}
         if (patch.name && patch.name !== original.name) propFields.title = patch.name as string
-        // Due-date changes: offer to move incomplete spawned tasks to the new date
-        if (patch.dates) {
-          const oldDates = (original.dates ?? {}) as Record<string, string>
-          const pairs = Object.entries(patch.dates as Record<string, string>)
-            .filter(([m, v]) => !!v && !!oldDates[m] && oldDates[m] !== v)
-            .map(([m, v]) => ({ old: oldDates[m], new: v }))
-          if (pairs.length) propFields.due_dates = pairs
-        }
+        // Due dates are no longer offered as a prompt: the server now moves
+        // the spawned tasks itself inside the save, so by the time this runs
+        // they are already on the new date. Asking again would be a prompt
+        // that does nothing, and relying on the answer is what let the master
+        // and the live tasks drift apart. See lib/ca/migrateMasterDates.ts.
         if (patch.priority && patch.priority !== original.priority) propFields.priority = patch.priority as string
         if (patch.attachment_headers) {
           const oldH = original.attachment_headers ?? []
@@ -2038,18 +2044,11 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
       if (original) {
         const propFields: PropagatePrompt['fields'] = {}
         if (patch.name && patch.name !== original.name) propFields.title = patch.name as string
-        // Due-date changes — mirrors handleSaveRow. Their absence here was the
-        // reason a date corrected through "Save all" updated the master calendar
-        // but never moved the tasks already sitting in assignees' lists: the
-        // propagation prompt was only ever built for name, priority and
-        // attachments, so the new deadline had no path to spawned work.
-        if (patch.dates) {
-          const oldDates = (original.dates ?? {}) as Record<string, string>
-          const pairs = Object.entries(patch.dates as Record<string, string>)
-            .filter(([m, v]) => !!v && !!oldDates[m] && oldDates[m] !== v)
-            .map(([m, v]) => ({ old: oldDates[m], new: v }))
-          if (pairs.length) propFields.due_dates = pairs
-        }
+        // Due dates are no longer offered as a prompt: the server now moves
+        // the spawned tasks itself inside the save, so by the time this runs
+        // they are already on the new date. Asking again would be a prompt
+        // that does nothing, and relying on the answer is what let the master
+        // and the live tasks drift apart. See lib/ca/migrateMasterDates.ts.
         if (patch.priority && patch.priority !== original.priority) propFields.priority = patch.priority as string
         if (patch.attachment_headers) {
           const oldH = original.attachment_headers ?? []
@@ -2072,8 +2071,17 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rows }),
       })
-      const json = await res.json() as { saved: number; failed: number; errors: Array<{ id: string; error: string }> }
+      const json = await res.json() as {
+        saved: number; failed: number; errors: Array<{ id: string; error: string }>
+        dateMigrations?: Record<string, { tasksMoved: number; instancesMoved: number; warnings: string[] }>
+      }
       if (!res.ok) throw new Error('Bulk save failed')
+
+      // Aggregate across every row whose dates moved.
+      const migs = Object.values(json.dateMigrations ?? {})
+      const movedTotal = migs.reduce((n, m) => n + (m.tasksMoved ?? 0), 0)
+      if (movedTotal > 0) toast.success(`${movedTotal} client task${movedTotal !== 1 ? 's' : ''} moved to the new date`)
+      migs.flatMap(m => m.warnings ?? []).forEach(w => toast.error(w))
 
       const failedIdSet = new Set((json.errors ?? []).map(e => e.id))
       const savedRowIds = rows.filter(r => !failedIdSet.has(r.id as string)).map(r => r.id as string)

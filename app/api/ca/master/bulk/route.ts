@@ -5,6 +5,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import type { NextRequest } from 'next/server'
 import { dbError } from '@/lib/api-error'
 import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
+import { diffDates, migrateMasterDates } from '@/lib/ca/migrateMasterDates'
+import type { MigrateResult } from '@/lib/ca/migrateMasterDates'
 
 export const maxDuration = 30
 
@@ -38,6 +40,19 @@ export async function POST(req: NextRequest) {
   const admin = createAdminClient()
   const now = new Date().toISOString()
 
+  // Snapshot the dates of every row about to change, BEFORE writing, so a
+  // moved due date can carry the already-spawned tasks with it. Only rows
+  // that actually carry `dates` in their patch are looked up.
+  const dateRowIds = rows.filter(r => 'dates' in r).map(r => r.id)
+  const beforeDates = new Map<string, Record<string, string> | null>()
+  if (dateRowIds.length > 0) {
+    const { data: prev } = await admin.from('ca_master_tasks')
+      .select('id, dates').eq('org_id', mb.org_id).in('id', dateRowIds)
+    for (const p of prev ?? []) {
+      beforeDates.set(p.id as string, p.dates as Record<string, string> | null)
+    }
+  }
+
   const results = await Promise.allSettled(
     rows.map(({ id, ...fields }) =>
       admin.from('ca_master_tasks')
@@ -63,5 +78,24 @@ export async function POST(req: NextRequest) {
     }
   })
 
-  return NextResponse.json({ saved, failed: errors.length, errors })
+  // Migrate spawned tasks for every row that SAVED and whose dates moved.
+  // Rows the write rejected are skipped: propagating a change that did not
+  // persist would put the client tasks ahead of the master calendar.
+  //
+  // Sequential, not Promise.all — each migration issues several writes against
+  // the same two tables, and running forty of them at once against a small
+  // Postgres instance is how a save turns into a timeout.
+  const dateMigrations: Record<string, MigrateResult> = {}
+  const failedIds = new Set(errors.map(e => e.id))
+  for (const row of rows) {
+    if (failedIds.has(row.id) || !('dates' in row)) continue
+    const changes = diffDates(
+      beforeDates.get(row.id) ?? null,
+      row.dates as Record<string, string> | null,
+    )
+    if (changes.length === 0) continue
+    dateMigrations[row.id] = await migrateMasterDates(admin, mb.org_id, row.id, changes)
+  }
+
+  return NextResponse.json({ saved, failed: errors.length, errors, dateMigrations })
 }
