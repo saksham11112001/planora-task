@@ -19,6 +19,11 @@ const APP_ROUTES = [
   '/recurring', '/reports', '/settings', '/team', '/time', '/inbox',
   '/invoices', '/monitor', '/activity', '/approvals', '/import', '/profile',
   '/walkthrough', '/partner',
+  // Feature-gated pages. Listed here even though the features ship off by
+  // default: robots.txt may name a path that does not exist yet, and the
+  // alternative is remembering to come back here the day someone switches
+  // the feature on — which is exactly how /dashboard ended up crawlable.
+  '/attendance', '/leads', '/notices',
 ]
 
 /**
