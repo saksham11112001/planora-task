@@ -13,6 +13,7 @@ import { MONTH_KEYS, MONTH_LABELS, CA_GROUP_NAMES } from '@/lib/data/caDefaultTa
 import type { MonthKey } from '@/lib/data/caDefaultTasks'
 import { COUNTRY_TASK_SETS } from '@/lib/data/caDefaultTasksByCountry'
 import { toast } from '@/store/appStore'
+import { csvCell } from '@/lib/utils/csv'
 
 /* ─── Types ───────────────────────────────────────────────────── */
 
@@ -1869,6 +1870,62 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
     }
   }
 
+  /* ── Export the calendar as a spreadsheet ──────────────────────────────
+   * Opens directly in Excel, Google Sheets or Numbers.
+   *
+   * Scope: every task in the current financial year, honouring the search
+   * box but NOT the Unsaved/Saved tab. That tab is an internal save-state,
+   * not a reporting dimension — exporting only what one tab shows would
+   * silently drop most of the calendar from a file someone circulates.
+   * Nothing is lost: the state is carried as its own "Saved" column.
+   */
+  function exportCSV() {
+    const q = search.toLowerCase().trim()
+    const rows = tasks.filter(t =>
+      !q ||
+      t.name.toLowerCase().includes(q) ||
+      t.group_name.toLowerCase().includes(q) ||
+      t.code.toLowerCase().includes(q),
+    )
+
+    if (rows.length === 0) { toast.error('Nothing to export'); return }
+
+    const HEADERS = [
+      'Group', 'Code', 'Task name', 'Type', 'Priority',
+      'Days before due', 'Attachments', 'Attachment names', 'Saved',
+      // Dates are written in full (YYYY-MM-DD) rather than as the bare day
+      // number shown in the grid. A spreadsheet can sort and filter a real
+      // date; it cannot do anything useful with "13".
+      ...MONTH_KEYS.map(mk => MONTH_LABELS[mk]),
+    ]
+
+    const body = rows.map(t => [
+      t.group_name,
+      t.code,
+      t.name,
+      t.task_type,
+      t.priority,
+      String(t.days_before_due ?? ''),
+      String(t.attachment_count ?? 0),
+      (t.attachment_headers ?? []).join('; '),
+      t.is_user_saved ? 'Yes' : 'No',
+      ...MONTH_KEYS.map(mk => t.dates?.[mk] ?? ''),
+    ])
+
+    const csv = [HEADERS, ...body].map(r => r.map(csvCell).join(',')).join('\r\n')
+
+    // The BOM is what makes Excel on Windows read the file as UTF-8. Without
+    // it, a task name containing an en dash or a rupee sign arrives mangled.
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `ca-calendar-FY${fy}-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(a.href)
+
+    toast.success(`Exported ${rows.length} task${rows.length === 1 ? '' : 's'}`)
+  }
+
   /* ── CSV template download (client-side blob) ── */
   function downloadTemplate() {
     const HEADERS = [
@@ -2449,6 +2506,18 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
             Import CSV
           </button>
         )}
+
+        {/* Not gated on canEdit: exporting reads what is already on screen
+            and changes nothing, so a member who can see the calendar can
+            take a copy of it. */}
+        <button
+          onClick={exportCSV}
+          title="Download this calendar as a spreadsheet (opens in Excel)"
+          style={{ ...btnGhost, display: 'flex', alignItems: 'center', gap: 6 }}
+        >
+          <Download size={14} />
+          Export
+        </button>
 
         {canEdit && (
           <button
