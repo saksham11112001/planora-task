@@ -11,7 +11,7 @@ import {
   ChevronsUpDown, FileQuestion, CalendarDays, Building2, Handshake, ExternalLink,
   CalendarCheck,
   FileWarning,
-  Target,
+  Target, AlertTriangle,
 } from 'lucide-react'
 import { cn }            from '@/lib/utils/cn'
 import { createClient }  from '@/lib/supabase/client'
@@ -432,6 +432,9 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
             only mean something to a firm running the compliance module. */}
         {nav.ca_compliance_mode && <SI href="/notices" active={isActive('/notices')} icon={<FileWarning className="h-4 w-4"/>} label="Notices"/>}
         {nav.ca_compliance_mode && <SI href="/compliance/pending-docs" active={isActive('/compliance/pending-docs')} icon={<FileQuestion className="h-4 w-4"/>} label="Pending Docs"/>}
+        {/* Manager and above only — the page and its API both enforce it too. */}
+        {nav.ca_compliance_mode && ['owner','admin','manager'].includes(role) &&
+          <SI href="/compliance/missed" active={isActive('/compliance/missed')} icon={<AlertTriangle className="h-4 w-4"/>} label="Missed Tasks"/>}
         {nav.ca_compliance_mode && <SI href="/compliance/annual-calendar" active={isActive('/compliance/annual-calendar')} icon={<CalendarDays className="h-4 w-4"/>} label="Annual Calendar"/>}
         <Div/>
 
