@@ -7,7 +7,7 @@ import ReactDOM from 'react-dom'
 import {
   ChevronDown, ChevronRight, Plus, Trash2, Pencil, Check, X,
   RefreshCw, Calendar, Paperclip, AlertCircle, Save, Search,
-  UploadCloud, Download, FileText,
+  UploadCloud, Download, FileText, ArrowRight,
 } from 'lucide-react'
 import { MONTH_KEYS, MONTH_LABELS, CA_GROUP_NAMES } from '@/lib/data/caDefaultTasks'
 import type { MonthKey } from '@/lib/data/caDefaultTasks'
@@ -1000,6 +1000,137 @@ const btnGhost: React.CSSProperties = {
   border: '1px solid var(--border)', cursor: 'pointer',
 }
 
+/* ─── Carry assignments into a new financial year ─────────────────────────── */
+
+interface RolloverSummary {
+  from_fy: string; to_fy: string
+  would_create: number; created?: number
+  skipped: { inactive: number; ended: number; no_matching_task: number; already_assigned: number }
+  unmatched_codes: string[]
+}
+
+/**
+ * Master tasks are unique per financial year, so a new year gets new rows with
+ * new ids — and assignments are bound to one year's rows. Switch the calendar
+ * to a new year and nothing is assigned to anything, so no compliance task is
+ * created for anyone until this is run.
+ *
+ * It always previews first. This writes an assignment for every client x every
+ * task, and the count is the only way to see it is about to do the right thing.
+ */
+function RolloverModal({ toFy, onClose }: { toFy: string; onClose: () => void }) {
+  const prior = FY_OPTIONS.filter(f => f < toFy)
+  const [fromFy, setFromFy]   = useState<string>(prior[prior.length - 1] ?? '')
+  const [preview, setPreview] = useState<RolloverSummary | null>(null)
+  const [busy, setBusy]       = useState(false)
+  const [done, setDone]       = useState(false)
+
+  async function call(dryRun: boolean) {
+    if (!fromFy) { toast.error('Choose the year to copy from'); return }
+    setBusy(true)
+    try {
+      const res = await fetch('/api/ca/assignments/rollover', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from_fy: fromFy, to_fy: toFy, dry_run: dryRun }),
+      })
+      const json = await res.json()
+      if (!res.ok) { toast.error(json.error ?? 'Could not carry assignments forward'); return }
+      setPreview(json)
+      if (!dryRun) {
+        setDone(true)
+        toast.success(`${json.created} assignment(s) carried into FY ${toFy}`)
+      }
+    } catch {
+      toast.error('Could not carry assignments forward')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const skipped = preview?.skipped
+  const skipTotal = skipped
+    ? skipped.inactive + skipped.ended + skipped.no_matching_task + skipped.already_assigned
+    : 0
+
+  return (
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(0,0,0,0.45)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12,
+        width: '100%', maxWidth: 520, maxHeight: '85vh', overflowY: 'auto', padding: 20,
+      }}>
+        <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+          Carry assignments into FY {toFy}
+        </h2>
+        <p style={{ fontSize: 12.5, color: 'var(--text-muted)', margin: '6px 0 16px', lineHeight: 1.5 }}>
+          Each financial year has its own copy of every task, so a new year starts with
+          nothing assigned to any client — and no tasks are created until it is.
+          This copies who does what from an earlier year, matching tasks by code.
+          Nothing already set up in FY {toFy} is changed.
+        </p>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Copy from</span>
+          <select value={fromFy} onChange={e => { setFromFy(e.target.value); setPreview(null); setDone(false) }}
+            disabled={busy || done}
+            style={{
+              padding: '6px 9px', borderRadius: 7, fontSize: 13, fontFamily: 'inherit',
+              border: '1px solid var(--border)', background: 'var(--surface)',
+              color: 'var(--text-primary)', outline: 'none',
+            }}>
+            {prior.length === 0 && <option value="">No earlier year</option>}
+            {prior.map(f => <option key={f} value={f}>FY {f}</option>)}
+          </select>
+        </div>
+
+        {preview && (
+          <div style={{
+            border: '1px solid var(--border)', borderRadius: 9, padding: 12,
+            background: 'var(--surface-subtle)', marginBottom: 16, fontSize: 13,
+          }}>
+            <div style={{ fontWeight: 700, color: done ? 'var(--brand)' : 'var(--text-primary)' }}>
+              {done
+                ? `${preview.created} assignment(s) created`
+                : `${preview.would_create} assignment(s) would be created`}
+            </div>
+            {skipTotal > 0 && (
+              <ul style={{ margin: '8px 0 0', paddingLeft: 18, color: 'var(--text-muted)', fontSize: 12 }}>
+                {skipped!.already_assigned > 0 && <li>{skipped!.already_assigned} already set up in FY {toFy}</li>}
+                {skipped!.inactive > 0         && <li>{skipped!.inactive} paused, left paused</li>}
+                {skipped!.ended > 0            && <li>{skipped!.ended} ended before FY {toFy} began</li>}
+                {skipped!.no_matching_task > 0 && (
+                  <li>
+                    {skipped!.no_matching_task} have no matching task in FY {toFy}
+                    {preview.unmatched_codes.length > 0 &&
+                      <> — {preview.unmatched_codes.slice(0, 5).join(', ')}
+                        {preview.unmatched_codes.length > 5 ? '…' : ''}</>}
+                  </li>
+                )}
+              </ul>
+            )}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button onClick={onClose} style={btnGhost}>{done ? 'Close' : 'Cancel'}</button>
+          {!done && !preview && (
+            <button onClick={() => call(true)} disabled={busy || !fromFy} style={btnPrimary}>
+              {busy ? 'Checking…' : 'Preview'}
+            </button>
+          )}
+          {!done && preview && preview.would_create > 0 && (
+            <button onClick={() => call(false)} disabled={busy} style={btnPrimary}>
+              {busy ? 'Copying…' : `Create ${preview.would_create}`}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ─── Add Custom Task Modal ───────────────────────────────────── */
 
 interface NewTaskDraft {
@@ -1733,6 +1864,7 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
   const [attTemplates,       setAttTemplates]       = useState<AttachTemplate[]>(() => loadAttTemplates())
   const [taskSel,            setTaskSel]            = useState<Record<string, string[]>>(() => loadTaskSel())
   const [showManageTemplates, setShowManageTemplates] = useState(false)
+  const [showRollover, setShowRollover] = useState(false)
 
   function handleTemplateChange(templates: AttachTemplate[]) {
     setAttTemplates(templates)
@@ -1835,6 +1967,10 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
       if (!res.ok) throw new Error(json.error ?? 'Trigger failed')
       if (json.errors?.length) {
         toast.error(`${json.spawned} spawned, but errors: ${json.errors[0]}`)
+      } else if (json.deferred > 0) {
+        // Stopped at the per-run cap. Not a success and not a failure — the
+        // user has to press again, so it must not look finished.
+        toast.info(json.message)
       } else {
         toast.success(json.message ?? `Spawned ${json.spawned} compliance task(s) ✓`)
       }
@@ -2282,6 +2418,21 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
             dropdownWidth={160}
           />
         </div>
+
+        {/* Each financial year has its own copy of every task, so a new year
+            starts with nothing assigned and spawns nothing until assignments
+            are carried across. This is the only route to doing that without
+            re-ticking every client by hand. */}
+        {canEdit && (
+          <button
+            onClick={() => setShowRollover(true)}
+            title={`Copy who does what from an earlier year into FY ${fy}`}
+            style={{ ...btnGhost, display: 'flex', alignItems: 'center', gap: 6 }}
+          >
+            <ArrowRight size={14} />
+            Carry assignments
+          </button>
+        )}
 
         {canEdit && (
           <div ref={countryPickerRef} style={{ position: 'relative' }}>
@@ -2767,6 +2918,10 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
       )}
 
       {/* ── Attachment Templates Manager ── */}
+      {showRollover && (
+        <RolloverModal toFy={fy} onClose={() => setShowRollover(false)} />
+      )}
+
       {showManageTemplates && (
         <TemplateManageModal
           templates={attTemplates}
