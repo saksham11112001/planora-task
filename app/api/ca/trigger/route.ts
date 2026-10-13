@@ -5,7 +5,8 @@ import { createAdminClient }   from '@/lib/supabase/admin'
 import { dbError } from '@/lib/api-error'
 import type { NextRequest }    from 'next/server'
 import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
-import { shiftDays }           from '@/lib/utils/recurringSchedule'
+import { decideSpawn, skipReasonText } from '@/lib/ca/spawnDecision'
+import { todayInCountry }      from '@/lib/locale/countries'
 import { fetchAllRows, chunk } from '@/lib/supabase/fetchAll'
 
 /**
@@ -48,9 +49,15 @@ export async function POST(request: NextRequest) {
 
   const admin = createAdminClient()
 
-  // Use IST date so "today" matches the business day
-  const nowIST = new Date(Date.now() + 5.5 * 60 * 60 * 1000)
-  const today  = nowIST.toISOString().split('T')[0]
+  // "Today" in THIS org's timezone, not a hardcoded IST date.
+  //
+  // The product ships compliance catalogues for the US, UK, Canada and
+  // Australia, so assuming +5:30 measured a non-Indian firm against a clock
+  // up to 12.5 hours from its own — enough to create a task a day early or
+  // treat a deadline as passed mid-working-day.
+  const { data: orgSettings } = await admin.from('org_settings')
+    .select('locale').eq('org_id', mb.org_id).maybeSingle()
+  const today = todayInCountry((orgSettings?.locale as { country?: string } | null)?.country)
 
   // ── 0. Clean up any legacy compliance subtasks (attachment headers that were
   //       incorrectly created as subtask rows). Attachment headers are now shown
@@ -192,32 +199,31 @@ export async function POST(request: NextRequest) {
 
       const logBase = { client_id: asgn.client_id, task: master.name, month: monthKey, due: dueDateStr }
 
-      // Skip dates before the client's start date
-      if (dueDateStr < startDateStr) {
-        detail.push({ ...logBase, action: 'skipped', reason: `before start_date (${startDateStr})` })
-        continue
-      }
-
-      // Skip dates after the client's end date
-      if (endDateStr && dueDateStr > endDateStr) {
-        detail.push({ ...logBase, action: 'skipped', reason: `after end_date (${endDateStr})` })
-        continue
-      }
-
-      // Compute trigger date (timezone-safe: no UTC round-trip)
-      const triggerStr = shiftDays(dueDateStr, -daysBeforeDue)
-
-      // Only spawn when trigger window has arrived (future tasks not yet due)
-      if (triggerStr > today) {
-        detail.push({ ...logBase, action: 'skipped', reason: `trigger date ${triggerStr} not reached yet (today=${today})` })
-        continue
-      }
-
-      // Skip if already spawned (check both instance table and actual tasks)
       const instanceKey = `${asgn.id}__${dueDateStr}`
       const taskKey     = `${master.name}__${asgn.client_id ?? ''}__${dueDateStr}`
-      if (existingKeys.has(instanceKey) || existingTaskKeys.has(taskKey)) {
-        detail.push({ ...logBase, action: 'skipped', reason: 'already spawned' })
+
+      // Every rule lives in decideSpawn, shared with the nightly cron and the
+      // Missed Tasks report, so the three cannot answer the same question
+      // differently — which is precisely how they diverged before.
+      //
+      // graceDays: null — no back-fill limit. Catching up on what was missed
+      // is the entire reason someone presses this button; a nightly run is
+      // the one that has to stay bounded.
+      const spawnInput = {
+        dueDate:       dueDateStr,
+        startDate:     startDateStr,
+        endDate:       endDateStr,
+        daysBeforeDue,
+        today,
+        graceDays:     null,
+        hasInstance:   existingKeys.has(instanceKey),
+        hasTask:       existingTaskKeys.has(taskKey),
+      }
+      const decision = decideSpawn(spawnInput)
+
+      if (!decision.spawn) {
+        skipped++
+        detail.push({ ...logBase, action: 'skipped', reason: skipReasonText(decision.reason, spawnInput) })
         continue
       }
 
@@ -257,7 +263,12 @@ export async function POST(request: NextRequest) {
       }
 
       // ── Record instance to prevent re-spawn ──
-      await admin.from('ca_task_instances').insert({
+      // The error was previously ignored here, while the cron rolls the task
+      // back on the same failure. That asymmetry produced exactly the state
+      // the cron's comment calls "the root cause of duplication": a task with
+      // no spawn record. Nothing ever reconciled it, and every later run
+      // re-attempted the same occurrence.
+      const { error: instErr } = await admin.from('ca_task_instances').insert({
         org_id:        asgn.org_id,
         assignment_id: asgn.id,
         task_id:       newTask.id,
@@ -265,6 +276,16 @@ export async function POST(request: NextRequest) {
         month_key:     monthKey,
         status:        'created',
       })
+
+      if (instErr) {
+        // Undo the task so the next run can retry cleanly, rather than
+        // leaving a row that nothing can account for.
+        await admin.from('tasks').delete().eq('id', newTask.id)
+        const msg = `${master.name} (${monthKey}): spawn record failed — ${instErr.message}`
+        errors.push(msg)
+        console.error('[ca/trigger] instance insert failed:', msg)
+        continue
+      }
 
       existingKeys.add(instanceKey)   // prevent duplicate within same request
       existingTaskKeys.add(taskKey)   // same
