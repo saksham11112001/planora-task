@@ -9,6 +9,29 @@ import { shiftDays }           from '@/lib/utils/recurringSchedule'
 import { fetchAllRows, chunk } from '@/lib/supabase/fetchAll'
 
 /**
+ * This route had NO maxDuration while every neighbouring route set one
+ * (assignments 30, propagate 30, import-csv 60). It inserts sequentially —
+ * a task and then its spawn record, two round trips per occurrence — across
+ * the whole org, so a first-time setup or a long backfill ran past the
+ * platform default and died partway with no explanation.
+ *
+ * 60 matches import-csv, the heaviest route already proven on this plan.
+ */
+export const maxDuration = 60
+
+/**
+ * Hard ceiling on one invocation, so the work cannot outlive the budget
+ * above. Two round trips per spawn at ~40ms each is roughly 24s for 300,
+ * leaving headroom for the reads at the top.
+ *
+ * Reaching it is not an error: the route is idempotent, so the remainder is
+ * picked up by pressing the button again. What matters is that the shortfall
+ * is REPORTED rather than looking like a clean finish — a silent timeout is
+ * how a firm concludes everything spawned when half of it did not.
+ */
+const MAX_SPAWNS_PER_CALL = 300
+
+/**
  * POST /api/ca/trigger
  * Admin-only: runs the CA compliance spawn logic DIRECTLY (synchronous).
  * Bypasses Inngest so tasks are created immediately and errors surface to the UI.
@@ -128,6 +151,7 @@ export async function POST(request: NextRequest) {
   // ── 3. Walk each assignment × each due date ───────────────────────
   let spawned = 0
   let skipped = 0
+  let deferred = 0
   const errors: string[] = []
   const detail: { client_id: string; task: string; month: string; due: string; action: string; reason?: string }[] = []
 
@@ -197,6 +221,14 @@ export async function POST(request: NextRequest) {
         continue
       }
 
+      // Budget reached: stop creating, but keep walking so `deferred` is a
+      // true count of what is left rather than an unknown.
+      if (spawned >= MAX_SPAWNS_PER_CALL) {
+        deferred++
+        detail.push({ ...logBase, action: 'deferred', reason: 'per-run limit reached' })
+        continue
+      }
+
       // ── Create the parent compliance task ──
       const { data: newTask, error: taskErr } = await admin
         .from('tasks')
@@ -241,14 +273,19 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const message = spawned > 0
-    ? `Successfully spawned ${spawned} compliance task(s).`
-    : `No tasks to spawn yet. Tasks appear N days before their due date (trigger windows haven't been reached for any assignment).`
+  // A run that stopped at the cap must not read as a clean finish — that is
+  // exactly how half a backfill gets mistaken for all of it.
+  const message = deferred > 0
+    ? `Created ${spawned} task(s). ${deferred} still to go — press the button again to continue.`
+    : spawned > 0
+      ? `Successfully spawned ${spawned} compliance task(s).`
+      : `No tasks to spawn yet. Tasks appear N days before their due date (trigger windows haven't been reached for any assignment).`
 
   return NextResponse.json({
     ok: true,
     spawned,
     skipped,
+    deferred,
     today,
     assignments_checked: assignments.length,
     legacy_subtasks_removed: legacyRows?.length ?? 0,
