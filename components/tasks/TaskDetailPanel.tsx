@@ -239,7 +239,16 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     const isCaCompliance = (task as any).custom_fields?._ca_compliance === true ||
       (task as any).custom_fields?._compliance_subtask === true
     if (isCaCompliance) {
-      fetch(`/api/ca/master?name=${encodeURIComponent(task.title)}`)
+      // Prefer the assignment id the spawner stamped on the task: it names
+      // the exact master row, including which financial year's copy. Matching
+      // by title breaks the moment a task is renamed — the checklist simply
+      // disappears — and cannot tell two years' copies apart. Title remains
+      // the fallback for tasks created before the id was recorded.
+      const caAsgnId = (task as any).custom_fields?._assignment_id
+      const caQuery = caAsgnId
+        ? `assignment_id=${encodeURIComponent(caAsgnId)}`
+        : `name=${encodeURIComponent(task.title)}`
+      fetch(`/api/ca/master?${caQuery}`)
         .then(r => r.json())
         .then(d => {
           const row = Array.isArray(d.data) ? d.data[0] : d.data

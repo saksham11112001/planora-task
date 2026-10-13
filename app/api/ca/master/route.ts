@@ -18,15 +18,31 @@ export async function GET(req: NextRequest) {
 
   const fy   = req.nextUrl.searchParams.get('fy') ?? '2026-27'
   const name = req.nextUrl.searchParams.get('name')
+  const assignmentId = req.nextUrl.searchParams.get('assignment_id')
 
   let q = admin
     .from('ca_master_tasks')
-    .select(name ? 'name,attachment_count,attachment_headers' : '*')
+    .select(name || assignmentId ? 'name,attachment_count,attachment_headers' : '*')
     .eq('org_id', mb.org_id)
     .eq('is_active', true)
 
-  if (name) {
-    q = q.eq('name', name).limit(1)
+  if (assignmentId) {
+    // Exact resolution. A spawned task carries its assignment id, which names
+    // the master row it came from — including which financial year's copy.
+    // Name matching cannot do that: rename the task and the match is lost,
+    // and the same name exists once per year.
+    const { data: asgn } = await admin.from('ca_client_assignments')
+      .select('master_task_id').eq('id', assignmentId).eq('org_id', mb.org_id).maybeSingle()
+    if (!asgn) return NextResponse.json({ data: [] })
+    q = q.eq('id', asgn.master_task_id).limit(1)
+  } else if (name) {
+    // Fallback for tasks created before assignment ids were recorded.
+    //
+    // Ordered by financial year, newest first. It previously had neither a
+    // year filter nor an ORDER BY, so with the same task present in several
+    // years Postgres was free to return any of them — the checklist shown
+    // depended on physical row order.
+    q = q.eq('name', name).order('financial_year', { ascending: false }).limit(1)
   } else {
     q = q.eq('financial_year', fy).order('sort_order', { ascending: true })
   }

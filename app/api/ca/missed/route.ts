@@ -7,8 +7,8 @@ import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
 import { fetchAllRows }        from '@/lib/supabase/fetchAll'
 import { dbError }             from '@/lib/api-error'
 import { todayInCountry }      from '@/lib/locale/countries'
-import { classifyOccurrence, withinGraceWindow } from '@/lib/ca/missedTasks'
-import type { OccurrenceStatus } from '@/lib/ca/missedTasks'
+import { classifyOccurrence, withinGraceWindow } from '@/lib/ca/spawnDecision'
+import type { OccurrenceStatus } from '@/lib/ca/spawnDecision'
 
 export const maxDuration = 60
 

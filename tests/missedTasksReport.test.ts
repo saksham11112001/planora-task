@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   classifyOccurrence, withinGraceWindow, SPAWN_GRACE_DAYS, BENIGN_STATUSES,
-} from '../lib/ca/missedTasks.ts'
+} from '../lib/ca/spawnDecision.ts'
 
 const base = {
   startDate: '2026-04-01',

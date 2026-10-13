@@ -1,7 +1,8 @@
 import { inngest }           from '../client'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { shiftDays }         from '@/lib/utils/recurringSchedule'
-import { SPAWN_GRACE_DAYS } from '@/lib/ca/missedTasks'
+import { SPAWN_GRACE_DAYS, decideSpawn } from '@/lib/ca/spawnDecision'
+import { todayInCountry, DEFAULT_COUNTRY } from '@/lib/locale/countries'
 import { fetchAllRows, chunk } from '@/lib/supabase/fetchAll'
 
 /**
@@ -35,12 +36,34 @@ export const caComplianceSpawn = inngest.createFunction(
   async ({ step }) => {
     const admin = createAdminClient()
 
-    // Use IST date (UTC + 5h30m) so "today" matches the business day.
-    // Resolved inside a step so it is memoised: the spawn batches below are
-    // addressed by position, so a replay that crossed midnight would otherwise
-    // plan different work than the batch ids already stand for.
-    const today: string = await step.run('resolve-today-ist', async () =>
-      new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().split('T')[0])
+    // "Today" per ORG, not one hardcoded IST date for the whole platform.
+    //
+    // This was `Date.now() + 5h30m` for everyone. The product now ships
+    // compliance catalogues for the US, UK, Canada and Australia, so a firm
+    // outside India was being measured against a clock up to 12.5 hours away
+    // from its own: a task could appear a day early, or a deadline read as
+    // passed while the working day was still running.
+    //
+    // Resolved inside a step so it is memoised — the spawn batches below are
+    // addressed by position, so a replay that crossed midnight would
+    // otherwise plan different work than the batch ids already stand for.
+    const todayByOrgArr: [string, string][] = await step.run('resolve-today-per-org', async () => {
+      const { data } = await admin.from('org_settings').select('org_id, locale')
+      return (data ?? []).map((r: any) => [
+        r.org_id as string,
+        todayInCountry((r.locale as { country?: string } | null)?.country),
+      ] as [string, string])
+    })
+    const todayByOrg = new Map<string, string>(todayByOrgArr)
+
+    // Fallback for an org with no settings row yet. India is the launch
+    // market and the only one with a statutory catalogue shipped by default,
+    // so it remains the right default — it is just no longer imposed on
+    // everyone.
+    const defaultToday: string = await step.run('resolve-default-today', async () =>
+      todayInCountry(DEFAULT_COUNTRY))
+
+    const todayFor = (orgId: string) => todayByOrg.get(orgId) ?? defaultToday
 
     // ── 1. Fetch all active assignments with their master task ──────────────
     // Paged. This is a platform-wide cron, so the row count is every firm's
@@ -114,6 +137,48 @@ export const caComplianceSpawn = inngest.createFunction(
     })
     const existingKeys = new Set<string>(existingKeysArr)
 
+    // ── 2b. Tasks that already exist, as a second dedup signal ──────────────
+    // The cron used to look ONLY at ca_task_instances. A task whose spawn
+    // record was missing was therefore invisible to it, so it re-attempted
+    // that task every night: the unique index rejected the insert, no record
+    // was ever written, and it retried forever. The manual route has always
+    // checked both; this is the same check.
+    //
+    // Bounded by date, which is what makes it affordable platform-wide. The
+    // loop below only considers due dates from (today - grace) onwards, so a
+    // task outside that window cannot change any decision. Without the bound
+    // this would scan every compliance task ever created, for every firm,
+    // every night.
+    // The earliest "today" across all orgs. Using any later date would make
+    // the window too narrow for the orgs behind it, and a missing task from
+    // this set reads as "not created" — the exact duplicate attempt this
+    // fetch exists to prevent.
+    const earliestToday = [defaultToday, ...todayByOrg.values()].sort()[0]
+    const taskWindowStart = shiftDays(earliestToday, -SPAWN_GRACE_DAYS)
+    const existingTaskKeysArr: string[] = await step.run('fetch-existing-tasks', async () => {
+      const { data, error } = await fetchAllRows<any>(
+        (from, to) => admin
+          .from('tasks')
+          .select('title, client_id, due_date')
+          .is('parent_task_id', null)
+          .contains('custom_fields', { _ca_compliance: true })
+          .gte('due_date', taskWindowStart)
+          .order('id', { ascending: true })
+          .range(from, to),
+        { maxRows: 50_000 },
+      )
+      if (error) {
+        // A partial set would reintroduce exactly the duplicate attempts this
+        // check exists to prevent, so stop rather than guess.
+        console.error('[caComplianceSpawn] fetch existing tasks:', (error as any)?.message)
+        throw new Error('Could not read existing CA compliance tasks')
+      }
+      // Archived and completed rows are deliberately included: the question is
+      // "was this obligation ever created?", not "is it on the board now".
+      return data.map((t: any) => `${t.title}__${t.client_id ?? ''}__${t.due_date ?? ''}`)
+    })
+    const existingTaskKeys = new Set<string>(existingTaskKeysArr)
+
     let alreadyExisted = 0
 
     // Inngest recommends staying under ~1000 steps per run, so the work is
@@ -160,35 +225,29 @@ export const caComplianceSpawn = inngest.createFunction(
       for (const [monthKey, dueDateStr] of Object.entries(dates)) {
         if (!dueDateStr) continue
 
-        // Skip dates before the client's configured start date
-        if (dueDateStr < startDateStr) continue
-
-        // Skip dates after the client's configured end date
-        if (endDateStr && dueDateStr > endDateStr) continue
-
-        // Compute trigger date (timezone-safe: no UTC round-trip)
-        const triggerStr = shiftDays(dueDateStr, -daysBeforeDue)
-
-        // Only spawn when trigger date has arrived
-        if (triggerStr > today) continue
-
-        // Back-fill a recently missed date, but no further.
+        // Every rule lives in decideSpawn, which "Spawn tasks now" and the
+        // Missed Tasks report also call. Restating them here is how the two
+        // paths drifted apart in the first place.
         //
-        // This used to be `if (dueDateStr < today) continue` — any date that
-        // slipped past was skipped FOREVER. One failed run, or one run that
-        // hit MAX_SPAWNS_PER_RUN and deferred, and that occurrence simply
-        // never existed; the only remedy was an admin noticing and pressing
-        // "Spawn tasks now". A firm found 33 such tasks spread over six
-        // months, and only by building a spreadsheet by hand.
-        //
-        // The window is deliberately bounded. Unbounded back-fill would mean
-        // that editing a calendar date, or onboarding a client, could bury a
-        // team under months of history in a single night.
-        if (dueDateStr < shiftDays(today, -SPAWN_GRACE_DAYS)) continue
+        // graceDays: the nightly run back-fills a bounded window. It used to
+        // skip ANY past date, so a single failed or capped run lost that
+        // occurrence forever — a firm found 33 such tasks spread over six
+        // months, and only by building a spreadsheet by hand. Unbounded
+        // back-fill is the opposite mistake: a calendar edit would bury a
+        // team under months of history in one night.
+        const decision = decideSpawn({
+          dueDate:       dueDateStr,
+          startDate:     startDateStr,
+          endDate:       endDateStr,
+          daysBeforeDue,
+          today:         todayFor(asgn.org_id),
+          graceDays:     SPAWN_GRACE_DAYS,
+          hasInstance:   existingKeys.has(`${asgn.id}__${dueDateStr}`),
+          hasTask:       existingTaskKeys.has(`${master.name}__${asgn.client_id ?? ''}__${dueDateStr}`),
+        })
 
-        // Skip if already spawned for this assignment + due_date
-        if (existingKeys.has(`${asgn.id}__${dueDateStr}`)) {
-          alreadyExisted++
+        if (!decision.spawn) {
+          if (decision.reason === 'already_exists') alreadyExisted++
           continue
         }
 
@@ -269,7 +328,10 @@ export const caComplianceSpawn = inngest.createFunction(
       console.warn(`[caComplianceSpawn] Spawn cap (${MAX_SPAWNS_PER_RUN}) reached — ${deferred} deferred to the next cron run`)
     }
     return {
-      date_checked:        today,
+      // One date can no longer describe a platform-wide run; report the
+      // default and how many distinct business days were in play.
+      date_checked:        defaultToday,
+      distinct_org_dates:  new Set([defaultToday, ...todayByOrg.values()]).size,
       assignments_checked: assignments.length,
       tasks_spawned:       spawned,
       already_existed:     alreadyExisted,
