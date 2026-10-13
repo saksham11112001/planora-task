@@ -1,6 +1,7 @@
 import { inngest }           from '../client'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { shiftDays }         from '@/lib/utils/recurringSchedule'
+import { SPAWN_GRACE_DAYS } from '@/lib/ca/missedTasks'
 import { fetchAllRows, chunk } from '@/lib/supabase/fetchAll'
 
 /**
@@ -171,9 +172,19 @@ export const caComplianceSpawn = inngest.createFunction(
         // Only spawn when trigger date has arrived
         if (triggerStr > today) continue
 
-        // Never spawn tasks whose due date has already passed in the daily cron
-        // (past tasks are handled by the manual Spawn Tasks trigger).
-        if (dueDateStr < today) continue
+        // Back-fill a recently missed date, but no further.
+        //
+        // This used to be `if (dueDateStr < today) continue` — any date that
+        // slipped past was skipped FOREVER. One failed run, or one run that
+        // hit MAX_SPAWNS_PER_RUN and deferred, and that occurrence simply
+        // never existed; the only remedy was an admin noticing and pressing
+        // "Spawn tasks now". A firm found 33 such tasks spread over six
+        // months, and only by building a spreadsheet by hand.
+        //
+        // The window is deliberately bounded. Unbounded back-fill would mean
+        // that editing a calendar date, or onboarding a client, could bury a
+        // team under months of history in a single night.
+        if (dueDateStr < shiftDays(today, -SPAWN_GRACE_DAYS)) continue
 
         // Skip if already spawned for this assignment + due_date
         if (existingKeys.has(`${asgn.id}__${dueDateStr}`)) {
