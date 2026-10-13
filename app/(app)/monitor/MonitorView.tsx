@@ -21,6 +21,7 @@ interface MonTask {
   updated_at?: string | null
   created_at: string
   is_recurring: boolean
+  parent_recurring_id?: string | null
   frequency?: string | null
   next_occurrence_date?: string | null
   estimated_hours?: number | null
@@ -64,19 +65,34 @@ const PRIORITY_DOT: Record<string, string> = {
 
 function typeAccent(t: MonTask): string {
   if (t.custom_fields?._ca_compliance) return '#d97706'
-  if (t.is_recurring)                  return '#0d9488'
+  if (isRepeat(t))                     return '#0d9488'
   if (t.project_id)                    return '#7c3aed'
   return '#2563eb'   // blue — one-time (was cyan, too close to recurring teal)
 }
 function typeBg(t: MonTask): string {
   if (t.custom_fields?._ca_compliance) return 'rgba(234,179,8,0.06)'
-  if (t.is_recurring)                  return 'rgba(13,148,136,0.05)'
+  if (isRepeat(t))                     return 'rgba(13,148,136,0.05)'
   if (t.project_id)                    return 'rgba(124,58,237,0.05)'
   return 'rgba(37,99,235,0.05)'
 }
+/**
+ * A task is "Repeat" when it CAME FROM a recurring template, not when it is
+ * one. Templates are no longer fetched at all — they are schedule
+ * definitions, not work, and their frozen due_date made them read as months
+ * overdue while they spawned perfectly on time.
+ *
+ * Before this, is_recurring was the test, so "Repeat" counted the templates
+ * and the actual recurring work was filed under Quick or Project. One
+ * definition, used by the label, the type filter and the stats, so the three
+ * cannot disagree.
+ */
+function isRepeat(t: MonTask): boolean {
+  return !!t.parent_recurring_id
+}
+
 function typeLabel(t: MonTask): string {
   if (t.custom_fields?._ca_compliance) return 'CA'
-  if (t.is_recurring)                  return 'Repeat'
+  if (isRepeat(t))                     return 'Repeat'
   if (t.project_id)                    return 'Project'
   return 'Quick'
 }
@@ -488,9 +504,9 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
       if (filterMember.length > 0  && !filterMember.includes(t.assignee_id ?? '')) return false
       if (filterType.length > 0) {
         const isCA        = !!t.custom_fields?._ca_compliance
-        const isRecurring = !!t.is_recurring && !isCA
-        const isProject   = !!t.project_id && !t.is_recurring && !isCA
-        const isQuick     = !t.project_id && !t.is_recurring && !isCA
+        const isRecurring = isRepeat(t) && !isCA
+        const isProject   = !!t.project_id && !isRepeat(t) && !isCA
+        const isQuick     = !t.project_id && !isRepeat(t) && !isCA
         const typeMatch   = filterType.some(type =>
           (type === 'ca' && isCA) || (type === 'recurring' && isRecurring) ||
           (type === 'project' && isProject) || (type === 'quick' && isQuick)
@@ -544,7 +560,7 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
       cancelled:  m.filter(t => t.status === 'cancelled').length,
       overdue:    m.filter(t => t.due_date! < today && !['completed', 'cancelled'].includes(t.status)).length,
       ca:         m.filter(t => !!t.custom_fields?._ca_compliance).length,
-      recurring:  m.filter(t => t.is_recurring).length,
+      recurring:  m.filter(isRepeat).length,
       unassigned: m.filter(t => !t.assignee_id && !['completed', 'cancelled'].includes(t.status)).length,
     }
   }, [hasFilters, visible, monthTasks, today])
@@ -624,9 +640,9 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
     if (groupBy === 'type') {
       return [
         { key: 'ca',        label: 'CA Compliance', color: '#d97706', tasks: visible.filter(t => t.custom_fields?._ca_compliance) },
-        { key: 'recurring', label: 'Repeat tasks',  color: '#0d9488', tasks: visible.filter(t => t.is_recurring && !t.custom_fields?._ca_compliance) },
-        { key: 'project',   label: 'Project tasks', color: '#7c3aed', tasks: visible.filter(t => !!t.project_id && !t.is_recurring && !t.custom_fields?._ca_compliance) },
-        { key: 'quick',     label: 'Quick tasks',   color: '#2563eb', tasks: visible.filter(t => !t.project_id && !t.is_recurring && !t.custom_fields?._ca_compliance) },
+        { key: 'recurring', label: 'Repeat tasks',  color: '#0d9488', tasks: visible.filter(t => isRepeat(t) && !t.custom_fields?._ca_compliance) },
+        { key: 'project',   label: 'Project tasks', color: '#7c3aed', tasks: visible.filter(t => !!t.project_id && !isRepeat(t) && !t.custom_fields?._ca_compliance) },
+        { key: 'quick',     label: 'Quick tasks',   color: '#2563eb', tasks: visible.filter(t => !t.project_id && !isRepeat(t) && !t.custom_fields?._ca_compliance) },
       ].filter(g => g.tasks.length > 0)
     }
     return [{ key: 'all', label: 'All tasks', color: 'var(--brand)', tasks: visible }]
@@ -772,8 +788,8 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
                   <BarChart data={[
                     { name: 'CA',      value: stats.ca,        fill: '#d97706' },
                     { name: 'Repeat',  value: stats.recurring, fill: '#0d9488' },
-                    { name: 'Project', value: (hasFilters ? visible : monthTasks).filter(t => !!t.project_id && !t.is_recurring && !t.custom_fields?._ca_compliance).length, fill: '#7c3aed' },
-                    { name: 'Quick',   value: (hasFilters ? visible : monthTasks).filter(t => !t.project_id && !t.is_recurring && !t.custom_fields?._ca_compliance).length,  fill: '#2563eb' },
+                    { name: 'Project', value: (hasFilters ? visible : monthTasks).filter(t => !!t.project_id && !isRepeat(t) && !t.custom_fields?._ca_compliance).length, fill: '#7c3aed' },
+                    { name: 'Quick',   value: (hasFilters ? visible : monthTasks).filter(t => !t.project_id && !isRepeat(t) && !t.custom_fields?._ca_compliance).length,  fill: '#2563eb' },
                     { name: 'Overdue', value: stats.overdue,   fill: '#dc2626' },
                   ]} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                     <XAxis dataKey="name" tick={{ fontSize: 9 }}/>
@@ -1211,6 +1227,9 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
               // Recurring templates have no completable status of their own — per-occurrence
               // status lives on spawned instances. Display them as 'todo' so a stale template
               // status never renders as Done in the monitor.
+              // Defensive only: templates are no longer fetched at all, so this
+              // is always false now. Kept so a template arriving by some other
+              // route still cannot render a stale status as Done.
               const isRecurringTemplate = !!task.is_recurring && !task.parent_task_id
               const displayStatus = isRecurringTemplate ? 'todo' : task.status
               const sc     = STATUS_CONFIG[displayStatus] ?? STATUS_CONFIG.todo
