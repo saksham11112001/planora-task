@@ -8,7 +8,7 @@ import { redirect }     from 'next/navigation'
 // `description` is deliberately absent. Monitor never renders it — the only
 // reader is TaskDetailPanel, which now fetches the single task it opens. It was
 // the widest column here, shipped for every row on every 2-minute refresh.
-const TASK_COLS = 'id, title, status, priority, due_date, completed_at, assignee_id, approver_id, client_id, project_id, parent_task_id, approval_status, approval_required, is_recurring, frequency, next_occurrence_date, estimated_hours, custom_fields, created_at, updated_at, is_billable, billable_amount, assignee:users!tasks_assignee_id_fkey(id, name), approver:users!tasks_approver_id_fkey(id, name), creator:users!tasks_created_by_fkey(id, name), projects(id, name, color)'
+const TASK_COLS = 'id, title, status, priority, due_date, completed_at, assignee_id, approver_id, client_id, project_id, parent_task_id, parent_recurring_id, approval_status, approval_required, is_recurring, frequency, next_occurrence_date, estimated_hours, custom_fields, created_at, updated_at, is_billable, billable_amount, assignee:users!tasks_assignee_id_fkey(id, name), approver:users!tasks_approver_id_fkey(id, name), creator:users!tasks_created_by_fkey(id, name), projects(id, name, color)'
 
 export async function MonitorFetcher() {
   const user = await getSessionUser()
@@ -48,6 +48,15 @@ export async function MonitorFetcher() {
     .eq('org_id', mb.org_id)
     .neq('is_archived', true)
     .is('parent_task_id', null)
+    // Recurring TEMPLATES are excluded. A template is the definition of a
+    // schedule, not a piece of work: it has a due_date frozen at its first
+    // occurrence that never advances, so it sat in Monitor looking months
+    // overdue while spawning perfectly on time. The work it produces — the
+    // occurrences — is still here and is what "Repeat" now counts.
+    //
+    // .or rather than .neq because is_recurring is NULL on older rows, and
+    // `is_recurring <> true` is NULL for those, which would drop them.
+    .or('is_recurring.is.null,is_recurring.eq.false')
     .or(recentOrOpen)
 
   const [
