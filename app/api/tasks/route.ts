@@ -7,7 +7,7 @@ import { inngest }           from '@/lib/inngest/client'
 import { assertCan }         from '@/lib/utils/permissionGate'
 import { dbError }           from '@/lib/api-error'
 import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
-import { isValidGranularFrequency } from '@/lib/utils/recurringSchedule'
+import { isValidGranularFrequency, firstOccurrenceDate } from '@/lib/utils/recurringSchedule'
 import { fetchAllRows }  from '@/lib/supabase/fetchAll'
 
 const VALID_PRIORITIES    = ['low', 'medium', 'high', 'urgent']
@@ -168,7 +168,17 @@ export async function POST(request: NextRequest) {
     estimated_hours: estimated_hours ?? null, approval_required: !!approval_required,
     approver_id: approver_id || null, created_by: user.id, is_recurring: is_recurring ?? false,
     frequency: (is_recurring && frequency) ? frequency : null,
-    next_occurrence_date: (is_recurring && next_occurrence_date) ? next_occurrence_date : null,
+    // Never NULL for a working recurring template. The daily job selects on
+    // `next_occurrence_date <= today`, and in SQL `NULL <= today` is NULL
+    // rather than TRUE — so a template with no date is never selected and
+    // silently never spawns anything, for as long as it exists.
+    //
+    // This previously stored only what the caller happened to send, while
+    // PATCH has always recalculated from the frequency. A repeat task created
+    // through any path that omitted the field was born dead.
+    next_occurrence_date: is_recurring
+      ? firstOccurrenceDate(frequency, due_date, next_occurrence_date, new Date().toISOString().slice(0, 10))
+      : null,
     parent_task_id: parent_task_id || null,
     is_billable: !!is_billable,
     billable_amount: (is_billable && billable_amount != null) ? Number(billable_amount) : null,

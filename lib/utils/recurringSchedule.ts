@@ -227,3 +227,41 @@ export function nextOccurrence(freq: string, from: string): string {
   }
   return toDateStr(d)
 }
+
+/**
+ * The date a newly created recurring template should FIRST run.
+ *
+ * WHY THIS EXISTS
+ * ---------------
+ * POST /api/tasks stored next_occurrence_date only when the client happened
+ * to send one, with no server-side fallback — while PATCH has always
+ * recalculated it from the frequency. So a repeat task created through any
+ * path that omitted the field was born with next_occurrence_date = NULL.
+ *
+ * That is fatal and completely silent. The daily job selects templates with
+ *     .lte('next_occurrence_date', today)
+ * and in SQL `NULL <= today` is NULL, not TRUE — so the row is never
+ * selected. The template sits in the list looking normal and never spawns a
+ * single occurrence, for as long as it exists. A firm had 8 of these.
+ *
+ * Resolution order:
+ *   1. an explicit date from the caller — they know best
+ *   2. the task's own due date — for a repeat task that IS the first run
+ *   3. computed from the frequency, counting from yesterday so that a
+ *      schedule landing on today still fires today rather than waiting a
+ *      whole cycle. This mirrors what PATCH already does.
+ *
+ * Returns null only when there is no frequency to work from, in which case
+ * the row is not a working recurring template anyway.
+ */
+export function firstOccurrenceDate(
+  frequency:   string | null | undefined,
+  dueDate:     string | null | undefined,
+  explicit:    string | null | undefined,
+  today:       string,
+): string | null {
+  if (explicit) return explicit
+  if (dueDate)  return dueDate
+  if (!frequency) return null
+  return nextOccurrence(frequency, shiftDays(today, -1))
+}
