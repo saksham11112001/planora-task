@@ -2,6 +2,8 @@
 // Protected by a shared secret — not exposed to end users.
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient }         from '@/lib/supabase/admin'
+import { currentPeriod, isValidPeriodEnd } from '@/lib/msme/periods'
+import { getDeclaration }            from '@/lib/msme/declarations'
 import crypto                        from 'crypto'
 
 export async function POST(req: NextRequest) {
@@ -17,20 +19,33 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const { vendor_id } = await req.json()
+  const { vendor_id, period_end: rawPeriod } = await req.json()
   if (!vendor_id) return NextResponse.json({ error: 'vendor_id required' }, { status: 400 })
+
+  // A magic link belongs to ONE half-year. The caller names it; an older
+  // caller that does not falls back to the period currently being collected.
+  const periodEnd = isValidPeriodEnd(rawPeriod)
+    ? rawPeriod
+    : currentPeriod(new Date().toISOString().slice(0, 10)).periodEnd
 
   const admin = createAdminClient()
   const { data: vendor } = await admin
     .from('msme_vendors')
-    .select('org_id, status')
+    .select('org_id')
     .eq('id', vendor_id)
     .maybeSingle()
 
   if (!vendor) return NextResponse.json({ error: 'Vendor not found' }, { status: 404 })
-  // Only mint tokens for vendors still awaiting submission
-  if (vendor.status !== 'emailed') {
-    return NextResponse.json({ error: 'Vendor has already submitted or is not in emailed state' }, { status: 422 })
+
+  // Only mint tokens while THIS period's declaration is still outstanding.
+  // Checking the vendor row instead would refuse to chase a vendor for March
+  // because they answered for September.
+  const declaration = await getDeclaration(admin, vendor_id, periodEnd)
+  if (!declaration) {
+    return NextResponse.json({ error: 'No declaration is open for this period' }, { status: 422 })
+  }
+  if (declaration.status === 'submitted' || declaration.status === 'not_msme') {
+    return NextResponse.json({ error: 'Vendor has already submitted their details for this period' }, { status: 422 })
   }
 
   const rawToken  = crypto.randomBytes(32).toString('hex')
@@ -42,7 +57,8 @@ export async function POST(req: NextRequest) {
     org_id: vendor.org_id,
     token_hash: tokenHash,
     expires_at: expiresAt,
+    period_end: periodEnd,
   })
 
-  return NextResponse.json({ token: rawToken })
+  return NextResponse.json({ token: rawToken, period_end: periodEnd })
 }

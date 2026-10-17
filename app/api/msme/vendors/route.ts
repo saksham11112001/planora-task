@@ -4,6 +4,13 @@ import { getAuthUser } from '@/lib/supabase/authUser'
 import { createAdminClient }        from '@/lib/supabase/admin'
 import { getApiOrgMembership }      from '@/lib/supabase/apiActiveOrg'
 import { resolvePackEntitlement }   from '@/lib/msme/packs'
+import {
+  currentPeriod, isValidPeriodEnd, describePeriod, periodsForFinancialYear,
+  previousPeriod, nextPeriod,
+} from '@/lib/msme/periods'
+import { DECLARATION_COLS }         from '@/lib/msme/declarations'
+import type { Declaration }         from '@/lib/msme/declarations'
+import { chunk }                    from '@/lib/supabase/fetchAll'
 
 export async function GET(req: NextRequest) {
   const supabase = await createClient()
@@ -14,6 +21,14 @@ export async function GET(req: NextRequest) {
   if (!mb) return NextResponse.json({ error: 'Not a member' }, { status: 403 })
 
   const admin = createAdminClient()
+
+  // Which half-year the list shows. Form MSME-1 is filed twice a year, so the
+  // same vendor has a separate status, balance and chase count per cycle.
+  const rawPeriod = req.nextUrl.searchParams.get('period_end')
+  const periodEnd = isValidPeriodEnd(rawPeriod)
+    ? rawPeriod
+    : currentPeriod(new Date().toISOString().slice(0, 10)).periodEnd
+  const period = describePeriod(periodEnd)
 
   const [
     { data: vendors, error },
@@ -49,19 +64,88 @@ export async function GET(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
+  // This period's declarations, keyed by vendor. Read separately rather than
+  // as an embedded join so a vendor with no declaration for the period still
+  // appears in the list — as 'pending', which is exactly what they are.
+  const declByVendor = new Map<string, Declaration>()
+  for (const part of chunk((vendors ?? []).map(v => v.id))) {
+    const { data: decls } = await admin
+      .from('msme_declarations')
+      .select(DECLARATION_COLS)
+      .eq('org_id', mb.org_id)
+      .eq('period_end', periodEnd)
+      .in('vendor_id', part)
+    for (const d of (decls as Declaration[] | null) ?? []) declByVendor.set(d.vendor_id, d)
+  }
+
+  // Overlay the period's declaration over the vendor master.
+  //
+  // The declaration fields win, so every existing consumer of this list reads
+  // the SELECTED half-year without changing how it reads it. The vendor row's
+  // own copy is a mirror of the latest declaration and would show March's
+  // figures while the user is looking at September.
+  const shaped = (vendors ?? []).map(v => {
+    const d = declByVendor.get(v.id)
+    return {
+      ...v,
+      // ── period-scoped ──
+      status:              d?.status              ?? 'pending',
+      is_not_msme:         d?.is_not_msme         ?? false,
+      udyam_number:        d?.udyam_number        ?? null,
+      pan:                 d?.pan                 ?? v.pan ?? null,
+      udyam_registered_on: d?.udyam_registered_on ?? null,
+      msme_category:       d?.msme_category       ?? null,
+      nature_of_business:  d?.nature_of_business  ?? null,
+      outstanding_amount:  d?.outstanding_amount  ?? null,
+      cert_url:            d?.cert_url            ?? null,
+      declarant_name:      d?.declarant_name      ?? null,
+      declared_at:         d?.declared_at         ?? null,
+      submitted_at:        d?.submitted_at        ?? null,
+      // Chases sent for THIS half-year — what "3/5 sent" should mean.
+      email_count:         d?.email_count         ?? 0,
+      last_emailed_at:     d?.last_emailed_at     ?? null,
+
+      // ── lifetime, from the vendor master ──
+      // The billing slot ledger. Kept under its own name because the UI needs
+      // both: "has this vendor ever consumed a slot" (lifetime) is a different
+      // question from "how many times have we chased them this cycle".
+      lifetime_email_count: v.email_count,
+      declaration_id:       d?.id ?? null,
+      period_end:           periodEnd,
+    }
+  })
+
   // Packs run for a year. resolvePackEntitlement is the single place that
   // decides what the term means, so the list, the send gates and settings can
   // never disagree about whether an org still has its slots.
   const addonSlots: number = (addonRow?.config as any)?.extra_slots ?? 0
   const ent = resolvePackEntitlement(packRow?.config as any, addonSlots)
-  const total = vendors?.length ?? 0
+  const total = shaped.length
   return NextResponse.json({
-    vendors: vendors ?? [], total, totalEver: totalEver ?? 0,
+    vendors: shaped, total, totalEver: totalEver ?? 0,
     vendorLimit: ent.vendorLimit,
     // Surfaced so the dashboard can show renewal state rather than silently
     // showing fewer slots than the customer thinks they bought.
     packExpiresAt: ent.expiresAt,
     packExpired:   ent.isExpired,
+
+    // The selected cycle, and both cycles of its financial year so the UI can
+    // offer them without re-deriving the statutory calendar. The adjacent
+    // periods are named here for the same reason: the half-year arithmetic
+    // lives in lib/msme/periods.ts only, so the UI cannot disagree with it.
+    period: {
+      period_end: period.periodEnd, label: period.label, short_label: period.shortLabel,
+      as_on: period.asOn, range_label: period.rangeLabel,
+      due_date: period.dueDate, financial_year: period.financialYear, half: period.half,
+      prev_period_end: previousPeriod(period.periodEnd).periodEnd,
+      next_period_end: nextPeriod(period.periodEnd).periodEnd,
+      // Is this the cycle a firm is currently collecting for?
+      is_current: period.periodEnd === currentPeriod(new Date().toISOString().slice(0, 10)).periodEnd,
+    },
+    periods: periodsForFinancialYear(period.financialYear).map(p => ({
+      period_end: p.periodEnd, label: p.label, short_label: p.shortLabel,
+      as_on: p.asOn, range_label: p.rangeLabel, due_date: p.dueDate, half: p.half,
+    })),
   })
 }
 

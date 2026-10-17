@@ -2,6 +2,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient }         from '@/lib/supabase/admin'
 import { uploadToR2, R2_CONFIGURED, R2_BUCKET } from '@/lib/storage/r2'
+import { currentPeriod, isValidPeriodEnd } from '@/lib/msme/periods'
+import { ensureDeclaration, syncVendorMirror } from '@/lib/msme/declarations'
 import crypto                        from 'crypto'
 
 const MAX_BYTES = 5 * 1024 * 1024  // 5 MB
@@ -16,7 +18,7 @@ export async function POST(
 
   const { data: tokenRow } = await admin
     .from('msme_tokens')
-    .select('id, vendor_id, org_id, expires_at, used_at')
+    .select('id, vendor_id, org_id, expires_at, used_at, period_end, created_at')
     .eq('token_hash', tokenHash)
     .maybeSingle()
 
@@ -31,6 +33,12 @@ export async function POST(
   const formData = await req.formData()
   const file     = formData.get('file') as File | null
   if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
+
+  // Which document this is. The route used to pre-save EVERY upload to
+  // cert_url, so uploading a payment proof overwrote the vendor's Udyam
+  // certificate — the certificate list then showed the proof instead.
+  // Defaults to 'cert' so an older client keeps its previous behaviour.
+  const kind = formData.get('kind') === 'proof' ? 'proof' : 'cert'
 
   const allowed = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png']
   if (!allowed.includes(file.type)) {
@@ -71,9 +79,39 @@ export async function POST(
     certUrl = urlData.publicUrl
   }
 
-  // Persist cert_url on the vendor record immediately (form submit will also send it as a backup)
-  const { error: urlErr } = await admin.from('msme_vendors').update({ cert_url: certUrl }).eq('id', tokenRow.vendor_id).eq('org_id', tokenRow.org_id)
-  if (urlErr) console.error('[msme/upload] cert_url pre-save failed (non-fatal):', urlErr.message)
+  // Pre-save against THIS period's declaration so an upload is not lost if the
+  // vendor abandons the form before submitting (the submit also sends it).
+  //
+  // A null token period means a link minted before half-yearly tracking: the
+  // period that was current when the token was created is the right answer,
+  // not the one current now.
+  const periodEnd = isValidPeriodEnd(tokenRow.period_end)
+    ? tokenRow.period_end
+    : currentPeriod((tokenRow.created_at ?? new Date().toISOString()).slice(0, 10)).periodEnd
 
-  return NextResponse.json({ ok: true, cert_url: certUrl })
+  const column = kind === 'proof' ? 'proof_url' : 'cert_url'
+
+  const declaration = await ensureDeclaration(admin, {
+    orgId: tokenRow.org_id, vendorId: tokenRow.vendor_id, periodEnd,
+  })
+
+  if (declaration) {
+    const { error: urlErr } = await admin
+      .from('msme_declarations')
+      .update({ [column]: certUrl })
+      .eq('id', declaration.id)
+    if (urlErr) console.error('[msme/upload] pre-save failed (non-fatal):', urlErr.message)
+    else await syncVendorMirror(admin, tokenRow.vendor_id)
+  } else {
+    // Degrade to the vendor row when the declarations table is not there yet.
+    const { error: urlErr } = await admin
+      .from('msme_vendors')
+      .update({ [column]: certUrl })
+      .eq('id', tokenRow.vendor_id).eq('org_id', tokenRow.org_id)
+    if (urlErr) console.error('[msme/upload] vendor-row pre-save failed (non-fatal):', urlErr.message)
+  }
+
+  // `cert_url` is kept in the response for the existing client, which reads
+  // that key for both document kinds; `url` is the name to use from now on.
+  return NextResponse.json({ ok: true, url: certUrl, cert_url: certUrl })
 }
