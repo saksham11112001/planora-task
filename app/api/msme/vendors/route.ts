@@ -8,9 +8,40 @@ import {
   currentPeriod, isValidPeriodEnd, describePeriod, periodsForFinancialYear,
   previousPeriod, nextPeriod,
 } from '@/lib/msme/periods'
+import { msmeToday }            from '@/lib/msme/today'
 import { DECLARATION_COLS }         from '@/lib/msme/declarations'
 import type { Declaration }         from '@/lib/msme/declarations'
 import { chunk, fetchAllRows }      from '@/lib/supabase/fetchAll'
+
+/** The vendor-master columns the list reads. Declared because the paged read
+ *  cannot infer them, and because the period overlay below depends on knowing
+ *  which of these the declaration replaces. */
+interface VendorRow {
+  id: string
+  vendor_name: string
+  vendor_email: string
+  gstin: string | null
+  pan: string | null
+  client_id: string | null
+  status: string
+  payment_status: string
+  udyam_number: string | null
+  udyam_registered_on: string | null
+  msme_category: string | null
+  nature_of_business: string | null
+  outstanding_amount: number | null
+  cert_url: string | null
+  is_not_msme: boolean
+  declarant_name: string | null
+  declared_at: string | null
+  submitted_at: string | null
+  email_count: number
+  last_emailed_at: string | null
+  is_paid: boolean
+  created_at: string
+  email_bounced: boolean | null
+  bounce_reason: string | null
+}
 
 export async function GET(req: NextRequest) {
   const supabase = await createClient()
@@ -27,7 +58,7 @@ export async function GET(req: NextRequest) {
   const rawPeriod = req.nextUrl.searchParams.get('period_end')
   const periodEnd = isValidPeriodEnd(rawPeriod)
     ? rawPeriod
-    : currentPeriod(new Date().toISOString().slice(0, 10)).periodEnd
+    : currentPeriod(msmeToday()).periodEnd
   const period = describePeriod(periodEnd)
 
   // Which client company's suppliers to list. MSME-1 is filed BY a company
@@ -48,15 +79,26 @@ export async function GET(req: NextRequest) {
     : isUuid(rawClient)               ? rawClient
     : 'all'
 
-  // Built before the Promise.all so the client filter can be applied without
-  // duplicating the whole select.
-  let vendorQuery = admin
-    .from('msme_vendors')
-    .select('id, vendor_name, vendor_email, gstin, pan, client_id, status, payment_status, udyam_number, udyam_registered_on, msme_category, nature_of_business, outstanding_amount, cert_url, is_not_msme, declarant_name, declared_at, submitted_at, email_count, last_emailed_at, is_paid, created_at, email_bounced, bounce_reason')
-    .eq('org_id', mb.org_id)
-    .eq('is_deleted', false)
-  if (clientFilter === 'none')      vendorQuery = vendorQuery.is('client_id', null)
-  else if (clientFilter !== 'all')  vendorQuery = vendorQuery.eq('client_id', clientFilter)
+  // Paged. An org may hold up to 2000 vendors (the import cap) while PostgREST
+  // truncates at 1000 silently, so the list would simply stop — and the
+  // per-client counts below ARE paged, so the selector would say "Alpha
+  // (1,500)" above a list showing a thousand.
+  //
+  // Ordered by created_at then id: created_at alone is not unique, so paging
+  // could repeat one row and drop another.
+  const vendorsPaged = fetchAllRows<VendorRow>((from, to) => {
+    let q = admin
+      .from('msme_vendors')
+      .select('id, vendor_name, vendor_email, gstin, pan, client_id, status, payment_status, udyam_number, udyam_registered_on, msme_category, nature_of_business, outstanding_amount, cert_url, is_not_msme, declarant_name, declared_at, submitted_at, email_count, last_emailed_at, is_paid, created_at, email_bounced, bounce_reason')
+      .eq('org_id', mb.org_id)
+      .eq('is_deleted', false)
+    if (clientFilter === 'none')      q = q.is('client_id', null)
+    else if (clientFilter !== 'all')  q = q.eq('client_id', clientFilter)
+    return q
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: true })
+      .range(from, to)
+  })
 
   const [
     { data: vendors, error },
@@ -64,7 +106,7 @@ export async function GET(req: NextRequest) {
     { data: addonRow },
     { count: totalEver },
   ] = await Promise.all([
-    vendorQuery.order('created_at', { ascending: false }),
+    vendorsPaged,
     admin
       .from('org_feature_settings')
       .select('config')
@@ -89,7 +131,14 @@ export async function GET(req: NextRequest) {
       .gt('email_count', 0),
   ])
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    // fetchAllRows widens the error to unknown, so it is narrowed rather than
+    // assumed to carry a message.
+    return NextResponse.json(
+      { error: (error as { message?: string }).message ?? 'Failed to load vendors' },
+      { status: 500 },
+    )
+  }
 
   // This period's declarations, keyed by vendor. Read separately rather than
   // as an embedded join so a vendor with no declaration for the period still
@@ -144,12 +193,20 @@ export async function GET(req: NextRequest) {
 
   // The firm's clients, so the page can offer the selector without a second
   // round trip. Archived clients are excluded, matching /api/clients.
-  const { data: clientRows } = await admin
-    .from('clients')
-    .select('id, name')
-    .eq('org_id', mb.org_id)
-    .neq('is_archived', true)
-    .order('name')
+  // Paged: a large firm can have more clients than PostgREST's 1000-row cap,
+  // and a client missing from the selector is a client whose return cannot be
+  // produced. `is_archived` is matched with .neq the same way /api/clients
+  // does, so the two lists always agree about which clients exist.
+  const { data: clientRows } = await fetchAllRows<{ id: string; name: string }>(
+    (from, to) => admin
+      .from('clients')
+      .select('id, name')
+      .eq('org_id', mb.org_id)
+      .neq('is_archived', true)
+      .order('name', { ascending: true })
+      .order('id', { ascending: true })   // name is not unique
+      .range(from, to),
+  )
 
   // How many vendors sit under each client, for the selector's counts. Read
   // unfiltered so the numbers do not shift as the user switches between
@@ -199,7 +256,7 @@ export async function GET(req: NextRequest) {
       prev_period_end: previousPeriod(period.periodEnd).periodEnd,
       next_period_end: nextPeriod(period.periodEnd).periodEnd,
       // Is this the cycle a firm is currently collecting for?
-      is_current: period.periodEnd === currentPeriod(new Date().toISOString().slice(0, 10)).periodEnd,
+      is_current: period.periodEnd === currentPeriod(msmeToday()).periodEnd,
     },
     periods: periodsForFinancialYear(period.financialYear).map(p => ({
       period_end: p.periodEnd, label: p.label, short_label: p.shortLabel,

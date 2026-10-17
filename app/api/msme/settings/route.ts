@@ -40,15 +40,24 @@ export async function GET(req: NextRequest) {
   const ent  = resolvePackEntitlement(packRow?.config as any)
   const pack = { tier: ent.tier, vendor_limit: ent.vendorLimit, expires_at: ent.expiresAt, expired: ent.isExpired }
 
-  const [{ data: ccRow }, { data: contactRow }] = await Promise.all([
+  const [{ data: ccRow }, { data: contactRow }, { data: rateRow }] = await Promise.all([
     admin.from('org_feature_settings').select('config').eq('org_id', mb.org_id).eq('feature_key', 'msme_cc_email').maybeSingle(),
     admin.from('org_feature_settings').select('config').eq('org_id', mb.org_id).eq('feature_key', 'msme_contact_person').maybeSingle(),
+    admin.from('org_feature_settings').select('config').eq('org_id', mb.org_id).eq('feature_key', 'msme_bank_rate').maybeSingle(),
   ])
 
   const cc_email: string | null = (ccRow?.config as { email?: string } | null)?.email ?? null
   const contact_person = (contactRow?.config as { name?: string; email?: string; phone?: string } | null) ?? null
+  // RBI bank rate as a percent. Section 16 MSMED interest is three times this,
+  // and the rate changes, so a firm sets the one in force for the year it is
+  // computing. Null means "use the built-in default", which the exposure
+  // report states explicitly rather than hiding.
+  const bank_rate: number | null = (() => {
+    const r = Number((rateRow?.config as { rate?: number } | null)?.rate)
+    return Number.isFinite(r) && r > 0 ? r : null
+  })()
 
-  return NextResponse.json({ schedule, pack, cc_email, contact_person })
+  return NextResponse.json({ schedule, pack, cc_email, contact_person, bank_rate })
 }
 
 export async function PATCH(req: NextRequest) {
@@ -63,10 +72,11 @@ export async function PATCH(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { schedule, cc_email, contact_person } = body as {
+  const { schedule, cc_email, contact_person, bank_rate } = body as {
     schedule?: number[]
     cc_email?: string | null
     contact_person?: { name: string; email: string; phone?: string } | null
+    bank_rate?: number | null
   }
 
   const admin = createAdminClient()
@@ -116,6 +126,30 @@ export async function PATCH(req: NextRequest) {
       .from('org_feature_settings')
       .upsert(
         { org_id: mb.org_id, feature_key: 'msme_contact_person', is_enabled: true, config: contact_person ?? {} },
+        { onConflict: 'org_id,feature_key' }
+      )
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  if (bank_rate !== undefined) {
+    // Null clears it, falling back to the built-in default. A stored rate is
+    // bounded well inside anything the RBI has ever set: section 16 trebles
+    // it, so a fat-fingered 65 would treble into a 195% interest figure
+    // appearing in a tax computation.
+    if (bank_rate !== null) {
+      const r = Number(bank_rate)
+      if (!Number.isFinite(r) || r <= 0 || r > 25) {
+        return NextResponse.json(
+          { error: 'Bank rate must be a percentage between 0 and 25 (the RBI bank rate, not the trebled MSMED rate)' },
+          { status: 400 },
+        )
+      }
+    }
+    const { error } = await admin
+      .from('org_feature_settings')
+      .upsert(
+        { org_id: mb.org_id, feature_key: 'msme_bank_rate', is_enabled: true,
+          config: bank_rate === null ? {} : { rate: Number(bank_rate) } },
         { onConflict: 'org_id,feature_key' }
       )
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })

@@ -3,7 +3,9 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import MsmeWalkthrough from './MsmeWalkthrough'
 import MsmeTour        from './MsmeTour'
 import MsmePresumptionPack from './MsmePresumptionPack'
+import MsmeReports from './MsmeReports'
 import { buildPresumptionPack } from '@/lib/msme/presumption'
+import { msmeToday } from '@/lib/msme/today'
 import type { PresumptionPack } from '@/lib/msme/presumption'
 import * as XLSX from 'xlsx'
 import { MSME_PACKS } from '@/lib/msme/packs'
@@ -132,6 +134,17 @@ export function MsmeView({ userRole, orgName }: Props) {
   const [clientCounts,  setClientCounts]  = useState<Record<string, number>>({})
   const [presumption,   setPresumption]   = useState<PresumptionPack | null>(null)
   const [buildingPack,  setBuildingPack]  = useState(false)
+  const [showReports,   setShowReports]   = useState(false)
+  // Creditors-ledger import: bill-wise outstanding from the firm's own books,
+  // which is what makes the 43B(h) test exact rather than an estimate.
+  const [showLedger,    setShowLedger]    = useState(false)
+  const [ledgerBusy,    setLedgerBusy]    = useState(false)
+  const [ledgerResult,  setLedgerResult]  = useState<{
+    imported: number; matchedByGstin: number; matchedByName: number
+    skipped: Array<{ rowNo: number; partyName: string; reason_text: string; candidates?: string[] }>
+    partialFailures?: string[]
+  } | null>(null)
+  const [ledgerError,   setLedgerError]   = useState<string | null>(null)
   const toastRef = useRef(0)
 
   // Add vendor form
@@ -751,6 +764,80 @@ export function MsmeView({ userRole, orgName }: Props) {
     fetchVendors(true)
   }
 
+  // ── Creditors-ledger import ───────────────────────────────────────────────
+  //
+  // Bill-wise outstanding from the firm's own books. This is what turns the
+  // vendor's job from "find and state a figure" into "confirm a figure", and
+  // it is also what makes the section 43B(h) test exact: that test runs per
+  // invoice against its own date, so a closing balance cannot be assessed.
+  //
+  // The file is parsed here and matched on the server, which holds the vendor
+  // list. Dates are normalised to ISO before sending, because a spreadsheet
+  // may hand back a Date object, a serial number or a dd/mm/yyyy string.
+  function handleLedgerFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setLedgerError(null); setLedgerResult(null); setLedgerBusy(true)
+    const reader = new FileReader()
+    reader.onload = async ev => {
+      try {
+        const data  = new Uint8Array(ev.target!.result as ArrayBuffer)
+        // cellDates so a real date cell arrives as a Date rather than a serial.
+        const wb    = XLSX.read(data, { type: 'array', cellDates: true })
+        const sheet = wb.Sheets[wb.SheetNames[0]]
+        const raw   = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' })
+        if (raw.length === 0) { setLedgerError('No rows found in file'); setLedgerBusy(false); return }
+
+        const normalise = (k: string) => k.toLowerCase().replace(/[\s_.\-/]/g, '')
+        const rows = raw.map((row, i) => {
+          const entries = Object.entries(row)
+          const pick = (...targets: string[]) => {
+            for (const t of targets) {
+              const hit = entries.find(([k]) => normalise(k) === t)
+              if (hit && hit[1] !== '' && hit[1] != null) return hit[1]
+            }
+            return undefined
+          }
+          return {
+            rowNo:         i + 2,          // +2: header row, and 1-based
+            partyName:     String(pick('partyname', 'party', 'vendorname', 'name', 'supplier', 'suppliername', 'ledgername') ?? '').trim(),
+            gstin:         String(pick('gstin', 'gst', 'gstno', 'gstnumber') ?? '').trim() || null,
+            invoiceNo:     String(pick('invoiceno', 'invoice', 'billno', 'bill', 'voucherno', 'documentno') ?? '').trim() || null,
+            invoiceDate:   toIsoDate(pick('invoicedate', 'billdate', 'date', 'voucherdate')),
+            amount:        toNumber(pick('amount', 'invoiceamount', 'billamount', 'debit', 'closingbalance', 'balance')),
+            paidAmount:    toNumber(pick('paidamount', 'paid', 'credit', 'amountpaid')),
+            paymentDate:   toIsoDate(pick('paymentdate', 'paidon', 'settlementdate')),
+            agreementDays: toNumber(pick('agreementdays', 'creditdays', 'paymentterms', 'terms')),
+          }
+        }).filter(r => r.partyName || r.gstin)
+
+        if (rows.length === 0) {
+          setLedgerError('Could not find a party name or GSTIN column. Expected something like "Party Name" or "Supplier".')
+          setLedgerBusy(false); return
+        }
+
+        const res = await fetch('/api/msme/invoices', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          // Matched only against the selected client's vendors — see the route.
+          body: JSON.stringify({ rows, client_id: clientId }),
+        })
+        const d = await res.json()
+        if (!res.ok) { setLedgerError(d.error ?? 'Import failed'); setLedgerBusy(false); return }
+        setLedgerResult(d)
+        if (d.imported > 0) {
+          showToast(`${d.imported} invoice(s) imported`)
+          fetchVendors(true)
+        }
+      } catch {
+        setLedgerError('Could not read the file. Please check it is an Excel or CSV export.')
+      } finally {
+        setLedgerBusy(false)
+      }
+    }
+    reader.readAsArrayBuffer(file)
+  }
+
   // ── Excel/CSV import ───────────────────────────────────────────────────────
   function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -889,7 +976,11 @@ export function MsmeView({ userRole, orgName }: Props) {
           status:       v.status,
           emailBounced: !!v.email_bounced,
           emailDates,
-          today:        new Date().toISOString().slice(0, 10),
+          // IST, not the browser's UTC date. toISOString() is UTC, so between
+          // midnight and 05:30 IST it returns yesterday — and the 15-day
+          // non-response window would be computed a day short on a document
+          // the firm signs.
+          today:        msmeToday(),
         }
       }))
 
@@ -1096,6 +1187,16 @@ export function MsmeView({ userRole, orgName }: Props) {
             <button onClick={handlePresumptionPack} disabled={buildingPack}
               style={{ ...ghostBtn, opacity: buildingPack ? 0.6 : 1, cursor: buildingPack ? 'default' : 'pointer' }}>
               {buildingPack ? 'Preparing…' : '⚖ Non-response pack'}
+            </button>
+          )}
+          {canManage && (
+            <button onClick={() => { setShowLedger(true); setLedgerResult(null); setLedgerError(null) }} style={ghostBtn}>
+              ↑ Import ledger
+            </button>
+          )}
+          {vendors.length > 0 && period && (
+            <button onClick={() => setShowReports(true)} style={{ ...primaryBtn, background: '#0f172a' }}>
+              📑 Reports
             </button>
           )}
           {vendors.some(v => v.cert_url) && (
@@ -2044,6 +2145,134 @@ export function MsmeView({ userRole, orgName }: Props) {
 
       {/* ── Walkthrough + spotlight tour ── */}
       <MsmeWalkthrough onUpgrade={() => setShowUpgrade(true)} onStartTour={() => setShowTour(true)} />
+      {showReports && period && (
+        <MsmeReports
+          periodEnd={period.period_end}
+          clientId={clientId}
+          clientName={clientId !== 'all' && clientId !== 'none'
+            ? (clients.find(c => c.id === clientId)?.name ?? null)
+            : null}
+          firmName={orgName || 'Your firm'}
+          onClose={() => setShowReports(false)}
+        />
+      )}
+
+      {/* ── Creditors-ledger import ── */}
+      {showLedger && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(15,23,42,0.55)',
+          overflowY: 'auto', padding: '32px 16px',
+        }}>
+          <div style={{
+            maxWidth: 620, margin: '0 auto', background: '#fff', borderRadius: 12,
+            padding: '26px 28px',
+          }}>
+            <h2 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: '#0f172a' }}>
+              Import creditors ledger
+            </h2>
+            <p style={{ margin: '6px 0 0', fontSize: 12.5, color: '#475569', lineHeight: 1.7 }}>
+              Upload a bill-wise outstanding export from Tally, Busy or any spreadsheet.
+              Your own books then supply each balance, so the vendor only has to confirm it
+              — and section 43B(h) can be computed per invoice, which a closing balance
+              alone cannot support.
+            </p>
+            {clientId !== 'all' && clientId !== 'none' && (
+              <p style={{ margin: '8px 0 0', fontSize: 12, color: ACCENT, fontWeight: 600 }}>
+                Matching against {clients.find(c => c.id === clientId)?.name}&apos;s vendors only.
+              </p>
+            )}
+            {clientId === 'all' && clients.length > 0 && (
+              <p style={{ margin: '8px 0 0', fontSize: 12, color: '#b45309', lineHeight: 1.6 }}>
+                Select a client company first if this ledger belongs to one — matching across
+                all clients could attach a balance to the wrong company&apos;s filing.
+              </p>
+            )}
+
+            <div style={{
+              marginTop: 16, background: '#f8fafc', border: '1px solid #e2e8f0',
+              borderRadius: 8, padding: '12px 16px',
+            }}>
+              <p style={{ margin: 0, fontSize: 11.5, color: '#475569', lineHeight: 1.8 }}>
+                <strong>Columns it looks for</strong> (any order, names are matched loosely):<br/>
+                Party Name or Supplier · GSTIN · Invoice No · Invoice Date · Amount ·
+                Paid Amount · Payment Date · Credit Days<br/>
+                Dates are read day-first (dd/mm/yyyy). Only Party Name (or GSTIN),
+                Invoice Date and Amount are required.
+              </p>
+            </div>
+
+            {!ledgerResult && (
+              <label style={{
+                display: 'block', marginTop: 16, border: `2px dashed ${ACCENT}`,
+                borderRadius: 10, padding: '22px 16px', textAlign: 'center',
+                cursor: ledgerBusy ? 'default' : 'pointer', background: `${ACCENT}06`,
+              }}>
+                <input type="file" accept=".xlsx,.xls,.csv" disabled={ledgerBusy}
+                  onChange={handleLedgerFile} style={{ display: 'none' }} />
+                <span style={{ fontSize: 13, fontWeight: 700, color: ACCENT }}>
+                  {ledgerBusy ? 'Importing…' : 'Choose an Excel or CSV file'}
+                </span>
+              </label>
+            )}
+
+            {ledgerError && (
+              <p style={{ margin: '14px 0 0', fontSize: 12.5, color: '#dc2626', lineHeight: 1.6 }}>{ledgerError}</p>
+            )}
+
+            {ledgerResult && (
+              <div style={{ marginTop: 16 }}>
+                <p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#0f172a' }}>
+                  {ledgerResult.imported} invoice(s) imported
+                </p>
+                <p style={{ margin: '4px 0 0', fontSize: 12, color: '#475569' }}>
+                  Matched {ledgerResult.matchedByGstin} by GSTIN and {ledgerResult.matchedByName} by name.
+                </p>
+
+                {(ledgerResult.partialFailures ?? []).length > 0 && (
+                  <p style={{ margin: '10px 0 0', fontSize: 12, color: '#dc2626', lineHeight: 1.6 }}>
+                    Some rows failed to save: {ledgerResult.partialFailures!.join('; ')}
+                  </p>
+                )}
+
+                {/* Every unmatched row with its reason. A financial import that
+                    drops rows quietly is how a balance goes missing. */}
+                {ledgerResult.skipped.length > 0 && (
+                  <div style={{ marginTop: 14 }}>
+                    <p style={{ margin: 0, fontSize: 12.5, fontWeight: 700, color: '#92400e' }}>
+                      {ledgerResult.skipped.length} row(s) not imported
+                    </p>
+                    <div style={{ maxHeight: 220, overflowY: 'auto', marginTop: 6 }}>
+                      {ledgerResult.skipped.map(s => (
+                        <div key={s.rowNo} style={{
+                          borderBottom: '1px solid #f1f5f9', padding: '6px 0', fontSize: 11.5,
+                        }}>
+                          <strong style={{ color: '#0f172a' }}>Row {s.rowNo}</strong>
+                          {s.partyName && <span style={{ color: '#475569' }}> · {s.partyName}</span>}
+                          <br/>
+                          <span style={{ color: '#64748b' }}>{s.reason_text}</span>
+                          {s.candidates && (
+                            <span style={{ color: '#b45309' }}> — {s.candidates.join(' / ')}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 8, marginTop: 20, justifyContent: 'flex-end' }}>
+              {ledgerResult && (
+                <button onClick={() => { setLedgerResult(null); setLedgerError(null) }} style={ghostBtn}>
+                  Import another
+                </button>
+              )}
+              <button onClick={() => setShowLedger(false)} style={primaryBtn}>Done</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {presumption && period && (
         <MsmePresumptionPack
           pack={presumption}
@@ -2054,7 +2283,7 @@ export function MsmeView({ userRole, orgName }: Props) {
           periodLabel={period.label}
           periodAsOn={period.as_on}
           periodDue={period.due_date}
-          today={new Date().toISOString().slice(0, 10)}
+          today={msmeToday()}
           onClose={() => setPresumption(null)}
         />
       )}
@@ -2072,7 +2301,7 @@ export function MsmeView({ userRole, orgName }: Props) {
           }}
           /* Any open dialog hides the tour, so its backdrop can never sit on
              top of the form the current step is asking the user to fill in. */
-          paused={showAdd || showImport || showUpgrade || showSettings || showGstModal || showContactModal || showCerts || showBounced || !!presumption}
+          paused={showAdd || showImport || showUpgrade || showSettings || showGstModal || showContactModal || showCerts || showBounced || !!presumption || showReports || showLedger}
         />
       )}
 
@@ -2482,6 +2711,56 @@ const primaryBtn: React.CSSProperties = {
   background: ACCENT, color: '#fff', border: 'none', borderRadius: 8,
   padding: '9px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer',
 }
+/**
+ * A spreadsheet cell to an ISO date, or null.
+ *
+ * A date cell can arrive as a Date (with cellDates), an ISO string, or the
+ * dd/mm/yyyy that Indian accounting software writes. Ambiguous dd/mm vs mm/dd
+ * is resolved as DAY FIRST, which is correct for Tally, Busy and every other
+ * ledger this will see; a value whose first part exceeds 12 proves day-first
+ * anyway, and one that cannot be read at all returns null so the server
+ * reports the row rather than guessing.
+ */
+function toIsoDate(v: unknown): string | null {
+  if (v == null || v === '') return null
+  if (v instanceof Date && !Number.isNaN(v.getTime())) {
+    // Built from local parts: the Date came from a date-only cell, and using
+    // toISOString would shift it a day west of UTC.
+    const p = (n: number) => String(n).padStart(2, '0')
+    return `${v.getFullYear()}-${p(v.getMonth() + 1)}-${p(v.getDate())}`
+  }
+  const s = String(v).trim()
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
+  const m = /^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})$/.exec(s)
+  if (m) {
+    const day = Number(m[1]), month = Number(m[2])
+    let year  = Number(m[3])
+    if (year < 100) year += year < 70 ? 2000 : 1900
+    if (day < 1 || day > 31 || month < 1 || month > 12) return null
+    const p = (n: number) => String(n).padStart(2, '0')
+    return `${year}-${p(month)}-${p(day)}`
+  }
+  return null
+}
+
+/**
+ * A spreadsheet cell to a number, or null.
+ *
+ * Null for an empty cell, NEVER zero: Number('') and Number(null) are both 0,
+ * and a blank amount silently becoming a zero-rupee invoice — or a blank
+ * credit-days column becoming "due the same day" — is the kind of wrong that
+ * looks like data rather than a bug. Indian digit grouping ("1,50,000.00")
+ * and a trailing "Dr"/"Cr" are stripped.
+ */
+function toNumber(v: unknown): number | null {
+  if (v == null || v === '') return null
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null
+  const s = String(v).replace(/[,\s₹]/g, '').replace(/\b(dr|cr)\b/i, '').trim()
+  if (s === '') return null
+  const n = Number(s)
+  return Number.isFinite(n) ? n : null
+}
+
 const ghostBtn: React.CSSProperties = {
   background: 'transparent', color: '#64748b', border: '1px solid #e2e8f0',
   borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer',

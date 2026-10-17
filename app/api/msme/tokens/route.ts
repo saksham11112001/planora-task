@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient }         from '@/lib/supabase/admin'
 import { currentPeriod, isValidPeriodEnd } from '@/lib/msme/periods'
+import { msmeToday }            from '@/lib/msme/today'
 import { getDeclaration }            from '@/lib/msme/declarations'
 import crypto                        from 'crypto'
 
@@ -26,7 +27,7 @@ export async function POST(req: NextRequest) {
   // caller that does not falls back to the period currently being collected.
   const periodEnd = isValidPeriodEnd(rawPeriod)
     ? rawPeriod
-    : currentPeriod(new Date().toISOString().slice(0, 10)).periodEnd
+    : currentPeriod(msmeToday()).periodEnd
 
   const admin = createAdminClient()
   const { data: vendor } = await admin

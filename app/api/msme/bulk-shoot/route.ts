@@ -10,6 +10,7 @@ import { sendMsmeVendorEmail }      from '@/lib/email/send'
 import { DEFAULT_EMAIL_SCHEDULE }   from '@/lib/msme/emailSchedule'
 import { resolvePackEntitlement }   from '@/lib/msme/packs'
 import { currentPeriod, isValidPeriodEnd, describePeriod } from '@/lib/msme/periods'
+import { msmeToday }            from '@/lib/msme/today'
 import { ensureDeclarations, getPreviousDeclarations } from '@/lib/msme/declarations'
 import { planSends, sendSkipText }  from '@/lib/msme/sendEligibility'
 import crypto                       from 'crypto'
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
   // Which half-year this batch chases. The UI sends the selected period.
   const periodEnd = isValidPeriodEnd(rawPeriod)
     ? rawPeriod
-    : currentPeriod(new Date().toISOString().slice(0, 10)).periodEnd
+    : currentPeriod(msmeToday()).periodEnd
   const period = describePeriod(periodEnd)
 
   const admin   = createAdminClient()

@@ -7,6 +7,7 @@ import { sendMsmeVendorEmail }      from '@/lib/email/send'
 import { DEFAULT_EMAIL_SCHEDULE }   from '@/lib/msme/emailSchedule'
 import { resolvePackEntitlement }   from '@/lib/msme/packs'
 import { currentPeriod, isValidPeriodEnd, describePeriod } from '@/lib/msme/periods'
+import { msmeToday }            from '@/lib/msme/today'
 import { ensureDeclaration, getPreviousDeclaration, syncVendorMirror } from '@/lib/msme/declarations'
 import { decideSend, sendSkipText } from '@/lib/msme/sendEligibility'
 import crypto                       from 'crypto'
@@ -55,7 +56,7 @@ export async function POST(
   const bodyPeriod = await req.json().then(b => b?.period_end).catch(() => undefined)
   const periodEnd  = isValidPeriodEnd(bodyPeriod)
     ? bodyPeriod
-    : currentPeriod(new Date().toISOString().slice(0, 10)).periodEnd
+    : currentPeriod(msmeToday()).periodEnd
 
   const period = describePeriod(periodEnd)
 

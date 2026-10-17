@@ -1,8 +1,6 @@
 'use client'
 import { useEffect } from 'react'
-import {
-  PRESUMPTION_WINDOW_DAYS, PRESUMPTION_LABEL,
-} from '@/lib/msme/presumption'
+import { PRESUMPTION_WINDOW_DAYS } from '@/lib/msme/presumption'
 import type { PresumptionPack, PresumptionEntry } from '@/lib/msme/presumption'
 
 /**
@@ -307,4 +305,3 @@ function Td({ children, style }: { children: React.ReactNode; style?: React.CSSP
   return <td style={{ padding: '7px 8px', verticalAlign: 'top', ...style }}>{children}</td>
 }
 
-export { PRESUMPTION_LABEL }
