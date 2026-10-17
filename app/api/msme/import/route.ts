@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
-  const { rows }: { rows: ImportRow[] } = await req.json()
+  const { rows, client_id: rawClientId }: { rows: ImportRow[]; client_id?: string } = await req.json()
 
   if (!Array.isArray(rows) || rows.length === 0) {
     return NextResponse.json({ error: 'No rows provided' }, { status: 400 })
@@ -35,6 +35,20 @@ export async function POST(req: NextRequest) {
   }
 
   const admin = createAdminClient()
+
+  // Which client company these suppliers belong to; null means firm level.
+  const clientId: string | null =
+    typeof rawClientId === 'string' && rawClientId && rawClientId !== 'all' && rawClientId !== 'none'
+      ? rawClientId
+      : null
+
+  // Verified against this org before use — the id arrives in the request body.
+  if (clientId) {
+    const { data: client } = await admin
+      .from('clients').select('id')
+      .eq('id', clientId).eq('org_id', mb.org_id).maybeSingle()
+    if (!client) return NextResponse.json({ error: 'Client not found' }, { status: 400 })
+  }
 
   // Cap total vendor rows per org to 2000 (prevents runaway DB growth on free plans)
   const { count: totalVendors } = await admin
@@ -52,10 +66,20 @@ export async function POST(req: NextRequest) {
   // exists" meant a vendor who had ever been removed could never be brought
   // back by import — the row was skipped every time with a reason that read
   // like a duplicate. Manual add already reactivates those; import now matches.
-  const { data: existingVendors } = await admin
+  //
+  // Scoped to the same client as the import, matching the unique index. A
+  // supplier already on client A's list is NOT a duplicate when imported for
+  // client B — each company owes it a different amount and files its own
+  // return, so each needs its own row.
+  let existingQuery = admin
     .from('msme_vendors')
     .select('id, vendor_email, is_deleted')
     .eq('org_id', mb.org_id)
+  existingQuery = clientId
+    ? existingQuery.eq('client_id', clientId)
+    : existingQuery.is('client_id', null)
+
+  const { data: existingVendors } = await existingQuery
 
   const existingEmails = new Set(
     (existingVendors ?? []).filter(v => !v.is_deleted).map(v => v.vendor_email.toLowerCase()),
@@ -68,7 +92,7 @@ export async function POST(req: NextRequest) {
   }
 
   const skipped: Array<{ row: number; name: string; reason: string }> = []
-  const toInsert: Array<{ org_id: string; vendor_name: string; vendor_email: string; gstin: string | null; is_paid: boolean; payment_status: string; created_by: string }> = []
+  const toInsert: Array<{ org_id: string; client_id: string | null; vendor_name: string; vendor_email: string; gstin: string | null; is_paid: boolean; payment_status: string; created_by: string }> = []
   // Rows matching a previously removed vendor — reactivated rather than inserted.
   const toRevive: Array<{ id: string; name: string; gstin: string | null }> = []
 
@@ -80,7 +104,7 @@ export async function POST(req: NextRequest) {
 
     if (!name)                         { skipped.push({ row: i + 1, name: name ?? '(blank)', reason: 'Name is missing' }); continue }
     if (!email || !EMAIL_RE.test(email)) { skipped.push({ row: i + 1, name, reason: 'Invalid or missing email' }); continue }
-    if (existingEmails.has(email))     { skipped.push({ row: i + 1, name, reason: 'Email already exists' }); continue }
+    if (existingEmails.has(email))     { skipped.push({ row: i + 1, name, reason: clientId ? 'Already on this client\'s list' : 'Email already exists' }); continue }
 
     existingEmails.add(email) // prevent intra-batch duplicates
 
@@ -90,7 +114,7 @@ export async function POST(req: NextRequest) {
     const reviveId = revivable.get(email)
     if (reviveId) { toRevive.push({ id: reviveId, name, gstin }); continue }
 
-    toInsert.push({ org_id: mb.org_id, vendor_name: name, vendor_email: email, gstin, is_paid: true, payment_status: 'free', created_by: user.id })
+    toInsert.push({ org_id: mb.org_id, client_id: clientId, vendor_name: name, vendor_email: email, gstin, is_paid: true, payment_status: 'free', created_by: user.id })
   }
 
   // Reactivations run before the insert so a failure here cannot leave the

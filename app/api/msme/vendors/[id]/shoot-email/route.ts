@@ -6,6 +6,10 @@ import { getApiOrgMembership }      from '@/lib/supabase/apiActiveOrg'
 import { sendMsmeVendorEmail }      from '@/lib/email/send'
 import { DEFAULT_EMAIL_SCHEDULE }   from '@/lib/msme/emailSchedule'
 import { resolvePackEntitlement }   from '@/lib/msme/packs'
+import { currentPeriod, isValidPeriodEnd, describePeriod } from '@/lib/msme/periods'
+import { msmeToday }            from '@/lib/msme/today'
+import { ensureDeclaration, getPreviousDeclaration, syncVendorMirror } from '@/lib/msme/declarations'
+import { decideSend, sendSkipText } from '@/lib/msme/sendEligibility'
 import crypto                       from 'crypto'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://upfloat.co'
@@ -46,18 +50,42 @@ export async function POST(
     .maybeSingle()
 
   if (!vendor) return NextResponse.json({ error: 'Vendor not found' }, { status: 404 })
-  if (vendor.email_bounced) {
-    return NextResponse.json({ error: 'This vendor has unsubscribed or their email bounced — cannot send further emails.' }, { status: 422 })
-  }
 
-  // ── Lock check: enforce email-slot limit server-side ──────────────────────
-  // A slot is consumed when the first email is sent to a vendor (email_count 0→1).
-  // Slots are permanent even if the vendor is later deleted — this prevents gaming.
-  // If the vendor has already been emailed (email_count > 0), allow re-shoots regardless.
+  // Which half-year is being chased. The client may name one (the period
+  // selector in the UI); otherwise the period currently being collected.
+  const bodyPeriod = await req.json().then(b => b?.period_end).catch(() => undefined)
+  const periodEnd  = isValidPeriodEnd(bodyPeriod)
+    ? bodyPeriod
+    : currentPeriod(msmeToday()).periodEnd
+
+  const period = describePeriod(periodEnd)
+
+  // Open this period's declaration, pre-filled from the vendor's last one, so
+  // the vendor sees their existing details and need only restate the balance.
+  const declaration = await ensureDeclaration(admin, {
+    orgId: mb.org_id, vendorId: id, periodEnd,
+  })
+  // Did they declare in an earlier cycle? Drives the email's "we already have
+  // your details" framing.
+  const previous = declaration
+    ? await getPreviousDeclaration(admin, id, periodEnd)
+    : null
+
+  // ── Eligibility ───────────────────────────────────────────────────────────
+  // Every gate is scoped to THIS period except the slot ledger, which is
+  // lifetime. decideSend is shared with the bulk send and the reminder cron so
+  // all three cannot drift. See lib/msme/sendEligibility.ts.
+  //
+  // Slots are only looked up when one might actually be consumed — a vendor
+  // emailed in any previous cycle costs nothing to chase again.
+  let slotsRemaining = Number.POSITIVE_INFINITY
   if (vendor.email_count === 0) {
-    const [{ data: packRow }, { data: addonRow }] = await Promise.all([
+    const [{ data: packRow }, { data: addonRow }, { count: emailedEver }] = await Promise.all([
       admin.from('org_feature_settings').select('config').eq('org_id', mb.org_id).eq('feature_key', 'msme_pack').maybeSingle(),
       admin.from('org_feature_settings').select('config').eq('org_id', mb.org_id).eq('feature_key', 'msme_addon_slots').maybeSingle(),
+      // Vendors that have already consumed a slot (incl. soft-deleted ones).
+      admin.from('msme_vendors').select('id', { count: 'exact', head: true })
+        .eq('org_id', mb.org_id).gt('email_count', 0),
     ])
     // Annual term: an expired pack drops back to the free allowance, so the
     // slot gate has to ask the shared resolver rather than read the raw limit.
@@ -65,31 +93,32 @@ export async function POST(
       packRow?.config as any,
       (addonRow?.config as any)?.extra_slots ?? 0,
     ).vendorLimit
-
-    // Count vendors that have already consumed an email slot (incl. soft-deleted)
-    const { count: emailedEver } = await admin
-      .from('msme_vendors')
-      .select('id', { count: 'exact', head: true })
-      .eq('org_id', mb.org_id)
-      .gt('email_count', 0)
-
-    if ((emailedEver ?? 0) >= vendorLimit) {
-      return NextResponse.json(
-        { error: 'Email slot limit reached. Upgrade your pack to contact more vendors.' },
-        { status: 403 }
-      )
-    }
+    slotsRemaining = vendorLimit - (emailedEver ?? 0)
   }
 
   // x-copy-only: generate link without sending email (for "share via WhatsApp" use case)
   const copyOnly = req.headers.get('x-copy-only') === '1'
 
-  if (!copyOnly) {
-    if (vendor.status === 'submitted' || vendor.status === 'not_msme') {
-      return NextResponse.json({ error: 'Vendor has already submitted their details' }, { status: 422 })
-    }
-    if (vendor.email_count >= maxEmails) {
-      return NextResponse.json({ error: `Maximum ${maxEmails} emails already sent to this vendor` }, { status: 422 })
+  const decision = decideSend({
+    emailBounced:       !!vendor.email_bounced,
+    periodStatus:       declaration?.status ?? 'none',
+    periodEmailCount:   declaration?.email_count ?? 0,
+    lifetimeEmailCount: vendor.email_count,
+    maxEmails,
+    slotsRemaining,
+  })
+
+  // A bounce or an exhausted slot blocks even a copy-only link: the first is an
+  // opt-out, and the second is the paywall. The per-period checks are about
+  // SENDING, so copying a link for a vendor who already answered stays allowed
+  // — that is how a firm re-shares a receipt.
+  if (!decision.send) {
+    const hardBlock = decision.reason === 'bounced' || decision.reason === 'slot_limit'
+    if (!copyOnly || hardBlock) {
+      return NextResponse.json(
+        { error: sendSkipText(decision.reason, maxEmails) },
+        { status: decision.reason === 'slot_limit' ? 403 : 422 },
+      )
     }
   }
 
@@ -103,6 +132,10 @@ export async function POST(
     org_id: mb.org_id,
     token_hash: tokenHash,
     expires_at: expiresAt,
+    // Binds the link to one half-year. Without it, a vendor who kept the
+    // September email could reopen it in April and overwrite the September
+    // declaration with March figures.
+    period_end: periodEnd,
   })
 
   const formUrl        = `${APP_URL}/msme/form/${rawToken}`
@@ -110,11 +143,14 @@ export async function POST(
 
   if (copyOnly) {
     // Return link only — no email sent, no email_count increment
-    return NextResponse.json({ ok: true, formUrl })
+    return NextResponse.json({ ok: true, formUrl, period_end: periodEnd })
   }
 
   const orgName = (mb.organisations as any)?.name ?? 'Your business'
-  const attempt = Math.min(vendor.email_count + 1, 5) as 1 | 2 | 3 | 4 | 5
+  // "Reminder 2 of 5" counts within THIS half-year, not the vendor's lifetime.
+  // Using the lifetime count would label a returning vendor's first March
+  // email as their fourth.
+  const attempt = Math.min((declaration?.email_count ?? 0) + 1, 5) as 1 | 2 | 3 | 4 | 5
 
   // Fetch CC email + contact person setting
   let ownerEmail: string | undefined
@@ -158,6 +194,11 @@ export async function POST(
       contactName:    contactPerson?.name,
       contactEmail:   contactPerson?.email,
       contactPhone:   contactPerson?.phone,
+      // Name the half-year, and tell a returning vendor their details are
+      // already pre-filled so the second cycle is a confirmation, not a re-fill.
+      asOn:           period.asOn,
+      periodLabel:    period.rangeLabel,
+      isReturning:    !!previous?.submitted_at,
     }) ?? {}
     if (resendErr) sendError = typeof resendErr === 'string' ? resendErr : (resendErr as any)?.message ?? 'Email delivery failed'
   } catch (err) {
@@ -170,17 +211,35 @@ export async function POST(
     return NextResponse.json({ error: `Failed to send email: ${sendError}` }, { status: 502 })
   }
 
+  const sentAt = new Date().toISOString()
+
+  // The vendor row's email_count is the LIFETIME slot ledger: incremented,
+  // never set to a per-period value and never reset. Every slot gate counts
+  // rows where email_count > 0, so writing this period's count here would
+  // hand a consumed slot back the moment a new cycle began.
   await admin.from('msme_vendors').update({
-    status: 'emailed',
-    email_count: attempt,
-    last_emailed_at: new Date().toISOString(),
+    email_count:     vendor.email_count + 1,
+    last_emailed_at: sentAt,
+    // Normally the mirror sets status from the latest declaration; this keeps
+    // the row correct if the declarations table is not there yet.
+    ...(declaration ? {} : { status: 'emailed' }),
   }).eq('id', id)
+
+  if (declaration) {
+    await admin.from('msme_declarations').update({
+      status:          'emailed',
+      email_count:     attempt,
+      last_emailed_at: sentAt,
+    }).eq('id', declaration.id)
+    await syncVendorMirror(admin, id)
+  }
 
   await admin.from('msme_email_log').insert({
     vendor_id: id,
     org_id: mb.org_id,
     attempt_no: attempt,
+    period_end: periodEnd,
   })
 
-  return NextResponse.json({ ok: true, attempt, formUrl })
+  return NextResponse.json({ ok: true, attempt, formUrl, period_end: periodEnd })
 }

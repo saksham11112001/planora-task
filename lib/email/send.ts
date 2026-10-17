@@ -312,6 +312,9 @@ export async function sendMsmeVendorEmail(p: {
   formUrl: string; unsubscribeUrl?: string | null
   attemptNo: 1 | 2 | 3 | 4 | 5; totalEmails?: number; cc?: string
   contactName?: string; contactEmail?: string; contactPhone?: string
+  // Which half-year the request covers (Form MSME-1 is filed twice a year),
+  // and whether the vendor has declared before — see the template's Props.
+  asOn?: string; periodLabel?: string; isReturning?: boolean
 }) {
   const msmeDomain = (process.env.FROM_EMAIL ?? 'noreply@upfloat.co').replace(/.*<|>/g, '')
   // Display name = the requesting business (e.g. "SGNG & Associates"), so the

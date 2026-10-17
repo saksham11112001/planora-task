@@ -37,6 +37,13 @@ export async function DELETE(request: NextRequest) {
     await admin.from('tasks').delete().eq('org_id', orgId)
     await admin.from('time_logs').delete().eq('org_id', orgId)
     await admin.from('projects').delete().eq('org_id', orgId)
+    // MUST come before clients. msme_vendors.client_id is ON DELETE SET NULL,
+    // so deleting the clients first collapses every vendor row into the
+    // firm-level group — and two clients that shared a supplier then collide
+    // on the (org, client, email) unique index, which aborts the clients
+    // delete and leaves the account half-removed. Declarations, tokens and
+    // the email log cascade from msme_vendors, so this one delete is enough.
+    await admin.from('msme_vendors').delete().eq('org_id', orgId)
     await admin.from('clients').delete().eq('org_id', orgId)
     await admin.from('org_members').delete().eq('org_id', orgId)
     await admin.from('organisations').delete().eq('id', orgId)

@@ -9,6 +9,10 @@ import { getApiOrgMembership }      from '@/lib/supabase/apiActiveOrg'
 import { sendMsmeVendorEmail }      from '@/lib/email/send'
 import { DEFAULT_EMAIL_SCHEDULE }   from '@/lib/msme/emailSchedule'
 import { resolvePackEntitlement }   from '@/lib/msme/packs'
+import { currentPeriod, isValidPeriodEnd, describePeriod } from '@/lib/msme/periods'
+import { msmeToday }            from '@/lib/msme/today'
+import { ensureDeclarations, getPreviousDeclarations } from '@/lib/msme/declarations'
+import { planSends, sendSkipText }  from '@/lib/msme/sendEligibility'
 import crypto                       from 'crypto'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://upfloat.co'
@@ -25,13 +29,19 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { vendor_ids } = body as { vendor_ids?: string[] }
+  const { vendor_ids, period_end: rawPeriod } = body as { vendor_ids?: string[]; period_end?: string }
   if (!Array.isArray(vendor_ids) || vendor_ids.length === 0) {
     return NextResponse.json({ error: 'vendor_ids array required' }, { status: 400 })
   }
   if (vendor_ids.length > 500) {
     return NextResponse.json({ error: 'Maximum 500 vendors per bulk send' }, { status: 400 })
   }
+
+  // Which half-year this batch chases. The UI sends the selected period.
+  const periodEnd = isValidPeriodEnd(rawPeriod)
+    ? rawPeriod
+    : currentPeriod(msmeToday()).periodEnd
+  const period = describePeriod(periodEnd)
 
   const admin   = createAdminClient()
   const orgName = (mb.organisations as any)?.name ?? 'Your firm'
@@ -77,18 +87,47 @@ export async function POST(req: NextRequest) {
 
   if (!vendors?.length) return NextResponse.json({ sent: 0, failed: 0, errors: [] })
 
-  // Split into new (never emailed) vs re-shoots
-  const newVendors     = vendors.filter(v => v.email_count === 0)
-  const reshootVendors = vendors.filter(v => v.email_count > 0 && v.email_count < maxEmails && v.status !== 'submitted' && v.status !== 'not_msme')
+  // Open this period's declaration for each vendor, pre-filled from their
+  // previous one. Batched: per-vendor calls would be ~1500 round trips for a
+  // 500-vendor batch and would not finish inside the request.
+  const [declarations, previous] = await Promise.all([
+    ensureDeclarations(admin, { orgId: mb.org_id, vendorIds: vendors.map(v => v.id), periodEnd }),
+    getPreviousDeclarations(admin, vendors.map(v => v.id), periodEnd),
+  ])
 
-  // Only allow up to slotsRemaining new vendors
-  const eligibleNew    = newVendors.slice(0, slotsRemaining)
-  const skippedSlot    = newVendors.length - eligibleNew.length
-  const eligible       = [...eligibleNew, ...reshootVendors]
+  // One shared rule for eligibility, with the slot budget drawn down in order.
+  //
+  // This replaces slicing the never-emailed vendors by the budget and dropping
+  // the remainder: that counted returning vendors against a budget they do not
+  // consume, and the dropped ones vanished from the response with no reason
+  // attached. Now every vendor comes back with its own outcome.
+  const plan = planSends(vendors, v => ({
+    emailBounced:       !!v.email_bounced,
+    // 'none' would restart a cycle the vendor is already mid-way through, so a
+    // vendor whose declaration could not be opened is reported, not sent to.
+    periodStatus:       declarations.get(v.id)?.status ?? 'none',
+    periodEmailCount:   declarations.get(v.id)?.email_count ?? 0,
+    lifetimeEmailCount: v.email_count,
+    maxEmails,
+  }), slotsRemaining)
+
+  const eligible    = plan.filter(p => p.decision.send).map(p => p.vendor)
+  const skipped     = plan.filter(p => !p.decision.send)
+  const skippedSlot = skipped.filter(p => !p.decision.send && p.decision.reason === 'slot_limit').length
+
+  // Skipped vendors are reported with their reason rather than silently
+  // dropped, so a firm can see why 12 of 60 were not contacted.
+  const skippedErrors = skipped.map(p => ({
+    vendor_id:    p.vendor.id,
+    vendor_name:  p.vendor.vendor_name,
+    vendor_email: p.vendor.vendor_email,
+    reason:       p.decision.send ? '' : sendSkipText(p.decision.reason, maxEmails),
+  }))
 
   if (eligible.length === 0) {
     return NextResponse.json({
-      sent: 0, failed: 0, skipped_slot_limit: skippedSlot, errors: [],
+      sent: 0, failed: 0, skipped_slot_limit: skippedSlot,
+      skipped: skippedErrors, period_end: periodEnd, errors: [],
     })
   }
 
@@ -98,13 +137,19 @@ export async function POST(req: NextRequest) {
       const rawToken  = crypto.randomBytes(32).toString('hex')
       const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex')
       const expiresAt = new Date(Date.now() + 30 * 86400_000).toISOString()
-      const attempt   = Math.min(vendor.email_count + 1, 5) as 1 | 2 | 3 | 4 | 5
+      const declaration = declarations.get(vendor.id)
+      // "Reminder 2 of 5" counts within THIS half-year. The lifetime count
+      // would label a returning vendor's first March email as their fourth.
+      const attempt   = Math.min((declaration?.email_count ?? 0) + 1, 5) as 1 | 2 | 3 | 4 | 5
 
       await admin.from('msme_tokens').insert({
         vendor_id: vendor.id,
         org_id:    mb.org_id,
         token_hash: tokenHash,
         expires_at: expiresAt,
+        // Binds the link to one half-year, so an old email cannot be reopened
+        // to overwrite a later period's declaration.
+        period_end: periodEnd,
       })
 
       const formUrl        = `${APP_URL}/msme/form/${rawToken}`
@@ -122,6 +167,9 @@ export async function POST(req: NextRequest) {
         contactName:    contactPerson?.name,
         contactEmail:   contactPerson?.email,
         contactPhone:   contactPerson?.phone,
+        asOn:           period.asOn,
+        periodLabel:    period.rangeLabel,
+        isReturning:    !!previous.get(vendor.id)?.submitted_at,
       }) ?? {}
 
       if (sendErr) {
@@ -130,18 +178,42 @@ export async function POST(req: NextRequest) {
         throw new Error(typeof sendErr === 'string' ? sendErr : (sendErr as any)?.message ?? 'Email delivery failed')
       }
 
-      // Update vendor record
+      const sentAt = new Date().toISOString()
+
+      // All writes for this vendor issued together, and deliberately WITHOUT
+      // syncVendorMirror.
+      //
+      // This loop runs for up to 500 vendors concurrently. Recomputing the
+      // mirror would add a read and a write each — and over-fanning out
+      // against Supabase is what once saturated the API tier and took the
+      // site down (see lib/supabase/fetchAll.ts). The mirror is a derived
+      // cache: status is written directly below, and the next submission
+      // recomputes it exactly. The single-vendor send, which is not a fan-out,
+      // still syncs it properly.
       await Promise.all([
         admin.from('msme_vendors').update({
+          // The LIFETIME slot ledger: incremented, never set to a per-period
+          // value and never reset. Every slot gate counts rows where
+          // email_count > 0, so writing this period's count here would hand a
+          // consumed slot back each new cycle.
+          email_count:     vendor.email_count + 1,
+          last_emailed_at: sentAt,
           status:          'emailed',
-          email_count:     attempt,
-          last_emailed_at: new Date().toISOString(),
         }).eq('id', vendor.id),
         admin.from('msme_email_log').insert({
           vendor_id:  vendor.id,
           org_id:     mb.org_id,
           attempt_no: attempt,
+          period_end: periodEnd,
         }),
+        // This period's own chase counter — the one the reminder cron reads.
+        ...(declaration ? [
+          admin.from('msme_declarations').update({
+            status:          'emailed',
+            email_count:     attempt,
+            last_emailed_at: sentAt,
+          }).eq('id', declaration.id),
+        ] : []),
       ])
 
       return vendor.id
@@ -157,6 +229,10 @@ export async function POST(req: NextRequest) {
     sent,
     failed:            errors.length,
     skipped_slot_limit: skippedSlot,
+    // Every vendor that was not contacted, with the reason. Previously these
+    // were dropped from the response entirely.
+    skipped:           skippedErrors,
+    period_end:        periodEnd,
     errors,
   })
 }

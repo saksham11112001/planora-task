@@ -18,6 +18,38 @@ interface VendorInfo {
   is_not_msme?: boolean
   declarant_name?: string | null
   submitted_at?: string | null
+
+  // ── which half-year this form is asking about ──
+  // Form MSME-1 is filed twice a year: as on 31 March and as on 30 September.
+  // The vendor must know which date their balance should reflect.
+  period_end?: string
+  period_label?: string
+  period_due?: string
+
+  /**
+   * Details carried forward from this vendor's previous declaration.
+   *
+   * Registration details do not change between half-years, so a returning
+   * vendor confirms them instead of re-keying a form they already filled in.
+   * outstanding_amount is deliberately absent: carrying a six-month-old
+   * balance would let it be confirmed without ever being looked at.
+   */
+  prefill?: {
+    udyam_number?:        string | null
+    pan?:                 string | null
+    udyam_registered_on?: string | null
+    msme_category?:       string | null
+    nature_of_business?:  string | null
+    cert_url?:            string | null
+    is_not_msme?:         boolean
+  }
+  is_returning?: boolean
+  /** Last cycle's figures, shown as read-only context. */
+  previous?: {
+    period_label:       string
+    outstanding_amount: number | null
+    is_not_msme:        boolean
+  } | null
 }
 
 const CATEGORIES = [
@@ -64,6 +96,11 @@ export function MsmeVendorForm({ token }: { token: string }) {
   const [outstandingAmount, setOutstandingAmount] = useState('')
   const [certFile,          setCertFile]          = useState<File | null>(null)
   const [certUrl,           setCertUrl]           = useState<string | null>(null)
+  // True while certUrl is the certificate carried over from a previous
+  // half-year rather than one uploaded in this session. Without this the
+  // dropzone would claim "uploaded successfully" for a file the vendor has
+  // not touched, which reads as a bug the first time they see it.
+  const [certCarried,       setCertCarried]       = useState(false)
   const [proofFile,         setProofFile]         = useState<File | null>(null)
   const [proofUrl,          setProofUrl]          = useState<string | null>(null)
   const [uploading,         setUploading]         = useState(false)
@@ -90,10 +127,44 @@ export function MsmeVendorForm({ token }: { token: string }) {
         if (!r.ok || d.error) { setError(d.error ?? 'Failed to load the form.'); setLoading(false); return }
         setInfo(d)
         if (d.already_submitted) setSubmitted(true)
+
+        // Pre-fill what the vendor told us last half-year, so this cycle is a
+        // confirmation rather than a re-fill. The outstanding amount and its
+        // supporting document are NOT pre-filled — restating the balance is
+        // the entire point of the new return.
+        const pf = d.prefill
+        if (pf && !d.already_submitted) {
+          if (pf.udyam_number)       setUdyamNumber(pf.udyam_number)
+          if (pf.msme_category)      setMsmeCategory(pf.msme_category)
+          if (pf.nature_of_business) setNatureOfBusiness(pf.nature_of_business)
+          // The Udyam certificate is a registration document, not a
+          // period-specific one, so last cycle's upload still stands and the
+          // vendor is not asked for the same PDF twice.
+          if (pf.cert_url)         { setCertUrl(pf.cert_url); setCertCarried(true) }
+          // Only infer the MSME path for a vendor who actually declared
+          // before. is_not_msme defaults to false, and treating that default
+          // as an answer would silently pre-answer the first question.
+          //
+          // An explicit ?a= choice from the email's one-click buttons always
+          // wins: a vendor who just pressed "No — we're not an MSME" must not
+          // be flipped back by what they answered six months ago.
+          const clicked = new URLSearchParams(window.location.search).get('a')
+          if (!clicked && d.is_returning) {
+            if (pf.is_not_msme === true)  setIsMsme(false)
+            if (pf.is_not_msme === false) setIsMsme(true)
+          }
+        }
         setLoading(false)
       })
       .catch(() => { setError('Failed to load the form. Please try again or ask the sender to resend the link.'); setLoading(false) })
   }, [token])
+
+  // The date this form's figures must reflect, in words. Every "as on" in the
+  // form reads from here, so the September and March cycles can never show
+  // each other's date.
+  const asOnLabel = info?.period_end
+    ? new Date(`${info.period_end}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
+    : 'the reporting date'
 
   const udyamClean   = udyamNumber.trim().toUpperCase()
   const udyamValid   = UDYAM_REGEX.test(udyamClean)
@@ -110,11 +181,13 @@ export function MsmeVendorForm({ token }: { token: string }) {
     setFormError(null)
     const fd = new FormData()
     fd.append('file', file)
+    fd.append('kind', 'cert')
     const res  = await fetch(`/api/msme/upload/${token}`, { method: 'POST', body: fd })
     const data = await res.json()
     setUploading(false)
     if (!res.ok) { setFormError(data.error ?? 'Upload failed'); setCertFile(null); return }
-    setCertUrl(data.cert_url)
+    setCertUrl(data.url ?? data.cert_url)
+    setCertCarried(false)   // this one was uploaded here and now
   }
 
   async function handleProofFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -125,11 +198,14 @@ export function MsmeVendorForm({ token }: { token: string }) {
     setFormError(null)
     const fd = new FormData()
     fd.append('file', file)
+    // Says this is the payment proof, not the Udyam certificate. Without it
+    // the upload was pre-saved to cert_url and overwrote the certificate.
+    fd.append('kind', 'proof')
     const res  = await fetch(`/api/msme/upload/${token}`, { method: 'POST', body: fd })
     const data = await res.json()
     setUploadingProof(false)
     if (!res.ok) { setFormError(data.error ?? 'Upload failed'); setProofFile(null); return }
-    setProofUrl(data.cert_url)
+    setProofUrl(data.url ?? data.cert_url)
   }
 
   async function handleSubmit() {
@@ -230,7 +306,16 @@ export function MsmeVendorForm({ token }: { token: string }) {
         </div>
 
         <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: 18, marginBottom: 20 }}>
-          <p style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 700, color: '#0f172a' }}>What you submitted</p>
+          <p style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
+            What you submitted
+            {/* Names the half-year, so a vendor who files twice a year can tell
+                which receipt they are looking at. */}
+            {info.period_label && (
+              <span style={{ display: 'block', fontSize: 11, fontWeight: 500, color: '#64748b', marginTop: 2 }}>
+                {info.period_label}
+              </span>
+            )}
+          </p>
 
           {info.is_not_msme ? (
             <div>
@@ -244,7 +329,7 @@ export function MsmeVendorForm({ token }: { token: string }) {
               {info.msme_category     && <ReceiptRow label="Category"          value={CAT_LABEL[info.msme_category] ?? info.msme_category} />}
               {info.nature_of_business&& <ReceiptRow label="Nature"            value={NAT_LABEL[info.nature_of_business] ?? info.nature_of_business} />}
               {info.outstanding_amount !== null && info.outstanding_amount !== undefined && (
-                <ReceiptRow label="Outstanding (31 Mar)" value={`₹${Number(info.outstanding_amount).toLocaleString('en-IN')}`} />
+                <ReceiptRow label={`Outstanding (as on ${asOnLabel})`} value={`₹${Number(info.outstanding_amount).toLocaleString('en-IN')}`} />
               )}
               {info.submitted_at && <ReceiptRow label="Submitted on" value={new Date(info.submitted_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })} />}
               {info.cert_url && <ReceiptRow label="Certificate" value="Uploaded ✓" />}
@@ -273,10 +358,45 @@ export function MsmeVendorForm({ token }: { token: string }) {
           <span style={{ color: '#fff', fontSize: 15, fontWeight: 700 }}>MSME Compliance — {info?.org_name}</span>
         </div>
 
-        <h1 style={{ ...h1, marginBottom: 4 }}>Share Your MSME Details</h1>
-        <p style={{ ...sub, marginBottom: 20 }}>
-          Dear {info?.vendor_name} — {info?.org_name} is collecting MSME registration details from vendors for statutory compliance. This takes under 2 minutes.
+        <h1 style={{ ...h1, marginBottom: 4 }}>
+          {info?.is_returning ? 'Confirm Your MSME Details' : 'Share Your MSME Details'}
+        </h1>
+        <p style={{ ...sub, marginBottom: info?.period_label ? 14 : 20 }}>
+          {info?.is_returning
+            ? <>Dear {info?.vendor_name} — thank you for confirming earlier. {info?.org_name} files Form MSME-1 twice a year, so this is the next half-yearly confirmation.</>
+            : <>Dear {info?.vendor_name} — {info?.org_name} is collecting MSME registration details from vendors for statutory compliance. This takes under 2 minutes.</>}
         </p>
+
+        {/* Which half-year this form covers. Form MSME-1 is filed twice a
+            year, so without this a vendor cannot tell which date their
+            balance should reflect — or that this is not the same form again. */}
+        {info?.period_label && (
+          <div style={{
+            background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8,
+            padding: '10px 14px', marginBottom: info?.is_returning ? 12 : 20,
+          }}>
+            <p style={{ margin: 0, fontSize: 10, fontWeight: 700, color: '#94a3b8', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              Reporting period
+            </p>
+            <p style={{ margin: '2px 0 0', fontSize: 13, fontWeight: 700, color: '#0f172a', lineHeight: 1.5 }}>
+              {info.period_label}
+            </p>
+          </div>
+        )}
+
+        {/* The returning vendor's shortcut: most of the form is already
+            filled, and only the balance genuinely needs restating. */}
+        {info?.is_returning && !submitted && (
+          <div style={{
+            background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8,
+            padding: '12px 14px', marginBottom: 20,
+          }}>
+            <p style={{ margin: 0, fontSize: 12, color: '#1e40af', lineHeight: 1.65 }}>
+              ✓ <strong>Your details are already filled in</strong> from your last confirmation.
+              Please check they are still correct, then update your <strong>outstanding balance as on {asOnLabel}</strong>.
+            </p>
+          </div>
+        )}
 
         {/* Step indicator — only shown when user has chosen MSME status = Yes */}
         {isMsme === true && (
@@ -535,9 +655,16 @@ export function MsmeVendorForm({ token }: { token: string }) {
                   <>
                     <div style={{ fontSize: 24 }}>✅</div>
                     <span style={{ fontSize: 13, color: ACCENT, fontWeight: 700 }}>
-                      {certFile?.name ?? 'Certificate uploaded successfully'}
+                      {certFile?.name
+                        ?? (certCarried
+                          ? 'Certificate already on file from your last confirmation'
+                          : 'Certificate uploaded successfully')}
                     </span>
-                    <span style={{ fontSize: 11, color: '#475569' }}>{isMobile ? 'Tap' : 'Click'} to replace</span>
+                    <span style={{ fontSize: 11, color: '#475569' }}>
+                      {certCarried
+                        ? `${isMobile ? 'Tap' : 'Click'} to upload a newer certificate`
+                        : `${isMobile ? 'Tap' : 'Click'} to replace`}
+                    </span>
                   </>
                 ) : (
                   <>
@@ -554,23 +681,38 @@ export function MsmeVendorForm({ token }: { token: string }) {
               </p>
             </div>
 
-            {/* Outstanding amount */}
+            {/* Outstanding amount — the ONE field a returning vendor must
+                restate. Its label names the period's own as-on date; it used
+                to say "31st March" regardless, which was wrong for the
+                September cycle every single year. */}
             <div style={{ marginBottom: 20 }}>
               <label style={labelStyle}>
-                Last outstanding amount as on 31st March (₹)
+                Outstanding amount as on {asOnLabel} (₹)
                 <span style={{ marginLeft: 6, fontSize: 11, color: '#64748b', fontWeight: 400 }}>leave blank if nil</span>
               </label>
+              {/* Last cycle's figure, for reference only. Shown rather than
+                  pre-filled: a stale balance that can be confirmed without
+                  being looked at is worse than no balance at all. */}
+              {info?.previous && info.previous.outstanding_amount !== null && (
+                <p style={{
+                  margin: '0 0 6px', fontSize: 11, color: '#1e40af', background: '#eff6ff',
+                  border: '1px solid #bfdbfe', borderRadius: 6, padding: '6px 10px', lineHeight: 1.5,
+                }}>
+                  For reference, you declared <strong>₹{Number(info.previous.outstanding_amount).toLocaleString('en-IN')}</strong> for {info.previous.period_label}.
+                  Please enter the amount outstanding as on {asOnLabel}.
+                </p>
+              )}
               <input
                 style={inputStyle}
                 type="number"
                 min="0"
                 step="0.01"
-                placeholder="Enter amount owed to you as on 31 March — enter 0 if fully paid"
+                placeholder={`Enter amount owed to you as on ${asOnLabel} — enter 0 if fully paid`}
                 value={outstandingAmount}
                 onChange={e => setOutstandingAmount(e.target.value)}
               />
               <p style={{ margin: '4px 0 0', fontSize: 11, color: '#64748b', lineHeight: 1.5 }}>
-                The amount {info?.org_name} owes you that was unpaid as of 31st March of the last financial year.
+                The amount {info?.org_name} owes you that was unpaid as on {asOnLabel}.
               </p>
             </div>
 

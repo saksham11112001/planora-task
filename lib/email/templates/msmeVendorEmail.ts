@@ -8,6 +8,23 @@ interface Props {
   contactName?:    string
   contactEmail?:   string
   contactPhone?:   string
+  /**
+   * Which half-year this request covers. Form MSME-1 is filed twice a year, so
+   * the email has to name the date the figures are "as on" — this template used
+   * to hardcode 31st March, which was wrong for one of the two cycles every
+   * year, and made the two requests look like duplicates in a vendor's inbox.
+   *
+   * asOn:        '30 Sep 2026'
+   * periodLabel: 'Apr–Sep 2026'
+   *
+   * Both optional: when absent the as-on qualifier is simply left out, which is
+   * never wrong, rather than falling back to a date that might be.
+   */
+  asOn?:           string
+  periodLabel?:    string
+  /** The vendor declared in an earlier cycle, so their registration details
+   *  are already on file and only the balance needs restating. */
+  isReturning?:    boolean
 }
 
 const ACCENT = '#0d9488'
@@ -16,13 +33,17 @@ const ACCENT = '#0d9488'
 // (e.g. "Reminder 7 - MSME confirmations of Jones Lang ..."): first email has
 // no reminder prefix; follow-ups are numbered sequentially.
 export function msmeVendorEmailSubject(p: Props): string {
+  // The half-year is part of the subject so the two cycles do not arrive
+  // looking like the same email sent twice — a vendor who answered in October
+  // would otherwise reasonably ignore the April request as a duplicate.
+  const period = p.periodLabel ? ` (${p.periodLabel})` : ''
   if (p.attemptNo === 1)
-    return `MSME confirmations of ${p.orgName}`
+    return `MSME confirmations of ${p.orgName}${period}`
   const total = p.totalEmails ?? 5
   const n = p.attemptNo - 1   // attempt 2 = Reminder 1, etc.
   if (p.attemptNo === total)
-    return `Final Reminder ${n} - MSME confirmations of ${p.orgName}`
-  return `Reminder ${n} - MSME confirmations of ${p.orgName}`
+    return `Final Reminder ${n} - MSME confirmations of ${p.orgName}${period}`
+  return `Reminder ${n} - MSME confirmations of ${p.orgName}${period}`
 }
 
 // Plain-text alternative part. HTML-only email is a classic spam-filter
@@ -32,10 +53,15 @@ export function msmeVendorEmailText(p: Props): string {
   const isReminder = p.attemptNo > 1
   const isFinal    = p.attemptNo === total
 
+  const asOnPhrase = p.asOn ? ` as on ${p.asOn}` : ''
+
   const intro = isFinal
     ? `A quick final note — we've reached out a few times but haven't heard back yet.`
     : isReminder
     ? `Just a gentle follow-up on our earlier note.`
+    : p.isReturning
+    ? `Thank you for confirming your MSME status earlier. This is the next`
+      + ` half-yearly confirmation${p.periodLabel ? ` for ${p.periodLabel}` : ''}.`
     : `As a valued vendor of ${p.orgName}, we need a quick confirmation.`
 
   return [
@@ -44,6 +70,15 @@ export function msmeVendorEmailText(p: Props): string {
     ``,
     intro,
     ``,
+    ...(p.periodLabel ? [`This request covers the half-year ${p.periodLabel}.`, ``] : []),
+    // A returning vendor's details are pre-filled, so the ask is much smaller.
+    // Saying so is the difference between a 30-second confirmation and a form
+    // they put off because it looks like the one they already filled in.
+    ...(p.isReturning ? [
+      `Your Udyam details are already on file and pre-filled in the form —`,
+      `you only need to confirm them and update your outstanding balance${asOnPhrase}.`,
+      ``,
+    ] : []),
     `Is your business registered as an MSME (Udyam)? Please let us know:`,
     ``,
     `  YES — we're MSME registered:  ${p.formUrl}?a=msme`,
@@ -57,7 +92,7 @@ export function msmeVendorEmailText(p: Props): string {
     ``,
     `If you are MSME-registered, keep handy: your Udyam Registration Number`,
     `(UDYAM-XX-00-0000000), MSME category (Micro/Small/Medium), nature of`,
-    `business, outstanding receivable amount as on 31st March (if any), and`,
+    `business, outstanding receivable amount${asOnPhrase} (if any), and`,
     `your Udyam Registration Certificate (PDF or JPG).`,
     ``,
     `Note: if we do not receive any reply within 15 days, we shall presume your`,
@@ -86,6 +121,8 @@ export function msmeVendorEmailHtml(p: Props): string {
   const yesUrl = `${p.formUrl}?a=msme`
   const noUrl  = `${p.formUrl}?a=not_msme`
 
+  const asOnPhrase = p.asOn ? ` as on ${p.asOn}` : ''
+
   const attentionLine = isFinal
     ? `<p style="color:#b45309;font-size:13px;margin:0 0 18px;line-height:1.6">
         A quick final note — we've reached out a few times but haven't heard back yet. It only takes a moment to reply below.
@@ -94,6 +131,30 @@ export function msmeVendorEmailHtml(p: Props): string {
     ? `<p style="color:#64748b;font-size:13px;margin:0 0 18px;line-height:1.6">
         Just a gentle follow-up on our earlier note — a quick reply below is all we need.
        </p>`
+    : ''
+
+  // Which half-year this request covers. Form MSME-1 is half-yearly, so
+  // without this the April and October requests read as the same email twice.
+  const periodBanner = p.periodLabel
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;margin:0 0 20px">
+        <tr><td style="padding:12px 18px">
+          <p style="color:#475569;font-size:12px;margin:0;line-height:1.6;letter-spacing:0.02em;text-transform:uppercase">Reporting period</p>
+          <p style="color:#0f172a;font-size:14px;font-weight:700;margin:2px 0 0;line-height:1.5">${p.periodLabel}</p>
+        </td></tr>
+      </table>`
+    : ''
+
+  // A returning vendor is confirming, not filling in. Saying so up front is
+  // what stops the second cycle being ignored as a form already completed.
+  const returningNote = p.isReturning
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;margin:0 0 20px">
+        <tr><td style="padding:14px 18px">
+          <p style="color:#1e40af;font-size:13px;line-height:1.7;margin:0">
+            ✓ <strong>You've confirmed with us before.</strong> Your Udyam details are already pre-filled in the form —
+            you only need to check them and update your <strong>outstanding balance${asOnPhrase}</strong>.
+          </p>
+        </td></tr>
+      </table>`
     : ''
 
   const deadlineColour = isFinal ? '#dc2626' : '#b45309'
@@ -115,6 +176,10 @@ export function msmeVendorEmailHtml(p: Props): string {
       <p style="color:#334155;font-size:14px;margin:0 0 18px;line-height:1.7">Dear Sir/Madam,<br/><strong>${p.vendorName}</strong></p>
 
       ${attentionLine}
+
+      ${periodBanner}
+
+      ${returningNote}
 
       <p style="color:#334155;font-size:15px;margin:0 0 14px;line-height:1.7">
         As a valued vendor of <strong>${p.orgName}</strong>, we just need a quick confirmation:
@@ -160,7 +225,7 @@ export function msmeVendorEmailHtml(p: Props): string {
             <tr><td style="color:#374151;font-size:13px;line-height:1.9;vertical-align:top;padding-right:6px">•</td><td style="color:#374151;font-size:13px;line-height:1.9">Udyam Registration Number (format: UDYAM-XX-00-0000000)</td></tr>
             <tr><td style="color:#374151;font-size:13px;line-height:1.9;vertical-align:top;padding-right:6px">•</td><td style="color:#374151;font-size:13px;line-height:1.9">MSME Category — Micro, Small, or Medium</td></tr>
             <tr><td style="color:#374151;font-size:13px;line-height:1.9;vertical-align:top;padding-right:6px">•</td><td style="color:#374151;font-size:13px;line-height:1.9">Nature of Business — Manufacturer, Service Provider, or Trader</td></tr>
-            <tr><td style="color:#374151;font-size:13px;line-height:1.9;vertical-align:top;padding-right:6px">•</td><td style="color:#374151;font-size:13px;line-height:1.9">Outstanding receivable amount as on 31st March (if any)</td></tr>
+            <tr><td style="color:#374151;font-size:13px;line-height:1.9;vertical-align:top;padding-right:6px">•</td><td style="color:#374151;font-size:13px;line-height:1.9">Outstanding receivable amount${asOnPhrase} (if any)</td></tr>
             <tr><td style="color:#374151;font-size:13px;line-height:1.9;vertical-align:top;padding-right:6px">•</td><td style="color:#374151;font-size:13px;line-height:1.9">Udyam Registration Certificate (PDF or JPG)</td></tr>
           </table>
           <p style="color:#64748b;font-size:12px;line-height:1.6;margin:10px 0 0">

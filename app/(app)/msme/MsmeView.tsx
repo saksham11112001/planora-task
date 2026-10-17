@@ -2,6 +2,11 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import MsmeWalkthrough from './MsmeWalkthrough'
 import MsmeTour        from './MsmeTour'
+import MsmePresumptionPack from './MsmePresumptionPack'
+import MsmeReports from './MsmeReports'
+import { buildPresumptionPack } from '@/lib/msme/presumption'
+import { msmeToday } from '@/lib/msme/today'
+import type { PresumptionPack } from '@/lib/msme/presumption'
 import * as XLSX from 'xlsx'
 import { MSME_PACKS } from '@/lib/msme/packs'
 import { createClient } from '@/lib/supabase/client'
@@ -26,12 +31,45 @@ interface Vendor {
   declarant_name: string | null
   declared_at: string | null
   submitted_at: string | null
+  // Chases sent for the SELECTED half-year — what "3/5 sent" means on screen.
   email_count: number
   last_emailed_at: string | null
+  /**
+   * Lifetime emails ever sent to this vendor: the billing slot ledger, which
+   * never resets.
+   *
+   * Distinct from email_count because the two answer different questions.
+   * "Has this vendor consumed a slot?" is lifetime; "how many times have we
+   * chased them this cycle?" is per-period. Reading the per-period count as a
+   * slot would show a returning vendor as locked although they are paid for.
+   */
+  lifetime_email_count: number
+  declaration_id: string | null
+  period_end: string
+  /** The client company whose supplier this is; null = held at firm level. */
+  client_id: string | null
   is_paid: boolean
   created_at: string
   email_bounced: boolean
   bounce_reason: string | null
+}
+
+/** One MSME-1 reporting half-year, as the API describes it. */
+interface Period {
+  period_end:   string
+  label:        string
+  short_label:  string
+  as_on:        string
+  range_label:  string
+  due_date:     string
+  half:         'H1' | 'H2'
+  // Only present on the selected period. The half-year arithmetic lives
+  // server-side in lib/msme/periods.ts, so these are given rather than
+  // derived here — one calendar, one implementation.
+  financial_year?:  string
+  prev_period_end?: string
+  next_period_end?: string
+  is_current?:      boolean
 }
 
 const STATUS_LABEL: Record<Vendor['status'], string> = {
@@ -84,6 +122,29 @@ export function MsmeView({ userRole, orgName }: Props) {
   const [bulkProgress,  setBulkProgress]  = useState<{ sent: number; total: number } | null>(null)
   const [bulkErrors,    setBulkErrors]    = useState<Array<{ vendor_name: string; vendor_email: string; reason: string }> | null>(null)
   const [viewingCert,   setViewingCert]   = useState<string | null>(null)
+  // Which half-year is on screen. null until the first fetch tells us which
+  // period is current — asking the browser would use the viewer's clock.
+  const [periodEnd,     setPeriodEnd]     = useState<string | null>(null)
+  const [period,        setPeriod]        = useState<Period | null>(null)
+  const [periods,       setPeriods]       = useState<Period[]>([])
+  // Which client company's suppliers are on screen. 'all' keeps the page
+  // behaving exactly as it did before vendors could belong to a client.
+  const [clientId,      setClientId]      = useState<string>('all')
+  const [clients,       setClients]       = useState<Array<{ id: string; name: string }>>([])
+  const [clientCounts,  setClientCounts]  = useState<Record<string, number>>({})
+  const [presumption,   setPresumption]   = useState<PresumptionPack | null>(null)
+  const [buildingPack,  setBuildingPack]  = useState(false)
+  const [showReports,   setShowReports]   = useState(false)
+  // Creditors-ledger import: bill-wise outstanding from the firm's own books,
+  // which is what makes the 43B(h) test exact rather than an estimate.
+  const [showLedger,    setShowLedger]    = useState(false)
+  const [ledgerBusy,    setLedgerBusy]    = useState(false)
+  const [ledgerResult,  setLedgerResult]  = useState<{
+    imported: number; matchedByGstin: number; matchedByName: number
+    skipped: Array<{ rowNo: number; partyName: string; reason_text: string; candidates?: string[] }>
+    partialFailures?: string[]
+  } | null>(null)
+  const [ledgerError,   setLedgerError]   = useState<string | null>(null)
   const toastRef = useRef(0)
 
   // Add vendor form
@@ -112,9 +173,13 @@ export function MsmeView({ userRole, orgName }: Props) {
 
   // A vendor is "unlocked" if it has already been emailed (slot consumed) OR if there are
   // still free email slots available. Locking is based on email slots, not import order.
+  //
+  // Uses the LIFETIME count, not this period's: a vendor emailed in a previous
+  // half-year has their slot already paid for, and reading the per-period count
+  // here would re-lock every returning vendor at the start of each cycle.
   const unlockedIds = useMemo(() => {
     const canEmailMore = totalEver < vendorLimit
-    return new Set(vendors.filter(v => v.email_count > 0 || canEmailMore).map(v => v.id))
+    return new Set(vendors.filter(v => v.lifetime_email_count > 0 || canEmailMore).map(v => v.id))
   }, [vendors, vendorLimit, totalEver])
 
   // ── GST details modal (shown before MSME pack payment) ───────────────────
@@ -177,25 +242,64 @@ export function MsmeView({ userRole, orgName }: Props) {
     setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 4000)
   }
 
-  const fetchVendors = useCallback(async (silent = false) => {
+  const fetchVendors = useCallback(async (
+    silent = false, forPeriod?: string | null, forClient?: string,
+  ) => {
     if (!silent) setLoading(true)
     try {
-      const res  = await fetch('/api/msme/vendors')
+      // period_end is omitted on the first load so the SERVER picks the current
+      // period from its own clock. A browser in another timezone could
+      // otherwise land a day either side of a period boundary and open the
+      // wrong cycle.
+      const target = forPeriod !== undefined ? forPeriod : periodEnd
+      const client = forClient !== undefined ? forClient : clientId
+      const qs = new URLSearchParams()
+      if (target) qs.set('period_end', target)
+      if (client && client !== 'all') qs.set('client_id', client)
+      const res  = await fetch(`/api/msme/vendors${qs.toString() ? `?${qs}` : ''}`)
       const data = await res.json()
       if (res.ok) {
         setVendors(data.vendors ?? [])
         setTotal(data.total ?? 0)
         setTotalEver(data.totalEver ?? data.total ?? 0)
         if (data.vendorLimit) setVendorLimit(data.vendorLimit)
+        if (data.period)  { setPeriod(data.period); setPeriodEnd(data.period.period_end) }
+        if (data.periods) setPeriods(data.periods)
+        if (data.clients) setClients(data.clients)
+        if (data.vendorCountByClient) setClientCounts(data.vendorCountByClient)
       }
     } catch (e) {
       console.error('[MsmeView] fetchVendors failed', e)
     } finally {
       if (!silent) setLoading(false)
     }
-  }, [])
+  }, [periodEnd, clientId])
 
-  useEffect(() => { fetchVendors() }, [fetchVendors])
+  // Deliberately not keyed on fetchVendors: it changes identity whenever
+  // periodEnd does, which would re-fire this on every period switch and race
+  // with the switch's own fetch.
+  useEffect(() => { fetchVendors() }, [])   // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Switch cycles. Clears the selection and any checked rows: both are keyed
+  // to vendors as they stood in the period being left.
+  const switchPeriod = useCallback((next: string) => {
+    if (next === periodEnd) return
+    setPeriodEnd(next)
+    setSelectedId(null)
+    setCheckedIds(new Set())
+    fetchVendors(false, next)
+  }, [periodEnd, fetchVendors])
+
+  // Switch client company. Same reasoning as switchPeriod: the selection and
+  // any ticked rows belong to the list being left.
+  const switchClient = useCallback((next: string) => {
+    if (next === clientId) return
+    setClientId(next)
+    setSelectedId(null)
+    setCheckedIds(new Set())
+    setFilterStatus('all')
+    fetchVendors(false, undefined, next)
+  }, [clientId, fetchVendors])
 
   // If user returns to the page after payment (fallback), refresh pack settings
   useEffect(() => {
@@ -477,7 +581,9 @@ export function MsmeView({ userRole, orgName }: Props) {
     const res  = await fetch('/api/msme/vendors', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ vendor_name: vendorName, vendor_email: vendorEmail, gstin }),
+      // Lands under the client currently on screen. With 'all' or 'none'
+      // selected it is held at firm level and can be assigned later.
+      body: JSON.stringify({ vendor_name: vendorName, vendor_email: vendorEmail, gstin, client_id: clientId }),
     })
     const data = await res.json()
     setAdding(false)
@@ -493,7 +599,13 @@ export function MsmeView({ userRole, orgName }: Props) {
     setShootingId(vendorId)
     let res: Response, data: any
     try {
-      res  = await fetch(`/api/msme/vendors/${vendorId}/shoot-email`, { method: 'POST' })
+      res  = await fetch(`/api/msme/vendors/${vendorId}/shoot-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        // Chase the cycle the user is looking at, not whichever one the server
+        // would default to.
+        body: JSON.stringify({ period_end: periodEnd }),
+      })
       data = await res.json()
     } catch { setShootingId(null); showToast('Network error — please try again', 'error'); return }
     setShootingId(null)
@@ -512,10 +624,14 @@ export function MsmeView({ userRole, orgName }: Props) {
     const ids = Array.from(checkedIds).filter(id => unlockedIds.has(id))
     if (ids.length === 0) return
 
-    // Optimistic update: immediately mark eligible vendors as emailed in local state
+    // Optimistic update: immediately mark eligible vendors as emailed in local state.
+    // email_count here is THIS period's chase count, so a returning vendor whose
+    // cycle has not started yet is correctly shown as going from 0 to 1.
     setVendors(prev => prev.map(v =>
       ids.includes(v.id) && v.email_count === 0 && v.status !== 'submitted' && v.status !== 'not_msme'
-        ? { ...v, status: 'emailed' as const, email_count: 1 }
+        ? { ...v, status: 'emailed' as const, email_count: 1,
+            // The slot ledger only moves on a vendor's very first email ever.
+            lifetime_email_count: v.lifetime_email_count + 1 }
         : v
     ))
     setCheckedIds(new Set())
@@ -526,7 +642,7 @@ export function MsmeView({ userRole, orgName }: Props) {
       const res  = await fetch('/api/msme/bulk-shoot', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ vendor_ids: ids }),
+        body:    JSON.stringify({ vendor_ids: ids, period_end: periodEnd }),
       })
       const data = await res.json()
       setBulkShooting(false)
@@ -543,8 +659,14 @@ export function MsmeView({ userRole, orgName }: Props) {
       if (data.failed)             parts.push(`${data.failed} failed`)
       if (data.skipped_slot_limit) parts.push(`${data.skipped_slot_limit} skipped (slot limit)`)
 
-      if (data.errors?.length) {
-        setBulkErrors(data.errors.map((e: any) => ({
+      // Vendors the server declined to contact, each with its reason. These
+      // used to be dropped from the response, so a firm saw "40 sent" for a
+      // batch of 60 and had no way to find out about the other 20.
+      const notSent = (data.skipped ?? []).filter((s: any) => s.reason)
+      const failures = [...(data.errors ?? []), ...notSent]
+
+      if (failures.length) {
+        setBulkErrors(failures.map((e: any) => ({
           vendor_name:  e.vendor_name,
           vendor_email: e.vendor_email,
           reason:       parseSendError(e.reason),
@@ -611,7 +733,12 @@ export function MsmeView({ userRole, orgName }: Props) {
   // ── Copy link ──────────────────────────────────────────────────────────────
   async function handleCopyLink(vendorId: string) {
     setCopyingId(vendorId)
-    const res  = await fetch(`/api/msme/vendors/${vendorId}/shoot-email`, { method: 'POST', headers: { 'x-copy-only': '1' } })
+    const res  = await fetch(`/api/msme/vendors/${vendorId}/shoot-email`, {
+      method: 'POST',
+      headers: { 'x-copy-only': '1', 'Content-Type': 'application/json' },
+      // The shared link must point at the cycle on screen.
+      body: JSON.stringify({ period_end: periodEnd }),
+    })
     const data = await res.json()
     setCopyingId(null)
     if (!res.ok) { showToast(data.error ?? 'Could not generate link', 'error'); return }
@@ -635,6 +762,80 @@ export function MsmeView({ userRole, orgName }: Props) {
     setEditingEmail(null)
     showToast('Email updated')
     fetchVendors(true)
+  }
+
+  // ── Creditors-ledger import ───────────────────────────────────────────────
+  //
+  // Bill-wise outstanding from the firm's own books. This is what turns the
+  // vendor's job from "find and state a figure" into "confirm a figure", and
+  // it is also what makes the section 43B(h) test exact: that test runs per
+  // invoice against its own date, so a closing balance cannot be assessed.
+  //
+  // The file is parsed here and matched on the server, which holds the vendor
+  // list. Dates are normalised to ISO before sending, because a spreadsheet
+  // may hand back a Date object, a serial number or a dd/mm/yyyy string.
+  function handleLedgerFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setLedgerError(null); setLedgerResult(null); setLedgerBusy(true)
+    const reader = new FileReader()
+    reader.onload = async ev => {
+      try {
+        const data  = new Uint8Array(ev.target!.result as ArrayBuffer)
+        // cellDates so a real date cell arrives as a Date rather than a serial.
+        const wb    = XLSX.read(data, { type: 'array', cellDates: true })
+        const sheet = wb.Sheets[wb.SheetNames[0]]
+        const raw   = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' })
+        if (raw.length === 0) { setLedgerError('No rows found in file'); setLedgerBusy(false); return }
+
+        const normalise = (k: string) => k.toLowerCase().replace(/[\s_.\-/]/g, '')
+        const rows = raw.map((row, i) => {
+          const entries = Object.entries(row)
+          const pick = (...targets: string[]) => {
+            for (const t of targets) {
+              const hit = entries.find(([k]) => normalise(k) === t)
+              if (hit && hit[1] !== '' && hit[1] != null) return hit[1]
+            }
+            return undefined
+          }
+          return {
+            rowNo:         i + 2,          // +2: header row, and 1-based
+            partyName:     String(pick('partyname', 'party', 'vendorname', 'name', 'supplier', 'suppliername', 'ledgername') ?? '').trim(),
+            gstin:         String(pick('gstin', 'gst', 'gstno', 'gstnumber') ?? '').trim() || null,
+            invoiceNo:     String(pick('invoiceno', 'invoice', 'billno', 'bill', 'voucherno', 'documentno') ?? '').trim() || null,
+            invoiceDate:   toIsoDate(pick('invoicedate', 'billdate', 'date', 'voucherdate')),
+            amount:        toNumber(pick('amount', 'invoiceamount', 'billamount', 'debit', 'closingbalance', 'balance')),
+            paidAmount:    toNumber(pick('paidamount', 'paid', 'credit', 'amountpaid')),
+            paymentDate:   toIsoDate(pick('paymentdate', 'paidon', 'settlementdate')),
+            agreementDays: toNumber(pick('agreementdays', 'creditdays', 'paymentterms', 'terms')),
+          }
+        }).filter(r => r.partyName || r.gstin)
+
+        if (rows.length === 0) {
+          setLedgerError('Could not find a party name or GSTIN column. Expected something like "Party Name" or "Supplier".')
+          setLedgerBusy(false); return
+        }
+
+        const res = await fetch('/api/msme/invoices', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          // Matched only against the selected client's vendors — see the route.
+          body: JSON.stringify({ rows, client_id: clientId }),
+        })
+        const d = await res.json()
+        if (!res.ok) { setLedgerError(d.error ?? 'Import failed'); setLedgerBusy(false); return }
+        setLedgerResult(d)
+        if (d.imported > 0) {
+          showToast(`${d.imported} invoice(s) imported`)
+          fetchVendors(true)
+        }
+      } catch {
+        setLedgerError('Could not read the file. Please check it is an Excel or CSV export.')
+      } finally {
+        setLedgerBusy(false)
+      }
+    }
+    reader.readAsArrayBuffer(file)
   }
 
   // ── Excel/CSV import ───────────────────────────────────────────────────────
@@ -693,7 +894,9 @@ export function MsmeView({ userRole, orgName }: Props) {
       const res = await fetch('/api/msme/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rows: batch }),
+        // Imported under the client on screen, so a firm can load one client
+        // company's supplier list at a time.
+        body: JSON.stringify({ rows: batch, client_id: clientId }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -730,6 +933,66 @@ export function MsmeView({ userRole, orgName }: Props) {
   }
 
   // ── Export audit log: vendor data + email history merged ─────────────────
+  // ── Non-response presumption pack ─────────────────────────────────────────
+  async function handlePresumptionPack() {
+    if (buildingPack) return
+    setBuildingPack(true)
+    try {
+      // Send dates come from the email log, which records every individual
+      // send; the vendor row only keeps the latest.
+      let logs: Array<{ vendor_id: string; sent_at: string; period_end: string | null }> = []
+      try {
+        const res = await fetch('/api/msme/email-logs')
+        if (res.ok) {
+          const d = await res.json()
+          if (Array.isArray(d.logs)) logs = d.logs
+        }
+      } catch { /* falls back to the declaration's own last_emailed_at below */ }
+
+      const datesByVendor = new Map<string, string[]>()
+      for (const log of logs) {
+        // Only this period's sends. A log row written before half-yearly
+        // tracking has no period and is deliberately NOT assumed to belong
+        // here — guessing would put the wrong dates in a signed document.
+        if (log.period_end !== periodEnd) continue
+        const list = datesByVendor.get(log.vendor_id) ?? []
+        list.push(log.sent_at)
+        datesByVendor.set(log.vendor_id, list)
+      }
+
+      const pack = buildPresumptionPack(vendors.map(v => {
+        let emailDates = datesByVendor.get(v.id) ?? []
+        // No log row for this period, but the declaration says we emailed:
+        // fall back to its own last_emailed_at, which is period-scoped and so
+        // authoritative. It names the LAST send rather than the first, which
+        // starts the 15-day clock later and can only make the vendor harder to
+        // presume about — the safe direction to err in.
+        if (emailDates.length === 0 && v.email_count > 0 && v.last_emailed_at) {
+          emailDates = [v.last_emailed_at]
+        }
+        return {
+          vendorName:   v.vendor_name,
+          vendorEmail:  v.vendor_email,
+          status:       v.status,
+          emailBounced: !!v.email_bounced,
+          emailDates,
+          // IST, not the browser's UTC date. toISOString() is UTC, so between
+          // midnight and 05:30 IST it returns yesterday — and the 15-day
+          // non-response window would be computed a day short on a document
+          // the firm signs.
+          today:        msmeToday(),
+        }
+      }))
+
+      setPresumption(pack)
+      if (pack.presumed.length === 0) {
+        showToast('No vendor meets the 15-day non-response conditions yet — the pack shows why.', 'info')
+      }
+    } finally {
+      setBuildingPack(false)
+    }
+  }
+
   async function handleExport() {
     if (exporting) return
     setExporting(true)
@@ -751,30 +1014,51 @@ export function MsmeView({ userRole, orgName }: Props) {
         logsByVendor.get(log.vendor_id)!.push(log)
       }
 
-      // Single merged sheet: one row per vendor, emails collapsed into single cells
+      // Single merged sheet: one row per vendor, emails collapsed into single cells.
+      //
+      // The vendor rows are scoped to the SELECTED half-year while the email
+      // log spans every period, so both columns say which they are. Labelling
+      // them the same way would make a lifetime email count look like it
+      // belonged to this period's status.
+      // A "Filing For" column only when the export spans more than one client
+      // — MSME-1 is filed per company, so a single-client export has one
+      // answer and repeating it down every row is noise.
+      const showClientCol = clientId === 'all' && clients.length > 0
+
       const header = [
-        'Vendor Name', 'Vendor Email', 'GSTIN', 'Current Status',
-        'Udyam Number', 'Category', 'Nature of Business', 'Outstanding Amount (₹)',
-        'Emails Sent', 'Email Dates (all)',
+        'Vendor Name', 'Vendor Email', 'GSTIN',
+        ...(showClientCol ? ['Filing For'] : []),
+        'Current Status',
+        'Udyam Number', 'Category', 'Nature of Business',
+        period ? `Outstanding as on ${period.as_on} (₹)` : 'Outstanding Amount (₹)',
+        'Emails Sent (this period)', 'Email Dates (all periods)',
         'Submitted On', 'Declaration By', 'Date Added',
       ]
+      const clientName = (id: string | null) =>
+        id ? (clients.find(c => c.id === id)?.name ?? '—') : 'Not assigned'
 
       const mergedRows: (string | number)[][] = []
       for (const v of vendors) {
-        const vendorLogs = (logsByVendor.get(v.id) ?? []).sort((a, b) => a.attempt_no - b.attempt_no)
+        // Chronological, not by attempt number: attempt numbers restart each
+        // half-year, so sorting by them interleaves the two cycles' sends.
+        const vendorLogs = (logsByVendor.get(v.id) ?? [])
+          .slice()
+          .sort((a, b) => a.sent_at.localeCompare(b.sent_at))
         const status = v.is_not_msme ? 'Non-MSME Declaration' : STATUS_LABEL[v.status].replace(' ✓', '')
 
-        const emailsSent   = vendorLogs.length
         const emailDates   = vendorLogs.length
           ? vendorLogs.map(l => new Date(l.sent_at).toLocaleDateString('en-IN')).join(' | ')
           : '—'
 
         mergedRows.push([
-          v.vendor_name, v.vendor_email, v.gstin ?? '', status,
+          v.vendor_name, v.vendor_email, v.gstin ?? '',
+          ...(showClientCol ? [clientName(v.client_id)] : []),
+          status,
           v.udyam_number ?? '', v.msme_category ? CAT_LABEL[v.msme_category] : '',
           v.nature_of_business ? NAT_LABEL[v.nature_of_business] : '',
           v.outstanding_amount !== null && v.outstanding_amount !== undefined ? v.outstanding_amount : '',
-          emailsSent || '—',
+          // This period's chase count, matching the status beside it.
+          v.email_count || '—',
           emailDates,
           v.submitted_at ? new Date(v.submitted_at).toLocaleDateString('en-IN') : '',
           v.declarant_name ?? '',
@@ -782,13 +1066,27 @@ export function MsmeView({ userRole, orgName }: Props) {
         ])
       }
 
-      const ws = XLSX.utils.aoa_to_sheet([header, ...mergedRows])
+      // A title row naming the half-year. An MSME-1 audit file without it
+      // cannot be told apart from the other cycle's export six months later.
+      const scopeLine = clientId === 'all' ? 'All clients'
+        : clientId === 'none'              ? 'Vendors not assigned to a client'
+        : clientName(clientId)
+      const titleRows: (string | number)[][] = period
+        ? [
+            [`MSME Form 1 — ${period.label}`],
+            [`Filing for: ${scopeLine}`],
+            [`Filing due ${period.due_date} · exported ${new Date().toLocaleDateString('en-IN')}`],
+            [],
+          ]
+        : []
+
+      const ws = XLSX.utils.aoa_to_sheet([...titleRows, header, ...mergedRows])
       ws['!cols'] = header.map(() => ({ wch: 22 }))
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, 'MSME Audit Log')
 
-      XLSX.writeFile(wb, `msme-audit-log-${new Date().toISOString().slice(0,10)}.xlsx`)
-      showToast(`Exported audit log — ${vendors.length} vendors, ${logs.length} email records`)
+      XLSX.writeFile(wb, `msme-audit-log-${period?.period_end ?? new Date().toISOString().slice(0,10)}.xlsx`)
+      showToast(`Exported audit log — ${vendors.length} vendors${period ? ` for ${period.range_label}` : ''}`)
     } finally {
       setExporting(false)
     }
@@ -881,6 +1179,26 @@ export function MsmeView({ userRole, orgName }: Props) {
           {vendors.length > 0 && (
             <button onClick={handleExport} disabled={exporting} style={{ ...ghostBtn, opacity: exporting ? 0.6 : 1, cursor: exporting ? 'default' : 'pointer' }}>{exporting ? 'Exporting…' : '↓ Export Audit Log'}</button>
           )}
+          {/* The audit defence for every vendor who never replied: the dates
+              they were asked, and the declaration that silence was taken as
+              "not registered". Shown once anyone has actually been emailed —
+              before that there is nothing to evidence. */}
+          {vendors.some(v => v.email_count > 0) && (
+            <button onClick={handlePresumptionPack} disabled={buildingPack}
+              style={{ ...ghostBtn, opacity: buildingPack ? 0.6 : 1, cursor: buildingPack ? 'default' : 'pointer' }}>
+              {buildingPack ? 'Preparing…' : '⚖ Non-response pack'}
+            </button>
+          )}
+          {canManage && (
+            <button onClick={() => { setShowLedger(true); setLedgerResult(null); setLedgerError(null) }} style={ghostBtn}>
+              ↑ Import ledger
+            </button>
+          )}
+          {vendors.length > 0 && period && (
+            <button onClick={() => setShowReports(true)} style={{ ...primaryBtn, background: '#0f172a' }}>
+              📑 Reports
+            </button>
+          )}
           {vendors.some(v => v.cert_url) && (
             <button onClick={() => setShowCerts(true)} style={ghostBtn}>📄 Certificates ({vendors.filter(v => v.cert_url).length})</button>
           )}
@@ -889,6 +1207,102 @@ export function MsmeView({ userRole, orgName }: Props) {
           )}
         </div>
       </div>
+
+      {/* ── Reporting period selector ──
+          Form MSME-1 is filed twice a year — as on 31 March (due 30 April) and
+          as on 30 September (due 31 October). Each vendor therefore has a
+          separate status, outstanding balance and chase count per half-year,
+          and the whole list below is scoped to whichever is selected here. */}
+      {period && (
+        <div style={{
+          background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 12,
+          padding: '12px 16px', marginBottom: 20, display: 'flex', alignItems: 'center',
+          justifyContent: 'space-between', flexWrap: 'wrap', gap: 12,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              Reporting period
+            </span>
+
+            {/* Both cycles of the selected financial year, earliest first. */}
+            <div style={{ display: 'flex', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 9, padding: 2, gap: 2 }}>
+              {periods.map(p => {
+                const active = p.period_end === periodEnd
+                return (
+                  <button key={p.period_end} onClick={() => switchPeriod(p.period_end)}
+                    title={p.label}
+                    style={{
+                      border: 'none', borderRadius: 7, padding: '6px 12px', cursor: 'pointer',
+                      fontSize: 12, fontWeight: 700, transition: 'background 0.15s, color 0.15s',
+                      background: active ? '#ffffff' : 'transparent',
+                      color:      active ? ACCENT : '#64748b',
+                      boxShadow:  active ? '0 1px 3px rgba(15,23,42,0.10)' : 'none',
+                    }}>
+                    {p.range_label}
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Step a full half-year either way — crosses into the adjacent
+                financial year, which the two buttons above cannot reach. */}
+            <div style={{ display: 'flex', gap: 4 }}>
+              <button onClick={() => period.prev_period_end && switchPeriod(period.prev_period_end)}
+                disabled={!period.prev_period_end} title="Previous half-year"
+                style={{ ...ghostBtn, padding: '5px 9px', fontSize: 12 }}>‹</button>
+              <button onClick={() => period.next_period_end && switchPeriod(period.next_period_end)}
+                disabled={!period.next_period_end} title="Next half-year"
+                style={{ ...ghostBtn, padding: '5px 9px', fontSize: 12 }}>›</button>
+            </div>
+
+            {period.financial_year && (
+              <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>FY {period.financial_year}</span>
+            )}
+            {period.is_current && (
+              <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 20, background: `${ACCENT}15`, color: ACCENT, border: `1px solid ${ACCENT}30` }}>
+                CURRENT
+              </span>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+            {/* Whose suppliers these are. MSME-1 is filed BY a company about
+                its own suppliers, so a firm acting for several companies works
+                one at a time. Hidden when the firm has no clients set up, so
+                nothing changes for a company using this for itself. */}
+            {clients.length > 0 && (
+              <div>
+                <label htmlFor="msme-client" style={{ display: 'block', fontSize: 10, fontWeight: 700, color: '#94a3b8', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 3 }}>
+                  Filing for
+                </label>
+                <select id="msme-client" value={clientId} onChange={e => switchClient(e.target.value)}
+                  style={{
+                    border: '1px solid #e2e8f0', borderRadius: 8, padding: '6px 10px',
+                    fontSize: 12, fontWeight: 600, color: '#0f172a', background: '#fff',
+                    cursor: 'pointer', maxWidth: 230,
+                  }}>
+                  <option value="all">All clients ({Object.values(clientCounts).reduce((a, b) => a + b, 0)})</option>
+                  {clients.map(c => (
+                    <option key={c.id} value={c.id}>{c.name} ({clientCounts[c.id] ?? 0})</option>
+                  ))}
+                  {(clientCounts.none ?? 0) > 0 && (
+                    <option value="none">Not assigned to a client ({clientCounts.none})</option>
+                  )}
+                </select>
+              </div>
+            )}
+
+            <div style={{ textAlign: 'right' }}>
+              <p style={{ margin: 0, fontSize: 12, color: '#475569', fontWeight: 600 }}>
+                Balances as on <strong style={{ color: '#0f172a' }}>{period.as_on}</strong>
+              </p>
+              <p style={{ margin: '2px 0 0', fontSize: 11, color: '#64748b' }}>
+                MSME-1 due {new Date(`${period.due_date}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Getting started banner (shown when no vendors yet) ── */}
       {!loading && totalEver === 0 && (
@@ -1299,7 +1713,10 @@ export function MsmeView({ userRole, orgName }: Props) {
                 ) : (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
                     <span style={{ fontSize: 13, color: '#0f172a', wordBreak: 'break-all' }}>{selected.vendor_email}</span>
-                    {selected.email_count === 0 && canManage && (
+                    {/* Lifetime, not this period: once an email has EVER gone
+                        to this address it is part of the audit trail and the
+                        slot ledger, so it stays fixed in later cycles too. */}
+                    {selected.lifetime_email_count === 0 && canManage && (
                       <button onClick={() => { setEditingEmail(selected.id); setEditEmailVal(selected.vendor_email) }}
                         style={{ background: 'none', border: 'none', color: ACCENT, cursor: 'pointer', fontSize: 11, flexShrink: 0 }}>✎</button>
                     )}
@@ -1307,6 +1724,15 @@ export function MsmeView({ userRole, orgName }: Props) {
                 )}
               </div>
 
+              {/* Whose supplier this is — needed most in the "All clients"
+                  view, where the list alone does not say. */}
+              {clients.length > 0 && (
+                <DetailRow label="Filing for" value={
+                  selected.client_id
+                    ? (clients.find(c => c.id === selected.client_id)?.name ?? '—')
+                    : 'Not assigned to a client'
+                } />
+              )}
               {selected.gstin && <DetailRow label="GSTIN" value={selected.gstin} />}
               {selected.pan   && <DetailRow label="PAN"   value={selected.pan} />}
 
@@ -1719,6 +2145,149 @@ export function MsmeView({ userRole, orgName }: Props) {
 
       {/* ── Walkthrough + spotlight tour ── */}
       <MsmeWalkthrough onUpgrade={() => setShowUpgrade(true)} onStartTour={() => setShowTour(true)} />
+      {showReports && period && (
+        <MsmeReports
+          periodEnd={period.period_end}
+          clientId={clientId}
+          clientName={clientId !== 'all' && clientId !== 'none'
+            ? (clients.find(c => c.id === clientId)?.name ?? null)
+            : null}
+          firmName={orgName || 'Your firm'}
+          onClose={() => setShowReports(false)}
+        />
+      )}
+
+      {/* ── Creditors-ledger import ── */}
+      {showLedger && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(15,23,42,0.55)',
+          overflowY: 'auto', padding: '32px 16px',
+        }}>
+          <div style={{
+            maxWidth: 620, margin: '0 auto', background: '#fff', borderRadius: 12,
+            padding: '26px 28px',
+          }}>
+            <h2 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: '#0f172a' }}>
+              Import creditors ledger
+            </h2>
+            <p style={{ margin: '6px 0 0', fontSize: 12.5, color: '#475569', lineHeight: 1.7 }}>
+              Upload a bill-wise outstanding export from Tally, Busy or any spreadsheet.
+              Your own books then supply each balance, so the vendor only has to confirm it
+              — and section 43B(h) can be computed per invoice, which a closing balance
+              alone cannot support.
+            </p>
+            {clientId !== 'all' && clientId !== 'none' && (
+              <p style={{ margin: '8px 0 0', fontSize: 12, color: ACCENT, fontWeight: 600 }}>
+                Matching against {clients.find(c => c.id === clientId)?.name}&apos;s vendors only.
+              </p>
+            )}
+            {clientId === 'all' && clients.length > 0 && (
+              <p style={{ margin: '8px 0 0', fontSize: 12, color: '#b45309', lineHeight: 1.6 }}>
+                Select a client company first if this ledger belongs to one — matching across
+                all clients could attach a balance to the wrong company&apos;s filing.
+              </p>
+            )}
+
+            <div style={{
+              marginTop: 16, background: '#f8fafc', border: '1px solid #e2e8f0',
+              borderRadius: 8, padding: '12px 16px',
+            }}>
+              <p style={{ margin: 0, fontSize: 11.5, color: '#475569', lineHeight: 1.8 }}>
+                <strong>Columns it looks for</strong> (any order, names are matched loosely):<br/>
+                Party Name or Supplier · GSTIN · Invoice No · Invoice Date · Amount ·
+                Paid Amount · Payment Date · Credit Days<br/>
+                Dates are read day-first (dd/mm/yyyy). Only Party Name (or GSTIN),
+                Invoice Date and Amount are required.
+              </p>
+            </div>
+
+            {!ledgerResult && (
+              <label style={{
+                display: 'block', marginTop: 16, border: `2px dashed ${ACCENT}`,
+                borderRadius: 10, padding: '22px 16px', textAlign: 'center',
+                cursor: ledgerBusy ? 'default' : 'pointer', background: `${ACCENT}06`,
+              }}>
+                <input type="file" accept=".xlsx,.xls,.csv" disabled={ledgerBusy}
+                  onChange={handleLedgerFile} style={{ display: 'none' }} />
+                <span style={{ fontSize: 13, fontWeight: 700, color: ACCENT }}>
+                  {ledgerBusy ? 'Importing…' : 'Choose an Excel or CSV file'}
+                </span>
+              </label>
+            )}
+
+            {ledgerError && (
+              <p style={{ margin: '14px 0 0', fontSize: 12.5, color: '#dc2626', lineHeight: 1.6 }}>{ledgerError}</p>
+            )}
+
+            {ledgerResult && (
+              <div style={{ marginTop: 16 }}>
+                <p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#0f172a' }}>
+                  {ledgerResult.imported} invoice(s) imported
+                </p>
+                <p style={{ margin: '4px 0 0', fontSize: 12, color: '#475569' }}>
+                  Matched {ledgerResult.matchedByGstin} by GSTIN and {ledgerResult.matchedByName} by name.
+                </p>
+
+                {(ledgerResult.partialFailures ?? []).length > 0 && (
+                  <p style={{ margin: '10px 0 0', fontSize: 12, color: '#dc2626', lineHeight: 1.6 }}>
+                    Some rows failed to save: {ledgerResult.partialFailures!.join('; ')}
+                  </p>
+                )}
+
+                {/* Every unmatched row with its reason. A financial import that
+                    drops rows quietly is how a balance goes missing. */}
+                {ledgerResult.skipped.length > 0 && (
+                  <div style={{ marginTop: 14 }}>
+                    <p style={{ margin: 0, fontSize: 12.5, fontWeight: 700, color: '#92400e' }}>
+                      {ledgerResult.skipped.length} row(s) not imported
+                    </p>
+                    <div style={{ maxHeight: 220, overflowY: 'auto', marginTop: 6 }}>
+                      {ledgerResult.skipped.map(s => (
+                        <div key={s.rowNo} style={{
+                          borderBottom: '1px solid #f1f5f9', padding: '6px 0', fontSize: 11.5,
+                        }}>
+                          <strong style={{ color: '#0f172a' }}>Row {s.rowNo}</strong>
+                          {s.partyName && <span style={{ color: '#475569' }}> · {s.partyName}</span>}
+                          <br/>
+                          <span style={{ color: '#64748b' }}>{s.reason_text}</span>
+                          {s.candidates && (
+                            <span style={{ color: '#b45309' }}> — {s.candidates.join(' / ')}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 8, marginTop: 20, justifyContent: 'flex-end' }}>
+              {ledgerResult && (
+                <button onClick={() => { setLedgerResult(null); setLedgerError(null) }} style={ghostBtn}>
+                  Import another
+                </button>
+              )}
+              <button onClick={() => setShowLedger(false)} style={primaryBtn}>Done</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {presumption && period && (
+        <MsmePresumptionPack
+          pack={presumption}
+          firmName={orgName || 'Your firm'}
+          clientName={clientId !== 'all' && clientId !== 'none'
+            ? (clients.find(c => c.id === clientId)?.name ?? null)
+            : null}
+          periodLabel={period.label}
+          periodAsOn={period.as_on}
+          periodDue={period.due_date}
+          today={msmeToday()}
+          onClose={() => setPresumption(null)}
+        />
+      )}
+
       {showTour && (
         <MsmeTour
           onDone={() => setShowTour(false)}
@@ -1726,11 +2295,13 @@ export function MsmeView({ userRole, orgName }: Props) {
              done, rather than assuming it because the user clicked something. */
           progress={{
             vendorCount:  vendors.length,
-            emailedCount: vendors.filter(v => (v.email_count ?? 0) > 0).length,
+            // Lifetime: the tour step asks "have you sent an email yet",
+            // which stays done once done, not per half-year.
+            emailedCount: vendors.filter(v => (v.lifetime_email_count ?? 0) > 0).length,
           }}
           /* Any open dialog hides the tour, so its backdrop can never sit on
              top of the form the current step is asking the user to fill in. */
-          paused={showAdd || showImport || showUpgrade || showSettings || showGstModal || showContactModal || showCerts || showBounced}
+          paused={showAdd || showImport || showUpgrade || showSettings || showGstModal || showContactModal || showCerts || showBounced || !!presumption || showReports || showLedger}
         />
       )}
 
@@ -2140,6 +2711,56 @@ const primaryBtn: React.CSSProperties = {
   background: ACCENT, color: '#fff', border: 'none', borderRadius: 8,
   padding: '9px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer',
 }
+/**
+ * A spreadsheet cell to an ISO date, or null.
+ *
+ * A date cell can arrive as a Date (with cellDates), an ISO string, or the
+ * dd/mm/yyyy that Indian accounting software writes. Ambiguous dd/mm vs mm/dd
+ * is resolved as DAY FIRST, which is correct for Tally, Busy and every other
+ * ledger this will see; a value whose first part exceeds 12 proves day-first
+ * anyway, and one that cannot be read at all returns null so the server
+ * reports the row rather than guessing.
+ */
+function toIsoDate(v: unknown): string | null {
+  if (v == null || v === '') return null
+  if (v instanceof Date && !Number.isNaN(v.getTime())) {
+    // Built from local parts: the Date came from a date-only cell, and using
+    // toISOString would shift it a day west of UTC.
+    const p = (n: number) => String(n).padStart(2, '0')
+    return `${v.getFullYear()}-${p(v.getMonth() + 1)}-${p(v.getDate())}`
+  }
+  const s = String(v).trim()
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
+  const m = /^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})$/.exec(s)
+  if (m) {
+    const day = Number(m[1]), month = Number(m[2])
+    let year  = Number(m[3])
+    if (year < 100) year += year < 70 ? 2000 : 1900
+    if (day < 1 || day > 31 || month < 1 || month > 12) return null
+    const p = (n: number) => String(n).padStart(2, '0')
+    return `${year}-${p(month)}-${p(day)}`
+  }
+  return null
+}
+
+/**
+ * A spreadsheet cell to a number, or null.
+ *
+ * Null for an empty cell, NEVER zero: Number('') and Number(null) are both 0,
+ * and a blank amount silently becoming a zero-rupee invoice — or a blank
+ * credit-days column becoming "due the same day" — is the kind of wrong that
+ * looks like data rather than a bug. Indian digit grouping ("1,50,000.00")
+ * and a trailing "Dr"/"Cr" are stripped.
+ */
+function toNumber(v: unknown): number | null {
+  if (v == null || v === '') return null
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null
+  const s = String(v).replace(/[,\s₹]/g, '').replace(/\b(dr|cr)\b/i, '').trim()
+  if (s === '') return null
+  const n = Number(s)
+  return Number.isFinite(n) ? n : null
+}
+
 const ghostBtn: React.CSSProperties = {
   background: 'transparent', color: '#64748b', border: '1px solid #e2e8f0',
   borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
