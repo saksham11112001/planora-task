@@ -10,7 +10,7 @@ import {
 } from '@/lib/msme/periods'
 import { DECLARATION_COLS }         from '@/lib/msme/declarations'
 import type { Declaration }         from '@/lib/msme/declarations'
-import { chunk }                    from '@/lib/supabase/fetchAll'
+import { chunk, fetchAllRows }      from '@/lib/supabase/fetchAll'
 
 export async function GET(req: NextRequest) {
   const supabase = await createClient()
@@ -30,18 +30,41 @@ export async function GET(req: NextRequest) {
     : currentPeriod(new Date().toISOString().slice(0, 10)).periodEnd
   const period = describePeriod(periodEnd)
 
+  // Which client company's suppliers to list. MSME-1 is filed BY a company
+  // about its own suppliers, so a firm serving many companies works one at a
+  // time.
+  //   absent / 'all' — every vendor in the firm (what the page did before)
+  //   'none'         — only vendors not yet assigned to a client
+  //   a uuid         — that client's vendors
+  const rawClient = req.nextUrl.searchParams.get('client_id')
+  // Shape-checked before it reaches the query. Postgres rejects a malformed
+  // uuid with an error, which this route would return as a 500 — a bad query
+  // string should narrow to nothing or fall back, not look like an outage.
+  const isUuid = (s: string) =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)
+  const clientFilter =
+    !rawClient || rawClient === 'all' ? 'all'
+    : rawClient === 'none'            ? 'none'
+    : isUuid(rawClient)               ? rawClient
+    : 'all'
+
+  // Built before the Promise.all so the client filter can be applied without
+  // duplicating the whole select.
+  let vendorQuery = admin
+    .from('msme_vendors')
+    .select('id, vendor_name, vendor_email, gstin, pan, client_id, status, payment_status, udyam_number, udyam_registered_on, msme_category, nature_of_business, outstanding_amount, cert_url, is_not_msme, declarant_name, declared_at, submitted_at, email_count, last_emailed_at, is_paid, created_at, email_bounced, bounce_reason')
+    .eq('org_id', mb.org_id)
+    .eq('is_deleted', false)
+  if (clientFilter === 'none')      vendorQuery = vendorQuery.is('client_id', null)
+  else if (clientFilter !== 'all')  vendorQuery = vendorQuery.eq('client_id', clientFilter)
+
   const [
     { data: vendors, error },
     { data: packRow },
     { data: addonRow },
     { count: totalEver },
   ] = await Promise.all([
-    admin
-      .from('msme_vendors')
-      .select('id, vendor_name, vendor_email, gstin, pan, status, payment_status, udyam_number, udyam_registered_on, msme_category, nature_of_business, outstanding_amount, cert_url, is_not_msme, declarant_name, declared_at, submitted_at, email_count, last_emailed_at, is_paid, created_at, email_bounced, bounce_reason')
-      .eq('org_id', mb.org_id)
-      .eq('is_deleted', false)
-      .order('created_at', { ascending: false }),
+    vendorQuery.order('created_at', { ascending: false }),
     admin
       .from('org_feature_settings')
       .select('config')
@@ -55,6 +78,10 @@ export async function GET(req: NextRequest) {
       .eq('feature_key', 'msme_addon_slots')
       .maybeSingle(),
     // Count vendors that have ever been emailed (including soft-deleted ones) — these are permanent slots used.
+    // Deliberately NOT narrowed by the client filter: slots are a firm-level
+    // entitlement, so the usage figure must stay the same whichever client is
+    // on screen. Scoping it would show a firm with its pack nearly full as
+    // having plenty of room while viewing one client.
     admin
       .from('msme_vendors')
       .select('id', { count: 'exact', head: true })
@@ -115,6 +142,38 @@ export async function GET(req: NextRequest) {
     }
   })
 
+  // The firm's clients, so the page can offer the selector without a second
+  // round trip. Archived clients are excluded, matching /api/clients.
+  const { data: clientRows } = await admin
+    .from('clients')
+    .select('id, name')
+    .eq('org_id', mb.org_id)
+    .neq('is_archived', true)
+    .order('name')
+
+  // How many vendors sit under each client, for the selector's counts. Read
+  // unfiltered so the numbers do not shift as the user switches between
+  // clients.
+  //
+  // Paged: an org may hold up to 2000 vendors (the import cap) and PostgREST
+  // silently truncates at 1000, so a single read would undercount every
+  // client's total for the largest firms — and quietly, which is the worst
+  // way to be wrong about a number on screen.
+  const { data: allForCounts } = await fetchAllRows<{ client_id: string | null }>(
+    (from, to) => admin
+      .from('msme_vendors')
+      .select('client_id')
+      .eq('org_id', mb.org_id)
+      .eq('is_deleted', false)
+      .order('id', { ascending: true })   // unique, so pages cannot overlap
+      .range(from, to),
+  )
+  const vendorCountByClient: Record<string, number> = {}
+  for (const row of allForCounts) {
+    const key = row.client_id ?? 'none'
+    vendorCountByClient[key] = (vendorCountByClient[key] ?? 0) + 1
+  }
+
   // Packs run for a year. resolvePackEntitlement is the single place that
   // decides what the term means, so the list, the send gates and settings can
   // never disagree about whether an org still has its slots.
@@ -146,6 +205,12 @@ export async function GET(req: NextRequest) {
       period_end: p.periodEnd, label: p.label, short_label: p.shortLabel,
       as_on: p.asOn, range_label: p.rangeLabel, due_date: p.dueDate, half: p.half,
     })),
+
+    // Per-client scoping. client_id is the filter in force, echoed back so the
+    // UI never disagrees with what it is showing.
+    client_id: clientFilter,
+    clients:   clientRows ?? [],
+    vendorCountByClient,
   })
 }
 
@@ -162,7 +227,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { vendor_name, vendor_email, gstin } = body
+  const { vendor_name, vendor_email, gstin, client_id: rawClientId } = body
 
   if (!vendor_name?.trim() || !vendor_email?.trim()) {
     return NextResponse.json({ error: 'vendor_name and vendor_email are required' }, { status: 400 })
@@ -174,6 +239,26 @@ export async function POST(req: NextRequest) {
   const admin       = createAdminClient()
   const emailNorm   = vendor_email.trim().toLowerCase()
 
+  // Which client company this supplier belongs to. Null means firm level,
+  // which is what every vendor was before per-client scoping.
+  const clientId: string | null =
+    typeof rawClientId === 'string' && rawClientId && rawClientId !== 'all' && rawClientId !== 'none'
+      ? rawClientId
+      : null
+
+  // Verify the client belongs to THIS org before storing it. Without this a
+  // member could attach a vendor to another firm's client id and have its name
+  // rendered back to them — the id comes straight from the request body.
+  if (clientId) {
+    const { data: client } = await admin
+      .from('clients')
+      .select('id')
+      .eq('id', clientId)
+      .eq('org_id', mb.org_id)
+      .maybeSingle()
+    if (!client) return NextResponse.json({ error: 'Client not found' }, { status: 400 })
+  }
+
   // Fetch EVERY row for this email in one query — active and soft-deleted.
   //
   // This used to be two .maybeSingle() lookups whose errors were discarded.
@@ -183,11 +268,19 @@ export async function POST(req: NextRequest) {
   // When that happened both lookups returned null, the reactivate branch was
   // skipped, and the request fell through to an insert — which is how an email
   // ends up looking permanently taken after a delete.
-  const { data: sameEmail, error: lookupErr } = await admin
+  //
+  // Scoped to the client as well, matching the unique index. The same supplier
+  // commonly supplies several of a firm's client companies, and each of those
+  // needs its own declaration — so "already exists" must mean "already exists
+  // FOR THIS CLIENT", not anywhere in the firm.
+  let lookup = admin
     .from('msme_vendors')
     .select('id, is_deleted, created_at')
     .eq('org_id', mb.org_id)
     .eq('vendor_email', emailNorm)
+  lookup = clientId ? lookup.eq('client_id', clientId) : lookup.is('client_id', null)
+
+  const { data: sameEmail, error: lookupErr } = await lookup
     .order('created_at', { ascending: false })
 
   // Never guess on a failed lookup: inserting here could breach the unique
@@ -198,7 +291,11 @@ export async function POST(req: NextRequest) {
   const deletedRow = (sameEmail ?? []).find(v =>  v.is_deleted)
 
   if (activeRow) {
-    return NextResponse.json({ error: 'A vendor with this email already exists' }, { status: 409 })
+    return NextResponse.json({
+      error: clientId
+        ? 'This vendor is already on this client\'s list'
+        : 'A vendor with this email already exists',
+    }, { status: 409 })
   }
 
   if (deletedRow) {
@@ -235,6 +332,7 @@ export async function POST(req: NextRequest) {
     .from('msme_vendors')
     .insert({
       org_id:         mb.org_id,
+      client_id:      clientId,
       vendor_name:    vendor_name.trim(),
       vendor_email:   emailNorm,
       gstin:          gstin?.trim() || null,

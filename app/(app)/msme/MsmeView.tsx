@@ -2,6 +2,9 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import MsmeWalkthrough from './MsmeWalkthrough'
 import MsmeTour        from './MsmeTour'
+import MsmePresumptionPack from './MsmePresumptionPack'
+import { buildPresumptionPack } from '@/lib/msme/presumption'
+import type { PresumptionPack } from '@/lib/msme/presumption'
 import * as XLSX from 'xlsx'
 import { MSME_PACKS } from '@/lib/msme/packs'
 import { createClient } from '@/lib/supabase/client'
@@ -41,6 +44,8 @@ interface Vendor {
   lifetime_email_count: number
   declaration_id: string | null
   period_end: string
+  /** The client company whose supplier this is; null = held at firm level. */
+  client_id: string | null
   is_paid: boolean
   created_at: string
   email_bounced: boolean
@@ -120,6 +125,13 @@ export function MsmeView({ userRole, orgName }: Props) {
   const [periodEnd,     setPeriodEnd]     = useState<string | null>(null)
   const [period,        setPeriod]        = useState<Period | null>(null)
   const [periods,       setPeriods]       = useState<Period[]>([])
+  // Which client company's suppliers are on screen. 'all' keeps the page
+  // behaving exactly as it did before vendors could belong to a client.
+  const [clientId,      setClientId]      = useState<string>('all')
+  const [clients,       setClients]       = useState<Array<{ id: string; name: string }>>([])
+  const [clientCounts,  setClientCounts]  = useState<Record<string, number>>({})
+  const [presumption,   setPresumption]   = useState<PresumptionPack | null>(null)
+  const [buildingPack,  setBuildingPack]  = useState(false)
   const toastRef = useRef(0)
 
   // Add vendor form
@@ -217,15 +229,21 @@ export function MsmeView({ userRole, orgName }: Props) {
     setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 4000)
   }
 
-  const fetchVendors = useCallback(async (silent = false, forPeriod?: string | null) => {
+  const fetchVendors = useCallback(async (
+    silent = false, forPeriod?: string | null, forClient?: string,
+  ) => {
     if (!silent) setLoading(true)
     try {
-      // Omitted on the first load so the SERVER picks the current period from
-      // its own clock. A browser in another timezone could otherwise land a
-      // day either side of a period boundary and open the wrong cycle.
+      // period_end is omitted on the first load so the SERVER picks the current
+      // period from its own clock. A browser in another timezone could
+      // otherwise land a day either side of a period boundary and open the
+      // wrong cycle.
       const target = forPeriod !== undefined ? forPeriod : periodEnd
-      const qs  = target ? `?period_end=${encodeURIComponent(target)}` : ''
-      const res  = await fetch(`/api/msme/vendors${qs}`)
+      const client = forClient !== undefined ? forClient : clientId
+      const qs = new URLSearchParams()
+      if (target) qs.set('period_end', target)
+      if (client && client !== 'all') qs.set('client_id', client)
+      const res  = await fetch(`/api/msme/vendors${qs.toString() ? `?${qs}` : ''}`)
       const data = await res.json()
       if (res.ok) {
         setVendors(data.vendors ?? [])
@@ -234,13 +252,15 @@ export function MsmeView({ userRole, orgName }: Props) {
         if (data.vendorLimit) setVendorLimit(data.vendorLimit)
         if (data.period)  { setPeriod(data.period); setPeriodEnd(data.period.period_end) }
         if (data.periods) setPeriods(data.periods)
+        if (data.clients) setClients(data.clients)
+        if (data.vendorCountByClient) setClientCounts(data.vendorCountByClient)
       }
     } catch (e) {
       console.error('[MsmeView] fetchVendors failed', e)
     } finally {
       if (!silent) setLoading(false)
     }
-  }, [periodEnd])
+  }, [periodEnd, clientId])
 
   // Deliberately not keyed on fetchVendors: it changes identity whenever
   // periodEnd does, which would re-fire this on every period switch and race
@@ -256,6 +276,17 @@ export function MsmeView({ userRole, orgName }: Props) {
     setCheckedIds(new Set())
     fetchVendors(false, next)
   }, [periodEnd, fetchVendors])
+
+  // Switch client company. Same reasoning as switchPeriod: the selection and
+  // any ticked rows belong to the list being left.
+  const switchClient = useCallback((next: string) => {
+    if (next === clientId) return
+    setClientId(next)
+    setSelectedId(null)
+    setCheckedIds(new Set())
+    setFilterStatus('all')
+    fetchVendors(false, undefined, next)
+  }, [clientId, fetchVendors])
 
   // If user returns to the page after payment (fallback), refresh pack settings
   useEffect(() => {
@@ -537,7 +568,9 @@ export function MsmeView({ userRole, orgName }: Props) {
     const res  = await fetch('/api/msme/vendors', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ vendor_name: vendorName, vendor_email: vendorEmail, gstin }),
+      // Lands under the client currently on screen. With 'all' or 'none'
+      // selected it is held at firm level and can be assigned later.
+      body: JSON.stringify({ vendor_name: vendorName, vendor_email: vendorEmail, gstin, client_id: clientId }),
     })
     const data = await res.json()
     setAdding(false)
@@ -774,7 +807,9 @@ export function MsmeView({ userRole, orgName }: Props) {
       const res = await fetch('/api/msme/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rows: batch }),
+        // Imported under the client on screen, so a firm can load one client
+        // company's supplier list at a time.
+        body: JSON.stringify({ rows: batch, client_id: clientId }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -811,6 +846,62 @@ export function MsmeView({ userRole, orgName }: Props) {
   }
 
   // ── Export audit log: vendor data + email history merged ─────────────────
+  // ── Non-response presumption pack ─────────────────────────────────────────
+  async function handlePresumptionPack() {
+    if (buildingPack) return
+    setBuildingPack(true)
+    try {
+      // Send dates come from the email log, which records every individual
+      // send; the vendor row only keeps the latest.
+      let logs: Array<{ vendor_id: string; sent_at: string; period_end: string | null }> = []
+      try {
+        const res = await fetch('/api/msme/email-logs')
+        if (res.ok) {
+          const d = await res.json()
+          if (Array.isArray(d.logs)) logs = d.logs
+        }
+      } catch { /* falls back to the declaration's own last_emailed_at below */ }
+
+      const datesByVendor = new Map<string, string[]>()
+      for (const log of logs) {
+        // Only this period's sends. A log row written before half-yearly
+        // tracking has no period and is deliberately NOT assumed to belong
+        // here — guessing would put the wrong dates in a signed document.
+        if (log.period_end !== periodEnd) continue
+        const list = datesByVendor.get(log.vendor_id) ?? []
+        list.push(log.sent_at)
+        datesByVendor.set(log.vendor_id, list)
+      }
+
+      const pack = buildPresumptionPack(vendors.map(v => {
+        let emailDates = datesByVendor.get(v.id) ?? []
+        // No log row for this period, but the declaration says we emailed:
+        // fall back to its own last_emailed_at, which is period-scoped and so
+        // authoritative. It names the LAST send rather than the first, which
+        // starts the 15-day clock later and can only make the vendor harder to
+        // presume about — the safe direction to err in.
+        if (emailDates.length === 0 && v.email_count > 0 && v.last_emailed_at) {
+          emailDates = [v.last_emailed_at]
+        }
+        return {
+          vendorName:   v.vendor_name,
+          vendorEmail:  v.vendor_email,
+          status:       v.status,
+          emailBounced: !!v.email_bounced,
+          emailDates,
+          today:        new Date().toISOString().slice(0, 10),
+        }
+      }))
+
+      setPresumption(pack)
+      if (pack.presumed.length === 0) {
+        showToast('No vendor meets the 15-day non-response conditions yet — the pack shows why.', 'info')
+      }
+    } finally {
+      setBuildingPack(false)
+    }
+  }
+
   async function handleExport() {
     if (exporting) return
     setExporting(true)
@@ -838,13 +929,22 @@ export function MsmeView({ userRole, orgName }: Props) {
       // log spans every period, so both columns say which they are. Labelling
       // them the same way would make a lifetime email count look like it
       // belonged to this period's status.
+      // A "Filing For" column only when the export spans more than one client
+      // — MSME-1 is filed per company, so a single-client export has one
+      // answer and repeating it down every row is noise.
+      const showClientCol = clientId === 'all' && clients.length > 0
+
       const header = [
-        'Vendor Name', 'Vendor Email', 'GSTIN', 'Current Status',
+        'Vendor Name', 'Vendor Email', 'GSTIN',
+        ...(showClientCol ? ['Filing For'] : []),
+        'Current Status',
         'Udyam Number', 'Category', 'Nature of Business',
         period ? `Outstanding as on ${period.as_on} (₹)` : 'Outstanding Amount (₹)',
         'Emails Sent (this period)', 'Email Dates (all periods)',
         'Submitted On', 'Declaration By', 'Date Added',
       ]
+      const clientName = (id: string | null) =>
+        id ? (clients.find(c => c.id === id)?.name ?? '—') : 'Not assigned'
 
       const mergedRows: (string | number)[][] = []
       for (const v of vendors) {
@@ -860,7 +960,9 @@ export function MsmeView({ userRole, orgName }: Props) {
           : '—'
 
         mergedRows.push([
-          v.vendor_name, v.vendor_email, v.gstin ?? '', status,
+          v.vendor_name, v.vendor_email, v.gstin ?? '',
+          ...(showClientCol ? [clientName(v.client_id)] : []),
+          status,
           v.udyam_number ?? '', v.msme_category ? CAT_LABEL[v.msme_category] : '',
           v.nature_of_business ? NAT_LABEL[v.nature_of_business] : '',
           v.outstanding_amount !== null && v.outstanding_amount !== undefined ? v.outstanding_amount : '',
@@ -875,9 +977,13 @@ export function MsmeView({ userRole, orgName }: Props) {
 
       // A title row naming the half-year. An MSME-1 audit file without it
       // cannot be told apart from the other cycle's export six months later.
+      const scopeLine = clientId === 'all' ? 'All clients'
+        : clientId === 'none'              ? 'Vendors not assigned to a client'
+        : clientName(clientId)
       const titleRows: (string | number)[][] = period
         ? [
             [`MSME Form 1 — ${period.label}`],
+            [`Filing for: ${scopeLine}`],
             [`Filing due ${period.due_date} · exported ${new Date().toLocaleDateString('en-IN')}`],
             [],
           ]
@@ -982,6 +1088,16 @@ export function MsmeView({ userRole, orgName }: Props) {
           {vendors.length > 0 && (
             <button onClick={handleExport} disabled={exporting} style={{ ...ghostBtn, opacity: exporting ? 0.6 : 1, cursor: exporting ? 'default' : 'pointer' }}>{exporting ? 'Exporting…' : '↓ Export Audit Log'}</button>
           )}
+          {/* The audit defence for every vendor who never replied: the dates
+              they were asked, and the declaration that silence was taken as
+              "not registered". Shown once anyone has actually been emailed —
+              before that there is nothing to evidence. */}
+          {vendors.some(v => v.email_count > 0) && (
+            <button onClick={handlePresumptionPack} disabled={buildingPack}
+              style={{ ...ghostBtn, opacity: buildingPack ? 0.6 : 1, cursor: buildingPack ? 'default' : 'pointer' }}>
+              {buildingPack ? 'Preparing…' : '⚖ Non-response pack'}
+            </button>
+          )}
           {vendors.some(v => v.cert_url) && (
             <button onClick={() => setShowCerts(true)} style={ghostBtn}>📄 Certificates ({vendors.filter(v => v.cert_url).length})</button>
           )}
@@ -1048,13 +1164,41 @@ export function MsmeView({ userRole, orgName }: Props) {
             )}
           </div>
 
-          <div style={{ textAlign: 'right' }}>
-            <p style={{ margin: 0, fontSize: 12, color: '#475569', fontWeight: 600 }}>
-              Balances as on <strong style={{ color: '#0f172a' }}>{period.as_on}</strong>
-            </p>
-            <p style={{ margin: '2px 0 0', fontSize: 11, color: '#64748b' }}>
-              MSME-1 due {new Date(`${period.due_date}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-            </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+            {/* Whose suppliers these are. MSME-1 is filed BY a company about
+                its own suppliers, so a firm acting for several companies works
+                one at a time. Hidden when the firm has no clients set up, so
+                nothing changes for a company using this for itself. */}
+            {clients.length > 0 && (
+              <div>
+                <label htmlFor="msme-client" style={{ display: 'block', fontSize: 10, fontWeight: 700, color: '#94a3b8', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 3 }}>
+                  Filing for
+                </label>
+                <select id="msme-client" value={clientId} onChange={e => switchClient(e.target.value)}
+                  style={{
+                    border: '1px solid #e2e8f0', borderRadius: 8, padding: '6px 10px',
+                    fontSize: 12, fontWeight: 600, color: '#0f172a', background: '#fff',
+                    cursor: 'pointer', maxWidth: 230,
+                  }}>
+                  <option value="all">All clients ({Object.values(clientCounts).reduce((a, b) => a + b, 0)})</option>
+                  {clients.map(c => (
+                    <option key={c.id} value={c.id}>{c.name} ({clientCounts[c.id] ?? 0})</option>
+                  ))}
+                  {(clientCounts.none ?? 0) > 0 && (
+                    <option value="none">Not assigned to a client ({clientCounts.none})</option>
+                  )}
+                </select>
+              </div>
+            )}
+
+            <div style={{ textAlign: 'right' }}>
+              <p style={{ margin: 0, fontSize: 12, color: '#475569', fontWeight: 600 }}>
+                Balances as on <strong style={{ color: '#0f172a' }}>{period.as_on}</strong>
+              </p>
+              <p style={{ margin: '2px 0 0', fontSize: 11, color: '#64748b' }}>
+                MSME-1 due {new Date(`${period.due_date}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+              </p>
+            </div>
           </div>
         </div>
       )}
@@ -1479,6 +1623,15 @@ export function MsmeView({ userRole, orgName }: Props) {
                 )}
               </div>
 
+              {/* Whose supplier this is — needed most in the "All clients"
+                  view, where the list alone does not say. */}
+              {clients.length > 0 && (
+                <DetailRow label="Filing for" value={
+                  selected.client_id
+                    ? (clients.find(c => c.id === selected.client_id)?.name ?? '—')
+                    : 'Not assigned to a client'
+                } />
+              )}
               {selected.gstin && <DetailRow label="GSTIN" value={selected.gstin} />}
               {selected.pan   && <DetailRow label="PAN"   value={selected.pan} />}
 
@@ -1891,6 +2044,21 @@ export function MsmeView({ userRole, orgName }: Props) {
 
       {/* ── Walkthrough + spotlight tour ── */}
       <MsmeWalkthrough onUpgrade={() => setShowUpgrade(true)} onStartTour={() => setShowTour(true)} />
+      {presumption && period && (
+        <MsmePresumptionPack
+          pack={presumption}
+          firmName={orgName || 'Your firm'}
+          clientName={clientId !== 'all' && clientId !== 'none'
+            ? (clients.find(c => c.id === clientId)?.name ?? null)
+            : null}
+          periodLabel={period.label}
+          periodAsOn={period.as_on}
+          periodDue={period.due_date}
+          today={new Date().toISOString().slice(0, 10)}
+          onClose={() => setPresumption(null)}
+        />
+      )}
+
       {showTour && (
         <MsmeTour
           onDone={() => setShowTour(false)}
@@ -1904,7 +2072,7 @@ export function MsmeView({ userRole, orgName }: Props) {
           }}
           /* Any open dialog hides the tour, so its backdrop can never sit on
              top of the form the current step is asking the user to fill in. */
-          paused={showAdd || showImport || showUpgrade || showSettings || showGstModal || showContactModal || showCerts || showBounced}
+          paused={showAdd || showImport || showUpgrade || showSettings || showGstModal || showContactModal || showCerts || showBounced || !!presumption}
         />
       )}
 
