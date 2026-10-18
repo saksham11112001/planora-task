@@ -165,16 +165,40 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
     ...customSections.map(s => ({ ...s, creator: true, tasks: [] as Task[] })),
   ]
 
+  /**
+   * Load a task's subtasks.
+   *
+   * `force` re-reads even when they are already cached.
+   *
+   * They used to be fetched once per task and then cached for the lifetime of
+   * the page, with `if (subtaskData[taskId]) return` and nothing ever
+   * invalidating it. So the list — and the "2/3 subtasks done" badge built
+   * from it — went stale the moment a subtask changed anywhere else: in the
+   * task detail panel, in another tab, or by a colleague. Collapsing and
+   * re-expanding did not help, because that hit the same cache. That is the
+   * "subtasks showing as different" report: two views of the same subtasks
+   * disagreeing, with no way to force agreement short of a full reload.
+   */
+  async function loadSubtasks(taskId: string, force = false) {
+    if (!force && subtaskData[taskId]) return
+    setLoadingSubs(p => ({ ...p, [taskId]: true }))
+    try {
+      const r = await fetch(`/api/tasks?parent_id=${taskId}&limit=200`)
+      const d = await r.json()
+      if (r.ok) setSubtaskData(p => ({ ...p, [taskId]: d.data ?? [] }))
+    } catch { /* leave the previous list rather than blanking it */ }
+    finally {
+      setLoadingSubs(p => ({ ...p, [taskId]: false }))
+    }
+  }
+
   async function toggleSubExpand(taskId: string) {
     const isOpen = expandedSubs[taskId]
     if (isOpen) { setExpandedSubs(p => ({ ...p, [taskId]: false })); return }
     setExpandedSubs(p => ({ ...p, [taskId]: true }))
-    if (subtaskData[taskId]) return
-    setLoadingSubs(p => ({ ...p, [taskId]: true }))
-    const r = await fetch(`/api/tasks?parent_id=${taskId}&limit=50`)
-    const d = await r.json()
-    setSubtaskData(p => ({ ...p, [taskId]: d.data ?? [] }))
-    setLoadingSubs(p => ({ ...p, [taskId]: false }))
+    // Re-read on every expand. The round trip is one small query and it is
+    // the difference between a count a user can trust and one they cannot.
+    await loadSubtasks(taskId, true)
   }
 
   async function toggleSubDone(subId: string, status: string, parentId: string) {
@@ -243,7 +267,10 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
     if (res.ok) {
       setNewSubInputs(p => ({ ...p, [parentId]: '' }))
       setNewSubAssignees(p => ({ ...p, [parentId]: null }))
-      const r = await fetch(`/api/tasks?parent_id=${parentId}&limit=50`)
+      // 200, matching the other subtask reads. At 50 a task with more
+      // subtasks than that silently showed a short list, and the "n/m done"
+      // badge counted against the truncated total.
+      const r = await fetch(`/api/tasks?parent_id=${parentId}&limit=200`)
       const d = await r.json()
       setSubtaskData(p => ({ ...p, [parentId]: d.data ?? [] }))
     }
@@ -302,15 +329,28 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
       return
     }
 
-    // Check subtasks — must all be completed first
-    // Load them if not already loaded
-    let subs = subtaskData[task.id]
-    if (!subs) {
-      setLoadingSubs(p => ({ ...p, [task.id]: true }))
-      const r = await fetch(`/api/tasks?parent_id=${task.id}&limit=50`)
+    // Check subtasks — must all be completed first.
+    //
+    // ALWAYS read fresh, never from the cache. This gate blocks the user, so
+    // stale data here does not merely look wrong: a task whose subtasks were
+    // all finished in the detail panel, or by a colleague, refused to complete
+    // with "Complete all subtasks first — 2 remaining" and no way past it
+    // except reloading the page. Being told you cannot do something you have
+    // already done is the most frustrating possible failure mode, so this
+    // trades one small query for a gate that is always right.
+    setLoadingSubs(p => ({ ...p, [task.id]: true }))
+    let subs: any[] = subtaskData[task.id] ?? []
+    try {
+      const r = await fetch(`/api/tasks?parent_id=${task.id}&limit=200`)
       const d = await r.json()
-      subs = d.data ?? []
-      setSubtaskData(p => ({ ...p, [task.id]: subs }))
+      if (r.ok) {
+        subs = d.data ?? []
+        setSubtaskData(p => ({ ...p, [task.id]: subs }))
+      }
+    } catch {
+      // Network failure: fall back to whatever was cached rather than
+      // treating "could not check" as "no subtasks" and completing anyway.
+    } finally {
       setLoadingSubs(p => ({ ...p, [task.id]: false }))
     }
 
@@ -1233,6 +1273,17 @@ export function ProjectView({ project, tasks: initialTasks, members, clients, de
         onClose={() => {
           if (panelHasUpdates.current) {
             if (selectedTask) setTasks(prev => prev.map(t => t.id === panelTaskIdRef.current ? { ...t, ...selectedTask as unknown as Task } : t))
+            // The panel is where subtasks actually get ticked off, and this
+            // only ever synced the parent row — so the project list kept
+            // showing the subtask state from before the panel was opened.
+            // Re-read them for the task that was open, and for its parent if
+            // what was open was itself a subtask.
+            const openId = panelTaskIdRef.current
+            if (openId) {
+              if (subtaskData[openId] || expandedSubs[openId]) void loadSubtasks(openId, true)
+              const parentId = (selectedTask as { parent_task_id?: string } | null)?.parent_task_id
+              if (parentId) void loadSubtasks(parentId, true)
+            }
             toast.success('Task updated')
             panelHasUpdates.current = false
           }

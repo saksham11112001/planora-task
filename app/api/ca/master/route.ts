@@ -7,6 +7,8 @@ import { getTasksForCountries } from '@/lib/data/caDefaultTasksByCountry'
 import type { NextRequest } from 'next/server'
 import { dbError } from '@/lib/api-error'
 import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
+import { financialYearOf } from '@/lib/ca/financialYear'
+import { todayInCountry } from '@/lib/locale/countries'
 
 export async function GET(req: NextRequest) {
   const supabase = await createClient()
@@ -16,7 +18,9 @@ export async function GET(req: NextRequest) {
   if (!mb) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   const admin = createAdminClient()
 
-  const fy   = req.nextUrl.searchParams.get('fy') ?? '2026-27'
+  // Derived, not hardcoded: a '2026-27' default silently served the previous
+  // year's calendar from 1 April 2027 onwards.
+  const fy   = req.nextUrl.searchParams.get('fy') ?? financialYearOf(todayInCountry(null))
   const name = req.nextUrl.searchParams.get('name')
   const assignmentId = req.nextUrl.searchParams.get('assignment_id')
 
@@ -75,7 +79,7 @@ export async function POST(req: NextRequest) {
 
   // Special action: load defaults (supports optional countries[] and task_codes[] for selective import)
   if (body.action === 'load_defaults') {
-    const fy = body.financial_year ?? '2026-27'
+    const fy = body.financial_year ?? financialYearOf(todayInCountry(null))
     const countries: string[] = Array.isArray(body.countries) && body.countries.length > 0
       ? body.countries
       : ['IN']  // default to India for backward compat
@@ -143,7 +147,7 @@ export async function POST(req: NextRequest) {
   const admin = createAdminClient()
   const { data, error } = await admin.from('ca_master_tasks').insert({
     org_id: mb.org_id, code, name, group_name: group_name ?? 'Other',
-    task_type: task_type ?? '', financial_year: financial_year ?? '2026-27',
+    task_type: task_type ?? '', financial_year: financial_year ?? financialYearOf(todayInCountry(null)),
     dates: dates ?? {}, days_before_due: days_before_due ?? 7,
     attachment_count: attachment_count ?? 0,
     attachment_headers: attachment_headers ?? [],

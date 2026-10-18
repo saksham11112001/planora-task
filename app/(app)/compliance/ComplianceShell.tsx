@@ -4,6 +4,9 @@ import { useSearchParams } from 'next/navigation'
 import { FileCheck, ChevronRight, Search, ClipboardList, ShieldCheck } from 'lucide-react'
 import { CAMasterView } from './CAMasterView'
 import { CAClientSetupView } from './CAClientSetupView'
+import { CAAssignByTaskView } from './CAAssignByTaskView'
+import { financialYearOf } from '@/lib/ca/financialYear'
+import { todayInCountry } from '@/lib/locale/countries'
 import { CATasksView } from './CATasksView'
 import { CADSCTrackerView } from './CADSCTrackerView'
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
@@ -709,10 +712,34 @@ function CAKanbanView({ userRole, currentUserId }: { userRole: string; currentUs
 export function ComplianceShell({ userRole, currentUserId }: Props) {
   const searchParams = useSearchParams()
   const tabParam = searchParams.get('tab')
-  const initStep = tabParam === 'catasks' ? 4 : tabParam === 'dsctracker' ? 5 : 1
-  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(initStep as 1 | 2 | 3 | 4 | 5)
   const isAdmin = ['owner', 'admin'].includes(userRole)
   const canSetupClients = ['owner', 'admin', 'manager'].includes(userRole)
+
+  /**
+   * Where this role lands.
+   *
+   * Everyone used to land on step 1, which is admin-only. So a member opening
+   * Compliance was met with "CA Calendar setup is restricted to admins" and a
+   * single button to Client Setup — a step they cannot edit either. The first
+   * thing the module said to most of the people in a firm was "not for you",
+   * twice, while the screen they actually wanted (their own compliance work,
+   * step 4) was unmentioned and two clicks away.
+   *
+   * Steps 1–3 are a setup sequence for whoever configures the firm's
+   * calendar. For a member they are not a sequence at all — step 4 is simply
+   * their job.
+   */
+  const defaultStep: 1 | 2 | 3 | 4 | 5 =
+    isAdmin ? 1 : canSetupClients ? 2 : 4
+  const initStep = tabParam === 'catasks' ? 4 : tabParam === 'dsctracker' ? 5 : defaultStep
+  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(initStep as 1 | 2 | 3 | 4 | 5)
+  // Which way round assignment is being done on step 2. Defaults to
+  // client-first, which is what the step has always been.
+  const [assignMode, setAssignMode] = useState<'client' | 'task'>('client')
+  /* One financial year for both directions of step 2, derived from today
+     rather than hardcoded. The two views had independent '2026-27' defaults,
+     so they could have disagreed about which year was being assigned. */
+  const complianceFy = financialYearOf(todayInCountry(null))
 
   /* ── Shared members + clients for CATasksView ── */
   const [sharedMembers, setSharedMembers] = useState<{ id: string; name: string; role?: string }[]>([])
@@ -738,13 +765,30 @@ export function ComplianceShell({ userRole, currentUserId }: Props) {
     }).catch(() => {})
   }, [])
 
-  const tabBtn = (s: 1 | 2 | 3 | 4 | 5, label: string, num: number, enabled: boolean) => (
+  /**
+   * One step tab.
+   *
+   * A disabled tab now SAYS it is disabled. Previously it rendered at full
+   * strength, in the same colours as a working tab, and `onClick` quietly
+   * evaluated to nothing — so a member clicked "Client Setup", watched the
+   * page not move, and clicked it again. A control that ignores you is worse
+   * than one that is visibly unavailable, and step 1 already got this right
+   * with its "Admin only" badge; steps 2 and 3 did not.
+   */
+  const tabBtn = (
+    s: 1 | 2 | 3 | 4 | 5, label: string, num: number, enabled: boolean,
+    lockedReason = 'Managers and above only',
+  ) => (
     <button
       onClick={() => enabled && setStep(s)}
+      disabled={!enabled}
+      title={enabled ? undefined : lockedReason}
       style={{
         display: 'flex', alignItems: 'center', gap: 8,
         padding: s === 1 ? '14px 20px 14px 0' : '14px 20px',
-        background: 'none', border: 'none', cursor: enabled ? 'pointer' : 'default',
+        background: 'none', border: 'none',
+        cursor: enabled ? 'pointer' : 'not-allowed',
+        opacity: enabled ? 1 : 0.55,
         borderBottom: step === s ? '2px solid var(--brand)' : '2px solid transparent',
         marginBottom: -1, flexShrink: 0,
       }}>
@@ -757,6 +801,15 @@ export function ComplianceShell({ userRole, currentUserId }: Props) {
       <span style={{ fontSize: 13, fontWeight: step === s ? 700 : 500, color: step === s ? 'var(--brand)' : 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
         {label}
       </span>
+      {!enabled && (
+        <span style={{
+          fontSize: 10, color: 'var(--text-muted)', background: 'var(--surface-subtle)',
+          padding: '1px 6px', borderRadius: 4, border: '1px solid var(--border)',
+          whiteSpace: 'nowrap',
+        }}>
+          {lockedReason}
+        </span>
+      )}
     </button>
   )
 
@@ -895,16 +948,72 @@ export function ComplianceShell({ userRole, currentUserId }: Props) {
       {/* Step content */}
       <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
         {step === 1 && isAdmin && <CAMasterView userRole={userRole} />}
+        {/* Reachable only if someone navigates here deliberately — this role
+            no longer LANDS here. The button offers a step they can actually
+            use: it used to send everyone to Client Setup, which a member
+            cannot edit either, so the one action on a "not for you" screen led
+            to a second "not for you" screen. */}
         {step === 1 && !isAdmin && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 300, gap: 12, color: 'var(--text-muted)', fontSize: 14 }}>
             <FileCheck style={{ width: 32, height: 32, opacity: 0.4 }}/>
-            <p>CA Calendar setup is restricted to admins.</p>
-            <button onClick={() => setStep(2)} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: 13 }}>
-              Go to Client Setup →
+            <p style={{ margin: 0, textAlign: 'center', maxWidth: 420, lineHeight: 1.6 }}>
+              The compliance calendar — which statutory tasks exist and when they fall due —
+              is set up by an owner or admin. Your own compliance work is on CA Tasks.
+            </p>
+            <button
+              onClick={() => setStep(canSetupClients ? 2 : 4)}
+              style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: 13 }}>
+              {canSetupClients ? 'Go to Client Setup →' : 'Go to my CA Tasks →'}
             </button>
           </div>
         )}
-        {step === 2 && <CAClientSetupView userRole={userRole} />}
+        {/* Step 2 holds BOTH directions of the same job.
+            A sixth numbered tab would have made a flow people already find
+            heavy heavier still; the question is not "which screen" but
+            "which way round am I working today". */}
+        {step === 2 && (
+          <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+              padding: '10px 20px 0',
+            }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                Assign
+              </span>
+              <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border)' }}>
+                {([
+                  { key: 'client' as const, label: 'One client, many tasks',
+                    hint: 'Onboarding a client: tick everything that applies to them' },
+                  { key: 'task'   as const, label: 'One task, many clients',
+                    hint: 'A statute applies across your book: tick every client it covers' },
+                ]).map(m => {
+                  const active = assignMode === m.key
+                  return (
+                    <button key={m.key} onClick={() => setAssignMode(m.key)} title={m.hint}
+                      style={{
+                        padding: '6px 14px', fontSize: 12, fontWeight: active ? 700 : 500,
+                        border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                        background: active ? 'var(--brand)' : 'var(--surface-alt)',
+                        color: active ? '#fff' : 'var(--text-secondary)',
+                      }}>
+                      {m.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+            <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+              {assignMode === 'client'
+                ? <CAClientSetupView userRole={userRole} financialYear={complianceFy} />
+                : <CAAssignByTaskView
+                    financialYear={complianceFy}
+                    clients={sharedClients}
+                    members={sharedMembers}
+                    canEdit={canSetupClients}
+                  />}
+            </div>
+          </div>
+        )}
         {step === 3 && <CAKanbanView userRole={userRole} currentUserId={currentUserId} />}
         {step === 4 && (
           <CATasksView
