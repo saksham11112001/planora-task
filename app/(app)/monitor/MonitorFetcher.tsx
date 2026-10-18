@@ -8,7 +8,25 @@ import { redirect }     from 'next/navigation'
 // `description` is deliberately absent. Monitor never renders it — the only
 // reader is TaskDetailPanel, which now fetches the single task it opens. It was
 // the widest column here, shipped for every row on every 2-minute refresh.
-const TASK_COLS = 'id, title, status, priority, due_date, completed_at, assignee_id, approver_id, client_id, project_id, parent_task_id, parent_recurring_id, approval_status, approval_required, is_recurring, frequency, next_occurrence_date, estimated_hours, custom_fields, created_at, updated_at, is_billable, billable_amount, assignee:users!tasks_assignee_id_fkey(id, name), approver:users!tasks_approver_id_fkey(id, name), creator:users!tasks_created_by_fkey(id, name), projects(id, name, color)'
+/**
+ * What Monitor actually reads.
+ *
+ * This used to carry four joined relations and six columns that nothing in
+ * MonitorView ever looked at — `projects(id, name, color)`, `creator`,
+ * `approver`, plus estimated_hours, is_billable, billable_amount,
+ * approval_required, frequency and next_occurrence_date, all of which existed
+ * only as fields on the MonTask interface. On a query that returns thousands
+ * of rows, three unused joins is most of the wait.
+ *
+ * `assignee` is no longer joined either. The page already holds the full
+ * member list and already resolves subtask assignees from it by id — so the
+ * join was fetching, per task row, a name the page had in memory all along.
+ * It is resolved the same way below, which keeps MonitorView's props
+ * unchanged.
+ *
+ * custom_fields stays: `_ca_compliance` is read for the CA count.
+ */
+const TASK_COLS = 'id, title, status, priority, due_date, completed_at, assignee_id, approver_id, client_id, project_id, parent_task_id, parent_recurring_id, approval_status, is_recurring, custom_fields, created_at, updated_at'
 
 export async function MonitorFetcher() {
   const user = await getSessionUser()
@@ -39,12 +57,20 @@ export async function MonitorFetcher() {
   //   completed_at >= 90 days ago (recently finished work)
   const recentOrOpen = `status.neq.completed,completed_at.is.null,completed_at.gte.${from90}`
 
-  // Kept beside the queries so the view can tell whether either cap was hit.
+  // Kept beside the query so the view can tell whether the cap was hit.
   const DATED_CAP   = 4000
-  const UNDATED_CAP = 2000
 
-  const makeBase = () => supabase.from('tasks')
-    .select(TASK_COLS)
+  /**
+   * The filters that define "work Monitor is about".
+   *
+   * Applied to both the row query and the no-due-date count, from one place,
+   * so the count can never describe a different population from the list.
+   *
+   * Typed `any` deliberately: Supabase's builder generics are deep enough
+   * that parameterising this trips "type instantiation is excessively deep".
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const applyScope = (q: any): any => q
     .eq('org_id', mb.org_id)
     .neq('is_archived', true)
     .is('parent_task_id', null)
@@ -59,31 +85,51 @@ export async function MonitorFetcher() {
     .or('is_recurring.is.null,is_recurring.eq.false')
     .or(recentOrOpen)
 
+  const makeBase  = () => applyScope(supabase.from('tasks').select(TASK_COLS))
+  const makeCount = () => applyScope(supabase.from('tasks').select('id', { count: 'exact', head: true }))
+
   const [
     hasRoleAccess,
     { data: datedTasks },
-    { data: undatedTasks },
+    { count: undatedCount },
     { data: members },
     { data: clientsData },
   ] = await Promise.all([
     isOwnerOrAdmin
       ? Promise.resolve(true)
       : canDo(supabase, mb.org_id, user.id, mb.role, 'monitor.view'),
-    // Caps are a backstop against a runaway payload, not the working limit —
-    // with the 90-day filter above, a realistic org lands far below these.
-    // Both are ordered so that if a cap IS hit the truncation is deterministic
-    // (soonest due first / newest first) rather than arbitrary, and the view
-    // shows a notice rather than silently reporting partial stats.
+    // The cap is a backstop against a runaway payload, not the working limit —
+    // with the 90-day filter above, a realistic org lands far below it.
+    // Ordered so that if the cap IS hit the truncation is deterministic
+    // (soonest due first) rather than arbitrary, and the view shows a notice
+    // rather than silently reporting partial stats.
     makeBase().not('due_date', 'is', null)
       .order('due_date', { ascending: true }).limit(DATED_CAP),
-    makeBase().is('due_date', null)
-      .order('created_at', { ascending: false }).limit(UNDATED_CAP),
+    // ── Tasks with NO due date are COUNTED, not fetched ──────────────────
+    //
+    // Up to 2000 of them used to be loaded on every visit and mixed into the
+    // list. They are close to untrackable there: Monitor is organised around
+    // when work is due, every stat tile is a slice of the current month, and
+    // the overdue and trend figures cannot say anything about a task with no
+    // date. So they padded the payload and the list without being actionable
+    // in either.
+    //
+    // A count is one cheap query and keeps them honest: the view shows
+    // "N tasks have no due date" with a link to the task list filtered to
+    // them, so they are visible and fixable without being in the way.
+    // OPEN work only. applyScope deliberately lets through anything completed
+    // in the last 90 days, which is right for the list but wrong here: a
+    // finished task does not need a due date, so counting it would make the
+    // banner's number larger than the list that opens underneath it — the
+    // on-demand panel drops completed and cancelled rows for the same reason.
+    // Two numbers describing the same thing have to be the same number.
+    makeCount().is('due_date', null).not('status', 'in', '(completed,cancelled)'),
     supabase.from('org_members')
       .select('user_id, users(id, name)').eq('org_id', mb.org_id).eq('is_active', true),
     supabase.from('clients').select('id, name, color, status').eq('org_id', mb.org_id).order('name'),
   ])
 
-  const tasks = [...(datedTasks ?? []), ...(undatedTasks ?? [])]
+  const tasks = datedTasks ?? []
 
   const hasMemberAccess = mb.can_view_monitor === true
   if (!hasRoleAccess && !hasMemberAccess) {
@@ -98,6 +144,11 @@ export async function MonitorFetcher() {
     name: (m.users as any)?.name ?? 'Unknown',
   }))
 
+  // Assignee resolved from the member list rather than a per-row join — see
+  // TASK_COLS. Built as a lookup so this stays one pass over the tasks.
+  const memberById: Record<string, { id: string; name: string }> = {}
+  memberList.forEach(m => { memberById[m.id] = m })
+
   const taskList = (tasks ?? []).map((t: any) => ({
     ...t,
     // No `description` key at all: undefined tells the detail panel to fetch
@@ -107,21 +158,19 @@ export async function MonitorFetcher() {
     project_id: t.project_id ?? null, parent_task_id: t.parent_task_id ?? null,
     approval_status: t.approval_status ?? null,
     is_recurring: t.is_recurring ?? false,
-    frequency: t.frequency ?? null, next_occurrence_date: t.next_occurrence_date ?? null,
-    estimated_hours: t.estimated_hours ?? null,
     created_at: t.created_at ?? '',
-    updated_at: t.updated_at ?? null, is_billable: t.is_billable ?? false,
-    billable_amount: t.billable_amount ?? null,
-    assignee: (t.assignee as any) ?? null, approver: (t.approver as any) ?? null,
-    creator: (t.creator as any) ?? null,
+    updated_at: t.updated_at ?? null,
+    assignee: t.assignee_id ? (memberById[t.assignee_id] ?? null) : null,
+    // Declared on MonTask but never read, so they are filled in rather than
+    // fetched. Dropping them from the select removed two joins from a query
+    // that returns thousands of rows.
+    approver: null, creator: null, project: null,
     client: t.client_id ? (clientMap[t.client_id] ?? null) : null,
-    project: (t.projects as any) ?? null,
   }))
 
-  // Either query hitting its cap means the stats bar below is computed over a
+  // The query hitting its cap means the stats bar below is computed over a
   // partial set. Surface it rather than showing a quietly wrong count.
-  const truncated =
-    (datedTasks?.length ?? 0) >= DATED_CAP || (undatedTasks?.length ?? 0) >= UNDATED_CAP
+  const truncated = (datedTasks?.length ?? 0) >= DATED_CAP
 
   return <MonitorView
     tasks={taskList as any}
@@ -131,5 +180,6 @@ export async function MonitorFetcher() {
     userRole={mb.role}
     from90={from90}
     truncated={truncated}
+    undatedCount={undatedCount ?? 0}
   />
 }

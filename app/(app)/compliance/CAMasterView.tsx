@@ -229,12 +229,23 @@ function PriorityBadge({ value }: { value: string }) {
 
 /** Date cell — teal if set, gray placeholder if empty */
 function DateCell({
-  monthKey, dateStr, editable,
+  monthKey, dateStr, editable, dirty,
   onSave, onClear,
 }: {
   monthKey: MonthKey
   dateStr: string | undefined
   editable: boolean
+  /**
+   * This date has been changed but not yet saved.
+   *
+   * Without this the cell was the whole problem: typing a date updated it
+   * optimistically, so an unsaved value looked exactly like a stored one. The
+   * only hint anything was pending was a small Save button appearing in the
+   * far-right actions column, several columns away and easy to miss entirely
+   * — so people reasonably believed the date had already been saved, or that
+   * the app had changed it by itself.
+   */
+  dirty: boolean
   onSave: (iso: string) => void
   onClear: () => void
 }) {
@@ -299,7 +310,10 @@ function DateCell({
   return (
     <td
       onClick={openEdit}
-      title={dateStr ?? `Set ${MONTH_LABELS[monthKey]} date`}
+      title={
+        dirty ? `${dateStr ?? 'Cleared'} — not saved yet. Press Save on this row.`
+        : dateStr ?? `Set ${MONTH_LABELS[monthKey]} date`
+      }
       style={{
         padding: '4px 2px', verticalAlign: 'middle', minWidth: 52, textAlign: 'center',
         cursor: editable ? 'pointer' : 'default',
@@ -309,9 +323,23 @@ function DateCell({
         <span style={{
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
           width: 28, height: 22, borderRadius: 6, fontSize: 12, fontWeight: 600,
-          background: '#f0fdfa', color: '#0d9488', border: '1px solid #99f6e4',
+          // Amber and dashed while unsaved, so an edit cannot be mistaken for
+          // a stored value. Teal and solid once it is actually saved.
+          ...(dirty
+            ? { background: '#fffbeb', color: '#b45309', border: '1.5px dashed #f59e0b' }
+            : { background: '#f0fdfa', color: '#0d9488', border: '1px solid #99f6e4' }),
         }}>
           {day}
+        </span>
+      ) : dirty ? (
+        // A cleared-but-unsaved date needs to read as pending too, not as the
+        // same empty dash a never-set month shows.
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          width: 28, height: 22, borderRadius: 6, fontSize: 12, fontWeight: 600,
+          background: '#fffbeb', color: '#b45309', border: '1.5px dashed #f59e0b',
+        }}>
+          —
         </span>
       ) : (
         <span style={{
@@ -1511,7 +1539,7 @@ const inputStyle: React.CSSProperties = {
 
 function TaskRow({
   task, editable, fy,
-  onUpdate, onDelete, hasPendingChanges, onSave,
+  onUpdate, onDelete, hasPendingChanges, pendingDates, justConfirmed, onSave,
   templates, selectedTemplateIds, onTemplateSelect, onManageTemplates,
 }: {
   task: CAMasterTask
@@ -1520,6 +1548,12 @@ function TaskRow({
   onUpdate: (patch: Partial<CAMasterTask>) => void
   onDelete: () => void
   hasPendingChanges: boolean
+  /** The month keys with an unsaved date on this row, or undefined when the
+   *  row has no pending edits. Drives the per-cell amber marker. */
+  pendingDates: Record<string, string> | undefined
+  /** Saved in this sitting — the row is being held visible deliberately
+   *  rather than disappearing out of the "To review" tab. */
+  justConfirmed: boolean
   onSave: () => Promise<void>
   templates: AttachTemplate[]
   selectedTemplateIds: string[]
@@ -1678,13 +1712,17 @@ function TaskRow({
         onApply={dates => onUpdate({ dates: { ...task.dates, ...dates } })}
       />
 
-      {/* Month date cells */}
+      {/* Month date cells.
+          `dirty` is per MONTH, not per row: a row can hold one edited date
+          among eleven stored ones, and highlighting the whole row would not
+          say which. */}
       {MONTH_KEYS.map(mk => (
         <DateCell
           key={mk}
           monthKey={mk}
           dateStr={task.dates[mk]}
           editable={editable}
+          dirty={pendingDates ? mk in pendingDates : false}
           onSave={iso => handleDateSave(mk, iso)}
           onClear={() => handleDateClear(mk)}
         />
@@ -1694,20 +1732,33 @@ function TaskRow({
       <td style={{ padding: '4px 8px', verticalAlign: 'middle', textAlign: 'center' }}>
         {editable && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
-            {hasPendingChanges && (
+            {/* Three distinct states, each said out loud. Previously the only
+                one with any UI was the middle one, and it was a bare "Save"
+                button with nothing explaining why it had appeared. */}
+            {hasPendingChanges ? (
               <button
                 onClick={onSave}
-                title="Save changes"
+                title="Save the highlighted changes on this row"
                 style={{
                   display: 'flex', alignItems: 'center', gap: 3,
                   padding: '3px 8px', borderRadius: 6, border: 'none',
-                  background: 'var(--brand)', color: '#fff',
-                  fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                  background: '#f59e0b', color: '#fff',
+                  fontSize: 11, fontWeight: 700, cursor: 'pointer',
                 }}
               >
                 <Save size={11} /> Save
               </button>
-            )}
+            ) : justConfirmed ? (
+              <span title="Saved just now — moved to the Confirmed tab"
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 3,
+                  padding: '3px 7px', borderRadius: 6,
+                  background: '#f0fdfa', color: '#0d9488',
+                  border: '1px solid #99f6e4', fontSize: 10, fontWeight: 700,
+                }}>
+                ✓ Saved
+              </span>
+            ) : null}
             <button
               onClick={onDelete}
               title="Delete task"
@@ -1730,7 +1781,7 @@ function TaskRow({
 
 function GroupSection({
   groupName, tasks, editable, fy,
-  pendingChanges, onUpdate, onDelete, onSaveRow,
+  pendingChanges, justConfirmedIds, onUpdate, onDelete, onSaveRow,
   templates, taskSel, onTemplateSelect, onManageTemplates,
 }: {
   groupName: string
@@ -1738,6 +1789,7 @@ function GroupSection({
   editable: boolean
   fy: string
   pendingChanges: Record<string, Partial<CAMasterTask>>
+  justConfirmedIds: Set<string>
   onUpdate: (id: string, patch: Partial<CAMasterTask>) => void
   onDelete: (id: string) => void
   onSaveRow: (id: string) => Promise<void>
@@ -1786,6 +1838,8 @@ function GroupSection({
           onUpdate={patch => onUpdate(task.id, patch)}
           onDelete={() => onDelete(task.id)}
           hasPendingChanges={!!pendingChanges[task.id]}
+          pendingDates={pendingChanges[task.id]?.dates as Record<string, string> | undefined}
+          justConfirmed={justConfirmedIds.has(task.id)}
           onSave={() => onSaveRow(task.id)}
           templates={templates}
           selectedTemplateIds={taskSel[task.id] ?? []}
@@ -1814,7 +1868,30 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
   const [triggering,      setTriggering]      = useState(false)
   const [groupFilter, setGroupFilter] = useState<GroupFilter>(GROUP_FILTER_ALL)
   const [search, setSearch] = useState('')
-  const [savedTab, setSavedTab] = useState<'unsaved' | 'saved'>('unsaved')
+  /**
+   * Which review state to show.
+   *
+   * These tabs filter on `is_user_saved`, a column meaning "a person has
+   * checked this task's dates at least once". They were labelled "Unsaved" and
+   * "Saved", which is the same word the page uses for edits you have typed but
+   * not yet submitted — two completely different things sharing one word.
+   *
+   * The reported symptom was exactly this collision: edit a date, press Save,
+   * and the row leaves the "Unsaved" tab and vanishes, which reads as the app
+   * doing something on its own. Renamed to say what they actually mean, and an
+   * "All" tab added because there was previously no way to see the whole
+   * calendar at once.
+   */
+  const [savedTab, setSavedTab] = useState<'review' | 'confirmed' | 'all'>('review')
+  /**
+   * Rows saved in this sitting.
+   *
+   * Saving sets is_user_saved, which moves a row out of the "To review" tab.
+   * Without this it disappears from under the cursor the instant it is saved —
+   * the single most confusing thing about this screen. Kept visible (with a
+   * "just confirmed" marker) until the tab or filter is changed deliberately.
+   */
+  const [justConfirmed, setJustConfirmed] = useState<Set<string>>(new Set())
   const [showAddModal, setShowAddModal] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [pendingChanges, setPendingChanges] = useState<Record<string, Partial<CAMasterTask>>>({})
@@ -2166,9 +2243,14 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
       mig?.warnings?.forEach(w => toast.error(w))
       setPendingChanges(p => { const n = { ...p }; delete n[id]; return n })
       setTasks(ts => ts.map(t => t.id === id ? { ...t, is_user_saved: true } : t))
+      // Keep the row on screen. Saving flips is_user_saved, which would
+      // otherwise drop it out of the "To review" tab mid-edit.
+      setJustConfirmed(s => new Set(s).add(id))
       // Update our baseline so next save compares against fresh values
       if (original) originalValuesRef.current[id] = { ...original, ...patch }
-      toast.success('Task saved')
+      // Names the consequence, because the row visibly gains a "Confirmed"
+      // badge at the same moment and that needs explaining once.
+      toast.success('Saved — this task is now marked Confirmed')
 
       // Check if any propagation-relevant fields changed
       if (original) {
@@ -2287,6 +2369,9 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
       })
       const savedSet = new Set(savedRowIds)
       setTasks(ts => ts.map(t => savedSet.has(t.id) ? { ...t, is_user_saved: true } : t))
+      // Keep every saved row on screen — see justConfirmed. A bulk save would
+      // otherwise empty the view the user was working in.
+      setJustConfirmed(s => { const n = new Set(s); savedRowIds.forEach(id => n.add(id)); return n })
 
       // Advance baselines so the next save compares against fresh values
       savedRowIds.forEach(id => {
@@ -2379,10 +2464,16 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
     const searchedSavedCount   = searchFiltered.filter(t => t.is_user_saved).length
     const searchedUnsavedCount = searchFiltered.filter(t => !t.is_user_saved).length
 
-    // Then apply tab filter
+    // Then apply tab filter.
+    //
+    // A row confirmed in this sitting stays put even though it no longer
+    // belongs to the "To review" tab. Dropping it the moment it is saved is
+    // what made saving feel like the app changing things by itself.
     const filtered = searchFiltered.filter(t => {
-      if (savedTab === 'saved'   && !t.is_user_saved) return false
-      if (savedTab === 'unsaved' &&  t.is_user_saved) return false
+      if (savedTab === 'all') return true
+      if (justConfirmed.has(t.id)) return true
+      if (savedTab === 'confirmed' && !t.is_user_saved) return false
+      if (savedTab === 'review'    &&  t.is_user_saved) return false
       return true
     })
     const map = new Map<string, CAMasterTask[]>()
@@ -2391,7 +2482,7 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
       map.get(t.group_name)!.push(t)
     }
     return { grouped: map, searchedUnsavedCount, searchedSavedCount }
-  }, [tasks, groupFilter, search, savedTab])
+  }, [tasks, groupFilter, search, savedTab, justConfirmed])
 
   /* ─── Render ────────────────────────────────────────────────── */
 
@@ -2707,19 +2798,64 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
           </button>
         )}
 
-        {Object.keys(pendingChanges).length > 0 && (
-          <button
-            onClick={handleSaveAll}
-            disabled={savingAll}
-            style={{
-              ...btnPrimary, display: 'flex', alignItems: 'center', gap: 6,
-              background: '#0d9488', opacity: savingAll ? 0.7 : 1,
-            }}
-          >
-            <Save size={14} />
-            {savingAll ? 'Saving…' : `Bulk Save (${Object.keys(pendingChanges).length})`}
-          </button>
-        )}
+        {/* Unsaved-changes bar.
+            This was a lone "Bulk Save (3)" button, which said how many rows
+            were pending but not that anything was wrong, and offered no way
+            to back out. Amber to match the highlighted cells, so the two read
+            as one state, and with an explicit discard — people edit a date to
+            see what it looks like and then need a way out. */}
+        {Object.keys(pendingChanges).length > 0 && (() => {
+          const n = Object.keys(pendingChanges).length
+          return (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              background: '#fffbeb', border: '1.5px solid #f59e0b',
+              borderRadius: 8, padding: '5px 8px 5px 12px',
+            }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#92400e' }}>
+                {n} task{n !== 1 ? 's' : ''} not saved
+              </span>
+              <button
+                onClick={handleSaveAll}
+                disabled={savingAll}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  padding: '5px 12px', borderRadius: 6, border: 'none',
+                  background: '#f59e0b', color: '#fff',
+                  fontSize: 12, fontWeight: 700, cursor: savingAll ? 'default' : 'pointer',
+                  opacity: savingAll ? 0.7 : 1, fontFamily: 'inherit',
+                }}
+              >
+                <Save size={13} />
+                {savingAll ? 'Saving…' : `Save all ${n}`}
+              </button>
+              <button
+                onClick={() => {
+                  // Restores from the server-confirmed baseline rather than
+                  // refetching, so a discard is instant and cannot half-apply.
+                  const ids = Object.keys(pendingChanges)
+                  setTasks(ts => ts.map(t => {
+                    if (!ids.includes(t.id)) return t
+                    const base = originalValuesRef.current[t.id]
+                    return base ? { ...t, ...base } : t
+                  }))
+                  setPendingChanges({})
+                  toast.success('Changes discarded')
+                }}
+                disabled={savingAll}
+                title="Put every edited value back to what is stored"
+                style={{
+                  padding: '5px 10px', borderRadius: 6,
+                  border: '1px solid #fcd34d', background: 'transparent',
+                  color: '#92400e', fontSize: 12, fontWeight: 600,
+                  cursor: savingAll ? 'default' : 'pointer', fontFamily: 'inherit',
+                }}
+              >
+                Discard
+              </button>
+            </div>
+          )
+        })()}
 
         <div style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
           {loading ? (
@@ -2761,15 +2897,23 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
           )}
         </div>
 
-        {/* Unsaved / Saved tabs */}
+        {/* Review-state tabs.
+            Labelled for what they mean — whether a person has checked the
+            dates — not "Saved/Unsaved", which collided with the page's own
+            word for edits not yet submitted. */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 0, borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border)', flexShrink: 0 }}>
           {([
-            { key: 'unsaved', label: 'Unsaved', count: searchedUnsavedCount, color: '#ca8a04' },
-            { key: 'saved',   label: 'Saved',   count: searchedSavedCount,   color: '#0d9488' },
+            { key: 'review',    label: 'To review', count: searchedUnsavedCount, color: '#ca8a04',
+              hint: 'Dates straight from the statutory catalogue — nobody has checked them yet' },
+            { key: 'confirmed', label: 'Confirmed', count: searchedSavedCount,   color: '#0d9488',
+              hint: 'Someone has checked these dates for this financial year' },
+            { key: 'all',       label: 'All',       count: searchedUnsavedCount + searchedSavedCount, color: '#475569',
+              hint: 'The whole calendar, whether checked or not' },
           ] as const).map(tab => {
             const active = savedTab === tab.key
             return (
-              <button key={tab.key} onClick={() => setSavedTab(tab.key)}
+              <button key={tab.key} onClick={() => { setSavedTab(tab.key); setJustConfirmed(new Set()) }}
+                title={tab.hint}
                 style={{
                   padding: '6px 14px', fontSize: 12, fontWeight: active ? 700 : 500,
                   border: 'none',
@@ -2868,6 +3012,7 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
                     editable={canEdit}
                     fy={fy}
                     pendingChanges={pendingChanges}
+                    justConfirmedIds={justConfirmed}
                     onUpdate={handleUpdate}
                     onDelete={requestDelete}
                     onSaveRow={handleSaveRow}

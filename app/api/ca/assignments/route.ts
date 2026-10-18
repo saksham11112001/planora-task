@@ -18,6 +18,7 @@ export async function GET(req: NextRequest) {
   const admin = createAdminClient()
 
   const clientId       = req.nextUrl.searchParams.get('client_id')
+  const masterTaskId   = req.nextUrl.searchParams.get('master_task_id')
   // include_inactive=true is used by the CA kanban board so paused assignments
   // are still returned and can be shown in the "Paused" section with an Activate button.
   // All other callers (e.g. CAClientSetupView) omit this param and get only active ones.
@@ -38,6 +39,12 @@ export async function GET(req: NextRequest) {
 
     if (!includeInactive) query = query.eq('is_active', true)
     if (clientId) query = query.eq('client_id', clientId)
+    // Narrowing by TASK, for the "assign one task to many clients" view. The
+    // whole-org read is a few hundred rows wide per client; asking for one
+    // task's clients is a couple of hundred rows total, so the task-first
+    // screen does not have to pull the entire assignment table to find out
+    // which clients already have one task.
+    if (masterTaskId) query = query.eq('master_task_id', masterTaskId)
 
     // created_at is not unique, so it cannot page on its own — id breaks the ties.
     return query.order('created_at', { ascending: false }).order('id', { ascending: true })

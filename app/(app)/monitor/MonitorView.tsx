@@ -51,6 +51,14 @@ interface Props {
   from90: string
   /** Set when either server query hit its row cap — the stats below are partial. */
   truncated?: boolean
+  /**
+   * How many tasks in scope have no due date.
+   *
+   * Counted rather than loaded — see MonitorFetcher. Monitor is organised
+   * entirely around when work is due, so these were padding the list without
+   * being actionable in it. The number is shown so they stay visible.
+   */
+  undatedCount?: number
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
@@ -130,7 +138,7 @@ function selectStyle(active: boolean) {
   } as React.CSSProperties
 }
 
-export function MonitorView({ tasks: initialTasks, members, clients, currentUserId, userRole, from90, truncated = false }: Props) {
+export function MonitorView({ tasks: initialTasks, members, clients, currentUserId, userRole, from90, truncated = false, undatedCount = 0 }: Props) {
   // Drop completed tasks older than 90 days. The fetcher now applies the same
   // cutoff in the database, so this is a redundant safety net rather than the
   // primary filter — kept because it is free and guards against a row slipping
@@ -259,7 +267,13 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
    * actually wants to read.
    */
   async function openTask(id: string) {
-    const row = tasks.find(t => t.id === id) ?? subtasks.find(t => t.id === id)
+    // undatedTasks is searched too: those rows are not in `tasks` (the server
+    // counts them rather than loading them), so without this a click in the
+    // no-due-date panel would be silently ignored — and that panel exists
+    // precisely so someone can open a task and give it a date.
+    const row = tasks.find(t => t.id === id)
+      ?? subtasks.find(t => t.id === id)
+      ?? undatedTasks.find(t => t.id === id)
     if (!row) return
 
     if (!row.parent_task_id) { setPanelTask(row as unknown as Task); return }
@@ -441,6 +455,12 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
   // flag. The checkbox sat on "Loading subtasks…" for ever. A ref cannot
   // retrigger the effect, so the fetch runs exactly once.
   const subtaskFetchStarted = useRef(false)
+  // No-due-date panel: counted on the server, loaded here only when opened.
+  const [showUndated,    setShowUndated]    = useState(false)
+  const [undatedTasks,   setUndatedTasks]   = useState<MonTask[]>([])
+  const [undatedLoading, setUndatedLoading] = useState(false)
+  const [undatedError,   setUndatedError]   = useState('')
+  const undatedFetchStarted = useRef(false)
   const mountedRef          = useRef(true)
   useEffect(() => () => { mountedRef.current = false }, [])
 
@@ -482,6 +502,48 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showSubtasks])
 
+  /**
+   * Tasks with no due date, fetched only when an admin asks for them.
+   *
+   * Same shape as the subtask load above, and for the same reason: Monitor's
+   * default payload stays small, and work that cannot be placed on a calendar
+   * does not clutter a view organised entirely around dates. The difference
+   * is that these are shown in order to be FIXED — an admin opens them to set
+   * dates, which is the only way they ever become trackable.
+   */
+  useEffect(() => {
+    if (!showUndated || undatedFetchStarted.current) return
+    undatedFetchStarted.current = true
+    setUndatedLoading(true); setUndatedError('')
+
+    fetch(`/api/tasks?no_due_date=true&top_level=true&exclude_recurring=true&limit=${SUBTASK_FETCH_LIMIT}`)
+      .then(r => r.ok ? r.json() : Promise.reject(new Error(String(r.status))))
+      .then((json: { data?: any[] }) => {
+        if (!mountedRef.current) return
+        const memberById: Record<string, { id: string; name: string }> = {}
+        members.forEach(m => { memberById[m.id] = m })
+        const clientById: Record<string, { id: string; name: string; color: string }> = {}
+        clients.forEach(c => { clientById[c.id] = c })
+        setUndatedTasks((json.data ?? [])
+          // Completed and cancelled work needs no due date, so showing it here
+          // would pad a list whose whole purpose is "these need a date".
+          .filter((t: any) => !['completed', 'cancelled'].includes(t.status))
+          .map((t: any) => ({
+            ...t,
+            assignee: t.assignee_id ? (memberById[t.assignee_id] ?? null) : null,
+            client:   t.client_id   ? (clientById[t.client_id]   ?? null) : null,
+            project:  null, approver: null, creator: null,
+          })) as MonTask[])
+      })
+      .catch(() => {
+        if (!mountedRef.current) return
+        setUndatedError('Could not load these — close and try again')
+        undatedFetchStarted.current = false
+      })
+      .finally(() => { if (mountedRef.current) setUndatedLoading(false) })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showUndated])
+
   // ── Filtering ──
   const visible = useMemo(() => {
     // Subtasks join the browsable LIST only. They are deliberately kept out of
@@ -489,6 +551,10 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
     // `tasks` directly: folding subtasks into those would change what every
     // headline number means and break comparison with any figure quoted before
     // today.
+    //
+    // Undated tasks are kept out of BOTH. They are shown in their own panel,
+    // because mixing them into a list sorted and filtered by due date is what
+    // made them impossible to track in the first place.
     const source = showSubtasks ? [...tasks, ...subtasks] : tasks
     return source.filter(t => {
       if (search) {
@@ -712,6 +778,91 @@ export function MonitorView({ tasks: initialTasks, members, clients, currentUser
               noun="tasks"
               hint="Filter by client, assignee or date to see the rest."
             />
+          </div>
+        )}
+
+        {/* Tasks with no due date.
+            Deliberately not in the list: Monitor is organised around when
+            work is due, so a dateless task has no row that means anything
+            here — it cannot be overdue, cannot fall in a month, and cannot
+            appear in the trend. Shown as a count with one click through to
+            the task list filtered to them, which is where a date can
+            actually be set. */}
+        {undatedCount > 0 && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+            background: 'var(--surface-alt)', border: '1px solid var(--border)',
+            borderRadius: 8, padding: '7px 12px', marginBottom: 4,
+          }}>
+            <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+              <strong style={{ color: 'var(--text-primary)' }}>{undatedCount}</strong>
+              {' '}task{undatedCount !== 1 ? 's have' : ' has'} no due date, so {undatedCount !== 1 ? 'they are' : 'it is'} not counted above.
+            </span>
+            <button onClick={() => setShowUndated(v => !v)}
+              style={{
+                background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                fontSize: 12, fontWeight: 700, color: 'var(--brand)', fontFamily: 'inherit',
+              }}>
+              {showUndated ? 'Hide' : 'Show them'} {showUndated ? '↑' : '↓'}
+            </button>
+          </div>
+        )}
+
+        {/* The no-due-date list. Loaded on demand, and shown for one purpose:
+            giving a date to work that has none. Clicking a row opens the same
+            detail panel as everywhere else, which is where the date is set. */}
+        {showUndated && (
+          <div style={{
+            border: '1px solid var(--border)', borderRadius: 8,
+            marginBottom: 6, overflow: 'hidden',
+          }}>
+            {undatedLoading && (
+              <p style={{ margin: 0, padding: '12px 14px', fontSize: 12, color: 'var(--text-muted)' }}>
+                Loading…
+              </p>
+            )}
+            {undatedError && (
+              <p style={{ margin: 0, padding: '12px 14px', fontSize: 12, color: '#dc2626' }}>
+                {undatedError}
+              </p>
+            )}
+            {!undatedLoading && !undatedError && undatedTasks.length === 0 && (
+              <p style={{ margin: 0, padding: '12px 14px', fontSize: 12, color: 'var(--text-muted)' }}>
+                Nothing open without a date.
+              </p>
+            )}
+            {/* States its own count. The banner's number is org-wide; this
+                list is scoped to what the viewer may see, so for a member
+                without full visibility the two can legitimately differ and
+                saying so is better than looking broken. */}
+            {!undatedLoading && !undatedError && undatedTasks.length > 0 && (
+              <p style={{
+                margin: 0, padding: '7px 14px', fontSize: 11, fontWeight: 700,
+                color: 'var(--text-muted)', letterSpacing: '0.04em', textTransform: 'uppercase',
+                background: 'var(--surface-subtle)',
+              }}>
+                {undatedTasks.length} task{undatedTasks.length !== 1 ? 's' : ''} needing a date
+                {undatedTasks.length !== undatedCount && ` · ${undatedCount} across the firm`}
+              </p>
+            )}
+            {undatedTasks.map(t => (
+              <button key={t.id} onClick={() => void openTask(t.id)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                  textAlign: 'left', padding: '8px 14px', cursor: 'pointer',
+                  background: 'none', border: 'none',
+                  borderTop: '1px solid var(--border)', fontFamily: 'inherit',
+                }}>
+                <span style={{ flex: 1, fontSize: 12.5, color: 'var(--text-primary)' }}>{t.title}</span>
+                {t.client && (
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t.client.name}</span>
+                )}
+                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                  {t.assignee?.name ?? 'Unassigned'}
+                </span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--brand)' }}>Set date →</span>
+              </button>
+            ))}
           </div>
         )}
 

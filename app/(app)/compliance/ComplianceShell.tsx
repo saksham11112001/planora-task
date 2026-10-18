@@ -4,6 +4,7 @@ import { useSearchParams } from 'next/navigation'
 import { FileCheck, ChevronRight, Search, ClipboardList, ShieldCheck } from 'lucide-react'
 import { CAMasterView } from './CAMasterView'
 import { CAClientSetupView } from './CAClientSetupView'
+import { CAAssignByTaskView } from './CAAssignByTaskView'
 import { CATasksView } from './CATasksView'
 import { CADSCTrackerView } from './CADSCTrackerView'
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel'
@@ -713,6 +714,9 @@ export function ComplianceShell({ userRole, currentUserId }: Props) {
   const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(initStep as 1 | 2 | 3 | 4 | 5)
   const isAdmin = ['owner', 'admin'].includes(userRole)
   const canSetupClients = ['owner', 'admin', 'manager'].includes(userRole)
+  // Which way round assignment is being done on step 2. Defaults to
+  // client-first, which is what the step has always been.
+  const [assignMode, setAssignMode] = useState<'client' | 'task'>('client')
 
   /* ── Shared members + clients for CATasksView ── */
   const [sharedMembers, setSharedMembers] = useState<{ id: string; name: string; role?: string }[]>([])
@@ -904,7 +908,53 @@ export function ComplianceShell({ userRole, currentUserId }: Props) {
             </button>
           </div>
         )}
-        {step === 2 && <CAClientSetupView userRole={userRole} />}
+        {/* Step 2 holds BOTH directions of the same job.
+            A sixth numbered tab would have made a flow people already find
+            heavy heavier still; the question is not "which screen" but
+            "which way round am I working today". */}
+        {step === 2 && (
+          <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+              padding: '10px 20px 0',
+            }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                Assign
+              </span>
+              <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border)' }}>
+                {([
+                  { key: 'client' as const, label: 'One client, many tasks',
+                    hint: 'Onboarding a client: tick everything that applies to them' },
+                  { key: 'task'   as const, label: 'One task, many clients',
+                    hint: 'A statute applies across your book: tick every client it covers' },
+                ]).map(m => {
+                  const active = assignMode === m.key
+                  return (
+                    <button key={m.key} onClick={() => setAssignMode(m.key)} title={m.hint}
+                      style={{
+                        padding: '6px 14px', fontSize: 12, fontWeight: active ? 700 : 500,
+                        border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                        background: active ? 'var(--brand)' : 'var(--surface-alt)',
+                        color: active ? '#fff' : 'var(--text-secondary)',
+                      }}>
+                      {m.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+            <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+              {assignMode === 'client'
+                ? <CAClientSetupView userRole={userRole} />
+                : <CAAssignByTaskView
+                    financialYear="2026-27"
+                    clients={sharedClients}
+                    members={sharedMembers}
+                    canEdit={canSetupClients}
+                  />}
+            </div>
+          </div>
+        )}
         {step === 3 && <CAKanbanView userRole={userRole} currentUserId={currentUserId} />}
         {step === 4 && (
           <CATasksView

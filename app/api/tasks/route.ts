@@ -82,6 +82,11 @@ export async function GET(request: NextRequest) {
     // Monitor's opt-in "include subtasks" view, which is deliberately a separate
     // on-demand request so the default page load stays small.
     if (sp.get('subtasks_only') === 'true') q = q.not('parent_task_id', 'is', null)
+    // Tasks with no due date. Monitor counts these rather than loading them —
+    // it is organised entirely around when work is due, so a dateless task has
+    // no meaningful row there — and fetches them through this on demand when
+    // an admin asks to go and fix them. Same shape as subtasks_only above.
+    if (sp.get('no_due_date') === 'true') q = q.is('due_date', null)
     if (sp.get('exclude_recurring') === 'true') q = q.or('is_recurring.is.null,is_recurring.eq.false')
     if (sp.get('parent_recurring_id')) q = q.eq('parent_recurring_id', sp.get('parent_recurring_id')!)
     // Filter to CA compliance tasks only (custom_fields @> '{"_ca_compliance":true}')
