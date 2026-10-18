@@ -4,6 +4,8 @@ import {
   Search, Plus, ChevronDown, ChevronRight, Building2, X,
 } from 'lucide-react'
 import { toast } from '@/store/appStore'
+import { financialYearOf } from '@/lib/ca/financialYear'
+import { todayInCountry } from '@/lib/locale/countries'
 
 /* ─── Types ───────────────────────────────────────────────────── */
 
@@ -342,7 +344,7 @@ interface PropagateChange {
 
 interface Props { userRole: string; financialYear?: string }
 
-export function CAClientSetupView({ userRole, financialYear = '2026-27' }: Props) {
+export function CAClientSetupView({ userRole, financialYear = financialYearOf(todayInCountry(null)) }: Props) {
   const canEdit = ['owner', 'admin', 'manager'].includes(userRole)
 
   /* State */
@@ -1012,8 +1014,25 @@ export function CAClientSetupView({ userRole, financialYear = '2026-27' }: Props
                   Loading tasks…
                 </div>
               ) : masterTasks.length === 0 ? (
-                <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
-                  No master tasks found for FY {financialYear}
+                /* Said "No master tasks found for FY 2026-27" — true, and no
+                   use to anyone. It did not say WHY there were none, that the
+                   calendar is a prerequisite rather than something broken, or
+                   who can do anything about it. A manager landing here on a
+                   fresh org had an empty screen and no next move. */
+                <div style={{ padding: '28px 24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.7 }}>
+                  <p style={{ margin: 0, fontWeight: 700, color: 'var(--text-primary)', fontSize: 14 }}>
+                    The compliance calendar for FY {financialYear} is empty
+                  </p>
+                  <p style={{ margin: '6px auto 0', maxWidth: 420 }}>
+                    There are no statutory tasks to assign yet. The calendar — which tasks
+                    exist and when they fall due — has to be loaded once per financial year
+                    before clients can be set up.
+                  </p>
+                  <p style={{ margin: '10px 0 0', fontSize: 12 }}>
+                    {['owner', 'admin'].includes(userRole)
+                      ? 'Open the CA Calendar tab and choose "Load defaults from template".'
+                      : 'Ask an owner or admin to load it on the CA Calendar tab.'}
+                  </p>
                 </div>
               ) : (
                 Object.entries(grouped).map(([groupName, tasks]) => (

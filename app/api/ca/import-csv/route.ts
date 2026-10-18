@@ -5,6 +5,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import type { NextRequest }  from 'next/server'
 import { dbError } from '@/lib/api-error'
 import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
+import { financialYearOf } from '@/lib/ca/financialYear'
+import { todayInCountry } from '@/lib/locale/countries'
 
 export const maxDuration = 60
 
@@ -71,7 +73,7 @@ export async function POST(req: NextRequest) {
   catch { return NextResponse.json({ error: 'Invalid multipart form' }, { status: 400 }) }
 
   const file = formData.get('csv') as File | null
-  const fy   = ((formData.get('financial_year') as string) || '2026-27').trim()
+  const fy   = ((formData.get('financial_year') as string) || financialYearOf(todayInCountry(null))).trim()
 
   if (!file || file.size === 0)
     return NextResponse.json({ error: 'No CSV file provided' }, { status: 400 })

@@ -13,6 +13,8 @@ import { MONTH_KEYS, MONTH_LABELS, CA_GROUP_NAMES } from '@/lib/data/caDefaultTa
 import type { MonthKey } from '@/lib/data/caDefaultTasks'
 import { COUNTRY_TASK_SETS } from '@/lib/data/caDefaultTasksByCountry'
 import { toast } from '@/store/appStore'
+import { financialYearOf, financialYearOptions } from '@/lib/ca/financialYear'
+import { todayInCountry } from '@/lib/locale/countries'
 import { csvCell } from '@/lib/utils/csv'
 
 /* ─── Types ───────────────────────────────────────────────────── */
@@ -55,7 +57,10 @@ interface PropagatePrompt {
 
 /* ─── Constants ───────────────────────────────────────────────── */
 
-const FY_OPTIONS = ['2025-26', '2026-27', '2027-28'] as const
+/* Derived from today, not listed. The hardcoded ['2025-26','2026-27','2027-28']
+   would have stopped containing the CURRENT year in April 2028 — the dropdown
+   simply would not have offered the year the firm was working in. */
+const FY_OPTIONS = financialYearOptions(todayInCountry(null))
 type FYOption = typeof FY_OPTIONS[number]
 
 const PRIORITY_OPTS = ['low', 'medium', 'high', 'urgent'] as const
@@ -1853,9 +1858,9 @@ function GroupSection({
 
 /* ─── Main Component ──────────────────────────────────────────── */
 
-export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Props) {
+export function CAMasterView({ userRole, financialYear: initFY }: Props) {
   const [fy, setFy] = useState<FYOption>(
-    FY_OPTIONS.includes(initFY as FYOption) ? (initFY as FYOption) : '2026-27'
+    initFY && FY_OPTIONS.includes(initFY) ? initFY : financialYearOf(todayInCountry(null))
   )
   const [tasks, setTasks] = useState<CAMasterTask[]>([])
   const [loading, setLoading] = useState(true)
@@ -1911,7 +1916,7 @@ export function CAMasterView({ userRole, financialYear: initFY = '2026-27' }: Pr
   const originalValuesRef = useRef<Record<string, CAMasterTask>>({})
   // CSV import state
   const [showImportModal, setShowImportModal] = useState(false)
-  const [importFy,        setImportFy]        = useState<string>('2026-27')
+  const [importFy,        setImportFy]        = useState<string>(() => financialYearOf(todayInCountry(null)))
   const [importFile,      setImportFile]      = useState<File | null>(null)
   const [importing,       setImporting]       = useState(false)
   const [importResult,    setImportResult]    = useState<{
