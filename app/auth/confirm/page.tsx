@@ -172,29 +172,29 @@ function AuthConfirmInner() {
             </button>
           </form>
 
-          {!isRecovery && (
-            <button
-              onClick={() => navigateToNext(next, router)}
-              title="You will sign in with an emailed link each time until you set a password"
-              style={{ marginTop: 12, width: '100%', padding: '11px 16px', background: 'transparent',
-                color: '#94a3b8', border: '1.5px solid #e2e8f0', borderRadius: 10, fontSize: 13,
-                cursor: 'pointer', fontFamily: 'inherit' }}>
-              Skip — email me a link each time
-            </button>
-          )}
+          {/* THERE IS NO "SKIP" ANY MORE, and that is the point.
 
-          {/* This used to say "You can always set or change your password later
-              from your profile settings", which is not true: there is no
-              password field anywhere in settings. The only two places a
-              password can be set are this screen and the reset-password screen
-              reached from "Forgot password?". Someone who skipped was left
-              with no password, no way to make one from their profile, and this
-              sentence telling them to go looking for a control that does not
-              exist. Say what actually works. */}
+              An invite arrives as a one-time link. Someone who skipped setting
+              a password was left with no way back in at all: there is no
+              password field in profile settings (the only two places a
+              password can be set are this screen and the reset screen reached
+              from "Forgot password?"), so their only route was asking an admin
+              for another invite. The old copy under the skip button even told
+              them to go and set it later "from your profile settings", sending
+              them to look for a control that does not exist.
+
+              That is not hypothetical — it is what happened to the first
+              invited user, who believed she had set a password and then could
+              not sign in. Her auth row showed no write after provisioning, so
+              the password was never submitted.
+
+              Nothing is lost by requiring it: anyone who prefers signing in
+              without a password can still use "Continue with email link" on
+              the sign-in page every time. */}
           <p style={{ ...hint, marginTop: 14 }}>
             {isRecovery
               ? 'This replaces your old password immediately.'
-              : 'No password yet? You can sign in any time with an emailed link, or use “Forgot password?” on the sign-in page to set one.'}
+              : 'Prefer not to use a password? You can still sign in with an emailed link any time — but set one now so you are never locked out waiting for email.'}
           </p>
         </div>
       </div>
