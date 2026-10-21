@@ -175,15 +175,26 @@ function AuthConfirmInner() {
           {!isRecovery && (
             <button
               onClick={() => navigateToNext(next, router)}
+              title="You will sign in with an emailed link each time until you set a password"
               style={{ marginTop: 12, width: '100%', padding: '11px 16px', background: 'transparent',
                 color: '#94a3b8', border: '1.5px solid #e2e8f0', borderRadius: 10, fontSize: 13,
                 cursor: 'pointer', fontFamily: 'inherit' }}>
-              Skip for now
+              Skip — email me a link each time
             </button>
           )}
 
+          {/* This used to say "You can always set or change your password later
+              from your profile settings", which is not true: there is no
+              password field anywhere in settings. The only two places a
+              password can be set are this screen and the reset-password screen
+              reached from "Forgot password?". Someone who skipped was left
+              with no password, no way to make one from their profile, and this
+              sentence telling them to go looking for a control that does not
+              exist. Say what actually works. */}
           <p style={{ ...hint, marginTop: 14 }}>
-            You can always set or change your password later from your profile settings.
+            {isRecovery
+              ? 'This replaces your old password immediately.'
+              : 'No password yet? You can sign in any time with an emailed link, or use “Forgot password?” on the sign-in page to set one.'}
           </p>
         </div>
       </div>

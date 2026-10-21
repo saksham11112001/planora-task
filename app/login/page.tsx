@@ -41,6 +41,19 @@ function authErrorMessage(err: unknown, context: string, fallback: string): stri
   return e?.status ? `${fallback} (error ${e.status})` : fallback
 }
 
+/**
+ * The email address, as Auth stores it.
+ *
+ * Every path on this page used `email.trim()` and nothing more, while the
+ * invite path (lib/auth/inviteUser.ts) lowercases before creating the account.
+ * So an invite sent to "John.Smith@acme.com" creates the account as
+ * "john.smith@acme.com", and the four forms below then looked it up by
+ * whatever casing the person typed. Normalising in one place removes a whole
+ * class of "my password does not work" that is really "that is not the
+ * address the account is under".
+ */
+const normaliseEmail = (raw: string) => raw.trim().toLowerCase()
+
 type Mode = 'choose' | 'magic' | 'magic_sent' | 'email_password' | 'email_signup' | 'signup_confirm' | 'reset_password' | 'reset_sent'
 
 function MicrosoftIcon() {
@@ -218,7 +231,7 @@ export default function LoginPage() {
     const res  = await fetch('/api/auth/magic-link', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email.trim(), next: getPostLoginPath() }),
+      body: JSON.stringify({ email: normaliseEmail(email), next: getPostLoginPath() }),
     })
     const json = await res.json().catch(() => ({}))
     setLoading(false)
@@ -235,7 +248,7 @@ export default function LoginPage() {
 
     const supabase = createClient()
     const { data, error: err } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
+      email: normaliseEmail(email),
       password,
     })
     if (err || !data.user) {
@@ -261,7 +274,7 @@ export default function LoginPage() {
 
     const supabase = createClient()
     const { data, error: err } = await supabase.auth.signUp({
-      email: email.trim(),
+      email: normaliseEmail(email),
       password,
       options: {
         emailRedirectTo: `${APP_ORIGIN}/auth/callback?next=${encodeURIComponent(getPostLoginPath())}`,
@@ -311,7 +324,7 @@ export default function LoginPage() {
     if (!email.trim()) { setError('Enter your email address'); return }
     setLoading(true); setError('')
     const supabase = createClient()
-    const { error: err } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+    const { error: err } = await supabase.auth.resetPasswordForEmail(normaliseEmail(email), {
       redirectTo: `${window.location.origin}/auth/callback?recovery=1`,
     })
     setLoading(false)
