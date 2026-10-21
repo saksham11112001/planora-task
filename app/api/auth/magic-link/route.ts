@@ -14,6 +14,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Email required' }, { status: 400 })
     }
 
+    // Lowercase, not just trim. generateLink below CREATES the account when
+    // the address is unknown, so a stray capital does not fail -- it quietly
+    // mints a second account, and the person then cannot see why their
+    // membership and tasks are missing. The invite path (lib/auth/inviteUser.ts)
+    // and the sign-in form both store trim().toLowerCase(); this route is the
+    // one account-creating path that did not, so it has to agree with them.
+    const address = email.trim().toLowerCase()
+
     const admin   = createAdminClient()
     const siteUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://upfloat.co'
 
@@ -23,7 +31,7 @@ export async function POST(req: NextRequest) {
 
     const { data, error } = await admin.auth.admin.generateLink({
       type: 'magiclink',
-      email: email.trim(),
+      email: address,
       options: { redirectTo },
     })
 
@@ -36,7 +44,7 @@ export async function POST(req: NextRequest) {
 
     await resend.emails.send({
       from: FROM,
-      to:   email.trim(),
+      to:   address,
       subject: 'Your upFloat sign-in link',
       html: `
         <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;background:#fff">
