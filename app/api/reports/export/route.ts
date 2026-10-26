@@ -2,6 +2,7 @@ import { createClient }    from '@/lib/supabase/server'
 import { getAuthUser } from '@/lib/supabase/authUser'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { effectivePlan, canUseFeature } from '@/lib/utils/planGate'
+import { canDo } from '@/lib/utils/permissionGate'
 import { NextResponse }    from 'next/server'
 import type { NextRequest } from 'next/server'
 import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
@@ -24,6 +25,17 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Reports require Starter plan or above.' }, { status: 403 })
   }
 
+  // This route is the Reports page's download button, so it answers to the same
+  // permission as the page. It had no permission check of any kind, and it
+  // queries through the admin client, so ANY role -- member, viewer included --
+  // could call ?type=time and download every colleague's name, hours and
+  // billable split for the org. Restricting the page without restricting this
+  // would have been cosmetic: the data was one URL away.
+  //
+  // Without the permission the export is scoped to the caller's own rows, which
+  // is what the page now shows them, so the file matches the screen.
+  const canViewAll = await canDo(adminC, mb.org_id, user.id, mb.role, 'reports.view_all')
+
   const sp           = req.nextUrl.searchParams
   const type         = sp.get('type') ?? 'tasks'
   const format       = sp.get('format') ?? 'csv'     // 'csv' | 'xlsx'
@@ -41,8 +53,12 @@ export async function GET(req: NextRequest) {
       .eq('org_id', mb.org_id).gte('created_at', from30).neq('is_archived', true)
       .order('created_at', { ascending: false })
 
-    // Apply optional filters
-    if (assigneeIds.length)  q = q.in('assignee_id', assigneeIds)
+    // Apply optional filters.
+    // The caller's own id wins over whatever assigneeId they asked for: the
+    // request parameter is attacker-controlled, so it is ignored rather than
+    // ANDed, which would otherwise just return an empty file and look broken.
+    if (!canViewAll)             q = q.eq('assignee_id', user.id)
+    else if (assigneeIds.length) q = q.in('assignee_id', assigneeIds)
     if (clientIds.length)    q = q.in('client_id', clientIds)
     if (priorities.length)   q = q.in('priority', priorities)
     if (statuses.length)     q = q.in('status', statuses)
@@ -86,6 +102,10 @@ export async function GET(req: NextRequest) {
       .select('hours, is_billable, description, logged_date, user:users!time_logs_user_id_fkey(name), project:projects(name), task:tasks(title)')
       .eq('org_id', mb.org_id).gte('logged_date', logDateFrom)
       .order('logged_date', { ascending: false })
+
+    // The "Team member" column is this export's whole point, so without the
+    // permission it is restricted to the caller's own logged hours.
+    if (!canViewAll) q = q.eq('user_id', user.id)
 
     if (logDateTo) q = (q as any).lte('logged_date', logDateTo)
 

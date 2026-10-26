@@ -109,7 +109,8 @@ const DEFAULT_PERMISSIONS: RolePermissions = {
   'recurring.edit':     { admin: true,  manager: true,  member: false, viewer: false },
   'recurring.delete':   { admin: true,  manager: false, member: false, viewer: false },
   'reports.view_own':   { admin: true,  manager: true,  member: true,  viewer: true  },
-  'reports.view_all':   { admin: true,  manager: true,  member: false, viewer: false },
+  // Owner/admin only by default -- see the note in lib/utils/permissionGate.ts.
+  'reports.view_all':   { admin: true,  manager: false, member: false, viewer: false },
   'time.log':           { admin: true,  manager: true,  member: true,  viewer: false },
   'time.view_all':      { admin: true,  manager: true,  member: false, viewer: false },
   'team.invite':        { admin: true,  manager: false, member: false, viewer: false },

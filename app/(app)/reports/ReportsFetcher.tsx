@@ -32,6 +32,7 @@ export async function ReportsFetcher() {
     { data: projects },
     { data: members },
     { data: clients },
+    canViewAllReports,
   ] = await Promise.all([
     supabase.from('tasks')
       .select('id, title, status, priority, due_date, assignee_id, created_at, completed_at, project_id, client_id, is_billable, billable_amount, custom_fields, is_recurring, parent_recurring_id')
@@ -60,6 +61,17 @@ export async function ReportsFetcher() {
     supabase.from('org_members')
       .select('user_id, role, users(id, name, email)').eq('org_id', orgId).eq('is_active', true),
     supabase.from('clients').select('id, name, color').eq('org_id', orgId).eq('status','active').order('name'),
+    // Whose figures may this person see?
+    //
+    // Owner/admin always; otherwise the per-user override on
+    // org_members.permissions, then the org's role grid, then the built-in
+    // default -- which is now owner/admin only, so a manager no longer gets
+    // the whole team's individual numbers just by being a manager.
+    //
+    // Folded into this Promise.all rather than awaited after it: wipData below
+    // needs the answer, and a serial await here would add a round-trip to a
+    // page that has already been tuned down to one task query.
+    canDo(supabase, orgId, user.id, mb.role, 'reports.view_all'),
   ])
 
   // Derived subsets — no extra DB round-trips
@@ -236,6 +248,11 @@ export async function ReportsFetcher() {
       status: t.status,
       priority: t.priority,
       due_date: t.due_date,
+      // Carried so the scoping below can filter on the id. Filtering on
+      // assignee_name would be wrong: two staff can share a display name, and
+      // an unassigned task has a null name, so a name match would silently
+      // hand someone else's row to the wrong person.
+      assignee_id: t.assignee_id ?? null,
       assignee_name: (member?.users as any)?.name ?? null,
       client_id: t.client_id,
       client_name: clientObj?.name ?? null,
@@ -293,20 +310,6 @@ export async function ReportsFetcher() {
     memberMap[uid] = name
   })
 
-  // Whose figures may this person see?
-  //
-  // ReportsCharts used to decide this itself with a hardcoded
-  // ['owner','admin','manager'].includes(role) test, which meant the
-  // reports.view_all permission — settable per role in Settings → Permissions
-  // and per person in Team → Permissions — had no effect on this page at all.
-  // Granting it to a member changed nothing; they still saw only themselves.
-  //
-  // canDo applies the documented order: owner/admin always, then the per-user
-  // override on org_members.permissions, then the org's role grid, then the
-  // built-in default. So a Member with the permission granted now sees the
-  // whole team, and a Member without it still sees only their own row.
-  const canViewAllReports = await canDo(supabase, orgId, user.id, mb.role, 'reports.view_all')
-
   const actionItems = {
     overdue: tasks
       .filter(t => t.due_date && t.due_date < today && t.status !== 'completed' && t.status !== 'cancelled')
@@ -341,6 +344,39 @@ export async function ReportsFetcher() {
         due_date: t.due_date ?? null,
       }))
       .slice(0, 15),
+  }
+
+  // ── What a person without reports.view_all is actually sent ──────────────
+  //
+  // Filtered HERE, on the server, not hidden in the browser. Everything below
+  // used to be serialised into the page for everybody and merely not rendered,
+  // so a member could read the whole team's figures out of devtools. Hiding a
+  // chart is not access control.
+  //
+  // What stays firm-wide on purpose: the KPI tiles, the 14-day activity trend,
+  // priority split, project progress, time-by-project, the 12-week trajectory,
+  // status breakdown and the compliance report. Those describe the firm's and
+  // the clients' work, not any individual's performance, and a manager needs
+  // them to do the job. Only the views that name or rank PEOPLE are withheld.
+  const scoped = {
+    // "Team task completion" bar chart — one bar per colleague, by name. The
+    // chart is guarded by memberData.length > 0, so an empty array removes the
+    // whole card cleanly with no layout gap and no change in ReportsCharts.
+    memberData: canViewAllReports ? memberData : [],
+    // Own rows only. Their own name is not a disclosure.
+    employeeStats: canViewAllReports ? employeeStats : employeeStats.filter(e => e.uid === user.id),
+    // WIP: own tasks only. Everyone else's titles, clients and hours go.
+    wipData: canViewAllReports ? wipData : wipData.filter(w => w.assignee_id === user.id),
+    // Drives the assignee dropdown in the compliance filter bar, and the
+    // "Compliance — <name>" chart headings. Reduced to themselves, so the
+    // filter still works for their own work but lists nobody else.
+    complianceMemberList: canViewAllReports
+      ? complianceMemberList
+      : complianceMemberList.filter(m => m.id === user.id),
+    // The Action Items tab is already hidden without the permission, but the
+    // data was still shipped to the browser. Send nothing; the prop is
+    // optional and the tab badge is guarded on it.
+    actionItems: canViewAllReports ? actionItems : undefined,
   }
 
   const kpis = [
@@ -389,25 +425,21 @@ export async function ReportsFetcher() {
 
         <ReportsCharts
           dailyData={dailyData}
-          memberData={memberData}
+          memberData={scoped.memberData}
           priorityData={priorityData}
           projectData={projectData}
           timeByProject={timeByProject}
-          /* Filtered HERE, not in the browser. Every member's figures used to
-             be serialised into the page for everyone and merely hidden by the
-             client — readable by anyone who opened devtools. Someone without
-             reports.view_all is now simply not sent their colleagues' rows. */
-          employeeStats={canViewAllReports ? employeeStats : employeeStats.filter(e => e.uid === user.id)}
+          employeeStats={scoped.employeeStats}
           currentUserId={user.id}
           clients={clients ?? []}
           userRole={mb.role}
           canViewAllReports={canViewAllReports}
           complianceRawTasks={complianceRawTasks}
-          complianceMemberList={complianceMemberList}
-          wipData={wipData}
+          complianceMemberList={scoped.complianceMemberList}
+          wipData={scoped.wipData}
           trajectoryData={trajectoryData}
           statusBreakdown={statusBreakdown}
-          actionItems={actionItems}
+          actionItems={scoped.actionItems}
         />
       </div>
     </div>

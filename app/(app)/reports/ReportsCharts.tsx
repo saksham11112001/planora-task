@@ -390,7 +390,11 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
   // permission overrides. The old role-list test here ignored the permission
   // entirely, so a Member granted reports.view_all still saw only themselves.
   // The role fallback covers callers that predate the prop.
-  const canViewAll = canViewAllReports ?? (!userRole || ['owner','admin','manager'].includes(userRole))
+  // The fallback no longer includes 'manager': reports.view_all is owner/admin
+  // only by default, and a fallback that disagreed with the server would hand a
+  // manager the Action Items tab whenever the prop went missing. It is only a
+  // safety net -- ReportsFetcher always passes the resolved value.
+  const canViewAll = canViewAllReports ?? (!userRole || ['owner','admin'].includes(userRole))
 
   // Universal filter store — used to pre-filter compliance raw tasks
   const {
