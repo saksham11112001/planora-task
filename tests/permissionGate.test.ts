@@ -205,3 +205,76 @@ describe('assertCan', () => {
     assert.ok(denied.error.length > 0)
   })
 })
+
+describe('reports.view_all — owner/admin only', () => {
+  // Reports name and rank individual staff, so this key is deliberately
+  // stricter than the other *.view_all keys: those cover client work (tasks,
+  // leads, time) and stay manager:true.
+
+  test('owner and admin see the whole team', async () => {
+    const sb = makeSupabase({})
+    for (const role of ['owner', 'admin']) {
+      assert.equal(await canDo(sb as never, nextOrg(), 'u1', role, 'reports.view_all'), true)
+    }
+  })
+
+  test('manager does NOT see the whole team by default', async () => {
+    // The regression this change exists to prevent.
+    const sb = makeSupabase({})
+    assert.equal(await canDo(sb as never, nextOrg(), 'u1', 'manager', 'reports.view_all'), false)
+  })
+
+  test('member and viewer do not either', async () => {
+    const sb = makeSupabase({})
+    for (const role of ['member', 'viewer']) {
+      assert.equal(await canDo(sb as never, nextOrg(), 'u1', role, 'reports.view_all'), false)
+    }
+  })
+
+  test('everyone but viewer still gets their OWN reports', async () => {
+    // The restriction must not lock staff out of their own figures.
+    const sb = makeSupabase({})
+    for (const role of ['manager', 'member', 'viewer']) {
+      assert.equal(await canDo(sb as never, nextOrg(), 'u1', role, 'reports.view_own'), true)
+    }
+  })
+
+  test('a firm can still grant it to one manager, per role', async () => {
+    // Settings -> Permissions must keep working: this is a default, not a law.
+    const sb = makeSupabase({
+      org_settings: { role_permissions: { 'reports.view_all': { manager: true } } },
+    })
+    assert.equal(await canDo(sb as never, nextOrg(), 'u1', 'manager', 'reports.view_all'), true)
+  })
+
+  test('a firm can grant it to one PERSON, overriding their role', async () => {
+    // Team -> Permissions, e.g. a senior manager who does appraisals.
+    const sb = makeSupabase({
+      org_members: { permissions: { 'reports.view_all': true } },
+    })
+    assert.equal(await canDo(sb as never, nextOrg(), 'u1', 'member', 'reports.view_all'), true)
+  })
+
+  test('a stored grid that omits the key falls back to the NEW default', async () => {
+    // Most orgs saved their grid before this change. A grid that never carried
+    // reports.view_all must pick up owner/admin-only, not the old manager:true.
+    const sb = makeSupabase({
+      org_settings: { role_permissions: { 'tasks.create': { manager: true } } },
+    })
+    assert.equal(await canDo(sb as never, nextOrg(), 'u1', 'manager', 'reports.view_all'), false)
+  })
+
+  test('a stored grid that explicitly says manager:true still wins', async () => {
+    // Documents exactly why the SQL script is needed: an org that saved the old
+    // grid keeps manager access until the stored row is updated. This is the
+    // gap the code change alone does NOT close.
+    const sb = makeSupabase({
+      org_settings: {
+        role_permissions: {
+          'reports.view_all': { admin: true, manager: true, member: false, viewer: false },
+        },
+      },
+    })
+    assert.equal(await canDo(sb as never, nextOrg(), 'u1', 'manager', 'reports.view_all'), true)
+  })
+})
