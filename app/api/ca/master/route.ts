@@ -7,7 +7,7 @@ import { getTasksForCountries } from '@/lib/data/caDefaultTasksByCountry'
 import type { NextRequest } from 'next/server'
 import { dbError } from '@/lib/api-error'
 import { getApiOrgMembership } from '@/lib/supabase/apiActiveOrg'
-import { financialYearOf } from '@/lib/ca/financialYear'
+import { financialYearOf, rebaseDatesToFy } from '@/lib/ca/financialYear'
 import { todayInCountry } from '@/lib/locale/countries'
 
 export async function GET(req: NextRequest) {
@@ -125,7 +125,13 @@ export async function POST(req: NextRequest) {
     const rows = newTasks.map(t => ({
       org_id: mb.org_id, financial_year: fy,
       code: t.code, name: t.name, group_name: t.group_name,
-      task_type: t.task_type, dates: t.dates,
+      // Rebased onto the financial year being loaded, not copied verbatim.
+      // The catalogue stores absolute dates, so copying them meant a stale
+      // entry produced a due date a year in the past -- which the nightly
+      // spawner then skipped as 'too_old', silently, for ever. It also meant
+      // loading defaults for a future FY handed out this FY's dates.
+      // Statutory month and day are preserved; only the year is recomputed.
+      task_type: t.task_type, dates: rebaseDatesToFy(t.dates, fy),
       sort_order: t.sort_order,
       days_before_due: 7,
       attachment_count: t.attachment_count ?? 0,

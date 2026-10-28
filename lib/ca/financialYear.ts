@@ -68,3 +68,63 @@ export function financialYearOptions(today: string): string[] {
   if (!current) return []
   return [previousFinancialYear(current), current, nextFinancialYear(current)]
 }
+
+/**
+ * Re-date a master task's `dates` map onto a given financial year.
+ *
+ * WHY THIS EXISTS
+ * ---------------
+ * The default catalogue in lib/data/caDefaultTasks.ts stores absolute dates
+ * ('2026-10-31'), and "Load defaults" copied them into whichever financial
+ * year you asked for, verbatim. Two consequences, both silent:
+ *
+ *   1. Entries that were never updated carried a stale year. HVAT (Return)
+ *      shipped oct:'2025-10-31' on an otherwise FY-2026-27 catalogue. Loaded
+ *      into FY 2026-27 it produced a task whose due date was a year in the
+ *      past, so the nightly spawner classified it 'too_old' and skipped it --
+ *      every night, without an error. The obligation simply never appeared.
+ *
+ *   2. The whole catalogue goes stale annually. Loading defaults for
+ *      FY 2027-28 would have handed every firm FY 2026-27's dates.
+ *
+ * Rebasing on the way in removes both. The month and day are statutory and are
+ * kept exactly; only the year is recomputed from which side of 1 April the
+ * month falls on.
+ *
+ * The DATE's own month decides the year, not the map key. A few catalogue
+ * entries file a date under a neighbouring key (IEC renewal sits under 'jun'
+ * with a July date), and the statutory day is the thing to preserve.
+ */
+export function rebaseDatesToFy(
+  dates: Record<string, string> | null | undefined,
+  fy: string,
+): Record<string, string> {
+  if (!dates || typeof dates !== 'object') return {}
+  // An unparseable year must not silently rewrite every date to NaN. Returning
+  // the input unchanged is the only safe failure here: wrong-but-original
+  // beats confidently-corrupted.
+  if (!isValidFinancialYear(fy)) return { ...dates }
+  const startYear = Number(fy.slice(0, 4))
+
+  const out: Record<string, string> = {}
+  for (const [key, value] of Object.entries(dates)) {
+    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      out[key] = value          // leave anything unrecognised exactly as found
+      continue
+    }
+    const month = Number(value.slice(5, 7))
+    const day   = Number(value.slice(8, 10))
+    if (month < 1 || month > 12) { out[key] = value; continue }
+
+    const year = month >= 4 ? startYear : startYear + 1
+
+    // 29 February only exists in a leap year. Rebasing a leap date onto a
+    // common year would otherwise produce '2027-02-29', which Postgres rejects
+    // outright -- the whole "Load defaults" insert would fail on one date.
+    const isLeap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0
+    const safeDay = month === 2 && day === 29 && !isLeap ? 28 : day
+
+    out[key] = `${year}-${String(month).padStart(2, '0')}-${String(safeDay).padStart(2, '0')}`
+  }
+  return out
+}
