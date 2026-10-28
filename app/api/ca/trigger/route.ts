@@ -117,15 +117,29 @@ export async function POST(request: NextRequest) {
   const { data: instances } = await fetchAllRows<any>(
     (from, to) => admin
       .from('ca_task_instances')
-      .select('assignment_id, due_date')
+      .select('assignment_id, due_date, task_id')
       .eq('org_id', mb.org_id)
       .order('id', { ascending: true })
       .range(from, to),
     { maxRows: 20_000 },
   )
 
+  // ORPHANED RECORDS DO NOT COUNT AS "already spawned" HERE.
+  //
+  // ca_task_instances.task_id is `REFERENCES tasks(id) ON DELETE SET NULL`, so
+  // deleting a compliance task leaves its spawn record behind with task_id
+  // NULL -- and that record still holds UNIQUE (assignment_id, due_date).
+  // Treating it as proof the task exists is what made a deleted obligation
+  // unrecoverable: the task was gone, every later run skipped it as
+  // 'already_exists', and this button could not bring it back either.
+  //
+  // The nightly cron deliberately still counts them, so nothing resurrects on
+  // its own overnight. This route is a person explicitly asking to catch up,
+  // which is exactly when recreating a deleted task is the intended outcome.
   const existingKeys = new Set(
-    (instances ?? []).map((r: any) => `${r.assignment_id}__${r.due_date}`)
+    (instances ?? [])
+      .filter((r: any) => r.task_id !== null)
+      .map((r: any) => `${r.assignment_id}__${r.due_date}`)
   )
 
   // Also check actual tasks table — guards against ca_task_instances being out of sync
@@ -268,14 +282,21 @@ export async function POST(request: NextRequest) {
       // the cron's comment calls "the root cause of duplication": a task with
       // no spawn record. Nothing ever reconciled it, and every later run
       // re-attempted the same occurrence.
-      const { error: instErr } = await admin.from('ca_task_instances').insert({
+      // upsert, not insert: when this occurrence is being recreated after its
+      // task was deleted, the orphaned spawn record is still there and still
+      // holds UNIQUE (assignment_id, due_date). A plain insert would hit that
+      // constraint, the task below would be rolled back, and the occurrence
+      // would stay unrecoverable -- the exact state this change exists to end.
+      // Re-pointing the existing record keeps one row per occurrence and
+      // preserves its original created_at as the audit trail.
+      const { error: instErr } = await admin.from('ca_task_instances').upsert({
         org_id:        asgn.org_id,
         assignment_id: asgn.id,
         task_id:       newTask.id,
         due_date:      dueDateStr,
         month_key:     monthKey,
         status:        'created',
-      })
+      }, { onConflict: 'assignment_id,due_date' })
 
       if (instErr) {
         // Undo the task so the next run can retry cleanly, rather than

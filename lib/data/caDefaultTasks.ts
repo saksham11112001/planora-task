@@ -55,7 +55,7 @@ export const CA_DEFAULT_TASKS: CADefaultTask[] = [
   { code: 'ROC for LLP (Form 8)', name: 'ROC for LLP (Form 8)', group_name: 'ROC / Company Law', task_type: 'Form 8', sort_order: 61, dates: { oct:'2026-10-30' }, attachment_count: 2, attachment_headers: ['Filed Form 8', 'Acknowledgement'] },
   { code: 'ROC (With 30 days of AGM) (AOC-4)', name: 'ROC (With 30 days of AGM) (AOC-4)', group_name: 'ROC / Company Law', task_type: 'AOC-4', sort_order: 62, dates: { dec:'2026-12-31' }, attachment_count: 2, attachment_headers: ['Filed AOC-4', 'Acknowledgement'] },
   { code: 'ROC (With 60 days of AGM) (MGT-7)', name: 'ROC (With 60 days of AGM) (MGT-7)', group_name: 'ROC / Company Law', task_type: 'MGT-7', sort_order: 63, dates: { dec:'2026-12-31' }, attachment_count: 2, attachment_headers: ['Filed MGT-7', 'Acknowledgement'] },
-  { code: 'ROC (MSME)', name: 'ROC (MSME)', group_name: 'ROC / Company Law', task_type: 'MSME', sort_order: 64, dates: { apr:'2026-04-30', oct:'2026-07-30' }, attachment_count: 2, attachment_headers: ['Filed Form', 'Acknowledgement'] },
+  { code: 'ROC (MSME)', name: 'ROC (MSME)', group_name: 'ROC / Company Law', task_type: 'MSME', sort_order: 64, dates: { apr:'2026-04-30', oct:'2026-10-31' }, attachment_count: 2, attachment_headers: ['Filed Form', 'Acknowledgement'] },
   { code: 'INC 20A (120 days from Inc)', name: 'INC 20A (120 days from Inc)', group_name: 'ROC / Company Law', task_type: '120 days from Inc', sort_order: 65, dates: {}, attachment_count: 2, attachment_headers: ['Filed INC 20A', 'Acknowledgement'] },
 
   // Accounting & MIS GROUP
@@ -99,7 +99,7 @@ export const CA_DEFAULT_TASKS: CADefaultTask[] = [
   { code: 'HVAT (Annual Return)', name: 'HVAT (Annual Return)', group_name: 'Other', task_type: 'Annual Return', sort_order: 133, dates: { nov:'2026-11-30' }, attachment_count: 2, attachment_headers: ['Annual Return Copy', 'Acknowledgement'] },
   { code: 'DVAT (Challan)', name: 'DVAT (Challan)', group_name: 'Other', task_type: 'Challan', sort_order: 134, dates: { apr:'2026-04-15', jul:'2026-07-15', oct:'2026-10-15', jan:'2027-01-15' }, attachment_count: 1, attachment_headers: ['Challan Copy'] },
   { code: 'DVAT (Return)', name: 'DVAT (Return)', group_name: 'Other', task_type: 'Return', sort_order: 135, dates: { apr:'2026-04-30', jul:'2026-07-31', oct:'2026-10-31', jan:'2027-01-31' }, attachment_count: 2, attachment_headers: ['Filed Return', 'Acknowledgement'] },
-  { code: 'IEC Code (Renewal for Export )', name: 'IEC Code (Renewal for Export )', group_name: 'Other', task_type: 'Renewal for Export', sort_order: 136, dates: { jun:'2026-07-31' }, attachment_count: 2, attachment_headers: ['IEC Certificate', 'Acknowledgement'] },
+  { code: 'IEC Code (Renewal for Export )', name: 'IEC Code (Renewal for Export )', group_name: 'Other', task_type: 'Renewal for Export', sort_order: 136, dates: { jun:'2026-06-30' }, attachment_count: 2, attachment_headers: ['IEC Certificate', 'Acknowledgement'] },
   { code: 'US Polo KH (Sale Report)', name: 'US Polo KH (Sale Report)', group_name: 'Other', task_type: 'Sale Report', sort_order: 137, dates: { may:'2026-05-02', jun:'2026-06-02', jul:'2026-07-02', aug:'2026-08-02', sep:'2026-09-02', oct:'2026-10-02', nov:'2026-11-02', dec:'2026-12-02', jan:'2027-01-02', feb:'2027-02-02', mar:'2027-03-02' }, attachment_count: 1, attachment_headers: ['Sale Report'] },
 ]
 
