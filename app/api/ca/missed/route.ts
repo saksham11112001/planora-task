@@ -102,9 +102,8 @@ export async function GET(request: NextRequest) {
     { maxRows: 50_000 },
   )
   const instanceKeys = new Set(
-    (instances ?? [])
-      .filter(r => r.task_id !== null)
-      .map(r => `${r.assignment_id}__${r.due_date}`),
+    // Built below, once the task ids are known -- see the note there.
+    [] as string[],
   )
 
   // Tasks too, matched the way the spawner matches them. Older rows predate
@@ -113,7 +112,7 @@ export async function GET(request: NextRequest) {
   const { data: caTasks } = await fetchAllRows<Record<string, unknown>>(
     (from, to) => admin
       .from('tasks')
-      .select('title, client_id, due_date')
+      .select('id, title, client_id, due_date')
       .eq('org_id', mb.org_id)
       .is('parent_task_id', null)
       .contains('custom_fields', { _ca_compliance: true })
@@ -124,6 +123,20 @@ export async function GET(request: NextRequest) {
   const taskKeys = new Set(
     (caTasks ?? []).map(t => `${t.title}__${t.client_id ?? ''}__${t.due_date ?? ''}`),
   )
+
+  // A spawn record counts only while its task is still there. Membership is
+  // tested against the ids present in `tasks`, not by checking task_id is not
+  // null: the FK that is supposed to null it on delete
+  // (`REFERENCES tasks(id) ON DELETE SET NULL`) is missing on at least one
+  // live database, and without it a deleted task leaves task_id pointing at a
+  // dead id. A null check reports that as healthy, which is precisely how a
+  // deleted obligation went on counting as done.
+  const liveTaskIds = new Set((caTasks ?? []).map(t => t.id as string))
+  for (const r of instances ?? []) {
+    if (r.task_id !== null && liveTaskIds.has(r.task_id)) {
+      instanceKeys.add(`${r.assignment_id}__${r.due_date}`)
+    }
+  }
 
   /* ── Walk every assignment x every calendar date ───────────────────────── */
   interface Row {

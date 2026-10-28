@@ -124,23 +124,9 @@ export async function POST(request: NextRequest) {
     { maxRows: 20_000 },
   )
 
-  // ORPHANED RECORDS DO NOT COUNT AS "already spawned" HERE.
-  //
-  // ca_task_instances.task_id is `REFERENCES tasks(id) ON DELETE SET NULL`, so
-  // deleting a compliance task leaves its spawn record behind with task_id
-  // NULL -- and that record still holds UNIQUE (assignment_id, due_date).
-  // Treating it as proof the task exists is what made a deleted obligation
-  // unrecoverable: the task was gone, every later run skipped it as
-  // 'already_exists', and this button could not bring it back either.
-  //
-  // The nightly cron deliberately still counts them, so nothing resurrects on
-  // its own overnight. This route is a person explicitly asking to catch up,
-  // which is exactly when recreating a deleted task is the intended outcome.
-  const existingKeys = new Set(
-    (instances ?? [])
-      .filter((r: any) => r.task_id !== null)
-      .map((r: any) => `${r.assignment_id}__${r.due_date}`)
-  )
+  // existingKeys is built further down, once the task ids are known: whether a
+  // spawn record still stands for a real task cannot be answered from the
+  // record alone. See the comment above its construction.
 
   // Also check actual tasks table — guards against ca_task_instances being out of sync
   // (e.g. if a previous spawn wrote the task but the instance insert failed).
@@ -167,6 +153,32 @@ export async function POST(request: NextRequest) {
 
   const existingTaskKeys = new Set(
     (existingCATasks ?? []).map((t: any) => `${t.title}__${t.client_id ?? ''}__${t.due_date ?? ''}`)
+  )
+
+  // A SPAWN RECORD ONLY COUNTS IF ITS TASK IS STILL THERE.
+  //
+  // Deleting a compliance task leaves the record behind holding
+  // UNIQUE (assignment_id, due_date). Treating that as proof the obligation
+  // exists is what made a deleted task unrecoverable: it was gone from the
+  // board, every later run skipped it as 'already_exists', and this button
+  // could not bring it back either.
+  //
+  // Membership is tested against the ids actually present in `tasks`, NOT by
+  // checking `task_id is not null`. The schema declares
+  // `task_id REFERENCES tasks(id) ON DELETE SET NULL`, but that constraint is
+  // missing on at least one live database, and without it a deleted task
+  // leaves task_id pointing at an id that no longer exists -- non-NULL and
+  // entirely dead. A null check calls that healthy. This does not care whether
+  // the FK is enforcing.
+  //
+  // The nightly cron deliberately still counts orphans, so nothing a firm
+  // deleted reappears overnight. This route is a person explicitly asking to
+  // catch up, which is when recreating a deleted task is the intended outcome.
+  const existingTaskIds = new Set((existingCATasks ?? []).map((t: any) => t.id))
+  const existingKeys = new Set(
+    (instances ?? [])
+      .filter((r: any) => r.task_id !== null && existingTaskIds.has(r.task_id))
+      .map((r: any) => `${r.assignment_id}__${r.due_date}`)
   )
 
   // ── 3. Walk each assignment × each due date ───────────────────────
