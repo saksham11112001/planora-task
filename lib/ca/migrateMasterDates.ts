@@ -37,6 +37,13 @@ export interface DateChange { monthKey: string; old: string; new: string }
 export interface MigrateResult {
   tasksMoved:     number
   instancesMoved: number
+  /**
+   * Dedup rows deliberately LEFT on the old date, because the task they point
+   * at did not move -- it was completed, archived or deleted. Advancing those
+   * would make the new occurrence unspawnable, so they stay put and the new
+   * date is free for the spawner to fill.
+   */
+  instancesLeft:  number
   /** Non-fatal problems. The caller surfaces these; they are never swallowed. */
   warnings:       string[]
 }
@@ -85,7 +92,7 @@ export async function migrateMasterDates(
   masterTaskId: string,
   changes:      DateChange[],
 ): Promise<MigrateResult> {
-  const result: MigrateResult = { tasksMoved: 0, instancesMoved: 0, warnings: [] }
+  const result: MigrateResult = { tasksMoved: 0, instancesMoved: 0, instancesLeft: 0, warnings: [] }
   if (changes.length === 0) return result
 
   // Every assignment of this master task. Scoping by assignment rather than by
@@ -123,6 +130,34 @@ export async function migrateMasterDates(
     const rows    = instances ?? []
     const taskIds = rows.map(r => r.task_id as string).filter(Boolean)
 
+    // Which tasks actually moved. Declared out here because step 3 must not
+    // re-point a dedup row whose task stayed behind -- see the note there.
+    const movedIdSet = new Set<string>()
+
+    // WHY a task stayed behind decides what its dedup row should do, and the
+    // two reasons point opposite ways:
+    //
+    //   completed / cancelled -> the obligation was DEALT WITH under the old
+    //        date. Its row must still advance, or freeing the new date makes
+    //        the spawner create a second task for work already filed.
+    //   archived / deleted    -> the obligation was NOT dealt with. Its row
+    //        must stay behind so the new date is free and the task comes back.
+    //
+    // Fetched before the move so a task is still on the old date here.
+    const settledIds = new Set<string>()
+    if (taskIds.length > 0) {
+      const { data: settled } = await admin
+        .from('tasks')
+        .select('id')
+        .in('id', taskIds)
+        .eq('org_id', orgId)
+        .in('status', ['completed', 'cancelled'])
+        // Archived AND completed still counts as settled: the work was done
+        // before someone tidied it away.
+        .or('is_archived.is.null,is_archived.eq.false,is_archived.eq.true')
+      for (const t of settled ?? []) settledIds.add(t.id as string)
+    }
+
     // ── 1. Move the spawned tasks ──────────────────────────────────────────
     if (taskIds.length > 0) {
       const { data: moved, error: taskErr } = await admin
@@ -144,6 +179,7 @@ export async function migrateMasterDates(
       }
 
       const movedIds = (moved ?? []).map(t => t.id as string)
+      for (const id of movedIds) movedIdSet.add(id)
       result.tasksMoved += movedIds.length
 
       // ── 2. Their open subtasks that shared the parent's date ─────────────
@@ -166,7 +202,32 @@ export async function migrateMasterDates(
     // already sits on the new date for the same assignment, this update would
     // abort the whole statement, so those are moved one at a time and a
     // collision is reported rather than silently losing the rest.
+    //
+    // ONLY rows whose task actually moved. Step 1 deliberately leaves two
+    // kinds of task behind -- completed ones (they record the deadline that
+    // applied when the work was done) and archived/deleted ones -- and this
+    // loop used to advance their dedup rows anyway.
+    //
+    // The result was an obligation that could never be created. The record
+    // claimed the new date was already spawned while the task it pointed at
+    // still sat on the old one, so the spawner skipped the new date for ever,
+    // silently. A firm hit exactly this: HVAT (Return) tasks deleted in April
+    // kept due_date 2025-10-31 while their records were advanced to
+    // 2026-10-31, and the 2026 task was never created for any client.
+    //
+    // Leaving the row on the old date is correct and carries no duplicate
+    // risk: the task is still there on the old date, and the new date is a
+    // genuinely different occurrence that SHOULD be spawned.
     for (const row of rows) {
+      const tid = row.task_id as string | null
+      // Advance when the task moved, and also when it was completed or
+      // cancelled: that obligation is settled, and freeing its date would make
+      // the spawner raise a second task for work already filed. Only an
+      // unfinished task that was archived or deleted leaves its date open.
+      if (!tid || !(movedIdSet.has(tid) || settledIds.has(tid))) {
+        result.instancesLeft++
+        continue
+      }
       const { error: upErr } = await admin
         .from('ca_task_instances')
         .update({ due_date: change.new, month_key: change.monthKey })

@@ -63,3 +63,165 @@ test('null and undefined maps do not throw', () => {
   assert.deepEqual(diffDates(undefined, { oct: '2026-10-31' }), [])
   assert.deepEqual(diffDates({ oct: '2026-10-31' }, null), [])
 })
+
+/* ── migrateMasterDates: the dedup row must not outrun its task ───────────── */
+
+/**
+ * Chainable stand-in for the PostgREST builder. Every filter returns `this`;
+ * awaiting resolves to whatever the scenario configured for that table and
+ * operation. Records each update so the test can assert what was written.
+ */
+function makeAdmin(scenario: {
+  assignments: { id: string }[]
+  instances:   { id: string; task_id: string | null; assignment_id: string }[]
+  movedTasks:  { id: string }[]
+  /** Tasks that stayed behind because they were completed or cancelled. */
+  settledTasks?: { id: string }[]
+}) {
+  const instanceUpdates: { id: string; patch: Record<string, unknown> }[] = []
+  const admin = {
+    instanceUpdates,
+    from(table: string) {
+      let op: 'select' | 'update' = 'select'
+      let patch: Record<string, unknown> = {}
+      let eqId: string | null = null
+      const builder: any = {
+        select: () => builder,
+        update: (p: Record<string, unknown>) => { op = 'update'; patch = p; return builder },
+        in:     () => builder,
+        not:    () => builder,
+        or:     () => builder,
+        eq: (col: string, val: unknown) => {
+          if (col === 'id') eqId = val as string
+          return builder
+        },
+        then: (resolve: (v: unknown) => void) => {
+          if (table === 'ca_client_assignments') return resolve({ data: scenario.assignments, error: null })
+          if (table === 'ca_task_instances') {
+            if (op === 'update') {
+              instanceUpdates.push({ id: eqId!, patch })
+              return resolve({ data: null, error: null })
+            }
+            return resolve({ data: scenario.instances, error: null })
+          }
+          if (table === 'tasks') {
+            // The settled-task probe is a plain select; the move is an update.
+            if (op === 'select') return resolve({ data: scenario.settledTasks ?? [], error: null })
+            return resolve({ data: scenario.movedTasks, error: null })
+          }
+          return resolve({ data: [], error: null })
+        },
+      }
+      return builder
+    },
+  }
+  return admin
+}
+
+const CHANGE = [{ monthKey: 'oct', old: '2025-10-31', new: '2026-10-31' }]
+
+test('THE HVAT INCIDENT: a deleted task does not drag its spawn record forward', async () => {
+  // The task was archived in April, so step 1 leaves it on 2025-10-31. If the
+  // dedup row still advanced to 2026-10-31, the spawner would see the 2026
+  // occurrence as already created and never make it — which is exactly what
+  // happened to HVAT (Return) for every client of one firm.
+  const admin = makeAdmin({
+    assignments: [{ id: 'asg-1' }],
+    instances:   [{ id: 'inst-1', task_id: 'task-archived', assignment_id: 'asg-1' }],
+    movedTasks:  [],      // nothing moved: the task is archived
+  })
+  const { migrateMasterDates } = await import('../lib/ca/migrateMasterDates.ts')
+  const res = await migrateMasterDates(admin as never, 'org-1', 'master-1', CHANGE)
+
+  assert.equal(admin.instanceUpdates.length, 0, 'the spawn record must stay on the old date')
+  assert.equal(res.instancesMoved, 0)
+  assert.equal(res.instancesLeft, 1)
+  assert.equal(res.tasksMoved, 0)
+})
+
+test('a task that really moved still takes its spawn record with it', async () => {
+  // The duplicate-prevention the re-point exists for must keep working.
+  const admin = makeAdmin({
+    assignments: [{ id: 'asg-1' }],
+    instances:   [{ id: 'inst-1', task_id: 'task-live', assignment_id: 'asg-1' }],
+    movedTasks:  [{ id: 'task-live' }],
+  })
+  const { migrateMasterDates } = await import('../lib/ca/migrateMasterDates.ts')
+  const res = await migrateMasterDates(admin as never, 'org-1', 'master-1', CHANGE)
+
+  assert.equal(admin.instanceUpdates.length, 1)
+  assert.equal(admin.instanceUpdates[0].id, 'inst-1')
+  assert.equal(admin.instanceUpdates[0].patch.due_date, '2026-10-31')
+  assert.equal(res.instancesMoved, 1)
+  assert.equal(res.instancesLeft, 0)
+})
+
+test('a mix moves only the records whose tasks moved', async () => {
+  const admin = makeAdmin({
+    assignments: [{ id: 'asg-1' }, { id: 'asg-2' }, { id: 'asg-3' }],
+    instances: [
+      { id: 'inst-live',     task_id: 'task-live',     assignment_id: 'asg-1' },
+      { id: 'inst-archived', task_id: 'task-archived', assignment_id: 'asg-2' },
+      { id: 'inst-orphan',   task_id: null,            assignment_id: 'asg-3' },
+    ],
+    movedTasks: [{ id: 'task-live' }],
+  })
+  const { migrateMasterDates } = await import('../lib/ca/migrateMasterDates.ts')
+  const res = await migrateMasterDates(admin as never, 'org-1', 'master-1', CHANGE)
+
+  assert.deepEqual(admin.instanceUpdates.map(u => u.id), ['inst-live'])
+  assert.equal(res.instancesMoved, 1)
+  assert.equal(res.instancesLeft, 2, 'archived and orphaned records both stay put')
+})
+
+test('an orphaned record (no task at all) is never advanced', async () => {
+  // Nothing to move, so advancing it would block the new occurrence for ever.
+  const admin = makeAdmin({
+    assignments: [{ id: 'asg-1' }],
+    instances:   [{ id: 'inst-1', task_id: null, assignment_id: 'asg-1' }],
+    movedTasks:  [],
+  })
+  const { migrateMasterDates } = await import('../lib/ca/migrateMasterDates.ts')
+  const res = await migrateMasterDates(admin as never, 'org-1', 'master-1', CHANGE)
+  assert.equal(admin.instanceUpdates.length, 0)
+  assert.equal(res.instancesLeft, 1)
+})
+
+test('a COMPLETED task still takes its record forward — no duplicate filing', async () => {
+  // The opposite of the HVAT case, and the one that bites if you get it wrong.
+  // Step 1 leaves a completed task on the old date on purpose. If its record
+  // stayed behind too, the new date would be free and the spawner would raise
+  // a second task for a return that has already been filed.
+  const admin = makeAdmin({
+    assignments:  [{ id: 'asg-1' }],
+    instances:    [{ id: 'inst-1', task_id: 'task-done', assignment_id: 'asg-1' }],
+    movedTasks:   [],                      // not moved: it is completed
+    settledTasks: [{ id: 'task-done' }],   // ...because it is completed
+  })
+  const { migrateMasterDates } = await import('../lib/ca/migrateMasterDates.ts')
+  const res = await migrateMasterDates(admin as never, 'org-1', 'master-1', CHANGE)
+
+  assert.equal(admin.instanceUpdates.length, 1, 'settled work must not be re-raised')
+  assert.equal(admin.instanceUpdates[0].patch.due_date, '2026-10-31')
+  assert.equal(res.instancesMoved, 1)
+  assert.equal(res.instancesLeft, 0)
+})
+
+test('completed and deleted in the same batch are treated oppositely', async () => {
+  const admin = makeAdmin({
+    assignments: [{ id: 'asg-1' }, { id: 'asg-2' }],
+    instances: [
+      { id: 'inst-done',    task_id: 'task-done',    assignment_id: 'asg-1' },
+      { id: 'inst-deleted', task_id: 'task-deleted', assignment_id: 'asg-2' },
+    ],
+    movedTasks:   [],
+    settledTasks: [{ id: 'task-done' }],
+  })
+  const { migrateMasterDates } = await import('../lib/ca/migrateMasterDates.ts')
+  const res = await migrateMasterDates(admin as never, 'org-1', 'master-1', CHANGE)
+
+  assert.deepEqual(admin.instanceUpdates.map(u => u.id), ['inst-done'],
+    'the completed one advances, the deleted one stays so it can respawn')
+  assert.equal(res.instancesMoved, 1)
+  assert.equal(res.instancesLeft, 1)
+})

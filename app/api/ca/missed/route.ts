@@ -76,19 +76,35 @@ export async function GET(request: NextRequest) {
   const clientNames = new Map((clientRows ?? []).map(c => [c.id as string, c.name as string]))
 
   /* ── What already exists ───────────────────────────────────────────────── */
-  // Spawn records: the authoritative "this occurrence was created" marker.
-  // It survives the task being deleted, which is deliberate — a task someone
-  // deleted on purpose must not be reported as missing and re-created.
-  const { data: instances } = await fetchAllRows<{ assignment_id: string; due_date: string }>(
+  // Spawn records: the "this occurrence was created" marker.
+  //
+  // A record whose task_id is NULL no longer counts. task_id is
+  // `REFERENCES tasks(id) ON DELETE SET NULL`, so deleting a compliance task
+  // leaves the record behind pointing at nothing.
+  //
+  // This previously counted those as created, on the reasoning that a task
+  // deleted on purpose should not be reported as missing. The effect was the
+  // opposite of intended: the obligation vanished from the board AND from this
+  // report, the nightly job skipped it as 'already_exists' for ever, and a
+  // firm had no way to find out. A statutory filing disappeared in silence.
+  //
+  // Reporting is not recreating. This report only tells a firm the task is
+  // gone; the nightly job still leaves it alone, so nothing resurrects by
+  // surprise. Whoever deleted it can ignore the row, and whoever deleted it by
+  // mistake can now see that they did.
+  const { data: instances } = await fetchAllRows<{ assignment_id: string; due_date: string; task_id: string | null }>(
     (from, to) => admin
       .from('ca_task_instances')
-      .select('assignment_id, due_date')
+      .select('assignment_id, due_date, task_id')
       .eq('org_id', mb.org_id)
       .order('assignment_id', { ascending: true })
       .range(from, to),
     { maxRows: 50_000 },
   )
-  const instanceKeys = new Set((instances ?? []).map(r => `${r.assignment_id}__${r.due_date}`))
+  const instanceKeys = new Set(
+    // Built below, once the task ids are known -- see the note there.
+    [] as string[],
+  )
 
   // Tasks too, matched the way the spawner matches them. Older rows predate
   // the instance table, so an instance-only check would report long-standing
@@ -96,7 +112,7 @@ export async function GET(request: NextRequest) {
   const { data: caTasks } = await fetchAllRows<Record<string, unknown>>(
     (from, to) => admin
       .from('tasks')
-      .select('title, client_id, due_date')
+      .select('id, title, client_id, due_date')
       .eq('org_id', mb.org_id)
       .is('parent_task_id', null)
       .contains('custom_fields', { _ca_compliance: true })
@@ -107,6 +123,20 @@ export async function GET(request: NextRequest) {
   const taskKeys = new Set(
     (caTasks ?? []).map(t => `${t.title}__${t.client_id ?? ''}__${t.due_date ?? ''}`),
   )
+
+  // A spawn record counts only while its task is still there. Membership is
+  // tested against the ids present in `tasks`, not by checking task_id is not
+  // null: the FK that is supposed to null it on delete
+  // (`REFERENCES tasks(id) ON DELETE SET NULL`) is missing on at least one
+  // live database, and without it a deleted task leaves task_id pointing at a
+  // dead id. A null check reports that as healthy, which is precisely how a
+  // deleted obligation went on counting as done.
+  const liveTaskIds = new Set((caTasks ?? []).map(t => t.id as string))
+  for (const r of instances ?? []) {
+    if (r.task_id !== null && liveTaskIds.has(r.task_id)) {
+      instanceKeys.add(`${r.assignment_id}__${r.due_date}`)
+    }
+  }
 
   /* ── Walk every assignment x every calendar date ───────────────────────── */
   interface Row {

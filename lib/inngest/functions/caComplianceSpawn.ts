@@ -115,6 +115,15 @@ export const caComplianceSpawn = inngest.createFunction(
       // length limit and returns 414, which looks like "nothing spawned yet" to
       // the caller. The job then retried work it had already done and spent its
       // whole budget being rejected by the unique constraint.
+      // DELIBERATELY counts orphaned records too -- rows whose task_id is NULL
+      // because the task was deleted (the FK is ON DELETE SET NULL).
+      //
+      // Do not "fix" this to match /api/ca/trigger and /api/ca/missed, which
+      // both ignore orphans. The split is the whole design: a task someone
+      // deleted must not silently reappear overnight, so the nightly job
+      // leaves it alone. It is instead reported as Missing by the Missed Tasks
+      // report, and recreated only when a person presses "Spawn tasks now".
+      // Nothing resurrects by surprise; nothing stays invisible either.
       const keys: string[] = []
       for (const ids of chunk(assignmentIds)) {
         const { data, error } = await fetchAllRows<any>(
