@@ -134,6 +134,30 @@ export async function migrateMasterDates(
     // re-point a dedup row whose task stayed behind -- see the note there.
     const movedIdSet = new Set<string>()
 
+    // WHY a task stayed behind decides what its dedup row should do, and the
+    // two reasons point opposite ways:
+    //
+    //   completed / cancelled -> the obligation was DEALT WITH under the old
+    //        date. Its row must still advance, or freeing the new date makes
+    //        the spawner create a second task for work already filed.
+    //   archived / deleted    -> the obligation was NOT dealt with. Its row
+    //        must stay behind so the new date is free and the task comes back.
+    //
+    // Fetched before the move so a task is still on the old date here.
+    const settledIds = new Set<string>()
+    if (taskIds.length > 0) {
+      const { data: settled } = await admin
+        .from('tasks')
+        .select('id')
+        .in('id', taskIds)
+        .eq('org_id', orgId)
+        .in('status', ['completed', 'cancelled'])
+        // Archived AND completed still counts as settled: the work was done
+        // before someone tidied it away.
+        .or('is_archived.is.null,is_archived.eq.false,is_archived.eq.true')
+      for (const t of settled ?? []) settledIds.add(t.id as string)
+    }
+
     // ── 1. Move the spawned tasks ──────────────────────────────────────────
     if (taskIds.length > 0) {
       const { data: moved, error: taskErr } = await admin
@@ -195,7 +219,12 @@ export async function migrateMasterDates(
     // risk: the task is still there on the old date, and the new date is a
     // genuinely different occurrence that SHOULD be spawned.
     for (const row of rows) {
-      if (!row.task_id || !movedIdSet.has(row.task_id as string)) {
+      const tid = row.task_id as string | null
+      // Advance when the task moved, and also when it was completed or
+      // cancelled: that obligation is settled, and freeing its date would make
+      // the spawner raise a second task for work already filed. Only an
+      // unfinished task that was archived or deleted leaves its date open.
+      if (!tid || !(movedIdSet.has(tid) || settledIds.has(tid))) {
         result.instancesLeft++
         continue
       }
