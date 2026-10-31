@@ -6,6 +6,13 @@ import {
 } from 'recharts'
 import { useFilterStore } from '@/store/appStore'
 import { localDayStr } from '@/lib/utils/format'
+// Pure aggregation, extracted so it can be tested: a .tsx file cannot be
+// imported by the node test runner, which is why the arithmetic behind these
+// four chart lines ran untested while firms read it every morning.
+import {
+  buildComplianceData, isRecurringTemplate,
+  type ComplianceRawTask, type ComplianceDayData, type ComplianceSummary,
+} from '@/lib/reports/complianceSeries'
 import { UniversalFilterBar } from '@/components/filters/UniversalFilterBar'
 
 interface EmployeeStat {
@@ -18,44 +25,7 @@ interface EmployeeStat {
   weeklyTrend: { week: string; completed: number; assigned: number }[]
 }
 
-interface ComplianceDayData {
-  date: string; dateKey: string
-  addedC: number; completedC: number; noDueDateC: number; overdueC: number
-  addedNC: number; completedNC: number; noDueDateNC: number; overdueNC: number
-}
 
-interface ComplianceSummary {
-  date: string
-  overdueC: number; overdueNC: number
-  noDueDateC: number; noDueDateNC: number
-  addedTodayC: number; addedTodayNC: number
-  completedTodayC: number; completedTodayNC: number
-  pendingC: number; pendingNC: number
-}
-
-interface ComplianceRawTask {
-  id: string; title: string; status: string; priority: string
-  due_date: string | null; created_at: string; completed_at: string | null
-  custom_fields: Record<string, any> | null
-  assignee_id: string | null; client_id: string | null
-  is_recurring?: boolean | null; parent_recurring_id?: string | null
-}
-
-/**
- * A recurring TEMPLATE, as distinct from one of its occurrences.
- *
- * A template carries no due_date by design — it has next_occurrence_date
- * instead — so every one of them landed in the "No Due Date" bucket and
- * inflated it with rows that are not outstanding work at all, just the rule
- * that generates it. The occurrences it spawns DO have due dates and are
- * counted normally.
- *
- * Same test the WIP and trajectory sections of this page already use, so the
- * whole Reports tab now agrees on what a template is.
- */
-function isRecurringTemplate(t: ComplianceRawTask): boolean {
-  return t.is_recurring === true && !t.parent_recurring_id
-}
 
 interface ActionItems {
   overdue:           { id: string; title: string; priority: string; due_date: string; assignee_name: string | null; days_overdue: number }[]
@@ -308,70 +278,6 @@ function ComplianceTrendChart({ data, title, addedKey, completedKey, noDueDateKe
   )
 }
 
-// ── Client-side compliance aggregation ──────────────────────────────────────
-function fmtDay(d: Date) {
-  return `${d.getDate().toString().padStart(2,'0')}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getFullYear().toString().slice(2)}`
-}
-
-function buildComplianceData(
-  rawTasks: ComplianceRawTask[],
-  days: number,
-  memberFilter: string,
-): { daily: ComplianceDayData[]; summary: ComplianceSummary } {
-  // Repeat-task TEMPLATES are removed once, here, so no figure this function
-  // produces can count them.
-  //
-  // A template is the rule that creates work, not the work. It sits in the
-  // Repeat Tasks category until its date arrives, at which point it spawns an
-  // occurrence — a separate row, with a due date, which IS counted. Including
-  // the template as well counts the same obligation twice, and counts it
-  // forever, because a template is never completed.
-  //
-  // Excluding at the source rather than per figure: an earlier pass added the
-  // test to the four No Due Date counts and left the other ten — Overdue,
-  // Added, Completed, and the Active totals — still counting templates. One
-  // filter cannot drift out of step with itself.
-  const withoutTemplates = rawTasks.filter(t => !isRecurringTemplate(t))
-  const filtered = memberFilter
-    ? withoutTemplates.filter(t => t.assignee_id === memberFilter)
-    : withoutTemplates
-  const today = new Date().toISOString().split('T')[0]
-  const caT = filtered.filter(t => t.custom_fields?._ca_compliance === true)
-  const ncT = filtered.filter(t => !t.custom_fields?._ca_compliance)
-
-  const daily = Array.from({ length: days }, (_, i) => {
-    const d  = new Date(Date.now() - (days - 1 - i) * 86400000)
-    const ds = localDayStr(d)
-    return {
-      date:       fmtDay(d),
-      dateKey:    ds,
-      addedC:     caT.filter(t => t.created_at?.startsWith(ds)).length,
-      completedC: caT.filter(t => t.completed_at?.startsWith(ds)).length,
-      noDueDateC: caT.filter(t => !t.due_date && t.created_at <= ds+'T23:59:59' && !['completed','cancelled'].includes(t.status)).length,
-      overdueC:   caT.filter(t => t.due_date && t.due_date < ds && !['completed','cancelled'].includes(t.status)).length,
-      addedNC:    ncT.filter(t => t.created_at?.startsWith(ds)).length,
-      completedNC:ncT.filter(t => t.completed_at?.startsWith(ds)).length,
-      noDueDateNC:ncT.filter(t => !t.due_date && t.created_at <= ds+'T23:59:59' && !['completed','cancelled'].includes(t.status)).length,
-      overdueNC:  ncT.filter(t => t.due_date && t.due_date < ds && !['completed','cancelled'].includes(t.status)).length,
-    }
-  })
-
-  const todayD = new Date()
-  const summary: ComplianceSummary = {
-    date:             todayD.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
-    overdueC:         caT.filter(t => t.due_date && t.due_date < today && !['completed','cancelled'].includes(t.status)).length,
-    overdueNC:        ncT.filter(t => t.due_date && t.due_date < today && !['completed','cancelled'].includes(t.status)).length,
-    noDueDateC:       caT.filter(t => !t.due_date && !['completed','cancelled'].includes(t.status)).length,
-    noDueDateNC:      ncT.filter(t => !t.due_date && !['completed','cancelled'].includes(t.status)).length,
-    addedTodayC:      caT.filter(t => t.created_at?.startsWith(today)).length,
-    addedTodayNC:     ncT.filter(t => t.created_at?.startsWith(today)).length,
-    completedTodayC:  caT.filter(t => t.completed_at?.startsWith(today)).length,
-    completedTodayNC: ncT.filter(t => t.completed_at?.startsWith(today)).length,
-    pendingC:         caT.filter(t => !['completed','cancelled'].includes(t.status)).length,
-    pendingNC:        ncT.filter(t => !['completed','cancelled'].includes(t.status)).length,
-  }
-  return { daily, summary }
-}
 // ────────────────────────────────────────────────────────────────────────────
 
 export function ReportsCharts({ dailyData, memberData, priorityData, projectData, timeByProject, employeeStats, currentUserId, userRole, canViewAllReports, clients = [], complianceRawTasks = [], complianceMemberList = [], wipData = [], trajectoryData = [], statusBreakdown = [], actionItems }: Props) {
@@ -427,7 +333,7 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
     (new Date(compDateTo).getTime() - new Date(compDateFrom).getTime()) / 86400000
   ) + 1)
   const { daily: rawCompDaily, summary: complianceSummary } = buildComplianceData(
-    filteredCompRaw, compDays, ''
+    filteredCompRaw, compDays, '', localDayStr
   )
   const complianceDailyData = rawCompDaily.filter(
     d => d.dateKey >= compDateFrom && d.dateKey <= compDateTo
@@ -1009,7 +915,7 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
             />
             <ComplianceTrendChart
               data={complianceDailyData}
-              title={`Non-Compliance${uAssigneeId.length === 1 ? ` — ${complianceMemberList.find(m=>m.id===uAssigneeId[0])?.name ?? ''}` : ''}`}
+              title={`Other Tasks${uAssigneeId.length === 1 ? ` — ${complianceMemberList.find(m=>m.id===uAssigneeId[0])?.name ?? ''}` : ''}`}
               addedKey="addedNC" completedKey="completedNC"
               noDueDateKey="noDueDateNC" overdueKey="overdueNC"
             />
@@ -1025,7 +931,7 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                   <thead>
                     <tr style={{ background: 'var(--surface-subtle)' }}>
-                      {['Date', 'Status', 'Compliance', 'Non-Compliance'].map(h => (
+                      {['Date', 'Status', 'CA Compliance', 'Other Tasks'].map(h => (
                         <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600,
                           color: 'var(--text-secondary)', borderBottom: '1px solid var(--border)',
                           fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
@@ -1072,7 +978,7 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
                 </div>
                 <div style={{ background: '#fff7ed', border: '1px solid #fdba74', borderRadius: 12, padding: '20px 24px', textAlign: 'center' }}>
                   <p style={{ fontSize: 11, fontWeight: 600, color: '#ea580c', textTransform: 'uppercase',
-                    letterSpacing: '0.05em', marginBottom: 6 }}>Non-Compliance Active</p>
+                    letterSpacing: '0.05em', marginBottom: 6 }}>Other Tasks Active</p>
                   <p style={{ fontSize: 40, fontWeight: 900, color: '#ea580c', lineHeight: 1 }}>{complianceSummary.pendingNC}</p>
                   <p style={{ fontSize: 11, color: '#ea580c', opacity: 0.7, marginTop: 4 }}>{complianceSummary.overdueNC} overdue</p>
                 </div>
@@ -1092,7 +998,7 @@ export function ReportsCharts({ dailyData, memberData, priorityData, projectData
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                 <thead>
                   <tr style={{ background: 'var(--surface-subtle)' }}>
-                    {['Date', 'Status', 'Compliance', 'Non-Compliance'].map(h => (
+                    {['Date', 'Status', 'CA Compliance', 'Other Tasks'].map(h => (
                       <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600,
                         color: 'var(--text-secondary)', borderBottom: '1px solid var(--border)',
                         fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
