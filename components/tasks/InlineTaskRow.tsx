@@ -3,6 +3,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, X, User, Flag, Calendar, Shield, DollarSign } from 'lucide-react'
 import { toast } from '@/store/appStore'
+import { useOrgSettings } from '@/lib/hooks/useOrgSettings'
 
 interface Member { id: string; name: string; role?: string }
 interface Client { id: string; name: string; color: string }
@@ -33,6 +34,20 @@ export function InlineTaskRow({
   const router   = useRouter()
   const inputRef = useRef<HTMLInputElement>(null)
   const rowRef   = useRef<HTMLDivElement>(null)
+
+  // Settings -> Tasks lets a firm mark fields mandatory. InlineOneTimeTask has
+  // always honoured that; this row did not, and it is the quick-add used on a
+  // project board -- so a firm could switch "Due date: mandatory" on, watch it
+  // work on the Tasks page, and still accumulate dateless tasks from projects.
+  // One firm ended up with 44 of them, including an 8-step incorporation
+  // checklist with no dates and no assignee, invisible to every view the app
+  // organises by date.
+  //
+  // Only enforced for the fields this row actually offers. Subtasks and
+  // recurring templates are created elsewhere and are legitimately dateless --
+  // a template carries next_occurrence_date instead.
+  const { taskFields } = useOrgSettings()
+  const required = (key: string) => taskFields[key]?.mandatory === true
 
   const [open,          setOpen]          = useState(false)
   const [saving,        setSaving]        = useState(false)
@@ -72,6 +87,16 @@ export function InlineTaskRow({
 
   async function save() {
     if (!title.trim()) { inputRef.current?.focus(); return }
+
+    // Named, one at a time, so the person is told which field is missing
+    // rather than being left with a button that silently does nothing.
+    const missing =
+      required('due_date') && !dueDate   ? 'Due date'  :
+      required('assignee') && !assignee  ? 'Assignee'  :
+      required('client')   && !defaultClientId ? 'Client' :
+      required('approver') && !approverId ? 'Approver' : null
+    if (missing) { toast.error(`${missing} is required`); return }
+
     setSaving(true)
     try {
       const res = await fetch('/api/tasks', {
