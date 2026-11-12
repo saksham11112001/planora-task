@@ -230,14 +230,22 @@ export function ClientsView({ initialClients, initialGroups, canManage }: Props)
         )}
       </div>
 
-      {/* ── Client Groups ── */}
-      <div style={{ padding: '0 20px', flexShrink: 0 }}>
-        <ClientGroupsSection
-          initialGroups={initialGroups}
-          allClients={clients.map(c => ({ id: c.id, name: c.name, color: c.color, status: c.status, group_id: c.group_id ?? null }))}
-          canManage={canManage}
-        />
-      </div>
+      {/* ── Client Groups ──
+          Hidden while searching or filtering by status. The section is as tall
+          as the whole viewport for a firm with a few groups, and it does not
+          respond to the search box — so looking up one client showed 16
+          irrelevant groups and pushed the single match below the fold. The
+          header still reports "206 · 1 shown", which made it read as though
+          the client was missing. */}
+      {!search.trim() && statusTab === 'all' && (
+        <div style={{ padding: '0 20px', flexShrink: 0 }}>
+          <ClientGroupsSection
+            initialGroups={initialGroups}
+            allClients={clients.map(c => ({ id: c.id, name: c.name, color: c.color, status: c.status, group_id: c.group_id ?? null }))}
+            canManage={canManage}
+          />
+        </div>
+      )}
 
       {/* ── Main content area ── */}
       <div style={{ flex: 1, overflowY: 'auto', display: 'flex', minHeight: 0 }}>
