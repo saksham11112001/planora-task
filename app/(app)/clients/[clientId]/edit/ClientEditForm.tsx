@@ -43,13 +43,49 @@ export function ClientEditForm({ client }: { client: any }) {
   async function save(e: React.FormEvent) {
     e.preventDefault()
     if (!form.name.trim()) { toast.error('Name required'); return }
+
+    // Marking a client inactive archives their open tasks and stops their
+    // compliance spawning. Ask the server what that amounts to and say so
+    // before doing it -- a count of real work disappearing is not something to
+    // spring on someone after the fact.
+    const goingInactive = form.status === 'inactive' && client.status !== 'inactive'
+    if (goingInactive) {
+      setSaving(true)
+      const pv = await fetch(`/api/clients/${client.id}?preview=1`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'inactive' }),
+      })
+      setSaving(false)
+      const { preview } = pv.ok ? await pv.json() : { preview: null }
+      const tasks = preview?.tasksArchived ?? 0
+      const asg   = preview?.assignmentsDeactivated ?? 0
+      const parts = [
+        tasks ? `archive ${tasks} open task${tasks === 1 ? '' : 's'}` : null,
+        asg   ? `stop ${asg} compliance task${asg === 1 ? '' : 's'} from spawning` : null,
+      ].filter(Boolean)
+      const detail = parts.length
+        ? `This will ${parts.join(' and ')}.`
+        : 'This client has no open tasks or compliance assignments.'
+      if (!confirm(
+        `Mark ${client.name} inactive?\n\n${detail}\n\n` +
+        'Nothing is deleted. Archived tasks go to Trash, and making the client ' +
+        'active again restores exactly these.'
+      )) return
+    }
+
     setSaving(true)
     const res = await fetch(`/api/clients/${client.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(form),
     })
     setSaving(false)
-    if (res.ok) { toast.success('Client updated'); router.push(`/clients/${client.id}`) }
+    if (res.ok) {
+      const { effect } = await res.json().catch(() => ({ effect: null }))
+      if (effect?.tasksArchived)  toast.success(`Client marked inactive \u2014 ${effect.tasksArchived} task(s) archived`)
+      else if (effect?.tasksRestored) toast.success(`Client reactivated \u2014 ${effect.tasksRestored} task(s) restored`)
+      else toast.success('Client updated')
+      router.push(`/clients/${client.id}`)
+    }
     else { const d = await res.json(); toast.error(d.error ?? 'Failed') }
   }
 
