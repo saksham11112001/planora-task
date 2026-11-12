@@ -25,8 +25,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const body = await req.json()
   if (body.status && !VALID_CLIENT_STATUSES.includes(body.status)) return NextResponse.json({ error: `Invalid status "${body.status}". Must be one of: active, inactive, prospect` }, { status: 400 })
   const ALLOWED = ['name','email','phone','company','website','industry','notes','status','color','group_id','dsc_expiry_date','dsc_holder_name','gstin','pan']
+
+  // Columns that are NOT text. An empty form field arrives as "", and Postgres
+  // rejects "" for a date or a uuid -- "invalid input syntax for type date" --
+  // which the UI shows as "An invalid value was provided". The edit form always
+  // sends dsc_expiry_date, so leaving the DSC date blank made EVERY save of
+  // that form fail, whatever field was actually being changed.
+  // Empty means "not set", which is null.
+  const NOT_TEXT = new Set(['dsc_expiry_date', 'group_id'])
+
   const updates: Record<string, unknown> = {}
-  for (const k of ALLOWED) { if (k in body) updates[k] = body[k] }
+  for (const k of ALLOWED) {
+    if (!(k in body)) continue
+    const v = body[k]
+    updates[k] = NOT_TEXT.has(k) && (v === '' || v === undefined) ? null : v
+  }
 
   // Only `status` is read here. An earlier version also selected
   // custom_fields, which does NOT exist on clients -- the select failed, the
