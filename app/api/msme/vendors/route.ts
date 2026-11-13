@@ -330,9 +330,17 @@ export async function POST(req: NextRequest) {
   // commonly supplies several of a firm's client companies, and each of those
   // needs its own declaration — so "already exists" must mean "already exists
   // FOR THIS CLIENT", not anywhere in the firm.
+  //
+  // Keyed on the COMPANY as well as the email, matching the unique index. One
+  // proprietor commonly owns several supplier companies that share an address
+  // -- Discovery Alcobev Private Limited and Discovery Sales on the same
+  // gmail. Those are different vendors, each owing a different amount and each
+  // needing its own declaration, so matching on email alone refused the second
+  // one as a duplicate.
+  const nameNorm = vendor_name.trim().toLowerCase()
   let lookup = admin
     .from('msme_vendors')
-    .select('id, is_deleted, created_at')
+    .select('id, is_deleted, created_at, vendor_name')
     .eq('org_id', mb.org_id)
     .eq('vendor_email', emailNorm)
   lookup = clientId ? lookup.eq('client_id', clientId) : lookup.is('client_id', null)
@@ -344,14 +352,18 @@ export async function POST(req: NextRequest) {
   // index or silently duplicate a vendor.
   if (lookupErr) return NextResponse.json({ error: lookupErr.message }, { status: 500 })
 
-  const activeRow  = (sameEmail ?? []).find(v => !v.is_deleted)
-  const deletedRow = (sameEmail ?? []).find(v =>  v.is_deleted)
+  // Same email AND same company name is the duplicate; same email alone is not.
+  const sameVendor = (sameEmail ?? []).filter(
+    (v: any) => (v.vendor_name ?? '').trim().toLowerCase() === nameNorm,
+  )
+  const activeRow  = sameVendor.find((v: any) => !v.is_deleted)
+  const deletedRow = sameVendor.find((v: any) =>  v.is_deleted)
 
   if (activeRow) {
     return NextResponse.json({
       error: clientId
-        ? 'This vendor is already on this client\'s list'
-        : 'A vendor with this email already exists',
+        ? `"${vendor_name.trim()}" is already on this client's list`
+        : `"${vendor_name.trim()}" already exists with this email`,
     }, { status: 409 })
   }
 
