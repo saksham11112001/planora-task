@@ -201,16 +201,26 @@ export async function POST(
 
   if (decision === 'approve') {
     // Block approving a parent task if real subtasks are still incomplete.
-    // _compliance_subtask rows are attachment-header placeholders — excluded from this gate.
-    // Owner/admin bypass: they can force-approve regardless of subtask state
+    // Owner/admin bypass: they can force-approve regardless of subtask state.
+    //
+    // Uses the SHARED gate, like submit above. This path had its own inline
+    // copy that selected only id/status/custom_fields -- no is_archived -- so
+    // a DELETED subtask still counted as outstanding. The panel filters
+    // archived rows out, so a task showing "3/3 complete" could not be
+    // approved, and the message named nothing to act on.
+    //
+    // It was also invisible to whoever could fix it: an owner or admin
+    // bypasses this gate, so the task approved fine for them and failed only
+    // for the approver it was assigned to. That is exactly the drift
+    // lib/utils/subtaskGate.ts was extracted to prevent -- submit was moved
+    // onto it and approve was left behind.
     const { data: subtasksForApprove } = await admin
-      .from('tasks').select('id, status, custom_fields').eq('parent_task_id', id).eq('org_id', mb.org_id)
-    const realSubtasksForApprove = (subtasksForApprove ?? []).filter((s: any) => s.custom_fields?._compliance_subtask !== true)
-    if (!isOwnerOrAdmin && realSubtasksForApprove.length > 0) {
-      const incomplete = realSubtasksForApprove.filter((s: any) => s.status !== 'completed')
+      .from('tasks').select(SUBTASK_GATE_COLS).eq('parent_task_id', id).eq('org_id', mb.org_id)
+    if (!isOwnerOrAdmin) {
+      const incomplete = blockingSubtasks(subtasksForApprove as any)
       if (incomplete.length > 0) {
         return NextResponse.json({
-          error: `Cannot approve — ${incomplete.length} subtask${incomplete.length > 1 ? 's are' : ' is'} still incomplete`,
+          error: subtaskGateMessage(incomplete),
           code: 'SUBTASKS_INCOMPLETE',
         }, { status: 422 })
       }

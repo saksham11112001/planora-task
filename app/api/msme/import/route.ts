@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
   // return, so each needs its own row.
   let existingQuery = admin
     .from('msme_vendors')
-    .select('id, vendor_email, is_deleted')
+    .select('id, vendor_name, vendor_email, is_deleted')
     .eq('org_id', mb.org_id)
   existingQuery = clientId
     ? existingQuery.eq('client_id', clientId)
@@ -81,14 +81,23 @@ export async function POST(req: NextRequest) {
 
   const { data: existingVendors } = await existingQuery
 
-  const existingEmails = new Set(
-    (existingVendors ?? []).filter(v => !v.is_deleted).map(v => v.vendor_email.toLowerCase()),
+  // Keyed on COMPANY + email, matching the unique index. One proprietor
+  // commonly owns several supplier companies that share an address --
+  // Discovery Alcobev Private Limited and Discovery Sales on the same gmail --
+  // and those are different vendors, each owing a different amount and each
+  // needing its own declaration. Keying on email alone silently skipped the
+  // second company of every such pair, with a reason that read like a
+  // duplicate.
+  const key = (name: string, email: string) => `${email.toLowerCase()}\u0000${name.trim().toLowerCase()}`
+
+  const existingKeys = new Set(
+    (existingVendors ?? []).filter(v => !v.is_deleted).map(v => key(v.vendor_name ?? '', v.vendor_email)),
   )
-  // email → id of a removed row that can simply be switched back on.
+  // company+email → id of a removed row that can simply be switched back on.
   const revivable = new Map<string, string>()
   for (const v of existingVendors ?? []) {
-    const e = v.vendor_email.toLowerCase()
-    if (v.is_deleted && !existingEmails.has(e) && !revivable.has(e)) revivable.set(e, v.id)
+    const k = key(v.vendor_name ?? '', v.vendor_email)
+    if (v.is_deleted && !existingKeys.has(k) && !revivable.has(k)) revivable.set(k, v.id)
   }
 
   const skipped: Array<{ row: number; name: string; reason: string }> = []
@@ -104,14 +113,15 @@ export async function POST(req: NextRequest) {
 
     if (!name)                         { skipped.push({ row: i + 1, name: name ?? '(blank)', reason: 'Name is missing' }); continue }
     if (!email || !EMAIL_RE.test(email)) { skipped.push({ row: i + 1, name, reason: 'Invalid or missing email' }); continue }
-    if (existingEmails.has(email))     { skipped.push({ row: i + 1, name, reason: clientId ? 'Already on this client\'s list' : 'Email already exists' }); continue }
+    const rowKey = key(name, email)
+    if (existingKeys.has(rowKey))      { skipped.push({ row: i + 1, name, reason: clientId ? 'Already on this client\'s list' : 'This company already exists with this email' }); continue }
 
-    existingEmails.add(email) // prevent intra-batch duplicates
+    existingKeys.add(rowKey) // prevent intra-batch duplicates
 
     // Previously removed — switch the existing row back on instead of inserting
     // a second one for the same address. Reuses its slot, exactly as the manual
     // add path does.
-    const reviveId = revivable.get(email)
+    const reviveId = revivable.get(rowKey)
     if (reviveId) { toRevive.push({ id: reviveId, name, gstin }); continue }
 
     toInsert.push({ org_id: mb.org_id, client_id: clientId, vendor_name: name, vendor_email: email, gstin, is_paid: true, payment_status: 'free', created_by: user.id })
