@@ -59,21 +59,43 @@ function codeClass(reason: string): '4' | '5' | null {
   return null
 }
 
-/** Mailbox-full / rate-limit wording, for servers that send no usable code. */
+/**
+ * Mailbox-full / rate-limit wording, for servers that send no usable code.
+ *
+ * Deliberately NOT 'unavailable' on its own. "mailbox unavailable" with no
+ * code is how several providers word a DEAD mailbox — it is the same failure
+ * as Outlook's "550 5.5.0 Requested action not taken: mailbox unavailable",
+ * just with the code stripped. Matching the bare word filed those as
+ * temporary, which would have shown them to the firm as "mailbox full" and
+ * let the bulk send keep mailing an address that does not exist.
+ * "temporarily unavailable" is still caught, by 'temporarily'.
+ */
 const SOFT_WORDS = [
   'out of storage', 'over quota', 'overquota', 'quota exceeded', 'quota',
   'mailbox full', 'mailbox is full', 'insufficient storage',
   'temporarily', 'temporary', 'try again later', 'greylist', 'grey list',
   'soft bounce', 'timed out', 'too many messages', 'rate limit', 'throttl',
-  'queue', 'busy', 'deferred', 'unavailable',
+  'queue', 'busy', 'deferred',
 ]
 
-/** Wording that means the address itself is wrong. */
+/**
+ * Wording that means the address itself is wrong.
+ *
+ * Checked BEFORE the soft list, so a phrase that contains a soft-ish word
+ * ("mailbox unavailable") is not captured by it.
+ *
+ * 'mx of domain' covers "Unable to find MX of domain acme.com": the domain
+ * publishes no mail server at all, so no address at it can ever receive. It
+ * is the single most common failure in this firm's list and is almost always
+ * a mistyped domain, so it belongs with the addresses worth correcting rather
+ * than in the "reason not reported" bucket where it previously landed.
+ */
 const HARD_WORDS = [
   'does not exist', 'doesn\'t exist', 'no such user', 'unknown user',
   'user unknown', 'recipient not found', 'no mailbox', 'mailbox not found',
-  'address rejected', 'invalid email', 'invalid address', 'invalid recipient',
-  'hard bounce', 'not a valid', 'account has been disabled', 'account disabled',
+  'mailbox unavailable', 'address rejected', 'invalid email', 'invalid address',
+  'invalid recipient', 'hard bounce', 'not a valid', 'account has been disabled',
+  'account disabled', 'mx of domain', 'no mx record', 'relaying denied',
 ]
 
 /**

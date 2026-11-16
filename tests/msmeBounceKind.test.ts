@@ -46,6 +46,65 @@ describe('the real bounce list', () => {
   })
 })
 
+/* ── the wider real list, from the firm's full bounce export ─────────────── */
+
+describe('the full bounce export', () => {
+  // These are all rows the repair SQL left BLOCKED in the database. If the
+  // classifier calls any of them 'soft' the two disagree: the screen would
+  // file it under "mailbox full" and the bulk send would keep mailing it.
+  const mustNotBeSoft: [string, string][] = [
+    ['bare mailbox unavailable',  'mailbox unavailable'],
+    ['Outlook coded form',        '550 5.5.0 Requested action not taken: mailbox unavailable (S2017062302).'],
+    ['rediffmail coded form',     '550 Requested action not taken: mailbox unavailable'],
+    ['no MX for the domain',      'Unable to find MX of domain ambikaagroproducts.com'],
+    ['Yahoo mailbox not found',   '552 1 Requested mail action aborted, mailbox not found'],
+    ['relaying denied',           '550 relaying denied'],
+    ['no such user',              '550 No Such User Here'],
+    ['recipient not found',       '550 5.1.0 <x@y.com> Recipient not found.'],
+    ['access denied',             '550 5.4.1 Recipient address rejected: Access denied.'],
+    ['not an allowed rcpthost',   "553 sorry, that domain isn't in my list of allowed rcpthosts"],
+    ['bare enhanced code',        '5.1.1'],
+    ['no usable reason',          'Message delivery failed'],
+    ['connection timeout',        'connection timeout'],
+  ]
+  for (const [label, reason] of mustNotBeSoft) {
+    test(`${label} is never treated as temporary`, () => {
+      assert.notEqual(classifyBounce(reason), 'soft')
+      assert.equal(isBlockingBounce(true, reason), true)
+    })
+  }
+
+  test('"mailbox unavailable" is a DEAD mailbox, not a full one', () => {
+    // The bug this caught: 'unavailable' sat in the soft-word list, so the
+    // bare form — the same failure as Outlook's 550 5.5.0, with the code
+    // stripped — was filed as temporary and would have been re-emailed.
+    assert.equal(classifyBounce('mailbox unavailable'), 'hard')
+    assert.equal(bounceCopy(classifyBounce('mailbox unavailable')).action, 'fix_email')
+  })
+
+  test('"temporarily unavailable" is still temporary', () => {
+    // Removing 'unavailable' from the soft list must not take this with it.
+    assert.equal(classifyBounce('Soft bounce — mailbox temporarily unavailable'), 'soft')
+    assert.equal(classifyBounce('Recipient server temporarily unavailable'), 'soft')
+  })
+
+  test('a domain with no MX is offered as an address to correct', () => {
+    // Nearly always a mistyped domain — royalwarehousing1.com,
+    // vanguardindustrieslt.com. Burying these under "reason not reported"
+    // hid the one class of failure the firm can actually act on.
+    assert.equal(classifyBounce('Unable to find MX of domain royalwarehousing1.com'), 'hard')
+    assert.equal(bounceCopy('hard').action, 'fix_email')
+  })
+
+  test('Gmail\'s multi-line NoSuchUser block is read as one hard bounce', () => {
+    const reason =
+      '550-5.1.1 The email account that you tried to reach does not exist. Please try\n' +
+      "   550-5.1.1 double-checking the recipient's email address for typos or\n" +
+      '   550 5.1.1  https://support.google.com/mail/?p=NoSuchUser - gsmtp'
+    assert.equal(classifyBounce(reason), 'hard')
+  })
+})
+
 /* ── the SMTP code is what decides, when there is one ────────────────────── */
 
 describe('SMTP codes', () => {
