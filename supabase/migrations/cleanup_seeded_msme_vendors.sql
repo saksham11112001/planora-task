@@ -41,29 +41,65 @@
 -- firm's suppliers can. If you recognise a single name in section 2, stop and
 -- say so rather than running section 4.
 --
--- Safe to re-run. Set the org id once, at the top.
+-- Safe to re-run. There is ONE thing to edit: the org id, in section 0.
 -- ============================================================================
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 0. WHICH ORG. Run this first and paste the id into :'org' below.
+-- 0. WHICH ORG. Run this on its own first.
+--
+--    It lists every org that has MSME vendors, with how many. The firm you
+--    want is the one whose count matches what you see on the MSME screen.
+--    Identified by its DATA rather than by its name, so a similarly named
+--    org cannot be picked by mistake.
 -- ─────────────────────────────────────────────────────────────────────────────
--- select id, name from organisations order by name;
+select
+  v.org_id,
+  o.name                                            as organisation,
+  count(*)                                          as active_vendors,
+  count(*) filter (where v.email_bounced)           as blocked,
+  count(*) filter (where v.bounce_reason is not null) as with_delivery_problem,
+  min(v.created_at)::date                           as first_vendor_added
+from msme_vendors v
+join organisations o on o.id = v.org_id
+where v.is_deleted = false
+group by v.org_id, o.name
+order by count(*) desc;
 
-\set org '00000000-0000-0000-0000-000000000000'   -- <-- REPLACE THIS
+-- Pin it down exactly, using four addresses from your own bounce export.
+-- The org that comes back owning all four is the right one.
+select v.org_id, o.name as organisation, count(*) as matched_from_your_export
+from msme_vendors v
+join organisations o on o.id = v.org_id
+where v.is_deleted = false
+  and v.vendor_email in (
+    'accounts@ambikaagroproducts.com',
+    'contact@shreesteel.com',
+    'omsbilling@timesgroup.com',
+    'customersupport@icicilombard.com'
+  )
+group by v.org_id, o.name
+order by count(*) desc;
 
 
--- The matching rule, defined once and reused by every section below so the
--- preview cannot drift from what the delete actually does.
+-- ─────────────────────────────────────────────────────────────────────────────
+-- THE ONE LINE TO EDIT is marked below. Paste the org_id from section 0 into
+-- it, then run from here down.
+--
+-- NOTE: no psql variables (\set, :'org'). The Supabase SQL editor is not psql
+-- and silently fails on them, so the org is written once, here, and every
+-- section below reads it from this view.
+-- ─────────────────────────────────────────────────────────────────────────────
 create or replace view _seeded_vendor_review as
 with v as (
   select
-    id, vendor_name, vendor_email, status, email_count,
+    id, org_id, vendor_name, vendor_email, status, email_count,
     declared_at, submitted_at, is_not_msme, created_at,
     lower(split_part(vendor_email, '@', 1))              as local_part,
     lower(split_part(vendor_email, '@', 2))              as domain,
     regexp_replace(lower(vendor_name), '[^a-z]', '', 'g') as squashed_name
   from msme_vendors
   where is_deleted = false
+    and org_id = '00000000-0000-0000-0000-000000000000'::uuid  -- <<< PASTE ORG ID HERE
 ),
 judged as (
   select v.*,
@@ -170,12 +206,13 @@ create table if not exists _seeded_vendor_cleanup_log (
   deleted_at timestamptz not null default now()
 );
 
+-- The view is already scoped to the one org and to is_deleted = false, so the
+-- delete inherits that scope and cannot reach another firm's vendors.
 with target as (
   select v.id
   from msme_vendors v
   join _seeded_vendor_review r on r.id = v.id
-  where v.org_id = :'org'::uuid
-    and v.is_deleted = false
+  where v.is_deleted = false
     and r.verdict like 'DELETE%'
 ), logged as (
   insert into _seeded_vendor_cleanup_log (id)
@@ -196,11 +233,14 @@ select
   count(*) filter (where email_bounced)                 as still_blocked,
   count(*) filter (where bounce_reason is not null)     as with_any_delivery_problem
 from msme_vendors
-where org_id = :'org'::uuid and is_deleted = false;
+where is_deleted = false
+  and org_id = (select org_id from _seeded_vendor_review limit 1);
 
+-- The bounce list the firm will now see on the MSME screen.
 select vendor_name, vendor_email, bounce_reason
 from msme_vendors
-where org_id = :'org'::uuid and is_deleted = false and email_bounced
+where is_deleted = false and email_bounced
+  and org_id = (select org_id from _seeded_vendor_review limit 1)
 order by vendor_name;
 
 
