@@ -44,7 +44,7 @@ export async function POST(
 
   const { data: vendor } = await admin
     .from('msme_vendors')
-    .select('id, vendor_name, vendor_email, status, email_count, email_bounced, created_at')
+    .select('id, vendor_name, vendor_email, status, email_count, email_bounced, bounce_reason, created_at')
     .eq('id', id)
     .eq('org_id', mb.org_id)
     .maybeSingle()
@@ -101,6 +101,7 @@ export async function POST(
 
   const decision = decideSend({
     emailBounced:       !!vendor.email_bounced,
+    bounceReason:       vendor.bounce_reason,
     periodStatus:       declaration?.status ?? 'none',
     periodEmailCount:   declaration?.email_count ?? 0,
     lifetimeEmailCount: vendor.email_count,
@@ -220,6 +221,12 @@ export async function POST(
   await admin.from('msme_vendors').update({
     email_count:     vendor.email_count + 1,
     last_emailed_at: sentAt,
+    // A stale reason from a PREVIOUS soft bounce is cleared on a fresh send,
+    // so "mailbox was full" does not sit on the vendor for ever once the
+    // mailbox has room again. Only a soft bounce can reach this line — the
+    // blocking kinds are refused by decideSend above — and if this send also
+    // fails the webhook writes the reason back.
+    ...(vendor.bounce_reason ? { bounce_reason: null } : {}),
     // Normally the mirror sets status from the latest declaration; this keeps
     // the row correct if the declarations table is not there yet.
     ...(declaration ? {} : { status: 'emailed' }),

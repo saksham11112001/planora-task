@@ -21,10 +21,11 @@ export async function PATCH(
 
   const admin = createAdminClient()
 
-  // Guard: only allow email edit if no emails have been sent yet
+  // email_bounced / vendor_email are read so a WRONG address can be corrected
+  // after sending — see the guard below.
   const { data: vendor } = await admin
     .from('msme_vendors')
-    .select('email_count')
+    .select('email_count, email_bounced, bounce_reason, vendor_email')
     .eq('id', id)
     .eq('org_id', mb.org_id)
     .maybeSingle()
@@ -33,8 +34,26 @@ export async function PATCH(
 
   const body = await req.json()
 
+  const newEmail = typeof body.vendor_email === 'string'
+    ? body.vendor_email.trim().toLowerCase()
+    : null
+  const emailChanges = newEmail !== null && newEmail !== vendor.vendor_email
+
   if (body.vendor_email !== undefined) {
-    if (vendor.email_count > 0) {
+    // The address is frozen once mail has gone out, so one paid vendor slot
+    // cannot be recycled across a succession of different vendors.
+    //
+    // A BOUNCED vendor is the exception, and it is the whole point of the
+    // "fix the address and re-send" flow. Without this, that flow could never
+    // work: a vendor only reaches the bounce list by having been emailed, so
+    // email_count was always > 0 and the correction was always refused with
+    // "Email cannot be changed after the first email has been sent" — the
+    // screen told the firm to do something the API forbade.
+    //
+    // Slots are unaffected: they are counted as rows with email_count > 0,
+    // which this does not change, and decideSend only consumes a new slot
+    // when lifetimeEmailCount is 0.
+    if (vendor.email_count > 0 && !vendor.email_bounced) {
       return NextResponse.json({ error: 'Email cannot be changed after the first email has been sent' }, { status: 422 })
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.vendor_email)) {
@@ -43,7 +62,19 @@ export async function PATCH(
   }
 
   const allowed: Record<string, unknown> = {}
-  if (body.vendor_email != null && body.vendor_email !== '') allowed.vendor_email = body.vendor_email.trim().toLowerCase()
+  if (body.vendor_email != null && body.vendor_email !== '') allowed.vendor_email = newEmail
+
+  // Correcting the address lifts the block, because the block belongs to the
+  // OLD address: the new one is a different recipient who has not bounced and
+  // has not opted out.
+  //
+  // Strictly only when the address actually CHANGES. Clearing it on a re-save
+  // of the same address would turn this into a one-click way to undo someone's
+  // unsubscribe, which must not exist.
+  if (emailChanges && vendor.email_bounced) {
+    allowed.email_bounced = false
+    allowed.bounce_reason = null
+  }
   if (body.vendor_name)  allowed.vendor_name  = body.vendor_name.trim()
   if (body.gstin !== undefined) allowed.gstin = body.gstin?.trim() || null
   if (body.pan !== undefined) allowed.pan = body.pan?.trim().toUpperCase() || null
