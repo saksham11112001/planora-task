@@ -31,6 +31,7 @@
  * what would make a vendor chased four times in September unreachable in
  * March — i.e. it would break the feature outright.
  */
+import { isBlockingBounce } from './bounceKind.ts'
 
 export type SendSkipReason =
   | 'bounced'            // unsubscribed, or the address hard-bounced
@@ -49,6 +50,15 @@ export type PeriodStatus = 'none' | 'pending' | 'emailed' | 'submitted' | 'not_m
 export interface SendInput {
   /** msme_vendors.email_bounced — unsubscribed or bounced. */
   emailBounced:       boolean
+  /**
+   * msme_vendors.bounce_reason. Decides whether the bounce actually blocks:
+   * a full mailbox is not an opt-out, and treating it as one made a vendor
+   * permanently unreachable. See lib/msme/bounceKind.ts.
+   *
+   * Optional so a caller that cannot supply it keeps the old, stricter
+   * behaviour — omitting it blocks, which is the safe direction.
+   */
+  bounceReason?:      string | null
   /** Status of the declaration for the period being chased. */
   periodStatus:       PeriodStatus
   /** Emails already sent for THIS period. */
@@ -76,7 +86,12 @@ export interface SendInput {
  * anyway must not be counted against that budget.
  */
 export function decideSend(o: SendInput): SendDecision {
-  if (o.emailBounced) return { send: false, reason: 'bounced' }
+  // Not `if (o.emailBounced)`: that blocked a soft bounce for ever, so one
+  // full inbox on one day permanently silenced a vendor whose address was
+  // correct all along.
+  if (isBlockingBounce(o.emailBounced, o.bounceReason)) {
+    return { send: false, reason: 'bounced' }
+  }
 
   // Scoped to the period: a September submission must not block the March
   // chase. That is the whole point of the period dimension.

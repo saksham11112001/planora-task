@@ -79,10 +79,14 @@ export async function POST(req: NextRequest) {
   // Fetch all requested vendors in one query (scoped to this org)
   const { data: vendors } = await admin
     .from('msme_vendors')
-    .select('id, vendor_name, vendor_email, status, email_count, email_bounced')
+    .select('id, vendor_name, vendor_email, status, email_count, email_bounced, bounce_reason')
     .eq('org_id', mb.org_id)
     .eq('is_deleted', false)
-    .eq('email_bounced', false)  // never email opted-out or bounced vendors
+    // Deliberately NOT filtered on email_bounced here. That filter could not
+    // tell an opt-out from a mailbox that was full for an hour, so it silenced
+    // the second kind for ever; and a vendor dropped by the query vanishes
+    // from the response with no reason attached. planSends blocks the ones
+    // that must be blocked and reports every skip with its cause.
     .in('id', vendor_ids)
 
   if (!vendors?.length) return NextResponse.json({ sent: 0, failed: 0, errors: [] })
@@ -103,6 +107,7 @@ export async function POST(req: NextRequest) {
   // attached. Now every vendor comes back with its own outcome.
   const plan = planSends(vendors, v => ({
     emailBounced:       !!v.email_bounced,
+    bounceReason:       v.bounce_reason,
     // 'none' would restart a cycle the vendor is already mid-way through, so a
     // vendor whose declaration could not be opened is reported, not sent to.
     periodStatus:       declarations.get(v.id)?.status ?? 'none',
@@ -199,6 +204,11 @@ export async function POST(req: NextRequest) {
           email_count:     vendor.email_count + 1,
           last_emailed_at: sentAt,
           status:          'emailed',
+          // Clear a stale reason from a previous soft bounce, as the single
+          // send does. Only soft bounces reach here; planSends refuses the
+          // blocking kinds, and the webhook writes the reason back if this
+          // send fails too.
+          ...(vendor.bounce_reason ? { bounce_reason: null } : {}),
         }).eq('id', vendor.id),
         admin.from('msme_email_log').insert({
           vendor_id:  vendor.id,

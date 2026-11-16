@@ -5,6 +5,8 @@ import MsmeTour        from './MsmeTour'
 import MsmePresumptionPack from './MsmePresumptionPack'
 import MsmeReports from './MsmeReports'
 import { buildPresumptionPack } from '@/lib/msme/presumption'
+import { classifyBounce, bounceCopy } from '@/lib/msme/bounceKind'
+import type { BounceKind } from '@/lib/msme/bounceKind'
 import { msmeToday } from '@/lib/msme/today'
 import type { PresumptionPack } from '@/lib/msme/presumption'
 import * as XLSX from 'xlsx'
@@ -1109,7 +1111,31 @@ export function MsmeView({ userRole, orgName }: Props) {
       return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
     })
 
-  const bouncedVendors  = vendors.filter(v => v.email_bounced)
+  // Anything with a delivery problem, blocking or not. A soft bounce no longer
+  // sets email_bounced (it is not an opt-out and must not silence the vendor),
+  // so filtering on that flag alone would hide the mailbox-full cases entirely.
+  const bouncedVendors  = vendors.filter(v => v.email_bounced || !!v.bounce_reason)
+
+  // Grouped by what actually happened, because the single list described all
+  // of them as "invalid email addresses ... never received your email", which
+  // was untrue of the opt-outs (they read it and unsubscribed) and of the full
+  // mailboxes (the address is correct), and sent the firm chasing fixes that
+  // were neither needed nor possible.
+  const bounceGroups = (() => {
+    const order: BounceKind[] = ['unsubscribed', 'spam', 'hard', 'unknown', 'soft']
+    const by = new Map<BounceKind, typeof bouncedVendors>()
+    for (const v of bouncedVendors) {
+      const k = classifyBounce(v.bounce_reason)
+      const list = by.get(k)
+      if (list) list.push(v); else by.set(k, [v])
+    }
+    return order.filter(k => by.has(k)).map(k => ({ kind: k, copy: bounceCopy(k), vendors: by.get(k)! }))
+  })()
+
+  // Only the ones a corrected address can actually rescue.
+  const fixableCount = bounceGroups
+    .filter(g => g.copy.action === 'fix_email')
+    .reduce((n, g) => n + g.vendors.length, 0)
   const completedCount  = vendors.filter(v => v.status === 'submitted' || v.status === 'not_msme').length
   const exhaustedCount  = vendors.filter(v => v.email_count >= maxEmails && v.status === 'emailed').length
   const completionPct   = total > 0 ? Math.round((completedCount / total) * 100) : 0
@@ -1412,10 +1438,12 @@ export function MsmeView({ userRole, orgName }: Props) {
             <span style={{ fontSize: 18 }}>⚠️</span>
             <div>
               <p style={{ margin: 0, fontWeight: 700, color: '#dc2626', fontSize: 14 }}>
-                {bouncedVendors.length} invalid email address{bouncedVendors.length > 1 ? 'es' : ''} detected
+                {bouncedVendors.length} email{bouncedVendors.length > 1 ? 's' : ''} did not get through
               </p>
               <p style={{ margin: '2px 0 0', fontSize: 12, color: '#b45309' }}>
-                These vendors never received your email. Click to view and fix them.
+                {fixableCount > 0
+                  ? `${fixableCount} need${fixableCount === 1 ? 's' : ''} a corrected address — the rest need no action. Click for details.`
+                  : 'None of these need an address change. Click to see what happened.'}
               </p>
             </div>
           </div>
@@ -1426,24 +1454,55 @@ export function MsmeView({ userRole, orgName }: Props) {
       {/* ── Bounced vendors list (only when expanded) ── */}
       {showBounced && bouncedVendors.length > 0 && (
         <div style={{ background: '#fff5f5', border: '1.5px solid #fecaca', borderRadius: 10, padding: '14px 16px', marginBottom: 16 }}>
-          <p style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: '#dc2626' }}>Invalid / bounced email addresses — fix these and re-shoot</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {bouncedVendors.map(v => (
-              <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#fff', border: '1px solid #fecaca', borderRadius: 8, padding: '10px 14px' }}>
-                <span style={{ fontSize: 14, flexShrink: 0 }}>✕</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ margin: 0, fontWeight: 600, fontSize: 13, color: '#0f172a' }}>{v.vendor_name}</p>
-                  <p style={{ margin: '2px 0 0', fontSize: 12, color: '#dc2626', wordBreak: 'break-all' }}>{v.vendor_email}</p>
-                  {v.bounce_reason && <p style={{ margin: '1px 0 0', fontSize: 11, color: '#b45309' }}>{v.bounce_reason}</p>}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {bounceGroups.map(({ kind, copy, vendors: group }) => {
+              // Opt-outs and spam complaints are not failures to repair, so
+              // they are not dressed in alarm red; a full mailbox is amber,
+              // because it clears itself.
+              const tone = kind === 'hard' || kind === 'unknown'
+                ? { fg: '#dc2626', border: '#fecaca', mark: '✕' }
+                : kind === 'soft'
+                  ? { fg: '#b45309', border: '#fed7aa', mark: '⏳' }
+                  : { fg: '#475569', border: '#e2e8f0', mark: '🚫' }
+              return (
+                <div key={kind}>
+                  <p style={{ margin: '0 0 2px', fontSize: 13, fontWeight: 700, color: tone.fg }}>
+                    {copy.title} ({group.length})
+                  </p>
+                  {/* Fixed slate, not var(--text-secondary): this panel's
+                      surfaces (#fff5f5, #fff) are hardcoded light, so a token
+                      that inverts in dark mode would put pale grey text on a
+                      near-white card. */}
+                  <p style={{ margin: '0 0 8px', fontSize: 11.5, color: '#475569', lineHeight: 1.45 }}>
+                    {copy.detail}
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {group.map(v => (
+                      <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#fff', border: `1px solid ${tone.border}`, borderRadius: 8, padding: '10px 14px' }}>
+                        <span style={{ fontSize: 14, flexShrink: 0 }}>{tone.mark}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ margin: 0, fontWeight: 600, fontSize: 13, color: '#0f172a' }}>{v.vendor_name}</p>
+                          <p style={{ margin: '2px 0 0', fontSize: 12, color: tone.fg, wordBreak: 'break-all' }}>{v.vendor_email}</p>
+                          {v.bounce_reason && (
+                            <p style={{ margin: '1px 0 0', fontSize: 11, color: '#64748b', wordBreak: 'break-word' }}>
+                              {v.bounce_reason}
+                            </p>
+                          )}
+                        </div>
+                        {copy.action === 'fix_email' && (
+                          <button
+                            onClick={e => { e.stopPropagation(); setSelectedId(v.id); setEditingEmail(v.id); setEditEmailVal(v.vendor_email) }}
+                            style={{ background: '#dc2626', color: '#fff', border: 'none', borderRadius: 6, padding: '5px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
+                          >
+                            ✎ Fix email
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <button
-                  onClick={e => { e.stopPropagation(); setSelectedId(v.id); setEditingEmail(v.id); setEditEmailVal(v.vendor_email) }}
-                  style={{ background: '#dc2626', color: '#fff', border: 'none', borderRadius: 6, padding: '5px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
-                >
-                  ✎ Fix email
-                </button>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}

@@ -78,6 +78,62 @@ test('a bounced or unsubscribed vendor is never emailed', () => {
   assert.equal(!d.send && d.reason, 'bounced')
 })
 
+test('an unrecognised bounce reason still blocks', () => {
+  // A caller that cannot supply the reason, or a reason nothing can classify,
+  // must keep the old strict behaviour. Defaulting the other way would turn
+  // every unreadable bounce into a repeat send.
+  for (const reason of [undefined, null, 'Delivery failed']) {
+    const d = decideSend(i({ emailBounced: true, bounceReason: reason }))
+    assert.equal(d.send, false, `reason ${String(reason)} must block`)
+  }
+})
+
+test('an opt-out blocks even though the reason is readable', () => {
+  const d = decideSend(i({
+    emailBounced: true,
+    bounceReason: 'Opted out — unsubscribed via email link',
+  }))
+  assert.equal(d.send, false)
+  assert.equal(!d.send && d.reason, 'bounced')
+})
+
+test('a FULL MAILBOX does not block — the address was always correct', () => {
+  // The defect this fixes: one temporarily full inbox marked the vendor
+  // bounced, and because every send path refused a bounced vendor, they could
+  // never be contacted again. The firm's screen then told them to "fix" an
+  // address that had nothing wrong with it.
+  const d = decideSend(i({
+    emailBounced: true,
+    bounceReason: "452-4.2.2 The recipient's inbox is out of storage space",
+  }))
+  assert.equal(d.send, true)
+})
+
+test('a soft-bounced vendor still obeys the period cap', () => {
+  // Unblocking must not also exempt them from the cap, or a permanently full
+  // mailbox would be retried without limit.
+  const d = decideSend(i({
+    emailBounced:     true,
+    bounceReason:     '450 4.7.3 Organization queue quota exceeded',
+    periodEmailCount: 5,
+    maxEmails:        5,
+  }))
+  assert.equal(d.send, false)
+  assert.equal(!d.send && d.reason, 'max_emails')
+})
+
+test('a soft-bounced vendor does not consume a second slot', () => {
+  // They were emailed before, so the slot is already paid for.
+  const d = decideSend(i({
+    emailBounced:       true,
+    bounceReason:       '4.2.2 mailbox full',
+    lifetimeEmailCount: 2,
+    slotsRemaining:     0,
+  }))
+  assert.equal(d.send, true)
+  assert.equal(d.send && d.consumesSlot, false)
+})
+
 /* ── slots ────────────────────────────────────────────────────────────────── */
 
 test('a never-emailed vendor consumes a slot', () => {

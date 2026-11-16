@@ -11,6 +11,8 @@
 // quiet, not a compliance record.
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient }        from '@/lib/supabase/admin'
+import { classifyBounce }           from '@/lib/msme/bounceKind'
+import type { BounceKind }          from '@/lib/msme/bounceKind'
 import crypto                       from 'crypto'
 
 const BOUNCE_EVENTS = new Set(['hard_bounce', 'soft_bounce', 'spam', 'invalid_email'])
@@ -92,15 +94,40 @@ export async function POST(req: NextRequest) {
       : event === 'invalid_email'? 'Invalid email address'
       : 'Delivery failed'
 
+    // What kind of failure this is decides whether the vendor is BLOCKED or
+    // merely had a bad day.
+    //
+    // The SMTP text wins when it is decisive, because the code in it comes
+    // from the receiving server itself; the event name is Brevo's own
+    // bucketing and is the fallback. A spam complaint overrides both: the
+    // remedy there is stricter than for a bad address, and some servers wrap
+    // a complaint in an ordinary 5xx.
+    const fromText = classifyBounce(reason)
+    const kind: BounceKind =
+      event === 'spam'                                        ? 'spam'
+      : fromText !== 'unknown'                                ? fromText
+      : event === 'soft_bounce'                               ? 'soft'
+      : event === 'hard_bounce' || event === 'invalid_email'  ? 'hard'
+      : 'unknown'
+
+    // email_bounced means "never email this address again", and every send
+    // path filters on it. A full mailbox is not that: the address is correct
+    // and will accept mail once there is room, so recording it as a block
+    // silenced the vendor for ever. The reason is still stored, so the screen
+    // can show what happened without the vendor becoming unreachable.
+    const blocks = kind !== 'soft'
+
     // Update all vendors with this email across all orgs — one email may appear in multiple orgs
     const { data: updated } = await admin
       .from('msme_vendors')
-      .update({ email_bounced: true, bounce_reason: reason })
+      .update({ email_bounced: blocks, bounce_reason: reason })
       .eq('vendor_email', email)
-      .eq('email_bounced', false) // idempotent
+      // Idempotent, and it also stops a later soft bounce from clearing a
+      // block that an earlier opt-out or hard bounce put there.
+      .eq('email_bounced', false)
       .select('id')
 
-    marked += updated?.length ?? 0
+    if (blocks) marked += updated?.length ?? 0
   }
 
   return NextResponse.json({ ok: true, marked, opens })
