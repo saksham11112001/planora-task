@@ -50,16 +50,28 @@ with classified as (
          or lower(bounce_reason) like '%quota%')          then 'soft'
       when bounce_reason ~ '^[[:space:]]*5[0-9]{2}(?![0-9.])'
         or bounce_reason ~ '^[[:space:]]*5\.[0-9]{1,3}\.[0-9]{1,3}' then 'hard'
+      -- Hard wording is checked BEFORE soft, so "mailbox unavailable" is not
+      -- captured by a looser phrase. That bare form is a DEAD mailbox -- the
+      -- same failure as Outlook's "550 5.5.0 ... mailbox unavailable" with the
+      -- code stripped -- and "Unable to find MX of domain x.com" means the
+      -- domain publishes no mail server at all, so no address at it can ever
+      -- receive. Both are addresses worth correcting, not mysteries.
+      when lower(bounce_reason) like '%does not exist%'
+        or lower(bounce_reason) like '%no such user%'
+        or lower(bounce_reason) like '%user unknown%'
+        or lower(bounce_reason) like '%invalid email%'
+        or lower(bounce_reason) like '%hard bounce%'
+        or lower(bounce_reason) like '%mailbox unavailable%'
+        or lower(bounce_reason) like '%mailbox not found%'
+        or lower(bounce_reason) like '%recipient not found%'
+        or lower(bounce_reason) like '%address rejected%'
+        or lower(bounce_reason) like '%relaying denied%'
+        or lower(bounce_reason) like '%mx of domain%'      then 'hard'
       when lower(bounce_reason) like '%mailbox full%'
         or lower(bounce_reason) like '%out of storage%'
         or lower(bounce_reason) like '%over quota%'
         or lower(bounce_reason) like '%temporarily%'
         or lower(bounce_reason) like '%soft bounce%'       then 'soft'
-      when lower(bounce_reason) like '%does not exist%'
-        or lower(bounce_reason) like '%no such user%'
-        or lower(bounce_reason) like '%user unknown%'
-        or lower(bounce_reason) like '%invalid email%'
-        or lower(bounce_reason) like '%hard bounce%'       then 'hard'
       else 'unknown'
     end as kind
   from msme_vendors
