@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { safeFetchJson } from '@/lib/http/safeFetch'
 
 const ACCENT = '#0d9488'
 const UDYAM_REGEX = /^UDYAM-[A-Z]{2}-\d{2}-\d{7}$/
@@ -182,12 +183,19 @@ export function MsmeVendorForm({ token }: { token: string }) {
     const fd = new FormData()
     fd.append('file', file)
     fd.append('kind', 'cert')
-    const res  = await fetch(`/api/msme/upload/${token}`, { method: 'POST', body: fd })
-    const data = await res.json()
-    setUploading(false)
-    if (!res.ok) { setFormError(data.error ?? 'Upload failed'); setCertFile(null); return }
-    setCertUrl(data.url ?? data.cert_url)
-    setCertCarried(false)   // this one was uploaded here and now
+    try {
+      const r = await safeFetchJson<{ url?: string; cert_url?: string }>(
+        `/api/msme/upload/${token}`, { method: 'POST', body: fd },
+      )
+      if (!r.ok) { setFormError(r.error); setCertFile(null); return }
+      setCertUrl(r.data.url ?? r.data.cert_url ?? null)
+      setCertCarried(false)   // this one was uploaded here and now
+    } finally {
+      // In `finally`, not after the await. A throw here used to skip this
+      // line and leave "Uploading…" on screen for ever, which reads as "still
+      // working" rather than "failed".
+      setUploading(false)
+    }
   }
 
   async function handleProofFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -201,11 +209,15 @@ export function MsmeVendorForm({ token }: { token: string }) {
     // Says this is the payment proof, not the Udyam certificate. Without it
     // the upload was pre-saved to cert_url and overwrote the certificate.
     fd.append('kind', 'proof')
-    const res  = await fetch(`/api/msme/upload/${token}`, { method: 'POST', body: fd })
-    const data = await res.json()
-    setUploadingProof(false)
-    if (!res.ok) { setFormError(data.error ?? 'Upload failed'); setProofFile(null); return }
-    setProofUrl(data.url ?? data.cert_url)
+    try {
+      const r = await safeFetchJson<{ url?: string; cert_url?: string }>(
+        `/api/msme/upload/${token}`, { method: 'POST', body: fd },
+      )
+      if (!r.ok) { setFormError(r.error); setProofFile(null); return }
+      setProofUrl(r.data.url ?? r.data.cert_url ?? null)
+    } finally {
+      setUploadingProof(false)
+    }
   }
 
   async function handleSubmit() {
@@ -241,15 +253,23 @@ export function MsmeVendorForm({ token }: { token: string }) {
           proof_url: proofUrl,
         }
 
-    const res  = await fetch(`/api/msme/submit/${token}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
-    const data = await res.json()
-    setSaving(false)
+    // The one that matters most. A failure here used to leave the button
+    // reading "Saving…" with no error, so the vendor closed the tab believing
+    // the declaration was filed. The firm then chased someone who was sure
+    // they had already answered, and nothing in the system could say who was
+    // right.
+    let r: Awaited<ReturnType<typeof safeFetchJson>>
+    try {
+      r = await safeFetchJson(`/api/msme/submit/${token}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+    } finally {
+      setSaving(false)
+    }
 
-    if (!res.ok) { setFormError(data.error ?? 'Submission failed. Please try again.'); return }
+    if (!r.ok) { setFormError(r.error); return }
     setInfo(prev => prev ? ({
       ...prev,
       already_submitted: true,
