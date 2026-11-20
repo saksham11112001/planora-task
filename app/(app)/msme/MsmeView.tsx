@@ -754,16 +754,29 @@ export function MsmeView({ userRole, orgName }: Props) {
       showToast('Enter a valid email address', 'error'); return
     }
     setSavingEmail(true)
-    const res = await fetch(`/api/msme/vendors/${vendorId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ vendor_email: editEmailVal.trim().toLowerCase() }),
-    })
-    setSavingEmail(false)
-    if (!res.ok) { showToast('Failed to update email', 'error'); return }
-    setEditingEmail(null)
-    showToast('Email updated')
-    fetchVendors(true)
+    try {
+      const res = await fetch(`/api/msme/vendors/${vendorId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vendor_email: editEmailVal.trim().toLowerCase() }),
+      })
+      if (!res.ok) {
+        // The server's own message, not a generic one. This route explains
+        // why a change was refused — "Email cannot be changed after the first
+        // email has been sent" is the difference between a person correcting
+        // the address and a person staring at "Failed to update email".
+        const d = await res.json().catch(() => ({}))
+        showToast(d.error ?? 'Failed to update email', 'error')
+        return
+      }
+      setEditingEmail(null)
+      showToast('Email updated')
+      fetchVendors(true)
+    } catch {
+      showToast('Could not reach the server — the email was not changed.', 'error')
+    } finally {
+      setSavingEmail(false)
+    }
   }
 
   // ── Creditors-ledger import ───────────────────────────────────────────────

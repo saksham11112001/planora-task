@@ -140,12 +140,20 @@ export function TeamView({ members: initialMembers, canManage, isAdmin = false, 
     setBulkSending(true); setBulkResults([])
     const results: {email:string;ok:boolean;msg:string}[] = []
     for (const row of valid) {
-      const res = await fetch('/api/team', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: row.email.trim(), role: row.role }),
-      })
-      const d = await res.json()
-      results.push({ email: row.email, ok: res.ok, msg: res.ok ? 'Invited' : (d.error ?? 'Failed') })
+      // Per row, so one unreachable request does not abandon the rest of the
+      // list. Before this, a throw on row 3 of 20 skipped rows 4-20 entirely
+      // AND stranded the button — the person could not tell who had been
+      // invited and who had not.
+      try {
+        const res = await fetch('/api/team', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: row.email.trim(), role: row.role }),
+        })
+        const d = await res.json().catch(() => ({}))
+        results.push({ email: row.email, ok: res.ok, msg: res.ok ? 'Invited' : (d.error ?? 'Failed') })
+      } catch {
+        results.push({ email: row.email, ok: false, msg: 'Could not reach the server' })
+      }
     }
     setBulkSending(false); setBulkResults(results)
     const succeeded = results.filter(r => r.ok).length
@@ -213,17 +221,26 @@ export function TeamView({ members: initialMembers, canManage, isAdmin = false, 
     setMembers(p => p.map(m => m.id === editingMember.id ? { ...m, name: editName.trim(), phone_number: editPhone.trim() || null } : m))
     setEditingMember(null)
     setEditSaving(true)
-    const res = await fetch('/api/team', {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: editingMember.id, name: editName.trim(), phone_number: editPhone.trim() || null }),
-    })
-    setEditSaving(false)
-    const d = await res.json().catch(() => ({}))
-    if (res.ok) { toast.success('Member info updated'); router.refresh() }
-    else {
-      // Rollback
+    try {
+      const res = await fetch('/api/team', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: editingMember.id, name: editName.trim(), phone_number: editPhone.trim() || null }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (res.ok) { toast.success('Member info updated'); router.refresh() }
+      else {
+        // Rollback
+        setMembers(p => p.map(m => m.id === editingMember.id ? { ...m, name: prevName, phone_number: prevPhone } : m))
+        toast.error(d.error ?? 'Failed to update member')
+      }
+    } catch {
+      // The name was applied optimistically and the dialog already closed, so
+      // without this rollback the list showed a new name that was never saved
+      // and reverted only on the next refresh.
       setMembers(p => p.map(m => m.id === editingMember.id ? { ...m, name: prevName, phone_number: prevPhone } : m))
-      toast.error(d.error ?? 'Failed to update member')
+      toast.error('Could not reach the server — the change was not saved.')
+    } finally {
+      setEditSaving(false)
     }
   }
 

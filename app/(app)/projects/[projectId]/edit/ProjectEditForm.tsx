@@ -43,6 +43,7 @@ export function ProjectEditForm({ project, clients, members }: { project: any; c
     e.preventDefault()
     if (!form.name.trim()) { toast.error('Name required'); return }
     setSaving(true)
+    try {
     const res = await fetch(`/api/projects/${project.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -56,9 +57,13 @@ export function ProjectEditForm({ project, clients, members }: { project: any; c
         member_ids:   memberIds.length > 0 ? memberIds : null,
       }),
     })
-    setSaving(false)
-    if (res.ok) { toast.success('Project updated'); router.push(`/projects/${project.id}`) }
-    else { const d = await res.json(); toast.error(d.error ?? 'Failed') }
+      if (res.ok) { toast.success('Project updated'); router.push(`/projects/${project.id}`) }
+      else { const d = await res.json().catch(() => ({})); toast.error(d.error ?? 'Failed') }
+    } catch {
+      toast.error('Could not reach the server — nothing was saved. Please try again.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function handleDelete() {

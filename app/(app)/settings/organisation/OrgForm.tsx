@@ -29,22 +29,30 @@ export function OrgForm({ org }: { org: { name: string; industry?: string; team_
     e.preventDefault()
     if (!name.trim()) { toast.error('Name required'); return }
     setSaving(true)
-    const res = await fetch('/api/settings/organisation', {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: name.trim(), industry: industry || null, team_size: teamSize || null, logo_color: color }),
-    })
-    let ok = res.ok
-    if (ok && country !== savedCountry) {
-      const lr = await fetch('/api/settings/locale', {
+    try {
+      const res = await fetch('/api/settings/organisation', {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ country }),
+        body: JSON.stringify({ name: name.trim(), industry: industry || null, team_size: teamSize || null, logo_color: color }),
       })
-      if (lr.ok) { setSavedCountry(country); refreshOrgSettings() }
-      else ok = false
+      let ok = res.ok
+      if (ok && country !== savedCountry) {
+        const lr = await fetch('/api/settings/locale', {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ country }),
+        })
+        if (lr.ok) { setSavedCountry(country); refreshOrgSettings() }
+        else ok = false
+      }
+      if (ok) { toast.success('Saved!'); router.refresh() }
+      else { const d = await res.json().catch(() => ({})); toast.error(d.error ?? 'Failed') }
+    } catch {
+      // Either request can throw. The second one runs only after the first
+      // succeeded, so a failure there leaves the name saved and the country
+      // not — the message says to check rather than claiming nothing happened.
+      toast.error('Could not reach the server. Please check your connection and reload to see what was saved.')
+    } finally {
+      setSaving(false)
     }
-    setSaving(false)
-    if (ok) { toast.success('Saved!'); router.refresh() }
-    else { const d = await res.json().catch(() => ({})); toast.error(d.error ?? 'Failed') }
   }
 
   return (

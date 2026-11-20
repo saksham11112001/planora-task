@@ -51,12 +51,21 @@ export function ClientEditForm({ client }: { client: any }) {
     const goingInactive = form.status === 'inactive' && client.status !== 'inactive'
     if (goingInactive) {
       setSaving(true)
-      const pv = await fetch(`/api/clients/${client.id}?preview=1`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'inactive' }),
-      })
-      setSaving(false)
-      const { preview } = pv.ok ? await pv.json() : { preview: null }
+      let preview: { tasksArchived?: number; assignmentsDeactivated?: number } | null = null
+      try {
+        const pv = await fetch(`/api/clients/${client.id}?preview=1`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'inactive' }),
+        })
+        preview = pv.ok ? (await pv.json().catch(() => ({ preview: null }))).preview : null
+      } catch {
+        // The preview only decides what the confirmation says. A failure here
+        // must not block the save or strand the button — the confirmation
+        // falls back to the generic wording below.
+        preview = null
+      } finally {
+        setSaving(false)
+      }
       const tasks = preview?.tasksArchived ?? 0
       const asg   = preview?.assignmentsDeactivated ?? 0
       const parts = [
@@ -74,19 +83,27 @@ export function ClientEditForm({ client }: { client: any }) {
     }
 
     setSaving(true)
-    const res = await fetch(`/api/clients/${client.id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
-    })
-    setSaving(false)
-    if (res.ok) {
-      const { effect } = await res.json().catch(() => ({ effect: null }))
-      if (effect?.tasksArchived)  toast.success(`Client marked inactive \u2014 ${effect.tasksArchived} task(s) archived`)
-      else if (effect?.tasksRestored) toast.success(`Client reactivated \u2014 ${effect.tasksRestored} task(s) restored`)
-      else toast.success('Client updated')
-      router.push(`/clients/${client.id}`)
+    try {
+      const res = await fetch(`/api/clients/${client.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      })
+      if (res.ok) {
+        const { effect } = await res.json().catch(() => ({ effect: null }))
+        if (effect?.tasksArchived)  toast.success(`Client marked inactive \u2014 ${effect.tasksArchived} task(s) archived`)
+        else if (effect?.tasksRestored) toast.success(`Client reactivated \u2014 ${effect.tasksRestored} task(s) restored`)
+        else toast.success('Client updated')
+        router.push(`/clients/${client.id}`)
+      }
+      else { const d = await res.json().catch(() => ({})); toast.error(d.error ?? 'Failed') }
+    } catch {
+      // Says "not saved" rather than "something went wrong": a request that
+      // never reached the server changed nothing, and on a form that can
+      // archive a client's open work, the person needs to know which.
+      toast.error('Could not reach the server \u2014 nothing was saved. Please try again.')
+    } finally {
+      setSaving(false)
     }
-    else { const d = await res.json(); toast.error(d.error ?? 'Failed') }
   }
 
   async function handleDelete() {
