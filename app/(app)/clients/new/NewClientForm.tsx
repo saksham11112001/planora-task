@@ -15,6 +15,8 @@ import {
   type AttachmentConfig, type OrgOverrides,
 } from '@/lib/compliance'
 import { useOrgSettings } from '@/lib/hooks/useOrgSettings'
+import { trackEvent } from '@/components/analytics/PostHogProvider'
+import { EVENTS, safeProps } from '@/lib/analytics/events'
 
 /* ─── Constants ──────────────────────────────────────────────── */
 
@@ -211,6 +213,10 @@ export function NewClientForm({ members = [] }: { members?: Member[] }) {
       })
       const clientData = await clientRes.json()
       if (!clientRes.ok) { setError(clientData.error ?? 'Failed to create client'); return }
+      // Fired after the server confirmed it, so a failed attempt is not
+      // counted as activation. No name or GSTIN: this is the firm's client,
+      // not the firm, and PostHog works out "first ever" by itself.
+      trackEvent(EVENTS.CLIENT_CREATED, safeProps({ source: 'clients_new', gst_prefilled: !!gstCustomFields }))
       const clientId = clientData.data.id
 
       if (selectedCount > 0) {

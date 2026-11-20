@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { trackEvent } from '@/components/analytics/PostHogProvider'
+import { EVENTS, safeProps } from '@/lib/analytics/events'
 
 // Always route auth callbacks through the main domain so msme.upfloat.co
 // doesn't need its own entry in the Supabase redirect URL allow-list.
@@ -184,6 +186,10 @@ export default function LoginPage() {
     if (loading) return
     setLoading(true); setError('')
     try {
+      // Fired on the click, not on success: OAuth navigates away from this
+      // page, so there is no success to observe here. intent is 'unknown'
+      // because this button signs people in and signs them up alike.
+      trackEvent(EVENTS.AUTH_STARTED, safeProps({ method: 'microsoft', intent: 'unknown' }))
       const supabase = createClient()
       const { error: e } = await supabase.auth.signInWithOAuth({
         provider: 'azure',
@@ -205,6 +211,7 @@ export default function LoginPage() {
     if (loading) return
     setLoading(true); setError('')
     try {
+      trackEvent(EVENTS.AUTH_STARTED, safeProps({ method: 'google', intent: 'unknown' }))
       const supabase = createClient()
       const { error: e } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -246,6 +253,8 @@ export default function LoginPage() {
     if (!password)        { setError('Enter your password'); return }
     setLoading(true); setError('')
 
+    trackEvent(EVENTS.AUTH_STARTED, safeProps({ method: 'email', intent: 'signin' }))
+
     const supabase = createClient()
     const { data, error: err } = await supabase.auth.signInWithPassword({
       email: normaliseEmail(email),
@@ -271,6 +280,10 @@ export default function LoginPage() {
     if (password.length < 8)  { setError('Password must be at least 8 characters'); return }
     if (password !== confirm)  { setError('Passwords do not match'); return }
     setLoading(true); setError('')
+
+    // The one place intent is certain: this form only exists to create an
+    // account, so this is the signup number the funnel should be read against.
+    trackEvent(EVENTS.AUTH_STARTED, safeProps({ method: 'email', intent: 'signup' }))
 
     const supabase = createClient()
     const { data, error: err } = await supabase.auth.signUp({
