@@ -831,21 +831,30 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     const placeholder = { id: tempId, file_name: 'Not available (nil)', drive_url: 'nil', attachment_type: 'link', file_size: 0, mime_type: 'text/uri-list', storage_path: '', created_at: new Date().toISOString(), uploaded_by: null, uploader: null }
     setAttachments(p => [placeholder as any, ...p])
     setUploading(true)
-    const r = await fetch(`/api/tasks/${task.id}/attachments`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ drive_url: 'nil', file_name: 'Not available (nil)', attachment_type: 'link' }),
-    })
-    const d = await r.json()
-    if (r.ok) {
-      // Replace placeholder with real row from server
-      setAttachments(p => p.map(a => a.id === tempId ? d.data : a))
-      toast.success('Marked as NIL — document noted as unavailable')
-    } else {
-      setAttachments(p => p.filter(a => a.id !== tempId))  // rollback
-      toast.error(d.error ?? 'Failed to mark as NIL')
+    try {
+      const r = await fetch(`/api/tasks/${task.id}/attachments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ drive_url: 'nil', file_name: 'Not available (nil)', attachment_type: 'link' }),
+      })
+      const d = await r.json().catch(() => ({}))
+      if (r.ok) {
+        // Replace placeholder with real row from server
+        setAttachments(p => p.map(a => a.id === tempId ? d.data : a))
+        toast.success('Marked as NIL — document noted as unavailable')
+      } else {
+        setAttachments(p => p.filter(a => a.id !== tempId))  // rollback
+        toast.error(d.error ?? 'Failed to mark as NIL')
+      }
+    } catch {
+      // The optimistic placeholder MUST come out here. Without this the row
+      // stayed on screen after a network failure, so the task looked as
+      // though its NIL return had been recorded when nothing was saved.
+      setAttachments(p => p.filter(a => a.id !== tempId))
+      toast.error('Could not reach the server — not marked as NIL. Please try again.')
+    } finally {
+      setUploading(false)
     }
-    setUploading(false)
   }
 
   async function viewAttachment(storagePath: string, mimeType: string, fileName: string) {
@@ -886,24 +895,31 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
       }
     }
     setUploading(true)
-    const r = await fetch(`/api/tasks/${task.id}/attachments`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        drive_url: isNil ? 'nil' : trimmedUrl,
-        file_name: isNil ? 'Not available (nil)' : (driveTitle.trim() || trimmedUrl),
-        attachment_type: 'link',
-      }),
-    })
-    const d = await r.json()
-    if (r.ok) {
-      setAttachments(p => [d.data, ...p])
-      setDriveUrl(''); setDriveTitle('')
-      toast.success(isNil ? 'Marked as not available' : 'Link added')
-    } else {
-      toast.error(d.error ?? 'Failed to add link')
+    try {
+      const r = await fetch(`/api/tasks/${task.id}/attachments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          drive_url: isNil ? 'nil' : trimmedUrl,
+          file_name: isNil ? 'Not available (nil)' : (driveTitle.trim() || trimmedUrl),
+          attachment_type: 'link',
+        }),
+      })
+      const d = await r.json().catch(() => ({}))
+      if (r.ok) {
+        setAttachments(p => [d.data, ...p])
+        setDriveUrl(''); setDriveTitle('')
+        toast.success(isNil ? 'Marked as not available' : 'Link added')
+      } else {
+        toast.error(d.error ?? 'Failed to add link')
+      }
+    } catch {
+      // The URL and title are deliberately NOT cleared here, so the link the
+      // person pasted is still there to retry with.
+      toast.error('Could not reach the server — link not added. Please try again.')
+    } finally {
+      setUploading(false)
     }
-    setUploading(false)
   }
 
   async function fetchComments(taskId: string) {
@@ -955,19 +971,30 @@ export function TaskDetailPanel({ task, members, clients, currentUserId, userRol
     }
     setComments(prev => [...prev, optimistic])
     setComment('')
-    const res = await fetch(`/api/tasks/${task.id}/comments`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: optimistic.content }),
-    })
-    setSending(false)
-    if (res.ok) {
-      // Replace optimistic with real data
-      fetchComments(task.id)
-    } else {
-      // Roll back
+    try {
+      const res = await fetch(`/api/tasks/${task.id}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: optimistic.content }),
+      })
+      if (res.ok) {
+        // Replace optimistic with real data
+        fetchComments(task.id)
+      } else {
+        // Roll back
+        setComments(prev => prev.filter(c => c.id !== optimistic.id))
+        toast.error('Could not post comment')
+      }
+    } catch {
+      // Roll the comment back AND put the text back in the box. The input is
+      // cleared optimistically, so without this the comment vanished from the
+      // thread and from the box at once — the person had to retype it, having
+      // been shown it posted a moment earlier.
       setComments(prev => prev.filter(c => c.id !== optimistic.id))
-      toast.error('Could not post comment')
+      setComment(optimistic.content)
+      toast.error('Could not reach the server — comment not posted. Your text has been restored.')
+    } finally {
+      setSending(false)
     }
   }
 

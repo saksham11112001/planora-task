@@ -190,21 +190,26 @@ export function CouponsView({ initialCoupons }: Props) {
       if (form.plan_tier.startsWith('pack_')) body.msme_only = true
     }
 
-    const res = await fetch('/api/admin/coupons', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(body),
-    })
-    const d = await res.json() as { data?: Coupon; error?: string }
-    if (res.ok && d.data) {
-      setCoupons(cs => [{ ...d.data!, coupon_redemptions: [] }, ...cs])
-      setForm({ ...BLANK })
-      setShowCreate(false)
-      toast.success(`Coupon "${d.data.code}" created!`)
-    } else {
-      toast.error(d.error ?? 'Failed to create coupon')
+    try {
+      const res = await fetch('/api/admin/coupons', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(body),
+      })
+      const d = await res.json().catch(() => ({})) as { data?: Coupon; error?: string }
+      if (res.ok && d.data) {
+        setCoupons(cs => [{ ...d.data!, coupon_redemptions: [] }, ...cs])
+        setForm({ ...BLANK })
+        setShowCreate(false)
+        toast.success(`Coupon "${d.data.code}" created!`)
+      } else {
+        toast.error(d.error ?? 'Failed to create coupon')
+      }
+    } catch {
+      toast.error('Could not reach the server — the coupon was not created.')
+    } finally {
+      setSaving(false)
     }
-    setSaving(false)
   }
 
   /* ── Reload ── */

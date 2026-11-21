@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Zap, Building2, Users, ChevronRight, CheckCircle, UserCircle2, KeyRound, PlusCircle, Megaphone, Phone, Mail } from 'lucide-react'
 import { trackEvent } from '@/components/analytics/PostHogProvider'
+import { EVENTS, safeProps } from '@/lib/analytics/events'
 import { createClient } from '@/lib/supabase/client'
 
 const COUNTRIES = [
@@ -265,7 +266,13 @@ export default function OnboardingPage() {
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error ?? 'Failed to create organisation'); return }
-      trackEvent('org_created', { org_name: form.org_name, country: form.country, industry: form.industry, team_size: form.team_size })
+      // Same event name and the same properties as before — routed through the
+      // catalogue so the name lives in one place, and through safeProps so a
+      // property added here later cannot quietly carry personal data out.
+      trackEvent(EVENTS.ORG_CREATED, safeProps({
+        org_name: form.org_name, country: form.country,
+        industry: form.industry, team_size: form.team_size,
+      }))
       // Set the new org as active before redirecting so the cookie points to it
       if (data.org_id) {
         await fetch('/api/org/switch', {

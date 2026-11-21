@@ -3,6 +3,8 @@ import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from '@/store/appStore'
+import { trackEvent } from '@/components/analytics/PostHogProvider'
+import { EVENTS, safeProps } from '@/lib/analytics/events'
 
 // ── Project templates ────────────────────────────────────────────────────
 interface TemplateTask {
@@ -99,6 +101,7 @@ export function NewProjectForm({ clients: initialClients, members, orgTemplates 
       })
       const data = await res.json()
       if (res.ok && data.data?.id) {
+        trackEvent(EVENTS.CLIENT_CREATED, safeProps({ source: 'project_new_inline' }))
         const newClient = { id: data.data.id, name: data.data.name, color: data.data.color ?? '#94a3b8' }
         setClients(prev => [...prev, newClient])
         setClientId(newClient.id)

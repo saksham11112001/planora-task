@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { trackEvent } from '@/components/analytics/PostHogProvider'
+import { EVENTS, safeProps } from '@/lib/analytics/events'
 
 // Always route auth callbacks through the main domain so msme.upfloat.co
 // doesn't need its own entry in the Supabase redirect URL allow-list.
@@ -184,6 +186,10 @@ export default function LoginPage() {
     if (loading) return
     setLoading(true); setError('')
     try {
+      // Fired on the click, not on success: OAuth navigates away from this
+      // page, so there is no success to observe here. intent is 'unknown'
+      // because this button signs people in and signs them up alike.
+      trackEvent(EVENTS.AUTH_STARTED, safeProps({ method: 'microsoft', intent: 'unknown' }))
       const supabase = createClient()
       const { error: e } = await supabase.auth.signInWithOAuth({
         provider: 'azure',
@@ -205,6 +211,7 @@ export default function LoginPage() {
     if (loading) return
     setLoading(true); setError('')
     try {
+      trackEvent(EVENTS.AUTH_STARTED, safeProps({ method: 'google', intent: 'unknown' }))
       const supabase = createClient()
       const { error: e } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -228,15 +235,24 @@ export default function LoginPage() {
     setLoading(true); setError('')
     // Use server-side admin link generation to bypass Supabase client-side
     // email domain validation, which rejects some valid corporate domains.
-    const res  = await fetch('/api/auth/magic-link', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: normaliseEmail(email), next: getPostLoginPath() }),
-    })
-    const json = await res.json().catch(() => ({}))
-    setLoading(false)
-    if (!res.ok || json.error) { setError(json.error ?? 'Failed to send magic link'); return }
-    setMode('magic_sent')
+    // try/finally, not a bare await: fetch rejects outright on a network
+    // failure, and setLoading(false) below would be skipped. Every button on
+    // this screen is disabled while loading, so that left the whole sign-in
+    // page frozen with no way back except a reload.
+    try {
+      const res  = await fetch('/api/auth/magic-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: normaliseEmail(email), next: getPostLoginPath() }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json.error) { setError(json.error ?? 'Failed to send magic link'); return }
+      setMode('magic_sent')
+    } catch {
+      setError('Could not reach the server. Check your internet connection and try again.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   // ── Email + password sign-in ──────────────────────────────────────────────
@@ -245,6 +261,8 @@ export default function LoginPage() {
     if (!email.trim())    { setError('Enter your email address'); return }
     if (!password)        { setError('Enter your password'); return }
     setLoading(true); setError('')
+
+    trackEvent(EVENTS.AUTH_STARTED, safeProps({ method: 'email', intent: 'signin' }))
 
     const supabase = createClient()
     const { data, error: err } = await supabase.auth.signInWithPassword({
@@ -271,6 +289,10 @@ export default function LoginPage() {
     if (password.length < 8)  { setError('Password must be at least 8 characters'); return }
     if (password !== confirm)  { setError('Passwords do not match'); return }
     setLoading(true); setError('')
+
+    // The one place intent is certain: this form only exists to create an
+    // account, so this is the signup number the funnel should be read against.
+    trackEvent(EVENTS.AUTH_STARTED, safeProps({ method: 'email', intent: 'signup' }))
 
     const supabase = createClient()
     const { data, error: err } = await supabase.auth.signUp({

@@ -26,13 +26,18 @@ export function ProfileForm({ profile }: { profile: any }) {
     e.preventDefault()
     if (!form.name.trim()) { toast.error('Name is required'); return }
     setSaving(true)
-    const res = await fetch('/api/profile', {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
-    })
-    setSaving(false)
-    if (res.ok) toast.success('Profile updated!')
-    else { const d = await res.json(); toast.error(d.error ?? 'Failed') }
+    try {
+      const res = await fetch('/api/profile', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      })
+      if (res.ok) toast.success('Profile updated!')
+      else { const d = await res.json().catch(() => ({})); toast.error(d.error ?? 'Failed') }
+    } catch {
+      toast.error('Could not reach the server. Check your connection and try again.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const initials = form.name ? form.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) : profile.email[0].toUpperCase()

@@ -6,6 +6,8 @@ import {
 import { toast } from '@/store/appStore'
 import { financialYearOf } from '@/lib/ca/financialYear'
 import { todayInCountry } from '@/lib/locale/countries'
+import { trackEvent } from '@/components/analytics/PostHogProvider'
+import { EVENTS, safeProps } from '@/lib/analytics/events'
 
 /* ─── Types ───────────────────────────────────────────────────── */
 
@@ -82,6 +84,7 @@ function AddClientModal({ onClose, onCreated }: AddClientModalProps) {
       if (!res.ok) throw new Error('Failed to create client')
       const json = await res.json()
       const client: Client = json.data ?? json
+      trackEvent(EVENTS.CLIENT_CREATED, safeProps({ source: 'ca_client_setup' }))
       toast.success('Client created')
       onCreated(client)
     } catch {

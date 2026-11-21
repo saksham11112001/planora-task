@@ -64,14 +64,21 @@ export function MembersView({
     e.preventDefault()
     if (!email.trim()) return
     setSending(true)
-    const res = await fetch('/api/team', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email.trim(), role }),
-    })
-    const data = await res.json()
-    setSending(false)
-    if (res.ok) { toast.success(data.message ?? 'Invitation sent!'); setEmail(''); startT(() => router.refresh()) }
-    else toast.error(data.error ?? 'Failed to invite')
+    try {
+      const res = await fetch('/api/team', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), role }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) { toast.success(data.message ?? 'Invitation sent!'); setEmail(''); startT(() => router.refresh()) }
+      else toast.error(data.error ?? 'Failed to invite')
+    } catch {
+      toast.error('Could not reach the server. Check your connection and try again.')
+    } finally {
+      // In finally: a throw above used to skip this and leave the invite
+      // button disabled on "Sending…" for the rest of the session.
+      setSending(false)
+    }
   }
 
   async function changeRole(memberId: string, newRole: string) {

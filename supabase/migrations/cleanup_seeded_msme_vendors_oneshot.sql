@@ -2,8 +2,9 @@
 -- MSME seeded-vendor cleanup — SINGLE SCRIPT, nothing to fill in.
 --
 -- Paste the whole file into the Supabase SQL editor and run it once.
--- It finds the org itself, checks its own assumptions, soft-deletes the
--- seeded vendors, and prints what it did.
+-- It targets SAKSHAM TEST ORG by id, checks its own assumptions, soft-deletes
+-- the seeded vendors there, and prints what it did. It refuses to run against
+-- any organisation whose name does not say "test".
 --
 -- WHY THE REVIEW STILL MATTERS
 -- The rule matches an address SHAPE. A real supplier who happens to use
@@ -39,19 +40,19 @@ create table if not exists _seeded_vendor_cleanup_log (
 -- ── The rule, and the org, both derived from the data itself ───────────────
 create or replace view _seeded_vendor_review as
 with target_org as (
-  -- The org is identified by addresses from the firm's own bounce export,
-  -- not by name: two orgs can be called something similar, but only one
-  -- holds these particular vendors.
-  select org_id
-  from msme_vendors
-  where is_deleted = false
-    and vendor_email in ('contact@shreesteel.com',
-                         'omsbilling@timesgroup.com',
-                         'accounts@ambikaagroproducts.com',
-                         'customersupport@icicilombard.com')
-  group by org_id
-  order by count(*) desc
-  limit 1
+  -- SAKSHAM TEST ORG, named explicitly.
+  --
+  -- This was inferred from marker addresses at first, and the guard refused
+  -- to run because two orgs held them. It was right to: the seeded vendors
+  -- are in this test org, while the markers that looked like the same dataset
+  -- (Times Internet, ICICI Lombard) are REAL vendors belonging to a live
+  -- client, Secret Niko Foods LLP. Inferring would eventually have picked a
+  -- real firm and soft-deleted its vendors.
+  --
+  -- A single id cannot be ambiguous, so it is written here rather than
+  -- derived. Change it only to clean a different org, and only after
+  -- confirming that org's vendors really are seeded.
+  select 'f61f633b-df90-4849-bd47-5970c7a53cc1'::uuid as org_id
 ),
 v as (
   select
@@ -122,25 +123,35 @@ declare
   n_active     int;
   n_delete     int;
   n_protected  int;
+  org_name     text;
   n_done       int;
   bad          text;
 begin
   select count(*) into n_orgs
-  from (select org_id from msme_vendors
-        where is_deleted = false
-          and vendor_email in ('contact@shreesteel.com','omsbilling@timesgroup.com',
-                               'accounts@ambikaagroproducts.com','customersupport@icicilombard.com')
-        group by org_id having count(*) >= 2) x;
+  from organisations where id = 'f61f633b-df90-4849-bd47-5970c7a53cc1'::uuid;
 
   if n_orgs = 0 then
     raise exception
-      'Found no organisation holding the expected vendors. Nothing changed. '
-      'Either the cleanup already ran, or this is the wrong database.';
+      'Target organisation not found. Nothing changed — wrong database, or the '
+      'id has changed.';
   end if;
-  if n_orgs > 1 then
+
+  -- THE GUARD THAT MATTERS. This script deletes vendors wholesale, which is
+  -- only ever acceptable in a test organisation. If the id is ever edited to
+  -- point at a live client, this stops it.
+  --
+  -- It exists because the first version inferred the org from vendor
+  -- addresses and would eventually have chosen a real firm: the markers it
+  -- matched on included Times Internet and ICICI Lombard, which turned out to
+  -- be genuine vendors of a live client, not part of the seeded set.
+  select name into org_name
+  from organisations where id = 'f61f633b-df90-4849-bd47-5970c7a53cc1'::uuid;
+
+  if org_name !~* 'test' then
     raise exception
-      'Found % organisations holding these vendors, so the target is ambiguous. '
-      'Nothing changed — tell Claude and use the step-by-step script instead.', n_orgs;
+      'Target organisation is "%", which does not look like a test org. '
+      'Refusing to bulk-delete vendors from what may be a real client. '
+      'Nothing changed.', org_name;
   end if;
 
   select count(*)                                    into n_active   from _seeded_vendor_review;
@@ -160,16 +171,21 @@ begin
     raise exception 'A known-real vendor was caught by the rule (%). Nothing changed.', bad;
   end if;
 
-  -- Never empty the list. If almost everything matches, the rule is wrong.
-  if n_active > 0 and n_delete::numeric / n_active > 0.95 then
+  -- The "never empty the list" and "no real vendor present" checks that stood
+  -- here have been REMOVED, not relaxed.
+  --
+  -- Both assumed a live client's vendor list, where a rule matching nearly
+  -- everything means the rule is broken. In a test organisation the opposite
+  -- holds: almost every vendor IS seeded, so those checks would have blocked
+  -- the one job this script now has. A guard that fires on correct input
+  -- trains people to work around guards.
+  --
+  -- The org-name check above replaces them and is stricter about the thing
+  -- that actually matters: this cannot run against a real client at all.
+  if n_delete > 500 then
     raise exception
-      'Rule matched % of % vendors (over 95%%), which cannot be right. Nothing changed.',
-      n_delete, n_active;
-  end if;
-
-  if n_protected = 0 and n_delete > 0 then
-    raise exception
-      'No known-real vendor found in this org, so this may be the wrong one. Nothing changed.';
+      'Rule matched % vendors, far more than this job should ever touch. '
+      'Nothing changed.', n_delete;
   end if;
 
   raise notice 'Checks passed: % active, % to delete, % protected.', n_active, n_delete, n_protected;

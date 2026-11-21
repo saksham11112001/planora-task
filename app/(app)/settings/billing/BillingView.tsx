@@ -258,19 +258,36 @@ export function BillingView({ orgName, currentPlan, status, subscriptionId, tria
           name: 'upFloat', description: 'Professional Setup & Onboarding',
           image: '/favicon.svg', prefill: { name: orgName },
           theme: { color: '#f97316' },
+          // This callback runs OUTSIDE the try/catch above — Razorpay invokes
+          // it itself, so a throw in here was caught by nothing. The money has
+          // already left the customer's account by this point; only the
+          // verification call is in doubt. A silent failure here left the
+          // button spinning after a successful payment, which invites paying
+          // twice.
           handler: async (response: any) => {
-            const verifyRes = await fetch('/api/settings/billing/setup-fee/verify', {
-              method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(response),
-            })
-            if (verifyRes.ok) {
-              toast.success('Setup fee paid! Our team will reach out within 24 hours.')
-              setSetupPaid(true)
-            } else {
-              const d = await verifyRes.json()
-              toast.error(d.error ?? 'Payment verification failed. Contact support.')
+            try {
+              const verifyRes = await fetch('/api/settings/billing/setup-fee/verify', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(response),
+              })
+              if (verifyRes.ok) {
+                toast.success('Setup fee paid! Our team will reach out within 24 hours.')
+                setSetupPaid(true)
+              } else {
+                const d = await verifyRes.json().catch(() => ({}))
+                toast.error(d.error ?? 'Payment verification failed. Contact support.')
+              }
+            } catch {
+              // Deliberately explicit that the payment probably SUCCEEDED.
+              // Telling someone "something went wrong" after their card has
+              // been charged is how a support ticket becomes a double charge.
+              toast.error(
+                'Your payment went through, but we could not confirm it from this device. ' +
+                'Please do not pay again — refresh in a minute, and contact support if it still shows unpaid.',
+              )
+            } finally {
+              setSetupLoading(false)
             }
-            setSetupLoading(false)
           },
           modal: { ondismiss: () => setSetupLoading(false) },
         }
